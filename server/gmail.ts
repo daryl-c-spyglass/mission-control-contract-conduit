@@ -83,6 +83,7 @@ export async function createPropertyLabel(propertyAddress: string): Promise<stri
 }
 
 // Create a filter to automatically label emails containing the property address
+// Note: This requires the gmail.settings.basic scope which may not be available
 export async function createPropertyFilter(propertyAddress: string, labelId: string): Promise<string | null> {
   try {
     const gmail = await getUncachableGmailClient();
@@ -103,14 +104,23 @@ export async function createPropertyFilter(propertyAddress: string, labelId: str
     });
     
     return filterResponse.data.id || null;
-  } catch (error) {
+  } catch (error: any) {
+    // Check if it's a permissions error
+    if (error?.status === 403 || error?.code === 403) {
+      console.warn('Gmail filter creation requires gmail.settings.basic scope. Label was created but filter needs manual setup.');
+      return 'SCOPE_MISSING';
+    }
     console.error('Error creating Gmail filter:', error);
     return null;
   }
 }
 
 // Combined function to set up Gmail for a transaction
-export async function setupGmailForTransaction(propertyAddress: string): Promise<{ labelId: string | null; filterId: string | null }> {
+export async function setupGmailForTransaction(propertyAddress: string): Promise<{ 
+  labelId: string | null; 
+  filterId: string | null;
+  filterNeedsManualSetup?: boolean;
+}> {
   const labelId = await createPropertyLabel(propertyAddress);
   
   if (!labelId) {
@@ -118,6 +128,11 @@ export async function setupGmailForTransaction(propertyAddress: string): Promise
   }
   
   const filterId = await createPropertyFilter(propertyAddress, labelId);
+  
+  // Check if filter creation failed due to missing scope
+  if (filterId === 'SCOPE_MISSING') {
+    return { labelId, filterId: null, filterNeedsManualSetup: true };
+  }
   
   return { labelId, filterId };
 }

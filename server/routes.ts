@@ -106,16 +106,30 @@ export async function registerRoutes(
         try {
           const gmailResult = await setupGmailForTransaction(transaction.propertyAddress);
           
-          if (gmailResult.filterId) {
-            await storage.updateTransaction(transaction.id, {
-              gmailFilterId: gmailResult.filterId,
-            });
-            
-            await storage.createActivity({
-              transactionId: transaction.id,
-              type: "filter_created",
-              description: `Gmail label and filter created for "${transaction.propertyAddress}"`,
-            });
+          if (gmailResult.labelId) {
+            if (gmailResult.filterId) {
+              await storage.updateTransaction(transaction.id, {
+                gmailFilterId: gmailResult.filterId,
+              });
+              
+              await storage.createActivity({
+                transactionId: transaction.id,
+                type: "filter_created",
+                description: `Gmail label and filter created for "${transaction.propertyAddress}"`,
+              });
+            } else if (gmailResult.filterNeedsManualSetup) {
+              await storage.createActivity({
+                transactionId: transaction.id,
+                type: "label_created",
+                description: `Gmail label created for "${transaction.propertyAddress}". Filter requires manual setup in Gmail settings.`,
+              });
+            } else {
+              await storage.createActivity({
+                transactionId: transaction.id,
+                type: "label_created",
+                description: `Gmail label created for "${transaction.propertyAddress}"`,
+              });
+            }
           }
         } catch (gmailError) {
           console.error("Gmail setup error:", gmailError);
