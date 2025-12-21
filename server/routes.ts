@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, insertCoordinatorSchema } from "@shared/schema";
+import { setupGmailForTransaction } from "./gmail";
 
 // Helper to generate a slug from address
 function generateSlackChannelName(address: string): string {
@@ -76,21 +77,25 @@ export async function registerRoutes(
         }
       }
 
-      // Simulate Gmail filter creation if requested
+      // Create Gmail label and filter if requested
       if (createGmailFilter) {
-        const gmailSetting = await storage.getIntegrationSetting("gmail");
-        
-        if (gmailSetting?.isConnected) {
-          // In a real implementation, we would call Gmail API here
-          await storage.updateTransaction(transaction.id, {
-            gmailFilterId: `filter_${Date.now()}`,
-          });
+        try {
+          const gmailResult = await setupGmailForTransaction(transaction.propertyAddress);
           
-          await storage.createActivity({
-            transactionId: transaction.id,
-            type: "filter_created",
-            description: `Gmail filter created for "${transaction.propertyAddress}"`,
-          });
+          if (gmailResult.filterId) {
+            await storage.updateTransaction(transaction.id, {
+              gmailFilterId: gmailResult.filterId,
+            });
+            
+            await storage.createActivity({
+              transactionId: transaction.id,
+              type: "filter_created",
+              description: `Gmail label and filter created for "${transaction.propertyAddress}"`,
+            });
+          }
+        } catch (gmailError) {
+          console.error("Gmail setup error:", gmailError);
+          // Continue without Gmail - don't fail the transaction
         }
       }
 
