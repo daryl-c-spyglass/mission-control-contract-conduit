@@ -1,8 +1,144 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Transaction status enum
+export const transactionStatuses = ["in_contract", "pending_inspection", "clear_to_close", "closed", "cancelled"] as const;
+export type TransactionStatus = typeof transactionStatuses[number];
+
+// Transactions table
+export const transactions = pgTable("transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  propertyAddress: text("property_address").notNull(),
+  mlsNumber: text("mls_number"),
+  status: text("status").notNull().default("in_contract"),
+  contractDate: text("contract_date"),
+  closingDate: text("closing_date"),
+  listPrice: integer("list_price"),
+  salePrice: integer("sale_price"),
+  bedrooms: integer("bedrooms"),
+  bathrooms: integer("bathrooms"),
+  sqft: integer("sqft"),
+  yearBuilt: integer("year_built"),
+  propertyType: text("property_type"),
+  slackChannelId: text("slack_channel_id"),
+  slackChannelName: text("slack_channel_name"),
+  gmailFilterId: text("gmail_filter_id"),
+  fubClientId: text("fub_client_id"),
+  fubClientName: text("fub_client_name"),
+  fubClientEmail: text("fub_client_email"),
+  fubClientPhone: text("fub_client_phone"),
+  coordinatorIds: text("coordinator_ids").array(),
+  mlsData: jsonb("mls_data"),
+  cmaData: jsonb("cma_data"),
+  propertyImages: text("property_images").array(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Transaction coordinators
+export const coordinators = pgTable("coordinators", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  slackUserId: text("slack_user_id"),
+  avatarUrl: text("avatar_url"),
+  isActive: boolean("is_active").default(true),
+});
+
+// Integration settings
+export const integrationSettings = pgTable("integration_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  integrationType: text("integration_type").notNull(), // slack, gmail, repliers, fub
+  isConnected: boolean("is_connected").default(false),
+  apiKey: text("api_key"),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  metadata: jsonb("metadata"),
+  lastSyncAt: timestamp("last_sync_at"),
+});
+
+// Activity timeline for transactions
+export const activities = pgTable("activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  transactionId: varchar("transaction_id").notNull(),
+  type: text("type").notNull(), // channel_created, filter_created, mls_fetched, coordinator_added, status_changed
+  description: text("description").notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Insert schemas
+export const insertTransactionSchema = createInsertSchema(transactions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCoordinatorSchema = createInsertSchema(coordinators).omit({
+  id: true,
+});
+
+export const insertIntegrationSettingsSchema = createInsertSchema(integrationSettings).omit({
+  id: true,
+});
+
+export const insertActivitySchema = createInsertSchema(activities).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Types
+export type Transaction = typeof transactions.$inferSelect;
+export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+
+export type Coordinator = typeof coordinators.$inferSelect;
+export type InsertCoordinator = z.infer<typeof insertCoordinatorSchema>;
+
+export type IntegrationSetting = typeof integrationSettings.$inferSelect;
+export type InsertIntegrationSetting = z.infer<typeof insertIntegrationSettingsSchema>;
+
+export type Activity = typeof activities.$inferSelect;
+export type InsertActivity = z.infer<typeof insertActivitySchema>;
+
+// CMA Comparable type
+export interface CMAComparable {
+  address: string;
+  price: number;
+  bedrooms: number;
+  bathrooms: number;
+  sqft: number;
+  daysOnMarket: number;
+  distance: number;
+  imageUrl?: string;
+}
+
+// MLS Data type
+export interface MLSData {
+  listingId: string;
+  listDate: string;
+  listPrice: number;
+  propertyType: string;
+  bedrooms: number;
+  bathrooms: number;
+  sqft: number;
+  lotSize?: number;
+  yearBuilt: number;
+  garage?: number;
+  pool?: boolean;
+  description?: string;
+  features?: string[];
+  images?: string[];
+  agent?: {
+    name: string;
+    phone: string;
+    email: string;
+    brokerage: string;
+  };
+}
+
+// Users table (keeping for auth compatibility)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
