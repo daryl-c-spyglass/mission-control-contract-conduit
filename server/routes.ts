@@ -3,6 +3,10 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, insertCoordinatorSchema } from "@shared/schema";
 import { setupGmailForTransaction } from "./gmail";
+import { createSlackChannel, inviteUsersToChannel } from "./slack";
+import { fetchMLSListing, fetchSimilarListings } from "./repliers";
+import { searchFUBContacts } from "./fub";
+import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 
 // Helper to generate a slug from address
 function generateSlackChannelName(address: string): string {
@@ -17,9 +21,13 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Set up authentication (BEFORE other routes)
+  await setupAuth(app);
+  registerAuthRoutes(app);
+
   // ============ Transactions ============
 
-  app.get("/api/transactions", async (req, res) => {
+  app.get("/api/transactions", isAuthenticated, async (req, res) => {
     try {
       const transactions = await storage.getTransactions();
       res.json(transactions);
@@ -28,7 +36,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/transactions/:id", async (req, res) => {
+  app.get("/api/transactions/:id", isAuthenticated, async (req, res) => {
     try {
       const transaction = await storage.getTransaction(req.params.id);
       if (!transaction) {
@@ -40,7 +48,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions", async (req, res) => {
+  app.post("/api/transactions", isAuthenticated, async (req, res) => {
     try {
       const { createSlackChannel, createGmailFilter, fetchMlsData, ...transactionData } = req.body;
       
@@ -57,23 +65,39 @@ export async function registerRoutes(
         description: `Transaction created for ${transaction.propertyAddress}`,
       });
 
-      // Simulate Slack channel creation if requested
-      if (createSlackChannel) {
-        const channelName = generateSlackChannelName(transaction.propertyAddress);
-        const slackSetting = await storage.getIntegrationSetting("slack");
-        
-        if (slackSetting?.isConnected) {
-          // In a real implementation, we would call Slack API here
+      // Create real Slack channel if requested
+      if (createSlackChannel && process.env.SLACK_BOT_TOKEN) {
+        try {
+          const channelName = generateSlackChannelName(transaction.propertyAddress);
+          const slackResult = await createSlackChannel(channelName);
+          
           await storage.updateTransaction(transaction.id, {
-            slackChannelId: `C${Date.now()}`,
-            slackChannelName: channelName,
+            slackChannelId: slackResult.channelId,
+            slackChannelName: slackResult.channelName,
           });
           
           await storage.createActivity({
             transactionId: transaction.id,
             type: "channel_created",
-            description: `Slack channel #${channelName} created`,
+            description: `Slack channel #${slackResult.channelName} created`,
           });
+
+          // Invite coordinators if they have Slack user IDs
+          if (transaction.coordinatorIds && transaction.coordinatorIds.length > 0) {
+            const coordsWithSlack = await Promise.all(
+              transaction.coordinatorIds.map(id => storage.getCoordinator(id))
+            );
+            const slackUserIds = coordsWithSlack
+              .filter(c => c?.slackUserId)
+              .map(c => c!.slackUserId!);
+            
+            if (slackUserIds.length > 0) {
+              await inviteUsersToChannel(slackResult.channelId, slackUserIds);
+            }
+          }
+        } catch (slackError) {
+          console.error("Slack channel creation error:", slackError);
+          // Continue without Slack - don't fail the transaction
         }
       }
 
@@ -99,71 +123,34 @@ export async function registerRoutes(
         }
       }
 
-      // Simulate MLS data fetch if requested
-      if (fetchMlsData && transaction.mlsNumber) {
-        const repliersSetting = await storage.getIntegrationSetting("repliers");
-        
-        if (repliersSetting?.isConnected) {
-          // In a real implementation, we would call Repliers API here
-          // For now, generate mock MLS data
-          const mockMlsData = {
-            listingId: transaction.mlsNumber,
-            listDate: transaction.contractDate || new Date().toISOString(),
-            listPrice: transaction.listPrice || 400000,
-            propertyType: transaction.propertyType || "Single Family",
-            bedrooms: transaction.bedrooms || 3,
-            bathrooms: transaction.bathrooms || 2,
-            sqft: transaction.sqft || 1800,
-            yearBuilt: transaction.yearBuilt || 2015,
-            description: "Beautiful home in a great neighborhood with modern amenities and updates throughout.",
-            agent: {
-              name: "Jane Realtor",
-              phone: "(555) 555-5555",
-              email: "jane@realtyco.com",
-              brokerage: "Premier Realty",
-            },
-          };
-
-          const mockCmaData = [
-            {
-              address: "125 Oak Street",
-              price: 440000,
-              bedrooms: 3,
-              bathrooms: 2,
-              sqft: 1750,
-              daysOnMarket: 15,
-              distance: 0.2,
-            },
-            {
-              address: "130 Oak Street",
-              price: 455000,
-              bedrooms: 3,
-              bathrooms: 2,
-              sqft: 1900,
-              daysOnMarket: 22,
-              distance: 0.3,
-            },
-            {
-              address: "200 Elm Drive",
-              price: 425000,
-              bedrooms: 3,
-              bathrooms: 2,
-              sqft: 1700,
-              daysOnMarket: 8,
-              distance: 0.5,
-            },
-          ];
-
-          await storage.updateTransaction(transaction.id, {
-            mlsData: mockMlsData,
-            cmaData: mockCmaData,
-          });
+      // Fetch real MLS data if requested
+      if (fetchMlsData && transaction.mlsNumber && process.env.REPLIERS_API_KEY) {
+        try {
+          const mlsData = await fetchMLSListing(transaction.mlsNumber);
+          const cmaData = await fetchSimilarListings(transaction.mlsNumber);
           
-          await storage.createActivity({
-            transactionId: transaction.id,
-            type: "mls_fetched",
-            description: "MLS data and CMA comparables loaded",
-          });
+          if (mlsData) {
+            await storage.updateTransaction(transaction.id, {
+              mlsData: mlsData,
+              cmaData: cmaData,
+              propertyImages: mlsData.images || [],
+              bedrooms: mlsData.bedrooms || transaction.bedrooms,
+              bathrooms: mlsData.bathrooms || transaction.bathrooms,
+              sqft: mlsData.sqft || transaction.sqft,
+              yearBuilt: mlsData.yearBuilt || transaction.yearBuilt,
+              propertyType: mlsData.propertyType || transaction.propertyType,
+              listPrice: mlsData.listPrice || transaction.listPrice,
+            });
+            
+            await storage.createActivity({
+              transactionId: transaction.id,
+              type: "mls_fetched",
+              description: "MLS data and CMA comparables loaded from Repliers",
+            });
+          }
+        } catch (mlsError) {
+          console.error("MLS data fetch error:", mlsError);
+          // Continue without MLS - don't fail the transaction
         }
       }
 
@@ -176,7 +163,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/transactions/:id", async (req, res) => {
+  app.patch("/api/transactions/:id", isAuthenticated, async (req, res) => {
     try {
       const transaction = await storage.updateTransaction(req.params.id, req.body);
       if (!transaction) {
@@ -188,7 +175,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/transactions/:id", async (req, res) => {
+  app.delete("/api/transactions/:id", isAuthenticated, async (req, res) => {
     try {
       const deleted = await storage.deleteTransaction(req.params.id);
       if (!deleted) {
@@ -200,7 +187,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions/:id/refresh-mls", async (req, res) => {
+  app.post("/api/transactions/:id/refresh-mls", isAuthenticated, async (req, res) => {
     try {
       const transaction = await storage.getTransaction(req.params.id);
       if (!transaction) {
@@ -283,7 +270,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/transactions/:id/activities", async (req, res) => {
+  app.get("/api/transactions/:id/activities", isAuthenticated, async (req, res) => {
     try {
       const activities = await storage.getActivitiesByTransaction(req.params.id);
       res.json(activities);
@@ -294,7 +281,7 @@ export async function registerRoutes(
 
   // ============ Coordinators ============
 
-  app.get("/api/coordinators", async (req, res) => {
+  app.get("/api/coordinators", isAuthenticated, async (req, res) => {
     try {
       const coordinators = await storage.getCoordinators();
       res.json(coordinators);
@@ -303,7 +290,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/coordinators", async (req, res) => {
+  app.post("/api/coordinators", isAuthenticated, async (req, res) => {
     try {
       const validatedData = insertCoordinatorSchema.parse(req.body);
       const coordinator = await storage.createCoordinator(validatedData);
@@ -313,7 +300,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/coordinators/:id", async (req, res) => {
+  app.delete("/api/coordinators/:id", isAuthenticated, async (req, res) => {
     try {
       const deleted = await storage.deleteCoordinator(req.params.id);
       if (!deleted) {
@@ -327,7 +314,7 @@ export async function registerRoutes(
 
   // ============ Integrations ============
 
-  app.get("/api/integrations", async (req, res) => {
+  app.get("/api/integrations", isAuthenticated, async (req, res) => {
     try {
       const settings = await storage.getIntegrationSettings();
       // Don't expose API keys in full
@@ -343,7 +330,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/integrations/:type", async (req, res) => {
+  app.post("/api/integrations/:type", isAuthenticated, async (req, res) => {
     try {
       const { type } = req.params;
       const { apiKey } = req.body;
@@ -367,7 +354,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/integrations/:type/test", async (req, res) => {
+  app.post("/api/integrations/:type/test", isAuthenticated, async (req, res) => {
     try {
       const { type } = req.params;
       const setting = await storage.getIntegrationSetting(type);
@@ -386,6 +373,27 @@ export async function registerRoutes(
       res.json({ success: true, message: "Connection successful" });
     } catch (error) {
       res.status(500).json({ message: "Connection test failed" });
+    }
+  });
+
+  // ============ FUB Client Search ============
+
+  app.get("/api/fub/search", isAuthenticated, async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query || query.length < 2) {
+        return res.json([]);
+      }
+
+      if (!process.env.FUB_API_KEY) {
+        return res.status(400).json({ message: "FUB API key not configured" });
+      }
+
+      const contacts = await searchFUBContacts(query);
+      res.json(contacts);
+    } catch (error) {
+      console.error("FUB search error:", error);
+      res.status(500).json({ message: "Failed to search FUB contacts" });
     }
   });
 

@@ -8,6 +8,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Building2, LogOut, Loader2 } from "lucide-react";
 import Dashboard from "@/pages/dashboard";
 import Archive from "@/pages/archive";
 import Integrations from "@/pages/integrations";
@@ -15,8 +20,51 @@ import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import type { Transaction } from "@shared/schema";
 
-function AppContent() {
+function LandingPage() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-4 p-3 rounded-lg bg-primary/10 w-fit">
+            <Building2 className="h-10 w-10 text-primary" />
+          </div>
+          <CardTitle className="text-2xl">Mission Control</CardTitle>
+          <CardDescription>
+            Real estate transaction management for your brokerage. Track deals from contract to close.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button
+            className="w-full"
+            size="lg"
+            onClick={() => window.location.href = "/api/login"}
+            data-testid="button-login"
+          >
+            Sign in to continue
+          </Button>
+          <p className="text-xs text-center text-muted-foreground">
+            Sign in with your Google, GitHub, or email account
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+function AuthenticatedApp() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const { user, logout, isLoggingOut } = useAuth();
 
   const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
@@ -37,7 +85,31 @@ function AppContent() {
         <div className="flex flex-col flex-1 min-w-0">
           <header className="flex items-center justify-between gap-4 p-3 border-b bg-background sticky top-0 z-50">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <ThemeToggle />
+            <div className="flex items-center gap-3">
+              {user && (
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-7 w-7">
+                    <AvatarImage src={user.profileImageUrl || undefined} />
+                    <AvatarFallback>
+                      {user.firstName?.[0] || user.email?.[0]?.toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm hidden sm:inline">
+                    {user.firstName || user.email}
+                  </span>
+                </div>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => logout()}
+                disabled={isLoggingOut}
+                data-testid="button-logout"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+              <ThemeToggle />
+            </div>
           </header>
           <main className="flex-1 overflow-auto p-6">
             <div className="max-w-7xl mx-auto">
@@ -59,6 +131,20 @@ function AppContent() {
       </div>
     </SidebarProvider>
   );
+}
+
+function AppContent() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  if (!isAuthenticated) {
+    return <LandingPage />;
+  }
+
+  return <AuthenticatedApp />;
 }
 
 function App() {
