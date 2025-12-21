@@ -50,7 +50,7 @@ export async function registerRoutes(
 
   app.post("/api/transactions", isAuthenticated, async (req, res) => {
     try {
-      const { createSlackChannel, createGmailFilter, fetchMlsData, ...transactionData } = req.body;
+      const { createSlackChannel: shouldCreateSlack, createGmailFilter, fetchMlsData, ...transactionData } = req.body;
       
       // Validate the transaction data
       const validatedData = insertTransactionSchema.parse(transactionData);
@@ -66,7 +66,7 @@ export async function registerRoutes(
       });
 
       // Create real Slack channel if requested
-      if (createSlackChannel && process.env.SLACK_BOT_TOKEN) {
+      if (shouldCreateSlack && process.env.SLACK_BOT_TOKEN) {
         try {
           const channelName = generateSlackChannelName(transaction.propertyAddress);
           const slackResult = await createSlackChannel(channelName);
@@ -194,69 +194,37 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
 
-      const repliersSetting = await storage.getIntegrationSetting("repliers");
-      if (!repliersSetting?.isConnected) {
-        return res.status(400).json({ message: "Repliers integration not connected" });
+      if (!process.env.REPLIERS_API_KEY) {
+        return res.status(400).json({ message: "Repliers API key not configured" });
       }
 
-      // In a real implementation, we would call Repliers API here
-      // For now, generate mock MLS data
-      const mockMlsData = {
-        listingId: transaction.mlsNumber || `MLS${Date.now()}`,
-        listDate: transaction.contractDate || new Date().toISOString(),
-        listPrice: transaction.listPrice || 400000,
-        propertyType: transaction.propertyType || "Single Family",
-        bedrooms: transaction.bedrooms || 3,
-        bathrooms: transaction.bathrooms || 2,
-        sqft: transaction.sqft || 1800,
-        yearBuilt: transaction.yearBuilt || 2015,
-        lotSize: 6500,
-        garage: 2,
-        pool: false,
-        description: "Beautiful home in a great neighborhood with modern amenities and updates throughout. Features include hardwood floors, granite countertops, and a spacious backyard.",
-        features: ["Hardwood Floors", "Granite Counters", "Stainless Appliances", "Central A/C"],
-        agent: {
-          name: "Jane Realtor",
-          phone: "(555) 555-5555",
-          email: "jane@realtyco.com",
-          brokerage: "Premier Realty",
-        },
-      };
+      // Fetch real MLS data using address or MLS number
+      let mlsData = null;
+      let cmaData = null;
 
-      const mockCmaData = [
-        {
-          address: "125 Oak Street",
-          price: 440000,
-          bedrooms: 3,
-          bathrooms: 2,
-          sqft: 1750,
-          daysOnMarket: 15,
-          distance: 0.2,
-        },
-        {
-          address: "130 Oak Street",
-          price: 455000,
-          bedrooms: 3,
-          bathrooms: 2,
-          sqft: 1900,
-          daysOnMarket: 22,
-          distance: 0.3,
-        },
-        {
-          address: "200 Elm Drive",
-          price: 425000,
-          bedrooms: 3,
-          bathrooms: 2,
-          sqft: 1700,
-          daysOnMarket: 8,
-          distance: 0.5,
-        },
-      ];
+      if (transaction.mlsNumber) {
+        mlsData = await fetchMLSListing(transaction.mlsNumber);
+        cmaData = await fetchSimilarListings(transaction.mlsNumber);
+      }
 
-      const updated = await storage.updateTransaction(req.params.id, {
-        mlsData: mockMlsData,
-        cmaData: mockCmaData,
-      });
+      const updateData: any = {};
+      
+      if (mlsData) {
+        updateData.mlsData = mlsData;
+        updateData.propertyImages = mlsData.images || [];
+        if (mlsData.bedrooms) updateData.bedrooms = mlsData.bedrooms;
+        if (mlsData.bathrooms) updateData.bathrooms = mlsData.bathrooms;
+        if (mlsData.sqft) updateData.sqft = mlsData.sqft;
+        if (mlsData.yearBuilt) updateData.yearBuilt = mlsData.yearBuilt;
+        if (mlsData.propertyType) updateData.propertyType = mlsData.propertyType;
+        if (mlsData.listPrice) updateData.listPrice = mlsData.listPrice;
+      }
+      
+      if (cmaData) {
+        updateData.cmaData = cmaData;
+      }
+
+      const updated = await storage.updateTransaction(req.params.id, updateData);
 
       await storage.createActivity({
         transactionId: transaction.id,
