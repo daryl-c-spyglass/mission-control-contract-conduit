@@ -10,6 +10,7 @@ export type TransactionStatus = typeof transactionStatuses[number];
 // Transactions table
 export const transactions = pgTable("transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"), // The agent who created this transaction
   propertyAddress: text("property_address").notNull(),
   mlsNumber: text("mls_number"),
   status: text("status").notNull().default("in_contract"),
