@@ -6,7 +6,7 @@ import { setupGmailForTransaction } from "./gmail";
 import { createSlackChannel, inviteUsersToChannel } from "./slack";
 import { fetchMLSListing, fetchSimilarListings } from "./repliers";
 import { searchFUBContacts } from "./fub";
-import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
 
 // Helper to generate a slug from address
 function generateSlackChannelName(address: string): string {
@@ -48,12 +48,18 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions", isAuthenticated, async (req, res) => {
+  app.post("/api/transactions", isAuthenticated, async (req: any, res) => {
     try {
       const { createSlackChannel: shouldCreateSlack, createGmailFilter, fetchMlsData, ...transactionData } = req.body;
       
-      // Validate the transaction data
-      const validatedData = insertTransactionSchema.parse(transactionData);
+      // Get the current user's ID
+      const userId = req.user?.claims?.sub;
+      
+      // Validate the transaction data and add userId
+      const validatedData = insertTransactionSchema.parse({
+        ...transactionData,
+        userId,
+      });
       
       // Create the transaction
       const transaction = await storage.createTransaction(validatedData);
@@ -82,18 +88,30 @@ export async function registerRoutes(
             description: `Slack channel #${slackResult.channelName} created`,
           });
 
-          // Invite coordinators if they have Slack user IDs
+          // Collect all Slack user IDs to invite (agent + coordinators)
+          const slackUserIdsToInvite: string[] = [];
+          
+          // Add the creating agent's Slack ID if they have one
+          if (userId) {
+            const agent = await authStorage.getUser(userId);
+            if (agent?.slackUserId) {
+              slackUserIdsToInvite.push(agent.slackUserId);
+            }
+          }
+          
+          // Add coordinators' Slack IDs
           if (transaction.coordinatorIds && transaction.coordinatorIds.length > 0) {
             const coordsWithSlack = await Promise.all(
               transaction.coordinatorIds.map(id => storage.getCoordinator(id))
             );
-            const slackUserIds = coordsWithSlack
+            coordsWithSlack
               .filter(c => c?.slackUserId)
-              .map(c => c!.slackUserId!);
-            
-            if (slackUserIds.length > 0) {
-              await inviteUsersToChannel(slackResult.channelId, slackUserIds);
-            }
+              .forEach(c => slackUserIdsToInvite.push(c!.slackUserId!));
+          }
+          
+          // Invite all users to the channel
+          if (slackUserIdsToInvite.length > 0) {
+            await inviteUsersToChannel(slackResult.channelId, slackUserIdsToInvite);
           }
         } catch (slackError) {
           console.error("Slack channel creation error:", slackError);

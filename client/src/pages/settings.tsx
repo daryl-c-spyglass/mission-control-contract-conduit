@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Trash2, Loader2, UserPlus } from "lucide-react";
+import { Plus, Trash2, Loader2, UserPlus, Save } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Dialog,
   DialogContent,
@@ -30,8 +31,10 @@ import type { Coordinator } from "@shared/schema";
 
 export default function Settings() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [deleteCoordinator, setDeleteCoordinator] = useState<Coordinator | null>(null);
+  const [mySlackUserId, setMySlackUserId] = useState("");
   const [newCoordinator, setNewCoordinator] = useState({
     name: "",
     email: "",
@@ -39,8 +42,32 @@ export default function Settings() {
     slackUserId: "",
   });
 
+  useEffect(() => {
+    if (user?.slackUserId) {
+      setMySlackUserId(user.slackUserId);
+    }
+  }, [user]);
+
   const { data: coordinators = [], isLoading } = useQuery<Coordinator[]>({
     queryKey: ["/api/coordinators"],
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: { slackUserId: string }) => {
+      const res = await apiRequest("PATCH", "/api/auth/profile", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Profile updated", description: "Your Slack User ID has been saved." });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update profile",
+        variant: "destructive",
+      });
+    },
   });
 
   const addMutation = useMutation({
@@ -101,6 +128,44 @@ export default function Settings() {
           Manage your team and preferences
         </p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Slack Settings</CardTitle>
+          <CardDescription>
+            Connect your Slack account to be automatically invited to transaction channels
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-end gap-4 flex-wrap">
+            <div className="flex-1 min-w-[200px] space-y-2">
+              <Label htmlFor="mySlackId">Your Slack User ID</Label>
+              <Input
+                id="mySlackId"
+                placeholder="U01234567"
+                value={mySlackUserId}
+                onChange={(e) => setMySlackUserId(e.target.value)}
+                data-testid="input-my-slack-id"
+              />
+              <p className="text-xs text-muted-foreground">
+                Find your ID: In Slack, click your profile, then "..." menu, then "Copy member ID"
+              </p>
+            </div>
+            <Button
+              onClick={() => updateProfileMutation.mutate({ slackUserId: mySlackUserId })}
+              disabled={updateProfileMutation.isPending}
+              data-testid="button-save-slack-id"
+            >
+              {updateProfileMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Save
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
