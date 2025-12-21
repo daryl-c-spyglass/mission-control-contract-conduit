@@ -95,7 +95,7 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Create New Transaction</DialogTitle>
           <DialogDescription>
@@ -104,7 +104,7 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 overflow-y-auto flex-1 pr-2">
             <FormField
               control={form.control}
               name="propertyAddress"
@@ -289,7 +289,7 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
               />
             </div>
 
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-3 pt-4 pb-2 sticky bottom-0 bg-background border-t mt-4">
               <Button
                 type="button"
                 variant="outline"
