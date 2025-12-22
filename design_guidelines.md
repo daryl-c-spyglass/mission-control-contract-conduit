@@ -3,8 +3,23 @@
 ## Design Approach
 
 **Selected Approach:** Design System - Modern Productivity Dashboard
-**Primary References:** Linear (clean hierarchy), Notion (flexible layouts), Asana (workflow clarity)
+**Primary References:** Spyglass Realty Mission Control suite, Linear (clean hierarchy), Notion (flexible layouts)
 **Rationale:** This is a data-dense productivity tool requiring clarity, efficiency, and professional polish over visual flair.
+
+## Color System - Spyglass Realty Theme
+
+**Primary (Orange/Coral):** `hsl(22 90% 55%)` - Used for primary actions, buttons, and important CTAs
+**Success (Green):** `hsl(142 60% 45%)` - Used for positive states, completed items, charts
+**Warning (Amber):** `hsl(45 90% 55%)` - Used for attention items, alerts
+**Destructive (Red):** `hsl(0 84% 50%)` - Used for errors and delete actions
+
+**Sidebar:** Dark charcoal `hsl(30 8% 18%)` with light text `hsl(40 10% 95%)`
+**Background:** Warm off-white `hsl(40 20% 96%)`
+**Cards:** Pure white `hsl(0 0% 100%)` on the warm background
+**Text:** Dark warm gray `hsl(30 10% 15%)`
+**Muted Text:** Medium gray `hsl(30 5% 45%)`
+
+**Key Principle:** Dark sidebar creates a consistent navigation anchor while the light content area keeps data scannable and professional.
 
 ## Core Design Principles
 
