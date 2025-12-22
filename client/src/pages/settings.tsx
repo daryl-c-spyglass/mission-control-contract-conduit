@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Trash2, Loader2, UserPlus, Save } from "lucide-react";
+import { Plus, Trash2, Loader2, UserPlus, Save, Mail, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -163,6 +163,49 @@ export default function Settings() {
               )}
               Save
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-red-500/10">
+              <Mail className="h-5 w-5 text-red-500" />
+            </div>
+            <div>
+              <CardTitle>Gmail Integration</CardTitle>
+              <CardDescription>
+                Connect your Gmail to automatically create labels for properties
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Gmail integration uses OAuth to securely access your email. When you create a transaction, 
+              a label will be created for that property address.
+            </p>
+            <div className="flex items-center gap-4 flex-wrap">
+              <Button
+                onClick={() => window.open("/__replit/integrations/google-mail", "_blank")}
+                className="gap-2"
+                data-testid="button-connect-gmail"
+              >
+                <Mail className="h-4 w-4" />
+                Connect Gmail
+              </Button>
+              <a 
+                href="https://mail.google.com/mail/u/0/#settings/labels" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-sm text-muted-foreground flex items-center gap-1"
+              >
+                <ExternalLink className="h-3 w-3" />
+                Manage Gmail Labels
+              </a>
+            </div>
           </div>
         </CardContent>
       </Card>

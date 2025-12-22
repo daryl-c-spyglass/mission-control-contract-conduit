@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
-import { Home, Archive, Settings, Plug, Plus, Building2 } from "lucide-react";
+import { Home, Archive, Settings, Shield, Plus, Building2 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Sidebar,
   SidebarContent,
@@ -22,16 +23,25 @@ interface AppSidebarProps {
   onCreateTransaction: () => void;
 }
 
-const navItems = [
+const baseNavItems = [
   { title: "Transactions", url: "/", icon: Home },
   { title: "Archive", url: "/archive", icon: Archive },
-  { title: "Integrations", url: "/integrations", icon: Plug },
   { title: "Settings", url: "/settings", icon: Settings },
+];
+
+const adminNavItems = [
+  { title: "Admin", url: "/admin", icon: Shield },
 ];
 
 export function AppSidebar({ transactions, onCreateTransaction }: AppSidebarProps) {
   const [location] = useLocation();
+  const { user } = useAuth();
   const activeCount = transactions.filter(t => t.status !== "closed" && t.status !== "cancelled").length;
+  
+  // Combine nav items, adding Admin if user is admin
+  const navItems = user?.isAdmin === "true"
+    ? [...baseNavItems, ...adminNavItems]
+    : baseNavItems;
 
   return (
     <Sidebar>

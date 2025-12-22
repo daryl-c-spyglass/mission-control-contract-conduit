@@ -319,6 +319,29 @@ export async function registerRoutes(
     }
   });
 
+  // ============ Admin ============
+
+  app.get("/api/admin/integration-status", isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is admin
+      const userId = req.user?.claims?.sub;
+      const user = await authStorage.getUser(userId);
+      
+      if (user?.isAdmin !== "true") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Check which API keys are configured
+      res.json({
+        slack: !!process.env.SLACK_BOT_TOKEN,
+        repliers: !!process.env.REPLIERS_API_KEY,
+        fub: !!process.env.FUB_API_KEY,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get integration status" });
+    }
+  });
+
   // ============ Follow Up Boss ============
 
   app.get("/api/fub/contact-from-url", isAuthenticated, async (req, res) => {

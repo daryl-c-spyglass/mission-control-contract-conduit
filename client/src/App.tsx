@@ -15,8 +15,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Building2, LogOut, Loader2 } from "lucide-react";
 import Dashboard from "@/pages/dashboard";
 import Archive from "@/pages/archive";
-import Integrations from "@/pages/integrations";
 import Settings from "@/pages/settings";
+import Admin from "@/pages/admin";
 import NotFound from "@/pages/not-found";
 import type { Transaction } from "@shared/schema";
 
@@ -121,8 +121,8 @@ function AuthenticatedApp() {
                   />
                 </Route>
                 <Route path="/archive" component={Archive} />
-                <Route path="/integrations" component={Integrations} />
                 <Route path="/settings" component={Settings} />
+                <Route path="/admin" component={Admin} />
                 <Route component={NotFound} />
               </Switch>
             </div>
