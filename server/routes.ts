@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, insertCoordinatorSchema } from "@shared/schema";
 import { setupGmailForTransaction } from "./gmail";
-import { createSlackChannel, inviteUsersToChannel } from "./slack";
+import { createSlackChannel, inviteUsersToChannel, postToChannel } from "./slack";
 import { fetchMLSListing, fetchSimilarListings } from "./repliers";
 import { searchFUBContacts, getFUBContact } from "./fub";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
@@ -90,11 +90,13 @@ export async function registerRoutes(
 
           // Collect all Slack user IDs to invite (agent + coordinators)
           const slackUserIdsToInvite: string[] = [];
+          let agentSlackUserId: string | null = null;
           
           // Add the creating agent's Slack ID if they have one
           if (userId) {
             const agent = await authStorage.getUser(userId);
             if (agent?.slackUserId) {
+              agentSlackUserId = agent.slackUserId;
               slackUserIdsToInvite.push(agent.slackUserId);
             }
           }
@@ -113,6 +115,11 @@ export async function registerRoutes(
           if (slackUserIdsToInvite.length > 0) {
             await inviteUsersToChannel(slackResult.channelId, slackUserIdsToInvite);
           }
+
+          // Post welcome message to the channel mentioning the agent
+          const agentMention = agentSlackUserId ? `<@${agentSlackUserId}>` : req.user?.claims?.first_name || "An agent";
+          const welcomeMessage = `New transaction channel created for *${transaction.propertyAddress}*\n\n${agentMention} has started this transaction.${transaction.closingDate ? ` Closing date: ${transaction.closingDate}` : ""}`;
+          await postToChannel(slackResult.channelId, welcomeMessage);
         } catch (slackError) {
           console.error("Slack channel creation error:", slackError);
           // Continue without Slack - don't fail the transaction
