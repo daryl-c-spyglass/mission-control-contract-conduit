@@ -201,6 +201,7 @@ export default function Settings() {
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-sm text-muted-foreground flex items-center gap-1"
+                data-testid="link-gmail-labels"
               >
                 <ExternalLink className="h-3 w-3" />
                 Manage Gmail Labels
