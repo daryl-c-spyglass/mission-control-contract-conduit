@@ -176,7 +176,7 @@ export default function Settings() {
             <div>
               <CardTitle>Gmail Integration</CardTitle>
               <CardDescription>
-                Connect your Gmail to automatically create labels for properties
+                Automatic email routing to Slack channels
               </CardDescription>
             </div>
           </div>
@@ -184,29 +184,23 @@ export default function Settings() {
         <CardContent>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Gmail integration uses OAuth to securely access your email. When you create a transaction, 
-              a label will be created for that property address.
+              When you create a transaction, Mission Control automatically creates a Gmail filter for that property address. 
+              Any emails containing the address will be labeled and forwarded to the Slack channel.
             </p>
-            <div className="flex items-center gap-4 flex-wrap">
-              <Button
-                onClick={() => window.open("/__replit/integrations/google-mail", "_blank")}
-                className="gap-2"
-                data-testid="button-connect-gmail"
-              >
-                <Mail className="h-4 w-4" />
-                Connect Gmail
-              </Button>
-              <a 
-                href="https://mail.google.com/mail/u/0/#settings/labels" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-sm text-muted-foreground flex items-center gap-1"
-                data-testid="link-gmail-labels"
-              >
-                <ExternalLink className="h-3 w-3" />
-                Manage Gmail Labels
-              </a>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <span className="text-sm">Managed by your administrator</span>
             </div>
+            <a 
+              href="https://mail.google.com/mail/u/0/#settings/labels" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-sm text-muted-foreground flex items-center gap-1"
+              data-testid="link-gmail-labels"
+            >
+              <ExternalLink className="h-3 w-3" />
+              View your Gmail Labels
+            </a>
           </div>
         </CardContent>
       </Card>
