@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, insertCoordinatorSchema } from "@shared/schema";
-import { setupGmailForTransaction } from "./gmail";
+import { setupGmailForTransaction, isGmailConfigured, getNewMessages } from "./gmail";
 import { createSlackChannel, inviteUsersToChannel, postToChannel } from "./slack";
 import { fetchMLSListing, fetchSimilarListings } from "./repliers";
 import { searchFUBContacts, getFUBContact } from "./fub";
@@ -129,32 +129,41 @@ export async function registerRoutes(
       // Create Gmail label and filter if requested
       if (createGmailFilter) {
         try {
-          const gmailResult = await setupGmailForTransaction(transaction.propertyAddress);
+          // Get the agent's email for Gmail API impersonation
+          const agent = userId ? await authStorage.getUser(userId) : null;
+          const agentEmail = agent?.email;
           
-          if (gmailResult.labelId) {
-            if (gmailResult.filterId) {
-              await storage.updateTransaction(transaction.id, {
-                gmailFilterId: gmailResult.filterId,
-              });
-              
-              await storage.createActivity({
-                transactionId: transaction.id,
-                type: "filter_created",
-                description: `Gmail label and filter created for "${transaction.propertyAddress}"`,
-              });
-            } else if (gmailResult.filterNeedsManualSetup) {
-              await storage.createActivity({
-                transactionId: transaction.id,
-                type: "label_created",
-                description: `Gmail label created for "${transaction.propertyAddress}". Filter requires manual setup in Gmail settings.`,
-              });
-            } else {
-              await storage.createActivity({
-                transactionId: transaction.id,
-                type: "label_created",
-                description: `Gmail label created for "${transaction.propertyAddress}"`,
-              });
+          if (agentEmail) {
+            const gmailResult = await setupGmailForTransaction(transaction.propertyAddress, agentEmail);
+            
+            if (gmailResult.labelId) {
+              if (gmailResult.filterId) {
+                await storage.updateTransaction(transaction.id, {
+                  gmailFilterId: gmailResult.filterId,
+                  gmailLabelId: gmailResult.labelId,
+                });
+                
+                await storage.createActivity({
+                  transactionId: transaction.id,
+                  type: "filter_created",
+                  description: `Gmail label and filter created for "${transaction.propertyAddress}"`,
+                });
+              } else if (gmailResult.filterNeedsManualSetup) {
+                await storage.createActivity({
+                  transactionId: transaction.id,
+                  type: "label_created",
+                  description: `Gmail label created for "${transaction.propertyAddress}". Filter requires manual setup in Gmail settings.`,
+                });
+              } else {
+                await storage.createActivity({
+                  transactionId: transaction.id,
+                  type: "label_created",
+                  description: `Gmail label created for "${transaction.propertyAddress}"`,
+                });
+              }
             }
+          } else {
+            console.log("Skipping Gmail filter: agent email not available");
           }
         } catch (gmailError) {
           console.error("Gmail setup error:", gmailError);
@@ -336,6 +345,7 @@ export async function registerRoutes(
         slack: !!process.env.SLACK_BOT_TOKEN,
         repliers: !!process.env.REPLIERS_API_KEY,
         fub: !!process.env.FUB_API_KEY,
+        gmail: isGmailConfigured(),
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to get integration status" });
@@ -455,6 +465,76 @@ export async function registerRoutes(
     } catch (error) {
       console.error("FUB search error:", error);
       res.status(500).json({ message: "Failed to search FUB contacts" });
+    }
+  });
+
+  // ============ Gmail Pub/Sub Webhook ============
+
+  // Store processed message IDs to avoid duplicates (in production, use Redis/DB)
+  const processedMessageIds = new Set<string>();
+
+  app.post("/api/webhooks/gmail", async (req, res) => {
+    try {
+      // Pub/Sub sends base64 encoded message data
+      const message = req.body.message;
+      if (!message?.data) {
+        return res.status(400).json({ message: "Invalid Pub/Sub message" });
+      }
+
+      // Decode the message
+      const decoded = Buffer.from(message.data, "base64").toString("utf-8");
+      const notification = JSON.parse(decoded);
+      
+      // notification contains: { emailAddress, historyId }
+      const userEmail = notification.emailAddress;
+      const historyId = notification.historyId;
+      
+      if (!userEmail || !historyId) {
+        return res.status(200).json({ message: "No email data in notification" });
+      }
+
+      // Find transactions for this user that have Gmail labels
+      const transactions = await storage.getTransactions();
+      const userTransactions = transactions.filter(t => 
+        t.userId && t.gmailLabelId && t.slackChannelId
+      );
+
+      // For each transaction with a Gmail label, check for new messages
+      for (const txn of userTransactions) {
+        try {
+          // Get the user who owns this transaction
+          const owner = await authStorage.getUser(txn.userId!);
+          if (owner?.email !== userEmail) continue;
+          
+          const messages = await getNewMessages(userEmail, historyId, txn.gmailLabelId!);
+          
+          for (const msg of messages) {
+            // Skip if already processed
+            if (processedMessageIds.has(msg.id)) continue;
+            processedMessageIds.add(msg.id);
+            
+            // Keep set size manageable
+            if (processedMessageIds.size > 10000) {
+              const iterator = processedMessageIds.values();
+              for (let i = 0; i < 5000; i++) {
+                const next = iterator.next();
+                if (next.value) processedMessageIds.delete(next.value);
+              }
+            }
+            
+            // Post to Slack channel
+            const slackMessage = `*New email related to ${txn.propertyAddress}*\n\n*From:* ${msg.from}\n*Subject:* ${msg.subject}\n\n${msg.snippet}...`;
+            await postToChannel(txn.slackChannelId!, slackMessage);
+          }
+        } catch (err) {
+          console.error("Error processing transaction emails:", err);
+        }
+      }
+
+      res.status(200).json({ message: "Processed" });
+    } catch (error) {
+      console.error("Gmail webhook error:", error);
+      res.status(200).json({ message: "Error processed" }); // Return 200 to prevent retries
     }
   });
 

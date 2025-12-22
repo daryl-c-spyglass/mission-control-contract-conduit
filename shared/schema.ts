@@ -26,6 +26,7 @@ export const transactions = pgTable("transactions", {
   slackChannelId: text("slack_channel_id"),
   slackChannelName: text("slack_channel_name"),
   gmailFilterId: text("gmail_filter_id"),
+  gmailLabelId: text("gmail_label_id"),
   fubClientId: text("fub_client_id"),
   fubClientName: text("fub_client_name"),
   fubClientEmail: text("fub_client_email"),

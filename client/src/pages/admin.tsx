@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Shield, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
+import { Loader2, Shield, CheckCircle2, XCircle, ExternalLink, Mail } from "lucide-react";
 import { SiSlack } from "react-icons/si";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ interface IntegrationStatus {
   slack: boolean;
   repliers: boolean;
   fub: boolean;
+  gmail: boolean;
 }
 
 export default function Admin() {
@@ -60,6 +61,16 @@ export default function Admin() {
       configured: status?.slack ?? false,
       secretName: "SLACK_BOT_TOKEN",
       docsUrl: "https://api.slack.com/apps",
+    },
+    {
+      id: "gmail",
+      name: "Gmail (Domain-wide)",
+      description: "Auto-create filters to label and route property emails to Slack",
+      icon: <Mail className="h-5 w-5 text-red-500" />,
+      iconBg: "bg-red-500/10",
+      configured: status?.gmail ?? false,
+      secretName: "GOOGLE_SERVICE_ACCOUNT_JSON",
+      docsUrl: "https://developers.google.com/gmail/api/guides/domain-wide-delegation",
     },
     {
       id: "repliers",
