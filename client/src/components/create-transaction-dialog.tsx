@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, User, Check } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +20,11 @@ import {
   FormMessage,
   FormDescription,
 } from "@/components/ui/form";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -32,12 +38,24 @@ const formSchema = z.object({
   contractDate: z.string().optional(),
   closingDate: z.string().optional(),
   coordinatorIds: z.array(z.string()).default([]),
+  fubClientId: z.string().optional(),
+  fubClientName: z.string().optional(),
+  fubClientEmail: z.string().optional(),
+  fubClientPhone: z.string().optional(),
   createSlackChannel: z.boolean().default(true),
   createGmailFilter: z.boolean().default(true),
   fetchMlsData: z.boolean().default(true),
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+interface FUBContact {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+}
 
 interface CreateTransactionDialogProps {
   open: boolean;
@@ -46,6 +64,9 @@ interface CreateTransactionDialogProps {
 
 export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactionDialogProps) {
   const { toast } = useToast();
+  const [fubUrl, setFubUrl] = useState("");
+  const [fubExpanded, setFubExpanded] = useState(false);
+  const [fubContact, setFubContact] = useState<FUBContact | null>(null);
 
   const { data: coordinators = [] } = useQuery<Coordinator[]>({
     queryKey: ["/api/coordinators"],
@@ -60,9 +81,43 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
       contractDate: "",
       closingDate: "",
       coordinatorIds: [],
+      fubClientId: "",
+      fubClientName: "",
+      fubClientEmail: "",
+      fubClientPhone: "",
       createSlackChannel: true,
       createGmailFilter: true,
       fetchMlsData: true,
+    },
+  });
+
+  const pullFubMutation = useMutation({
+    mutationFn: async (url: string) => {
+      const res = await fetch(`/api/fub/contact-from-url?url=${encodeURIComponent(url)}`);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to fetch contact");
+      }
+      return res.json() as Promise<FUBContact>;
+    },
+    onSuccess: (contact) => {
+      setFubContact(contact);
+      const fullName = `${contact.firstName} ${contact.lastName}`.trim();
+      form.setValue("fubClientId", String(contact.id));
+      form.setValue("fubClientName", fullName);
+      form.setValue("fubClientEmail", contact.email || "");
+      form.setValue("fubClientPhone", contact.phone || "");
+      toast({
+        title: "Client details loaded",
+        description: `Loaded information for ${fullName}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -78,6 +133,9 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
       });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       form.reset();
+      setFubUrl("");
+      setFubContact(null);
+      setFubExpanded(false);
       onOpenChange(false);
     },
     onError: (error: Error) => {
@@ -144,6 +202,59 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                 </FormItem>
               )}
             />
+
+            <Collapsible open={fubExpanded} onOpenChange={setFubExpanded}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full justify-between text-primary"
+                  data-testid="button-toggle-fub"
+                >
+                  Pull lead details from Follow Up Boss
+                  {fubExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 pt-2">
+                <div className="flex items-end gap-2 flex-wrap">
+                  <div className="flex-1 min-w-[200px] space-y-2">
+                    <Input
+                      placeholder="Paste Follow Up Boss lead URL, e.g. https://yourteam.followupboss.com/2/people/view/123456"
+                      value={fubUrl}
+                      onChange={(e) => setFubUrl(e.target.value)}
+                      data-testid="input-fub-url"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => pullFubMutation.mutate(fubUrl)}
+                    disabled={pullFubMutation.isPending || !fubUrl}
+                    data-testid="button-pull-fub"
+                  >
+                    {pullFubMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Pull Details"
+                    )}
+                  </Button>
+                </div>
+
+                {fubContact && (
+                  <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50 border">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                      <User className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">{form.watch("fubClientName")}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {form.watch("fubClientEmail")} {form.watch("fubClientPhone") && `| ${form.watch("fubClientPhone")}`}
+                      </p>
+                    </div>
+                    <Check className="h-5 w-5 text-green-600" />
+                  </div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
 
             <div className="grid grid-cols-2 gap-4">
               <FormField

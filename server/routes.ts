@@ -5,7 +5,7 @@ import { insertTransactionSchema, insertCoordinatorSchema } from "@shared/schema
 import { setupGmailForTransaction } from "./gmail";
 import { createSlackChannel, inviteUsersToChannel } from "./slack";
 import { fetchMLSListing, fetchSimilarListings } from "./repliers";
-import { searchFUBContacts } from "./fub";
+import { searchFUBContacts, getFUBContact } from "./fub";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
 
 // Helper to generate a slug from address
@@ -309,6 +309,37 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete coordinator" });
+    }
+  });
+
+  // ============ Follow Up Boss ============
+
+  app.get("/api/fub/contact-from-url", isAuthenticated, async (req, res) => {
+    try {
+      const { url } = req.query;
+      
+      if (!url || typeof url !== "string") {
+        return res.status(400).json({ message: "URL is required" });
+      }
+      
+      // Extract contact ID from FUB URL
+      // Format: https://subdomain.followupboss.com/2/people/view/123456
+      const match = url.match(/\/people\/(?:view\/)?(\d+)/);
+      if (!match) {
+        return res.status(400).json({ message: "Invalid Follow Up Boss URL. Expected format: https://yourteam.followupboss.com/2/people/view/123456" });
+      }
+      
+      const contactId = parseInt(match[1], 10);
+      const contact = await getFUBContact(contactId);
+      
+      if (!contact) {
+        return res.status(404).json({ message: "Contact not found in Follow Up Boss" });
+      }
+      
+      res.json(contact);
+    } catch (error: any) {
+      console.error("FUB contact fetch error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch contact from Follow Up Boss" });
     }
   });
 
