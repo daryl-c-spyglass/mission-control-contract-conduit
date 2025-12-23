@@ -35,10 +35,9 @@ function getGmailClient(userEmail: string) {
     email: credentials.client_email,
     key: credentials.private_key,
     scopes: [
-      "https://www.googleapis.com/auth/gmail.readonly",
-      "https://www.googleapis.com/auth/gmail.modify",
       "https://www.googleapis.com/auth/gmail.labels",
       "https://www.googleapis.com/auth/gmail.settings.basic",
+      "https://www.googleapis.com/auth/gmail.readonly",
     ],
     subject: userEmail, // Impersonate this user via domain-wide delegation
   });
