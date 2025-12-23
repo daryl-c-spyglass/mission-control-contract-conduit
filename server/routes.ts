@@ -5,7 +5,7 @@ import { insertTransactionSchema, insertCoordinatorSchema } from "@shared/schema
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages } from "./gmail";
 import { createSlackChannel, inviteUsersToChannel, postToChannel } from "./slack";
 import { fetchMLSListing, fetchSimilarListings } from "./repliers";
-import { searchFUBContacts, getFUBContact } from "./fub";
+import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
 
 // Helper to generate a slug from address
@@ -458,7 +458,7 @@ export async function registerRoutes(
 
   // ============ FUB Client Search ============
 
-  app.get("/api/fub/search", isAuthenticated, async (req, res) => {
+  app.get("/api/fub/search", isAuthenticated, async (req: any, res) => {
     try {
       const query = req.query.q as string;
       if (!query || query.length < 2) {
@@ -469,7 +469,27 @@ export async function registerRoutes(
         return res.status(400).json({ message: "FUB API key not configured" });
       }
 
-      const contacts = await searchFUBContacts(query);
+      // Get the current user and their FUB user ID
+      const userId = req.user?.claims?.sub;
+      let fubUserId: string | undefined;
+      
+      if (userId) {
+        const user = await authStorage.getUser(userId);
+        
+        // If user doesn't have a FUB user ID cached, look it up
+        if (!user?.fubUserId && user?.email) {
+          const fubUser = await getFUBUserByEmail(user.email);
+          if (fubUser) {
+            await authStorage.updateUser(userId, { fubUserId: String(fubUser.id) });
+            fubUserId = String(fubUser.id);
+          }
+        } else if (user?.fubUserId) {
+          fubUserId = user.fubUserId;
+        }
+      }
+
+      // Search contacts - filter by assigned user if we have their FUB ID
+      const contacts = await searchFUBContactsByAssignedUser(query, fubUserId);
       res.json(contacts);
     } catch (error) {
       console.error("FUB search error:", error);
