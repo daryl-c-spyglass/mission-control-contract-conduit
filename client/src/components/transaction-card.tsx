@@ -127,6 +127,7 @@ export function TransactionCard({ transaction, coordinators, onClick }: Transact
               size="sm"
               variant="outline"
               className="gap-1.5"
+              onClick={() => window.open(`https://slack.com/app_redirect?channel=${transaction.slackChannelId}`, '_blank')}
               data-testid={`button-slack-${transaction.id}`}
             >
               <MessageSquare className="h-3.5 w-3.5" />
