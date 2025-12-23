@@ -129,7 +129,7 @@ export async function searchFUBContactsByAssignedUser(query: string, fubUserId?:
     };
     
     if (fubUserId) {
-      params.assignedUserId = fubUserId;
+      params.assignedTo = fubUserId;
     }
     
     const data = await fubRequest("/people", params);

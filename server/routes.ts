@@ -488,7 +488,14 @@ export async function registerRoutes(
         }
       }
 
-      // Search contacts - filter by assigned user if we have their FUB ID
+      // If we couldn't match the agent to a FUB user, return empty results
+      // This prevents agents from seeing contacts they don't own
+      if (!fubUserId) {
+        console.log("FUB search: No FUB user ID found for agent, returning empty results");
+        return res.json([]);
+      }
+
+      // Search contacts - filter by assigned user
       const contacts = await searchFUBContactsByAssignedUser(query, fubUserId);
       res.json(contacts);
     } catch (error) {
