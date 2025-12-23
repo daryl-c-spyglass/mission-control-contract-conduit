@@ -45,6 +45,8 @@ const formSchema = z.object({
   createSlackChannel: z.boolean().default(true),
   createGmailFilter: z.boolean().default(true),
   fetchMlsData: z.boolean().default(true),
+  onBehalfOfEmail: z.string().optional(),
+  onBehalfOfSlackId: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -73,6 +75,8 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
     enabled: open,
   });
 
+  const [onBehalfExpanded, setOnBehalfExpanded] = useState(false);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -88,6 +92,8 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
       createSlackChannel: true,
       createGmailFilter: true,
       fetchMlsData: true,
+      onBehalfOfEmail: "",
+      onBehalfOfSlackId: "",
     },
   });
 
@@ -335,6 +341,63 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                 )}
               />
             )}
+
+            <Collapsible open={onBehalfExpanded} onOpenChange={setOnBehalfExpanded}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full justify-between text-muted-foreground"
+                  data-testid="button-toggle-on-behalf"
+                >
+                  Creating on behalf of another agent?
+                  {onBehalfExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 pt-2">
+                <p className="text-xs text-muted-foreground">
+                  If you're creating this transaction for another agent, enter their details below. They'll be invited to the Slack channel and the Gmail filter will be set up for their inbox.
+                </p>
+                <FormField
+                  control={form.control}
+                  name="onBehalfOfEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Agent Email</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="agent@spyglassrealty.com"
+                          data-testid="input-on-behalf-email"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="onBehalfOfSlackId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Agent Slack User ID</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="U012ABC34DE"
+                          className="font-mono"
+                          data-testid="input-on-behalf-slack"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Find this by clicking on their profile in Slack, then "Copy member ID"
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CollapsibleContent>
+            </Collapsible>
 
             <div className="space-y-3 rounded-md border p-4 bg-muted/30">
               <p className="text-sm font-medium">Automatic Setup</p>

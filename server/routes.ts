@@ -50,7 +50,7 @@ export async function registerRoutes(
 
   app.post("/api/transactions", isAuthenticated, async (req: any, res) => {
     try {
-      const { createSlackChannel: shouldCreateSlack, createGmailFilter, fetchMlsData, ...transactionData } = req.body;
+      const { createSlackChannel: shouldCreateSlack, createGmailFilter, fetchMlsData, onBehalfOfEmail, onBehalfOfSlackId, ...transactionData } = req.body;
       
       // Get the current user's ID
       const userId = req.user?.claims?.sub;
@@ -92,11 +92,17 @@ export async function registerRoutes(
           const slackUserIdsToInvite: string[] = [];
           let agentSlackUserId: string | null = null;
           
-          // Add the creating agent's Slack ID if they have one
+          // If creating on behalf of another agent, use their Slack ID
+          if (onBehalfOfSlackId) {
+            agentSlackUserId = onBehalfOfSlackId;
+            slackUserIdsToInvite.push(onBehalfOfSlackId);
+          }
+          
+          // Also add the creating user's Slack ID if they have one
           if (userId) {
             const agent = await authStorage.getUser(userId);
-            if (agent?.slackUserId) {
-              agentSlackUserId = agent.slackUserId;
+            if (agent?.slackUserId && agent.slackUserId !== onBehalfOfSlackId) {
+              if (!agentSlackUserId) agentSlackUserId = agent.slackUserId;
               slackUserIdsToInvite.push(agent.slackUserId);
             }
           }
@@ -129,12 +135,15 @@ export async function registerRoutes(
       // Create Gmail label and filter if requested
       if (createGmailFilter) {
         try {
-          // Get the agent's email for Gmail API impersonation
-          const agent = userId ? await authStorage.getUser(userId) : null;
-          const agentEmail = agent?.email;
+          // Use onBehalfOfEmail if provided, otherwise use the logged-in agent's email
+          let targetEmail = onBehalfOfEmail;
+          if (!targetEmail && userId) {
+            const agent = await authStorage.getUser(userId);
+            targetEmail = agent?.email;
+          }
           
-          if (agentEmail) {
-            const gmailResult = await setupGmailForTransaction(transaction.propertyAddress, agentEmail);
+          if (targetEmail) {
+            const gmailResult = await setupGmailForTransaction(transaction.propertyAddress, targetEmail);
             
             if (gmailResult.labelId) {
               if (gmailResult.filterId) {
@@ -163,7 +172,7 @@ export async function registerRoutes(
               }
             }
           } else {
-            console.log("Skipping Gmail filter: agent email not available");
+            console.log("Skipping Gmail filter: no email available (neither onBehalfOfEmail nor logged-in agent email)");
           }
         } catch (gmailError) {
           console.error("Gmail setup error:", gmailError);
