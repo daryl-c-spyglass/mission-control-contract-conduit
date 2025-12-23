@@ -43,6 +43,7 @@ export interface MLSListingData {
   propertyType: string;
   description: string;
   listDate: string;
+  status: string;
   images: string[];
   agent?: {
     name: string;
@@ -82,6 +83,7 @@ export async function fetchMLSListing(mlsNumber: string): Promise<MLSListingData
       propertyType: data.details?.propertyType || data.class || "Residential",
       description: data.details?.description || data.publicRemarks || "",
       listDate: data.listingDate || data.listDate || "",
+      status: data.status || data.listingStatus || "",
       images: data.images || data.photos?.map((p: any) => p.url) || [],
       agent: data.agent ? {
         name: data.agent.name || "",

@@ -181,6 +181,9 @@ export async function registerRoutes(
       }
 
       // Fetch real MLS data if requested
+      // Get the updated transaction to check for Slack channel
+      let currentTransaction = await storage.getTransaction(transaction.id);
+      
       if (fetchMlsData && transaction.mlsNumber && process.env.REPLIERS_API_KEY) {
         try {
           const mlsData = await fetchMLSListing(transaction.mlsNumber);
@@ -204,6 +207,48 @@ export async function registerRoutes(
               type: "mls_fetched",
               description: "MLS data and CMA comparables loaded from Repliers",
             });
+
+            // Post MLS listing info to Slack channel if it exists and listing is active/pending
+            // Use exact matching (normalized to lowercase) to avoid false positives
+            const activeStatuses = new Set([
+              "active", "a", 
+              "active under contract", "active-under-contract", "auc", "ac",
+              "pending", "p", "pnd",
+              "coming soon", "cs"
+            ]);
+            const normalizedStatus = mlsData.status?.toLowerCase().trim() || "";
+            const isActiveListing = activeStatuses.has(normalizedStatus);
+            
+            if (currentTransaction?.slackChannelId && isActiveListing) {
+              try {
+                const priceFormatted = mlsData.listPrice 
+                  ? `$${mlsData.listPrice.toLocaleString()}` 
+                  : "Price not listed";
+                
+                const listingMessage = [
+                  `:house: *MLS Listing Data*`,
+                  `*Address:* ${mlsData.address}${mlsData.city ? `, ${mlsData.city}` : ""}${mlsData.state ? `, ${mlsData.state}` : ""}`,
+                  `*MLS #:* ${mlsData.mlsNumber}`,
+                  `*Status:* ${mlsData.status}`,
+                  `*List Price:* ${priceFormatted}`,
+                  `*Beds:* ${mlsData.bedrooms || "N/A"} | *Baths:* ${mlsData.bathrooms || "N/A"} | *Sqft:* ${mlsData.sqft ? mlsData.sqft.toLocaleString() : "N/A"}`,
+                  mlsData.yearBuilt ? `*Year Built:* ${mlsData.yearBuilt}` : "",
+                  mlsData.propertyType ? `*Property Type:* ${mlsData.propertyType}` : "",
+                  mlsData.description ? `\n${mlsData.description.substring(0, 300)}${mlsData.description.length > 300 ? "..." : ""}` : "",
+                ].filter(Boolean).join("\n");
+                
+                await postToChannel(currentTransaction.slackChannelId, listingMessage);
+                
+                // Post first listing image if available
+                if (mlsData.images && mlsData.images.length > 0) {
+                  await postToChannel(currentTransaction.slackChannelId, mlsData.images[0]);
+                }
+              } catch (slackPostError) {
+                console.error("Error posting MLS data to Slack:", slackPostError);
+              }
+            } else if (currentTransaction?.slackChannelId && mlsData.status) {
+              console.log(`Skipping Slack post: listing status "${mlsData.status}" is not active/pending`);
+            }
           }
         } catch (mlsError) {
           console.error("MLS data fetch error:", mlsError);
