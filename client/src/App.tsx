@@ -21,6 +21,9 @@ import NotFound from "@/pages/not-found";
 import type { Transaction } from "@shared/schema";
 
 function LandingPage() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const error = urlParams.get("error");
+  
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background">
       <Card className="w-full max-w-md">
@@ -34,16 +37,21 @@ function LandingPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {error === "unauthorized_domain" && (
+            <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm text-center" data-testid="error-unauthorized">
+              Only @spyglassrealty.com accounts can sign in. Please use your company email.
+            </div>
+          )}
           <Button
             className="w-full"
             size="lg"
-            onClick={() => window.location.href = "/api/login"}
+            onClick={() => window.location.href = "/api/auth/google"}
             data-testid="button-login"
           >
-            Sign in to continue
+            Sign in with Google
           </Button>
           <p className="text-xs text-center text-muted-foreground">
-            Sign in with your Google, GitHub, or email account
+            Use your @spyglassrealty.com email to sign in
           </p>
         </CardContent>
       </Card>
