@@ -131,13 +131,23 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
 
         <div className="flex items-center gap-2 flex-wrap">
           {transaction.slackChannelId && (
-            <Button variant="outline" className="gap-2" data-testid="button-open-slack">
+            <Button 
+              variant="outline" 
+              className="gap-2" 
+              data-testid="button-open-slack"
+              onClick={() => window.open(`https://spyglassrealty.slack.com/archives/${transaction.slackChannelId}`, "_blank")}
+            >
               <MessageSquare className="h-4 w-4" />
               Open Slack
             </Button>
           )}
-          {transaction.gmailFilterId && (
-            <Button variant="outline" className="gap-2" data-testid="button-view-emails">
+          {transaction.gmailLabelId && (
+            <Button 
+              variant="outline" 
+              className="gap-2" 
+              data-testid="button-view-emails"
+              onClick={() => window.open(`https://mail.google.com/mail/u/0/#label/MC`, "_blank")}
+            >
               <Mail className="h-4 w-4" />
               View Emails
             </Button>
@@ -282,10 +292,17 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                       )}
                     </div>
                   </div>
-                  <Button variant="outline" className="gap-2" data-testid="button-view-fub">
-                    <ExternalLink className="h-4 w-4" />
-                    View in FUB
-                  </Button>
+                  {transaction.fubClientId && (
+                    <Button 
+                      variant="outline" 
+                      className="gap-2" 
+                      data-testid="button-view-fub"
+                      onClick={() => window.open(`https://spyglassrealty.followupboss.com/2/people/view/${transaction.fubClientId}`, "_blank")}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      View in FUB
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

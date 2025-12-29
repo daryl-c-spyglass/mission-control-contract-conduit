@@ -45,10 +45,28 @@ export async function createSlackChannel(name: string): Promise<{ channelId: str
 export async function inviteUsersToChannel(channelId: string, userIds: string[]): Promise<void> {
   if (userIds.length === 0) return;
 
-  await slackRequest("conversations.invite", {
-    channel: channelId,
-    users: userIds.join(","),
-  });
+  // Filter out empty/invalid user IDs
+  const validUserIds = userIds.filter(id => id && id.trim());
+  if (validUserIds.length === 0) return;
+
+  try {
+    await slackRequest("conversations.invite", {
+      channel: channelId,
+      users: validUserIds.join(","),
+    });
+  } catch (error: any) {
+    // Handle common cases where invite fails but isn't a real error
+    const errorMessage = error?.message || "";
+    if (errorMessage.includes("already_in_channel") || 
+        errorMessage.includes("is_archived") ||
+        errorMessage.includes("cant_invite_self")) {
+      console.log(`Slack invite non-fatal: ${errorMessage}`);
+      return;
+    }
+    // Re-throw other errors
+    console.error("Failed to invite users to Slack channel:", error);
+    throw error;
+  }
 }
 
 export async function postToChannel(channelId: string, text: string): Promise<void> {
