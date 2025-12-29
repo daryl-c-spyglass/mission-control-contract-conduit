@@ -8,13 +8,31 @@ import { fetchMLSListing, fetchSimilarListings } from "./repliers";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
 
-// Helper to generate a slug from address
-function generateSlackChannelName(address: string): string {
-  return address
+// Helper to generate a Slack channel name in format: uc_buy_propertyname_agentname or uc_sell_propertyname_agentname
+function generateSlackChannelName(address: string, transactionType: string = "buy", agentName: string = ""): string {
+  // Extract just the street address (e.g., "123 Main Street" from "123 Main Street, Austin, TX 78701")
+  const streetPart = address.split(",")[0] || address;
+  
+  // Clean and shorten the address (remove spaces and special chars)
+  const cleanAddress = streetPart
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, "")
-    .replace(/\s+/g, "-")
-    .substring(0, 80);
+    .replace(/[^a-z0-9]/g, "")
+    .substring(0, 20);
+  
+  // Clean the agent name (remove spaces and special chars)
+  const cleanAgentName = agentName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .substring(0, 20);
+  
+  // Format: uc_buy_123main_joeywilkes or uc_sell_123main_joeywilkes
+  const type = transactionType === "sell" ? "sell" : "buy";
+  
+  if (cleanAgentName) {
+    return `uc_${type}_${cleanAddress}_${cleanAgentName}`.substring(0, 80);
+  } else {
+    return `uc_${type}_${cleanAddress}`.substring(0, 80);
+  }
 }
 
 export async function registerRoutes(
@@ -50,7 +68,7 @@ export async function registerRoutes(
 
   app.post("/api/transactions", isAuthenticated, async (req: any, res) => {
     try {
-      const { createSlackChannel: shouldCreateSlack, createGmailFilter, fetchMlsData, onBehalfOfEmail, onBehalfOfSlackId, ...transactionData } = req.body;
+      const { createSlackChannel: shouldCreateSlack, createGmailFilter, fetchMlsData, onBehalfOfEmail, onBehalfOfSlackId, onBehalfOfName, ...transactionData } = req.body;
       
       // Get the current user's ID
       const userId = req.user?.claims?.sub;
@@ -74,7 +92,20 @@ export async function registerRoutes(
       // Create real Slack channel if requested
       if (shouldCreateSlack && process.env.SLACK_BOT_TOKEN) {
         try {
-          const channelName = generateSlackChannelName(transaction.propertyAddress);
+          // Determine the agent name for the channel
+          let agentName = onBehalfOfName || "";
+          if (!agentName && userId) {
+            const creator = await authStorage.getUser(userId);
+            if (creator) {
+              agentName = `${creator.firstName || ""} ${creator.lastName || ""}`.trim();
+            }
+          }
+          
+          const channelName = generateSlackChannelName(
+            transaction.propertyAddress,
+            transaction.transactionType,
+            agentName
+          );
           const slackResult = await createSlackChannel(channelName);
           
           await storage.updateTransaction(transaction.id, {

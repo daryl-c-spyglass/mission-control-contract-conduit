@@ -28,11 +28,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Coordinator } from "@shared/schema";
 
 const formSchema = z.object({
+  transactionType: z.enum(["buy", "sell"]).default("buy"),
   propertyAddress: z.string().min(5, "Please enter a valid property address"),
   mlsNumber: z.string().optional(),
   contractDate: z.string().optional(),
@@ -47,6 +55,7 @@ const formSchema = z.object({
   fetchMlsData: z.boolean().default(true),
   onBehalfOfEmail: z.string().optional(),
   onBehalfOfSlackId: z.string().optional(),
+  onBehalfOfName: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -80,6 +89,7 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      transactionType: "buy",
       propertyAddress: "",
       mlsNumber: "",
       contractDate: "",
@@ -94,6 +104,7 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
       fetchMlsData: true,
       onBehalfOfEmail: "",
       onBehalfOfSlackId: "",
+      onBehalfOfName: "",
     },
   });
 
@@ -169,6 +180,28 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 overflow-y-auto flex-1 pr-2">
+            <FormField
+              control={form.control}
+              name="transactionType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Our Agent Represents</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-transaction-type">
+                        <SelectValue placeholder="Select buyer or seller" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="buy">Buyer</SelectItem>
+                      <SelectItem value="sell">Seller</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="propertyAddress"
@@ -358,6 +391,26 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                 <p className="text-xs text-muted-foreground">
                   If you're creating this transaction for another agent, enter their details below. They'll be invited to the Slack channel and the Gmail filter will be set up for their inbox.
                 </p>
+                <FormField
+                  control={form.control}
+                  name="onBehalfOfName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Agent Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Joey Wilkes"
+                          data-testid="input-on-behalf-name"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Used for the Slack channel name
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   control={form.control}
                   name="onBehalfOfEmail"

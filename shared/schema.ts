@@ -7,10 +7,15 @@ import { z } from "zod";
 export const transactionStatuses = ["in_contract", "pending_inspection", "clear_to_close", "closed", "cancelled"] as const;
 export type TransactionStatus = typeof transactionStatuses[number];
 
+// Transaction type enum (buy/sell)
+export const transactionTypes = ["buy", "sell"] as const;
+export type TransactionType = typeof transactionTypes[number];
+
 // Transactions table
 export const transactions = pgTable("transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id"), // The agent who created this transaction
+  transactionType: text("transaction_type").notNull().default("buy"), // buy or sell
   propertyAddress: text("property_address").notNull(),
   mlsNumber: text("mls_number"),
   status: text("status").notNull().default("in_contract"),
