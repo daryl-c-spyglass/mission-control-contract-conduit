@@ -88,9 +88,10 @@ export async function registerRoutes(
             description: `Slack channel #${slackResult.channelName} created`,
           });
 
-          // Collect all Slack user IDs to invite (agent + coordinators)
+          // Collect all Slack user IDs to invite (agent + creator + coordinators)
           const slackUserIdsToInvite: string[] = [];
           let agentSlackUserId: string | null = null;
+          let creatorSlackUserId: string | null = null;
           
           // If creating on behalf of another agent, use their Slack ID
           if (onBehalfOfSlackId) {
@@ -100,10 +101,13 @@ export async function registerRoutes(
           
           // Also add the creating user's Slack ID if they have one
           if (userId) {
-            const agent = await authStorage.getUser(userId);
-            if (agent?.slackUserId && agent.slackUserId !== onBehalfOfSlackId) {
-              if (!agentSlackUserId) agentSlackUserId = agent.slackUserId;
-              slackUserIdsToInvite.push(agent.slackUserId);
+            const creator = await authStorage.getUser(userId);
+            if (creator?.slackUserId) {
+              creatorSlackUserId = creator.slackUserId;
+              if (creator.slackUserId !== onBehalfOfSlackId) {
+                slackUserIdsToInvite.push(creator.slackUserId);
+              }
+              if (!agentSlackUserId) agentSlackUserId = creator.slackUserId;
             }
           }
           
@@ -122,9 +126,19 @@ export async function registerRoutes(
             await inviteUsersToChannel(slackResult.channelId, slackUserIdsToInvite);
           }
 
-          // Post welcome message to the channel mentioning the agent
+          // Post welcome message mentioning the agent and creator
           const agentMention = agentSlackUserId ? `<@${agentSlackUserId}>` : req.user?.claims?.first_name || "An agent";
-          const welcomeMessage = `New transaction channel created for *${transaction.propertyAddress}*\n\n${agentMention} has started this transaction.${transaction.closingDate ? ` Closing date: ${transaction.closingDate}` : ""}`;
+          let welcomeMessage = `New transaction channel created for *${transaction.propertyAddress}*\n\n${agentMention} has started this transaction.`;
+          
+          // If someone else created it on behalf of the agent, mention them too
+          if (creatorSlackUserId && creatorSlackUserId !== agentSlackUserId) {
+            welcomeMessage += `\n\nCreated by <@${creatorSlackUserId}>`;
+          }
+          
+          if (transaction.closingDate) {
+            welcomeMessage += `\n\nClosing date: ${transaction.closingDate}`;
+          }
+          
           await postToChannel(slackResult.channelId, welcomeMessage);
         } catch (slackError) {
           console.error("Slack channel creation error:", slackError);
