@@ -1,4 +1,4 @@
-import { Calendar, ExternalLink, Hash, Mail, MessageSquare, Users } from "lucide-react";
+import { Calendar, ExternalLink, Hash, Mail, MessageSquare, Users, Image } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ interface TransactionCardProps {
   transaction: Transaction;
   coordinators: Coordinator[];
   onClick: () => void;
+  onMarketingClick?: () => void;
 }
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -36,7 +37,7 @@ function formatDate(dateString: string | null): string {
   });
 }
 
-export function TransactionCard({ transaction, coordinators, onClick }: TransactionCardProps) {
+export function TransactionCard({ transaction, coordinators, onClick, onMarketingClick }: TransactionCardProps) {
   const status = statusConfig[transaction.status] || statusConfig.in_contract;
   const daysRemaining = getDaysRemaining(transaction.closingDate);
   
@@ -145,7 +146,7 @@ export function TransactionCard({ transaction, coordinators, onClick }: Transact
               Emails
             </Button>
           )}
-          {transaction.mlsData && (
+          {transaction.mlsData ? (
             <Button
               size="sm"
               variant="outline"
@@ -154,6 +155,18 @@ export function TransactionCard({ transaction, coordinators, onClick }: Transact
             >
               <ExternalLink className="h-3.5 w-3.5" />
               MLS Sheet
+            </Button>
+          ) : null}
+          {onMarketingClick && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={onMarketingClick}
+              data-testid={`button-marketing-${transaction.id}`}
+            >
+              <Image className="h-3.5 w-3.5" />
+              Marketing
             </Button>
           )}
         </div>

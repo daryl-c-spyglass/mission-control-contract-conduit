@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TransactionCard } from "@/components/transaction-card";
 import { TransactionDetails } from "@/components/transaction-details";
 import { CreateTransactionDialog } from "@/components/create-transaction-dialog";
+import { MarketingMaterialsDialog } from "@/components/marketing-materials-dialog";
 import type { Transaction, Coordinator, Activity } from "@shared/schema";
 
 interface DashboardProps {
@@ -17,6 +18,7 @@ interface DashboardProps {
 
 export default function Dashboard({ createDialogOpen, setCreateDialogOpen }: DashboardProps) {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [marketingTransaction, setMarketingTransaction] = useState<Transaction | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
@@ -113,6 +115,7 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen }: Das
               transaction={transaction}
               coordinators={coordinators}
               onClick={() => setSelectedTransaction(transaction)}
+              onMarketingClick={() => setMarketingTransaction(transaction)}
             />
           ))}
         </div>
@@ -139,6 +142,14 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen }: Das
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
       />
+
+      {marketingTransaction && (
+        <MarketingMaterialsDialog
+          open={!!marketingTransaction}
+          onOpenChange={(open) => !open && setMarketingTransaction(null)}
+          transaction={marketingTransaction}
+        />
+      )}
     </div>
   );
 }
