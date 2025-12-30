@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { Download, Image as ImageIcon, FileText, Mail, ChevronLeft, ChevronRight, Loader2, Copy, Check } from "lucide-react";
+import { Download, Image as ImageIcon, FileText, Mail, ChevronLeft, ChevronRight, Loader2, Copy, Check, Upload } from "lucide-react";
 import type { Transaction } from "@shared/schema";
 
 interface MarketingMaterialsDialogProps {
@@ -34,6 +34,7 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
   const { toast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const squareCanvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [status, setStatus] = useState<StatusType>("just_listed");
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
@@ -41,15 +42,54 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
   const [generatedLandscape, setGeneratedLandscape] = useState<string | null>(null);
   const [generatedSquare, setGeneratedSquare] = useState<string | null>(null);
   const [emailCopied, setEmailCopied] = useState(false);
+  const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
 
   const propertyImages = transaction.propertyImages || [];
   const mlsImages = (transaction.mlsData as any)?.images || [];
-  const allImages = [...propertyImages, ...mlsImages].filter(Boolean);
+  const allImages = [...uploadedPhotos, ...propertyImages, ...mlsImages].filter(Boolean);
 
   const currentImage = allImages[selectedPhotoIndex] || null;
 
   const getStatusLabel = (statusValue: StatusType) => {
     return STATUS_OPTIONS.find(s => s.value === statusValue)?.label?.toUpperCase() || "JUST LISTED";
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith("image/")) {
+        toast({
+          title: "Invalid File",
+          description: "Please select an image file.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: "Please select an image under 10MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        setUploadedPhotos((prev) => [...prev, dataUrl]);
+        setSelectedPhotoIndex(0); // Select the newly uploaded photo
+        setGeneratedLandscape(null);
+        setGeneratedSquare(null);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Reset input to allow re-uploading the same file
+    e.target.value = "";
   };
 
   // Use proxied URL to avoid CORS issues with MLS images
@@ -438,7 +478,7 @@ Thank you for your interest!`;
             </div>
 
             <div className="space-y-2">
-              <Label>Property Photo ({selectedPhotoIndex + 1} of {allImages.length || 1})</Label>
+              <Label>Property Photo ({allImages.length > 0 ? `${selectedPhotoIndex + 1} of ${allImages.length}` : "None"})</Label>
               <div className="flex items-center gap-2">
                 <Button
                   size="icon"
@@ -450,7 +490,7 @@ Thank you for your interest!`;
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <div className="flex-1 text-center text-sm text-muted-foreground truncate">
-                  {allImages.length === 0 ? "No photos available" : "Use arrows to browse"}
+                  {allImages.length === 0 ? "Upload a photo" : "Use arrows to browse"}
                 </div>
                 <Button
                   size="icon"
@@ -462,6 +502,23 @@ Thank you for your interest!`;
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoUpload}
+                data-testid="input-photo-upload"
+              />
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => fileInputRef.current?.click()}
+                data-testid="button-upload-photo"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Photo
+              </Button>
             </div>
           </div>
 
