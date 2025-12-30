@@ -35,6 +35,7 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const squareCanvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
   
   const [status, setStatus] = useState<StatusType>("just_listed");
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
@@ -135,8 +136,13 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
 
       toast({
         title: "Graphics Generated",
-        description: "Your marketing graphics are ready to download.",
+        description: "Scroll down to see download options.",
       });
+
+      // Scroll to the results section
+      setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
     } catch (error) {
       console.error("Error generating graphics:", error);
       toast({
@@ -564,6 +570,7 @@ Thank you for your interest!`;
           </Button>
 
           {(generatedLandscape || generatedSquare) && (
+            <div ref={resultsRef}>
             <Tabs defaultValue="landscape" className="w-full">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="landscape" data-testid="tab-landscape">
@@ -653,6 +660,7 @@ Thank you for your interest!`;
                 </Card>
               </TabsContent>
             </Tabs>
+            </div>
           )}
         </div>
       </DialogContent>
