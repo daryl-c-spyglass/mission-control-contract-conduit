@@ -37,4 +37,31 @@ export function registerAuthRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to update profile" });
     }
   });
+
+  // First-time onboarding - set Slack ID and email consent
+  app.post("/api/user/onboarding", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { slackUserId, emailFilterConsent } = req.body;
+      
+      // Validate slackUserId
+      if (!slackUserId || typeof slackUserId !== "string") {
+        return res.status(400).json({ message: "Slack User ID is required" });
+      }
+      
+      // Sanitize Slack ID
+      const sanitizedSlackId = slackUserId.replace(/[^A-Z0-9]/gi, "");
+      
+      const updatedUser = await authStorage.updateUser(userId, {
+        slackUserId: sanitizedSlackId,
+        emailFilterConsent: emailFilterConsent === true,
+        hasCompletedOnboarding: true,
+      });
+      
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error completing onboarding:", error);
+      res.status(500).json({ message: "Failed to complete onboarding" });
+    }
+  });
 }

@@ -165,16 +165,36 @@ export async function registerRoutes(
           }
 
           // Post welcome message mentioning the agent and creator
-          const agentMention = agentSlackUserId ? `<@${agentSlackUserId}>` : req.user?.claims?.first_name || "An agent";
-          let welcomeMessage = `New transaction channel created for *${transaction.propertyAddress}*\n\n${agentMention} has started this transaction.`;
+          const agentMention = agentSlackUserId ? `<@${agentSlackUserId}>` : (agentName || "An agent");
+          let welcomeMessage = `Welcome to the new channel created for *${transaction.propertyAddress}*\n\n${agentMention} is the agent on this transaction.`;
           
           // If someone else created it on behalf of the agent, mention them too
           if (creatorSlackUserId && creatorSlackUserId !== agentSlackUserId) {
-            welcomeMessage += `\n\nCreated by <@${creatorSlackUserId}>`;
+            welcomeMessage += `\nCreated by <@${creatorSlackUserId}>`;
           }
           
           if (transaction.closingDate) {
-            welcomeMessage += `\n\nClosing date: ${transaction.closingDate}`;
+            welcomeMessage += `\n\n:calendar: Closing date: ${transaction.closingDate}`;
+          }
+          
+          // Add instructions for email filtering setup if created on behalf of another agent
+          if (onBehalfOfName && !onBehalfOfSlackId) {
+            // Get the app URL for the onboarding link
+            const appUrl = process.env.REPLIT_DEV_DOMAIN 
+              ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+              : (process.env.REPLIT_DOMAINS?.split(",")[0] ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "the Contract Conduit app");
+            
+            welcomeMessage += `\n\n:envelope: *Email Filtering Setup Required*\n`;
+            welcomeMessage += `If this channel was not created by the agent representing our client, please have them log into the app to enable email filtering:\n`;
+            welcomeMessage += `\n1. Go to ${appUrl}\n`;
+            welcomeMessage += `2. Sign in with your @spyglassrealty.com email\n`;
+            welcomeMessage += `3. Enter your Slack Member ID when prompted\n\n`;
+            welcomeMessage += `*How to find your Slack Member ID:*\n`;
+            welcomeMessage += `• Click on your profile photo in the bottom left of Slack\n`;
+            welcomeMessage += `• Click "Profile" to open your profile screen\n`;
+            welcomeMessage += `• Click the three dots (...) next to "Set Status" and "View As"\n`;
+            welcomeMessage += `• Select "Copy Member ID" from the dropdown\n\n`;
+            welcomeMessage += `Once logged in, emails with "${transaction.propertyAddress.split(",")[0]}" in the subject will be filtered to this channel.`;
           }
           
           await postToChannel(slackResult.channelId, welcomeMessage);
