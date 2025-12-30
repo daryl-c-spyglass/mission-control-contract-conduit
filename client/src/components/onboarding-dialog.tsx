@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 
 interface OnboardingDialogProps {
   open: boolean;
@@ -26,6 +26,7 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
 
   const saveMutation = useMutation({
     mutationFn: async (data: { slackUserId: string; emailFilterConsent: boolean }) => {
+      // Save onboarding preferences
       const response = await fetch("/api/user/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -33,10 +34,24 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
         credentials: "include",
       });
       if (!response.ok) throw new Error("Failed to save");
+      
+      // Process any pending Gmail filters if consent was given
+      if (data.emailFilterConsent) {
+        try {
+          await fetch("/api/user/process-pending-filters", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+          });
+        } catch (e) {
+          console.log("Failed to process pending filters:", e);
+        }
+      }
+      
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({
         title: "Setup Complete",
         description: "Your preferences have been saved. Email filtering is now active for your transactions.",
@@ -66,7 +81,12 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-lg" onPointerDownOutside={(e) => e.preventDefault()}>
+      <DialogContent 
+        className="sm:max-w-lg" 
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle data-testid="text-onboarding-title">Welcome to Contract Conduit</DialogTitle>
           <DialogDescription>

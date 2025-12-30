@@ -73,6 +73,17 @@ export async function registerRoutes(
       // Get the current user's ID
       const userId = req.user?.claims?.sub;
       
+      // Enforce email consent for Gmail filter creation (unless creating on behalf of another agent)
+      if (createGmailFilter && userId && !onBehalfOfEmail) {
+        const currentUser = await authStorage.getUser(userId);
+        if (!currentUser?.emailFilterConsent) {
+          return res.status(400).json({ 
+            message: "Email filtering requires consent. Please complete onboarding first.",
+            requiresOnboarding: true 
+          });
+        }
+      }
+      
       // Validate the transaction data and add userId
       const validatedData = insertTransactionSchema.parse({
         ...transactionData,
@@ -179,10 +190,10 @@ export async function registerRoutes(
           
           // Add instructions for email filtering setup if created on behalf of another agent
           if (onBehalfOfName && !onBehalfOfSlackId) {
-            // Get the app URL for the onboarding link
-            const appUrl = process.env.REPLIT_DEV_DOMAIN 
-              ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-              : (process.env.REPLIT_DOMAINS?.split(",")[0] ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "the Contract Conduit app");
+            // Get the app URL for the onboarding link - use production domain
+            const domains = process.env.REPLIT_DOMAINS?.split(",") || [];
+            const productionDomain = domains.find(d => d.includes(".replit.app")) || domains[0];
+            const appUrl = productionDomain ? `https://${productionDomain}` : "Contract Conduit";
             
             welcomeMessage += `\n\n:envelope: *Email Filtering Setup Required*\n`;
             welcomeMessage += `If this channel was not created by the agent representing our client, please have them log into the app to enable email filtering:\n`;
@@ -207,14 +218,34 @@ export async function registerRoutes(
       // Create Gmail label and filter if requested
       if (createGmailFilter) {
         try {
-          // Use onBehalfOfEmail if provided, otherwise use the logged-in agent's email
-          let targetEmail = onBehalfOfEmail;
-          if (!targetEmail && userId) {
+          // Check if the agent has given email consent before creating filters
+          let targetEmail: string | undefined = undefined;
+          let hasEmailConsent = false;
+          
+          if (onBehalfOfEmail) {
+            // Creating on behalf of another agent - we can't check their consent yet
+            // Mark transaction as pending Gmail setup for when they consent
+            console.log(`Gmail filter pending for ${onBehalfOfEmail} - will create when they consent`);
+            await storage.updateTransaction(transaction.id, {
+              gmailPendingForEmail: onBehalfOfEmail,
+            });
+            await storage.createActivity({
+              transactionId: transaction.id,
+              type: "gmail_pending",
+              description: `Gmail filter pending - waiting for ${onBehalfOfEmail} to enable email filtering`,
+            });
+          } else if (userId) {
+            // Creating for the logged-in user - check their consent
             const agent = await authStorage.getUser(userId);
-            targetEmail = agent?.email;
+            if (agent?.email && agent?.emailFilterConsent) {
+              targetEmail = agent.email;
+              hasEmailConsent = true;
+            } else if (agent?.email && !agent?.emailFilterConsent) {
+              console.log("Skipping Gmail filter: agent hasn't given email consent");
+            }
           }
           
-          if (targetEmail) {
+          if (targetEmail && hasEmailConsent) {
             const gmailResult = await setupGmailForTransaction(transaction.propertyAddress, targetEmail);
             
             if (gmailResult.labelId) {
@@ -243,9 +274,8 @@ export async function registerRoutes(
                 });
               }
             }
-          } else {
-            console.log("Skipping Gmail filter: no email available (neither onBehalfOfEmail nor logged-in agent email)");
           }
+          // else: already logged the reason above
         } catch (gmailError) {
           console.error("Gmail setup error:", gmailError);
           // Continue without Gmail - don't fail the transaction
@@ -570,6 +600,59 @@ export async function registerRoutes(
       res.json({ success: true, message: "Connection successful" });
     } catch (error) {
       res.status(500).json({ message: "Connection test failed" });
+    }
+  });
+
+  // ============ Process Pending Gmail Filters ============
+  // Called after an agent completes onboarding to create any pending filters
+  
+  app.post("/api/user/process-pending-filters", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const user = await authStorage.getUser(userId);
+      if (!user?.email || !user?.emailFilterConsent) {
+        return res.json({ processed: 0, message: "Email consent not granted" });
+      }
+      
+      // Find transactions pending Gmail setup for this user's email
+      const allTransactions = await storage.getTransactions();
+      const pendingTransactions = allTransactions.filter(t => 
+        t.gmailPendingForEmail?.toLowerCase() === user.email?.toLowerCase()
+      );
+      
+      let processed = 0;
+      for (const txn of pendingTransactions) {
+        try {
+          const gmailResult = await setupGmailForTransaction(txn.propertyAddress, user.email);
+          
+          if (gmailResult.labelId && gmailResult.filterId) {
+            await storage.updateTransaction(txn.id, {
+              gmailFilterId: gmailResult.filterId,
+              gmailLabelId: gmailResult.labelId,
+              gmailPendingForEmail: null, // Clear the pending flag
+            });
+            
+            await storage.createActivity({
+              transactionId: txn.id,
+              type: "filter_created",
+              description: `Gmail filter created for "${txn.propertyAddress}" after ${user.email} enabled email filtering`,
+            });
+            
+            processed++;
+          }
+        } catch (error) {
+          console.error(`Failed to create pending Gmail filter for transaction ${txn.id}:`, error);
+        }
+      }
+      
+      res.json({ processed, message: `Created ${processed} pending Gmail filter(s)` });
+    } catch (error) {
+      console.error("Error processing pending filters:", error);
+      res.status(500).json({ message: "Failed to process pending filters" });
     }
   });
 

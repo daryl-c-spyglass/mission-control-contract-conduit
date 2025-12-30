@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { OnboardingDialog } from "@/components/onboarding-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,11 +73,19 @@ function LoadingScreen() {
 
 function AuthenticatedApp() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const { user, logout, isLoggingOut } = useAuth();
 
   const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
   });
+
+  // Check if user needs onboarding (first-time login without Slack ID or email consent)
+  useEffect(() => {
+    if (user && !user.hasCompletedOnboarding) {
+      setShowOnboarding(true);
+    }
+  }, [user]);
 
   const sidebarStyle = {
     "--sidebar-width": "16rem",
@@ -137,6 +146,11 @@ function AuthenticatedApp() {
           </main>
         </div>
       </div>
+      
+      <OnboardingDialog
+        open={showOnboarding}
+        onComplete={() => setShowOnboarding(false)}
+      />
     </SidebarProvider>
   );
 }

@@ -100,15 +100,22 @@ export async function createGmailLabelAndFilter(
       throw new Error("Failed to create Gmail label");
     }
 
-    // Create filter to match emails containing the address
-    // Match various formats: "123 Main", "123 Main St", "123 Main Street"
-    const searchQuery = `"${streetNumber} ${streetName}"`;
+    // Create filter to match emails with address in subject line
+    // Use street number + first meaningful word of street name
+    // "123 Main Street" -> filter on "123 Main"
+    // "123 5th Ave" -> filter on "123 5th"
+    // "123 Old Oak Lane" -> filter on "123 Old"
+    const streetWords = streetName.split(/\s+/);
+    const firstMeaningfulWord = streetWords[0] || streetName;
+    const subjectPattern = `${streetNumber} ${firstMeaningfulWord}`;
+    
+    console.log(`Creating Gmail filter for subject containing: "${subjectPattern}"`);
     
     const filterResponse = await gmail.users.settings.filters.create({
       userId: "me",
       requestBody: {
         criteria: {
-          query: searchQuery,
+          subject: subjectPattern,
         },
         action: {
           addLabelIds: [labelId],

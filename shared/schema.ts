@@ -32,6 +32,7 @@ export const transactions = pgTable("transactions", {
   slackChannelName: text("slack_channel_name"),
   gmailFilterId: text("gmail_filter_id"),
   gmailLabelId: text("gmail_label_id"),
+  gmailPendingForEmail: text("gmail_pending_for_email"), // Email of agent who needs to consent for filter creation
   fubClientId: text("fub_client_id"),
   fubClientName: text("fub_client_name"),
   fubClientEmail: text("fub_client_email"),
