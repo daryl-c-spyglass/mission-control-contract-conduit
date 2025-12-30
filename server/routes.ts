@@ -704,6 +704,51 @@ export async function registerRoutes(
     }
   });
 
+  // ============ Image Proxy for CORS ============
+  // Proxies external MLS images to avoid CORS issues in canvas rendering
+
+  app.get("/api/proxy-image", isAuthenticated, async (req, res) => {
+    try {
+      const { url } = req.query;
+      
+      if (!url || typeof url !== "string") {
+        return res.status(400).json({ message: "URL is required" });
+      }
+      
+      // Only allow HTTPS URLs for security
+      if (!url.startsWith("https://")) {
+        return res.status(400).json({ message: "Only HTTPS URLs are allowed" });
+      }
+      
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+          "Accept": "image/*",
+        },
+      });
+      
+      if (!response.ok) {
+        return res.status(response.status).json({ message: "Failed to fetch image" });
+      }
+      
+      const contentType = response.headers.get("content-type") || "image/jpeg";
+      
+      // Validate that the response is actually an image
+      if (!contentType.startsWith("image/")) {
+        return res.status(400).json({ message: "URL does not point to an image" });
+      }
+      
+      const buffer = await response.arrayBuffer();
+      
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.send(Buffer.from(buffer));
+    } catch (error) {
+      console.error("Image proxy error:", error);
+      res.status(500).json({ message: "Failed to proxy image" });
+    }
+  });
+
   // ============ Gmail Pub/Sub Webhook ============
 
   // Store processed message IDs to avoid duplicates (in production, use Redis/DB)

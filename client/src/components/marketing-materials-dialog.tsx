@@ -52,6 +52,14 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
     return STATUS_OPTIONS.find(s => s.value === statusValue)?.label?.toUpperCase() || "JUST LISTED";
   };
 
+  // Use proxied URL to avoid CORS issues with MLS images
+  const getProxiedUrl = (url: string) => {
+    if (!url) return url;
+    // If already a relative URL or data URL, don't proxy
+    if (url.startsWith("/") || url.startsWith("data:")) return url;
+    return `/api/proxy-image?url=${encodeURIComponent(url)}`;
+  };
+
   const generateGraphics = async () => {
     if (!currentImage) {
       toast({
@@ -68,10 +76,13 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
       const img = new Image();
       img.crossOrigin = "anonymous";
       
+      // Use proxied URL to avoid CORS issues
+      const proxiedUrl = getProxiedUrl(currentImage);
+      
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve();
         img.onerror = () => reject(new Error("Failed to load image"));
-        img.src = currentImage;
+        img.src = proxiedUrl;
       });
 
       // Generate landscape (16:9) graphic
@@ -90,7 +101,7 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
       console.error("Error generating graphics:", error);
       toast({
         title: "Generation Failed",
-        description: "Failed to generate graphics. Please try again.",
+        description: "Failed to load property image. The image may not be available for download. Please try a different photo.",
         variant: "destructive",
       });
     } finally {
@@ -175,10 +186,11 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
       try {
         const headshot = new Image();
         headshot.crossOrigin = "anonymous";
+        const headshotUrl = getProxiedUrl(user.marketingHeadshotUrl);
         await new Promise<void>((resolve) => {
           headshot.onload = () => resolve();
           headshot.onerror = () => resolve();
-          headshot.src = user.marketingHeadshotUrl!;
+          headshot.src = headshotUrl;
         });
         
         if (headshot.complete && headshot.naturalWidth > 0) {
@@ -291,10 +303,11 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
       try {
         const headshot = new Image();
         headshot.crossOrigin = "anonymous";
+        const headshotUrl = getProxiedUrl(user.marketingHeadshotUrl);
         await new Promise<void>((resolve) => {
           headshot.onload = () => resolve();
           headshot.onerror = () => resolve();
-          headshot.src = user.marketingHeadshotUrl!;
+          headshot.src = headshotUrl;
         });
         
         if (headshot.complete && headshot.naturalWidth > 0) {
@@ -455,10 +468,15 @@ Thank you for your interest!`;
           {currentImage && (
             <div className="relative aspect-video bg-muted rounded-md overflow-hidden">
               <img
-                src={currentImage}
+                src={getProxiedUrl(currentImage)}
                 alt="Selected property photo"
                 className="w-full h-full object-cover"
                 data-testid="img-selected-photo"
+                onError={(e) => {
+                  // Fallback to placeholder if proxy fails
+                  (e.target as HTMLImageElement).src = "";
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
               />
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
                 <div className="text-white">

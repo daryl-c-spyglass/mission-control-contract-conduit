@@ -76,13 +76,34 @@ export default function GraphicsSettings() {
   };
 
   const handleSave = () => {
+    // Validate required fields
+    if (!displayName.trim()) {
+      toast({
+        title: "Display Name Required",
+        description: "Please enter your display name for marketing materials.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!phone.trim()) {
+      toast({
+        title: "Phone Number Required",
+        description: "Please enter your phone number for marketing materials.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     saveMutation.mutate({
       marketingHeadshotUrl: headshotUrl || null,
-      marketingDisplayName: displayName || null,
-      marketingTitle: title || null,
-      marketingPhone: phone || null,
+      marketingDisplayName: displayName.trim() || null,
+      marketingTitle: title.trim() || null,
+      marketingPhone: phone.trim() || null,
     });
   };
+  
+  const isFormValid = displayName.trim() && phone.trim();
 
   const getInitials = () => {
     if (displayName) {
@@ -150,7 +171,7 @@ export default function GraphicsSettings() {
             <div className="space-y-2">
               <Label htmlFor="displayName" className="flex items-center gap-2">
                 <User className="h-4 w-4" />
-                Display Name
+                Display Name <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="displayName"
@@ -181,7 +202,7 @@ export default function GraphicsSettings() {
             <div className="space-y-2">
               <Label htmlFor="phone" className="flex items-center gap-2">
                 <Phone className="h-4 w-4" />
-                Phone Number
+                Phone Number <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="phone"
