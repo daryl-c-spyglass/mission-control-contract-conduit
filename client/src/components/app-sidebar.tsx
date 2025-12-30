@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Archive, Settings, Shield, Plus, Building2 } from "lucide-react";
+import { Home, Archive, Settings, Shield, Plus, Building2, Palette } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import {
   Sidebar,
@@ -26,6 +26,7 @@ interface AppSidebarProps {
 const baseNavItems = [
   { title: "Transactions", url: "/", icon: Home },
   { title: "Archive", url: "/archive", icon: Archive },
+  { title: "Graphics", url: "/graphics", icon: Palette },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 

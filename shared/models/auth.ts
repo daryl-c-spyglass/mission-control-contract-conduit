@@ -26,6 +26,11 @@ export const users = pgTable("users", {
   isAdmin: varchar("is_admin").default("false"),
   emailFilterConsent: boolean("email_filter_consent").default(false),
   hasCompletedOnboarding: boolean("has_completed_onboarding").default(false),
+  // Graphics/Marketing settings
+  marketingHeadshotUrl: varchar("marketing_headshot_url"),
+  marketingDisplayName: varchar("marketing_display_name"),
+  marketingTitle: varchar("marketing_title"),
+  marketingPhone: varchar("marketing_phone"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

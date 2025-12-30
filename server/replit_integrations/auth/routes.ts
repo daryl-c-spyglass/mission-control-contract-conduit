@@ -64,4 +64,24 @@ export function registerAuthRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to complete onboarding" });
     }
   });
+
+  // Update graphics/marketing settings
+  app.patch("/api/user/graphics-settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { marketingHeadshotUrl, marketingDisplayName, marketingTitle, marketingPhone } = req.body;
+      
+      const updatedUser = await authStorage.updateUser(userId, {
+        marketingHeadshotUrl: marketingHeadshotUrl || null,
+        marketingDisplayName: marketingDisplayName || null,
+        marketingTitle: marketingTitle || null,
+        marketingPhone: marketingPhone || null,
+      });
+      
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating graphics settings:", error);
+      res.status(500).json({ message: "Failed to update graphics settings" });
+    }
+  });
 }
