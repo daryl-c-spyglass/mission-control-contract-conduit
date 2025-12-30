@@ -41,6 +41,7 @@ export const transactions = pgTable("transactions", {
   mlsData: jsonb("mls_data"),
   cmaData: jsonb("cma_data"),
   propertyImages: text("property_images").array(),
+  propertyDescription: text("property_description"), // For brochure/marketing materials
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
