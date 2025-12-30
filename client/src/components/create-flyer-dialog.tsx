@@ -289,8 +289,6 @@ export function CreateFlyerDialog({
         title: "Flyer generated",
         description: "Your property flyer has been downloaded",
       });
-      
-      onOpenChange(false);
     } catch (error) {
       console.error("Flyer generation error:", error);
       toast({
