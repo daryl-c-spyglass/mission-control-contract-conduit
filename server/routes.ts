@@ -160,10 +160,11 @@ export async function registerRoutes(
             }
           }
           
-          // Add coordinators' Slack IDs
-          if (transaction.coordinatorIds && transaction.coordinatorIds.length > 0) {
+          // Add coordinators' Slack IDs (use validatedData since transaction might not have them yet)
+          const coordinatorIdsToInvite = validatedData.coordinatorIds || [];
+          if (coordinatorIdsToInvite.length > 0) {
             const coordsWithSlack = await Promise.all(
-              transaction.coordinatorIds.map(id => storage.getCoordinator(id))
+              coordinatorIdsToInvite.map(id => storage.getCoordinator(id))
             );
             coordsWithSlack
               .filter(c => c?.slackUserId)
@@ -175,6 +176,20 @@ export async function registerRoutes(
             await inviteUsersToChannel(slackResult.channelId, slackUserIdsToInvite);
           }
 
+          // Build coordinator mentions for welcome message
+          let coordinatorMentions = "";
+          if (coordinatorIdsToInvite.length > 0) {
+            const coordsWithSlack = await Promise.all(
+              coordinatorIdsToInvite.map(id => storage.getCoordinator(id))
+            );
+            const coordMentionParts = coordsWithSlack
+              .filter(c => c?.slackUserId)
+              .map(c => `<@${c!.slackUserId}>`);
+            if (coordMentionParts.length > 0) {
+              coordinatorMentions = coordMentionParts.join(", ");
+            }
+          }
+
           // Post welcome message mentioning the agent and creator
           const agentMention = agentSlackUserId ? `<@${agentSlackUserId}>` : (agentName || "An agent");
           let welcomeMessage = `Welcome to the new channel created for *${transaction.propertyAddress}*\n\n${agentMention} is the agent on this transaction.`;
@@ -182,6 +197,11 @@ export async function registerRoutes(
           // If someone else created it on behalf of the agent, mention them too
           if (creatorSlackUserId && creatorSlackUserId !== agentSlackUserId) {
             welcomeMessage += `\nCreated by <@${creatorSlackUserId}>`;
+          }
+          
+          // Add coordinator mentions
+          if (coordinatorMentions) {
+            welcomeMessage += `\n\n:busts_in_silhouette: *Transaction Coordinators:* ${coordinatorMentions}`;
           }
           
           if (transaction.closingDate) {
