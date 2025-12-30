@@ -21,7 +21,9 @@ import {
   Loader2,
   RefreshCw,
   Image as ImageIcon,
+  FileImage,
 } from "lucide-react";
+import { CreateFlyerDialog } from "./create-flyer-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -79,6 +81,7 @@ function formatDateTime(dateString: Date | null): string {
 
 export function TransactionDetails({ transaction, coordinators, activities, onBack, onMarketingClick }: TransactionDetailsProps) {
   const { toast } = useToast();
+  const [flyerDialogOpen, setFlyerDialogOpen] = useState(false);
   const status = statusConfig[transaction.status] || statusConfig.in_contract;
   const mlsData = transaction.mlsData as MLSData | null;
   const cmaData = transaction.cmaData as CMAComparable[] | null;
@@ -165,8 +168,23 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
               Marketing Materials
             </Button>
           )}
+          <Button 
+            variant="outline" 
+            className="gap-2" 
+            data-testid="button-create-flyer"
+            onClick={() => setFlyerDialogOpen(true)}
+          >
+            <FileImage className="h-4 w-4" />
+            Create Flyer
+          </Button>
         </div>
       </div>
+
+      <CreateFlyerDialog
+        open={flyerDialogOpen}
+        onOpenChange={setFlyerDialogOpen}
+        transaction={transaction}
+      />
 
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList>
@@ -324,11 +342,11 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           {/* Media Section */}
           {(() => {
             const photos: string[] = [];
-            if (transaction.uploadedPhotos && Array.isArray(transaction.uploadedPhotos)) {
-              photos.push(...transaction.uploadedPhotos as string[]);
+            if (transaction.propertyImages && Array.isArray(transaction.propertyImages)) {
+              photos.push(...transaction.propertyImages as string[]);
             }
-            if (mlsData?.photos && Array.isArray(mlsData.photos)) {
-              photos.push(...mlsData.photos);
+            if (mlsData?.images && Array.isArray(mlsData.images)) {
+              photos.push(...mlsData.images);
             }
             
             if (photos.length > 0) {
