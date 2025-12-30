@@ -6,11 +6,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Download, Image as ImageIcon, FileText, Mail, ChevronLeft, ChevronRight, Loader2, Copy, Check, Upload } from "lucide-react";
 import type { Transaction } from "@shared/schema";
+import spyglassLogoWhite from "@assets/White-Orange_(1)_1767129299733.png";
+import spyglassLogoBlack from "@assets/Large_Logo_1767129431992.jpeg";
+import leadingRELogo from "@assets/download_(3)_1767129649170.png";
 
 interface MarketingMaterialsDialogProps {
   open: boolean;
@@ -42,8 +46,10 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedLandscape, setGeneratedLandscape] = useState<string | null>(null);
   const [generatedSquare, setGeneratedSquare] = useState<string | null>(null);
+  const [generatedAltStyle, setGeneratedAltStyle] = useState<string | null>(null);
   const [emailCopied, setEmailCopied] = useState(false);
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
+  const [socialDescription, setSocialDescription] = useState("");
 
   const propertyImages = transaction.propertyImages || [];
   const mlsImages = (transaction.mlsData as any)?.images || [];
@@ -134,6 +140,10 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
       const squareDataUrl = await generateSquareGraphic(img);
       setGeneratedSquare(squareDataUrl);
 
+      // Generate alt style graphic (with Leading RE logo)
+      const altStyleDataUrl = await generateAltStyleGraphic(img);
+      setGeneratedAltStyle(altStyleDataUrl);
+
       toast({
         title: "Graphics Generated",
         description: "Scroll down to see download options.",
@@ -163,23 +173,42 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
     canvas.width = 1200;
     canvas.height = 675;
 
+    const headerHeight = 90;
+
     // Draw dark header bar
     ctx.fillStyle = "#2a2a2a";
-    ctx.fillRect(0, 0, canvas.width, 70);
+    ctx.fillRect(0, 0, canvas.width, headerHeight);
 
-    // Draw "SPYGLASS REALTY" text in header
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 18px Inter, sans-serif";
-    ctx.textAlign = "center";
-    ctx.letterSpacing = "4px";
-    const logoText = "SPYGLASS";
-    ctx.fillText(logoText, canvas.width / 2, 35);
-    ctx.font = "12px Inter, sans-serif";
-    ctx.fillText("R E A L T Y", canvas.width / 2, 55);
+    // Load and draw Spyglass logo
+    try {
+      const logo = new Image();
+      logo.crossOrigin = "anonymous";
+      await new Promise<void>((resolve) => {
+        logo.onload = () => resolve();
+        logo.onerror = () => resolve();
+        logo.src = spyglassLogoWhite;
+      });
+      
+      if (logo.complete && logo.naturalWidth > 0) {
+        const logoHeight = 60;
+        const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight;
+        const logoX = (canvas.width - logoWidth) / 2;
+        const logoY = (headerHeight - logoHeight) / 2;
+        ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
+      }
+    } catch (e) {
+      // Fallback to text if logo fails
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 18px Inter, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("SPYGLASS", canvas.width / 2, 40);
+      ctx.font = "12px Inter, sans-serif";
+      ctx.fillText("R E A L T Y", canvas.width / 2, 60);
+    }
 
     // Draw property image (main area)
-    const imageY = 70;
-    const imageHeight = canvas.height - 70 - 100; // Leave space for bottom bar
+    const imageY = headerHeight;
+    const imageHeight = canvas.height - headerHeight - 100; // Leave space for bottom bar
     
     // Calculate image dimensions to fill width while maintaining aspect ratio
     const imgAspect = img.width / img.height;
@@ -211,9 +240,10 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
     ctx.textAlign = "left";
     ctx.fillText(getStatusLabel(status), 30, bottomY + 40);
 
-    // Address
+    // Address (with optional social description)
     ctx.font = "16px Inter, sans-serif";
-    ctx.fillText(transaction.propertyAddress, 30, bottomY + 70);
+    const addressText = socialDescription ? `${transaction.propertyAddress}, ${socialDescription}` : transaction.propertyAddress;
+    ctx.fillText(addressText, 30, bottomY + 70);
 
     // Agent info on right side
     if (user?.marketingDisplayName) {
@@ -277,22 +307,43 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
     canvas.width = 1080;
     canvas.height = 1080;
 
+    const headerHeight = 100;
+
     // Draw dark header bar
     ctx.fillStyle = "#2a2a2a";
-    ctx.fillRect(0, 0, canvas.width, 80);
+    ctx.fillRect(0, 0, canvas.width, headerHeight);
 
-    // Draw "SPYGLASS REALTY" text in header
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 22px Inter, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("SPYGLASS", canvas.width / 2, 40);
-    ctx.font = "14px Inter, sans-serif";
-    ctx.fillText("R E A L T Y", canvas.width / 2, 62);
+    // Load and draw Spyglass logo
+    try {
+      const logo = new Image();
+      logo.crossOrigin = "anonymous";
+      await new Promise<void>((resolve) => {
+        logo.onload = () => resolve();
+        logo.onerror = () => resolve();
+        logo.src = spyglassLogoWhite;
+      });
+      
+      if (logo.complete && logo.naturalWidth > 0) {
+        const logoHeight = 70;
+        const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight;
+        const logoX = (canvas.width - logoWidth) / 2;
+        const logoY = (headerHeight - logoHeight) / 2;
+        ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
+      }
+    } catch (e) {
+      // Fallback to text if logo fails
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 22px Inter, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("SPYGLASS", canvas.width / 2, 45);
+      ctx.font = "14px Inter, sans-serif";
+      ctx.fillText("R E A L T Y", canvas.width / 2, 70);
+    }
 
     // Draw property image
-    const imageY = 80;
+    const imageY = headerHeight;
     const bottomBarHeight = 200;
-    const imageHeight = canvas.height - 80 - bottomBarHeight;
+    const imageHeight = canvas.height - headerHeight - bottomBarHeight;
     
     const imgAspect = img.width / img.height;
     const targetAspect = canvas.width / imageHeight;
@@ -329,9 +380,10 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
     ctx.textAlign = "left";
     ctx.fillText(getStatusLabel(status), 30, bottomY + 55);
 
-    // Address
+    // Address (with optional social description)
     ctx.font = "28px Inter, sans-serif";
-    ctx.fillText(transaction.propertyAddress, 30, bottomY + 100);
+    const addressText = socialDescription ? `${transaction.propertyAddress}, ${socialDescription}` : transaction.propertyAddress;
+    ctx.fillText(addressText, 30, bottomY + 100);
 
     // Agent info
     if (user?.marketingDisplayName) {
@@ -393,6 +445,152 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
     link.click();
   };
 
+  const generateAltStyleGraphic = async (img: HTMLImageElement): Promise<string> => {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d")!;
+    
+    // 1:1 aspect ratio at 1080x1080 (Instagram)
+    canvas.width = 1080;
+    canvas.height = 1080;
+
+    // White background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Left panel width for vertical address and logos
+    const leftPanelWidth = 200;
+
+    // Load Leading RE logo (top left)
+    try {
+      const leadingLogo = new Image();
+      leadingLogo.crossOrigin = "anonymous";
+      await new Promise<void>((resolve) => {
+        leadingLogo.onload = () => resolve();
+        leadingLogo.onerror = () => resolve();
+        leadingLogo.src = leadingRELogo;
+      });
+      
+      if (leadingLogo.complete && leadingLogo.naturalWidth > 0) {
+        const logoWidth = 120;
+        const logoHeight = (leadingLogo.naturalHeight / leadingLogo.naturalWidth) * logoWidth;
+        ctx.drawImage(leadingLogo, 30, 30, logoWidth, logoHeight);
+      }
+    } catch (e) {
+      // Ignore logo errors
+    }
+
+    // Draw vertical address text on left side
+    ctx.save();
+    ctx.translate(60, canvas.height - 200);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = "#1a1a1a";
+    ctx.font = "bold 36px Inter, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(transaction.propertyAddress.toUpperCase(), 0, 0);
+    ctx.restore();
+
+    // Draw property image on right side
+    const imageX = leftPanelWidth;
+    const imageY = 80;
+    const imageWidth = canvas.width - leftPanelWidth - 20;
+    const imageHeight = canvas.height - 200;
+    
+    const imgAspect = img.width / img.height;
+    const targetAspect = imageWidth / imageHeight;
+    
+    let drawWidth, drawHeight, drawX, drawY;
+    if (imgAspect > targetAspect) {
+      drawHeight = imageHeight;
+      drawWidth = imageHeight * imgAspect;
+      drawX = imageX + (imageWidth - drawWidth) / 2;
+      drawY = imageY;
+    } else {
+      drawWidth = imageWidth;
+      drawHeight = imageWidth / imgAspect;
+      drawX = imageX;
+      drawY = imageY + (imageHeight - drawHeight) / 2;
+    }
+    
+    // Clip to image area
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(imageX, imageY, imageWidth, imageHeight);
+    ctx.clip();
+    ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+    ctx.restore();
+
+    // Bottom section with status and description
+    const bottomY = canvas.height - 120;
+    
+    // Status badge and social description
+    ctx.fillStyle = "#1a1a1a";
+    ctx.font = "bold 32px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(getStatusLabel(status), canvas.width / 2 + 50, bottomY + 20);
+    
+    if (socialDescription) {
+      ctx.font = "24px Inter, sans-serif";
+      ctx.fillText(socialDescription, canvas.width / 2 + 50, bottomY + 55);
+    }
+
+    // Agent headshot in bottom left
+    if (user?.marketingHeadshotUrl) {
+      try {
+        const headshot = new Image();
+        headshot.crossOrigin = "anonymous";
+        const headshotUrl = getProxiedUrl(user.marketingHeadshotUrl);
+        await new Promise<void>((resolve) => {
+          headshot.onload = () => resolve();
+          headshot.onerror = () => resolve();
+          headshot.src = headshotUrl;
+        });
+        
+        if (headshot.complete && headshot.naturalWidth > 0) {
+          const headshotSize = 120;
+          const headshotX = 20;
+          const headshotY = canvas.height - headshotSize - 20;
+          
+          // Draw headshot without circle clip - just as rectangle
+          ctx.drawImage(headshot, headshotX, headshotY, headshotSize, headshotSize);
+        }
+      } catch (e) {
+        // Ignore headshot errors
+      }
+    }
+
+    // Spyglass logo in circular black background (bottom right)
+    try {
+      // Draw black circle background
+      const circleX = canvas.width - 100;
+      const circleY = canvas.height - 80;
+      const circleRadius = 70;
+      
+      ctx.fillStyle = "#1a1a1a";
+      ctx.beginPath();
+      ctx.arc(circleX, circleY, circleRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Load and draw the white/orange logo inside
+      const spyglassLogo = new Image();
+      spyglassLogo.crossOrigin = "anonymous";
+      await new Promise<void>((resolve) => {
+        spyglassLogo.onload = () => resolve();
+        spyglassLogo.onerror = () => resolve();
+        spyglassLogo.src = spyglassLogoWhite;
+      });
+      
+      if (spyglassLogo.complete && spyglassLogo.naturalWidth > 0) {
+        const logoWidth = 100;
+        const logoHeight = (spyglassLogo.naturalHeight / spyglassLogo.naturalWidth) * logoWidth;
+        ctx.drawImage(spyglassLogo, circleX - logoWidth / 2, circleY - logoHeight / 2, logoWidth, logoHeight);
+      }
+    } catch (e) {
+      // Ignore logo errors
+    }
+
+    return canvas.toDataURL("image/png");
+  };
+
   const generateEmailTemplate = () => {
     const mlsData = transaction.mlsData as any;
     const price = transaction.salePrice || transaction.listPrice || mlsData?.listPrice;
@@ -436,12 +634,14 @@ Thank you for your interest!`;
     setSelectedPhotoIndex((prev) => (prev > 0 ? prev - 1 : allImages.length - 1));
     setGeneratedLandscape(null);
     setGeneratedSquare(null);
+    setGeneratedAltStyle(null);
   };
 
   const nextImage = () => {
     setSelectedPhotoIndex((prev) => (prev < allImages.length - 1 ? prev + 1 : 0));
     setGeneratedLandscape(null);
     setGeneratedSquare(null);
+    setGeneratedAltStyle(null);
   };
 
   // Check if user has graphics settings configured
@@ -483,6 +683,26 @@ Thank you for your interest!`;
               </Select>
             </div>
 
+            <div className="space-y-2">
+              <Label>Social Media Description</Label>
+              <Input
+                placeholder="e.g. Modern 3BR Home"
+                value={socialDescription}
+                onChange={(e) => {
+                  if (e.target.value.length <= 20) {
+                    setSocialDescription(e.target.value);
+                    setGeneratedLandscape(null);
+                    setGeneratedSquare(null);
+                  }
+                }}
+                maxLength={20}
+                data-testid="input-social-description"
+              />
+              <p className="text-xs text-muted-foreground">{socialDescription.length}/20 characters</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Property Photo ({allImages.length > 0 ? `${selectedPhotoIndex + 1} of ${allImages.length}` : "None"})</Label>
               <div className="flex items-center gap-2">
@@ -569,18 +789,21 @@ Thank you for your interest!`;
             )}
           </Button>
 
-          {(generatedLandscape || generatedSquare) && (
+          {(generatedLandscape || generatedSquare || generatedAltStyle) && (
             <div ref={resultsRef}>
             <Tabs defaultValue="landscape" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="landscape" data-testid="tab-landscape">
-                  Facebook (16:9)
+                  Facebook
                 </TabsTrigger>
                 <TabsTrigger value="square" data-testid="tab-square">
-                  Instagram (1:1)
+                  Instagram
+                </TabsTrigger>
+                <TabsTrigger value="altstyle" data-testid="tab-altstyle">
+                  Alt Style
                 </TabsTrigger>
                 <TabsTrigger value="email" data-testid="tab-email">
-                  Email Template
+                  Email
                 </TabsTrigger>
               </TabsList>
 
@@ -624,6 +847,29 @@ Thank you for your interest!`;
                       >
                         <Download className="h-4 w-4 mr-2" />
                         Download Instagram Graphic
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
+              <TabsContent value="altstyle" className="space-y-4">
+                {generatedAltStyle && (
+                  <Card>
+                    <CardContent className="pt-4">
+                      <img
+                        src={generatedAltStyle}
+                        alt="Alt style graphic"
+                        className="w-full max-w-md mx-auto rounded-md"
+                        data-testid="img-altstyle-preview"
+                      />
+                      <Button
+                        className="w-full mt-4"
+                        onClick={() => downloadImage(generatedAltStyle, `${transaction.propertyAddress.replace(/[^a-z0-9]/gi, "_")}_altstyle.png`)}
+                        data-testid="button-download-altstyle"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Alt Style Graphic
                       </Button>
                     </CardContent>
                   </Card>

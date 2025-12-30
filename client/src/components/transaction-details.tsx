@@ -20,6 +20,7 @@ import {
   User,
   Loader2,
   RefreshCw,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +38,7 @@ interface TransactionDetailsProps {
   coordinators: Coordinator[];
   activities: ActivityType[];
   onBack: () => void;
+  onMarketingClick?: () => void;
 }
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -75,7 +77,7 @@ function formatDateTime(dateString: Date | null): string {
   });
 }
 
-export function TransactionDetails({ transaction, coordinators, activities, onBack }: TransactionDetailsProps) {
+export function TransactionDetails({ transaction, coordinators, activities, onBack, onMarketingClick }: TransactionDetailsProps) {
   const { toast } = useToast();
   const status = statusConfig[transaction.status] || statusConfig.in_contract;
   const mlsData = transaction.mlsData as MLSData | null;
@@ -150,6 +152,17 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
             >
               <Mail className="h-4 w-4" />
               View Emails
+            </Button>
+          )}
+          {onMarketingClick && (
+            <Button 
+              variant="outline" 
+              className="gap-2" 
+              data-testid="button-marketing-materials"
+              onClick={onMarketingClick}
+            >
+              <ImageIcon className="h-4 w-4" />
+              Marketing Materials
             </Button>
           )}
         </div>
@@ -307,6 +320,60 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
               </CardContent>
             </Card>
           )}
+
+          {/* Media Section */}
+          {(() => {
+            const photos: string[] = [];
+            if (transaction.uploadedPhotos && Array.isArray(transaction.uploadedPhotos)) {
+              photos.push(...transaction.uploadedPhotos as string[]);
+            }
+            if (mlsData?.photos && Array.isArray(mlsData.photos)) {
+              photos.push(...mlsData.photos);
+            }
+            
+            if (photos.length > 0) {
+              return (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <ImageIcon className="h-4 w-4" />
+                        Property Photos
+                      </CardTitle>
+                      {onMarketingClick && (
+                        <Button variant="outline" size="sm" onClick={onMarketingClick} data-testid="button-create-marketing">
+                          Create Marketing Materials
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                      {photos.slice(0, 8).map((photo, index) => (
+                        <div key={index} className="aspect-video bg-muted rounded-md overflow-hidden">
+                          <img
+                            src={`/api/proxy-image?url=${encodeURIComponent(photo)}`}
+                            alt={`Property photo ${index + 1}`}
+                            className="w-full h-full object-cover"
+                            data-testid={`img-property-photo-${index}`}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = "none";
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    {photos.length > 8 && (
+                      <p className="text-sm text-muted-foreground mt-2 text-center">
+                        +{photos.length - 8} more photos available in Marketing Materials
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            }
+            return null;
+          })()}
         </TabsContent>
 
         <TabsContent value="mls" className="space-y-6">

@@ -52,12 +52,22 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen }: Das
 
   if (selectedTransaction) {
     return (
-      <TransactionDetails
-        transaction={selectedTransaction}
-        coordinators={coordinators}
-        activities={activities}
-        onBack={() => setSelectedTransaction(null)}
-      />
+      <>
+        <TransactionDetails
+          transaction={selectedTransaction}
+          coordinators={coordinators}
+          activities={activities}
+          onBack={() => setSelectedTransaction(null)}
+          onMarketingClick={() => setMarketingTransaction(selectedTransaction)}
+        />
+        {marketingTransaction && (
+          <MarketingMaterialsDialog
+            open={!!marketingTransaction}
+            onOpenChange={(open) => !open && setMarketingTransaction(null)}
+            transaction={marketingTransaction}
+          />
+        )}
+      </>
     );
   }
 
