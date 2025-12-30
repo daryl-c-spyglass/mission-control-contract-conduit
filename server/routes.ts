@@ -8,30 +8,30 @@ import { fetchMLSListing, fetchSimilarListings } from "./repliers";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
 
-// Helper to generate a Slack channel name in format: uc_buy_propertyname_agentname or uc_sell_propertyname_agentname
+// Helper to generate a Slack channel name in format: buy-123main-joeywilkes or sell-123main-joeywilkes
 function generateSlackChannelName(address: string, transactionType: string = "buy", agentName: string = ""): string {
   // Extract just the street address (e.g., "123 Main Street" from "123 Main Street, Austin, TX 78701")
   const streetPart = address.split(",")[0] || address;
   
-  // Clean and shorten the address (remove spaces and special chars)
+  // Clean the address - keep alphanumeric and convert spaces to nothing, shorten
   const cleanAddress = streetPart
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "")
-    .substring(0, 20);
+    .substring(0, 25);
   
-  // Clean the agent name (remove spaces and special chars)
+  // Clean the agent name - convert to lowercase, remove spaces and special chars
   const cleanAgentName = agentName
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, "")
+    .replace(/[^a-z]/g, "")
     .substring(0, 20);
   
-  // Format: uc_buy_123main_joeywilkes or uc_sell_123main_joeywilkes
+  // Format: buy-123main-joeywilkes or sell-123main-joeywilkes (with dashes for readability)
   const type = transactionType === "sell" ? "sell" : "buy";
   
   if (cleanAgentName) {
-    return `uc_${type}_${cleanAddress}_${cleanAgentName}`.substring(0, 80);
+    return `${type}-${cleanAddress}-${cleanAgentName}`.substring(0, 80);
   } else {
-    return `uc_${type}_${cleanAddress}`.substring(0, 80);
+    return `${type}-${cleanAddress}`.substring(0, 80);
   }
 }
 
@@ -93,8 +93,15 @@ export async function registerRoutes(
       if (shouldCreateSlack && process.env.SLACK_BOT_TOKEN) {
         try {
           // Determine the agent name for the channel
-          let agentName = onBehalfOfName || "";
-          if (!agentName && userId) {
+          // If creating on behalf of another agent, use their name
+          // Otherwise, use the logged-in user's name
+          let agentName = "";
+          
+          if (onBehalfOfName && onBehalfOfName.trim()) {
+            // Use the specified agent's name when creating on behalf of someone
+            agentName = onBehalfOfName.trim();
+          } else if (userId) {
+            // Use the creator's name when creating for themselves
             const creator = await authStorage.getUser(userId);
             if (creator) {
               agentName = `${creator.firstName || ""} ${creator.lastName || ""}`.trim();
