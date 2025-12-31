@@ -7,10 +7,13 @@ import {
   type InsertIntegrationSetting,
   type Activity,
   type InsertActivity,
+  type MarketingAsset,
+  type InsertMarketingAsset,
   transactions,
   coordinators,
   integrationSettings,
   activities,
+  marketingAssets,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -39,6 +42,11 @@ export interface IStorage {
   // Activities
   getActivitiesByTransaction(transactionId: string): Promise<Activity[]>;
   createActivity(activity: InsertActivity): Promise<Activity>;
+
+  // Marketing Assets
+  getMarketingAssetsByTransaction(transactionId: string): Promise<MarketingAsset[]>;
+  createMarketingAsset(asset: InsertMarketingAsset): Promise<MarketingAsset>;
+  deleteMarketingAsset(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -164,6 +172,28 @@ export class DatabaseStorage implements IStorage {
       .values(activity)
       .returning();
     return newActivity;
+  }
+
+  // Marketing Assets
+  async getMarketingAssetsByTransaction(transactionId: string): Promise<MarketingAsset[]> {
+    return await db
+      .select()
+      .from(marketingAssets)
+      .where(eq(marketingAssets.transactionId, transactionId))
+      .orderBy(desc(marketingAssets.createdAt));
+  }
+
+  async createMarketingAsset(asset: InsertMarketingAsset): Promise<MarketingAsset> {
+    const [newAsset] = await db
+      .insert(marketingAssets)
+      .values(asset)
+      .returning();
+    return newAsset;
+  }
+
+  async deleteMarketingAsset(id: string): Promise<boolean> {
+    await db.delete(marketingAssets).where(eq(marketingAssets.id, id));
+    return true;
   }
 }
 

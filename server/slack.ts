@@ -84,3 +84,56 @@ export async function lookupUserByEmail(email: string): Promise<string | null> {
     return null;
   }
 }
+
+export async function uploadFileToChannel(
+  channelId: string,
+  fileData: string,
+  fileName: string,
+  title: string,
+  initialComment?: string
+): Promise<{ fileId: string } | null> {
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!token) {
+    console.log("Slack not configured, skipping file upload");
+    return null;
+  }
+
+  try {
+    // Convert base64 to buffer if it's a data URL
+    let fileBuffer: Buffer;
+    if (fileData.startsWith("data:")) {
+      const base64Data = fileData.split(",")[1];
+      fileBuffer = Buffer.from(base64Data, "base64");
+    } else {
+      fileBuffer = Buffer.from(fileData, "base64");
+    }
+
+    // Use FormData for file upload
+    const formData = new FormData();
+    formData.append("file", new Blob([fileBuffer]), fileName);
+    formData.append("channels", channelId);
+    formData.append("title", title);
+    if (initialComment) {
+      formData.append("initial_comment", initialComment);
+    }
+
+    const response = await fetch("https://slack.com/api/files.upload", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+    if (!data.ok) {
+      console.error("Slack file upload error:", data.error);
+      return null;
+    }
+
+    return { fileId: data.file?.id || "" };
+  } catch (error) {
+    console.error("Failed to upload file to Slack:", error);
+    return null;
+  }
+}

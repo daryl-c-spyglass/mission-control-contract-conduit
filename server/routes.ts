@@ -1,9 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, insertCoordinatorSchema } from "@shared/schema";
+import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema } from "@shared/schema";
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages } from "./gmail";
-import { createSlackChannel, inviteUsersToChannel, postToChannel } from "./slack";
+import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel } from "./slack";
 import { fetchMLSListing, fetchSimilarListings } from "./repliers";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
@@ -501,6 +501,79 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete coordinator" });
+    }
+  });
+
+  // ============ Marketing Assets ============
+
+  app.get("/api/transactions/:id/marketing-assets", isAuthenticated, async (req, res) => {
+    try {
+      const assets = await storage.getMarketingAssetsByTransaction(req.params.id);
+      res.json(assets);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch marketing assets" });
+    }
+  });
+
+  app.post("/api/transactions/:id/marketing-assets", isAuthenticated, async (req, res) => {
+    try {
+      const transaction = await storage.getTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      const { type, imageData, fileName, postToSlack } = req.body;
+      
+      if (!type || !imageData || !fileName) {
+        return res.status(400).json({ message: "type, imageData, and fileName are required" });
+      }
+
+      const asset = await storage.createMarketingAsset({
+        transactionId: req.params.id,
+        type,
+        imageData,
+        fileName,
+        metadata: { createdBy: (req as any).user?.claims?.sub },
+      });
+
+      await storage.createActivity({
+        transactionId: req.params.id,
+        type: "marketing_created",
+        description: `Marketing asset created: ${type}`,
+      });
+
+      // Upload to Slack if requested and channel exists
+      if (postToSlack && transaction.slackChannelId) {
+        const typeLabel = type === "facebook" ? "Facebook (16:9)" : 
+                          type === "instagram" ? "Instagram (1:1)" :
+                          type === "alt_style" ? "Alternative Style" :
+                          type === "flyer" ? "Property Flyer" : type;
+        
+        await uploadFileToChannel(
+          transaction.slackChannelId,
+          imageData,
+          fileName,
+          `${typeLabel} - ${transaction.propertyAddress}`,
+          `New marketing material generated for ${transaction.propertyAddress}`
+        );
+      }
+
+      res.status(201).json(asset);
+    } catch (error: any) {
+      console.error("Marketing asset creation error:", error);
+      res.status(400).json({ message: error.message || "Failed to create marketing asset" });
+    }
+  });
+
+  app.delete("/api/transactions/:transactionId/marketing-assets/:id", isAuthenticated, async (req, res) => {
+    try {
+      const deleted = await storage.deleteMarketingAsset(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Marketing asset not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete marketing asset" });
     }
   });
 

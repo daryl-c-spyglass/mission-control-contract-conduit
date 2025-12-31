@@ -333,13 +333,15 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
               />
             </div>
 
-            {coordinators.length > 0 && (
-              <FormField
-                control={form.control}
-                name="coordinatorIds"
-                render={() => (
-                  <FormItem>
-                    <FormLabel>Transaction Coordinators</FormLabel>
+            <FormField
+              control={form.control}
+              name="coordinatorIds"
+              render={() => (
+                <FormItem>
+                  <FormLabel>Transaction Coordinators</FormLabel>
+                  {coordinators.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Loading coordinators...</p>
+                  ) : (
                     <div className="space-y-2">
                       {coordinators.map((coordinator) => (
                         <FormField
@@ -369,11 +371,11 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                         />
                       ))}
                     </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <Collapsible open={onBehalfExpanded} onOpenChange={setOnBehalfExpanded}>
               <CollapsibleTrigger asChild>

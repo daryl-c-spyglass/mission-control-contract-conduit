@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Calendar,
@@ -22,6 +22,8 @@ import {
   RefreshCw,
   Image as ImageIcon,
   FileImage,
+  Download,
+  Trash2,
 } from "lucide-react";
 import { CreateFlyerDialog } from "./create-flyer-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,7 +35,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Transaction, Coordinator, Activity as ActivityType, CMAComparable, MLSData } from "@shared/schema";
+import type { Transaction, Coordinator, Activity as ActivityType, CMAComparable, MLSData, MarketingAsset } from "@shared/schema";
 
 interface TransactionDetailsProps {
   transaction: Transaction;
@@ -89,6 +91,30 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const transactionCoordinators = coordinators.filter(
     (c) => transaction.coordinatorIds?.includes(c.id)
   );
+
+  const { data: marketingAssets = [], isLoading: assetsLoading } = useQuery<MarketingAsset[]>({
+    queryKey: [`/api/transactions/${transaction.id}/marketing-assets`],
+  });
+
+  const deleteAssetMutation = useMutation({
+    mutationFn: async (assetId: number) => {
+      await apiRequest("DELETE", `/api/transactions/${transaction.id}/marketing-assets/${assetId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/transactions/${transaction.id}/marketing-assets`] });
+      toast({ title: "Marketing asset deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete asset", variant: "destructive" });
+    },
+  });
+
+  const downloadAsset = (asset: MarketingAsset) => {
+    const link = document.createElement("a");
+    link.href = asset.imageData;
+    link.download = asset.fileName;
+    link.click();
+  };
 
   const refreshMlsMutation = useMutation({
     mutationFn: async () => {
@@ -191,6 +217,12 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
           <TabsTrigger value="mls" data-testid="tab-mls">MLS Data</TabsTrigger>
           <TabsTrigger value="cma" data-testid="tab-cma">CMA</TabsTrigger>
+          <TabsTrigger value="marketing" data-testid="tab-marketing">
+            Marketing
+            {marketingAssets.length > 0 && (
+              <Badge variant="secondary" className="ml-2 text-xs">{marketingAssets.length}</Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="timeline" data-testid="tab-timeline">Timeline</TabsTrigger>
         </TabsList>
 
@@ -594,6 +626,92 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 <p className="text-sm text-muted-foreground">
                   Comparative market analysis will appear here once MLS data is fetched.
                 </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="marketing" className="space-y-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <h2 className="text-lg font-semibold">Marketing Assets</h2>
+            {onMarketingClick && (
+              <Button 
+                variant="outline" 
+                onClick={onMarketingClick}
+                data-testid="button-create-marketing"
+              >
+                <ImageIcon className="h-4 w-4 mr-2" />
+                Create New Graphics
+              </Button>
+            )}
+          </div>
+
+          {assetsLoading ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-48 w-full rounded-md" />
+              ))}
+            </div>
+          ) : marketingAssets.length > 0 ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {marketingAssets.map((asset) => (
+                <Card key={asset.id} data-testid={`card-asset-${asset.id}`}>
+                  <CardContent className="pt-4 space-y-3">
+                    <div className="aspect-video bg-muted rounded-md overflow-hidden">
+                      <img 
+                        src={asset.imageData} 
+                        alt={asset.fileName}
+                        className="w-full h-full object-cover"
+                        data-testid={`img-asset-${asset.id}`}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{asset.fileName}</p>
+                        <Badge variant="outline" className="text-xs mt-1">
+                          {asset.type === "facebook" ? "Facebook" : 
+                           asset.type === "instagram" ? "Instagram" :
+                           asset.type === "alt_style" ? "Alt Style" : asset.type}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => downloadAsset(asset)}
+                          data-testid={`button-download-asset-${asset.id}`}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => deleteAssetMutation.mutate(asset.id)}
+                          disabled={deleteAssetMutation.isPending}
+                          data-testid={`button-delete-asset-${asset.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                <h3 className="font-medium mb-2">No Marketing Assets Yet</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Generate social media graphics and other marketing materials for this property.
+                </p>
+                {onMarketingClick && (
+                  <Button onClick={onMarketingClick} data-testid="button-create-first-asset">
+                    <ImageIcon className="h-4 w-4 mr-2" />
+                    Create Marketing Materials
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}

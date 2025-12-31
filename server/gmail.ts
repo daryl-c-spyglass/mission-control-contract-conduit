@@ -101,13 +101,11 @@ export async function createGmailLabelAndFilter(
     }
 
     // Create filter to match emails with address in subject line
-    // Use street number + first meaningful word of street name
-    // "123 Main Street" -> filter on "123 Main"
-    // "123 5th Ave" -> filter on "123 5th"
-    // "123 Old Oak Lane" -> filter on "123 Old"
-    const streetWords = streetName.split(/\s+/);
-    const firstMeaningfulWord = streetWords[0] || streetName;
-    const subjectPattern = `${streetNumber} ${firstMeaningfulWord}`;
+    // Use street number + full street name for better matching
+    // "123 Main Street" -> filter on "123 Main Street"
+    // "123 5th Ave" -> filter on "123 5th Ave"
+    // This ensures more accurate email filtering
+    const subjectPattern = `${streetNumber} ${streetName}`;
     
     console.log(`Creating Gmail filter for subject containing: "${subjectPattern}"`);
     

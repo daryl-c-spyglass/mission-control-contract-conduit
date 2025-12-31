@@ -79,6 +79,17 @@ export const activities = pgTable("activities", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Marketing assets for transactions
+export const marketingAssets = pgTable("marketing_assets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  transactionId: varchar("transaction_id").notNull(),
+  type: text("type").notNull(), // facebook, instagram, alt_style, flyer
+  imageData: text("image_data").notNull(), // Base64 encoded image data
+  fileName: text("file_name").notNull(),
+  metadata: jsonb("metadata"), // Additional info like dimensions, status, etc.
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
   id: true,
@@ -98,6 +109,11 @@ export const insertActivitySchema = createInsertSchema(activities).omit({
   createdAt: true,
 });
 
+export const insertMarketingAssetSchema = createInsertSchema(marketingAssets).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
@@ -110,6 +126,9 @@ export type InsertIntegrationSetting = z.infer<typeof insertIntegrationSettingsS
 
 export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
+
+export type MarketingAsset = typeof marketingAssets.$inferSelect;
+export type InsertMarketingAsset = z.infer<typeof insertMarketingAssetSchema>;
 
 // CMA Comparable type
 export interface CMAComparable {

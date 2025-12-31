@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -7,10 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { Download, Image as ImageIcon, FileText, Mail, ChevronLeft, ChevronRight, Loader2, Copy, Check, Upload } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Download, Image as ImageIcon, FileText, Mail, ChevronLeft, ChevronRight, Loader2, Copy, Check, Upload, MessageSquare } from "lucide-react";
 import type { Transaction } from "@shared/schema";
 import spyglassLogoWhite from "@assets/White-Orange_(1)_1767129299733.png";
 import spyglassLogoBlack from "@assets/Large_Logo_1767129431992.jpeg";
@@ -50,6 +53,33 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
   const [emailCopied, setEmailCopied] = useState(false);
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
   const [socialDescription, setSocialDescription] = useState("");
+  const [postToSlack, setPostToSlack] = useState(true);
+
+  const saveAssetMutation = useMutation({
+    mutationFn: async ({ type, imageData, fileName }: { type: string; imageData: string; fileName: string }) => {
+      const res = await apiRequest("POST", `/api/transactions/${transaction.id}/marketing-assets`, {
+        type,
+        imageData,
+        fileName,
+        postToSlack,
+      });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/transactions/${transaction.id}/marketing-assets`] });
+      toast({
+        title: "Asset Saved",
+        description: postToSlack ? "Marketing asset saved and posted to Slack." : "Marketing asset saved.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save marketing asset.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const propertyImages = transaction.propertyImages || [];
   const mlsImages = (transaction.mlsData as any)?.images || [];
@@ -438,11 +468,15 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
     return canvas.toDataURL("image/png");
   };
 
-  const downloadImage = (dataUrl: string, filename: string) => {
+  const downloadImage = (dataUrl: string, filename: string, type: string) => {
+    // Download locally
     const link = document.createElement("a");
     link.href = dataUrl;
     link.download = filename;
     link.click();
+    
+    // Save to database and optionally post to Slack
+    saveAssetMutation.mutate({ type, imageData: dataUrl, fileName: filename });
   };
 
   const generateAltStyleGraphic = async (img: HTMLImageElement): Promise<string> => {
@@ -770,6 +804,26 @@ Thank you for your interest!`;
             </div>
           )}
 
+          <div className="flex items-center gap-3 p-3 rounded-md bg-muted/30 border">
+            <Checkbox
+              id="post-to-slack"
+              checked={postToSlack}
+              onCheckedChange={(checked) => setPostToSlack(checked === true)}
+              data-testid="checkbox-post-to-slack"
+            />
+            <div className="flex-1">
+              <label htmlFor="post-to-slack" className="text-sm font-medium cursor-pointer flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Post to Slack channel
+              </label>
+              <p className="text-xs text-muted-foreground">
+                {transaction.slackChannelId 
+                  ? "Assets will be automatically posted when saved" 
+                  : "No Slack channel connected"}
+              </p>
+            </div>
+          </div>
+
           <Button
             onClick={generateGraphics}
             disabled={isGenerating || !currentImage}
@@ -819,11 +873,12 @@ Thank you for your interest!`;
                       />
                       <Button
                         className="w-full mt-4"
-                        onClick={() => downloadImage(generatedLandscape, `${transaction.propertyAddress.replace(/[^a-z0-9]/gi, "_")}_facebook.png`)}
+                        onClick={() => downloadImage(generatedLandscape, `${transaction.propertyAddress.replace(/[^a-z0-9]/gi, "_")}_facebook.png`, "facebook")}
+                        disabled={saveAssetMutation.isPending}
                         data-testid="button-download-landscape"
                       >
-                        <Download className="h-4 w-4 mr-2" />
-                        Download Facebook Graphic
+                        {saveAssetMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                        Save & Download Facebook
                       </Button>
                     </CardContent>
                   </Card>
@@ -842,11 +897,12 @@ Thank you for your interest!`;
                       />
                       <Button
                         className="w-full mt-4"
-                        onClick={() => downloadImage(generatedSquare, `${transaction.propertyAddress.replace(/[^a-z0-9]/gi, "_")}_instagram.png`)}
+                        onClick={() => downloadImage(generatedSquare, `${transaction.propertyAddress.replace(/[^a-z0-9]/gi, "_")}_instagram.png`, "instagram")}
+                        disabled={saveAssetMutation.isPending}
                         data-testid="button-download-square"
                       >
-                        <Download className="h-4 w-4 mr-2" />
-                        Download Instagram Graphic
+                        {saveAssetMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                        Save & Download Instagram
                       </Button>
                     </CardContent>
                   </Card>
@@ -865,11 +921,12 @@ Thank you for your interest!`;
                       />
                       <Button
                         className="w-full mt-4"
-                        onClick={() => downloadImage(generatedAltStyle, `${transaction.propertyAddress.replace(/[^a-z0-9]/gi, "_")}_altstyle.png`)}
+                        onClick={() => downloadImage(generatedAltStyle, `${transaction.propertyAddress.replace(/[^a-z0-9]/gi, "_")}_altstyle.png`, "alt_style")}
+                        disabled={saveAssetMutation.isPending}
                         data-testid="button-download-altstyle"
                       >
-                        <Download className="h-4 w-4 mr-2" />
-                        Download Alt Style Graphic
+                        {saveAssetMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                        Save & Download Alt Style
                       </Button>
                     </CardContent>
                   </Card>
