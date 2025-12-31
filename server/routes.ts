@@ -68,7 +68,14 @@ export async function registerRoutes(
 
   app.post("/api/transactions", isAuthenticated, async (req: any, res) => {
     try {
-      const { createSlackChannel: shouldCreateSlack, createGmailFilter, fetchMlsData, onBehalfOfEmail, onBehalfOfSlackId, onBehalfOfName, ...transactionData } = req.body;
+      const { createSlackChannel: shouldCreateSlack, createGmailFilter, fetchMlsData, onBehalfOfEmail, onBehalfOfSlackId, onBehalfOfName, isUnderContract, ...transactionData } = req.body;
+      
+      // Set the status based on whether property is under contract
+      if (isUnderContract === false) {
+        transactionData.status = "active";
+      } else {
+        transactionData.status = "in_contract";
+      }
       
       // Get the current user's ID
       const userId = req.user?.claims?.sub;

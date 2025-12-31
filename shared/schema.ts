@@ -4,7 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Transaction status enum
-export const transactionStatuses = ["in_contract", "pending_inspection", "clear_to_close", "closed", "cancelled"] as const;
+export const transactionStatuses = ["active", "in_contract", "pending_inspection", "clear_to_close", "closed", "cancelled"] as const;
 export type TransactionStatus = typeof transactionStatuses[number];
 
 // Transaction type enum (buy/sell)

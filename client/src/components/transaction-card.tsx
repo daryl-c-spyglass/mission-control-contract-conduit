@@ -13,6 +13,7 @@ interface TransactionCardProps {
 }
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  active: { label: "Active Listing", variant: "secondary" },
   in_contract: { label: "In Contract", variant: "default" },
   pending_inspection: { label: "Pending Inspection", variant: "secondary" },
   clear_to_close: { label: "Clear to Close", variant: "outline" },
