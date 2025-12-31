@@ -43,6 +43,7 @@ const formSchema = z.object({
   transactionType: z.enum(["buy", "sell"]).default("buy"),
   propertyAddress: z.string().min(5, "Please enter a valid property address"),
   mlsNumber: z.string().optional(),
+  isUnderContract: z.boolean().default(true),
   contractDate: z.string().optional(),
   closingDate: z.string().optional(),
   coordinatorIds: z.array(z.string()).default([]),
@@ -105,6 +106,7 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
       transactionType: "buy",
       propertyAddress: "",
       mlsNumber: "",
+      isUnderContract: true,
       contractDate: "",
       closingDate: "",
       coordinatorIds: [],
@@ -308,24 +310,50 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
               </CollapsibleContent>
             </Collapsible>
 
-            <div className="grid grid-cols-2 gap-4">
+            {form.watch("transactionType") === "sell" && (
               <FormField
                 control={form.control}
-                name="contractDate"
+                name="isUnderContract"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Contract Date</FormLabel>
+                  <FormItem className="flex items-center gap-3 space-y-0 rounded-md border p-3">
                     <FormControl>
-                      <Input
-                        type="date"
-                        data-testid="input-contract-date"
-                        {...field}
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="checkbox-under-contract"
                       />
                     </FormControl>
-                    <FormMessage />
+                    <div className="space-y-1">
+                      <FormLabel className="cursor-pointer">Under contract?</FormLabel>
+                      <FormDescription className="text-xs">
+                        Uncheck if this is a new listing not yet under contract
+                      </FormDescription>
+                    </div>
                   </FormItem>
                 )}
               />
+            )}
+
+            <div className={`grid gap-4 ${form.watch("transactionType") === "sell" && !form.watch("isUnderContract") ? "grid-cols-1" : "grid-cols-2"}`}>
+              {(form.watch("transactionType") === "buy" || form.watch("isUnderContract")) && (
+                <FormField
+                  control={form.control}
+                  name="contractDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contract Date</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          data-testid="input-contract-date"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
