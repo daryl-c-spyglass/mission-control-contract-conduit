@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema } from "@shared/schema";
-import { setupGmailForTransaction, isGmailConfigured, getNewMessages } from "./gmail";
+import { setupGmailForTransaction, isGmailConfigured, getNewMessages, watchUserMailbox } from "./gmail";
 import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel } from "./slack";
 import { fetchMLSListing, fetchSimilarListings, searchByAddress } from "./repliers";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
@@ -288,6 +288,12 @@ export async function registerRoutes(
                   gmailFilterId: gmailResult.filterId,
                   gmailLabelId: gmailResult.labelId,
                 });
+                
+                // Set up Gmail watch on this label to receive push notifications
+                const watchResult = await watchUserMailbox(targetEmail, [gmailResult.labelId]);
+                if (watchResult) {
+                  console.log(`Gmail watch set up for ${targetEmail}, historyId: ${watchResult.historyId}`);
+                }
                 
                 await storage.createActivity({
                   transactionId: transaction.id,
@@ -850,6 +856,12 @@ export async function registerRoutes(
               gmailPendingForEmail: null, // Clear the pending flag
             });
             
+            // Set up Gmail watch on this label to receive push notifications
+            const watchResult = await watchUserMailbox(user.email, [gmailResult.labelId]);
+            if (watchResult) {
+              console.log(`Gmail watch set up for ${user.email}, historyId: ${watchResult.historyId}`);
+            }
+            
             await storage.createActivity({
               transactionId: txn.id,
               type: "filter_created",
@@ -965,34 +977,53 @@ export async function registerRoutes(
 
   // ============ Gmail Pub/Sub Webhook ============
 
+  // Helper to extract street pattern from property address for matching
+  function getStreetPatternFromAddress(propertyAddress: string): { streetNumber: string; streetName: string } | null {
+    const addressParts = propertyAddress.match(/^(\d+)\s+(.+?)(?:,|$)/);
+    if (!addressParts) return null;
+    return {
+      streetNumber: addressParts[1],
+      streetName: addressParts[2].trim(),
+    };
+  }
+
   // Store processed message IDs to avoid duplicates (in production, use Redis/DB)
   const processedMessageIds = new Set<string>();
 
   app.post("/api/gmail/webhook", async (req, res) => {
     try {
+      console.log("Gmail webhook received:", JSON.stringify(req.body).substring(0, 500));
+      
       // Pub/Sub sends base64 encoded message data
       const message = req.body.message;
       if (!message?.data) {
+        console.log("No message.data in webhook payload");
         return res.status(400).json({ message: "Invalid Pub/Sub message" });
       }
 
       // Decode the message
       const decoded = Buffer.from(message.data, "base64").toString("utf-8");
       const notification = JSON.parse(decoded);
+      console.log("Decoded notification:", notification);
       
       // notification contains: { emailAddress, historyId }
       const userEmail = notification.emailAddress;
       const historyId = notification.historyId;
       
       if (!userEmail || !historyId) {
+        console.log("Missing emailAddress or historyId in notification");
         return res.status(200).json({ message: "No email data in notification" });
       }
+
+      console.log(`Processing Gmail notification for ${userEmail}, historyId: ${historyId}`);
 
       // Find transactions for this user that have Gmail labels
       const transactions = await storage.getTransactions();
       const userTransactions = transactions.filter(t => 
         t.userId && t.gmailLabelId && t.slackChannelId
       );
+      
+      console.log(`Found ${userTransactions.length} transactions with Gmail labels and Slack channels`);
 
       // For each transaction with a Gmail label, check for new messages
       for (const txn of userTransactions) {
@@ -1001,11 +1032,33 @@ export async function registerRoutes(
           const owner = await authStorage.getUser(txn.userId!);
           if (owner?.email !== userEmail) continue;
           
+          console.log(`Checking transaction ${txn.id} for ${txn.propertyAddress}`);
+          
           const messages = await getNewMessages(userEmail, historyId, txn.gmailLabelId!);
+          console.log(`Found ${messages.length} new messages for transaction ${txn.id}`);
+          
+          // Extract street pattern for subject line filtering
+          const streetPattern = getStreetPatternFromAddress(txn.propertyAddress);
           
           for (const msg of messages) {
             // Skip if already processed
-            if (processedMessageIds.has(msg.id)) continue;
+            if (processedMessageIds.has(msg.id)) {
+              console.log(`Skipping already processed message ${msg.id}`);
+              continue;
+            }
+            
+            // Secondary filter: check if subject contains street number and street name
+            if (streetPattern) {
+              const subjectLower = msg.subject.toLowerCase();
+              const hasStreetNumber = subjectLower.includes(streetPattern.streetNumber);
+              const hasStreetName = subjectLower.includes(streetPattern.streetName.toLowerCase());
+              
+              if (!hasStreetNumber || !hasStreetName) {
+                console.log(`Skipping email - subject "${msg.subject}" doesn't match "${streetPattern.streetNumber} ${streetPattern.streetName}"`);
+                continue;
+              }
+            }
+            
             processedMessageIds.add(msg.id);
             
             // Keep set size manageable
@@ -1018,6 +1071,7 @@ export async function registerRoutes(
             }
             
             // Post to Slack channel
+            console.log(`Posting email to Slack channel ${txn.slackChannelId}`);
             const slackMessage = `*New email related to ${txn.propertyAddress}*\n\n*From:* ${msg.from}\n*Subject:* ${msg.subject}\n\n${msg.snippet}...`;
             await postToChannel(txn.slackChannelId!, slackMessage);
           }
