@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema } from "@shared/schema";
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages } from "./gmail";
 import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel } from "./slack";
-import { fetchMLSListing, fetchSimilarListings } from "./repliers";
+import { fetchMLSListing, fetchSimilarListings, searchByAddress } from "./repliers";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
 
@@ -475,6 +475,44 @@ export async function registerRoutes(
       res.json(activities);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch activities" });
+    }
+  });
+
+  // ============ Listing Search (Templates) ============
+  // Search MLS listing by address or MLS number for template generation
+  app.get("/api/listings/search", isAuthenticated, async (req, res) => {
+    try {
+      const { query } = req.query;
+      if (!query || typeof query !== "string") {
+        return res.status(400).json({ message: "Query parameter required" });
+      }
+
+      if (!process.env.REPLIERS_API_KEY) {
+        return res.status(400).json({ message: "Repliers API key not configured" });
+      }
+
+      let listing = null;
+
+      // If it looks like an MLS number (mostly digits), search by MLS number first
+      const isLikelyMLS = /^[A-Za-z]?\d+$/.test(query.replace(/\s/g, ""));
+      
+      if (isLikelyMLS) {
+        listing = await fetchMLSListing(query.replace(/\s/g, ""));
+      }
+      
+      // If not found by MLS, try address search
+      if (!listing) {
+        listing = await searchByAddress(query);
+      }
+
+      if (!listing) {
+        return res.status(404).json({ message: "No listing found for the provided query" });
+      }
+
+      res.json(listing);
+    } catch (error) {
+      console.error("Error searching listings:", error);
+      res.status(500).json({ message: "Failed to search listings" });
     }
   });
 

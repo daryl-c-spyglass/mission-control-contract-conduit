@@ -52,8 +52,15 @@ The app follows a Modern Productivity Dashboard approach inspired by Linear, Not
 ### Third-Party Integrations (Planned/Configurable)
 - **Slack**: Create channels for transactions, invite coordinators automatically
 - **Gmail**: Create filters to route property emails to appropriate channels
-- **MLS Systems**: Fetch property data including photos, pricing, and details
+- **MLS Systems (Repliers API)**: Fetch property data including photos, pricing, and details
 - **Follow Up Boss (FUB)**: CRM integration for client data
+
+### Templates Feature (ReChat-like)
+The Templates tab in transaction details provides marketing template generation:
+- Search by address or MLS number to fetch listing data from Repliers API
+- Template categories: Posts (1:1), Stories (9:16), Flyers, Postcards, Brochures
+- Live previews with property photos, pricing, and description overlays
+- Uses `/api/listings/search` endpoint with `searchByAddress` fallback to MLS lookup
 
 ### Key NPM Packages
 - **UI**: Radix UI primitives, shadcn/ui components, Lucide icons, react-icons

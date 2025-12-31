@@ -64,11 +64,29 @@ export interface CMAComparable {
   imageUrl?: string;
 }
 
+// Helper to normalize image URLs from various API response formats
+function normalizeImageUrls(images: any): string[] {
+  if (!images) return [];
+  if (!Array.isArray(images)) return [];
+  
+  return images
+    .map((img: any) => {
+      if (typeof img === "string") return img;
+      if (typeof img === "object" && img !== null) {
+        return img.url || img.src || img.href || img.imageUrl || "";
+      }
+      return "";
+    })
+    .filter((url: string) => url && typeof url === "string" && url.startsWith("http"));
+}
+
 export async function fetchMLSListing(mlsNumber: string): Promise<MLSListingData | null> {
   try {
     const data = await repliersRequest(`/listings/${mlsNumber}`);
     
     if (!data) return null;
+
+    const rawImages = data.images || data.photos || [];
 
     return {
       mlsNumber: data.mlsNumber || mlsNumber,
@@ -84,7 +102,7 @@ export async function fetchMLSListing(mlsNumber: string): Promise<MLSListingData
       description: data.details?.description || data.publicRemarks || "",
       listDate: data.listingDate || data.listDate || "",
       status: data.status || data.listingStatus || "",
-      images: data.images || data.photos?.map((p: any) => p.url) || [],
+      images: normalizeImageUrls(rawImages),
       agent: data.agent ? {
         name: data.agent.name || "",
         phone: data.agent.phone || "",
@@ -121,6 +139,49 @@ export async function fetchSimilarListings(mlsNumber: string, radius: number = 5
   } catch (error) {
     console.error("Error fetching similar listings:", error);
     return [];
+  }
+}
+
+export async function searchByAddress(address: string): Promise<MLSListingData | null> {
+  try {
+    const data = await repliersRequest("/listings", {
+      address: address,
+      resultsPerPage: "5",
+    });
+
+    if (!data.listings || !Array.isArray(data.listings) || data.listings.length === 0) {
+      return null;
+    }
+
+    // Return the first (best match) result
+    const listing = data.listings[0];
+    const rawImages = listing.images || listing.photos || [];
+    
+    return {
+      mlsNumber: listing.mlsNumber || "",
+      listPrice: parseFloat(listing.listPrice) || 0,
+      address: listing.address?.full || listing.address?.streetName || "",
+      city: listing.address?.city || "",
+      state: listing.address?.state || "",
+      bedrooms: listing.beds || listing.details?.numBedrooms || 0,
+      bathrooms: listing.baths || listing.details?.numBathrooms || 0,
+      sqft: listing.details?.sqft || listing.sqft || 0,
+      yearBuilt: listing.details?.yearBuilt || 0,
+      propertyType: listing.details?.propertyType || listing.class || "Residential",
+      description: listing.details?.description || listing.publicRemarks || "",
+      listDate: listing.listingDate || listing.listDate || "",
+      status: listing.status || listing.listingStatus || "",
+      images: normalizeImageUrls(rawImages),
+      agent: listing.agent ? {
+        name: listing.agent.name || "",
+        phone: listing.agent.phone || "",
+        email: listing.agent.email || "",
+        brokerage: listing.agent.brokerage || listing.office?.name || "",
+      } : undefined,
+    };
+  } catch (error) {
+    console.error("Error searching by address:", error);
+    return null;
   }
 }
 
