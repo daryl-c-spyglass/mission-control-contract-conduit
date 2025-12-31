@@ -80,20 +80,26 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
   const [fubExpanded, setFubExpanded] = useState(false);
   const [fubContact, setFubContact] = useState<FUBContact | null>(null);
 
-  const { data: coordinators = [], isLoading: coordinatorsLoading, error: coordinatorsError } = useQuery<Coordinator[]>({
+  const { data: coordinators = [], isLoading: coordinatorsLoading, error: coordinatorsError, status } = useQuery<Coordinator[]>({
     queryKey: ["/api/coordinators"],
     queryFn: async () => {
+      console.log("[DEBUG] Fetching coordinators...");
       const res = await fetch("/api/coordinators");
+      console.log("[DEBUG] Coordinators response status:", res.status);
       if (!res.ok) {
         throw new Error(`Failed to fetch coordinators: ${res.status}`);
       }
-      return res.json();
+      const data = await res.json();
+      console.log("[DEBUG] Coordinators data:", data);
+      return data;
     },
     enabled: open,
     staleTime: 0,
     gcTime: 0,
     refetchOnMount: "always",
   });
+  
+  console.log("[DEBUG] Coordinators query - open:", open, "status:", status, "loading:", coordinatorsLoading, "error:", coordinatorsError, "count:", coordinators.length);
 
   const [onBehalfExpanded, setOnBehalfExpanded] = useState(false);
 
