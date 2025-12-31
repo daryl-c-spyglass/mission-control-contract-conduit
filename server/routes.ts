@@ -968,7 +968,7 @@ export async function registerRoutes(
   // Store processed message IDs to avoid duplicates (in production, use Redis/DB)
   const processedMessageIds = new Set<string>();
 
-  app.post("/api/webhooks/gmail", async (req, res) => {
+  app.post("/api/gmail/webhook", async (req, res) => {
     try {
       // Pub/Sub sends base64 encoded message data
       const message = req.body.message;
