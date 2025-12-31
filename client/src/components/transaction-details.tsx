@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -24,6 +24,8 @@ import {
   FileImage,
   Download,
   Trash2,
+  Upload,
+  File,
 } from "lucide-react";
 import { CreateFlyerDialog } from "./create-flyer-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,7 +37,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Transaction, Coordinator, Activity as ActivityType, CMAComparable, MLSData, MarketingAsset } from "@shared/schema";
+import type { Transaction, Coordinator, Activity as ActivityType, CMAComparable, MLSData, MarketingAsset, ContractDocument } from "@shared/schema";
 
 interface TransactionDetailsProps {
   transaction: Transaction;
@@ -84,6 +86,7 @@ function formatDateTime(dateString: Date | null): string {
 export function TransactionDetails({ transaction, coordinators, activities, onBack, onMarketingClick }: TransactionDetailsProps) {
   const { toast } = useToast();
   const [flyerDialogOpen, setFlyerDialogOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const status = statusConfig[transaction.status] || statusConfig.in_contract;
   const mlsData = transaction.mlsData as MLSData | null;
   const cmaData = transaction.cmaData as CMAComparable[] | null;
@@ -96,8 +99,82 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
     queryKey: [`/api/transactions/${transaction.id}/marketing-assets`],
   });
 
+  const { data: documents = [], isLoading: documentsLoading } = useQuery<ContractDocument[]>({
+    queryKey: [`/api/transactions/${transaction.id}/documents`],
+  });
+
+  const uploadDocumentMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const reader = new FileReader();
+      return new Promise<ContractDocument>((resolve, reject) => {
+        reader.onload = async () => {
+          const fileData = reader.result as string;
+          try {
+            const res = await apiRequest("POST", `/api/transactions/${transaction.id}/documents`, {
+              fileName: file.name,
+              fileData,
+              fileType: file.type,
+              fileSize: file.size,
+            });
+            resolve(await res.json());
+          } catch (error) {
+            reject(error);
+          }
+        };
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(file);
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/transactions/${transaction.id}/documents`] });
+      toast({ title: "Document uploaded successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to upload document", variant: "destructive" });
+    },
+  });
+
+  const deleteDocumentMutation = useMutation({
+    mutationFn: async (docId: string) => {
+      await apiRequest("DELETE", `/api/transactions/${transaction.id}/documents/${docId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/transactions/${transaction.id}/documents`] });
+      toast({ title: "Document deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete document", variant: "destructive" });
+    },
+  });
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      Array.from(files).forEach(file => {
+        uploadDocumentMutation.mutate(file);
+      });
+    }
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const downloadDocument = (doc: ContractDocument) => {
+    const link = document.createElement("a");
+    link.href = doc.fileData;
+    link.download = doc.fileName;
+    link.click();
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   const deleteAssetMutation = useMutation({
-    mutationFn: async (assetId: number) => {
+    mutationFn: async (assetId: string) => {
       await apiRequest("DELETE", `/api/transactions/${transaction.id}/marketing-assets/${assetId}`);
     },
     onSuccess: () => {
@@ -217,6 +294,12 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
           <TabsTrigger value="mls" data-testid="tab-mls">MLS Data</TabsTrigger>
           <TabsTrigger value="cma" data-testid="tab-cma">CMA</TabsTrigger>
+          <TabsTrigger value="documents" data-testid="tab-documents">
+            Documents
+            {documents.length > 0 && (
+              <Badge variant="secondary" className="ml-2 text-xs">{documents.length}</Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="marketing" data-testid="tab-marketing">
             Marketing
             {marketingAssets.length > 0 && (
@@ -626,6 +709,98 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 <p className="text-sm text-muted-foreground">
                   Comparative market analysis will appear here once MLS data is fetched.
                 </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="documents" className="space-y-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <h2 className="text-lg font-semibold">Contract Documents</h2>
+            <div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                className="hidden"
+                multiple
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                data-testid="input-file-upload"
+              />
+              <Button
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadDocumentMutation.isPending}
+                data-testid="button-upload-document"
+              >
+                {uploadDocumentMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4 mr-2" />
+                )}
+                Upload Documents
+              </Button>
+            </div>
+          </div>
+
+          {documentsLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-md" />
+              ))}
+            </div>
+          ) : documents.length > 0 ? (
+            <div className="space-y-3">
+              {documents.map((doc) => (
+                <Card key={doc.id} data-testid={`card-document-${doc.id}`}>
+                  <CardContent className="flex items-center gap-4 py-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+                      <File className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{doc.fileName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatFileSize(doc.fileSize)} {doc.uploadedBy && `| Uploaded by ${doc.uploadedBy}`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => downloadDocument(doc)}
+                        data-testid={`button-download-doc-${doc.id}`}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => deleteDocumentMutation.mutate(doc.id)}
+                        disabled={deleteDocumentMutation.isPending}
+                        data-testid={`button-delete-doc-${doc.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                <h3 className="font-medium mb-2">No Documents Yet</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Upload contract documents, amendments, and other files for this transaction.
+                </p>
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  data-testid="button-upload-first-document"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Documents
+                </Button>
               </CardContent>
             </Card>
           )}

@@ -79,9 +79,10 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
   const [fubExpanded, setFubExpanded] = useState(false);
   const [fubContact, setFubContact] = useState<FUBContact | null>(null);
 
-  const { data: coordinators = [] } = useQuery<Coordinator[]>({
+  const { data: coordinators = [], isLoading: coordinatorsLoading, error: coordinatorsError } = useQuery<Coordinator[]>({
     queryKey: ["/api/coordinators"],
     enabled: open,
+    staleTime: 0, // Always refetch when dialog opens
   });
 
   const [onBehalfExpanded, setOnBehalfExpanded] = useState(false);
@@ -339,8 +340,15 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
               render={() => (
                 <FormItem>
                   <FormLabel>Transaction Coordinators</FormLabel>
-                  {coordinators.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Loading coordinators...</p>
+                  {coordinatorsLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading coordinators...
+                    </div>
+                  ) : coordinatorsError ? (
+                    <p className="text-sm text-destructive">Failed to load coordinators</p>
+                  ) : coordinators.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No coordinators configured</p>
                   ) : (
                     <div className="space-y-2">
                       {coordinators.map((coordinator) => (

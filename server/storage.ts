@@ -9,11 +9,14 @@ import {
   type InsertActivity,
   type MarketingAsset,
   type InsertMarketingAsset,
+  type ContractDocument,
+  type InsertContractDocument,
   transactions,
   coordinators,
   integrationSettings,
   activities,
   marketingAssets,
+  contractDocuments,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -47,6 +50,11 @@ export interface IStorage {
   getMarketingAssetsByTransaction(transactionId: string): Promise<MarketingAsset[]>;
   createMarketingAsset(asset: InsertMarketingAsset): Promise<MarketingAsset>;
   deleteMarketingAsset(id: string): Promise<boolean>;
+
+  // Contract Documents
+  getContractDocumentsByTransaction(transactionId: string): Promise<ContractDocument[]>;
+  createContractDocument(doc: InsertContractDocument): Promise<ContractDocument>;
+  deleteContractDocument(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -193,6 +201,28 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMarketingAsset(id: string): Promise<boolean> {
     await db.delete(marketingAssets).where(eq(marketingAssets.id, id));
+    return true;
+  }
+
+  // Contract Documents
+  async getContractDocumentsByTransaction(transactionId: string): Promise<ContractDocument[]> {
+    return await db
+      .select()
+      .from(contractDocuments)
+      .where(eq(contractDocuments.transactionId, transactionId))
+      .orderBy(desc(contractDocuments.createdAt));
+  }
+
+  async createContractDocument(doc: InsertContractDocument): Promise<ContractDocument> {
+    const [newDoc] = await db
+      .insert(contractDocuments)
+      .values(doc)
+      .returning();
+    return newDoc;
+  }
+
+  async deleteContractDocument(id: string): Promise<boolean> {
+    await db.delete(contractDocuments).where(eq(contractDocuments.id, id));
     return true;
   }
 }

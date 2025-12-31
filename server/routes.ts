@@ -208,6 +208,13 @@ export async function registerRoutes(
             welcomeMessage += `\n\n:calendar: Closing date: ${transaction.closingDate}`;
           }
           
+          // Add FUB contact link if available
+          if (transaction.fubClientId) {
+            const fubClientLink = `https://www.followupboss.com/2/people/view/${transaction.fubClientId}`;
+            const clientName = transaction.fubClientName || "Client";
+            welcomeMessage += `\n\n:bust_in_silhouette: *Follow Up Boss Contact:* <${fubClientLink}|${clientName}>`;
+          }
+          
           // Add instructions for email filtering setup if created on behalf of another agent
           if (onBehalfOfName && !onBehalfOfSlackId) {
             // Get the app URL for the onboarding link - use production domain
@@ -574,6 +581,72 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete marketing asset" });
+    }
+  });
+
+  // ============ Contract Documents ============
+
+  app.get("/api/transactions/:id/documents", isAuthenticated, async (req, res) => {
+    try {
+      const documents = await storage.getContractDocumentsByTransaction(req.params.id);
+      res.json(documents);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch documents" });
+    }
+  });
+
+  app.post("/api/transactions/:id/documents", isAuthenticated, async (req: any, res) => {
+    try {
+      const transaction = await storage.getTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      const { fileName, fileData, fileType, fileSize } = req.body;
+      
+      if (!fileName || !fileData || !fileType || !fileSize) {
+        return res.status(400).json({ message: "Missing required file data" });
+      }
+
+      const doc = await storage.createContractDocument({
+        transactionId: req.params.id,
+        fileName,
+        fileData,
+        fileType,
+        fileSize,
+        uploadedBy: req.user?.claims?.email || req.user?.claims?.sub,
+      });
+
+      await storage.createActivity({
+        transactionId: req.params.id,
+        type: "document_uploaded",
+        description: `Contract document uploaded: ${fileName}`,
+      });
+
+      // Optionally notify Slack about the upload
+      if (transaction.slackChannelId) {
+        await postToChannel(
+          transaction.slackChannelId,
+          `A new contract document has been uploaded: *${fileName}*`
+        );
+      }
+
+      res.status(201).json(doc);
+    } catch (error: any) {
+      console.error("Document upload error:", error);
+      res.status(400).json({ message: error.message || "Failed to upload document" });
+    }
+  });
+
+  app.delete("/api/transactions/:transactionId/documents/:id", isAuthenticated, async (req, res) => {
+    try {
+      const deleted = await storage.deleteContractDocument(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete document" });
     }
   });
 

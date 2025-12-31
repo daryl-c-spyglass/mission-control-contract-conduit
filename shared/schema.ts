@@ -90,6 +90,18 @@ export const marketingAssets = pgTable("marketing_assets", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Contract documents for transactions
+export const contractDocuments = pgTable("contract_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  transactionId: varchar("transaction_id").notNull(),
+  fileName: text("file_name").notNull(),
+  fileData: text("file_data").notNull(), // Base64 encoded file data
+  fileType: text("file_type").notNull(), // MIME type (application/pdf, etc.)
+  fileSize: integer("file_size").notNull(), // Size in bytes
+  uploadedBy: text("uploaded_by"), // User who uploaded
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
   id: true,
@@ -114,6 +126,11 @@ export const insertMarketingAssetSchema = createInsertSchema(marketingAssets).om
   createdAt: true,
 });
 
+export const insertContractDocumentSchema = createInsertSchema(contractDocuments).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
@@ -129,6 +146,9 @@ export type InsertActivity = z.infer<typeof insertActivitySchema>;
 
 export type MarketingAsset = typeof marketingAssets.$inferSelect;
 export type InsertMarketingAsset = z.infer<typeof insertMarketingAssetSchema>;
+
+export type ContractDocument = typeof contractDocuments.$inferSelect;
+export type InsertContractDocument = z.infer<typeof insertContractDocumentSchema>;
 
 // CMA Comparable type
 export interface CMAComparable {
