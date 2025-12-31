@@ -36,7 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import type { Coordinator } from "@shared/schema";
 
 const formSchema = z.object({
@@ -82,8 +82,16 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
 
   const { data: coordinators = [], isLoading: coordinatorsLoading, error: coordinatorsError } = useQuery<Coordinator[]>({
     queryKey: ["/api/coordinators"],
+    queryFn: async () => {
+      const res = await fetch("/api/coordinators");
+      if (!res.ok) {
+        throw new Error(`Failed to fetch coordinators: ${res.status}`);
+      }
+      return res.json();
+    },
     enabled: open,
     staleTime: 0,
+    gcTime: 0,
     refetchOnMount: "always",
   });
 
