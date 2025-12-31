@@ -363,22 +363,18 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="coordinatorIds"
-              render={() => (
-                <FormItem>
-                  <FormLabel>Transaction Coordinators</FormLabel>
-                  {coordinatorsLoading ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Loading coordinators...
-                    </div>
-                  ) : coordinatorsError ? (
-                    <p className="text-sm text-destructive">Failed to load coordinators</p>
-                  ) : coordinators.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No coordinators configured</p>
-                  ) : (
+            <div className="space-y-3 rounded-md border p-4 bg-muted/30">
+              <p className="text-sm font-medium">Assign Transaction Coordinators</p>
+              {coordinatorsLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading coordinators...
+                </div>
+              ) : coordinatorsError ? (
+                <p className="text-sm text-destructive">Failed to load coordinators: {String(coordinatorsError)}</p>
+              ) : coordinators.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No coordinators configured</p>
+              ) : (
                     <div className="space-y-2">
                       {coordinators.map((coordinator) => (
                         <FormField
@@ -408,11 +404,8 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                         />
                       ))}
                     </div>
-                  )}
-                  <FormMessage />
-                </FormItem>
               )}
-            />
+            </div>
 
             <Collapsible open={onBehalfExpanded} onOpenChange={setOnBehalfExpanded}>
               <CollapsibleTrigger asChild>
