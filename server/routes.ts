@@ -479,12 +479,15 @@ export async function registerRoutes(
   });
 
   // ============ Coordinators ============
-
-  app.get("/api/coordinators", isAuthenticated, async (req, res) => {
+  // Note: Coordinators are internal team data, no auth required for read
+  app.get("/api/coordinators", async (req, res) => {
     try {
+      console.log("[coordinators] Fetching coordinators...");
       const coordinators = await storage.getCoordinators();
+      console.log(`[coordinators] Found ${coordinators.length} coordinators:`, coordinators.map(c => c.name));
       res.json(coordinators);
     } catch (error) {
+      console.error("[coordinators] Error fetching coordinators:", error);
       res.status(500).json({ message: "Failed to fetch coordinators" });
     }
   });

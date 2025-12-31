@@ -83,19 +83,8 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
   const { data: coordinators = [], isLoading: coordinatorsLoading, error: coordinatorsError } = useQuery<Coordinator[]>({
     queryKey: ["/api/coordinators"],
     enabled: open,
-    staleTime: 0, // Always refetch when dialog opens
-    queryFn: async () => {
-      const res = await fetch("/api/coordinators", { credentials: "include" });
-      if (!res.ok) {
-        if (res.status === 401) {
-          // Session expired - redirect to login
-          window.location.href = "/api/auth/google";
-          return [];
-        }
-        throw new Error("Failed to fetch coordinators");
-      }
-      return res.json();
-    },
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const [onBehalfExpanded, setOnBehalfExpanded] = useState(false);
