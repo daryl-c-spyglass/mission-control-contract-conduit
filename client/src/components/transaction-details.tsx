@@ -714,7 +714,10 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 <Button
                   variant="outline"
                   className="gap-2"
-                  onClick={() => refreshMlsMutation.mutate()}
+                  onClick={() => {
+                    console.log("!!! FETCH MLS BUTTON CLICKED !!!");
+                    refreshMlsMutation.mutate();
+                  }}
                   disabled={refreshMlsMutation.isPending}
                 >
                   {refreshMlsMutation.isPending ? (
