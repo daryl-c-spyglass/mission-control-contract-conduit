@@ -432,15 +432,19 @@ export async function registerRoutes(
   });
 
   app.post("/api/transactions/:id/refresh-mls", isAuthenticated, async (req, res) => {
+    console.log("=== REFRESH MLS REQUEST ===", req.params.id);
     try {
       const transaction = await storage.getTransaction(req.params.id);
+      console.log("Transaction found:", transaction?.id, "MLS#:", transaction?.mlsNumber);
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
       }
 
       if (!process.env.REPLIERS_API_KEY) {
+        console.log("REPLIERS_API_KEY not configured");
         return res.status(400).json({ message: "Repliers API key not configured" });
       }
+      console.log("Calling Repliers API for MLS#:", transaction.mlsNumber);
 
       // Fetch real MLS data using address or MLS number
       let mlsData = null;
@@ -448,7 +452,10 @@ export async function registerRoutes(
 
       if (transaction.mlsNumber) {
         mlsData = await fetchMLSListing(transaction.mlsNumber);
+        console.log("MLS Data returned:", mlsData ? "found" : "null", mlsData?.images?.length, "images");
         cmaData = await fetchSimilarListings(transaction.mlsNumber);
+      } else {
+        console.log("No MLS number on transaction");
       }
 
       const updateData: any = {};
