@@ -62,8 +62,11 @@ export async function createGmailLabelAndFilter(
   try {
     const gmail = getGmailClient(userEmail);
 
-    // Extract street number and name for matching
-    // Handle formats like "123 Main Street, Austin, TX 78701"
+    // Extract street number and name for matching (without the street type suffix)
+    // Handle formats like "123 Main Street, Austin, TX 78701" -> "123 Main"
+    // Common street type suffixes to remove
+    const streetTypeSuffixes = /\s+(street|st|avenue|ave|drive|dr|road|rd|lane|ln|boulevard|blvd|way|circle|cir|court|ct|place|pl|terrace|ter|trail|trl|parkway|pkwy|highway|hwy)$/i;
+    
     const addressParts = propertyAddress.match(/^(\d+)\s+(.+?)(?:,|$)/);
     if (!addressParts) {
       console.log("Could not parse address for filter:", propertyAddress);
@@ -71,9 +74,11 @@ export async function createGmailLabelAndFilter(
     }
     
     const streetNumber = addressParts[1];
-    const streetName = addressParts[2].trim();
+    // Remove street type suffix to get just the street name
+    const fullStreetName = addressParts[2].trim();
+    const streetName = fullStreetName.replace(streetTypeSuffixes, "").trim();
     
-    // Create a label for this transaction
+    // Create a label for this transaction (use full name for label)
     const labelName = `MC/${streetNumber} ${streetName}`;
     
     // Check if label already exists
@@ -100,11 +105,10 @@ export async function createGmailLabelAndFilter(
       throw new Error("Failed to create Gmail label");
     }
 
-    // Create filter to match emails with address in subject line
-    // Use street number + full street name for better matching
-    // "123 Main Street" -> filter on "123 Main Street"
-    // "123 5th Ave" -> filter on "123 5th Ave"
-    // This ensures more accurate email filtering
+    // Create filter to match emails with just street number + street name
+    // "123 Main Street" -> filter on "123 Main"
+    // "1701 Testing Avenue" -> filter on "1701 Testing"
+    // This handles abbreviations like Ave/Avenue, St/Street, etc.
     const subjectPattern = `${streetNumber} ${streetName}`;
     
     console.log(`Creating Gmail filter for subject containing: "${subjectPattern}"`);

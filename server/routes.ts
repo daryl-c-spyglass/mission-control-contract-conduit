@@ -978,13 +978,18 @@ export async function registerRoutes(
   // ============ Gmail Pub/Sub Webhook ============
 
   // Helper to extract street pattern from property address for matching
+  // Removes street type suffixes (Ave, Street, etc.) for more flexible matching
   function getStreetPatternFromAddress(propertyAddress: string): { streetNumber: string; streetName: string } | null {
+    const streetTypeSuffixes = /\s+(street|st|avenue|ave|drive|dr|road|rd|lane|ln|boulevard|blvd|way|circle|cir|court|ct|place|pl|terrace|ter|trail|trl|parkway|pkwy|highway|hwy)$/i;
+    
     const addressParts = propertyAddress.match(/^(\d+)\s+(.+?)(?:,|$)/);
     if (!addressParts) return null;
-    return {
-      streetNumber: addressParts[1],
-      streetName: addressParts[2].trim(),
-    };
+    
+    const streetNumber = addressParts[1];
+    const fullStreetName = addressParts[2].trim();
+    const streetName = fullStreetName.replace(streetTypeSuffixes, "").trim();
+    
+    return { streetNumber, streetName };
   }
 
   // Store processed message IDs to avoid duplicates (in production, use Redis/DB)
