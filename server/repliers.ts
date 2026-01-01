@@ -82,32 +82,53 @@ function normalizeImageUrls(images: any): string[] {
 
 export async function fetchMLSListing(mlsNumber: string): Promise<MLSListingData | null> {
   try {
-    const data = await repliersRequest(`/listings/${mlsNumber}`);
+    // Use query parameter for MLS number lookup (as per Repliers API docs)
+    const data = await repliersRequest("/listings", { mlsNumber });
     
-    if (!data) return null;
+    console.log("Repliers API response for MLS", mlsNumber, ":", JSON.stringify(data).substring(0, 500));
+    
+    // Response could be a single listing or an array of listings
+    let listing = data;
+    if (data.listings && Array.isArray(data.listings)) {
+      if (data.listings.length === 0) {
+        console.log("No listings found for MLS number:", mlsNumber);
+        return null;
+      }
+      listing = data.listings[0];
+    }
+    
+    if (!listing) return null;
 
-    const rawImages = data.images || data.photos || [];
+    const rawImages = listing.images || listing.photos || [];
+    
+    // Build full address from components
+    const addressParts = [];
+    if (listing.address?.streetNumber) addressParts.push(listing.address.streetNumber);
+    if (listing.address?.streetName) addressParts.push(listing.address.streetName);
+    if (listing.address?.streetSuffix) addressParts.push(listing.address.streetSuffix);
+    const streetAddress = addressParts.join(" ");
+    const fullAddress = listing.address?.full || streetAddress;
 
     return {
-      mlsNumber: data.mlsNumber || mlsNumber,
-      listPrice: parseFloat(data.listPrice) || 0,
-      address: data.address?.full || data.address?.streetName || "",
-      city: data.address?.city || "",
-      state: data.address?.state || "",
-      bedrooms: data.beds || data.details?.numBedrooms || 0,
-      bathrooms: data.baths || data.details?.numBathrooms || 0,
-      sqft: data.details?.sqft || data.sqft || 0,
-      yearBuilt: data.details?.yearBuilt || 0,
-      propertyType: data.details?.propertyType || data.class || "Residential",
-      description: data.details?.description || data.publicRemarks || "",
-      listDate: data.listingDate || data.listDate || "",
-      status: data.status || data.listingStatus || "",
+      mlsNumber: listing.mlsNumber || mlsNumber,
+      listPrice: parseFloat(listing.listPrice) || 0,
+      address: fullAddress,
+      city: listing.address?.city || "",
+      state: listing.address?.state || listing.address?.province || "",
+      bedrooms: listing.details?.numBedrooms || listing.beds || 0,
+      bathrooms: listing.details?.numBathrooms || listing.baths || 0,
+      sqft: listing.details?.sqft || listing.sqft || 0,
+      yearBuilt: listing.details?.yearBuilt || 0,
+      propertyType: listing.details?.propertyType || listing.class || "Residential",
+      description: listing.details?.description || listing.publicRemarks || listing.remarks || "",
+      listDate: listing.listDate || listing.listingDate || "",
+      status: listing.status || listing.listingStatus || "",
       images: normalizeImageUrls(rawImages),
-      agent: data.agent ? {
-        name: data.agent.name || "",
-        phone: data.agent.phone || "",
-        email: data.agent.email || "",
-        brokerage: data.agent.brokerage || data.office?.name || "",
+      agent: listing.agents?.[0] ? {
+        name: listing.agents[0].name || "",
+        phone: listing.agents[0].phone || "",
+        email: listing.agents[0].email || "",
+        brokerage: listing.agents[0].brokerage || listing.office?.name || "",
       } : undefined,
     };
   } catch (error) {
@@ -118,24 +139,35 @@ export async function fetchMLSListing(mlsNumber: string): Promise<MLSListingData
 
 export async function fetchSimilarListings(mlsNumber: string, radius: number = 5): Promise<CMAComparable[]> {
   try {
-    const data = await repliersRequest(`/listings/${mlsNumber}/similar`, {
+    // Use the similar listings endpoint
+    const data = await repliersRequest("/listings/similar", {
+      mlsNumber,
       radius: radius.toString(),
     });
+
+    console.log("Repliers similar listings response:", JSON.stringify(data).substring(0, 300));
 
     if (!data.listings || !Array.isArray(data.listings)) {
       return [];
     }
 
-    return data.listings.slice(0, 10).map((listing: any) => ({
-      address: listing.address?.full || listing.address?.streetName || "",
-      price: parseFloat(listing.listPrice) || parseFloat(listing.soldPrice) || 0,
-      bedrooms: listing.beds || listing.details?.numBedrooms || 0,
-      bathrooms: listing.baths || listing.details?.numBathrooms || 0,
-      sqft: listing.details?.sqft || listing.sqft || 0,
-      daysOnMarket: listing.daysOnMarket || listing.dom || 0,
-      distance: listing.distance || 0,
-      imageUrl: listing.images?.[0] || listing.photos?.[0]?.url || undefined,
-    }));
+    return data.listings.slice(0, 10).map((listing: any) => {
+      const addressParts = [];
+      if (listing.address?.streetNumber) addressParts.push(listing.address.streetNumber);
+      if (listing.address?.streetName) addressParts.push(listing.address.streetName);
+      const streetAddress = addressParts.join(" ");
+      
+      return {
+        address: listing.address?.full || streetAddress || "",
+        price: parseFloat(listing.listPrice) || parseFloat(listing.soldPrice) || 0,
+        bedrooms: listing.details?.numBedrooms || listing.beds || 0,
+        bathrooms: listing.details?.numBathrooms || listing.baths || 0,
+        sqft: listing.details?.sqft || listing.sqft || 0,
+        daysOnMarket: listing.daysOnMarket || listing.dom || 0,
+        distance: listing.distance || 0,
+        imageUrl: listing.images?.[0] || listing.photos?.[0]?.url || undefined,
+      };
+    });
   } catch (error) {
     console.error("Error fetching similar listings:", error);
     return [];
