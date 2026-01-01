@@ -230,14 +230,18 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
 
   const refreshMlsMutation = useMutation({
     mutationFn: async () => {
+      console.log("=== REFRESH MLS MUTATION CALLED ===", transaction.id);
       const res = await apiRequest("POST", `/api/transactions/${transaction.id}/refresh-mls`);
+      console.log("Response status:", res.status);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("MLS refresh success:", data);
       toast({ title: "MLS data refreshed" });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", transaction.id] });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("MLS refresh error:", error);
       toast({ title: "Failed to refresh MLS data", variant: "destructive" });
     },
   });
