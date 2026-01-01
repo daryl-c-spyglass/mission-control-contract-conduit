@@ -9,25 +9,39 @@ async function repliersRequest(endpoint: string, params?: Record<string, string>
   }
 
   const url = new URL(`${REPLIERS_API_BASE}${endpoint}`);
+  
+  // Add API key as query parameter (Repliers accepts both header and query param)
+  url.searchParams.append("repliers_api_key", apiKey);
+  
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       url.searchParams.append(key, value);
     });
   }
 
+  console.log("Repliers API request:", url.toString().replace(apiKey, "***"));
+
   const response = await fetch(url.toString(), {
     method: "GET",
     headers: {
-      "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
   });
 
+  const responseText = await response.text();
+  console.log("Repliers API response status:", response.status, response.statusText);
+  console.log("Repliers API response body (first 1000 chars):", responseText.substring(0, 1000));
+
   if (!response.ok) {
-    throw new Error(`Repliers API error: ${response.status} ${response.statusText}`);
+    throw new Error(`Repliers API error: ${response.status} ${response.statusText} - ${responseText}`);
   }
 
-  return response.json();
+  try {
+    return JSON.parse(responseText);
+  } catch (e) {
+    console.error("Failed to parse Repliers response:", e);
+    throw new Error(`Invalid JSON response from Repliers API`);
+  }
 }
 
 export interface MLSListingData {
