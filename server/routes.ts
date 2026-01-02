@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema } from "@shared/schema";
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages, watchUserMailbox } from "./gmail";
 import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel } from "./slack";
-import { fetchMLSListing, fetchSimilarListings, searchByAddress } from "./repliers";
+import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess } from "./repliers";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
 
@@ -1098,6 +1098,18 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Gmail webhook error:", error);
       res.status(200).json({ message: "Error processed" }); // Return 200 to prevent retries
+    }
+  });
+
+  // Test endpoint to debug Repliers API access
+  app.get("/api/test-repliers", async (req, res) => {
+    try {
+      console.log("Testing Repliers API access...");
+      const result = await testRepliersAccess();
+      res.json(result);
+    } catch (error: any) {
+      console.error("Repliers test error:", error);
+      res.status(500).json({ error: error.message });
     }
   });
 

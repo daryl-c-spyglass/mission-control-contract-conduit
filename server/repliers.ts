@@ -162,10 +162,61 @@ function buildGarage(listing: any): string {
   return "";
 }
 
-export async function fetchMLSListing(mlsNumber: string): Promise<MLSListingData | null> {
+// Test function to check Repliers API access and discover available boards
+export async function testRepliersAccess(): Promise<any> {
+  const apiKey = process.env.REPLIERS_API_KEY;
+  if (!apiKey) {
+    throw new Error("REPLIERS_API_KEY not configured");
+  }
+
+  console.log("Testing Repliers API access with POST search...");
+  
+  const response = await fetch("https://api.repliers.io/listings", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "REPLIERS-API-KEY": apiKey,
+    },
+    body: JSON.stringify({
+      city: "Austin",
+      state: "TX",
+      class: "residential",
+      status: "A",
+      pageSize: 5,
+    }),
+  });
+
+  const responseText = await response.text();
+  console.log("Repliers test response status:", response.status);
+  console.log("Repliers test response FULL:", responseText);
+
+  if (!response.ok) {
+    return { error: `API error: ${response.status}`, body: responseText };
+  }
+
+  try {
+    const data = JSON.parse(responseText);
+    // Extract useful info about first listing
+    if (data.listings && data.listings.length > 0) {
+      console.log("First listing boardId:", data.listings[0].boardId);
+      console.log("First listing mlsNumber:", data.listings[0].mlsNumber);
+      console.log("First listing keys:", Object.keys(data.listings[0]));
+    }
+    return data;
+  } catch (e) {
+    return { error: "Failed to parse JSON", body: responseText };
+  }
+}
+
+export async function fetchMLSListing(mlsNumber: string, boardId?: string): Promise<MLSListingData | null> {
   try {
     // Use direct listing endpoint: GET /listings/{mlsNumber}
-    const data = await repliersRequest(`/listings/${mlsNumber}`);
+    // Include boardId if provided (required for some MLS systems)
+    const params: Record<string, string> = {};
+    if (boardId) {
+      params.boardId = boardId;
+    }
+    const data = await repliersRequest(`/listings/${mlsNumber}`, Object.keys(params).length > 0 ? params : undefined);
     
     console.log("Repliers API full response for MLS", mlsNumber, ":", JSON.stringify(data, null, 2));
     
