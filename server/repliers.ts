@@ -162,14 +162,14 @@ function buildGarage(listing: any): string {
   return "";
 }
 
-// Test function to check Repliers API access and discover available boards
+// Test function to search by specific address
 export async function testRepliersAccess(): Promise<any> {
   const apiKey = process.env.REPLIERS_API_KEY;
   if (!apiKey) {
     throw new Error("REPLIERS_API_KEY not configured");
   }
 
-  console.log("Testing Repliers API access with POST search...");
+  console.log("Testing Repliers API - searching by address...");
   
   const response = await fetch("https://api.repliers.io/listings", {
     method: "POST",
@@ -178,47 +178,38 @@ export async function testRepliersAccess(): Promise<any> {
       "REPLIERS-API-KEY": apiKey,
     },
     body: JSON.stringify({
+      streetName: "Spring Creek",
+      streetNumber: "2204",
       city: "Austin",
       class: "residential",
-      status: "A",
       pageSize: 5,
     }),
   });
 
   const responseText = await response.text();
-  console.log("Repliers test response status:", response.status);
+  console.log("Repliers address search response status:", response.status);
+  console.log("Repliers address search full response:", responseText);
 
   if (!response.ok) {
-    console.log("Repliers error response:", responseText);
     return { error: `API error: ${response.status}`, body: responseText };
   }
 
   try {
     const data = JSON.parse(responseText);
     
-    // Extract all unique boardIds
-    const boardIds = Array.from(new Set(data.listings?.map((l: any) => l.boardId) || []));
-    console.log("=== REPLIERS DEBUG ===");
-    console.log("Available boardIds:", boardIds);
-    console.log("Total listings returned:", data.listings?.length || 0);
-    
-    if (data.listings && data.listings.length > 0) {
-      const sample = data.listings[0];
-      console.log("Sample listing boardId:", sample.boardId);
-      console.log("Sample listing mlsNumber:", sample.mlsNumber);
-      console.log("Sample listing address:", sample.address?.full || sample.address);
-      console.log("Sample listing keys:", Object.keys(sample));
-    }
-    console.log("=== END DEBUG ===");
-    
     return {
-      boardIds,
-      totalListings: data.listings?.length || 0,
-      sampleListing: data.listings?.[0] || null,
+      status: response.status,
+      count: data.count,
+      listings: data.listings?.map((l: any) => ({
+        mlsNumber: l.mlsNumber,
+        address: l.address,
+        listPrice: l.listPrice,
+        status: l.status,
+        boardId: l.boardId,
+      })),
       fullResponse: data,
     };
   } catch (e) {
-    console.log("Failed to parse JSON:", responseText.substring(0, 500));
     return { error: "Failed to parse JSON", body: responseText };
   }
 }
