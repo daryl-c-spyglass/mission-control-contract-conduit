@@ -431,7 +431,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions/:id/refresh-mls", isAuthenticated, async (req, res) => {
+  app.post("/api/transactions/:id/refresh-mls", async (req, res) => {
     console.log("=== REFRESH MLS REQUEST ===", req.params.id);
     try {
       const transaction = await storage.getTransaction(req.params.id);
