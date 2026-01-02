@@ -174,6 +174,11 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   useEffect(() => {
     setCurrentPhoto(0);
   }, [transaction.id, mlsData?.mlsNumber, photos.length]);
+  
+  // Sync activeTab when initialTab prop changes (e.g., when clicking MLS Sheet button)
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab, transaction.id]);
 
   const transactionCoordinators = coordinators.filter(
     (c) => transaction.coordinatorIds?.includes(c.id)
