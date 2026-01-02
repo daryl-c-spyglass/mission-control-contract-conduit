@@ -343,11 +343,17 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
       
       hoaFee: listing.associationFee || listing.hoaFee || null,
       hoaFrequency: listing.associationFeeFrequency || listing.hoaFrequency || "Monthly",
-      taxAmount: listing.taxAnnualAmount || listing.taxes || null,
-      taxYear: listing.taxYear || null,
+      taxAmount: typeof listing.taxAnnualAmount === 'object' 
+        ? listing.taxAnnualAmount?.annualAmount 
+        : (listing.taxAnnualAmount || listing.taxes || null),
+      taxYear: listing.taxYear || listing.taxAnnualAmount?.assessmentYear || null,
       
       listingAgent: listing.listAgentFullName || listing.agents?.[0]?.name || "",
-      listingOffice: listing.listOfficeName || listing.office?.name || listing.agents?.[0]?.brokerage || "",
+      listingOffice: typeof listing.listOfficeName === 'object' 
+        ? listing.listOfficeName?.name 
+        : (listing.listOfficeName || 
+           (typeof listing.office === 'object' ? listing.office?.name : listing.office) || 
+           ""),
       listingAgentPhone: listing.listAgentPhone || listing.agents?.[0]?.phone || "",
       listingAgentEmail: listing.listAgentEmail || listing.agents?.[0]?.email || "",
       
@@ -357,12 +363,18 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
         name: listing.agents[0].name || "",
         phone: listing.agents[0].phone || "",
         email: listing.agents[0].email || "",
-        brokerage: listing.agents[0].brokerage || listing.office?.name || "",
+        brokerage: typeof listing.agents[0].brokerage === 'object' 
+          ? listing.agents[0].brokerage?.name 
+          : (listing.agents[0].brokerage || 
+             (typeof listing.office === 'object' ? listing.office?.name : listing.office) || 
+             ""),
       } : {
         name: listing.listAgentFullName || "",
         phone: listing.listAgentPhone || "",
         email: listing.listAgentEmail || "",
-        brokerage: listing.listOfficeName || "",
+        brokerage: typeof listing.listOfficeName === 'object' 
+          ? listing.listOfficeName?.name 
+          : (listing.listOfficeName || ""),
       },
     };
 

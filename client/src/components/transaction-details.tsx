@@ -864,13 +864,19 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                       {mlsData.taxAmount && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Annual Taxes</span>
-                          <span className="font-medium">${mlsData.taxAmount.toLocaleString()}</span>
+                          <span className="font-medium">
+                            ${typeof mlsData.taxAmount === 'object' && mlsData.taxAmount !== null
+                              ? ((mlsData.taxAmount as any).annualAmount || 0).toLocaleString()
+                              : (mlsData.taxAmount as number).toLocaleString()}
+                          </span>
                         </div>
                       )}
-                      {mlsData.taxYear && (
+                      {(mlsData.taxYear || (typeof mlsData.taxAmount === 'object' && (mlsData.taxAmount as any)?.assessmentYear)) && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Tax Year</span>
-                          <span className="font-medium">{mlsData.taxYear}</span>
+                          <span className="font-medium">
+                            {mlsData.taxYear || (mlsData.taxAmount as any)?.assessmentYear}
+                          </span>
                         </div>
                       )}
                     </CardContent>
@@ -917,7 +923,14 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                     {(mlsData.listingOffice || mlsData.agent?.brokerage) && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Office</span>
-                        <span className="font-medium text-right max-w-[150px] truncate">{mlsData.listingOffice || mlsData.agent?.brokerage}</span>
+                        <span className="font-medium text-right max-w-[150px] truncate">
+                          {typeof mlsData.listingOffice === 'object' && mlsData.listingOffice !== null 
+                            ? (mlsData.listingOffice as any).name 
+                            : mlsData.listingOffice || 
+                              (typeof mlsData.agent?.brokerage === 'object' && mlsData.agent?.brokerage !== null
+                                ? (mlsData.agent.brokerage as any).name
+                                : mlsData.agent?.brokerage)}
+                        </span>
                       </div>
                     )}
                   </CardContent>
