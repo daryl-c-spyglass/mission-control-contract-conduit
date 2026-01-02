@@ -431,7 +431,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions/:id/refresh-mls", async (req, res) => {
+  app.post("/api/transactions/:id/refresh-mls", isAuthenticated, async (req, res) => {
     console.log("=== REFRESH MLS REQUEST ===", req.params.id);
     try {
       const transaction = await storage.getTransaction(req.params.id);
@@ -446,13 +446,12 @@ export async function registerRoutes(
       }
       console.log("Calling Repliers API for MLS#:", transaction.mlsNumber);
 
-      // Fetch real MLS data using address or MLS number
       let mlsData = null;
       let cmaData = null;
 
       if (transaction.mlsNumber) {
         mlsData = await fetchMLSListing(transaction.mlsNumber);
-        console.log("MLS Data returned:", mlsData ? "found" : "null", mlsData?.images?.length, "images");
+        console.log("MLS Data returned:", mlsData ? "found" : "null", mlsData?.photos?.length, "photos");
         cmaData = await fetchSimilarListings(transaction.mlsNumber);
       } else {
         console.log("No MLS number on transaction");
@@ -462,7 +461,8 @@ export async function registerRoutes(
       
       if (mlsData) {
         updateData.mlsData = mlsData;
-        updateData.propertyImages = mlsData.images || [];
+        updateData.propertyImages = mlsData.photos || mlsData.images || [];
+        updateData.propertyDescription = mlsData.description || "";
         if (mlsData.bedrooms) updateData.bedrooms = mlsData.bedrooms;
         if (mlsData.bathrooms) updateData.bathrooms = mlsData.bathrooms;
         if (mlsData.sqft) updateData.sqft = mlsData.sqft;
@@ -475,17 +475,19 @@ export async function registerRoutes(
         updateData.cmaData = cmaData;
       }
 
+      console.log("Updating transaction with:", Object.keys(updateData));
       const updated = await storage.updateTransaction(req.params.id, updateData);
 
       await storage.createActivity({
         transactionId: transaction.id,
         type: "mls_refreshed",
-        description: "MLS data refreshed",
+        description: mlsData ? `MLS data refreshed with ${mlsData.photos?.length || 0} photos` : "MLS data refresh attempted (no data found)",
       });
 
       res.json(updated);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to refresh MLS data" });
+    } catch (error: any) {
+      console.error("Error refreshing MLS data:", error);
+      res.status(500).json({ message: error.message || "Failed to refresh MLS data" });
     }
   });
 

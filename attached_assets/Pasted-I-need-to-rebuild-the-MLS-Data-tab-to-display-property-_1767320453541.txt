@@ -1,0 +1,103 @@
+I need to rebuild the MLS Data tab to display property information like the mockup I'm providing. Here's the exact structure needed:
+
+## Data Mapping from Repliers API
+
+Map these Repliers API fields to state/database:
+```javascript
+const mlsDataStructure = {
+  // From Repliers listing object
+  listPrice: listing.listPrice,
+  status: listing.standardStatus || listing.mlsStatus,
+  daysOnMarket: listing.daysOnMarket,
+  mlsNumber: listing.mlsNumber || listing.listingId,
+  listDate: listing.listDate,
+  
+  // Property details
+  bedrooms: listing.bedroomsTotal,
+  bathrooms: listing.bathroomsFull,
+  halfBaths: listing.bathroomsHalf || 0,
+  sqft: listing.livingArea || listing.buildingAreaTotal,
+  lotSize: listing.lotSizeArea + ' ' + listing.lotSizeUnits,
+  yearBuilt: listing.yearBuilt,
+  propertyType: listing.propertyType,
+  propertyStyle: listing.architecturalStyle,
+  stories: listing.storiesTotal,
+  garage: listing.garageSpaces + ' Car ' + listing.garageType,
+  
+  // Description - try multiple fields
+  description: listing.publicRemarks || listing.privateRemarks || listing.remarks,
+  
+  // Features - these come as arrays or comma-separated strings
+  interiorFeatures: listing.interiorFeatures,
+  exteriorFeatures: listing.exteriorFeatures,
+  appliances: listing.appliances,
+  heatingCooling: [listing.heating, listing.cooling].flat(),
+  
+  // Financial
+  hoaFee: listing.associationFee,
+  hoaFrequency: listing.associationFeeFrequency,
+  taxAmount: listing.taxAnnualAmount,
+  taxYear: listing.taxYear,
+  
+  // Listing info
+  listingAgent: listing.listAgentFullName,
+  listingOffice: listing.listOfficeName,
+  listingAgentPhone: listing.listAgentPhone,
+  
+  // Photos - from media array
+  photos: listing.media?.map(m => m.mediaUrl) || listing.photos || []
+};
+```
+
+## UI Components Needed
+
+1. **Photo Gallery Section**
+   - Large main image with left/right navigation arrows
+   - Thumbnail strip below (scrollable horizontally)
+   - Photo counter showing "X / Y"
+   - "Download All" and "Use in Marketing" buttons
+   - Store selected photos for marketing materials feature
+
+2. **Price & Status Card** (right sidebar, top)
+   - Status badge (green for Active)
+   - Days on market
+   - Large price display
+   - Price per sqft calculated
+
+3. **Property Overview Card** (right sidebar)
+   - 2-column grid with icons
+   - Beds, Baths, Sq Ft, Lot Size, Year Built, Stories
+   - Use orange accent color for icons (#f97316)
+
+4. **Property Description Section**
+   - Full width text block
+   - Use the publicRemarks field
+
+5. **Property Features Section**
+   - Collapsible accordion sections
+   - Interior Features, Exterior Features, Appliances, Heating/Cooling
+   - Display as pill/tag badges
+
+6. **Financial Details Card** (right sidebar)
+   - HOA fee with frequency
+   - Annual taxes
+   - Tax year
+
+7. **Listing Information Card** (right sidebar)
+   - MLS #, List Date, Property Type, Style, Garage
+   - Listing Agent name and office
+
+## State Management
+
+Store the fetched MLS data so other components can access it:
+- Marketing Materials tab needs: photos array, description, property stats
+- Create Flyer needs: photos, address, price, beds/baths/sqft
+
+## Styling
+
+- Use white cards with rounded-xl and shadow-sm
+- Gray-50 background (#f9fafb)
+- Orange accent color (#f97316) matching the existing nav
+- Responsive: stack to single column on mobile
+
+Please show me the current Repliers API response structure for a listing first so we can verify the field mappings.

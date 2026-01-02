@@ -162,28 +162,70 @@ export interface CMAComparable {
   imageUrl?: string;
 }
 
-// MLS Data type
+// MLS Data type - matches the Repliers API response structure
 export interface MLSData {
-  listingId: string;
-  listDate: string;
+  mlsNumber: string;
   listPrice: number;
-  propertyType: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  
+  // Property basics
   bedrooms: number;
   bathrooms: number;
+  halfBaths: number;
   sqft: number;
-  lotSize?: number;
+  lotSize: string;
   yearBuilt: number;
-  garage?: number;
-  pool?: boolean;
-  description?: string;
-  features?: string[];
-  images?: string[];
+  propertyType: string;
+  propertyStyle: string;
+  stories: number;
+  garage: string;
+  
+  // Status & dates
+  status: string;
+  daysOnMarket: number;
+  listDate: string;
+  
+  // Description
+  description: string;
+  
+  // Features arrays
+  interiorFeatures: string[];
+  exteriorFeatures: string[];
+  appliances: string[];
+  heatingCooling: string[];
+  
+  // Financial
+  hoaFee: number | null;
+  hoaFrequency: string;
+  taxAmount: number | null;
+  taxYear: number | null;
+  
+  // Listing agent info
+  listingAgent: string;
+  listingOffice: string;
+  listingAgentPhone: string;
+  listingAgentEmail: string;
+  
+  // Photos
+  photos: string[];
+  
+  // Legacy compatibility
+  images: string[];
   agent?: {
     name: string;
     phone: string;
     email: string;
     brokerage: string;
   };
+  
+  // Legacy fields for backward compatibility
+  listingId?: string;
+  features?: string[];
+  lotSizeNum?: number;
+  pool?: boolean;
 }
 
 // Re-export auth models (users and sessions tables for Replit Auth)

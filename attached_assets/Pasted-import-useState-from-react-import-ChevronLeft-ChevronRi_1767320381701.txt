@@ -1,0 +1,318 @@
+import { useState } from 'react';
+import { ChevronLeft, ChevronRight, Home, Bed, Bath, Square, Calendar, MapPin, Building, DollarSign, RefreshCw, ChevronDown, ChevronUp, Download, Share2 } from 'lucide-react';
+
+// Sample MLS data structure - this maps to typical Repliers API response
+const sampleMLSData = {
+  listPrice: 875000,
+  status: "Active",
+  daysOnMarket: 12,
+  mlsNumber: "3435826",
+  listDate: "2024-01-15",
+  
+  // Property basics
+  bedrooms: 4,
+  bathrooms: 3,
+  halfBaths: 1,
+  sqft: 2847,
+  lotSize: "0.28 acres",
+  yearBuilt: 2019,
+  propertyType: "Single Family",
+  propertyStyle: "Contemporary",
+  stories: 2,
+  garage: "2 Car Attached",
+  
+  // Description - maps to publicRemarks or remarks
+  description: "Stunning contemporary home in the heart of Austin's sought-after 78704! This meticulously designed 4-bedroom residence features soaring ceilings, walls of windows, and seamless indoor-outdoor living. The chef's kitchen boasts quartz countertops, premium appliances, and a massive island perfect for entertaining. Primary suite offers a spa-like bathroom with dual vanities and walk-in shower. Enjoy the private backyard oasis with mature trees and covered patio. Walking distance to South Congress shops and restaurants. Solar panels included!",
+  
+  // Features
+  interiorFeatures: ["Hardwood Floors", "High Ceilings", "Open Floor Plan", "Smart Home System", "Recessed Lighting", "Crown Molding", "Walk-in Closets"],
+  exteriorFeatures: ["Covered Patio", "Sprinkler System", "Privacy Fence", "Outdoor Kitchen", "Solar Panels"],
+  appliances: ["Built-in Refrigerator", "Double Oven", "Gas Cooktop", "Dishwasher", "Disposal", "Washer", "Dryer"],
+  heatingCooling: ["Central Air", "Zoned HVAC", "Gas Heating"],
+  
+  // Financial
+  hoaFee: 150,
+  hoaFrequency: "Monthly",
+  taxAmount: 12450,
+  taxYear: 2023,
+  
+  // Listing info
+  listingAgent: "Sarah Johnson",
+  listingOffice: "Spyglass Realty",
+  listingAgentPhone: "(512) 555-0123",
+  
+  // Photos - maps to media array
+  photos: [
+    "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800",
+    "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800",
+    "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800",
+    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800",
+    "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800",
+    "https://images.unsplash.com/photo-1600573472550-8090b5e0745e?w=800"
+  ]
+};
+
+const FeatureSection = ({ title, items, defaultOpen = false }) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  
+  return (
+    <div className="border-b border-gray-200 last:border-0">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full py-3 flex items-center justify-between text-left hover:bg-gray-50"
+      >
+        <span className="font-medium text-gray-800">{title}</span>
+        {isOpen ? <ChevronUp size={18} className="text-gray-500" /> : <ChevronDown size={18} className="text-gray-500" />}
+      </button>
+      {isOpen && (
+        <div className="pb-3 flex flex-wrap gap-2">
+          {items.map((item, i) => (
+            <span key={i} className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full">
+              {item}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default function MLSDataTab() {
+  const [currentPhoto, setCurrentPhoto] = useState(0);
+  const [data, setData] = useState(sampleMLSData);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  const nextPhoto = () => setCurrentPhoto((prev) => (prev + 1) % data.photos.length);
+  const prevPhoto = () => setCurrentPhoto((prev) => (prev - 1 + data.photos.length) % data.photos.length);
+  
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    setTimeout(() => setIsRefreshing(false), 1500);
+  };
+
+  return (
+    <div className="bg-gray-50 min-h-screen p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">MLS Listing Data</h1>
+        <button 
+          onClick={handleRefresh}
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} />
+          Refresh MLS Data
+        </button>
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Photos & Description */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Photo Gallery */}
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="relative">
+              <img 
+                src={data.photos[currentPhoto]} 
+                alt={`Property photo ${currentPhoto + 1}`}
+                className="w-full h-80 object-cover"
+              />
+              <button 
+                onClick={prevPhoto}
+                className="absolute left-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <button 
+                onClick={nextPhoto}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+              >
+                <ChevronRight size={20} />
+              </button>
+              <div className="absolute bottom-3 right-3 px-3 py-1 bg-black/60 text-white text-sm rounded-full">
+                {currentPhoto + 1} / {data.photos.length}
+              </div>
+            </div>
+            
+            {/* Thumbnails */}
+            <div className="p-3 flex gap-2 overflow-x-auto">
+              {data.photos.map((photo, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentPhoto(i)}
+                  className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
+                    i === currentPhoto ? 'border-orange-500' : 'border-transparent'
+                  }`}
+                >
+                  <img src={photo} alt={`Thumb ${i + 1}`} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+            
+            {/* Photo Actions */}
+            <div className="px-4 pb-4 flex gap-2">
+              <button className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                <Download size={14} /> Download All
+              </button>
+              <button className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                <Share2 size={14} /> Use in Marketing
+              </button>
+            </div>
+          </div>
+          
+          {/* Description */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">Property Description</h2>
+            <p className="text-gray-700 leading-relaxed">{data.description}</p>
+          </div>
+          
+          {/* Property Features */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">Property Features</h2>
+            <div className="divide-y divide-gray-200">
+              <FeatureSection title="Interior Features" items={data.interiorFeatures} defaultOpen={true} />
+              <FeatureSection title="Exterior Features" items={data.exteriorFeatures} />
+              <FeatureSection title="Appliances" items={data.appliances} />
+              <FeatureSection title="Heating & Cooling" items={data.heatingCooling} />
+            </div>
+          </div>
+        </div>
+        
+        {/* Right Column - Stats & Details */}
+        <div className="space-y-6">
+          {/* Price & Status Card */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className={`px-3 py-1 text-sm font-medium rounded-full ${
+                data.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+              }`}>
+                {data.status}
+              </span>
+              <span className="text-sm text-gray-500">{data.daysOnMarket} days on market</span>
+            </div>
+            <div className="text-3xl font-bold text-gray-900 mb-1">
+              ${data.listPrice.toLocaleString()}
+            </div>
+            <div className="text-gray-500 text-sm">
+              ${Math.round(data.listPrice / data.sqft).toLocaleString()}/sqft
+            </div>
+          </div>
+          
+          {/* Property Stats */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Property Overview</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-50 rounded-lg">
+                  <Bed size={18} className="text-orange-600" />
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Beds</div>
+                  <div className="font-semibold">{data.bedrooms}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-50 rounded-lg">
+                  <Bath size={18} className="text-orange-600" />
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Baths</div>
+                  <div className="font-semibold">{data.bathrooms}.{data.halfBaths}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-50 rounded-lg">
+                  <Square size={18} className="text-orange-600" />
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Sq Ft</div>
+                  <div className="font-semibold">{data.sqft.toLocaleString()}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-50 rounded-lg">
+                  <MapPin size={18} className="text-orange-600" />
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Lot</div>
+                  <div className="font-semibold">{data.lotSize}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-50 rounded-lg">
+                  <Calendar size={18} className="text-orange-600" />
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Year Built</div>
+                  <div className="font-semibold">{data.yearBuilt}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-50 rounded-lg">
+                  <Building size={18} className="text-orange-600" />
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Type</div>
+                  <div className="font-semibold">{data.stories} Story</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Financial Info */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Financial Details</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-600">HOA Fee</span>
+                <span className="font-medium">${data.hoaFee}/{data.hoaFrequency}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Annual Taxes</span>
+                <span className="font-medium">${data.taxAmount.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Tax Year</span>
+                <span className="font-medium">{data.taxYear}</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Listing Info */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Listing Information</h3>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">MLS #</span>
+                <span className="font-medium">{data.mlsNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">List Date</span>
+                <span className="font-medium">{data.listDate}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Property Type</span>
+                <span className="font-medium">{data.propertyType}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Style</span>
+                <span className="font-medium">{data.propertyStyle}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Garage</span>
+                <span className="font-medium">{data.garage}</span>
+              </div>
+              <hr className="my-3" />
+              <div className="flex justify-between">
+                <span className="text-gray-600">Listing Agent</span>
+                <span className="font-medium">{data.listingAgent}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Office</span>
+                <span className="font-medium">{data.listingOffice}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

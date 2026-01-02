@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -32,6 +32,13 @@ import {
   Newspaper,
   CreditCard,
   BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Building,
+  DollarSign,
+  Share2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { CreateFlyerDialog } from "./create-flyer-dialog";
@@ -91,6 +98,35 @@ function formatDateTime(dateString: Date | null): string {
   });
 }
 
+// Collapsible feature section component for MLS features
+function FeatureSection({ title, items, defaultOpen = false }: { title: string; items: string[]; defaultOpen?: boolean }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  
+  if (!items || items.length === 0) return null;
+  
+  return (
+    <div className="border-b border-border last:border-0">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full py-3 flex items-center justify-between gap-2 text-left hover-elevate rounded-md px-2 -mx-2"
+        data-testid={`button-toggle-${title.toLowerCase().replace(/\s+/g, '-')}`}
+      >
+        <span className="font-medium text-foreground">{title}</span>
+        {isOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+      </button>
+      {isOpen && (
+        <div className="pb-3 flex flex-wrap gap-2">
+          {items.map((item, i) => (
+            <span key={i} className="px-3 py-1 bg-muted text-muted-foreground text-sm rounded-full">
+              {item}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Template listing data type
 interface TemplateListing {
   mlsNumber: string;
@@ -122,9 +158,20 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [templateSearch, setTemplateSearch] = useState("");
   const [templateListing, setTemplateListing] = useState<TemplateListing | null>(null);
   const [templateCategory, setTemplateCategory] = useState<string>("posts");
+  const [currentPhoto, setCurrentPhoto] = useState(0);
   const status = statusConfig[transaction.status] || statusConfig.in_contract;
   const mlsData = transaction.mlsData as MLSData | null;
   const cmaData = transaction.cmaData as CMAComparable[] | null;
+  
+  // Photo navigation for MLS gallery
+  const photos = mlsData?.photos || mlsData?.images || [];
+  const nextPhoto = () => setCurrentPhoto((prev) => (prev + 1) % Math.max(photos.length, 1));
+  const prevPhoto = () => setCurrentPhoto((prev) => (prev - 1 + photos.length) % Math.max(photos.length, 1));
+  
+  // Reset photo index when MLS data or photos change
+  useEffect(() => {
+    setCurrentPhoto(0);
+  }, [transaction.id, mlsData?.mlsNumber, photos.length]);
 
   const transactionCoordinators = coordinators.filter(
     (c) => transaction.coordinatorIds?.includes(c.id)
@@ -577,15 +624,13 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         </TabsContent>
 
         <TabsContent value="mls" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">MLS Listing Data</h2>
+          {/* Header */}
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <h2 className="text-xl font-bold">MLS Listing Data</h2>
             <Button
               variant="outline"
               className="gap-2"
-              onClick={() => {
-                console.log("!!! REFRESH MLS BUTTON (TOP) CLICKED !!!");
-                refreshMlsMutation.mutate();
-              }}
+              onClick={() => refreshMlsMutation.mutate()}
               disabled={refreshMlsMutation.isPending}
               data-testid="button-refresh-mls"
             >
@@ -599,112 +644,285 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           </div>
 
           {mlsData ? (
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Listing Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Listing ID</p>
-                      <p className="font-mono font-medium">{mlsData.listingId}</p>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column - Photos & Description */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Photo Gallery */}
+                {photos.length > 0 && (
+                  <Card>
+                    <CardContent className="p-0">
+                      <div className="relative">
+                        <img 
+                          src={`/api/proxy-image?url=${encodeURIComponent(photos[currentPhoto] || '')}`}
+                          alt={`Property photo ${currentPhoto + 1}`}
+                          className="w-full h-80 object-cover rounded-t-lg"
+                          data-testid="img-mls-main-photo"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23f0f0f0' width='400' height='300'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%23999' dy='0.3em'%3ENo Image%3C/text%3E%3C/svg%3E";
+                          }}
+                        />
+                        {photos.length > 1 && (
+                          <>
+                            <button 
+                              onClick={prevPhoto}
+                              className="absolute left-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+                              data-testid="button-photo-prev"
+                            >
+                              <ChevronLeft className="h-5 w-5" />
+                            </button>
+                            <button 
+                              onClick={nextPhoto}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+                              data-testid="button-photo-next"
+                            >
+                              <ChevronRight className="h-5 w-5" />
+                            </button>
+                            <div className="absolute bottom-3 right-3 px-3 py-1 bg-black/60 text-white text-sm rounded-full">
+                              {currentPhoto + 1} / {photos.length}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      
+                      {/* Thumbnails */}
+                      {photos.length > 1 && (
+                        <div className="p-3 flex gap-2 overflow-x-auto">
+                          {photos.slice(0, 10).map((photo, i) => (
+                            <button
+                              key={i}
+                              onClick={() => setCurrentPhoto(i)}
+                              className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
+                                i === currentPhoto ? 'border-primary' : 'border-transparent'
+                              }`}
+                              data-testid={`button-thumbnail-${i}`}
+                            >
+                              <img 
+                                src={`/api/proxy-image?url=${encodeURIComponent(photo)}`} 
+                                alt={`Thumb ${i + 1}`} 
+                                className="w-full h-full object-cover" 
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = "none";
+                                }}
+                              />
+                            </button>
+                          ))}
+                          {photos.length > 10 && (
+                            <div className="flex-shrink-0 w-16 h-16 rounded-lg bg-muted flex items-center justify-center text-muted-foreground text-sm">
+                              +{photos.length - 10}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Photo Actions */}
+                      <div className="px-4 pb-4 flex gap-2 flex-wrap">
+                        <Button variant="secondary" size="sm" className="gap-2" data-testid="button-download-photos">
+                          <Download className="h-4 w-4" /> Download All
+                        </Button>
+                        {onMarketingClick && (
+                          <Button variant="secondary" size="sm" className="gap-2" onClick={onMarketingClick} data-testid="button-use-marketing">
+                            <Share2 className="h-4 w-4" /> Use in Marketing
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                {/* Description */}
+                {mlsData.description && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Property Description</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{mlsData.description}</p>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                {/* Property Features */}
+                {(mlsData.interiorFeatures?.length > 0 || mlsData.exteriorFeatures?.length > 0 || mlsData.appliances?.length > 0 || mlsData.heatingCooling?.length > 0) && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Property Features</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="divide-y divide-border">
+                        <FeatureSection title="Interior Features" items={mlsData.interiorFeatures || []} defaultOpen={true} />
+                        <FeatureSection title="Exterior Features" items={mlsData.exteriorFeatures || []} />
+                        <FeatureSection title="Appliances" items={mlsData.appliances || []} />
+                        <FeatureSection title="Heating & Cooling" items={mlsData.heatingCooling || []} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+              
+              {/* Right Column - Stats & Details */}
+              <div className="space-y-6">
+                {/* Price & Status Card */}
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <Badge variant={mlsData.status?.toLowerCase() === 'active' ? 'default' : 'secondary'}>
+                        {mlsData.status || 'Unknown'}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">{mlsData.daysOnMarket || 0} days on market</span>
                     </div>
-                    <div>
-                      <p className="text-muted-foreground">List Date</p>
-                      <p className="font-medium">{formatDate(mlsData.listDate)}</p>
+                    <div className="text-3xl font-bold mb-1" data-testid="text-mls-price">
+                      {formatPrice(mlsData.listPrice)}
                     </div>
-                    <div>
-                      <p className="text-muted-foreground">List Price</p>
-                      <p className="font-medium">{formatPrice(mlsData.listPrice)}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Property Type</p>
-                      <p className="font-medium">{mlsData.propertyType}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Property Specifications</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Bedrooms</p>
-                      <p className="font-medium">{mlsData.bedrooms}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Bathrooms</p>
-                      <p className="font-medium">{mlsData.bathrooms}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Square Feet</p>
-                      <p className="font-medium">{mlsData.sqft?.toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Year Built</p>
-                      <p className="font-medium">{mlsData.yearBuilt}</p>
-                    </div>
-                    {mlsData.lotSize && (
-                      <div>
-                        <p className="text-muted-foreground">Lot Size</p>
-                        <p className="font-medium">{mlsData.lotSize.toLocaleString()} sqft</p>
+                    {mlsData.sqft > 0 && (
+                      <div className="text-muted-foreground text-sm">
+                        ${Math.round(mlsData.listPrice / mlsData.sqft).toLocaleString()}/sqft
                       </div>
                     )}
-                    {mlsData.garage !== undefined && (
-                      <div>
-                        <p className="text-muted-foreground">Garage</p>
-                        <p className="font-medium">{mlsData.garage} car</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {mlsData.agent && (
-                <Card className="md:col-span-2">
+                  </CardContent>
+                </Card>
+                
+                {/* Property Stats */}
+                <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Listing Agent</CardTitle>
+                    <CardTitle className="text-base">Property Overview</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback>
-                          {mlsData.agent.name.split(" ").map((n) => n[0]).join("").toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <p className="font-medium">{mlsData.agent.name}</p>
-                        <p className="text-sm text-muted-foreground">{mlsData.agent.brokerage}</p>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-                        <div className="flex items-center gap-1.5">
-                          <Phone className="h-3.5 w-3.5" />
-                          <span>{mlsData.agent.phone}</span>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          <Bed className="h-4 w-4 text-primary" />
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <Mail className="h-3.5 w-3.5" />
-                          <span>{mlsData.agent.email}</span>
+                        <div>
+                          <div className="text-sm text-muted-foreground">Beds</div>
+                          <div className="font-semibold">{mlsData.bedrooms || 0}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          <Bath className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <div className="text-sm text-muted-foreground">Baths</div>
+                          <div className="font-semibold">
+                            {mlsData.bathrooms || 0}{mlsData.halfBaths > 0 && `.${mlsData.halfBaths}`}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          <Square className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <div className="text-sm text-muted-foreground">Sq Ft</div>
+                          <div className="font-semibold">{mlsData.sqft?.toLocaleString() || '—'}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          <MapPin className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <div className="text-sm text-muted-foreground">Lot</div>
+                          <div className="font-semibold text-sm">{mlsData.lotSize || '—'}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          <Calendar className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <div className="text-sm text-muted-foreground">Year Built</div>
+                          <div className="font-semibold">{mlsData.yearBuilt || '—'}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          <Building className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <div className="text-sm text-muted-foreground">Stories</div>
+                          <div className="font-semibold">{mlsData.stories || 1}</div>
                         </div>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-              )}
-
-              {mlsData.description && (
-                <Card className="md:col-span-2">
+                
+                {/* Financial Info */}
+                {(mlsData.hoaFee || mlsData.taxAmount) && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Financial Details</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {mlsData.hoaFee && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">HOA Fee</span>
+                          <span className="font-medium">${mlsData.hoaFee}/{mlsData.hoaFrequency || 'Monthly'}</span>
+                        </div>
+                      )}
+                      {mlsData.taxAmount && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Annual Taxes</span>
+                          <span className="font-medium">${mlsData.taxAmount.toLocaleString()}</span>
+                        </div>
+                      )}
+                      {mlsData.taxYear && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Tax Year</span>
+                          <span className="font-medium">{mlsData.taxYear}</span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+                
+                {/* Listing Info */}
+                <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Description</CardTitle>
+                    <CardTitle className="text-base">Listing Information</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-sm leading-relaxed">{mlsData.description}</p>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">MLS #</span>
+                      <span className="font-mono font-medium">{mlsData.mlsNumber || transaction.mlsNumber}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">List Date</span>
+                      <span className="font-medium">{formatDate(mlsData.listDate)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Property Type</span>
+                      <span className="font-medium">{mlsData.propertyType || '—'}</span>
+                    </div>
+                    {mlsData.propertyStyle && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Style</span>
+                        <span className="font-medium">{mlsData.propertyStyle}</span>
+                      </div>
+                    )}
+                    {mlsData.garage && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Garage</span>
+                        <span className="font-medium">{mlsData.garage}</span>
+                      </div>
+                    )}
+                    <Separator className="my-2" />
+                    {(mlsData.listingAgent || mlsData.agent?.name) && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Agent</span>
+                        <span className="font-medium">{mlsData.listingAgent || mlsData.agent?.name}</span>
+                      </div>
+                    )}
+                    {(mlsData.listingOffice || mlsData.agent?.brokerage) && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Office</span>
+                        <span className="font-medium text-right max-w-[150px] truncate">{mlsData.listingOffice || mlsData.agent?.brokerage}</span>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
-              )}
+              </div>
             </div>
           ) : (
             <Card>
@@ -717,11 +935,9 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 <Button
                   variant="outline"
                   className="gap-2"
-                  onClick={() => {
-                    console.log("!!! FETCH MLS BUTTON CLICKED !!!");
-                    refreshMlsMutation.mutate();
-                  }}
+                  onClick={() => refreshMlsMutation.mutate()}
                   disabled={refreshMlsMutation.isPending}
+                  data-testid="button-fetch-mls"
                 >
                   {refreshMlsMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
