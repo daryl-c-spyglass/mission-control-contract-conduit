@@ -214,6 +214,36 @@ export async function testRepliersAccess(): Promise<any> {
   }
 }
 
+// Search for listing by MLS number using POST (fallback method)
+async function searchByMLSNumber(mlsNumber: string): Promise<any> {
+  const apiKey = process.env.REPLIERS_API_KEY;
+  if (!apiKey) return null;
+  
+  console.log("Searching by MLS number using POST:", mlsNumber);
+  
+  const response = await fetch("https://api.repliers.io/listings", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "REPLIERS-API-KEY": apiKey,
+    },
+    body: JSON.stringify({
+      mlsNumber: mlsNumber,
+      boardId: 53, // Unlock MLS (Austin)
+      pageSize: 1,
+    }),
+  });
+  
+  if (!response.ok) {
+    console.log("POST search failed:", response.status);
+    return null;
+  }
+  
+  const data = await response.json();
+  console.log("POST search result:", data.count, "listings found");
+  return data.listings?.[0] || null;
+}
+
 export async function fetchMLSListing(mlsNumber: string, boardId?: string): Promise<MLSListingData | null> {
   try {
     // Add ACT prefix for Unlock MLS (Austin) if not already present
@@ -222,14 +252,34 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
     console.log("Fetching MLS listing:", mlsNumber, "-> formatted:", formattedMLS);
     
     // Use direct listing endpoint: GET /listings/{mlsNumber}
-    // Include boardId if provided (required for some MLS systems)
-    const params: Record<string, string> = {};
-    if (boardId) {
-      params.boardId = boardId;
-    }
-    const data = await repliersRequest(`/listings/${formattedMLS}`, Object.keys(params).length > 0 ? params : undefined);
+    // Always include boardId=53 for Unlock MLS
+    const params: Record<string, string> = {
+      boardId: boardId || "53",
+    };
     
-    console.log("Repliers API full response for MLS", formattedMLS, ":", JSON.stringify(data, null, 2));
+    let data: any = null;
+    try {
+      data = await repliersRequest(`/listings/${formattedMLS}`, params);
+      console.log("Repliers API full response for MLS", formattedMLS, ":", JSON.stringify(data, null, 2));
+    } catch (directError: any) {
+      console.log("Direct lookup failed:", directError.message);
+      console.log("Trying POST search as fallback...");
+      
+      // Try searching by MLS number using POST
+      data = await searchByMLSNumber(mlsNumber);
+      if (!data) {
+        // Try with ACT prefix
+        data = await searchByMLSNumber(formattedMLS);
+      }
+      if (data) {
+        console.log("Found listing via POST search");
+      }
+    }
+    
+    if (!data) {
+      console.log("No listing data found for MLS:", mlsNumber);
+      return null;
+    }
     
     let listing = data;
     if (data.listings && Array.isArray(data.listings)) {
