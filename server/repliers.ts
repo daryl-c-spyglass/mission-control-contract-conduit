@@ -216,15 +216,20 @@ export async function testRepliersAccess(): Promise<any> {
 
 export async function fetchMLSListing(mlsNumber: string, boardId?: string): Promise<MLSListingData | null> {
   try {
+    // Add ACT prefix for Unlock MLS (Austin) if not already present
+    const formattedMLS = mlsNumber.startsWith("ACT") ? mlsNumber : `ACT${mlsNumber}`;
+    
+    console.log("Fetching MLS listing:", mlsNumber, "-> formatted:", formattedMLS);
+    
     // Use direct listing endpoint: GET /listings/{mlsNumber}
     // Include boardId if provided (required for some MLS systems)
     const params: Record<string, string> = {};
     if (boardId) {
       params.boardId = boardId;
     }
-    const data = await repliersRequest(`/listings/${mlsNumber}`, Object.keys(params).length > 0 ? params : undefined);
+    const data = await repliersRequest(`/listings/${formattedMLS}`, Object.keys(params).length > 0 ? params : undefined);
     
-    console.log("Repliers API full response for MLS", mlsNumber, ":", JSON.stringify(data, null, 2));
+    console.log("Repliers API full response for MLS", formattedMLS, ":", JSON.stringify(data, null, 2));
     
     let listing = data;
     if (data.listings && Array.isArray(data.listings)) {
