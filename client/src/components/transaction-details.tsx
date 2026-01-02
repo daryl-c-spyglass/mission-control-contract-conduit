@@ -59,6 +59,7 @@ interface TransactionDetailsProps {
   activities: ActivityType[];
   onBack: () => void;
   onMarketingClick?: () => void;
+  initialTab?: string;
 }
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -151,7 +152,8 @@ interface TemplateListing {
   };
 }
 
-export function TransactionDetails({ transaction, coordinators, activities, onBack, onMarketingClick }: TransactionDetailsProps) {
+export function TransactionDetails({ transaction, coordinators, activities, onBack, onMarketingClick, initialTab = "overview" }: TransactionDetailsProps) {
+  const [activeTab, setActiveTab] = useState(initialTab);
   const { toast } = useToast();
   const [flyerDialogOpen, setFlyerDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -402,7 +404,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         transaction={transaction}
       />
 
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
           <TabsTrigger value="mls" data-testid="tab-mls">MLS Data</TabsTrigger>
@@ -742,7 +744,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 )}
                 
                 {/* Property Features */}
-                {(mlsData.interiorFeatures?.length > 0 || mlsData.exteriorFeatures?.length > 0 || mlsData.appliances?.length > 0 || mlsData.heatingCooling?.length > 0 || mlsData.flooring?.length > 0 || mlsData.parking?.length > 0 || mlsData.constructionMaterials?.length > 0 || mlsData.roofMaterial || mlsData.foundation || mlsData.pool || mlsData.waterSource || mlsData.sewer) && (
+                {((mlsData.interiorFeatures?.length || 0) > 0 || (mlsData.exteriorFeatures?.length || 0) > 0 || (mlsData.appliances?.length || 0) > 0 || (mlsData.heatingCooling?.length || 0) > 0 || (mlsData.flooring?.length || 0) > 0 || (mlsData.parking?.length || 0) > 0 || (mlsData.constructionMaterials?.length || 0) > 0 || mlsData.roofMaterial || mlsData.foundation || mlsData.pool || mlsData.waterSource || mlsData.sewer) && (
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base">Property Features</CardTitle>

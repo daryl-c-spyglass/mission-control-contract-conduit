@@ -21,6 +21,7 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen }: Das
   const [marketingTransaction, setMarketingTransaction] = useState<Transaction | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [initialTab, setInitialTab] = useState<string>("overview");
 
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
@@ -57,8 +58,12 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen }: Das
           transaction={selectedTransaction}
           coordinators={coordinators}
           activities={activities}
-          onBack={() => setSelectedTransaction(null)}
+          onBack={() => {
+            setSelectedTransaction(null);
+            setInitialTab("overview");
+          }}
           onMarketingClick={() => setMarketingTransaction(selectedTransaction)}
+          initialTab={initialTab}
         />
         {marketingTransaction && (
           <MarketingMaterialsDialog
@@ -126,6 +131,10 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen }: Das
               coordinators={coordinators}
               onClick={() => setSelectedTransaction(transaction)}
               onMarketingClick={() => setMarketingTransaction(transaction)}
+              onMLSClick={() => {
+                setInitialTab("mls");
+                setSelectedTransaction(transaction);
+              }}
             />
           ))}
         </div>

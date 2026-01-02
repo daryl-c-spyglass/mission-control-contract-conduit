@@ -10,6 +10,7 @@ interface TransactionCardProps {
   coordinators: Coordinator[];
   onClick: () => void;
   onMarketingClick?: () => void;
+  onMLSClick?: () => void;
 }
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -38,7 +39,7 @@ function formatDate(dateString: string | null): string {
   });
 }
 
-export function TransactionCard({ transaction, coordinators, onClick, onMarketingClick }: TransactionCardProps) {
+export function TransactionCard({ transaction, coordinators, onClick, onMarketingClick, onMLSClick }: TransactionCardProps) {
   const status = statusConfig[transaction.status] || statusConfig.in_contract;
   const daysRemaining = getDaysRemaining(transaction.closingDate);
   
@@ -147,11 +148,12 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
               Emails
             </Button>
           )}
-          {transaction.mlsData ? (
+          {transaction.mlsData && onMLSClick ? (
             <Button
               size="sm"
               variant="outline"
               className="gap-1.5"
+              onClick={onMLSClick}
               data-testid={`button-mls-${transaction.id}`}
             >
               <ExternalLink className="h-3.5 w-3.5" />
