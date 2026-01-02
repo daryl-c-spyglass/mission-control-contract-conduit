@@ -328,10 +328,16 @@ export async function registerRoutes(
       
       if (fetchMlsData && transaction.mlsNumber && process.env.REPLIERS_API_KEY) {
         try {
-          const mlsData = await fetchMLSListing(transaction.mlsNumber);
-          const cmaData = await fetchSimilarListings(transaction.mlsNumber);
+          const mlsResult = await fetchMLSListing(transaction.mlsNumber);
           
-          if (mlsData) {
+          if (mlsResult) {
+            const { mlsData, comparables } = mlsResult;
+            // Use comparables from listing, fallback to separate API call if none found
+            let cmaData = comparables;
+            if (!cmaData || cmaData.length === 0) {
+              cmaData = await fetchSimilarListings(transaction.mlsNumber);
+            }
+            
             await storage.updateTransaction(transaction.id, {
               mlsData: mlsData,
               cmaData: cmaData,
@@ -447,12 +453,21 @@ export async function registerRoutes(
       console.log("Calling Repliers API for MLS#:", transaction.mlsNumber);
 
       let mlsData = null;
-      let cmaData = null;
+      let cmaData: any[] = [];
 
       if (transaction.mlsNumber) {
-        mlsData = await fetchMLSListing(transaction.mlsNumber);
-        console.log("MLS Data returned:", mlsData ? "found" : "null", mlsData?.photos?.length, "photos");
-        cmaData = await fetchSimilarListings(transaction.mlsNumber);
+        const mlsResult = await fetchMLSListing(transaction.mlsNumber);
+        if (mlsResult) {
+          mlsData = mlsResult.mlsData;
+          cmaData = mlsResult.comparables;
+          console.log("MLS Data returned:", "found", mlsData?.photos?.length, "photos");
+          // Fallback to separate API call if no comparables in listing
+          if (!cmaData || cmaData.length === 0) {
+            cmaData = await fetchSimilarListings(transaction.mlsNumber);
+          }
+        } else {
+          console.log("MLS Data returned: null");
+        }
       } else {
         console.log("No MLS number on transaction");
       }
@@ -471,7 +486,7 @@ export async function registerRoutes(
         if (mlsData.listPrice) updateData.listPrice = mlsData.listPrice;
       }
       
-      if (cmaData) {
+      if (cmaData && cmaData.length > 0) {
         updateData.cmaData = cmaData;
       }
 
@@ -519,12 +534,18 @@ export async function registerRoutes(
       const isLikelyMLS = /^[A-Za-z]?\d+$/.test(query.replace(/\s/g, ""));
       
       if (isLikelyMLS) {
-        listing = await fetchMLSListing(query.replace(/\s/g, ""));
+        const mlsResult = await fetchMLSListing(query.replace(/\s/g, ""));
+        if (mlsResult) {
+          listing = mlsResult.mlsData;
+        }
       }
       
       // If not found by MLS, try address search
       if (!listing) {
-        listing = await searchByAddress(query);
+        const addressResult = await searchByAddress(query);
+        if (addressResult) {
+          listing = addressResult;
+        }
       }
 
       if (!listing) {

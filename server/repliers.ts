@@ -244,7 +244,7 @@ async function searchByMLSNumber(mlsNumber: string): Promise<any> {
   return data.listings?.[0] || null;
 }
 
-export async function fetchMLSListing(mlsNumber: string, boardId?: string): Promise<MLSListingData | null> {
+export async function fetchMLSListing(mlsNumber: string, boardId?: string): Promise<{ mlsData: MLSListingData; comparables: CMAComparable[] } | null> {
   try {
     // Add ACT prefix for Unlock MLS (Austin) if not already present
     const formattedMLS = mlsNumber.startsWith("ACT") ? mlsNumber : `ACT${mlsNumber}`;
@@ -378,6 +378,33 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
       },
     };
 
+    // Extract comparables from the listing response if available
+    let comparables: CMAComparable[] = [];
+    if (listing.comparables && Array.isArray(listing.comparables)) {
+      console.log(`Found ${listing.comparables.length} comparables in listing data`);
+      comparables = listing.comparables.slice(0, 10).map((comp: any) => {
+        const compAddressParts = [];
+        if (comp.address?.streetNumber) compAddressParts.push(comp.address.streetNumber);
+        if (comp.address?.streetName) compAddressParts.push(comp.address.streetName);
+        if (comp.address?.streetSuffix) compAddressParts.push(comp.address.streetSuffix);
+        const compStreetAddress = compAddressParts.join(" ");
+        
+        return {
+          address: comp.address?.full || compStreetAddress || "",
+          price: parseFloat(comp.listPrice) || parseFloat(comp.soldPrice) || 0,
+          bedrooms: comp.bedroomsTotal || comp.details?.numBedrooms || comp.beds || 0,
+          bathrooms: comp.bathroomsFull || comp.details?.numBathrooms || comp.baths || 0,
+          sqft: comp.livingArea || comp.buildingAreaTotal || comp.details?.sqft || comp.sqft || 0,
+          daysOnMarket: comp.daysOnMarket || comp.simpleDaysOnMarket || comp.dom || 0,
+          distance: comp.distance || 0,
+          imageUrl: normalizeImageUrls(comp.images)?.[0] || undefined,
+          mlsNumber: comp.mlsNumber || "",
+          status: comp.standardStatus || comp.status || "",
+          listDate: comp.listDate || "",
+        };
+      });
+    }
+
     console.log("Parsed MLS data:", {
       mlsNumber: result.mlsNumber,
       price: result.listPrice,
@@ -385,6 +412,7 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
       baths: result.bathrooms,
       sqft: result.sqft,
       photos: result.photos.length,
+      comparables: comparables.length,
       features: {
         interior: result.interiorFeatures.length,
         exterior: result.exteriorFeatures.length,
@@ -392,7 +420,7 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
       }
     });
 
-    return result;
+    return { mlsData: result, comparables };
   } catch (error) {
     console.error("Error fetching MLS listing:", error);
     return null;
@@ -401,9 +429,17 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
 
 export async function fetchSimilarListings(mlsNumber: string, radius: number = 5): Promise<CMAComparable[]> {
   try {
+    // Add ACT prefix for Austin/Unlock MLS if not already present
+    const formattedMlsNumber = mlsNumber.toUpperCase().startsWith("ACT") 
+      ? mlsNumber 
+      : `ACT${mlsNumber}`;
+    
+    console.log(`Fetching similar listings for MLS: ${formattedMlsNumber}`);
+    
     const data = await repliersRequest("/listings/similar", {
-      mlsNumber,
+      mlsNumber: formattedMlsNumber,
       radius: radius.toString(),
+      boardId: "53", // Unlock MLS board ID
     });
 
     console.log("Repliers similar listings response:", JSON.stringify(data).substring(0, 300));
@@ -447,7 +483,8 @@ export async function searchByAddress(address: string): Promise<MLSListingData |
     }
 
     const listing = data.listings[0];
-    return fetchMLSListing(listing.mlsNumber);
+    const result = await fetchMLSListing(listing.mlsNumber);
+    return result?.mlsData || null;
   } catch (error) {
     console.error("Error searching by address:", error);
     return null;
@@ -479,9 +516,9 @@ export async function searchListings(params: {
 
     const results: MLSListingData[] = [];
     for (const listing of data.listings.slice(0, 20)) {
-      const fullListing = await fetchMLSListing(listing.mlsNumber);
-      if (fullListing) {
-        results.push(fullListing);
+      const result = await fetchMLSListing(listing.mlsNumber);
+      if (result) {
+        results.push(result.mlsData);
       }
     }
     return results;
