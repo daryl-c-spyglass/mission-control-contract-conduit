@@ -179,7 +179,6 @@ export async function testRepliersAccess(): Promise<any> {
     },
     body: JSON.stringify({
       city: "Austin",
-      state: "TX",
       class: "residential",
       status: "A",
       pageSize: 5,
@@ -188,22 +187,38 @@ export async function testRepliersAccess(): Promise<any> {
 
   const responseText = await response.text();
   console.log("Repliers test response status:", response.status);
-  console.log("Repliers test response FULL:", responseText);
 
   if (!response.ok) {
+    console.log("Repliers error response:", responseText);
     return { error: `API error: ${response.status}`, body: responseText };
   }
 
   try {
     const data = JSON.parse(responseText);
-    // Extract useful info about first listing
+    
+    // Extract all unique boardIds
+    const boardIds = Array.from(new Set(data.listings?.map((l: any) => l.boardId) || []));
+    console.log("=== REPLIERS DEBUG ===");
+    console.log("Available boardIds:", boardIds);
+    console.log("Total listings returned:", data.listings?.length || 0);
+    
     if (data.listings && data.listings.length > 0) {
-      console.log("First listing boardId:", data.listings[0].boardId);
-      console.log("First listing mlsNumber:", data.listings[0].mlsNumber);
-      console.log("First listing keys:", Object.keys(data.listings[0]));
+      const sample = data.listings[0];
+      console.log("Sample listing boardId:", sample.boardId);
+      console.log("Sample listing mlsNumber:", sample.mlsNumber);
+      console.log("Sample listing address:", sample.address?.full || sample.address);
+      console.log("Sample listing keys:", Object.keys(sample));
     }
-    return data;
+    console.log("=== END DEBUG ===");
+    
+    return {
+      boardIds,
+      totalListings: data.listings?.length || 0,
+      sampleListing: data.listings?.[0] || null,
+      fullResponse: data,
+    };
   } catch (e) {
+    console.log("Failed to parse JSON:", responseText.substring(0, 500));
     return { error: "Failed to parse JSON", body: responseText };
   }
 }
