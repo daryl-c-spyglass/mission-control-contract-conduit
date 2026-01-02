@@ -76,6 +76,17 @@ export interface MLSListingData {
   appliances: string[];
   heatingCooling: string[];
   
+  // Additional property features (from Repliers API)
+  flooring: string[];
+  roofMaterial: string;
+  foundation: string;
+  pool: string;
+  parking: string[];
+  waterSource: string;
+  sewer: string;
+  utilities: string[];
+  constructionMaterials: string[];
+  
   // Financial
   hoaFee: number | null;
   hoaFrequency: string;
@@ -336,10 +347,25 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
       
       description: listing.publicRemarks || listing.privateRemarks || listing.remarks || listing.details?.description || "",
       
-      interiorFeatures: parseFeatures(listing.interiorFeatures || listing.details?.interiorFeatures),
-      exteriorFeatures: parseFeatures(listing.exteriorFeatures || listing.details?.exteriorFeatures),
-      appliances: parseFeatures(listing.appliances || listing.details?.appliances),
-      heatingCooling: Array.from(new Set(heatingCooling)),
+      // Property Features - extract from details.extras and other fields
+      interiorFeatures: parseFeatures(listing.interiorFeatures || listing.details?.interiorFeatures || listing.details?.extras),
+      exteriorFeatures: parseFeatures(listing.exteriorFeatures || listing.details?.exteriorFeatures || listing.details?.patio),
+      appliances: parseFeatures(listing.appliances || listing.details?.appliances || listing.details?.extras),
+      heatingCooling: Array.from(new Set([
+        ...heatingCooling,
+        ...(listing.details?.airConditioning ? parseFeatures(listing.details.airConditioning) : [])
+      ])),
+      
+      // Additional property details from Repliers API
+      flooring: parseFeatures(listing.flooring || listing.details?.flooringType),
+      roofMaterial: listing.roofMaterial || listing.details?.roofMaterial || "",
+      foundation: listing.foundation || listing.details?.foundationType || "",
+      pool: listing.pool || listing.details?.swimmingPool || "",
+      parking: parseFeatures(listing.parking || listing.details?.garage),
+      waterSource: listing.waterSource || listing.details?.waterSource || "",
+      sewer: listing.sewer || listing.details?.sewer || "",
+      utilities: parseFeatures(listing.utilities),
+      constructionMaterials: parseFeatures(listing.constructionMaterials || listing.details?.exteriorConstruction1),
       
       hoaFee: listing.associationFee || listing.hoaFee || null,
       hoaFrequency: listing.associationFeeFrequency || listing.hoaFrequency || "Monthly",

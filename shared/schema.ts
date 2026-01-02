@@ -197,6 +197,17 @@ export interface MLSData {
   appliances: string[];
   heatingCooling: string[];
   
+  // Additional property features (from Repliers API)
+  flooring?: string[];
+  roofMaterial?: string;
+  foundation?: string;
+  pool?: string;
+  parking?: string[];
+  waterSource?: string;
+  sewer?: string;
+  utilities?: string[];
+  constructionMaterials?: string[];
+  
   // Financial
   hoaFee: number | null;
   hoaFrequency: string;
@@ -225,7 +236,6 @@ export interface MLSData {
   listingId?: string;
   features?: string[];
   lotSizeNum?: number;
-  pool?: boolean;
 }
 
 // Re-export auth models (users and sessions tables for Replit Auth)

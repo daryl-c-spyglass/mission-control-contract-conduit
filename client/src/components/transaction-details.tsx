@@ -742,7 +742,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 )}
                 
                 {/* Property Features */}
-                {(mlsData.interiorFeatures?.length > 0 || mlsData.exteriorFeatures?.length > 0 || mlsData.appliances?.length > 0 || mlsData.heatingCooling?.length > 0) && (
+                {(mlsData.interiorFeatures?.length > 0 || mlsData.exteriorFeatures?.length > 0 || mlsData.appliances?.length > 0 || mlsData.heatingCooling?.length > 0 || mlsData.flooring?.length > 0 || mlsData.parking?.length > 0 || mlsData.constructionMaterials?.length > 0 || mlsData.roofMaterial || mlsData.foundation || mlsData.pool || mlsData.waterSource || mlsData.sewer) && (
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base">Property Features</CardTitle>
@@ -753,7 +753,46 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                         <FeatureSection title="Exterior Features" items={mlsData.exteriorFeatures || []} />
                         <FeatureSection title="Appliances" items={mlsData.appliances || []} />
                         <FeatureSection title="Heating & Cooling" items={mlsData.heatingCooling || []} />
+                        <FeatureSection title="Flooring" items={mlsData.flooring || []} />
+                        <FeatureSection title="Parking" items={mlsData.parking || []} />
+                        <FeatureSection title="Construction" items={mlsData.constructionMaterials || []} />
                       </div>
+                      
+                      {/* Single-value property details */}
+                      {(mlsData.roofMaterial || mlsData.foundation || mlsData.pool || mlsData.waterSource || mlsData.sewer) && (
+                        <div className="mt-4 pt-4 border-t space-y-2">
+                          {mlsData.roofMaterial && mlsData.roofMaterial !== "None" && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Roof</span>
+                              <span>{mlsData.roofMaterial}</span>
+                            </div>
+                          )}
+                          {mlsData.foundation && mlsData.foundation !== "None" && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Foundation</span>
+                              <span>{mlsData.foundation}</span>
+                            </div>
+                          )}
+                          {mlsData.pool && mlsData.pool !== "None" && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Pool</span>
+                              <span>{mlsData.pool}</span>
+                            </div>
+                          )}
+                          {mlsData.waterSource && mlsData.waterSource !== "None" && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Water Source</span>
+                              <span>{mlsData.waterSource}</span>
+                            </div>
+                          )}
+                          {mlsData.sewer && mlsData.sewer !== "None" && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Sewer</span>
+                              <span>{mlsData.sewer}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 )}
