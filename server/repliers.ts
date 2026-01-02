@@ -10,20 +10,19 @@ async function repliersRequest(endpoint: string, params?: Record<string, string>
 
   const url = new URL(`${REPLIERS_API_BASE}${endpoint}`);
   
-  url.searchParams.append("repliers_api_key", apiKey);
-  
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       url.searchParams.append(key, value);
     });
   }
 
-  console.log("Repliers API request:", url.toString().replace(apiKey, "***"));
+  console.log("Repliers API request:", url.toString());
 
   const response = await fetch(url.toString(), {
     method: "GET",
     headers: {
-      "Content-Type": "application/json",
+      "REPLIERS-API-KEY": apiKey,
+      "Accept": "application/json",
     },
   });
 
@@ -165,9 +164,10 @@ function buildGarage(listing: any): string {
 
 export async function fetchMLSListing(mlsNumber: string): Promise<MLSListingData | null> {
   try {
-    const data = await repliersRequest("/listings", { mlsNumber });
+    // Use direct listing endpoint: GET /listings/{mlsNumber}
+    const data = await repliersRequest(`/listings/${mlsNumber}`);
     
-    console.log("Repliers API full response for MLS", mlsNumber, ":", JSON.stringify(data).substring(0, 3000));
+    console.log("Repliers API full response for MLS", mlsNumber, ":", JSON.stringify(data, null, 2));
     
     let listing = data;
     if (data.listings && Array.isArray(data.listings)) {
