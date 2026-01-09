@@ -1,0 +1,98 @@
+Fix Print Flyer template issues to match Caleb's design exactly.
+
+File: client/src/components/create-flyer-dialog.tsx
+
+## Issue 1: Address Number Spacing
+
+Current: "1 3 1 0 6  N E W  B O S T O N" (numbers spaced individually)
+Should be: "13106  N E W  B O S T O N" (numbers together, only letters spaced)
+
+Fix the address formatting:
+```javascript
+function formatAddressForFlyer(address: string): string {
+  return address
+    .toUpperCase()
+    .split(' ')
+    .map(word => {
+      // Keep numbers together (street number)
+      if (/^\d+$/.test(word)) {
+        return word;
+      }
+      // Space out letters for text words
+      return word.split('').join(' ');
+    })
+    .join('   '); // Triple space between words
+}
+// Result: "13106   N E W   B O S T O N"
+```
+
+## Issue 2: Add Icons to Property Stats
+
+Add simple icons next to bedrooms/bathrooms/sqft:
+
+- Bed icon (🛏️ or SVG bed icon) + "4 bedrooms"
+- Bath icon (🛁 or SVG bathtub icon) + "2 bathrooms"
+- Square/area icon (⬜ or SVG square icon) + "1,850 sq. ft"
+
+Use simple line-style SVG icons that match the reference template:
+- Bed: Simple bed outline
+- Bath: Bathtub with legs
+- Square: Rectangle with diagonal line (area symbol)
+
+Draw icons at ~40px size, dark gray color (#333)
+
+## Issue 3: Reduce Bottom White Space
+
+The bottom section has too much empty space below the content.
+
+1. Move the entire bottom content section higher
+2. Reduce padding/margin at the bottom of the flyer
+3. Content should end closer to the bottom edge
+4. Add the gold/tan footer bar at very bottom (like in reference)
+
+## Issue 4: Add Spyglass Team Logo Next to Agent
+
+In the agent section (right column):
+1. Agent photo (circular) - already there
+2. ADD: Small Spyglass logo (~100px) positioned to the right or below agent photo
+3. Agent name below
+4. "REALTOR®, Spyglass Realty" 
+5. Phone number
+
+Layout reference from template:
+[Agent Photo]  [Spyglass Logo]
+Agent Name
+REALTOR®, Spyglass Realty
+512-877-5272
+
+## Issue 5: Add "Leading" Script Logo
+
+The "LEADING REAL ESTATE COMPANIES" text should include the script "Leading" logo.
+
+Options:
+1. Use an image of the "Leading Real Estate Companies of the World" logo if available
+2. If no image: Use a script font for "Leading" (like Pinyon Script or similar)
+   - "Leading" in script/cursive style
+   - "REAL ESTATE COMPANIES OF THE WORLD" in small caps below
+
+## Issue 6: Add Footer Bar
+
+Add a gold/tan colored bar at the very bottom of the flyer:
+- Height: ~30-40px
+- Color: Match the price badge gold (#c4a962)
+- Full width
+- No text, just decorative
+
+## Issue 7: (Optional) Background Pattern
+
+The reference has subtle black and white decorative squares in the bottom section.
+- This is lower priority
+- Can skip for MVP if complex
+
+Test by:
+1. Generate Print Flyer
+2. Verify address shows "13106   N E W   B O S T O N"
+3. Verify icons appear next to bed/bath/sqft
+4. Verify less white space at bottom
+5. Verify Spyglass logo appears near agent photo
+6. Verify gold footer bar at bottom

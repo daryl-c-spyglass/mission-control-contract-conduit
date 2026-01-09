@@ -219,57 +219,45 @@ function PrintFlyerPreview({
 }: PreviewProps) {
   const [imagesLoaded, setImagesLoaded] = useState<Record<number, boolean>>({});
   
-  const statusLabel = STATUS_OPTIONS.find(s => s.value === status)?.label || "Just Listed";
+  const statusLabel = STATUS_OPTIONS.find(s => s.value === status)?.label || "Listed";
   const truncatedDesc = truncateDescription(description || "", DESCRIPTION_LIMITS.print);
   
-  // Format address: keep numbers together, space letters, triple space between words
-  const formatAddressSpaced = (addr: string): string => {
-    return addr
-      .toUpperCase()
-      .split(' ')
-      .map(word => {
-        // If word is all numbers (street number), keep together
-        if (/^\d+$/.test(word)) {
-          return word;
-        }
-        // Otherwise space the letters
-        return word.split('').join(' ');
-      })
-      .join('   '); // Triple space between words
-  };
-  const spacedAddress = formatAddressSpaced(address.split(",")[0]);
+  const streetAddress = address.split(",")[0].trim().toUpperCase();
   const cityStateZip = address.split(",").slice(1).join(",").trim().toUpperCase();
+  const fullAddress = `${streetAddress} ${cityStateZip}`;
 
   return (
-    <div className="relative w-full aspect-[8.5/11] bg-[#1a1a1a] rounded-lg overflow-hidden shadow-lg border border-border">
-      {/* Header Section */}
-      <div className="flex items-center justify-between px-2 py-1.5 bg-[#1a1a1a]">
-        <img
-          src={spyglassLogoWhite}
-          alt="Spyglass Realty"
-          className="h-3.5 w-auto"
-        />
-        <p className="text-[5px] text-gray-400 tracking-wider">LEADING REAL ESTATE COMPANIES</p>
-        <div className="bg-[#b39960] text-white px-2 py-1 rounded-sm">
-          <p className="text-[4px] tracking-[0.15em] text-center">{statusLabel.toUpperCase()} AT</p>
-          <p className="text-[8px] font-bold text-center">{price || "$0"}</p>
+    <div className="relative w-full aspect-[8.5/11] bg-white rounded-lg overflow-hidden shadow-lg border border-border" style={{ fontFamily: "'League Spartan', 'Montserrat', sans-serif" }}>
+      {/* Header Section - White background */}
+      <div className="flex items-center justify-between px-2 py-2 bg-white border-b border-gray-100">
+        <div className="bg-[#1a1a1a] rounded px-1.5 py-1">
+          <img
+            src={spyglassLogoWhite}
+            alt="Spyglass Realty"
+            className="h-4 w-auto"
+          />
+        </div>
+        <div className="text-center">
+          <p className="text-[5px] text-gray-500 italic">Leading</p>
+          <p className="text-[4px] text-gray-500 tracking-wider">REAL ESTATE COMPANIES OF THE WORLD</p>
+        </div>
+        <div className="bg-[#c4a962] text-white px-2 py-1.5">
+          <p className="text-[4px] tracking-[0.12em] text-center font-medium">{statusLabel.toUpperCase()} AT</p>
+          <p className="text-[9px] font-bold text-center">{price || "$0"}</p>
         </div>
       </div>
 
-      {/* Address Bar */}
-      <div className="bg-[#2a2a2a] py-1 px-2 text-center">
-        <p className="text-[5px] text-white tracking-[0.25em] font-medium">
-          {spacedAddress}
-        </p>
-        <p className="text-[4px] text-gray-400 tracking-[0.2em]">
-          {cityStateZip}
+      {/* Address Bar - White with dark text */}
+      <div className="py-1.5 px-2 text-center">
+        <p className="text-[6px] text-[#333] tracking-[0.2em] font-medium">
+          {fullAddress}
         </p>
       </div>
 
       {/* Photos Section */}
-      <div className="bg-white px-1 pt-1">
+      <div className="bg-white px-1.5">
         {/* Main Photo */}
-        <div className="relative aspect-[16/9] bg-muted overflow-hidden">
+        <div className="relative aspect-[2.2/1] bg-gray-100 overflow-hidden">
           {photoUrls[0] ? (
             <img
               src={photoUrls[0]}
@@ -278,7 +266,7 @@ function PrintFlyerPreview({
               onLoad={() => setImagesLoaded(prev => ({ ...prev, 0: true }))}
             />
           ) : (
-            <div className="flex items-center justify-center h-full bg-gray-200">
+            <div className="flex items-center justify-center h-full bg-gray-100">
               <p className="text-[8px] text-muted-foreground">Main Photo</p>
             </div>
           )}
@@ -287,7 +275,7 @@ function PrintFlyerPreview({
         {/* Secondary Photos */}
         <div className="grid grid-cols-2 gap-0.5 mt-0.5">
           {[1, 2].map(idx => (
-            <div key={idx} className="relative aspect-[16/10] bg-muted overflow-hidden">
+            <div key={idx} className="relative aspect-[2.2/1] bg-gray-100 overflow-hidden">
               {photoUrls[idx] ? (
                 <img
                   src={photoUrls[idx]}
@@ -296,7 +284,7 @@ function PrintFlyerPreview({
                   onLoad={() => setImagesLoaded(prev => ({ ...prev, [idx]: true }))}
                 />
               ) : (
-                <div className="flex items-center justify-center h-full bg-gray-200">
+                <div className="flex items-center justify-center h-full bg-gray-100">
                   <p className="text-[6px] text-muted-foreground">Photo {idx + 1}</p>
                 </div>
               )}
@@ -306,27 +294,27 @@ function PrintFlyerPreview({
       </div>
 
       {/* Info Section - 3 Columns */}
-      <div className="bg-white px-1 py-1.5 grid grid-cols-3 gap-1">
+      <div className="bg-white px-2 py-2 grid grid-cols-3 gap-1">
         {/* Left Column - Property Stats */}
-        <div className="space-y-0.5 pl-1">
-          <div className="flex items-center gap-1 text-gray-700">
-            <Bed className="h-2 w-2" />
-            <span className="text-[6px]">{bedrooms || "—"} bedrooms</span>
+        <div className="space-y-0.5 pl-0.5">
+          <div className="flex items-center gap-1 text-[#333]">
+            <Bed className="h-2.5 w-2.5" />
+            <span className="text-[6px] font-semibold">{bedrooms || "—"} bedrooms</span>
           </div>
-          <div className="flex items-center gap-1 text-gray-700">
-            <Bath className="h-2 w-2" />
-            <span className="text-[6px]">{bathrooms || "—"} bathrooms</span>
+          <div className="flex items-center gap-1 text-[#333]">
+            <Bath className="h-2.5 w-2.5" />
+            <span className="text-[6px] font-semibold">{bathrooms || "—"} bathrooms</span>
           </div>
-          <div className="flex items-center gap-1 text-gray-700">
-            <Square className="h-2 w-2" />
-            <span className="text-[6px]">{sqft ? parseInt(sqft).toLocaleString() : "—"} sq. ft</span>
+          <div className="flex items-center gap-1 text-[#333]">
+            <Square className="h-2.5 w-2.5" />
+            <span className="text-[6px] font-semibold">{sqft ? parseInt(sqft).toLocaleString() : "—"} sq. ft</span>
           </div>
         </div>
 
-        {/* Center Column - Description */}
+        {/* Center Column - Headline + Description */}
         <div className="text-center px-0.5">
           {listingHeadline && (
-            <p className="text-[5px] font-bold text-gray-800 tracking-wider uppercase mb-1">
+            <p className="text-[5px] font-semibold text-[#333] tracking-wider uppercase mb-1">
               {listingHeadline}
             </p>
           )}
@@ -338,26 +326,31 @@ function PrintFlyerPreview({
         </div>
 
         {/* Right Column - Agent Info */}
-        <div className="text-center pr-1 space-y-0.5">
+        <div className="text-center pr-0.5 space-y-0.5">
           {agentPhotoUrl ? (
             <img 
               src={agentPhotoUrl} 
               alt="Agent" 
-              className="w-5 h-5 mx-auto rounded-full object-cover"
+              className="w-6 h-6 mx-auto rounded-full object-cover border border-gray-200"
             />
           ) : (
-            <div className="w-5 h-5 mx-auto bg-gray-300 rounded-full flex items-center justify-center">
-              <User className="h-2.5 w-2.5 text-gray-500" />
+            <div className="w-6 h-6 mx-auto bg-gray-200 rounded-full flex items-center justify-center">
+              <User className="h-3 w-3 text-gray-400" />
             </div>
           )}
-          <p className="text-[5px] font-bold text-gray-800">{agentName || "Agent Name"}</p>
-          <p className="text-[4px] text-gray-500">{agentTitle || "REALTOR®"}</p>
-          <p className="text-[4px] text-gray-600">{agentPhone || "(XXX) XXX-XXXX"}</p>
+          <p className="text-[6px] font-bold text-[#333]">{agentName || "Agent Name"}</p>
+          <p className="text-[4px] text-gray-500">{agentTitle || "REALTOR®, Spyglass Realty"}</p>
+          <p className="text-[5px] text-gray-600">{agentPhone || "(XXX) XXX-XXXX"}</p>
+          <img
+            src={spyglassLogoWhite}
+            alt="Logo"
+            className="h-2 w-auto mx-auto mt-0.5"
+          />
         </div>
       </div>
 
-      {/* Bottom decorative bar */}
-      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#b39960]" />
+      {/* Bottom decorative bar - gold */}
+      <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#c4a962]" />
     </div>
   );
 }
@@ -902,19 +895,27 @@ export function CreateFlyerDialog({
   const generatePrintFlyer = async (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, data: FormValues, photosToUse: string[]) => {
     canvas.width = 2550;
     canvas.height = 3300;
+    
+    const GOLD_COLOR = "#c4a962";
+    const DARK_TEXT = "#333333";
+    const FONT_LEAGUE = "League Spartan, sans-serif";
+    const FONT_MONTSERRAT = "Montserrat, sans-serif";
 
     const address = transaction.propertyAddress;
     const addressParts = address.split(",");
-    const spacedAddress = addressParts[0].split("").join(" ").toUpperCase();
+    const streetAddress = addressParts[0].trim().toUpperCase();
     const cityStateZip = addressParts.slice(1).join(",").trim().toUpperCase();
-    const statusLabel = STATUS_OPTIONS.find(s => s.value === data.status)?.label || "Just Listed";
+    const fullAddress = `${streetAddress} ${cityStateZip}`;
+    const statusLabel = STATUS_OPTIONS.find(s => s.value === data.status)?.label || "Listed";
 
-    // Header Section - Dark background
-    const headerHeight = 200;
-    ctx.fillStyle = "#1a1a1a";
-    ctx.fillRect(0, 0, canvas.width, headerHeight);
+    // Fill white background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Load and draw logo
+    // ============ HEADER SECTION (height: ~250px) ============
+    const headerHeight = 250;
+    
+    // Load and draw Spyglass logo (left)
     const logo = document.createElement('img');
     logo.crossOrigin = "anonymous";
     await new Promise<void>((resolve) => {
@@ -923,60 +924,63 @@ export function CreateFlyerDialog({
       logo.src = spyglassLogoWhite;
     });
     
-    const logoHeight = 100;
-    const logoWidth = (logo.width / logo.height) * logoHeight || 300;
-    ctx.drawImage(logo, 80, 50, logoWidth, logoHeight);
+    const logoHeight = 120;
+    const logoWidth = (logo.width / logo.height) * logoHeight || 350;
+    
+    // Add dark background panel behind logo for visibility
+    const logoBgPadding = 20;
+    ctx.fillStyle = "#1a1a1a";
+    const logoBgRadius = 8;
+    const logoBgX = 60;
+    const logoBgY = 50;
+    const logoBgW = logoWidth + logoBgPadding * 2;
+    const logoBgH = logoHeight + logoBgPadding;
+    ctx.beginPath();
+    ctx.roundRect(logoBgX, logoBgY, logoBgW, logoBgH, logoBgRadius);
+    ctx.fill();
+    
+    ctx.drawImage(logo, 80, 65, logoWidth, logoHeight);
 
-    // Center text - "Leading Real Estate Companies"
-    ctx.fillStyle = "#888888";
-    ctx.font = "28px Inter, sans-serif";
+    // Center - "Leading Real Estate Companies of the World" text
+    ctx.fillStyle = "#666666";
+    ctx.font = `italic 28px ${FONT_MONTSERRAT}`;
     ctx.textAlign = "center";
-    ctx.fillText("LEADING REAL ESTATE COMPANIES", canvas.width / 2, 110);
+    ctx.fillText("Leading", canvas.width / 2, 100);
+    ctx.font = `500 22px ${FONT_MONTSERRAT}`;
+    ctx.fillText("REAL ESTATE COMPANIES OF THE WORLD", canvas.width / 2, 135);
 
-    // Price badge - gold background
-    const badgeWidth = 450;
-    const badgeHeight = 120;
+    // Price badge (right) - gold background
+    const badgeWidth = 420;
+    const badgeHeight = 140;
     const badgeX = canvas.width - badgeWidth - 80;
-    const badgeY = 40;
-    ctx.fillStyle = "#b39960";
+    const badgeY = 55;
+    ctx.fillStyle = GOLD_COLOR;
     ctx.fillRect(badgeX, badgeY, badgeWidth, badgeHeight);
     
     ctx.fillStyle = "#ffffff";
-    ctx.font = "24px Inter, sans-serif";
-    ctx.letterSpacing = "4px";
+    ctx.font = `500 22px ${FONT_LEAGUE}`;
     ctx.textAlign = "center";
-    ctx.fillText(`${statusLabel.toUpperCase()} AT`, badgeX + badgeWidth / 2, badgeY + 45);
-    ctx.font = "bold 56px Inter, sans-serif";
-    ctx.fillText(data.price || "$0", badgeX + badgeWidth / 2, badgeY + 100);
+    ctx.fillText(`${statusLabel.toUpperCase()} AT`, badgeX + badgeWidth / 2, badgeY + 50);
+    ctx.font = `700 52px ${FONT_LEAGUE}`;
+    ctx.fillText(data.price || "$0", badgeX + badgeWidth / 2, badgeY + 110);
 
-    // Address Bar - slightly lighter dark background
+    // ============ ADDRESS BAR (height: ~100px) ============
     const addressBarY = headerHeight;
     const addressBarHeight = 100;
-    ctx.fillStyle = "#2a2a2a";
-    ctx.fillRect(0, addressBarY, canvas.width, addressBarHeight);
     
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "36px Inter, sans-serif";
-    ctx.letterSpacing = "10px";
+    ctx.fillStyle = DARK_TEXT;
+    ctx.font = `500 40px ${FONT_LEAGUE}`;
     ctx.textAlign = "center";
-    ctx.fillText(spacedAddress, canvas.width / 2, addressBarY + 45);
-    
-    ctx.fillStyle = "#888888";
-    ctx.font = "24px Inter, sans-serif";
-    ctx.letterSpacing = "6px";
-    ctx.fillText(cityStateZip, canvas.width / 2, addressBarY + 80);
+    ctx.fillText(fullAddress, canvas.width / 2, addressBarY + 65);
 
-    // Photos Section - white background
-    const photosY = addressBarY + addressBarHeight;
-    const photosPadding = 40;
+    // ============ PHOTOS SECTION ============
+    const photosY = addressBarY + addressBarHeight + 30;
+    const photosPadding = 60;
+    const photoGap = 20;
     
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, photosY, canvas.width, canvas.height - photosY);
-
-    // Main Photo
-    const mainPhotoY = photosY + photosPadding;
-    const mainPhotoHeight = 1400;
+    // Main Photo - full width hero
     const mainPhotoWidth = canvas.width - photosPadding * 2;
+    const mainPhotoHeight = 1100;
     
     if (photosToUse[0]) {
       const mainPhoto = document.createElement('img');
@@ -987,24 +991,35 @@ export function CreateFlyerDialog({
         mainPhoto.src = photosToUse[0];
       });
       if (mainPhoto.complete && mainPhoto.naturalWidth > 0) {
-        ctx.drawImage(mainPhoto, photosPadding, mainPhotoY, mainPhotoWidth, mainPhotoHeight);
+        // Draw with cover-fit
+        const imgRatio = mainPhoto.naturalWidth / mainPhoto.naturalHeight;
+        const targetRatio = mainPhotoWidth / mainPhotoHeight;
+        let sx = 0, sy = 0, sw = mainPhoto.naturalWidth, sh = mainPhoto.naturalHeight;
+        if (imgRatio > targetRatio) {
+          sw = mainPhoto.naturalHeight * targetRatio;
+          sx = (mainPhoto.naturalWidth - sw) / 2;
+        } else {
+          sh = mainPhoto.naturalWidth / targetRatio;
+          sy = (mainPhoto.naturalHeight - sh) / 2;
+        }
+        ctx.drawImage(mainPhoto, sx, sy, sw, sh, photosPadding, photosY, mainPhotoWidth, mainPhotoHeight);
       }
     } else {
-      ctx.fillStyle = "#e0e0e0";
-      ctx.fillRect(photosPadding, mainPhotoY, mainPhotoWidth, mainPhotoHeight);
+      ctx.fillStyle = "#f0f0f0";
+      ctx.fillRect(photosPadding, photosY, mainPhotoWidth, mainPhotoHeight);
       ctx.fillStyle = "#999999";
-      ctx.font = "48px Inter, sans-serif";
+      ctx.font = `48px ${FONT_MONTSERRAT}`;
       ctx.textAlign = "center";
-      ctx.fillText("Main Photo", canvas.width / 2, mainPhotoY + mainPhotoHeight / 2);
+      ctx.fillText("Main Photo", canvas.width / 2, photosY + mainPhotoHeight / 2);
     }
 
-    // Secondary Photos
-    const secondaryY = mainPhotoY + mainPhotoHeight + 20;
+    // Secondary Photos - two side by side
+    const secondaryY = photosY + mainPhotoHeight + photoGap;
     const secondaryHeight = 550;
-    const secondaryWidth = (mainPhotoWidth - 20) / 2;
+    const secondaryWidth = (mainPhotoWidth - photoGap) / 2;
 
     for (let i = 1; i <= 2; i++) {
-      const x = photosPadding + (i - 1) * (secondaryWidth + 20);
+      const x = photosPadding + (i - 1) * (secondaryWidth + photoGap);
       if (photosToUse[i]) {
         const photo = document.createElement('img');
         photo.crossOrigin = "anonymous";
@@ -1014,63 +1029,113 @@ export function CreateFlyerDialog({
           photo.src = photosToUse[i];
         });
         if (photo.complete && photo.naturalWidth > 0) {
-          ctx.drawImage(photo, x, secondaryY, secondaryWidth, secondaryHeight);
+          // Draw with cover-fit
+          const imgRatio = photo.naturalWidth / photo.naturalHeight;
+          const targetRatio = secondaryWidth / secondaryHeight;
+          let sx = 0, sy = 0, sw = photo.naturalWidth, sh = photo.naturalHeight;
+          if (imgRatio > targetRatio) {
+            sw = photo.naturalHeight * targetRatio;
+            sx = (photo.naturalWidth - sw) / 2;
+          } else {
+            sh = photo.naturalWidth / targetRatio;
+            sy = (photo.naturalHeight - sh) / 2;
+          }
+          ctx.drawImage(photo, sx, sy, sw, sh, x, secondaryY, secondaryWidth, secondaryHeight);
         }
       } else {
-        ctx.fillStyle = "#e0e0e0";
+        ctx.fillStyle = "#f0f0f0";
         ctx.fillRect(x, secondaryY, secondaryWidth, secondaryHeight);
         ctx.fillStyle = "#999999";
-        ctx.font = "36px Inter, sans-serif";
+        ctx.font = `36px ${FONT_MONTSERRAT}`;
         ctx.textAlign = "center";
         ctx.fillText(`Photo ${i + 1}`, x + secondaryWidth / 2, secondaryY + secondaryHeight / 2);
       }
     }
 
-    // Info Section - 3 columns
-    const infoY = secondaryY + secondaryHeight + 60;
-    const columnWidth = (canvas.width - photosPadding * 2) / 3;
-
-    // Left Column - Property Stats
-    const leftColumnX = photosPadding + 40;
-    ctx.textAlign = "left";
-    ctx.fillStyle = "#1a1a1a";
+    // ============ BOTTOM INFO SECTION ============
+    const infoY = secondaryY + secondaryHeight + 80;
     
-    ctx.font = "36px Inter, sans-serif";
-    ctx.fillText(`${data.bedrooms || "—"} bedrooms`, leftColumnX, infoY + 50);
-    ctx.fillText(`${data.bathrooms || "—"} bathrooms`, leftColumnX, infoY + 100);
-    ctx.fillText(`${data.sqft ? parseInt(data.sqft).toLocaleString() : "—"} sq. ft`, leftColumnX, infoY + 150);
+    // Three column layout
+    const leftColX = 100;
+    const centerColX = canvas.width / 2;
+    const rightColX = canvas.width - 450;
+    const rightColWidth = 380;
 
-    // Center Column - Headline + Description
-    const descX = canvas.width / 2;
-    let descStartY = infoY + 40;
+    // LEFT COLUMN - Property Stats with simple line icons
+    ctx.textAlign = "left";
+    ctx.fillStyle = DARK_TEXT;
+    ctx.font = `600 38px ${FONT_MONTSERRAT}`;
+    
+    const statsStartY = infoY + 60;
+    const statSpacing = 60;
+    const iconSize = 36;
+    
+    // Helper to draw simple line icons
+    const drawBedIcon = (x: number, y: number) => {
+      ctx.strokeStyle = DARK_TEXT;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.rect(x, y - iconSize/2 + 8, iconSize, iconSize/2);
+      ctx.moveTo(x, y - iconSize/4 + 8);
+      ctx.lineTo(x + iconSize, y - iconSize/4 + 8);
+      ctx.stroke();
+    };
+    
+    const drawBathIcon = (x: number, y: number) => {
+      ctx.strokeStyle = DARK_TEXT;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(x + iconSize/2, y, iconSize/2 - 4, 0, Math.PI);
+      ctx.moveTo(x + 4, y);
+      ctx.lineTo(x + iconSize - 4, y);
+      ctx.stroke();
+    };
+    
+    const drawSqftIcon = (x: number, y: number) => {
+      ctx.strokeStyle = DARK_TEXT;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.rect(x + 4, y - iconSize/2 + 8, iconSize - 8, iconSize - 8);
+      ctx.stroke();
+    };
+    
+    // Draw icons
+    drawBedIcon(leftColX, statsStartY);
+    drawBathIcon(leftColX, statsStartY + statSpacing);
+    drawSqftIcon(leftColX, statsStartY + statSpacing * 2);
+    
+    // Draw stat text
+    ctx.fillText(`${data.bedrooms || "—"} bedrooms`, leftColX + 60, statsStartY);
+    ctx.fillText(`${data.bathrooms || "—"} bathrooms`, leftColX + 60, statsStartY + statSpacing);
+    ctx.fillText(`${data.sqft ? parseInt(data.sqft).toLocaleString() : "—"} sq. ft`, leftColX + 60, statsStartY + statSpacing * 2);
+
+    // CENTER COLUMN - Headline + Description
+    ctx.textAlign = "center";
+    let descStartY = infoY + 50;
     
     if (data.listingHeadline) {
-      ctx.font = "bold 32px Inter, sans-serif";
-      ctx.fillStyle = "#1a1a1a";
-      ctx.textAlign = "center";
-      ctx.letterSpacing = "3px";
-      ctx.fillText(data.listingHeadline.toUpperCase(), descX, descStartY);
-      descStartY += 50;
+      ctx.font = `600 34px ${FONT_LEAGUE}`;
+      ctx.fillStyle = DARK_TEXT;
+      ctx.fillText(data.listingHeadline.toUpperCase(), centerColX, descStartY);
+      descStartY += 60;
     }
     
     if (data.description) {
       const truncatedDesc = truncateDescription(data.description, DESCRIPTION_LIMITS.print);
-      ctx.font = "28px Inter, sans-serif";
+      ctx.font = `400 30px ${FONT_MONTSERRAT}`;
       ctx.fillStyle = "#444444";
-      ctx.textAlign = "center";
-      ctx.letterSpacing = "0px";
       
-      const maxWidth = columnWidth - 40;
+      const maxWidth = 900;
       const words = truncatedDesc.split(" ");
       let line = "";
       let descY = descStartY;
-      const lineHeight = 38;
+      const lineHeight = 45;
       
       words.forEach((word) => {
         const testLine = line + word + " ";
         const metrics = ctx.measureText(testLine);
         if (metrics.width > maxWidth && line !== "") {
-          ctx.fillText(line.trim(), descX, descY);
+          ctx.fillText(line.trim(), centerColX, descY);
           line = word + " ";
           descY += lineHeight;
         } else {
@@ -1078,16 +1143,18 @@ export function CreateFlyerDialog({
         }
       });
       if (line.trim()) {
-        ctx.fillText(line.trim(), descX, descY);
+        ctx.fillText(line.trim(), centerColX, descY);
       }
     }
 
-    // Right Column - Agent Info
-    const rightColumnX = photosPadding + columnWidth * 2 + columnWidth / 2;
+    // RIGHT COLUMN - Agent Info
     ctx.textAlign = "center";
+    const agentCenterX = rightColX + rightColWidth / 2;
     
-    // Agent photo (circle)
-    const agentCircleR = 60;
+    // Agent photo (circle) - larger size
+    const agentCircleR = 100;
+    const agentPhotoY = infoY + 20;
+    
     if (effectiveAgentPhoto) {
       const agentImg = document.createElement('img');
       agentImg.crossOrigin = "anonymous";
@@ -1099,35 +1166,70 @@ export function CreateFlyerDialog({
       if (agentImg.complete && agentImg.naturalWidth > 0) {
         ctx.save();
         ctx.beginPath();
-        ctx.arc(rightColumnX, infoY + 50, agentCircleR, 0, Math.PI * 2);
+        ctx.arc(agentCenterX, agentPhotoY + agentCircleR, agentCircleR, 0, Math.PI * 2);
         ctx.clip();
-        ctx.drawImage(agentImg, rightColumnX - agentCircleR, infoY + 50 - agentCircleR, agentCircleR * 2, agentCircleR * 2);
+        ctx.drawImage(agentImg, agentCenterX - agentCircleR, agentPhotoY, agentCircleR * 2, agentCircleR * 2);
         ctx.restore();
-      } else {
+        
+        // Add subtle border
         ctx.beginPath();
-        ctx.arc(rightColumnX, infoY + 50, agentCircleR, 0, Math.PI * 2);
-        ctx.fillStyle = "#cccccc";
+        ctx.arc(agentCenterX, agentPhotoY + agentCircleR, agentCircleR, 0, Math.PI * 2);
+        ctx.strokeStyle = "#dddddd";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      } else {
+        // Placeholder circle with simple user silhouette
+        ctx.beginPath();
+        ctx.arc(agentCenterX, agentPhotoY + agentCircleR, agentCircleR, 0, Math.PI * 2);
+        ctx.fillStyle = "#e0e0e0";
+        ctx.fill();
+        // Draw simple person silhouette
+        ctx.fillStyle = "#999999";
+        ctx.beginPath();
+        ctx.arc(agentCenterX, agentPhotoY + agentCircleR - 20, 28, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(agentCenterX, agentPhotoY + agentCircleR + 60, 50, Math.PI, 0, true);
         ctx.fill();
       }
     } else {
+      // Placeholder circle with simple user silhouette
       ctx.beginPath();
-      ctx.arc(rightColumnX, infoY + 50, agentCircleR, 0, Math.PI * 2);
-      ctx.fillStyle = "#cccccc";
+      ctx.arc(agentCenterX, agentPhotoY + agentCircleR, agentCircleR, 0, Math.PI * 2);
+      ctx.fillStyle = "#e0e0e0";
+      ctx.fill();
+      // Draw simple person silhouette
+      ctx.fillStyle = "#999999";
+      ctx.beginPath();
+      ctx.arc(agentCenterX, agentPhotoY + agentCircleR - 20, 28, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(agentCenterX, agentPhotoY + agentCircleR + 60, 50, Math.PI, 0, true);
       ctx.fill();
     }
 
-    ctx.fillStyle = "#1a1a1a";
-    ctx.font = "bold 32px Inter, sans-serif";
-    ctx.fillText(data.agentName || "Agent Name", rightColumnX, infoY + 140);
+    // Agent name
+    ctx.fillStyle = DARK_TEXT;
+    ctx.font = `700 44px ${FONT_MONTSERRAT}`;
+    ctx.fillText(data.agentName || "Agent Name", agentCenterX, agentPhotoY + agentCircleR * 2 + 55);
     
+    // Agent title
     ctx.fillStyle = "#666666";
-    ctx.font = "24px Inter, sans-serif";
-    ctx.fillText(data.agentTitle || "REALTOR®", rightColumnX, infoY + 175);
-    ctx.fillText(data.agentPhone || "(XXX) XXX-XXXX", rightColumnX, infoY + 210);
+    ctx.font = `400 26px ${FONT_MONTSERRAT}`;
+    ctx.fillText(data.agentTitle || "REALTOR®, Spyglass Realty", agentCenterX, agentPhotoY + agentCircleR * 2 + 95);
+    
+    // Agent phone
+    ctx.font = `400 30px ${FONT_MONTSERRAT}`;
+    ctx.fillText(data.agentPhone || "(XXX) XXX-XXXX", agentCenterX, agentPhotoY + agentCircleR * 2 + 135);
+
+    // Small Spyglass logo under agent info
+    const smallLogoHeight = 50;
+    const smallLogoWidth = (logo.width / logo.height) * smallLogoHeight || 150;
+    ctx.drawImage(logo, agentCenterX - smallLogoWidth / 2, agentPhotoY + agentCircleR * 2 + 160, smallLogoWidth, smallLogoHeight);
 
     // Bottom decorative bar - gold
-    ctx.fillStyle = "#b39960";
-    ctx.fillRect(0, canvas.height - 30, canvas.width, 30);
+    ctx.fillStyle = GOLD_COLOR;
+    ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
   };
 
   const generateFlyer = async (data: FormValues) => {
