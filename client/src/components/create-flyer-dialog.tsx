@@ -44,6 +44,12 @@ import spyglassLogoWhite from "@assets/White-Orange_(1)_1767129299733.png";
 
 type FlyerFormat = "social" | "print";
 
+// Single source of truth for character limits
+const DESCRIPTION_LIMITS = {
+  social: 200,
+  print: 115,
+} as const;
+
 const STATUS_OPTIONS = [
   { value: "for_sale", label: "For Sale" },
   { value: "just_listed", label: "Just Listed" },
@@ -116,7 +122,7 @@ function SocialMediaPreview({
 
   const statusLabel = STATUS_OPTIONS.find(s => s.value === status)?.label || "Just Listed";
   const addressParts = address.split(",");
-  const truncatedDesc = truncateDescription(description || "", 200);
+  const truncatedDesc = truncateDescription(description || "", DESCRIPTION_LIMITS.social);
 
   const specs = [];
   if (bedrooms) specs.push(`${bedrooms} bed`);
@@ -209,7 +215,7 @@ function PrintFlyerPreview({
   const [imagesLoaded, setImagesLoaded] = useState<Record<number, boolean>>({});
   
   const statusLabel = STATUS_OPTIONS.find(s => s.value === status)?.label || "Just Listed";
-  const truncatedDesc = truncateDescription(description || "", 115);
+  const truncatedDesc = truncateDescription(description || "", DESCRIPTION_LIMITS.print);
   
   // Format address: keep numbers together, space letters, triple space between words
   const formatAddressSpaced = (addr: string): string => {
@@ -402,7 +408,7 @@ export function CreateFlyerDialog({
 
   const mlsData = transaction.mlsData as MLSData | null;
   const maxPhotos = format === "social" ? 1 : 3;
-  const maxDescriptionLength = format === "social" ? 200 : 115;
+  const maxDescriptionLength = DESCRIPTION_LIMITS[format];
 
   const resetPhotoSelection = useCallback((newFormat: FlyerFormat) => {
     const limit = newFormat === "social" ? 1 : 3;
@@ -507,12 +513,10 @@ export function CreateFlyerDialog({
 
     setIsSummarizing(true);
     try {
-      // Use format-specific character limits
-      const maxLength = format === "social" ? 200 : 115;
-      
+      // Use format-specific character limits from single source of truth
       const response = await apiRequest("POST", "/api/summarize-description", {
         description: originalDescription, // Always use ORIGINAL MLS description
-        maxLength,
+        maxLength: maxDescriptionLength,
         propertyInfo: {
           address: transaction.propertyAddress,
           beds: form.getValues("bedrooms"),
@@ -817,7 +821,7 @@ export function CreateFlyerDialog({
     }
 
     if (data.description) {
-      const truncatedDesc = truncateDescription(data.description, 200);
+      const truncatedDesc = truncateDescription(data.description, DESCRIPTION_LIMITS.social);
       ctx.font = "24px Inter, sans-serif";
       ctx.fillStyle = "#cccccc";
       const maxWidth = canvas.width - 120;
@@ -1045,7 +1049,7 @@ export function CreateFlyerDialog({
     }
     
     if (data.description) {
-      const truncatedDesc = truncateDescription(data.description, 115);
+      const truncatedDesc = truncateDescription(data.description, DESCRIPTION_LIMITS.print);
       ctx.font = "28px Inter, sans-serif";
       ctx.fillStyle = "#444444";
       ctx.textAlign = "center";

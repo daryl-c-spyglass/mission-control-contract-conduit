@@ -64,7 +64,7 @@ The Templates tab in transaction details provides marketing template generation:
 
 ### Create Property Flyer Dialog (January 2026)
 Enhanced flyer creation dialog with UX improvements for mobile and desktop:
-- **Dual Format Support**: Social Media (1:1 aspect ratio, 350 char limit) and Print Flyer (8.5x11, 115 char limit)
+- **Dual Format Support**: Social Media (1:1 aspect ratio, 200 char limit) and Print Flyer (8.5x11, 115 char limit)
 - **Preview Enlarge Lightbox**: Click preview thumbnail to open full-size modal with enlarged view
 - **Photo Thumbnail Expand**: Hover shows ZoomIn icon, click opens photo in full-size lightbox
 - **Replace Mode for Uploads**: When 3/3 photos selected, new uploads clear previous selections and replace
@@ -82,6 +82,16 @@ Professional agent branding for print flyers with validated required fields:
 - **Listing Headline**: Optional 39-character headline (e.g., "OPEN HOUSE SATURDAY") shown above description
 - **Validation**: Toast error prevents generation without required agent name and phone
 - **Live Preview**: Agent section updates in real-time as fields are filled
+
+#### AI Description Summarization (January 2026)
+AI-powered summarization for property descriptions in both flyer formats:
+- **Dual Format Support**: Available for Social Media (200 chars) and Print Flyer (115 chars)
+- **Single Source of Truth**: Character limits centralized in `DESCRIPTION_LIMITS` constant
+- **Original Source**: Always summarizes from the original MLS description, not edited text
+- **Re-runnable**: Click "AI Summarize" again for a different variation
+- **Revert Functionality**: Dropdown with "Revert to Previous" and "Revert to Original" options
+- **API Endpoint**: `POST /api/summarize-description` using gpt-4o-mini model
+- **Graceful Fallback**: If AI fails, truncates to character limit with ellipsis
 
 #### Preview Modal Zoom Controls (January 2026)
 Zoom controls for the enlarged preview modal:

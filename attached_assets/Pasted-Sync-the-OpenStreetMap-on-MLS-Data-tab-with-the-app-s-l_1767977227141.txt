@@ -1,0 +1,63 @@
+Sync the OpenStreetMap on MLS Data tab with the app's light/dark mode setting.
+
+Files to modify:
+- client/src/components/transaction-details.tsx (map component)
+- Check where theme state is managed (likely a context or hook)
+
+## Issue
+
+The map at the bottom of the MLS Data tab is always dark. It should sync with the user's light/dark mode selection from the toggle in the upper right corner.
+
+## Requirements
+
+1. Detect current theme mode:
+   - Find where the theme toggle state is stored (likely React context, localStorage, or a theme provider)
+   - Subscribe to theme changes
+
+2. Update map tiles based on theme:
+
+   **Light Mode:**
+   - Use standard OpenStreetMap tiles: 
+     `https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`
+   - OR use CartoDB Positron (light): 
+     `https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png`
+
+   **Dark Mode:**
+   - Use CartoDB Dark Matter: 
+     `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png`
+
+3. Ensure street names are readable in dark mode:
+   - CartoDB Dark Matter has readable labels built-in
+   - If using a different dark tile set, verify text contrast
+   - Test that street names, city names, and landmarks are visible
+
+4. Update attribution based on tile provider:
+   - Light: "© OpenStreetMap contributors" (or add "© CARTO" if using CartoDB)
+   - Dark: "© OpenStreetMap contributors © CARTO"
+
+5. Handle theme changes dynamically:
+   - When user toggles theme, map should update immediately
+   - No page refresh required
+
+## Implementation
+```javascript
+// Example implementation
+const { theme } = useTheme(); // or however theme is accessed
+
+const tileUrl = theme === 'dark' 
+  ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+  : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+
+const attribution = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>';
+```
+
+6. Marker visibility:
+   - Ensure the property marker pin is visible on both light and dark maps
+   - May need to adjust marker color if it blends in
+
+Test by:
+1. Set app to Light mode - verify map shows light tiles with readable streets
+2. Set app to Dark mode - verify map shows dark tiles with readable streets
+3. Toggle between modes - verify map updates without page refresh
+4. Check street names are clearly readable in both modes
+5. Verify marker pin is visible in both modes
