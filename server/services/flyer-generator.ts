@@ -221,29 +221,8 @@ export async function generatePrintFlyer(data: FlyerData): Promise<Buffer> {
 }
 
 export function formatAddressForFlyer(address: string): string {
-  const parts = address.split(',');
-  const streetAddress = parts[0].trim().toUpperCase();
-  const cityStateZip = parts.slice(1).join(',').trim().toUpperCase();
-  
-  const formatWord = (word: string): string => {
-    if (/^\d+$/.test(word)) {
-      return word;
-    }
-    if (/^(TX|CA|NY|FL|AZ|CO|GA|NC|OH|PA|IL|NJ|VA|WA|MA|MD|TN|IN|MO|WI|MN|SC|AL|LA|KY|OR|OK|CT|IA|MS|AR|KS|UT|NV|NM|WV|NE|ID|HI|ME|NH|RI|MT|DE|SD|ND|AK|VT|WY|DC)$/i.test(word)) {
-      return word;
-    }
-    if (/^\d{5}(-\d{4})?$/.test(word)) {
-      return word;
-    }
-    return word.split('').join(' ');
-  };
-  
-  const formatSection = (section: string): string => {
-    return section.split(' ').filter(w => w).map(formatWord).join('   ');
-  };
-  
-  if (cityStateZip) {
-    return `${formatSection(streetAddress)}   ${formatSection(cityStateZip)}`;
-  }
-  return formatSection(streetAddress);
+  // Simple uppercase formatting - no character splitting
+  // Just normalize spacing and uppercase
+  const normalized = address.toUpperCase().replace(/\s+/g, ' ').trim();
+  return normalized;
 }

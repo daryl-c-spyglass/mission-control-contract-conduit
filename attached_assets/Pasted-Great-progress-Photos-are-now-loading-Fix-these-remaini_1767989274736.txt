@@ -1,0 +1,157 @@
+Great progress! Photos are now loading. Fix these remaining issues:
+
+## FIX 1: Spyglass Logo Not Loading
+
+The Spyglass logo shows broken image alt text. The logo file might not be in the right location or path is wrong.
+
+1. First, verify the logo file exists:
+```bash
+ls -la public/assets/
+# Look for SpyglassRealty_Logo_Black.png
+```
+
+2. If missing, download/copy the logo to: `public/assets/SpyglassRealty_Logo_Black.png`
+
+3. Update the path in the flyer generator to use absolute file path:
+```typescript
+const logoPath = path.join(process.cwd(), 'public', 'assets', 'SpyglassRealty_Logo_Black.png');
+console.log('Logo path:', logoPath);
+console.log('Logo exists:', fs.existsSync(logoPath));
+```
+
+4. Convert logo to base64 like we do for other images:
+```typescript
+// Read logo file and convert to base64
+let spyglassLogoBase64 = '';
+try {
+  const logoPath = path.join(process.cwd(), 'public', 'assets', 'SpyglassRealty_Logo_Black.png');
+  if (fs.existsSync(logoPath)) {
+    const logoBuffer = fs.readFileSync(logoPath);
+    spyglassLogoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+    console.log('Logo loaded successfully');
+  } else {
+    console.log('Logo file not found at:', logoPath);
+  }
+} catch (error) {
+  console.error('Error loading logo:', error);
+}
+```
+
+## FIX 2: "Leading" Section Needs BLACK Background
+
+Per the annotated template, the "Leading" text should have a BLACK background rectangle.
+
+Update flyer-template.html:
+```html
+<div class="leading-container">
+  <div class="leading-text">Leading</div>
+  <div class="leading-subtext">REAL ESTATE COMPANIES OF THE WORLD®</div>
+</div>
+```
+```css
+.leading-container {
+  background: #000000;  /* BLACK background */
+  padding: 15px 30px;
+  text-align: center;
+}
+
+.leading-text {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 28px;
+  color: #FFFFFF;  /* White text on black */
+}
+
+.leading-subtext {
+  font-size: 12px;
+  letter-spacing: 0.15em;
+  color: #FFFFFF;  /* White text on black */
+  margin-top: 3px;
+}
+```
+
+## FIX 3: Reduce Address Letter Spacing
+
+Current: "1 3 1 0 6   N E W   B O S T O N" (too spaced out)
+Should be: "13106 NEW BOSTON" (normal words, slight spacing between)
+
+Update address formatting:
+```css
+.address-bar {
+  text-align: center;
+  padding: 20px;
+  font-size: 24px;
+  letter-spacing: 0.15em;  /* Reduced from 0.3em */
+  font-weight: 500;
+  color: #333;
+  background: #f5f5f5;
+}
+```
+
+Or format address differently in the code:
+```typescript
+// Don't split individual characters
+const formattedAddress = address.toUpperCase();
+// NOT: address.split('').join(' ')
+```
+
+## FIX 4: Reduce Bottom White Space
+
+The bottom section has too much empty space. Options:
+
+1. **Increase bottom section height:**
+```css
+.bottom-section {
+  min-height: 1000px;  /* Increase from current */
+  padding: 80px;
+}
+```
+
+2. **Increase font sizes and spacing:**
+```css
+.stat-text {
+  font-size: 38px;
+}
+
+.listing-headline {
+  font-size: 28px;
+  margin-bottom: 30px;
+}
+
+.listing-description {
+  font-size: 24px;
+  line-height: 1.7;
+}
+
+.agent-name {
+  font-size: 36px;
+}
+```
+
+3. **Add more vertical spacing between elements:**
+```css
+.stat-item {
+  margin-bottom: 50px;  /* Increase gap between stats */
+}
+```
+
+## FIX 5: Make Agent Section Logo Larger
+
+The small Spyglass logo in agent section should be more visible:
+```css
+.team-logo-small {
+  width: 120px;  /* Increase from current */
+  height: auto;
+  margin-top: 15px;
+}
+```
+
+## TESTING CHECKLIST
+
+After fixes, verify:
+- [ ] Spyglass logo visible in header (not alt text)
+- [ ] Spyglass logo visible in agent section
+- [ ] "Leading" has black background with white text
+- [ ] Address has normal spacing (not letter-by-letter)
+- [ ] Bottom section fills more of the page
+- [ ] Overall looks professional and matches template

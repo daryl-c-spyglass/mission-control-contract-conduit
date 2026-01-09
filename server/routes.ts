@@ -1,5 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import path from "path";
+import fs from "fs";
 import { storage } from "./storage";
 import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema } from "@shared/schema";
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages, watchUserMailbox } from "./gmail";
@@ -1378,17 +1380,16 @@ Return only the summary text, nothing else.`;
         'listed': 'LISTED AT'
       };
       
-      // Get the Spyglass logo URL - use absolute URL for Puppeteer
-      const host = req.get('host') || 'localhost:5000';
-      const protocol = req.protocol || 'http';
-      const baseUrl = `${protocol}://${host}`;
+      // Use absolute file path for logo (will be converted to base64)
+      const logoPath = path.join(process.cwd(), 'public', 'assets', 'SpyglassRealty_Logo_Black.png');
+      console.log('Logo path:', logoPath, 'exists:', fs.existsSync(logoPath));
       
       // Clean price - remove $ and commas, then parse
       const cleanPrice = String(price || '0').replace(/[$,]/g, '');
       const numericPrice = parseFloat(cleanPrice) || 0;
       
       const flyerData: FlyerData = {
-        spyglassLogoUrl: `${baseUrl}/assets/SpyglassRealty_Logo_Black.png`,
+        spyglassLogoUrl: logoPath,
         statusLabel: statusLabels[status] || 'LISTED AT',
         price: `$${numericPrice.toLocaleString()}`,
         address: formatAddressForFlyer(address),
