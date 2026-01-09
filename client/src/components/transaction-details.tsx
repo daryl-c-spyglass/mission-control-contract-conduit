@@ -203,20 +203,18 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
     `${mlsData.address}, ${mlsData.city}, ${mlsData.state} ${mlsData.zipCode}` : 
     transaction.propertyAddress;
   
-  // Build Google Maps embed URL using frontend API key
-  const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  // Build OpenStreetMap embed URL (no API key required)
   const hasCoordinates = mlsData?.coordinates?.latitude && mlsData?.coordinates?.longitude;
   const mapEmbedUrl = useMemo(() => {
-    if (!googleMapsApiKey) return null;
     if (hasCoordinates) {
       const lat = mlsData.coordinates!.latitude;
       const lng = mlsData.coordinates!.longitude;
-      return `https://www.google.com/maps/embed/v1/place?key=${googleMapsApiKey}&q=${lat},${lng}&zoom=15`;
-    } else if (fullAddress) {
-      return `https://www.google.com/maps/embed/v1/place?key=${googleMapsApiKey}&q=${encodeURIComponent(fullAddress)}&zoom=15`;
+      // OpenStreetMap embed with marker
+      const bbox = `${lng - 0.005},${lat - 0.003},${lng + 0.005},${lat + 0.003}`;
+      return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;
     }
     return null;
-  }, [googleMapsApiKey, hasCoordinates, mlsData?.coordinates, fullAddress]);
+  }, [hasCoordinates, mlsData?.coordinates]);
   
   // Reset photo index when MLS data or photos change
   useEffect(() => {
@@ -993,7 +991,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                           allowFullScreen
                           loading="lazy"
                           referrerPolicy="no-referrer-when-downgrade"
-                          title="Property Location Map"
+                          title="Property Location - OpenStreetMap"
                           data-testid="iframe-property-map"
                         />
                       </div>
