@@ -37,6 +37,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import type { Transaction, MLSData } from "@shared/schema";
 
@@ -1259,23 +1264,47 @@ export function CreateFlyerDialog({
                         Select {format === "social" ? "1 photo" : "up to 3 photos"}
                       </FormLabel>
                       <div className="flex items-center gap-2">
-                        {format === "print" && (mlsData?.mlsNumber || transaction.mlsNumber) && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleAutoSelectPhotos}
-                            disabled={isAutoSelecting}
-                            className="h-6 text-xs gap-1"
-                            data-testid="button-auto-select-photos"
-                          >
-                            {isAutoSelecting ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Sparkles className="h-3 w-3" />
-                            )}
-                            Auto-Select
-                          </Button>
+                        {(mlsData?.mlsNumber || transaction.mlsNumber) && (
+                          <Tooltip delayDuration={300}>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handleAutoSelectPhotos}
+                                disabled={isAutoSelecting}
+                                className="h-6 text-xs gap-1"
+                                data-testid="button-auto-select-photos"
+                              >
+                                {isAutoSelecting ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Sparkles className="h-3 w-3" />
+                                )}
+                                Auto-Select
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-[250px] p-3">
+                              <div className="font-semibold mb-1">Smart Photo Selection</div>
+                              <div className="text-xs text-muted-foreground mb-2">
+                                Using AI Image Insights to select:
+                              </div>
+                              {format === "social" ? (
+                                <ul className="text-xs space-y-0.5">
+                                  <li>• Best Exterior/Front photo</li>
+                                </ul>
+                              ) : (
+                                <ul className="text-xs space-y-0.5">
+                                  <li>• Photo 1: Best Exterior/Front</li>
+                                  <li>• Photo 2: Best Kitchen</li>
+                                  <li>• Photo 3: Best Living Room</li>
+                                </ul>
+                              )}
+                              <div className="text-[10px] text-muted-foreground mt-2">
+                                Based on room classification & quality scores
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
                         )}
                         <span className="text-xs text-muted-foreground">
                           {selectedPhotos.length}/{maxPhotos} selected
