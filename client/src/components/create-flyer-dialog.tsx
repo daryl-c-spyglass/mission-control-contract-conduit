@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, X, Upload, Check, Download, Image, FileText, Bed, Bath, Square, ZoomIn, ChevronDown, ChevronUp, Maximize2, User } from "lucide-react";
+import { Loader2, X, Upload, Check, Download, Image, FileText, Bed, Bath, Square, ZoomIn, ChevronDown, ChevronUp, Maximize2, User, RotateCcw, Plus, Minus } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -355,6 +356,19 @@ export function CreateFlyerDialog({
   const [previewEnlarged, setPreviewEnlarged] = useState(false);
   const [expandedPhotoUrl, setExpandedPhotoUrl] = useState<string | null>(null);
   const [localAgentPhoto, setLocalAgentPhoto] = useState<string | null>(null);
+  const [zoomLevel, setZoomLevel] = useState(100);
+
+  const handleZoomIn = useCallback(() => {
+    setZoomLevel(prev => Math.min(prev + 25, 300));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoomLevel(prev => Math.max(prev - 25, 50));
+  }, []);
+
+  const handleZoomReset = useCallback(() => {
+    setZoomLevel(100);
+  }, []);
 
   const mlsData = transaction.mlsData as MLSData | null;
   const maxPhotos = format === "social" ? 1 : 3;
@@ -386,8 +400,37 @@ export function CreateFlyerDialog({
       setShowUploadSection(false);
       setFormat("social");
       setLocalAgentPhoto(null);
+      setZoomLevel(100);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!previewEnlarged) {
+      setZoomLevel(100);
+    }
+  }, [previewEnlarged]);
+
+  useEffect(() => {
+    if (!previewEnlarged) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === '=' || e.key === '+') {
+          e.preventDefault();
+          handleZoomIn();
+        } else if (e.key === '-') {
+          e.preventDefault();
+          handleZoomOut();
+        } else if (e.key === '0') {
+          e.preventDefault();
+          handleZoomReset();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewEnlarged, handleZoomIn, handleZoomOut, handleZoomReset]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -1571,45 +1614,91 @@ export function CreateFlyerDialog({
       {/* Enlarged Preview Modal */}
       {previewEnlarged && (
         <Dialog open={previewEnlarged} onOpenChange={setPreviewEnlarged}>
-          <DialogContent className="w-[95vw] max-w-xl max-h-[90vh] p-4 flex flex-col">
+          <DialogContent className="w-[95vw] max-w-[min(90vw,1200px)] max-h-[90vh] p-4 flex flex-col">
             <DialogHeader className="pb-2">
               <DialogTitle>Preview - {format === "social" ? "Social Media" : "Print Flyer"}</DialogTitle>
               <DialogDescription>
                 Full-size preview of your flyer
               </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 overflow-auto flex justify-center py-4">
-              <div className={format === "social" ? "w-64" : "w-80"}>
-                {format === "social" ? (
-                  <SocialMediaPreview
-                    photoUrls={previewPhotoUrls}
-                    status={watchedValues.status || "just_listed"}
-                    price={watchedValues.price || "$0"}
-                    address={transaction.propertyAddress}
-                    bedrooms={watchedValues.bedrooms}
-                    bathrooms={watchedValues.bathrooms}
-                    sqft={watchedValues.sqft}
-                    description={watchedValues.description}
-                  />
-                ) : (
-                  <PrintFlyerPreview
-                    photoUrls={previewPhotoUrls}
-                    status={watchedValues.status || "just_listed"}
-                    price={watchedValues.price || "$0"}
-                    address={transaction.propertyAddress}
-                    bedrooms={watchedValues.bedrooms}
-                    bathrooms={watchedValues.bathrooms}
-                    sqft={watchedValues.sqft}
-                    description={watchedValues.description}
-                    agentName={watchedValues.agentName}
-                    agentTitle={watchedValues.agentTitle}
-                    agentPhone={watchedValues.agentPhone}
-                    agentPhotoUrl={effectiveAgentPhoto || undefined}
-                    listingHeadline={watchedValues.listingHeadline}
-                  />
-                )}
+
+            {/* Zoom Controls Toolbar */}
+            <div className="flex items-center justify-center gap-2 py-2 border-b">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleZoomOut}
+                disabled={zoomLevel <= 50}
+                data-testid="button-zoom-out"
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <div className="w-16 text-center text-sm font-medium" data-testid="text-zoom-level">
+                {zoomLevel}%
               </div>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleZoomIn}
+                disabled={zoomLevel >= 300}
+                data-testid="button-zoom-in"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-2"
+                onClick={handleZoomReset}
+                disabled={zoomLevel === 100}
+                data-testid="button-zoom-fit"
+              >
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Fit
+              </Button>
             </div>
+
+            {/* Scrollable Preview Area */}
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="flex justify-center py-4">
+                <div 
+                  className="transition-transform duration-200 ease-out origin-top"
+                  style={{ transform: `scale(${zoomLevel / 100})` }}
+                >
+                  <div className={format === "social" ? "w-64" : "w-80"}>
+                    {format === "social" ? (
+                      <SocialMediaPreview
+                        photoUrls={previewPhotoUrls}
+                        status={watchedValues.status || "just_listed"}
+                        price={watchedValues.price || "$0"}
+                        address={transaction.propertyAddress}
+                        bedrooms={watchedValues.bedrooms}
+                        bathrooms={watchedValues.bathrooms}
+                        sqft={watchedValues.sqft}
+                        description={watchedValues.description}
+                      />
+                    ) : (
+                      <PrintFlyerPreview
+                        photoUrls={previewPhotoUrls}
+                        status={watchedValues.status || "just_listed"}
+                        price={watchedValues.price || "$0"}
+                        address={transaction.propertyAddress}
+                        bedrooms={watchedValues.bedrooms}
+                        bathrooms={watchedValues.bathrooms}
+                        sqft={watchedValues.sqft}
+                        description={watchedValues.description}
+                        agentName={watchedValues.agentName}
+                        agentTitle={watchedValues.agentTitle}
+                        agentPhone={watchedValues.agentPhone}
+                        agentPhotoUrl={effectiveAgentPhoto || undefined}
+                        listingHeadline={watchedValues.listingHeadline}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </ScrollArea>
+
             <div className="flex justify-end pt-2 border-t">
               <Button variant="outline" onClick={() => setPreviewEnlarged(false)}>
                 Close
