@@ -186,32 +186,40 @@ function PrintFlyerPreview({
   
   const statusLabel = STATUS_OPTIONS.find(s => s.value === status)?.label || "Just Listed";
   const truncatedDesc = truncateDescription(description || "", 250);
+  
+  const spacedAddress = address.split(",")[0].split("").join(" ").toUpperCase();
+  const cityStateZip = address.split(",").slice(1).join(",").trim().toUpperCase();
 
   return (
-    <div className="relative w-full aspect-[8.5/11] bg-white rounded-lg overflow-hidden shadow-lg border border-border">
-      <div className="flex items-center justify-between p-2 border-b border-gray-100">
+    <div className="relative w-full aspect-[8.5/11] bg-[#1a1a1a] rounded-lg overflow-hidden shadow-lg border border-border">
+      {/* Header Section */}
+      <div className="flex items-center justify-between px-2 py-1.5 bg-[#1a1a1a]">
         <img
           src={spyglassLogoWhite}
-          alt="Logo"
-          className="h-4 w-auto"
-          style={{ filter: 'invert(1) brightness(0.3)' }}
+          alt="Spyglass Realty"
+          className="h-3.5 w-auto"
         />
-        <div className="bg-amber-500 text-white text-[7px] font-bold px-1.5 py-0.5 rounded">
-          {statusLabel.toUpperCase()} AT {price || "$0"}
+        <p className="text-[5px] text-gray-400 tracking-wider">LEADING REAL ESTATE COMPANIES</p>
+        <div className="bg-[#b39960] text-white px-2 py-1 rounded-sm">
+          <p className="text-[4px] tracking-[0.15em] text-center">{statusLabel.toUpperCase()} AT</p>
+          <p className="text-[8px] font-bold text-center">{price || "$0"}</p>
         </div>
       </div>
 
-      <div className="px-2 py-1">
-        <p className="text-[8px] font-bold text-gray-800 tracking-widest uppercase text-center">
-          {address.split(",")[0]}
+      {/* Address Bar */}
+      <div className="bg-[#2a2a2a] py-1 px-2 text-center">
+        <p className="text-[5px] text-white tracking-[0.25em] font-medium">
+          {spacedAddress}
         </p>
-        <p className="text-[6px] text-gray-500 text-center">
-          {address.split(",").slice(1).join(",").trim()}
+        <p className="text-[4px] text-gray-400 tracking-[0.2em]">
+          {cityStateZip}
         </p>
       </div>
 
-      <div className="px-2">
-        <div className="relative aspect-[16/10] bg-muted rounded overflow-hidden">
+      {/* Photos Section */}
+      <div className="bg-white px-1 pt-1">
+        {/* Main Photo */}
+        <div className="relative aspect-[16/9] bg-muted overflow-hidden">
           {photoUrls[0] ? (
             <img
               src={photoUrls[0]}
@@ -220,15 +228,16 @@ function PrintFlyerPreview({
               onLoad={() => setImagesLoaded(prev => ({ ...prev, 0: true }))}
             />
           ) : (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-[8px] text-muted-foreground">Main photo</p>
+            <div className="flex items-center justify-center h-full bg-gray-200">
+              <p className="text-[8px] text-muted-foreground">Main Photo</p>
             </div>
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-1 mt-1">
+        {/* Secondary Photos */}
+        <div className="grid grid-cols-2 gap-0.5 mt-0.5">
           {[1, 2].map(idx => (
-            <div key={idx} className="relative aspect-[16/10] bg-muted rounded overflow-hidden">
+            <div key={idx} className="relative aspect-[16/10] bg-muted overflow-hidden">
               {photoUrls[idx] ? (
                 <img
                   src={photoUrls[idx]}
@@ -237,7 +246,7 @@ function PrintFlyerPreview({
                   onLoad={() => setImagesLoaded(prev => ({ ...prev, [idx]: true }))}
                 />
               ) : (
-                <div className="flex items-center justify-center h-full">
+                <div className="flex items-center justify-center h-full bg-gray-200">
                   <p className="text-[6px] text-muted-foreground">Photo {idx + 1}</p>
                 </div>
               )}
@@ -246,43 +255,46 @@ function PrintFlyerPreview({
         </div>
       </div>
 
-      <div className="px-2 py-1.5 mt-1 border-t border-gray-100">
-        <div className="grid grid-cols-3 gap-2">
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-0.5 text-gray-700">
-              <Bed className="h-2.5 w-2.5" />
-              <span className="text-[8px] font-bold">{bedrooms || "—"}</span>
-            </div>
-            <p className="text-[6px] text-gray-500">Beds</p>
+      {/* Info Section - 3 Columns */}
+      <div className="bg-white px-1 py-1.5 grid grid-cols-3 gap-1">
+        {/* Left Column - Property Stats */}
+        <div className="space-y-0.5 pl-1">
+          <div className="flex items-center gap-1 text-gray-700">
+            <Bed className="h-2 w-2" />
+            <span className="text-[6px]">{bedrooms || "—"} bedrooms</span>
           </div>
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-0.5 text-gray-700">
-              <Bath className="h-2.5 w-2.5" />
-              <span className="text-[8px] font-bold">{bathrooms || "—"}</span>
-            </div>
-            <p className="text-[6px] text-gray-500">Baths</p>
+          <div className="flex items-center gap-1 text-gray-700">
+            <Bath className="h-2 w-2" />
+            <span className="text-[6px]">{bathrooms || "—"} bathrooms</span>
           </div>
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-0.5 text-gray-700">
-              <Square className="h-2.5 w-2.5" />
-              <span className="text-[8px] font-bold">{sqft ? parseInt(sqft).toLocaleString() : "—"}</span>
-            </div>
-            <p className="text-[6px] text-gray-500">Sq Ft</p>
+          <div className="flex items-center gap-1 text-gray-700">
+            <Square className="h-2 w-2" />
+            <span className="text-[6px]">{sqft ? parseInt(sqft).toLocaleString() : "—"} sq. ft</span>
           </div>
+        </div>
+
+        {/* Center Column - Description */}
+        <div className="text-center px-0.5">
+          {truncatedDesc && (
+            <p className="text-[5px] text-gray-600 leading-relaxed line-clamp-4">
+              {truncatedDesc}
+            </p>
+          )}
+        </div>
+
+        {/* Right Column - Agent Info */}
+        <div className="text-center pr-1 space-y-0.5">
+          <div className="w-5 h-5 mx-auto bg-gray-300 rounded-full flex items-center justify-center">
+            <span className="text-[4px] text-gray-500">Photo</span>
+          </div>
+          <p className="text-[5px] font-bold text-gray-800">Agent Name</p>
+          <p className="text-[4px] text-gray-500">REALTOR®</p>
+          <p className="text-[4px] text-gray-600">(XXX) XXX-XXXX</p>
         </div>
       </div>
 
-      {truncatedDesc && (
-        <div className="px-2 pb-1">
-          <p className="text-[6px] text-gray-600 text-center leading-relaxed line-clamp-3">
-            {truncatedDesc}
-          </p>
-        </div>
-      )}
-
-      <div className="absolute bottom-1 left-0 right-0 text-center">
-        <p className="text-[6px] text-gray-400 italic">Agent info coming soon</p>
-      </div>
+      {/* Bottom decorative bar */}
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#b39960]" />
     </div>
   );
 }
@@ -585,9 +597,18 @@ export function CreateFlyerDialog({
     canvas.width = 2550;
     canvas.height = 3300;
 
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const address = transaction.propertyAddress;
+    const addressParts = address.split(",");
+    const spacedAddress = addressParts[0].split("").join(" ").toUpperCase();
+    const cityStateZip = addressParts.slice(1).join(",").trim().toUpperCase();
+    const statusLabel = STATUS_OPTIONS.find(s => s.value === data.status)?.label || "Just Listed";
 
+    // Header Section - Dark background
+    const headerHeight = 200;
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(0, 0, canvas.width, headerHeight);
+
+    // Load and draw logo
     const logo = document.createElement('img');
     logo.crossOrigin = "anonymous";
     await new Promise<void>((resolve) => {
@@ -596,52 +617,88 @@ export function CreateFlyerDialog({
       logo.src = spyglassLogoWhite;
     });
     
-    const logoHeight = 120;
+    const logoHeight = 100;
     const logoWidth = (logo.width / logo.height) * logoHeight || 300;
-    ctx.save();
-    ctx.filter = 'invert(1) brightness(0.3)';
-    ctx.drawImage(logo, 100, 80, logoWidth, logoHeight);
-    ctx.restore();
+    ctx.drawImage(logo, 80, 50, logoWidth, logoHeight);
 
-    const statusLabel = STATUS_OPTIONS.find(s => s.value === data.status)?.label || "Just Listed";
-    ctx.fillStyle = "#d97706";
-    ctx.fillRect(canvas.width - 700, 80, 600, 100);
+    // Center text - "Leading Real Estate Companies"
+    ctx.fillStyle = "#888888";
+    ctx.font = "28px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("LEADING REAL ESTATE COMPANIES", canvas.width / 2, 110);
+
+    // Price badge - gold background
+    const badgeWidth = 450;
+    const badgeHeight = 120;
+    const badgeX = canvas.width - badgeWidth - 80;
+    const badgeY = 40;
+    ctx.fillStyle = "#b39960";
+    ctx.fillRect(badgeX, badgeY, badgeWidth, badgeHeight);
+    
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 48px Inter, sans-serif";
+    ctx.font = "24px Inter, sans-serif";
+    ctx.letterSpacing = "4px";
     ctx.textAlign = "center";
-    ctx.fillText(`${statusLabel.toUpperCase()} AT ${data.price}`, canvas.width - 400, 145);
-    ctx.textAlign = "left";
+    ctx.fillText(`${statusLabel.toUpperCase()} AT`, badgeX + badgeWidth / 2, badgeY + 45);
+    ctx.font = "bold 56px Inter, sans-serif";
+    ctx.fillText(data.price || "$0", badgeX + badgeWidth / 2, badgeY + 100);
 
-    const address = transaction.propertyAddress;
-    const addressParts = address.split(",");
-    ctx.fillStyle = "#1a1a1a";
-    ctx.font = "bold 72px Inter, sans-serif";
-    ctx.textAlign = "center";
-    ctx.letterSpacing = "8px";
-    ctx.fillText(addressParts[0].toUpperCase(), canvas.width / 2, 320);
+    // Address Bar - slightly lighter dark background
+    const addressBarY = headerHeight;
+    const addressBarHeight = 100;
+    ctx.fillStyle = "#2a2a2a";
+    ctx.fillRect(0, addressBarY, canvas.width, addressBarHeight);
+    
+    ctx.fillStyle = "#ffffff";
     ctx.font = "36px Inter, sans-serif";
-    ctx.fillStyle = "#666666";
-    ctx.fillText(addressParts.slice(1).join(",").trim(), canvas.width / 2, 380);
-    ctx.textAlign = "left";
+    ctx.letterSpacing = "10px";
+    ctx.textAlign = "center";
+    ctx.fillText(spacedAddress, canvas.width / 2, addressBarY + 45);
+    
+    ctx.fillStyle = "#888888";
+    ctx.font = "24px Inter, sans-serif";
+    ctx.letterSpacing = "6px";
+    ctx.fillText(cityStateZip, canvas.width / 2, addressBarY + 80);
 
-    const mainPhoto = document.createElement('img');
-    mainPhoto.crossOrigin = "anonymous";
-    await new Promise<void>((resolve, reject) => {
-      mainPhoto.onload = () => resolve();
-      mainPhoto.onerror = () => reject(new Error("Failed to load main photo"));
-      mainPhoto.src = photosToUse[0];
-    });
+    // Photos Section - white background
+    const photosY = addressBarY + addressBarHeight;
+    const photosPadding = 40;
+    
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, photosY, canvas.width, canvas.height - photosY);
 
-    const mainPhotoY = 450;
-    const mainPhotoHeight = 1500;
-    ctx.drawImage(mainPhoto, 100, mainPhotoY, canvas.width - 200, mainPhotoHeight);
+    // Main Photo
+    const mainPhotoY = photosY + photosPadding;
+    const mainPhotoHeight = 1400;
+    const mainPhotoWidth = canvas.width - photosPadding * 2;
+    
+    if (photosToUse[0]) {
+      const mainPhoto = document.createElement('img');
+      mainPhoto.crossOrigin = "anonymous";
+      await new Promise<void>((resolve) => {
+        mainPhoto.onload = () => resolve();
+        mainPhoto.onerror = () => resolve();
+        mainPhoto.src = photosToUse[0];
+      });
+      if (mainPhoto.complete && mainPhoto.naturalWidth > 0) {
+        ctx.drawImage(mainPhoto, photosPadding, mainPhotoY, mainPhotoWidth, mainPhotoHeight);
+      }
+    } else {
+      ctx.fillStyle = "#e0e0e0";
+      ctx.fillRect(photosPadding, mainPhotoY, mainPhotoWidth, mainPhotoHeight);
+      ctx.fillStyle = "#999999";
+      ctx.font = "48px Inter, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Main Photo", canvas.width / 2, mainPhotoY + mainPhotoHeight / 2);
+    }
 
-    const secondaryY = mainPhotoY + mainPhotoHeight + 40;
-    const secondaryHeight = 600;
-    const secondaryWidth = (canvas.width - 240) / 2;
+    // Secondary Photos
+    const secondaryY = mainPhotoY + mainPhotoHeight + 20;
+    const secondaryHeight = 550;
+    const secondaryWidth = (mainPhotoWidth - 20) / 2;
 
     for (let i = 1; i <= 2; i++) {
-      const x = 100 + (i - 1) * (secondaryWidth + 40);
+      const x = photosPadding + (i - 1) * (secondaryWidth + 20);
       if (photosToUse[i]) {
         const photo = document.createElement('img');
         photo.crossOrigin = "anonymous";
@@ -654,46 +711,41 @@ export function CreateFlyerDialog({
           ctx.drawImage(photo, x, secondaryY, secondaryWidth, secondaryHeight);
         }
       } else {
-        ctx.fillStyle = "#f0f0f0";
+        ctx.fillStyle = "#e0e0e0";
         ctx.fillRect(x, secondaryY, secondaryWidth, secondaryHeight);
         ctx.fillStyle = "#999999";
-        ctx.font = "32px Inter, sans-serif";
+        ctx.font = "36px Inter, sans-serif";
         ctx.textAlign = "center";
         ctx.fillText(`Photo ${i + 1}`, x + secondaryWidth / 2, secondaryY + secondaryHeight / 2);
-        ctx.textAlign = "left";
       }
     }
 
-    const bottomY = secondaryY + secondaryHeight + 80;
-    
-    const specWidth = 600;
-    const specX = 100;
-    
-    ctx.fillStyle = "#1a1a1a";
-    ctx.font = "bold 72px Inter, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(data.bedrooms || "—", specX + specWidth / 6, bottomY + 60);
-    ctx.fillText(data.bathrooms || "—", specX + specWidth / 2, bottomY + 60);
-    ctx.fillText(data.sqft ? parseInt(data.sqft).toLocaleString() : "—", specX + (5 * specWidth) / 6, bottomY + 60);
-    
-    ctx.font = "28px Inter, sans-serif";
-    ctx.fillStyle = "#666666";
-    ctx.fillText("BEDS", specX + specWidth / 6, bottomY + 100);
-    ctx.fillText("BATHS", specX + specWidth / 2, bottomY + 100);
-    ctx.fillText("SQ FT", specX + (5 * specWidth) / 6, bottomY + 100);
-    ctx.textAlign = "left";
+    // Info Section - 3 columns
+    const infoY = secondaryY + secondaryHeight + 60;
+    const columnWidth = (canvas.width - photosPadding * 2) / 3;
 
+    // Left Column - Property Stats
+    const leftColumnX = photosPadding + 40;
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#1a1a1a";
+    
+    ctx.font = "36px Inter, sans-serif";
+    ctx.fillText(`${data.bedrooms || "—"} bedrooms`, leftColumnX, infoY + 50);
+    ctx.fillText(`${data.bathrooms || "—"} bathrooms`, leftColumnX, infoY + 100);
+    ctx.fillText(`${data.sqft ? parseInt(data.sqft).toLocaleString() : "—"} sq. ft`, leftColumnX, infoY + 150);
+
+    // Center Column - Description
     if (data.description) {
       const truncatedDesc = truncateDescription(data.description, 250);
-      ctx.font = "32px Inter, sans-serif";
+      ctx.font = "28px Inter, sans-serif";
       ctx.fillStyle = "#444444";
       ctx.textAlign = "center";
       
-      const maxWidth = 1000;
+      const maxWidth = columnWidth - 40;
       const words = truncatedDesc.split(" ");
       let line = "";
-      let descY = bottomY + 40;
-      const lineHeight = 45;
+      let descY = infoY + 40;
+      const lineHeight = 38;
       const descX = canvas.width / 2;
       
       words.forEach((word) => {
@@ -710,19 +762,34 @@ export function CreateFlyerDialog({
       if (line.trim()) {
         ctx.fillText(line.trim(), descX, descY);
       }
-      ctx.textAlign = "left";
     }
 
-    ctx.font = "italic 28px Inter, sans-serif";
-    ctx.fillStyle = "#999999";
-    ctx.textAlign = "right";
-    ctx.fillText("Agent info coming soon", canvas.width - 100, bottomY + 80);
-    ctx.textAlign = "left";
+    // Right Column - Agent Info (placeholder)
+    const rightColumnX = photosPadding + columnWidth * 2 + columnWidth / 2;
+    ctx.textAlign = "center";
+    
+    // Agent photo placeholder (circle)
+    const agentCircleR = 60;
+    ctx.beginPath();
+    ctx.arc(rightColumnX, infoY + 50, agentCircleR, 0, Math.PI * 2);
+    ctx.fillStyle = "#cccccc";
+    ctx.fill();
+    ctx.fillStyle = "#666666";
+    ctx.font = "20px Inter, sans-serif";
+    ctx.fillText("Photo", rightColumnX, infoY + 55);
 
-    ctx.save();
-    ctx.filter = 'invert(1) brightness(0.3)';
-    ctx.drawImage(logo, canvas.width / 2 - logoWidth / 2, canvas.height - 180, logoWidth, logoHeight);
-    ctx.restore();
+    ctx.fillStyle = "#1a1a1a";
+    ctx.font = "bold 32px Inter, sans-serif";
+    ctx.fillText("Agent Name", rightColumnX, infoY + 140);
+    
+    ctx.fillStyle = "#666666";
+    ctx.font = "24px Inter, sans-serif";
+    ctx.fillText("REALTOR®", rightColumnX, infoY + 175);
+    ctx.fillText("(XXX) XXX-XXXX", rightColumnX, infoY + 210);
+
+    // Bottom decorative bar - gold
+    ctx.fillStyle = "#b39960";
+    ctx.fillRect(0, canvas.height - 30, canvas.width, 30);
   };
 
   const generateFlyer = async (data: FormValues) => {

@@ -1,0 +1,81 @@
+Fix multiple UX issues in Create Property Flyer dialog.
+
+File: client/src/components/create-flyer-dialog.tsx
+
+## Issue 1: Preview too small - Add clickable enlarge
+
+1. Make the preview section clickable
+2. When clicked, open a modal/lightbox showing the full-size preview
+3. Add a small "Enlarge" icon or text hint on hover
+4. Add X button to close the enlarged preview
+5. Apply to both Social Media and Print Flyer formats
+
+## Issue 2: Photo thumbnails too small - Add expand option
+
+1. Add a hover effect on photo thumbnails with an expand/zoom icon
+2. When clicked (while holding Alt, or via icon), show larger version in a lightbox
+3. OR add an "Expand Photos" toggle that switches to larger thumbnail view
+4. Make sure selection still works (click to select, different action to expand)
+
+## Issue 3: "Upload Custom Photos" greyed out when 3/3 selected
+
+Current behavior: Shows "0 slots left" and greyed out when max photos selected
+Expected behavior: 
+1. Allow users to upload custom photos that REPLACE MLS selections
+2. Change text to "Replace with custom photos" when max reached
+3. OR allow deselecting MLS photos to free up slots
+4. Upload area should always be functional
+
+## Issue 4: Custom photos section has no close button
+
+1. Add a collapse/close button (chevron or X) to the "Upload Custom Photos" section
+2. Make it a collapsible accordion that can be toggled open/closed
+3. Default state: collapsed
+4. Remember: some dialogs scroll, ensure closing doesn't break layout
+
+## Issue 5: Description field hidden when custom photos open
+
+1. Ensure the dialog is scrollable so all fields are accessible
+2. OR limit the height of the custom photos section
+3. Make sure Description field is always reachable by scrolling
+4. Consider making the dialog taller or using a two-column layout
+
+## Issue 6: Description should show FULL text, not truncated
+
+Current: Description is pre-truncated to ~200 chars in the textarea
+Expected:
+1. Show the FULL description from MLS in the textarea (same as "About This Home")
+2. Let users edit it freely
+3. Show character count: "246/200" (current chars / limit for format)
+4. Truncation happens only at GENERATION time, not in the input field
+5. Add helper text: "Description will be truncated to [X] characters on the flyer"
+
+## Issue 7: Character limit should match format
+
+- Social Media format: 200 character limit for description
+- Print Flyer format: 115 character limit for description (per Caleb's template)
+
+When user switches format:
+1. Update the character counter to show the correct limit
+2. Update helper text to reflect the format's limit
+3. Keep the full description in textarea (don't auto-truncate)
+
+## Summary of changes needed:
+
+1. Add preview enlarge lightbox (clickable preview → full size modal)
+2. Add photo thumbnail expand option (see larger before selecting)
+3. Fix custom upload to work even when 3 photos selected (replace mode)
+4. Add collapse button to custom photos section
+5. Ensure dialog scrolls properly to show all fields
+6. Load FULL description in textarea, truncate only at generation
+7. Dynamic character limit based on format (200 vs 115)
+
+Test by:
+1. Open Create Flyer dialog
+2. Click preview - should open enlarged view
+3. Try to expand a photo thumbnail to see it larger
+4. Select 3 photos, then try to upload custom - should work
+5. Open custom photos section, verify it can be closed
+6. Scroll dialog to verify Description field is visible
+7. Check Description shows full MLS text
+8. Switch between formats, verify character limit updates
