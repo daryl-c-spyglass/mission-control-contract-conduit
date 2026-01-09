@@ -8,6 +8,7 @@ import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAcc
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
 import { getSyncStatus, triggerManualSync } from "./repliers-sync";
+import OpenAI from "openai";
 
 // Helper to generate a Slack channel name in format: buy-123main-joeywilkes or sell-123main-joeywilkes
 function generateSlackChannelName(address: string, transactionType: string = "buy", agentName: string = ""): string {
@@ -1188,6 +1189,74 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Repliers test error:", error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============ AI Description Summarization ============
+  
+  app.post("/api/summarize-description", isAuthenticated, async (req, res) => {
+    try {
+      const { description, maxLength = 115, propertyInfo } = req.body;
+      
+      if (!description || description.trim().length === 0) {
+        return res.status(400).json({ error: "Description is required" });
+      }
+
+      // If already short enough, return as-is
+      if (description.length <= maxLength) {
+        return res.json({ summary: description });
+      }
+
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const prompt = `Summarize this real estate listing description into exactly ${maxLength} characters or less. 
+Keep the most compelling selling points. Write in an engaging, professional tone.
+Do not include the address, beds, baths, or sqft (those are shown separately on the flyer).
+Do not use quotes around the summary.
+
+Property: ${propertyInfo?.address || "N/A"}
+
+Original description:
+${description}
+
+Provide only the summary text, no quotes or explanation.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 200,
+        temperature: 0.7,
+      });
+
+      let summary = response.choices[0]?.message?.content?.trim() || "";
+      
+      // Remove any quotes the AI might have added
+      summary = summary.replace(/^["']|["']$/g, "");
+      
+      // Ensure it fits within maxLength
+      if (summary.length > maxLength) {
+        const truncated = summary.substring(0, maxLength - 3);
+        const lastSpace = truncated.lastIndexOf(" ");
+        summary = (lastSpace > 0 ? truncated.substring(0, lastSpace) : truncated) + "...";
+      }
+
+      res.json({ summary });
+    } catch (error: any) {
+      console.error("AI summarization error:", error);
+      
+      // Fallback: simple truncation
+      const { description, maxLength = 115 } = req.body;
+      if (description) {
+        const truncated = description.substring(0, maxLength - 3);
+        const lastSpace = truncated.lastIndexOf(" ");
+        const fallback = (lastSpace > 0 ? truncated.substring(0, lastSpace) : truncated) + "...";
+        return res.json({ summary: fallback, fallback: true });
+      }
+      
+      res.status(500).json({ error: "Failed to summarize description" });
     }
   });
 

@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, X, Upload, Check, Download, Image, FileText, Bed, Bath, Square, ZoomIn, ChevronDown, ChevronUp, Maximize2, User, RotateCcw, Plus, Minus } from "lucide-react";
+import { Loader2, X, Upload, Check, Download, Image, FileText, Bed, Bath, Square, ZoomIn, ChevronDown, ChevronUp, Maximize2, User, RotateCcw, Plus, Minus, Sparkles } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
@@ -357,6 +358,7 @@ export function CreateFlyerDialog({
   const [expandedPhotoUrl, setExpandedPhotoUrl] = useState<string | null>(null);
   const [localAgentPhoto, setLocalAgentPhoto] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(100);
+  const [isSummarizing, setIsSummarizing] = useState(false);
 
   const handleZoomIn = useCallback(() => {
     setZoomLevel(prev => Math.min(prev + 25, 300));
@@ -450,6 +452,53 @@ export function CreateFlyerDialog({
 
   const watchedValues = useWatch({ control: form.control });
   const currentDescriptionLength = watchedValues.description?.length || 0;
+
+  const handleSummarize = useCallback(async () => {
+    const currentDescription = form.getValues("description");
+    if (!currentDescription || currentDescription.trim().length === 0) {
+      toast({
+        title: "No description",
+        description: "Please enter a description to summarize.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSummarizing(true);
+    try {
+      const response = await apiRequest("POST", "/api/summarize-description", {
+        description: currentDescription,
+        maxLength: 115,
+        propertyInfo: {
+          address: transaction.propertyAddress,
+          beds: form.getValues("bedrooms"),
+          baths: form.getValues("bathrooms"),
+          sqft: form.getValues("sqft"),
+        },
+      });
+
+      const data = await response.json();
+      
+      if (data.summary) {
+        form.setValue("description", data.summary);
+        toast({
+          title: data.fallback ? "Description truncated" : "Description summarized!",
+          description: data.fallback 
+            ? "AI unavailable, description was truncated instead."
+            : "AI generated a concise summary for your flyer.",
+        });
+      }
+    } catch (error) {
+      console.error("Summarization error:", error);
+      toast({
+        title: "Summarization failed",
+        description: "Could not summarize. Please try again or edit manually.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSummarizing(false);
+    }
+  }, [form, transaction.propertyAddress, toast]);
 
   const handleFormatChange = (newFormat: FlyerFormat) => {
     setFormat(newFormat);
@@ -1366,28 +1415,69 @@ export function CreateFlyerDialog({
                 <FormField
                   control={form.control}
                   name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm">Description</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Enter a brief property description..."
-                          className="resize-none h-20"
-                          data-testid="input-flyer-description"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormDescription className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">
-                          Will be truncated to {format === "print" ? "115" : maxDescriptionLength} chars on flyer
-                        </span>
-                        <span className={currentDescriptionLength > (format === "print" ? 115 : maxDescriptionLength) ? "text-amber-600 font-medium" : ""}>
-                          {currentDescriptionLength}/{format === "print" ? 115 : maxDescriptionLength}
-                        </span>
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const charLimit = format === "print" ? 115 : maxDescriptionLength;
+                    const isOverLimit = currentDescriptionLength > charLimit;
+                    const isNearLimit = currentDescriptionLength > charLimit - 10 && currentDescriptionLength <= charLimit;
+                    
+                    return (
+                      <FormItem>
+                        <div className="flex items-center justify-between">
+                          <FormLabel className="text-sm">Description</FormLabel>
+                          {format === "print" && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={handleSummarize}
+                              disabled={isSummarizing || !field.value}
+                              className="h-7 text-xs"
+                              data-testid="button-ai-summarize"
+                            >
+                              {isSummarizing ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  Summarizing...
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="h-3 w-3 mr-1" />
+                                  AI Summarize
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter a brief property description..."
+                            className="resize-none h-20"
+                            data-testid="input-flyer-description"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">
+                            {format === "print" 
+                              ? "Tip: Click 'AI Summarize' to create a concise summary"
+                              : `Will be truncated to ${charLimit} chars on flyer`
+                            }
+                          </span>
+                          <span className={
+                            isOverLimit 
+                              ? "text-red-600 font-medium" 
+                              : isNearLimit 
+                                ? "text-amber-600 font-medium" 
+                                : "text-green-600"
+                          }>
+                            {currentDescriptionLength}/{charLimit}
+                            {isOverLimit && " (will truncate)"}
+                          </span>
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
 
                 {format === "print" && (

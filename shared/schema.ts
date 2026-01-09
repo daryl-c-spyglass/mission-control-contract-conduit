@@ -260,3 +260,6 @@ export interface MLSData {
 
 // Re-export auth models (users and sessions tables for Replit Auth)
 export * from "./models/auth";
+
+// Re-export chat models (conversations and messages for AI chat)
+export * from "./models/chat";
