@@ -1,0 +1,70 @@
+Final refinements for Print Flyer to match template exactly.
+
+File: client/src/components/create-flyer-dialog.tsx
+
+## FIX 1: Decorative Squares Position
+
+Current: Squares are overlapping the agent photo circle awkwardly
+Template: Squares are in the CORNER, separate from the photo
+
+Move the decorative squares to the TOP-RIGHT corner of the agent section, NOT overlapping the photo:
+```javascript
+// Position squares in corner, above and to the right of agent photo
+const squaresX = agentSectionX + agentSectionWidth - (squareSize * 3) - 10;
+const squaresY = agentSectionY + 10; // Top of agent section
+
+// Draw small grid (3x3 or 2x3)
+for (let row = 0; row < 3; row++) {
+  for (let col = 0; col < 3; col++) {
+    ctx.fillStyle = (row + col) % 2 === 0 ? '#000000' : '#FFFFFF';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
+    ctx.fillRect(squaresX + col * squareSize, squaresY + row * squareSize, squareSize, squareSize);
+    ctx.strokeRect(squaresX + col * squareSize, squaresY + row * squareSize, squareSize, squareSize);
+  }
+}
+```
+
+The squares should be a decorative element in the corner, not covering the agent photo.
+
+## FIX 2: Reduce Bottom White Space
+
+Still too much empty space at bottom. Options:
+
+1. **Increase vertical spacing** between elements in bottom section
+2. **Make fonts larger:**
+   - Property stats: 52px
+   - Headline: 40px
+   - Description: 32px
+   - Agent name: 46px
+
+3. **Add more padding/margins** between the three columns
+
+4. **Move entire bottom section down** slightly so content extends closer to page edge
+
+## FIX 3: Make Spyglass Logos Larger
+
+**Header logo (top left):**
+- Current: Small and unclear
+- Fix: Increase to ~250px wide, ensure it's crisp and readable
+
+**Agent section logo (bottom right):**
+- Current: Tiny and unclear  
+- Fix: Increase to ~120px wide
+
+Load the high-resolution logo files and scale appropriately.
+
+## FIX 4: Icons (Lower Priority for MVP)
+
+The icons are functional but not matching the template's specific designs.
+
+For MVP: Current icons are acceptable
+Future: Replace with exact template icons (bed with posts, bathtub with faucet/legs, sqft with diagonal arrow)
+
+## TESTING
+
+Generate flyer and verify:
+- [ ] Decorative squares in corner, not overlapping photo
+- [ ] Less white space at bottom
+- [ ] Logos are clear and readable
+- [ ] Overall appearance is professional and balanced

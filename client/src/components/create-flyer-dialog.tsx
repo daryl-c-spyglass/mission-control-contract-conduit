@@ -262,11 +262,11 @@ function PrintFlyerPreview({
     <div className="relative w-full aspect-[8.5/11] bg-white rounded-lg overflow-hidden shadow-lg border border-border" style={{ fontFamily: "'League Spartan', 'Montserrat', sans-serif" }}>
       {/* Header Section - WHITE background with Logo + Leading + Price (per template) */}
       <div className="flex items-center justify-between px-2 py-2 bg-white border-b border-gray-100">
-        {/* Left: Larger Spyglass logo */}
+        {/* Left: Larger Spyglass logo (~250px wide equivalent) */}
         <img
           src={spyglassLogoBlack}
           alt="Spyglass Realty"
-          className="h-6 w-auto"
+          className="h-8 w-auto"
         />
         {/* Center: Leading Real Estate Companies */}
         <div className="text-center flex-shrink-0">
@@ -375,21 +375,8 @@ function PrintFlyerPreview({
           )}
         </div>
 
-        {/* Right Column - Agent Info with decorative squares */}
+        {/* Right Column - Agent Info */}
         <div className="text-center pr-0.5 space-y-0.5 relative">
-          {/* Decorative checkerboard squares (per template) */}
-          <div className="absolute -top-1 right-0 grid grid-cols-3 gap-0">
-            {[...Array(12)].map((_, i) => (
-              <div
-                key={i}
-                className="w-1 h-1"
-                style={{
-                  backgroundColor: (Math.floor(i / 3) + (i % 3)) % 2 === 0 ? '#000' : '#fff',
-                  border: (Math.floor(i / 3) + (i % 3)) % 2 !== 0 ? '0.5px solid #ccc' : 'none',
-                }}
-              />
-            ))}
-          </div>
           {agentPhotoUrl ? (
             <img 
               src={agentPhotoUrl} 
@@ -407,9 +394,22 @@ function PrintFlyerPreview({
           <img
             src={spyglassLogoBlack}
             alt="Logo"
-            className="h-3 w-auto mx-auto mt-1"
+            className="h-4 w-auto mx-auto mt-1"
           />
         </div>
+      </div>
+
+      {/* Decorative checkerboard squares in top-right corner (per template) */}
+      <div className="absolute top-[72%] right-1 grid grid-cols-3 gap-0">
+        {[...Array(9)].map((_, i) => (
+          <div
+            key={i}
+            className="w-1.5 h-1.5 border border-black"
+            style={{
+              backgroundColor: (Math.floor(i / 3) + (i % 3)) % 2 === 0 ? '#000' : '#fff',
+            }}
+          />
+        ))}
       </div>
 
       {/* NO gold footer bar per template */}
@@ -1094,8 +1094,8 @@ export function CreateFlyerDialog({
       logo.src = spyglassLogoBlack;
     });
     
-    const logoHeight = 180; // Larger logo per template (was 120)
-    const logoWidth = (logo.width / logo.height) * logoHeight || 500;
+    const logoWidth = 250; // Larger logo per template (~250px wide)
+    const logoHeight = (logo.height / logo.width) * logoWidth || 180;
     
     // Draw logo directly on white background (no dark panel needed)
     ctx.drawImage(logo, 60, 35, logoWidth, logoHeight);
@@ -1239,11 +1239,11 @@ export function CreateFlyerDialog({
     // LEFT COLUMN - Property Stats with simple line icons (larger per template)
     ctx.textAlign = "left";
     ctx.fillStyle = DARK_TEXT;
-    ctx.font = `600 48px ${FONT_MONTSERRAT}`;  // Larger font (was 38px)
+    ctx.font = `600 52px ${FONT_MONTSERRAT}`;  // Larger font per refinement
     
-    const statsStartY = infoY + 80;
-    const statSpacing = 100;  // More vertical spacing (was 60px)
-    const iconSize = 50;      // Larger icons (was 36px)
+    const statsStartY = infoY + 100;  // Move down to reduce white space
+    const statSpacing = 110;  // More vertical spacing
+    const iconSize = 55;      // Larger icons
     
     // Helper to draw line icons matching template style
     const drawBedIcon = (x: number, y: number) => {
@@ -1327,15 +1327,15 @@ export function CreateFlyerDialog({
     let descStartY = infoY + 70;
     
     if (data.listingHeadline) {
-      ctx.font = `600 42px ${FONT_LEAGUE}`;  // Larger headline (was 34px)
+      ctx.font = `600 46px ${FONT_LEAGUE}`;  // Larger headline per refinement
       ctx.fillStyle = DARK_TEXT;
       ctx.fillText(data.listingHeadline.toUpperCase(), centerColX, descStartY);
-      descStartY += 70;
+      descStartY += 80;
     }
     
     if (data.description) {
       const truncatedDesc = truncateDescription(data.description, DESCRIPTION_LIMITS.print);
-      ctx.font = `400 36px ${FONT_MONTSERRAT}`;  // Larger description (was 30px)
+      ctx.font = `400 38px ${FONT_MONTSERRAT}`;  // Larger description per refinement
       ctx.fillStyle = "#444444";
       
       const maxWidth = 900;
@@ -1430,11 +1430,11 @@ export function CreateFlyerDialog({
       );
     };
 
-    // Agent name (Title Case)
+    // Agent name (Title Case) - larger per refinement
     ctx.fillStyle = DARK_TEXT;
-    ctx.font = `700 44px ${FONT_MONTSERRAT}`;
+    ctx.font = `700 48px ${FONT_MONTSERRAT}`;
     const formattedAgentName = data.agentName ? toTitleCase(data.agentName) : "Agent Name";
-    ctx.fillText(formattedAgentName, agentCenterX, agentPhotoY + agentCircleR * 2 + 55);
+    ctx.fillText(formattedAgentName, agentCenterX, agentPhotoY + agentCircleR * 2 + 60);
     
     // Agent title
     ctx.fillStyle = "#666666";
@@ -1455,19 +1455,20 @@ export function CreateFlyerDialog({
       agentLogo.src = spyglassLogoBlack;
     });
     
-    const smallLogoHeight = 55;
-    const smallLogoWidth = (agentLogo.width / agentLogo.height) * smallLogoHeight || 160;
+    const smallLogoWidth = 120; // Larger agent logo per refinement (~120px wide)
+    const smallLogoHeight = (agentLogo.height / agentLogo.width) * smallLogoWidth || 70;
     const smallLogoX = agentCenterX - smallLogoWidth / 2;
-    const smallLogoY = agentPhotoY + agentCircleR * 2 + 180;
+    const smallLogoY = agentPhotoY + agentCircleR * 2 + 190;
     
     ctx.drawImage(agentLogo, smallLogoX, smallLogoY, smallLogoWidth, smallLogoHeight);
 
     // Decorative black/white checkerboard squares (per template)
-    const squareSize = 25;
-    const squaresStartX = agentCenterX + 160;
-    const squaresStartY = agentPhotoY - 10;
+    // Position in TOP-RIGHT CORNER of agent section, not overlapping photo
+    const squareSize = 20;
+    const squaresStartX = canvas.width - 100; // Far right corner
+    const squaresStartY = infoY + 10; // Top of info section
     
-    for (let row = 0; row < 4; row++) {
+    for (let row = 0; row < 3; row++) {
       for (let col = 0; col < 3; col++) {
         ctx.fillStyle = (row + col) % 2 === 0 ? '#000000' : '#FFFFFF';
         ctx.fillRect(
@@ -1476,17 +1477,15 @@ export function CreateFlyerDialog({
           squareSize,
           squareSize
         );
-        // Add border for white squares so they're visible
-        if ((row + col) % 2 !== 0) {
-          ctx.strokeStyle = '#cccccc';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(
-            squaresStartX + col * squareSize,
-            squaresStartY + row * squareSize,
-            squareSize,
-            squareSize
-          );
-        }
+        // Add border for all squares
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(
+          squaresStartX + col * squareSize,
+          squaresStartY + row * squareSize,
+          squareSize,
+          squareSize
+        );
       }
     }
   };
