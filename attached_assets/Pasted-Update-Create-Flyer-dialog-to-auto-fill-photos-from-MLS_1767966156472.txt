@@ -1,0 +1,61 @@
+Update Create Flyer dialog to auto-fill photos from MLS data.
+
+Files to modify:
+- client/src/components/transaction-details.tsx (pass MLS photos to dialog)
+- client/src/components/create-flyer-dialog.tsx (use MLS photos)
+
+## Part 1: Pass MLS photos to CreateFlyerDialog
+
+In transaction-details.tsx, update the CreateFlyerDialog usage (around line 445-449):
+
+1. Pass the MLS images array as a prop:
+   - mlsPhotos={mlsData?.images || []}
+
+2. Ensure mlsData is available when the dialog opens
+
+## Part 2: Update CreateFlyerDialog to use MLS photos
+
+In create-flyer-dialog.tsx:
+
+1. Add new prop to interface:
+   - mlsPhotos?: string[]
+
+2. Add state to track selected photos:
+   - selectedPhotos: string[] (max 3 photos for flyer)
+
+3. Update the photo selection UI:
+   - Show MLS photos in a scrollable grid (thumbnails)
+   - User can click to select/deselect (max 3)
+   - Selected photos show a checkmark or border highlight
+   - Display selected count: "3/3 photos selected"
+   - Keep the manual upload option as fallback ("Or upload your own")
+
+4. Photo selection grid layout:
+   - 4 columns of thumbnails
+   - Each thumbnail ~80x80px
+   - Checkbox overlay or selection indicator
+   - Show total available: "23 photos available from MLS"
+
+5. When generating flyer:
+   - Use selectedPhotos array instead of manually uploaded files
+   - If selectedPhotos is empty, fall back to uploaded files
+   - Main photo = selectedPhotos[0]
+   - Secondary photos = selectedPhotos[1], selectedPhotos[2]
+
+6. Default behavior:
+   - Auto-select first 3 MLS photos when dialog opens (if available)
+   - User can change selection before generating
+
+## Part 3: Update the flyer canvas generation
+
+Modify the canvas drawing code to:
+- Load images from URLs (MLS photos) instead of File objects
+- Handle async image loading properly
+- Show loading state while images load
+
+Test by:
+1. Open a transaction with MLS photos
+2. Click "Create Flyer"
+3. Verify MLS photos appear in selection grid
+4. Verify first 3 are pre-selected
+5. Generate flyer and confirm photos appear in output

@@ -446,6 +446,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         open={flyerDialogOpen}
         onOpenChange={setFlyerDialogOpen}
         transaction={transaction}
+        mlsPhotos={mlsData?.photos || mlsData?.images || []}
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
