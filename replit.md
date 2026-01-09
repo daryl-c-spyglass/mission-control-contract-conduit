@@ -71,6 +71,17 @@ The MLS Data tab provides comprehensive property information visualization:
 - **Property Details**: Description, collapsible feature sections, price per sqft, HOA fees, tax info
 - All MLS images are proxied through `/api/proxy-image` to avoid CORS issues
 
+### Automatic MLS Synchronization (January 2026)
+MLS data syncs automatically every 15 minutes without requiring manual refresh:
+- **Background Service**: `server/repliers-sync.ts` runs as a cron job using node-cron
+- **Transaction Filtering**: Only syncs transactions with status "active" or "in_contract"
+- **Rate Limiting**: 2-second delays between API calls to prevent overwhelming the Repliers API
+- **Sync Status Display**: MLS Data tab shows "Auto-synced {timestamp}" under the header
+- **API Endpoints**:
+  - `GET /api/mls-sync/status` - Returns last sync time and statistics
+  - `POST /api/mls-sync/trigger` - Manually triggers a sync
+- **Stats Tracking**: Sync results (total, successful, failed, duration) stored in integration settings
+
 ### Key NPM Packages
 - **UI**: Radix UI primitives, shadcn/ui components, Lucide icons, react-icons
 - **Forms**: react-hook-form with zod validation via @hookform/resolvers
