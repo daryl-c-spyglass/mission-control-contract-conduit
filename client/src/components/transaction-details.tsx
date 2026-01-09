@@ -367,77 +367,83 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-4">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <Button
             variant="ghost"
             size="icon"
             onClick={onBack}
+            className="shrink-0"
             data-testid="button-back"
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-semibold" data-testid="text-detail-address">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              <h1 className="text-lg sm:text-2xl font-semibold truncate" data-testid="text-detail-address">
                 {transaction.propertyAddress}
               </h1>
-              <Badge variant={status.variant} data-testid="badge-detail-status">
+              <Badge variant={status.variant} className="shrink-0" data-testid="badge-detail-status">
                 {status.label}
               </Badge>
             </div>
             {transaction.mlsNumber && (
               <div className="flex items-center gap-1.5 mt-1 text-muted-foreground">
                 <Hash className="h-3.5 w-3.5" />
-                <span className="font-mono text-sm">{transaction.mlsNumber}</span>
+                <span className="font-mono text-xs sm:text-sm">{transaction.mlsNumber}</span>
               </div>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap pl-10 sm:pl-0">
           {transaction.slackChannelId && (
             <Button 
               variant="outline" 
-              className="gap-2" 
+              size="sm"
+              className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9" 
               data-testid="button-open-slack"
               onClick={() => window.open(`https://spyglassrealty.slack.com/archives/${transaction.slackChannelId}`, "_blank")}
             >
-              <MessageSquare className="h-4 w-4" />
-              Open Slack
+              <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">Open</span> Slack
             </Button>
           )}
           {transaction.gmailLabelId && (
             <Button 
               variant="outline" 
-              className="gap-2" 
+              size="sm"
+              className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9" 
               data-testid="button-view-emails"
               onClick={() => window.open(`https://mail.google.com/mail/u/0/#label/MC`, "_blank")}
             >
-              <Mail className="h-4 w-4" />
-              View Emails
+              <Mail className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">View</span> Emails
             </Button>
           )}
           {onMarketingClick && (
             <Button 
               variant="outline" 
-              className="gap-2" 
+              size="sm"
+              className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9" 
               data-testid="button-marketing-materials"
               onClick={onMarketingClick}
             >
-              <ImageIcon className="h-4 w-4" />
-              Marketing Materials
+              <ImageIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Marketing</span>
+              <span className="sm:hidden">Assets</span>
             </Button>
           )}
           <Button 
             variant="outline" 
-            className="gap-2" 
+            size="sm"
+            className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9" 
             data-testid="button-create-flyer"
             onClick={() => setFlyerDialogOpen(true)}
           >
-            <FileImage className="h-4 w-4" />
-            Create Flyer
+            <FileImage className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span className="hidden xs:inline">Create</span> Flyer
           </Button>
         </div>
       </div>
@@ -450,25 +456,27 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
-          <TabsTrigger value="mls" data-testid="tab-mls">MLS Data</TabsTrigger>
-          <TabsTrigger value="cma" data-testid="tab-cma">CMA</TabsTrigger>
-          <TabsTrigger value="documents" data-testid="tab-documents">
-            Documents
-            {documents.length > 0 && (
-              <Badge variant="secondary" className="ml-2 text-xs">{documents.length}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="marketing" data-testid="tab-marketing">
-            Marketing
-            {marketingAssets.length > 0 && (
-              <Badge variant="secondary" className="ml-2 text-xs">{marketingAssets.length}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="timeline" data-testid="tab-timeline">Timeline</TabsTrigger>
-          <TabsTrigger value="templates" data-testid="tab-templates">Templates</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex w-auto min-w-full sm:w-auto">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm" data-testid="tab-overview">Overview</TabsTrigger>
+            <TabsTrigger value="mls" className="text-xs sm:text-sm" data-testid="tab-mls">MLS Data</TabsTrigger>
+            <TabsTrigger value="cma" className="text-xs sm:text-sm" data-testid="tab-cma">CMA</TabsTrigger>
+            <TabsTrigger value="documents" className="text-xs sm:text-sm" data-testid="tab-documents">
+              Docs
+              {documents.length > 0 && (
+                <Badge variant="secondary" className="ml-1 sm:ml-2 text-[10px] sm:text-xs">{documents.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="marketing" className="text-xs sm:text-sm" data-testid="tab-marketing">
+              Marketing
+              {marketingAssets.length > 0 && (
+                <Badge variant="secondary" className="ml-1 sm:ml-2 text-[10px] sm:text-xs">{marketingAssets.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="timeline" className="text-xs sm:text-sm" data-testid="tab-timeline">Timeline</TabsTrigger>
+            <TabsTrigger value="templates" className="text-xs sm:text-sm" data-testid="tab-templates">Templates</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="overview" className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -1210,14 +1218,14 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           {/* Fullscreen Photo Modal - only render if photos exist */}
           {photos.length > 0 && (
             <Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
-              <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black/95 border-none [&>button]:bg-white/10 [&>button]:text-white [&>button]:hover:bg-white/20 [&>button]:rounded-full [&>button]:opacity-100 [&>button]:p-2 [&>button]:hover:opacity-100">
+              <DialogContent className="w-[98vw] sm:max-w-[95vw] h-[95vh] sm:max-h-[95vh] p-0 bg-black/95 border-none [&>button]:bg-white/10 [&>button]:text-white [&>button]:hover:bg-white/20 [&>button]:active:bg-white/30 [&>button]:rounded-full [&>button]:opacity-100 [&>button]:p-1.5 sm:[&>button]:p-2 [&>button]:hover:opacity-100">
                 <VisuallyHidden>
                   <DialogTitle>Property Photo Gallery</DialogTitle>
                   <DialogDescription>View property photos in fullscreen mode</DialogDescription>
                 </VisuallyHidden>
-                <div className="relative w-full h-full flex items-center justify-center min-h-[80vh]">
+                <div className="relative w-full h-full flex items-center justify-center min-h-[70vh] sm:min-h-[80vh]">
                   {/* Photo Counter */}
-                  <div className="absolute top-4 left-4 px-4 py-2 bg-white/10 text-white rounded-full text-sm">
+                  <div className="absolute top-2 sm:top-4 left-2 sm:left-4 px-3 sm:px-4 py-1.5 sm:py-2 bg-white/10 text-white rounded-full text-xs sm:text-sm z-10">
                     {currentPhoto + 1} of {photos.length}
                   </div>
                   
@@ -1225,7 +1233,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                   <img
                     src={`/api/proxy-image?url=${encodeURIComponent(photos[currentPhoto] || '')}`}
                     alt={`Property photo ${currentPhoto + 1}`}
-                    className="max-w-full max-h-[80vh] object-contain"
+                    className="max-w-full max-h-[65vh] sm:max-h-[80vh] object-contain touch-manipulation"
                     data-testid="img-fullscreen-photo"
                   />
                   
@@ -1234,29 +1242,29 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                     <>
                       <button
                         onClick={prevPhoto}
-                        className="absolute left-4 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                        className="absolute left-1 sm:left-4 p-2 sm:p-3 bg-white/10 hover:bg-white/20 active:bg-white/30 rounded-full text-white transition-colors touch-manipulation"
                         data-testid="button-fullscreen-prev"
                       >
-                        <ChevronLeft className="h-8 w-8" />
+                        <ChevronLeft className="h-6 w-6 sm:h-8 sm:w-8" />
                       </button>
                       <button
                         onClick={nextPhoto}
-                        className="absolute right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                        className="absolute right-1 sm:right-4 p-2 sm:p-3 bg-white/10 hover:bg-white/20 active:bg-white/30 rounded-full text-white transition-colors touch-manipulation"
                         data-testid="button-fullscreen-next"
                       >
-                        <ChevronRight className="h-8 w-8" />
+                        <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
                       </button>
                     </>
                   )}
                   
                   {/* Thumbnail Strip at Bottom */}
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 p-2 bg-black/50 rounded-lg max-w-[90vw] overflow-x-auto">
+                  <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 sm:gap-2 p-1.5 sm:p-2 bg-black/50 rounded-lg max-w-[95vw] sm:max-w-[90vw] overflow-x-auto scrollbar-hide">
                     {photos.map((photo, i) => (
                       <button
                         key={i}
                         onClick={() => setCurrentPhoto(i)}
-                        className={`flex-shrink-0 w-16 h-12 rounded overflow-hidden border-2 transition-colors ${
-                          i === currentPhoto ? 'border-white' : 'border-transparent opacity-60 hover:opacity-100'
+                        className={`flex-shrink-0 w-12 h-9 sm:w-16 sm:h-12 rounded overflow-hidden border-2 transition-colors touch-manipulation ${
+                          i === currentPhoto ? 'border-white' : 'border-transparent opacity-60 hover:opacity-100 active:opacity-100'
                         }`}
                         data-testid={`button-fullscreen-thumb-${i}`}
                       >

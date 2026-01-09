@@ -779,25 +779,25 @@ export function CreateFlyerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Create Property Flyer</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[85vh] sm:max-h-[90vh] flex flex-col p-4 sm:p-6">
+        <DialogHeader className="pb-2 sm:pb-4">
+          <DialogTitle className="text-lg sm:text-xl">Create Property Flyer</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
             Choose a format, select photos, and customize details.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(generateFlyer)} className="flex-1 overflow-hidden">
-            <div className="flex flex-col lg:flex-row gap-6 h-full overflow-y-auto pr-2">
-              <div className="flex-1 space-y-4 min-w-0">
+            <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 h-full overflow-y-auto pr-1 sm:pr-2">
+              <div className="flex-1 space-y-3 sm:space-y-4 min-w-0">
                 <div className="space-y-2">
                   <FormLabel className="text-sm">Format</FormLabel>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => handleFormatChange("social")}
-                      className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all ${
+                      className={`flex flex-col items-center gap-1 sm:gap-1.5 p-2.5 sm:p-3 rounded-lg border-2 transition-all active:scale-[0.98] ${
                         format === "social"
                           ? "border-primary bg-primary/5"
                           : "border-muted hover:border-muted-foreground/50"
@@ -805,17 +805,17 @@ export function CreateFlyerDialog({
                       data-testid="button-format-social"
                     >
                       <Image className={`h-5 w-5 ${format === "social" ? "text-primary" : "text-muted-foreground"}`} />
-                      <span className={`text-sm font-medium ${format === "social" ? "text-primary" : ""}`}>
+                      <span className={`text-xs sm:text-sm font-medium ${format === "social" ? "text-primary" : ""}`}>
                         Social Media
                       </span>
-                      <span className="text-[10px] text-muted-foreground">
-                        Instagram/Facebook (1080×1920)
+                      <span className="text-[9px] sm:text-[10px] text-muted-foreground text-center leading-tight">
+                        Instagram/Facebook
                       </span>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleFormatChange("print")}
-                      className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all ${
+                      className={`flex flex-col items-center gap-1 sm:gap-1.5 p-2.5 sm:p-3 rounded-lg border-2 transition-all active:scale-[0.98] ${
                         format === "print"
                           ? "border-primary bg-primary/5"
                           : "border-muted hover:border-muted-foreground/50"
@@ -823,11 +823,11 @@ export function CreateFlyerDialog({
                       data-testid="button-format-print"
                     >
                       <FileText className={`h-5 w-5 ${format === "print" ? "text-primary" : "text-muted-foreground"}`} />
-                      <span className={`text-sm font-medium ${format === "print" ? "text-primary" : ""}`}>
+                      <span className={`text-xs sm:text-sm font-medium ${format === "print" ? "text-primary" : ""}`}>
                         Print Flyer
                       </span>
-                      <span className="text-[10px] text-muted-foreground">
-                        Printable PDF (8.5×11)
+                      <span className="text-[9px] sm:text-[10px] text-muted-foreground text-center leading-tight">
+                        8.5×11 Print
                       </span>
                     </button>
                   </div>
@@ -843,7 +843,7 @@ export function CreateFlyerDialog({
                         {selectedPhotos.length}/{maxPhotos} selected
                       </span>
                     </div>
-                    <div className="grid grid-cols-5 gap-1.5 max-h-28 overflow-y-auto p-1 border rounded-md bg-muted/30">
+                    <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 sm:gap-1.5 max-h-32 sm:max-h-28 overflow-y-auto p-1.5 sm:p-1 border rounded-md bg-muted/30">
                       {mlsPhotos.map((photo, index) => {
                         const isSelected = selectedPhotos.includes(photo);
                         const selectionIndex = selectedPhotos.indexOf(photo);
@@ -1096,11 +1096,12 @@ export function CreateFlyerDialog({
                 />
               </div>
 
-              <div className="lg:w-48 flex-shrink-0">
+              <div className="w-full lg:w-48 flex-shrink-0 order-first lg:order-last">
                 <div className="sticky top-0">
-                  <p className="text-xs font-medium text-muted-foreground mb-2 text-center lg:text-left">
+                  <p className="text-xs font-medium text-muted-foreground mb-2 text-center">
                     Preview
                   </p>
+                  <div className="flex justify-center lg:block">
                   {format === "social" ? (
                     <SocialMediaPreview
                       photoUrls={previewPhotoUrls}
@@ -1124,15 +1125,17 @@ export function CreateFlyerDialog({
                       description={watchedValues.description}
                     />
                   )}
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t mt-4">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-3 sm:pt-4 border-t mt-3 sm:mt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
+                className="w-full sm:w-auto"
                 data-testid="button-cancel-flyer"
               >
                 Cancel
@@ -1140,6 +1143,7 @@ export function CreateFlyerDialog({
               <Button
                 type="submit"
                 disabled={isGenerating || !hasPhotosSelected}
+                className="w-full sm:w-auto"
                 data-testid="button-generate-flyer"
               >
                 {isGenerating ? (
