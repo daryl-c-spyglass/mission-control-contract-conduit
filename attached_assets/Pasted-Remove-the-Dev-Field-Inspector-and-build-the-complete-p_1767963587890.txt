@@ -1,0 +1,82 @@
+Remove the Dev Field Inspector and build the complete property detail view using confirmed Repliers field paths.
+
+Files to modify:
+- client/src/components/transaction-details.tsx
+
+## Part 1: Remove Dev Inspector
+- Remove the "Dev: Field Inspector" section and "Hide Raw Data" button
+- Remove any debug console.logs added for field inspection
+- Keep the core MLS data functionality
+
+## Part 2: Build Photo Gallery (MLS Data Tab)
+
+Add a photo gallery section at the top of the MLS Data tab using these confirmed fields:
+- Photos: `mlsData.images` (Array of image URLs)
+- Photo count: `mlsData.images.length`
+
+Layout:
+- Large main photo on left (~60% width) with left/right arrow navigation
+- Thumbnail grid on right (2 columns x 3 rows, showing first 6 photos)
+- Last thumbnail shows overlay "See all X photos" (X = images.length)
+- Clicking thumbnail sets it as main photo
+- Clicking arrows cycles through all photos
+
+## Part 3: Browse by Room Type Section
+
+Using the `rooms` array (Array of 9 items), create filterable tabs:
+- Check if rooms array contains categorized data
+- If rooms have type/name fields, create filter tabs (All, Kitchen, Living Room, Bedroom, Bathroom, etc.)
+- If rooms don't have photo associations, skip this section for now
+
+## Part 4: Feature Tags Row
+
+Display property features as pill/tag buttons using:
+- View: `mlsData.details.viewType` (only show if not "None")
+- Garage: `mlsData.details.garage` + " Car Garage"
+- Patio: `mlsData.details.patio`
+- Also check `mlsData.details.extras` for additional features
+
+Style: horizontal row of rounded pills with icons (similar to reference screenshots)
+
+## Part 5: About This Home Section
+
+- Header: "About This Home"
+- Content: `mlsData.details.description`
+- Full text, no truncation
+
+## Part 6: Property Details Grid (2 columns)
+
+| Left Column | Right Column |
+|-------------|--------------|
+| MLS #: `mlsNumber` | Status: `standardStatus` |
+| Property Type: `propertyType` | Year Built: `yearBuilt` |
+| Listed Date: from `timestamps` | Days on Market: `daysOnMarket` |
+| Elementary School: if available | Middle School: if available |
+| High School: if available | Subdivision: if available |
+
+## Part 7: Location Map Section
+
+Add Google Maps embed at the bottom:
+- Header: "Location"
+- Use coordinates: `mlsData.latitude`, `mlsData.longitude`
+- Map height: 300px
+- API key from environment: GOOGLE_MAPS_API_KEY
+- Show property marker on map
+
+## Part 8: Keep Existing Sidebar
+
+Preserve the right sidebar with:
+- Status badge + Days on Market
+- Price (large, formatted)
+- Price per sqft
+- Property Overview (Beds, Baths, Sq Ft, Lot, Year Built, Stories)
+- Financial Details (Annual Taxes from `taxes.annualAmount`)
+- Listing Information (MLS#, List Date, Property Type, Style, Agent, Office)
+
+## Technical Notes
+- Use the confirmed field paths exactly as listed above
+- Handle missing fields gracefully (don't show section if data is null/undefined)
+- Maintain dark theme styling consistent with existing app
+- Make photo gallery responsive
+
+Test by viewing a transaction's MLS Data tab - photos should now display with full gallery functionality.

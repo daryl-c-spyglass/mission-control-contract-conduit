@@ -191,10 +191,6 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [selectedCMAProperty, setSelectedCMAProperty] = useState<CMAComparable | null>(null);
   const [cmaPhotoIndex, setCmaPhotoIndex] = useState(0);
   const [cmaFullscreenOpen, setCmaFullscreenOpen] = useState(false);
-  const [showDebugData, setShowDebugData] = useState(false);
-  
-  // Check if we're in development mode
-  const isDev = import.meta.env.DEV;
   
   // Photo navigation for MLS gallery
   const photos = mlsData?.photos || mlsData?.images || [];
@@ -712,172 +708,48 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
             </Button>
           </div>
 
-          {/* Dev-only Field Inspector */}
-          {isDev && mlsData && (
-            <Card className="border-dashed border-amber-500/50 bg-amber-50/10">
-              <CardHeader className="py-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-amber-700 dark:text-amber-400">
-                    Dev: Field Inspector
-                  </CardTitle>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setShowDebugData(!showDebugData);
-                      if (!showDebugData && mlsData.rawData) {
-                        console.log("Full Repliers listing data:", JSON.stringify(mlsData.rawData, null, 2));
-                      }
-                    }}
-                    data-testid="button-toggle-debug"
-                  >
-                    {showDebugData ? "Hide Raw Data" : "Debug: Show Raw Data"}
-                  </Button>
-                </div>
-              </CardHeader>
-              {showDebugData && (
-                <CardContent className="pt-0">
-                  {/* Field Presence Table */}
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium mb-2">Field Presence Check</h4>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs border-collapse">
-                        <thead>
-                          <tr className="bg-muted">
-                            <th className="text-left p-2 border">Field</th>
-                            <th className="text-center p-2 border w-16">Exists</th>
-                            <th className="text-left p-2 border">Sample Value</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(() => {
-                            const raw = mlsData.rawData || {};
-                            const fieldsToCheck = [
-                              { name: "images", path: raw.images },
-                              { name: "listPrice / price", path: raw.listPrice || raw.price },
-                              { name: "address", path: raw.address },
-                              { name: "bedrooms / beds", path: raw.bedroomsTotal || raw.details?.numBedrooms || raw.beds },
-                              { name: "bathrooms / baths", path: raw.bathroomsFull || raw.details?.numBathrooms || raw.baths },
-                              { name: "bathroomsHalf", path: raw.bathroomsHalf || raw.details?.numBathroomsHalf },
-                              { name: "livingArea / sqft", path: raw.livingArea || raw.details?.sqft || raw.sqft },
-                              { name: "lotSize / lotSizeArea", path: raw.lotSize || raw.lot?.size || raw.lot?.acres },
-                              { name: "yearBuilt", path: raw.yearBuilt || raw.details?.yearBuilt },
-                              { name: "propertyType", path: raw.propertyType || raw.details?.propertyType },
-                              { name: "propertySubType", path: raw.propertySubType || raw.details?.style },
-                              { name: "mlsNumber", path: raw.mlsNumber },
-                              { name: "latitude", path: raw.map?.latitude || raw.address?.latitude },
-                              { name: "longitude", path: raw.map?.longitude || raw.address?.longitude },
-                              { name: "map.point", path: raw.map?.point },
-                              { name: "details.description", path: raw.details?.description || raw.publicRemarks },
-                              { name: "details.extras", path: raw.details?.extras },
-                              { name: "details.airConditioning", path: raw.details?.airConditioning },
-                              { name: "details.heating", path: raw.details?.heating },
-                              { name: "details.flooringType", path: raw.details?.flooringType },
-                              { name: "details.foundationType", path: raw.details?.foundationType },
-                              { name: "details.roofMaterial", path: raw.details?.roofMaterial },
-                              { name: "details.swimmingPool", path: raw.details?.swimmingPool },
-                              { name: "details.garage", path: raw.details?.garage || raw.details?.numGarageSpaces },
-                              { name: "details.patio", path: raw.details?.patio },
-                              { name: "details.viewType", path: raw.details?.viewType },
-                              { name: "lot.features", path: raw.lot?.features },
-                              { name: "nearby.amenities", path: raw.nearby?.amenities },
-                              { name: "rooms", path: raw.rooms },
-                              { name: "taxes", path: raw.taxes },
-                              { name: "agents", path: raw.agents },
-                              { name: "office.brokerageName", path: raw.office?.brokerageName },
-                              { name: "timestamps", path: raw.timestamps },
-                              { name: "standardStatus", path: raw.standardStatus || raw.status },
-                              { name: "daysOnMarket", path: raw.daysOnMarket || raw.simpleDaysOnMarket },
-                              { name: "history", path: raw.history },
-                              { name: "comparables", path: raw.comparables },
-                            ];
-                            
-                            const formatValue = (val: any): string => {
-                              if (val === null || val === undefined) return "—";
-                              if (Array.isArray(val)) return `Array(${val.length})`;
-                              if (typeof val === "object") return JSON.stringify(val).substring(0, 100) + (JSON.stringify(val).length > 100 ? "..." : "");
-                              return String(val).substring(0, 100) + (String(val).length > 100 ? "..." : "");
-                            };
-                            
-                            return fieldsToCheck.map((field, i) => (
-                              <tr key={i} className={i % 2 === 0 ? "bg-background" : "bg-muted/30"}>
-                                <td className="p-2 border font-mono">{field.name}</td>
-                                <td className="p-2 border text-center">
-                                  {field.path !== null && field.path !== undefined ? (
-                                    <span className="text-green-600 font-bold">Yes</span>
-                                  ) : (
-                                    <span className="text-red-500">No</span>
-                                  )}
-                                </td>
-                                <td className="p-2 border font-mono text-muted-foreground break-all">
-                                  {formatValue(field.path)}
-                                </td>
-                              </tr>
-                            ));
-                          })()}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                  
-                  {/* Raw JSON Viewer */}
-                  <div>
-                    <h4 className="text-sm font-medium mb-2">Raw API Response</h4>
-                    <div className="max-h-96 overflow-auto bg-muted/50 rounded-lg p-3">
-                      <pre className="text-xs font-mono whitespace-pre-wrap break-all">
-                        {JSON.stringify(mlsData.rawData, null, 2)}
-                      </pre>
-                    </div>
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-          )}
-
           {mlsData ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left Column - Photos, Features, Description, Map */}
               <div className="lg:col-span-2 space-y-6">
-                {/* Enhanced Photo Gallery */}
+                {/* Photo Gallery - Main + Thumbnail Grid Layout */}
                 {photos.length > 0 && (
                   <Card>
                     <CardContent className="p-0">
-                      {/* Main Photo Display */}
-                      <div className="relative">
-                        <img 
-                          src={`/api/proxy-image?url=${encodeURIComponent(photos[currentPhoto] || '')}`}
-                          alt={`Property photo ${currentPhoto + 1}`}
-                          className="w-full h-96 object-cover rounded-t-lg cursor-pointer"
-                          data-testid="img-mls-main-photo"
-                          onClick={() => setFullscreenOpen(true)}
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23f0f0f0' width='400' height='300'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%23999' dy='0.3em'%3ENo Image%3C/text%3E%3C/svg%3E";
-                          }}
-                        />
-                        {photos.length > 1 && (
-                          <>
-                            <button 
-                              onClick={prevPhoto}
-                              className="absolute left-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
-                              data-testid="button-photo-prev"
-                            >
-                              <ChevronLeft className="h-5 w-5" />
-                            </button>
-                            <button 
-                              onClick={nextPhoto}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
-                              data-testid="button-photo-next"
-                            >
-                              <ChevronRight className="h-5 w-5" />
-                            </button>
-                          </>
-                        )}
-                        {/* Photo Counter Badge */}
-                        <div className="absolute bottom-3 left-3 px-3 py-1 bg-black/60 text-white text-sm rounded-full">
-                          {currentPhoto + 1} / {photos.length}
-                        </div>
-                        {/* Fullscreen Button - only show if photos exist */}
-                        {photos.length > 0 && (
+                      <div className="flex gap-1 rounded-t-lg overflow-hidden">
+                        {/* Main Photo (left ~60%) */}
+                        <div className="relative flex-[3] min-h-[400px]">
+                          <img 
+                            src={`/api/proxy-image?url=${encodeURIComponent(photos[currentPhoto] || '')}`}
+                            alt={`Property photo ${currentPhoto + 1}`}
+                            className="w-full h-full object-cover cursor-pointer"
+                            data-testid="img-mls-main-photo"
+                            onClick={() => setFullscreenOpen(true)}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23f0f0f0' width='400' height='300'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%23999' dy='0.3em'%3ENo Image%3C/text%3E%3C/svg%3E";
+                            }}
+                          />
+                          {photos.length > 1 && (
+                            <>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); prevPhoto(); }}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+                                data-testid="button-photo-prev"
+                              >
+                                <ChevronLeft className="h-5 w-5" />
+                              </button>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); nextPhoto(); }}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+                                data-testid="button-photo-next"
+                              >
+                                <ChevronRight className="h-5 w-5" />
+                              </button>
+                            </>
+                          )}
+                          <div className="absolute bottom-3 left-3 px-3 py-1 bg-black/60 text-white text-sm rounded-full">
+                            {currentPhoto + 1} / {photos.length}
+                          </div>
                           <button 
                             onClick={() => setFullscreenOpen(true)}
                             className="absolute bottom-3 right-3 p-2 bg-black/60 hover:bg-black/80 rounded-full text-white transition-colors"
@@ -885,82 +757,40 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                           >
                             <Maximize2 className="h-4 w-4" />
                           </button>
-                        )}
-                      </div>
-                      
-                      {/* Thumbnails Strip */}
-                      {photos.length > 1 && (
-                        <div className="p-3 flex gap-2 overflow-x-auto">
-                          {photos.slice(0, 5).map((photo, i) => (
-                            <button
-                              key={i}
-                              onClick={() => setCurrentPhoto(i)}
-                              className={`flex-shrink-0 w-20 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
-                                i === currentPhoto ? 'border-primary' : 'border-transparent'
-                              }`}
-                              data-testid={`button-thumbnail-${i}`}
-                            >
-                              <img 
-                                src={`/api/proxy-image?url=${encodeURIComponent(photo)}`} 
-                                alt={`Thumb ${i + 1}`} 
-                                className="w-full h-full object-cover"
-                                loading="lazy"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = "none";
-                                }}
-                              />
-                            </button>
-                          ))}
-                          {photos.length > 5 && (
-                            <button 
-                              onClick={() => setFullscreenOpen(true)}
-                              className="flex-shrink-0 w-20 h-16 rounded-lg bg-muted hover-elevate flex items-center justify-center text-muted-foreground text-sm font-medium"
-                              data-testid="button-see-all-photos"
-                            >
-                              See all {photos.length}
-                            </button>
-                          )}
                         </div>
-                      )}
-                      
-                      {/* Room Type Browse - Coming Soon */}
-                      <div className="px-4 pb-3 border-t border-border pt-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xs font-medium text-muted-foreground">Browse by room</span>
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">Coming Soon</Badge>
-                        </div>
-                        <div className="flex gap-2 overflow-x-auto pb-1">
-                          {ROOM_TYPES.map((roomType) => {
-                            const RoomIcon = roomType.icon;
-                            const isActive = roomType.id === "all";
-                            const isDisabled = roomType.id !== "all";
-                            return (
-                              <Button
-                                key={roomType.id}
-                                variant={isActive ? "default" : "outline"}
-                                size="sm"
-                                className={`gap-1.5 flex-shrink-0 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                disabled={isDisabled}
-                                data-testid={`button-filter-${roomType.id}`}
-                              >
-                                <RoomIcon className="h-3.5 w-3.5" />
-                                {roomType.label}
-                                {roomType.id === "all" && <span className="text-xs opacity-70">({photos.length})</span>}
-                              </Button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      
-                      {/* Photo Actions */}
-                      <div className="px-4 pb-4 flex gap-2 flex-wrap">
-                        <Button variant="secondary" size="sm" className="gap-2" data-testid="button-download-photos">
-                          <Download className="h-4 w-4" /> Download All
-                        </Button>
-                        {onMarketingClick && (
-                          <Button variant="secondary" size="sm" className="gap-2" onClick={onMarketingClick} data-testid="button-use-marketing">
-                            <Share2 className="h-4 w-4" /> Use in Marketing
-                          </Button>
+                        
+                        {/* Thumbnail Grid (right ~40%, 2 cols x 3 rows) */}
+                        {photos.length > 1 && (
+                          <div className="flex-[2] grid grid-cols-2 grid-rows-3 gap-1">
+                            {photos.slice(1, 7).map((photo, i) => {
+                              const isLastThumbnail = i === 5 || (photos.length <= 7 && i === photos.length - 2);
+                              const showSeeAll = isLastThumbnail && photos.length > 6;
+                              
+                              return (
+                                <button
+                                  key={i}
+                                  onClick={() => showSeeAll ? setFullscreenOpen(true) : setCurrentPhoto(i + 1)}
+                                  className="relative w-full h-full overflow-hidden hover-elevate"
+                                  data-testid={`button-thumbnail-${i}`}
+                                >
+                                  <img 
+                                    src={`/api/proxy-image?url=${encodeURIComponent(photo)}`} 
+                                    alt={`Thumbnail ${i + 2}`} 
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = "none";
+                                    }}
+                                  />
+                                  {showSeeAll && (
+                                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-sm font-medium">
+                                      See all {photos.length} photos
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
                         )}
                       </div>
                     </CardContent>
