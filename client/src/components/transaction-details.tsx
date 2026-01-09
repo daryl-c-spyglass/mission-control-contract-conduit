@@ -50,7 +50,7 @@ import {
   Grid3X3,
   Waves,
 } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Input } from "@/components/ui/input";
 import { CreateFlyerDialog } from "./create-flyer-dialog";
@@ -684,7 +684,14 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         <TabsContent value="mls" className="space-y-6">
           {/* Header */}
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <h2 className="text-xl font-bold">MLS Listing Data</h2>
+            <div>
+              <h2 className="text-xl font-bold">MLS Listing Data</h2>
+              {transaction.mlsLastSyncedAt && (
+                <p className="text-xs text-muted-foreground mt-1" data-testid="text-mls-sync-status">
+                  Auto-synced {new Date(transaction.mlsLastSyncedAt).toLocaleString()}
+                </p>
+              )}
+            </div>
             <Button
               variant="outline"
               className="gap-2"
@@ -1182,6 +1189,10 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           {photos.length > 0 && (
             <Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
               <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black/95 border-none">
+                <VisuallyHidden>
+                  <DialogTitle>Property Photo Gallery</DialogTitle>
+                  <DialogDescription>View property photos in fullscreen mode</DialogDescription>
+                </VisuallyHidden>
                 <div className="relative w-full h-full flex items-center justify-center min-h-[80vh]">
                   {/* Close Button */}
                   <button

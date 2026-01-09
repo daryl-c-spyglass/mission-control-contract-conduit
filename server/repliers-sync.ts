@@ -107,8 +107,7 @@ async function runSync(): Promise<void> {
     
     const activeTransactions = transactions.filter(t => 
       t.mlsNumber && 
-      t.status !== "closed" && 
-      t.status !== "cancelled"
+      (t.status === "active" || t.status === "in_contract")
     );
 
     console.log(`[ReplierSync] Found ${activeTransactions.length} active transactions with MLS numbers`);
