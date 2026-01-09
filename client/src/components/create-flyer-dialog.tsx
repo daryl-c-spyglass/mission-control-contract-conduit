@@ -97,7 +97,7 @@ function SocialMediaPreview({
 
   const statusLabel = STATUS_OPTIONS.find(s => s.value === status)?.label || "Just Listed";
   const addressParts = address.split(",");
-  const truncatedDesc = truncateDescription(description || "", 150);
+  const truncatedDesc = truncateDescription(description || "", 350);
 
   const specs = [];
   if (bedrooms) specs.push(`${bedrooms} bed`);
@@ -185,7 +185,7 @@ function PrintFlyerPreview({
   const [imagesLoaded, setImagesLoaded] = useState<Record<number, boolean>>({});
   
   const statusLabel = STATUS_OPTIONS.find(s => s.value === status)?.label || "Just Listed";
-  const truncatedDesc = truncateDescription(description || "", 115);
+  const truncatedDesc = truncateDescription(description || "", 250);
 
   return (
     <div className="relative w-full aspect-[8.5/11] bg-white rounded-lg overflow-hidden shadow-lg border border-border">
@@ -354,7 +354,7 @@ export function CreateFlyerDialog({
       bedrooms: mlsData?.bedrooms?.toString() || transaction.bedrooms?.toString() || "",
       bathrooms: mlsData?.bathrooms?.toString() || transaction.bathrooms?.toString() || "",
       sqft: mlsData?.sqft?.toString() || transaction.sqft?.toString() || "",
-      description: truncateDescription(mlsData?.description || "", 200),
+      description: truncateDescription(mlsData?.description || "", 400),
     },
   });
 
@@ -363,7 +363,7 @@ export function CreateFlyerDialog({
   const handleFormatChange = (newFormat: FlyerFormat) => {
     setFormat(newFormat);
     resetPhotoSelection(newFormat);
-    const newMaxLength = newFormat === "social" ? 200 : 115;
+    const newMaxLength = newFormat === "social" ? 350 : 250;
     const currentDescription = form.getValues("description") || "";
     if (currentDescription.length > newMaxLength) {
       form.setValue("description", truncateDescription(currentDescription, newMaxLength));
@@ -508,7 +508,7 @@ export function CreateFlyerDialog({
     }
 
     if (data.description) {
-      const truncatedDesc = truncateDescription(data.description, 200);
+      const truncatedDesc = truncateDescription(data.description, 350);
       ctx.font = "24px Inter, sans-serif";
       ctx.fillStyle = "#cccccc";
       const maxWidth = canvas.width - 120;
@@ -684,7 +684,7 @@ export function CreateFlyerDialog({
     ctx.textAlign = "left";
 
     if (data.description) {
-      const truncatedDesc = truncateDescription(data.description, 115);
+      const truncatedDesc = truncateDescription(data.description, 250);
       ctx.font = "32px Inter, sans-serif";
       ctx.fillStyle = "#444444";
       ctx.textAlign = "center";
