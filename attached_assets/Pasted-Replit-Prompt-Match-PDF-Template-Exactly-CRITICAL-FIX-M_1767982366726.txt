@@ -1,0 +1,170 @@
+Replit Prompt: Match PDF Template Exactly
+CRITICAL FIX: Match the Print Flyer exactly to the PDF template.
+
+Reference the uploaded screenshots showing the exact PDF layout:
+- Screenshot 1: Header with Spyglass logo + price badge (NO "Leading" logo!)
+- Screenshot 2: Photo layout (main + 2 secondary)
+- Screenshot 3: Bottom section with icons, description, agent info, QR code
+
+File: client/src/components/create-flyer-dialog.tsx
+
+## MAJOR CORRECTIONS NEEDED
+
+### Fix 1: Remove "Leading Real Estate Companies" from Header
+
+Current: Shows "Leading" script text in header
+Template: Does NOT have this - only Spyglass logo on left, price badge on right
+
+Update header to:
+- LEFT: Spyglass logo on black background rectangle
+- CENTER: Empty (no Leading logo)
+- RIGHT: Price badge (pentagon/arrow shape pointing left)
+
+### Fix 2: Price Badge Shape
+
+Current: Rectangle
+Template: Pentagon/arrow shape pointing LEFT (like a ribbon or tag)
+
+Draw the price badge as a polygon:
+```javascript
+// Pentagon shape pointing left
+ctx.beginPath();
+ctx.moveTo(x, y + height/2);           // Left point (arrow tip)
+ctx.lineTo(x + 40, y);                  // Top left
+ctx.lineTo(x + width, y);               // Top right
+ctx.lineTo(x + width, y + height);      // Bottom right
+ctx.lineTo(x + 40, y + height);         // Bottom left
+ctx.closePath();
+ctx.fillStyle = '#8b7355'; // Tan/brown color from template
+ctx.fill();
+```
+
+### Fix 3: Icon Style - MUST Match Template Exactly
+
+Look at Screenshot 3 - the icons are specific line drawings:
+
+**Bed Icon:**
+- Horizontal frame with vertical headboard on left
+- Simple lines, NOT filled shapes
+- Has small "posts" or legs
+
+**Bath Icon:**
+- Bathtub shape with curved body
+- Has faucet extending up on left side
+- Has two small legs/feet at bottom
+- Line drawing style
+
+**Sqft Icon:**
+- Rectangle outline
+- Diagonal line from corner to corner
+- Small arrow head at one end
+- Represents "area/square footage"
+
+Draw these as canvas paths with stroke (not fill):
+```javascript
+ctx.strokeStyle = '#333333';
+ctx.lineWidth = 3;
+// Draw each icon as line paths...
+```
+
+### Fix 4: Bottom Section Must Fill More Space
+
+Current: Bottom section is compressed, too much white space below
+Template: Bottom section fills ~40% of the page
+
+Increase the bottom section:
+- Property stats: Larger font (48px for numbers, 36px for labels)
+- More vertical spacing between items (100px between each stat)
+- Description: Larger font (32px), more line height
+- Agent section: Larger photo (200px diameter)
+
+### Fix 5: Add Black/White Decorative Squares
+
+In Screenshot 3, notice the geometric pattern around the agent photo area:
+- Small alternating black and white squares
+- Creates a decorative border/frame effect
+- Position: Around/behind the agent photo area
+```javascript
+// Draw decorative squares pattern
+const squareSize = 30;
+for (let row = 0; row < 4; row++) {
+  for (let col = 0; col < 3; col++) {
+    const isBlack = (row + col) % 2 === 0;
+    ctx.fillStyle = isBlack ? '#000' : '#fff';
+    ctx.fillRect(
+      agentX + col * squareSize,
+      agentY + row * squareSize,
+      squareSize,
+      squareSize
+    );
+  }
+}
+```
+
+### Fix 6: Add QR Code Placeholder
+
+Template has QR code below agent info.
+
+For now, draw a placeholder:
+```javascript
+// QR code placeholder
+ctx.strokeStyle = '#333';
+ctx.lineWidth = 2;
+ctx.strokeRect(qrX, qrY, 100, 100);
+// Draw simple QR-like pattern inside
+// Or use a QR code library to generate actual QR
+```
+
+Future enhancement: Generate real QR code linking to listing.
+
+### Fix 7: Address Format with Full Location
+
+Template shows: "142 N STEEL CREEK CREST HIGHWAY CENTER POINT, TX 78010"
+
+Include full address with:
+- Street address
+- City
+- State abbreviation
+- Zip code
+- Apply letter spacing to entire address
+
+### Fix 8: Remove Gold Footer Bar
+
+Looking at the template, there is NO gold footer bar at the bottom.
+The content just ends with the bottom info section.
+Remove the footer bar if present.
+
+## EXACT LAYOUT (Top to Bottom)
+
+1. **Header Bar** (height: ~80px)
+   - Black background
+   - Spyglass logo left
+   - Price badge right (pentagon shape)
+
+2. **Address Bar** (height: ~60px)
+   - Full address with letter spacing
+   - Centered
+
+3. **Main Photo** (height: ~45% of page)
+   - Full width
+
+4. **Secondary Photos** (height: ~25% of page)
+   - Two photos side by side
+   - Small gap between them
+
+5. **Bottom Info Section** (height: ~25% of page)
+   - Three columns
+   - LEFT: Property stats with proper icons
+   - CENTER: Headline + description
+   - RIGHT: Agent photo + decorative squares + name/title/phone + QR code
+
+## VERIFICATION
+
+After changes, the flyer should look nearly identical to the PDF:
+- [ ] Header: Only Spyglass logo + price badge (NO Leading logo)
+- [ ] Price badge: Pentagon/arrow shape
+- [ ] Icons: Line drawings matching template style
+- [ ] Bottom section: Fills space, minimal white space
+- [ ] Decorative squares: Present around agent area
+- [ ] QR code placeholder: Present
+- [ ] Full address: Street, city, state, zip

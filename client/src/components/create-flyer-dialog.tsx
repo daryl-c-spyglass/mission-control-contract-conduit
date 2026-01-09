@@ -239,7 +239,7 @@ function PrintFlyerPreview({
 
   return (
     <div className="relative w-full aspect-[8.5/11] bg-white rounded-lg overflow-hidden shadow-lg border border-border" style={{ fontFamily: "'League Spartan', 'Montserrat', sans-serif" }}>
-      {/* Header Section - White background */}
+      {/* Header Section - Only Spyglass logo + price badge (NO Leading logo per template) */}
       <div className="flex items-center justify-between px-2 py-2 bg-white border-b border-gray-100">
         <div className="bg-[#1a1a1a] rounded px-1.5 py-1">
           <img
@@ -248,11 +248,14 @@ function PrintFlyerPreview({
             className="h-4 w-auto"
           />
         </div>
-        <div className="text-center">
-          <p className="text-[7px] text-[#333]" style={{ fontFamily: "'Pinyon Script', cursive" }}>Leading</p>
-          <p className="text-[4px] text-gray-500 tracking-wider">REAL ESTATE COMPANIES OF THE WORLD</p>
-        </div>
-        <div className="bg-[#c4a962] text-white px-2 py-1.5">
+        {/* Price badge - pentagon/arrow shape pointing left (tan color) */}
+        <div 
+          className="text-white px-3 py-1.5 relative"
+          style={{ 
+            backgroundColor: '#8b7355',
+            clipPath: 'polygon(15% 50%, 25% 0%, 100% 0%, 100% 100%, 25% 100%)'
+          }}
+        >
           <p className="text-[4px] tracking-[0.12em] text-center font-medium">{statusLabel.toUpperCase()} AT</p>
           <p className="text-[9px] font-bold text-center">{price || "$0"}</p>
         </div>
@@ -304,54 +307,65 @@ function PrintFlyerPreview({
         </div>
       </div>
 
-      {/* Info Section - 3 Columns */}
-      <div className="bg-white px-2 py-2 grid grid-cols-3 gap-1">
-        {/* Left Column - Property Stats */}
-        <div className="space-y-0.5 pl-0.5">
-          <div className="flex items-center gap-1 text-[#333]">
-            <Bed className="h-2.5 w-2.5" />
-            <span className="text-[6px] font-semibold">{bedrooms || "—"} bedrooms</span>
+      {/* Info Section - 3 Columns (expanded per template) */}
+      <div className="bg-white px-2 py-3 grid grid-cols-3 gap-2">
+        {/* Left Column - Property Stats (larger) */}
+        <div className="space-y-1.5 pl-0.5">
+          <div className="flex items-center gap-1.5 text-[#333]">
+            <Bed className="h-3 w-3" strokeWidth={1.5} />
+            <span className="text-[7px] font-semibold">{bedrooms || "—"} bedrooms</span>
           </div>
-          <div className="flex items-center gap-1 text-[#333]">
-            <Bath className="h-2.5 w-2.5" />
-            <span className="text-[6px] font-semibold">{bathrooms || "—"} bathrooms</span>
+          <div className="flex items-center gap-1.5 text-[#333]">
+            <Bath className="h-3 w-3" strokeWidth={1.5} />
+            <span className="text-[7px] font-semibold">{bathrooms || "—"} bathrooms</span>
           </div>
-          <div className="flex items-center gap-1 text-[#333]">
-            <Square className="h-2.5 w-2.5" />
-            <span className="text-[6px] font-semibold">{sqft ? parseInt(sqft).toLocaleString() : "—"} sq. ft</span>
+          <div className="flex items-center gap-1.5 text-[#333]">
+            <Square className="h-3 w-3" strokeWidth={1.5} />
+            <span className="text-[7px] font-semibold">{sqft ? parseInt(sqft).toLocaleString() : "—"} sq. ft</span>
           </div>
         </div>
 
-        {/* Center Column - Headline + Description */}
+        {/* Center Column - Headline + Description (larger) */}
         <div className="text-center px-0.5">
           {listingHeadline && (
-            <p className="text-[5px] font-semibold text-[#333] tracking-wider uppercase mb-1">
+            <p className="text-[6px] font-semibold text-[#333] tracking-wider uppercase mb-1">
               {listingHeadline}
             </p>
           )}
           {truncatedDesc && (
-            <p className="text-[5px] text-gray-600 leading-relaxed line-clamp-4">
+            <p className="text-[6px] text-gray-600 leading-relaxed line-clamp-4">
               {truncatedDesc}
             </p>
           )}
         </div>
 
-        {/* Right Column - Agent Info */}
-        <div className="text-center pr-0.5 space-y-0.5">
+        {/* Right Column - Agent Info (larger with checkerboard hint + QR) */}
+        <div className="text-center pr-0.5 space-y-0.5 relative">
+          {/* Decorative checkerboard pattern (simplified) */}
+          <div className="absolute -left-1 top-0 flex flex-col gap-px">
+            <div className="flex gap-px">
+              <div className="w-1 h-1 bg-[#1a1a1a]" />
+              <div className="w-1 h-1 bg-white border border-gray-200" />
+            </div>
+            <div className="flex gap-px">
+              <div className="w-1 h-1 bg-white border border-gray-200" />
+              <div className="w-1 h-1 bg-[#1a1a1a]" />
+            </div>
+          </div>
           {agentPhotoUrl ? (
             <img 
               src={agentPhotoUrl} 
               alt="Agent" 
-              className="w-6 h-6 mx-auto rounded-full object-cover border border-gray-200"
+              className="w-8 h-8 mx-auto rounded-full object-cover border border-gray-200"
             />
           ) : (
-            <div className="w-6 h-6 mx-auto bg-gray-200 rounded-full flex items-center justify-center">
-              <User className="h-3 w-3 text-gray-400" />
+            <div className="w-8 h-8 mx-auto bg-gray-200 rounded-full flex items-center justify-center">
+              <User className="h-4 w-4 text-gray-400" />
             </div>
           )}
-          <p className="text-[6px] font-bold text-[#333]">{agentName || "Agent Name"}</p>
-          <p className="text-[4px] text-gray-500">{agentTitle || "REALTOR®, Spyglass Realty"}</p>
-          <p className="text-[5px] text-gray-600">{agentPhone || "(XXX) XXX-XXXX"}</p>
+          <p className="text-[7px] font-bold text-[#333]">{agentName || "Agent Name"}</p>
+          <p className="text-[5px] text-gray-500">{agentTitle || "REALTOR®, Spyglass Realty"}</p>
+          <p className="text-[6px] text-gray-600">{agentPhone || "(XXX) XXX-XXXX"}</p>
           <div className="bg-[#1a1a1a] rounded px-1 py-0.5 mx-auto mt-0.5 inline-block">
             <img
               src={spyglassLogoWhite}
@@ -359,11 +373,19 @@ function PrintFlyerPreview({
               className="h-2 w-auto"
             />
           </div>
+          {/* QR Code placeholder */}
+          <div className="w-4 h-4 mx-auto mt-1 border border-gray-400 bg-white">
+            <div className="grid grid-cols-3 gap-px p-px h-full">
+              {[1,0,1,0,1,0,1,0,1].map((v, i) => (
+                <div key={i} className={v ? "bg-gray-800" : "bg-white"} />
+              ))}
+            </div>
+          </div>
+          <p className="text-[3px] text-gray-400">Scan for listing</p>
         </div>
       </div>
 
-      {/* Bottom decorative bar - gold */}
-      <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-[#c4a962]" />
+      {/* NO gold footer bar per template */}
     </div>
   );
 }
@@ -1055,30 +1077,32 @@ export function CreateFlyerDialog({
     
     ctx.drawImage(logo, 80, 65, logoWidth, logoHeight);
 
-    // Center - "Leading Real Estate Companies of the World" text
-    const FONT_SCRIPT = "Pinyon Script, cursive";
-    ctx.fillStyle = "#333333";
-    ctx.font = `48px ${FONT_SCRIPT}`;
-    ctx.textAlign = "center";
-    ctx.fillText("Leading", canvas.width / 2, 105);
-    ctx.font = `500 20px ${FONT_MONTSERRAT}`;
-    ctx.fillStyle = "#666666";
-    ctx.fillText("REAL ESTATE COMPANIES OF THE WORLD", canvas.width / 2, 140);
-
-    // Price badge (right) - gold background
+    // Price badge (right) - pentagon/arrow shape pointing left (tan/brown color)
     const badgeWidth = 420;
     const badgeHeight = 140;
     const badgeX = canvas.width - badgeWidth - 80;
     const badgeY = 55;
-    ctx.fillStyle = GOLD_COLOR;
-    ctx.fillRect(badgeX, badgeY, badgeWidth, badgeHeight);
+    const arrowIndent = 50; // How far the arrow point goes in
+    
+    // Draw pentagon shape pointing left
+    ctx.beginPath();
+    ctx.moveTo(badgeX, badgeY + badgeHeight / 2);           // Left point (arrow tip)
+    ctx.lineTo(badgeX + arrowIndent, badgeY);                // Top left edge
+    ctx.lineTo(badgeX + badgeWidth, badgeY);                 // Top right
+    ctx.lineTo(badgeX + badgeWidth, badgeY + badgeHeight);   // Bottom right
+    ctx.lineTo(badgeX + arrowIndent, badgeY + badgeHeight);  // Bottom left edge
+    ctx.closePath();
+    ctx.fillStyle = '#8b7355'; // Tan/brown color from template
+    ctx.fill();
     
     ctx.fillStyle = "#ffffff";
     ctx.font = `500 22px ${FONT_LEAGUE}`;
     ctx.textAlign = "center";
-    ctx.fillText(`${statusLabel.toUpperCase()} AT`, badgeX + badgeWidth / 2, badgeY + 50);
+    // Center text in the pentagon (offset slightly right due to arrow indent)
+    const badgeCenterX = badgeX + arrowIndent + (badgeWidth - arrowIndent) / 2;
+    ctx.fillText(`${statusLabel.toUpperCase()} AT`, badgeCenterX, badgeY + 50);
     ctx.font = `700 52px ${FONT_LEAGUE}`;
-    ctx.fillText(data.price || "$0", badgeX + badgeWidth / 2, badgeY + 110);
+    ctx.fillText(data.price || "$0", badgeCenterX, badgeY + 110);
 
     // ============ ADDRESS BAR (height: ~100px) ============
     const addressBarY = headerHeight;
@@ -1188,14 +1212,14 @@ export function CreateFlyerDialog({
     const rightColX = canvas.width - 450;
     const rightColWidth = 380;
 
-    // LEFT COLUMN - Property Stats with simple line icons
+    // LEFT COLUMN - Property Stats with simple line icons (larger per template)
     ctx.textAlign = "left";
     ctx.fillStyle = DARK_TEXT;
-    ctx.font = `600 38px ${FONT_MONTSERRAT}`;
+    ctx.font = `600 48px ${FONT_MONTSERRAT}`;  // Larger font (was 38px)
     
-    const statsStartY = infoY + 60;
-    const statSpacing = 60;
-    const iconSize = 36;
+    const statsStartY = infoY + 80;
+    const statSpacing = 100;  // More vertical spacing (was 60px)
+    const iconSize = 50;      // Larger icons (was 36px)
     
     // Helper to draw line icons matching template style
     const drawBedIcon = (x: number, y: number) => {
@@ -1269,32 +1293,32 @@ export function CreateFlyerDialog({
     drawBathIcon(leftColX, statsStartY + statSpacing);
     drawSqftIcon(leftColX, statsStartY + statSpacing * 2);
     
-    // Draw stat text
-    ctx.fillText(`${data.bedrooms || "—"} bedrooms`, leftColX + 60, statsStartY);
-    ctx.fillText(`${data.bathrooms || "—"} bathrooms`, leftColX + 60, statsStartY + statSpacing);
-    ctx.fillText(`${data.sqft ? parseInt(data.sqft).toLocaleString() : "—"} sq. ft`, leftColX + 60, statsStartY + statSpacing * 2);
+    // Draw stat text (offset for larger icons)
+    ctx.fillText(`${data.bedrooms || "—"} bedrooms`, leftColX + 80, statsStartY);
+    ctx.fillText(`${data.bathrooms || "—"} bathrooms`, leftColX + 80, statsStartY + statSpacing);
+    ctx.fillText(`${data.sqft ? parseInt(data.sqft).toLocaleString() : "—"} sq. ft`, leftColX + 80, statsStartY + statSpacing * 2);
 
-    // CENTER COLUMN - Headline + Description
+    // CENTER COLUMN - Headline + Description (larger fonts per template)
     ctx.textAlign = "center";
-    let descStartY = infoY + 50;
+    let descStartY = infoY + 70;
     
     if (data.listingHeadline) {
-      ctx.font = `600 34px ${FONT_LEAGUE}`;
+      ctx.font = `600 42px ${FONT_LEAGUE}`;  // Larger headline (was 34px)
       ctx.fillStyle = DARK_TEXT;
       ctx.fillText(data.listingHeadline.toUpperCase(), centerColX, descStartY);
-      descStartY += 60;
+      descStartY += 70;
     }
     
     if (data.description) {
       const truncatedDesc = truncateDescription(data.description, DESCRIPTION_LIMITS.print);
-      ctx.font = `400 30px ${FONT_MONTSERRAT}`;
+      ctx.font = `400 36px ${FONT_MONTSERRAT}`;  // Larger description (was 30px)
       ctx.fillStyle = "#444444";
       
       const maxWidth = 900;
       const words = truncatedDesc.split(" ");
       let line = "";
       let descY = descStartY;
-      const lineHeight = 45;
+      const lineHeight = 52;  // More line height (was 45)
       
       words.forEach((word) => {
         const testLine = line + word + " ";
@@ -1312,12 +1336,14 @@ export function CreateFlyerDialog({
       }
     }
 
-    // RIGHT COLUMN - Agent Info
+    // RIGHT COLUMN - Agent Info (expand right column for bigger elements)
+    const expandedRightColX = canvas.width - 550;
+    const expandedRightColWidth = 480;
     ctx.textAlign = "center";
-    const agentCenterX = rightColX + rightColWidth / 2;
+    const agentCenterX = expandedRightColX + expandedRightColWidth / 2;
     
-    // Agent photo (circle) - larger size
-    const agentCircleR = 100;
+    // Agent photo (circle) - 200px diameter per template
+    const agentCircleR = 130;  // Larger (was 100)
     const agentPhotoY = infoY + 20;
     
     if (effectiveAgentPhoto) {
@@ -1387,6 +1413,57 @@ export function CreateFlyerDialog({
     ctx.font = `400 30px ${FONT_MONTSERRAT}`;
     ctx.fillText(data.agentPhone || "(XXX) XXX-XXXX", agentCenterX, agentPhotoY + agentCircleR * 2 + 135);
 
+    // Decorative checkerboard squares around agent photo area
+    const squareSize = 25;
+    const checkerboardX = agentCenterX - agentCircleR - squareSize * 2;
+    const checkerboardY = agentPhotoY - squareSize;
+    
+    // Draw 3x4 grid of alternating black/white squares behind agent area
+    for (let row = 0; row < 4; row++) {
+      for (let col = 0; col < 3; col++) {
+        const isBlack = (row + col) % 2 === 0;
+        ctx.fillStyle = isBlack ? '#1a1a1a' : '#ffffff';
+        ctx.fillRect(
+          checkerboardX + col * squareSize,
+          checkerboardY + row * squareSize,
+          squareSize,
+          squareSize
+        );
+        // Add subtle border
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(
+          checkerboardX + col * squareSize,
+          checkerboardY + row * squareSize,
+          squareSize,
+          squareSize
+        );
+      }
+    }
+    
+    // Also draw on right side of agent area
+    const checkerboardX2 = agentCenterX + agentCircleR;
+    for (let row = 0; row < 4; row++) {
+      for (let col = 0; col < 3; col++) {
+        const isBlack = (row + col + 1) % 2 === 0; // Offset pattern
+        ctx.fillStyle = isBlack ? '#1a1a1a' : '#ffffff';
+        ctx.fillRect(
+          checkerboardX2 + col * squareSize,
+          checkerboardY + row * squareSize,
+          squareSize,
+          squareSize
+        );
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(
+          checkerboardX2 + col * squareSize,
+          checkerboardY + row * squareSize,
+          squareSize,
+          squareSize
+        );
+      }
+    }
+
     // Small Spyglass logo under agent info with dark background
     const smallLogoHeight = 50;
     const smallLogoWidth = (logo.width / logo.height) * smallLogoHeight || 150;
@@ -1408,10 +1485,42 @@ export function CreateFlyerDialog({
     
     ctx.drawImage(logo, smallLogoX, smallLogoY, smallLogoWidth, smallLogoHeight);
 
-    // Bottom decorative bar - gold (40px height)
-    const footerHeight = 40;
-    ctx.fillStyle = GOLD_COLOR;
-    ctx.fillRect(0, canvas.height - footerHeight, canvas.width, footerHeight);
+    // QR Code placeholder below agent info
+    const qrSize = 80;
+    const qrX = agentCenterX - qrSize / 2;
+    const qrY = smallLogoY + smallLogoHeight + 30;
+    
+    // QR code border
+    ctx.strokeStyle = '#333333';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(qrX, qrY, qrSize, qrSize);
+    
+    // Simple QR-like pattern inside
+    const cellSize = qrSize / 6;
+    const pattern = [
+      [1, 1, 1, 0, 1, 1],
+      [1, 0, 1, 1, 0, 1],
+      [1, 1, 1, 0, 1, 0],
+      [0, 1, 0, 1, 1, 1],
+      [1, 0, 1, 0, 1, 1],
+      [1, 1, 0, 1, 1, 1]
+    ];
+    ctx.fillStyle = '#333333';
+    for (let row = 0; row < 6; row++) {
+      for (let col = 0; col < 6; col++) {
+        if (pattern[row][col]) {
+          ctx.fillRect(qrX + col * cellSize, qrY + row * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+    
+    // Label under QR code
+    ctx.fillStyle = '#666666';
+    ctx.font = `300 18px ${FONT_MONTSERRAT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText('Scan for listing', agentCenterX, qrY + qrSize + 25);
+    
+    // NO gold footer bar - template doesn't have one
   };
 
   const generateFlyer = async (data: FormValues) => {
