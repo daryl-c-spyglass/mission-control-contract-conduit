@@ -411,6 +411,8 @@ export function CreateFlyerDialog({
   const [originalDescription, setOriginalDescription] = useState<string>("");
   const [previousDescription, setPreviousDescription] = useState<string | null>(null);
   const [hasSummarized, setHasSummarized] = useState(false);
+  const [previousHeadline, setPreviousHeadline] = useState<string | null>(null);
+  const [hasGeneratedHeadline, setHasGeneratedHeadline] = useState(false);
 
   const handleZoomIn = useCallback(() => {
     setZoomLevel(prev => Math.min(prev + 25, 300));
@@ -453,6 +455,9 @@ export function CreateFlyerDialog({
       setOriginalDescription(mlsDescription);
       setPreviousDescription(null);
       setHasSummarized(false);
+      // Reset headline revert state
+      setPreviousHeadline(null);
+      setHasGeneratedHeadline(false);
     }
   }, [open, mlsPhotos.length, mlsData?.description]);
 
@@ -599,6 +604,10 @@ export function CreateFlyerDialog({
       return;
     }
 
+    // Save current headline before generating new one
+    const currentHeadline = form.getValues("listingHeadline");
+    setPreviousHeadline(currentHeadline || null);
+
     setIsGeneratingHeadline(true);
     try {
       const response = await apiRequest("POST", "/api/generate-headline", {
@@ -613,6 +622,7 @@ export function CreateFlyerDialog({
       
       if (data.headline) {
         form.setValue("listingHeadline", data.headline);
+        setHasGeneratedHeadline(true);
         toast({
           title: "Headline generated!",
           description: "AI created a catchy headline for your flyer.",
@@ -629,6 +639,28 @@ export function CreateFlyerDialog({
       setIsGeneratingHeadline(false);
     }
   }, [originalDescription, form, toast, transaction.propertyAddress]);
+
+  const handleRevertToPreviousHeadline = useCallback(() => {
+    if (previousHeadline !== null) {
+      const currentHeadline = form.getValues("listingHeadline");
+      form.setValue("listingHeadline", previousHeadline);
+      setPreviousHeadline(currentHeadline || null);
+      toast({
+        title: "Reverted",
+        description: "Headline reverted to previous version.",
+      });
+    }
+  }, [form, previousHeadline, toast]);
+
+  const handleClearHeadline = useCallback(() => {
+    const currentHeadline = form.getValues("listingHeadline");
+    setPreviousHeadline(currentHeadline || null);
+    form.setValue("listingHeadline", "");
+    toast({
+      title: "Cleared",
+      description: "Headline has been cleared.",
+    });
+  }, [form, toast]);
 
   const handleFormatChange = (newFormat: FlyerFormat) => {
     setFormat(newFormat);
@@ -1961,42 +1993,78 @@ export function CreateFlyerDialog({
                           <FormItem>
                             <div className="flex justify-between items-center">
                               <FormLabel className="text-sm">Listing Headline (optional)</FormLabel>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={handleGenerateHeadline}
-                                      disabled={isGeneratingHeadline || !originalDescription}
-                                      className="h-7 text-xs"
-                                      data-testid="button-ai-generate-headline"
-                                    >
-                                      {isGeneratingHeadline ? (
-                                        <>
-                                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                          Generating...
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Sparkles className="h-3 w-3 mr-1" />
-                                          AI Generate
-                                        </>
-                                      )}
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" className="max-w-xs">
-                                    <p className="font-medium mb-1">Generate AI Headline</p>
-                                    <p className="text-xs text-muted-foreground mb-2">
-                                      Creates a catchy, professional headline based on the property description.
-                                    </p>
-                                    <p className="text-xs italic text-muted-foreground">
-                                      Examples: "A PRIME OPPORTUNITY IN NW AUSTIN", "STUNNING HILL COUNTRY RETREAT", "YOUR DREAM HOME AWAITS"
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                              <div className="flex items-center gap-1">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleGenerateHeadline}
+                                        disabled={isGeneratingHeadline || !originalDescription}
+                                        className="h-7 text-xs"
+                                        data-testid="button-ai-generate-headline"
+                                      >
+                                        {isGeneratingHeadline ? (
+                                          <>
+                                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                            Generating...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Sparkles className="h-3 w-3 mr-1" />
+                                            AI Generate
+                                          </>
+                                        )}
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="max-w-xs">
+                                      <p className="font-medium mb-1">Generate AI Headline</p>
+                                      <p className="text-xs text-muted-foreground mb-2">
+                                        Creates a catchy, professional headline based on the property description.
+                                      </p>
+                                      <p className="text-xs italic text-muted-foreground">
+                                        Examples: "A PRIME OPPORTUNITY IN NW AUSTIN", "STUNNING HILL COUNTRY RETREAT", "YOUR DREAM HOME AWAITS"
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                
+                                {/* Revert dropdown - shown after AI headline has been generated */}
+                                {hasGeneratedHeadline && (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 text-xs px-2"
+                                        data-testid="button-headline-revert-dropdown"
+                                      >
+                                        <Undo2 className="h-3 w-3 mr-1" />
+                                        Revert
+                                        <ChevronDown className="h-3 w-3 ml-1" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem 
+                                        onClick={handleRevertToPreviousHeadline}
+                                        disabled={previousHeadline === null}
+                                        data-testid="button-headline-revert-previous"
+                                      >
+                                        Revert to Previous
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem 
+                                        onClick={handleClearHeadline}
+                                        data-testid="button-headline-clear"
+                                      >
+                                        Clear Headline
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )}
+                              </div>
                             </div>
                             <FormControl>
                               <Input
