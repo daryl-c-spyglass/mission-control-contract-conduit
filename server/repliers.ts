@@ -650,25 +650,31 @@ function selectBestPhotosForFlyer(
   const selectedPhotos: SelectedPhoto[] = [];
   const usedUrls: string[] = [];
 
-  // Photo 1: Exterior (hero shot)
-  const exteriorPhoto = findBestPhoto(EXTERIOR_CATEGORIES, usedUrls);
-  if (exteriorPhoto) {
-    selectedPhotos.push(exteriorPhoto);
-    usedUrls.push(exteriorPhoto.url);
+  // Photo 1: Exterior (hero shot) - always try to get this first
+  if (selectedPhotos.length < count) {
+    const exteriorPhoto = findBestPhoto(EXTERIOR_CATEGORIES, usedUrls);
+    if (exteriorPhoto) {
+      selectedPhotos.push(exteriorPhoto);
+      usedUrls.push(exteriorPhoto.url);
+    }
   }
 
-  // Photo 2: Kitchen
-  const kitchenPhoto = findBestPhoto(KITCHEN_CATEGORIES, usedUrls);
-  if (kitchenPhoto) {
-    selectedPhotos.push(kitchenPhoto);
-    usedUrls.push(kitchenPhoto.url);
+  // Photo 2: Kitchen (only if count > 1)
+  if (selectedPhotos.length < count) {
+    const kitchenPhoto = findBestPhoto(KITCHEN_CATEGORIES, usedUrls);
+    if (kitchenPhoto) {
+      selectedPhotos.push(kitchenPhoto);
+      usedUrls.push(kitchenPhoto.url);
+    }
   }
 
-  // Photo 3: Living area
-  const livingPhoto = findBestPhoto(LIVING_CATEGORIES, usedUrls);
-  if (livingPhoto) {
-    selectedPhotos.push(livingPhoto);
-    usedUrls.push(livingPhoto.url);
+  // Photo 3: Living area (only if count > 2)
+  if (selectedPhotos.length < count) {
+    const livingPhoto = findBestPhoto(LIVING_CATEGORIES, usedUrls);
+    if (livingPhoto) {
+      selectedPhotos.push(livingPhoto);
+      usedUrls.push(livingPhoto.url);
+    }
   }
 
   // Fill remaining slots with best available photos
