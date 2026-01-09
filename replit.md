@@ -69,9 +69,20 @@ Enhanced flyer creation dialog with UX improvements for mobile and desktop:
 - **Photo Thumbnail Expand**: Hover shows ZoomIn icon, click opens photo in full-size lightbox
 - **Replace Mode for Uploads**: When 3/3 photos selected, new uploads clear previous selections and replace
 - **Collapsible Upload Section**: Accordion-style toggle with ChevronUp/Down, shows "Replace with custom photos" when limit reached
-- **Full Description Loading**: Textarea loads complete MLS description, truncation only at canvas generation time
+- **Full Description Loading**: Textarea loads complete MLS description, truncation only at generation time
 - **Dynamic Character Limits**: Shows "{current}/{limit}" counter, amber warning when over limit
 - **Mobile Optimized**: Touch-friendly controls, responsive layouts, proper scrolling on iOS/Android
+
+#### Print Flyer Architecture (January 2026)
+Print flyers use HTML/CSS + Puppeteer for server-side rendering (replaced canvas approach):
+- **Template**: `server/templates/flyer-template.html` with Handlebars placeholders
+- **Fonts**: League Spartan (headlines) and Montserrat (body) via Google Fonts
+- **Generator Service**: `server/services/flyer-generator.ts` launches headless Chromium
+- **API Endpoint**: `POST /api/generate-flyer-html` returns PNG screenshot
+- **Address Formatting**: Letter-spaced styling preserving state abbreviations and ZIP codes
+- **Price Badge**: Tan/brown rectangle (#8b7355) with price display
+- **Puppeteer Config**: Runs with --no-sandbox, --disable-setuid-sandbox for Replit compatibility
+- **Social flyers** still use client-side canvas rendering for speed
 
 #### Print Flyer Agent Information (January 2026)
 Professional agent branding for print flyers with validated required fields:
