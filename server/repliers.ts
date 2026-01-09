@@ -17,8 +17,6 @@ async function repliersRequest(endpoint: string, params?: Record<string, string>
     });
   }
 
-  console.log("Repliers API request:", url.toString());
-
   const response = await fetch(url.toString(), {
     method: "GET",
     headers: {
@@ -28,8 +26,6 @@ async function repliersRequest(endpoint: string, params?: Record<string, string>
   });
 
   const responseText = await response.text();
-  console.log("Repliers API response status:", response.status, response.statusText);
-  console.log("Repliers API response body (first 2000 chars):", responseText.substring(0, 2000));
 
   if (!response.ok) {
     throw new Error(`Repliers API error: ${response.status} ${response.statusText} - ${responseText}`);
@@ -215,8 +211,6 @@ export async function testRepliersAccess(): Promise<any> {
     throw new Error("REPLIERS_API_KEY not configured");
   }
 
-  console.log("Testing Repliers API - searching by address...");
-  
   const response = await fetch("https://api.repliers.io/listings", {
     method: "POST",
     headers: {
@@ -233,8 +227,6 @@ export async function testRepliersAccess(): Promise<any> {
   });
 
   const responseText = await response.text();
-  console.log("Repliers address search response status:", response.status);
-  console.log("Repliers address search full response:", responseText);
 
   if (!response.ok) {
     return { error: `API error: ${response.status}`, body: responseText };
@@ -265,8 +257,6 @@ async function searchByMLSNumber(mlsNumber: string): Promise<any> {
   const apiKey = process.env.REPLIERS_API_KEY;
   if (!apiKey) return null;
   
-  console.log("Searching by MLS number using POST:", mlsNumber);
-  
   const response = await fetch("https://api.repliers.io/listings", {
     method: "POST",
     headers: {
@@ -281,12 +271,10 @@ async function searchByMLSNumber(mlsNumber: string): Promise<any> {
   });
   
   if (!response.ok) {
-    console.log("POST search failed:", response.status);
     return null;
   }
   
   const data = await response.json();
-  console.log("POST search result:", data.count, "listings found");
   return data.listings?.[0] || null;
 }
 
@@ -294,8 +282,6 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
   try {
     // Add ACT prefix for Unlock MLS (Austin) if not already present
     const formattedMLS = mlsNumber.startsWith("ACT") ? mlsNumber : `ACT${mlsNumber}`;
-    
-    console.log("Fetching MLS listing:", mlsNumber, "-> formatted:", formattedMLS);
     
     // Use direct listing endpoint: GET /listings/{mlsNumber}
     // Always include boardId=53 for Unlock MLS
@@ -306,42 +292,22 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
     let data: any = null;
     try {
       data = await repliersRequest(`/listings/${formattedMLS}`, params);
-      console.log("Repliers API full response for MLS", formattedMLS, ":", JSON.stringify(data, null, 2));
-      
-      // Debug: Log image-related fields at top level
-      console.log("Repliers top-level image fields:", JSON.stringify({
-        media: data.media,
-        images: data.images,
-        photos: data.photos,
-        Pictures: data.Pictures,
-        Photo: data.Photo,
-        MediaURL: data.MediaURL,
-        allKeys: Object.keys(data)
-      }, null, 2));
     } catch (directError: any) {
-      console.log("Direct lookup failed:", directError.message);
-      console.log("Trying POST search as fallback...");
-      
-      // Try searching by MLS number using POST
+      // Try searching by MLS number using POST as fallback
       data = await searchByMLSNumber(mlsNumber);
       if (!data) {
         // Try with ACT prefix
         data = await searchByMLSNumber(formattedMLS);
       }
-      if (data) {
-        console.log("Found listing via POST search");
-      }
     }
     
     if (!data) {
-      console.log("No listing data found for MLS:", mlsNumber);
       return null;
     }
     
     let listing = data;
     if (data.listings && Array.isArray(data.listings)) {
       if (data.listings.length === 0) {
-        console.log("No listings found for MLS number:", mlsNumber);
         return null;
       }
       listing = data.listings[0];
@@ -349,33 +315,8 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
     
     if (!listing) return null;
 
-    console.log("Processing listing object keys:", Object.keys(listing));
-    console.log("Listing details:", listing.details ? Object.keys(listing.details) : "no details");
-    
-    // Debug: Log all image-related fields in the listing object
-    console.log("Listing image fields:", JSON.stringify({
-      media: listing.media ? `Array(${listing.media.length})` : listing.media,
-      images: listing.images ? `Array(${listing.images.length})` : listing.images,
-      photos: listing.photos ? `Array(${listing.photos.length})` : listing.photos,
-      Pictures: listing.Pictures,
-      Photo: listing.Photo,
-      MediaURL: listing.MediaURL,
-      detailsPhotos: listing.details?.photos,
-      detailsImages: listing.details?.images,
-      sampleMedia: listing.media?.[0] ? JSON.stringify(listing.media[0]).substring(0, 200) : null
-    }, null, 2));
-
     const rawImages = listing.media || listing.images || listing.photos || [];
-    console.log("Raw images selected:", rawImages?.length || 0, "items");
-    if (rawImages.length > 0) {
-      console.log("First raw image sample:", JSON.stringify(rawImages[0]).substring(0, 300));
-    }
-    
     const photos = normalizeImageUrls(rawImages);
-    console.log("After normalizeImageUrls:", photos.length, "valid URLs");
-    if (photos.length > 0) {
-      console.log("Sample normalized URLs:", photos.slice(0, 3));
-    }
     
     const addressParts = [];
     if (listing.address?.streetNumber) addressParts.push(listing.address.streetNumber);
@@ -494,7 +435,6 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
     // Extract comparables from the listing response if available
     let comparables: CMAComparable[] = [];
     if (listing.comparables && Array.isArray(listing.comparables)) {
-      console.log(`Found ${listing.comparables.length} comparables in listing data`);
       comparables = listing.comparables.slice(0, 10).map((comp: any) => {
         const compAddressParts = [];
         if (comp.address?.streetNumber) compAddressParts.push(comp.address.streetNumber);
@@ -520,21 +460,6 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
       });
     }
 
-    console.log("Parsed MLS data:", {
-      mlsNumber: result.mlsNumber,
-      price: result.listPrice,
-      beds: result.bedrooms,
-      baths: result.bathrooms,
-      sqft: result.sqft,
-      photos: result.photos.length,
-      comparables: comparables.length,
-      features: {
-        interior: result.interiorFeatures.length,
-        exterior: result.exteriorFeatures.length,
-        appliances: result.appliances.length,
-      }
-    });
-
     return { mlsData: result, comparables };
   } catch (error) {
     console.error("Error fetching MLS listing:", error);
@@ -549,15 +474,11 @@ export async function fetchSimilarListings(mlsNumber: string, radius: number = 5
       ? mlsNumber 
       : `ACT${mlsNumber}`;
     
-    console.log(`Fetching similar listings for MLS: ${formattedMlsNumber}`);
-    
     const data = await repliersRequest("/listings/similar", {
       mlsNumber: formattedMlsNumber,
       radius: radius.toString(),
       boardId: "53", // Unlock MLS board ID
     });
-
-    console.log("Repliers similar listings response:", JSON.stringify(data).substring(0, 300));
 
     if (!data.listings || !Array.isArray(data.listings)) {
       return [];
