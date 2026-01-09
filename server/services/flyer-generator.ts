@@ -26,14 +26,6 @@ export async function generatePrintFlyer(data: FlyerData): Promise<Buffer> {
   const templatePath = path.join(import.meta.dirname, '../templates/flyer-template.html');
   const templateHtml = fs.readFileSync(templatePath, 'utf-8');
   
-  Handlebars.registerHelper('if', function(this: any, conditional: any, options: any) {
-    if (conditional) {
-      return options.fn(this);
-    } else {
-      return options.inverse(this);
-    }
-  });
-  
   const template = Handlebars.compile(templateHtml);
   const html = template(data);
   
@@ -90,11 +82,17 @@ export function formatAddressForFlyer(address: string): string {
     if (/^\d+$/.test(word)) {
       return word;
     }
+    if (/^(TX|CA|NY|FL|AZ|CO|GA|NC|OH|PA|IL|NJ|VA|WA|MA|MD|TN|IN|MO|WI|MN|SC|AL|LA|KY|OR|OK|CT|IA|MS|AR|KS|UT|NV|NM|WV|NE|ID|HI|ME|NH|RI|MT|DE|SD|ND|AK|VT|WY|DC)$/i.test(word)) {
+      return word;
+    }
+    if (/^\d{5}(-\d{4})?$/.test(word)) {
+      return word;
+    }
     return word.split('').join(' ');
   };
   
   const formatSection = (section: string): string => {
-    return section.split(' ').map(formatWord).join('   ');
+    return section.split(' ').filter(w => w).map(formatWord).join('   ');
   };
   
   if (cityStateZip) {

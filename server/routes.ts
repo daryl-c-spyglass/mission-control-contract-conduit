@@ -9,6 +9,7 @@ import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsB
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
 import { getSyncStatus, triggerManualSync } from "./repliers-sync";
 import OpenAI from "openai";
+import { generatePrintFlyer, formatAddressForFlyer, type FlyerData } from "./services/flyer-generator";
 
 // Helper to generate a Slack channel name in format: buy-123main-joeywilkes or sell-123main-joeywilkes
 function generateSlackChannelName(address: string, transactionType: string = "buy", agentName: string = ""): string {
@@ -1331,6 +1332,93 @@ Return only the summary text, nothing else.`;
       }
       
       res.status(500).json({ error: "Failed to summarize description" });
+    }
+  });
+
+  // ============ HTML/Puppeteer Flyer Generation ============
+  app.post("/api/generate-flyer-html", isAuthenticated, async (req, res) => {
+    try {
+      const {
+        status,
+        price,
+        address,
+        photos,
+        beds,
+        baths,
+        sqft,
+        headline,
+        description,
+        agentName,
+        agentTitle,
+        agentPhone,
+        agentPhoto
+      } = req.body;
+      
+      // Validate required fields
+      if (!address) {
+        return res.status(400).json({ error: "Address is required" });
+      }
+      if (!agentName) {
+        return res.status(400).json({ error: "Agent name is required" });
+      }
+      if (!agentPhone) {
+        return res.status(400).json({ error: "Agent phone is required" });
+      }
+      if (!photos || photos.length === 0) {
+        return res.status(400).json({ error: "At least one photo is required" });
+      }
+      
+      const statusLabels: Record<string, string> = {
+        'just_listed': 'JUST LISTED AT',
+        'for_sale': 'FOR SALE AT',
+        'open_house': 'OPEN HOUSE',
+        'price_improvement': 'PRICE REDUCED TO',
+        'under_contract': 'UNDER CONTRACT',
+        'just_sold': 'JUST SOLD FOR',
+        'listed': 'LISTED AT'
+      };
+      
+      // Get the Spyglass logo URL - use absolute URL for Puppeteer
+      const host = req.get('host') || 'localhost:5000';
+      const protocol = req.protocol || 'http';
+      const baseUrl = `${protocol}://${host}`;
+      
+      // Clean price - remove $ and commas, then parse
+      const cleanPrice = String(price || '0').replace(/[$,]/g, '');
+      const numericPrice = parseFloat(cleanPrice) || 0;
+      
+      const flyerData: FlyerData = {
+        spyglassLogoUrl: `${baseUrl}/assets/SpyglassRealty_Logo_Black.png`,
+        statusLabel: statusLabels[status] || 'LISTED AT',
+        price: `$${numericPrice.toLocaleString()}`,
+        address: formatAddressForFlyer(address),
+        mainPhoto: photos[0],
+        photo2: photos[1],
+        photo3: photos[2],
+        beds: String(beds || 0),
+        baths: String(baths || 0),
+        sqft: Number(sqft || 0).toLocaleString(),
+        headline: headline?.toUpperCase() || '',
+        description: description || '',
+        agentName: agentName,
+        agentTitle: agentTitle || 'REALTOR®',
+        agentPhone: agentPhone,
+        agentPhoto: agentPhoto
+      };
+      
+      console.log('Generating HTML flyer for:', address);
+      const pngBuffer = await generatePrintFlyer(flyerData);
+      
+      // Create filename from address
+      const addressSlug = address.split(',')[0].replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+      
+      res.set('Content-Type', 'image/png');
+      res.set('Content-Disposition', `attachment; filename="${addressSlug}_flyer.png"`);
+      res.send(pngBuffer);
+      
+    } catch (error: any) {
+      console.error('Flyer generation error:', error);
+      res.status(500).json({ error: 'Failed to generate flyer', details: error.message });
     }
   });
 

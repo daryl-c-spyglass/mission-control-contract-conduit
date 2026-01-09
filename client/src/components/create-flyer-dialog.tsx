@@ -1524,27 +1524,68 @@ export function CreateFlyerDialog({
     setIsGenerating(true);
 
     try {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Could not create canvas context");
-
       if (format === "social") {
+        // Social media flyer uses canvas (client-side)
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Could not create canvas context");
+        
         await generateSocialFlyer(ctx, canvas, data, photosToUse);
+        
+        const dataUrl = canvas.toDataURL("image/png");
+        const link = document.createElement("a");
+        const addressSlug = transaction.propertyAddress.split(",")[0].replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, "");
+        link.download = `${addressSlug}_social.png`;
+        link.href = dataUrl;
+        link.click();
+
+        toast({
+          title: "Graphic downloaded",
+          description: "Your social media graphic has been saved",
+        });
       } else {
-        await generatePrintFlyer(ctx, canvas, data, photosToUse);
+        // Print flyer uses HTML/Puppeteer (server-side)
+        const response = await fetch('/api/generate-flyer-html', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            status: data.status,
+            price: data.price,
+            address: transaction.propertyAddress,
+            photos: photosToUse,
+            beds: mlsData?.bedrooms || 0,
+            baths: mlsData?.bathrooms || 0,
+            sqft: mlsData?.sqft || 0,
+            headline: data.listingHeadline,
+            description: data.description,
+            agentName: data.agentName,
+            agentTitle: data.agentTitle,
+            agentPhone: data.agentPhone,
+            agentPhoto: effectiveAgentPhoto
+          }),
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Failed to generate flyer');
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        const addressSlug = transaction.propertyAddress.split(",")[0].replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, "");
+        link.download = `${addressSlug}_flyer.png`;
+        link.href = url;
+        link.click();
+        window.URL.revokeObjectURL(url);
+
+        toast({
+          title: "Flyer downloaded",
+          description: "Your print flyer has been saved",
+        });
       }
-
-      const dataUrl = canvas.toDataURL("image/png");
-      const link = document.createElement("a");
-      const addressSlug = transaction.propertyAddress.split(",")[0].replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, "");
-      link.download = format === "social" ? `${addressSlug}_social.png` : `${addressSlug}_flyer.png`;
-      link.href = dataUrl;
-      link.click();
-
-      toast({
-        title: format === "social" ? "Graphic downloaded" : "Flyer downloaded",
-        description: `Your property ${format === "social" ? "graphic" : "flyer"} has been saved`,
-      });
     } catch (error) {
       console.error("Flyer generation error:", error);
       toast({
