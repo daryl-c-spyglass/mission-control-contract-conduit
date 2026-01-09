@@ -532,6 +532,211 @@ export async function searchByAddress(address: string): Promise<MLSListingData |
   }
 }
 
+// Types for Image Insights photo selection
+export interface SelectedPhoto {
+  url: string;
+  classification: string;
+  quality: number;
+  confidence: number;
+}
+
+export interface BestPhotosResult {
+  selectedPhotos: SelectedPhoto[];
+  allPhotosWithInsights: Array<{
+    url: string;
+    classification: string;
+    quality: number;
+    confidence: number;
+  }>;
+  hasImageInsights: boolean;
+  selectionMethod: "ai" | "fallback";
+}
+
+// Priority categories for photo selection
+const EXTERIOR_CATEGORIES = ["Front of Structure", "Back of Structure", "Exterior", "Pool", "Patio", "Deck"];
+const KITCHEN_CATEGORIES = ["Kitchen"];
+const LIVING_CATEGORIES = ["Living Room", "Family Room", "Dining Room", "Great Room"];
+
+// Helper to extract image identifier from URL for matching
+function extractImageId(url: string): string {
+  // Extract filename like "IMG-ACT2572987_3.jpg" from various URL formats
+  const match = url.match(/IMG-[A-Z0-9]+_\d+\.[a-z]+/i);
+  return match ? match[0].toLowerCase() : url.toLowerCase();
+}
+
+// Select best photos for flyer using Image Insights
+function selectBestPhotosForFlyer(
+  imageInsights: any,
+  images: string[],
+  count: number = 3
+): BestPhotosResult {
+  if (!imageInsights?.images || imageInsights.images.length === 0) {
+    // Fallback: return first N images
+    return {
+      selectedPhotos: images.slice(0, count).map(url => ({
+        url,
+        classification: "Unknown",
+        quality: 0,
+        confidence: 0,
+      })),
+      allPhotosWithInsights: images.map(url => ({
+        url,
+        classification: "Unknown",
+        quality: 0,
+        confidence: 0,
+      })),
+      hasImageInsights: false,
+      selectionMethod: "fallback",
+    };
+  }
+
+  // Build a map from image identifier to insight data
+  const insightMap = new Map<string, { classification: string; quality: number; confidence: number }>();
+  for (const img of imageInsights.images) {
+    const imageUrl = img.image || img.url || "";
+    const imageId = extractImageId(imageUrl);
+    insightMap.set(imageId, {
+      classification: img.classification?.imageOf || "Unknown",
+      quality: img.quality?.quantitative || 0,
+      confidence: img.classification?.prediction || 0,
+    });
+  }
+
+  // Map the normalized images array to include insights using the actual URLs from images array
+  const allPhotosWithInsights = images.map(url => {
+    const imageId = extractImageId(url);
+    const insight = insightMap.get(imageId);
+    return {
+      url, // Use the original normalized URL
+      classification: insight?.classification || "Unknown",
+      quality: insight?.quality || 0,
+      confidence: insight?.confidence || 0,
+    };
+  });
+
+  // Helper to find best photo from categories
+  const findBestPhoto = (categories: string[], exclude: string[] = []): SelectedPhoto | null => {
+    const candidates = allPhotosWithInsights.filter(
+      p => categories.some(cat => 
+        p.classification.toLowerCase().includes(cat.toLowerCase())
+      ) && !exclude.includes(p.url)
+    );
+    
+    if (candidates.length === 0) return null;
+    
+    // Sort by confidence first, then quality
+    candidates.sort((a, b) => {
+      if (Math.abs(b.confidence - a.confidence) > 0.05) {
+        return b.confidence - a.confidence;
+      }
+      return b.quality - a.quality;
+    });
+    
+    return candidates[0];
+  };
+
+  // Find best photo from remaining photos
+  const findAnyBestPhoto = (exclude: string[]): SelectedPhoto | null => {
+    const candidates = allPhotosWithInsights.filter(
+      p => !exclude.includes(p.url) && p.confidence >= 0.5
+    );
+    
+    if (candidates.length === 0) return null;
+    
+    candidates.sort((a, b) => b.quality - a.quality);
+    return candidates[0];
+  };
+
+  const selectedPhotos: SelectedPhoto[] = [];
+  const usedUrls: string[] = [];
+
+  // Photo 1: Exterior (hero shot)
+  const exteriorPhoto = findBestPhoto(EXTERIOR_CATEGORIES, usedUrls);
+  if (exteriorPhoto) {
+    selectedPhotos.push(exteriorPhoto);
+    usedUrls.push(exteriorPhoto.url);
+  }
+
+  // Photo 2: Kitchen
+  const kitchenPhoto = findBestPhoto(KITCHEN_CATEGORIES, usedUrls);
+  if (kitchenPhoto) {
+    selectedPhotos.push(kitchenPhoto);
+    usedUrls.push(kitchenPhoto.url);
+  }
+
+  // Photo 3: Living area
+  const livingPhoto = findBestPhoto(LIVING_CATEGORIES, usedUrls);
+  if (livingPhoto) {
+    selectedPhotos.push(livingPhoto);
+    usedUrls.push(livingPhoto.url);
+  }
+
+  // Fill remaining slots with best available photos
+  while (selectedPhotos.length < count) {
+    const nextBest = findAnyBestPhoto(usedUrls);
+    if (!nextBest) break;
+    selectedPhotos.push(nextBest);
+    usedUrls.push(nextBest.url);
+  }
+
+  // If still not enough, add from original images array
+  if (selectedPhotos.length < count) {
+    for (const url of images) {
+      if (selectedPhotos.length >= count) break;
+      const fullUrl = url.startsWith("http") ? url : `https://cdn.repliers.io/${url}`;
+      if (!usedUrls.includes(fullUrl)) {
+        selectedPhotos.push({
+          url: fullUrl,
+          classification: "Unknown",
+          quality: 0,
+          confidence: 0,
+        });
+        usedUrls.push(fullUrl);
+      }
+    }
+  }
+
+  return {
+    selectedPhotos,
+    allPhotosWithInsights,
+    hasImageInsights: true,
+    selectionMethod: "ai",
+  };
+}
+
+// Fetch best photos for a listing using Image Insights
+export async function getBestPhotosForFlyer(mlsNumber: string, count: number = 3): Promise<BestPhotosResult> {
+  try {
+    const formattedMLS = mlsNumber.startsWith("ACT") ? mlsNumber : `ACT${mlsNumber}`;
+    
+    const data = await repliersRequest(`/listings/${formattedMLS}`, { boardId: "53" });
+    
+    if (!data) {
+      return {
+        selectedPhotos: [],
+        allPhotosWithInsights: [],
+        hasImageInsights: false,
+        selectionMethod: "fallback",
+      };
+    }
+
+    const listing = data.listings?.[0] || data;
+    const rawImages = listing.media || listing.images || listing.photos || [];
+    const photos = normalizeImageUrls(rawImages);
+    const imageInsights = listing.imageInsights;
+
+    return selectBestPhotosForFlyer(imageInsights, photos, count);
+  } catch (error) {
+    console.error("[BestPhotos] Error fetching best photos:", error);
+    return {
+      selectedPhotos: [],
+      allPhotosWithInsights: [],
+      hasImageInsights: false,
+      selectionMethod: "fallback",
+    };
+  }
+}
+
 // Diagnostic function to check if Image Insights is enabled on the account
 export async function checkImageInsights(mlsNumber: string): Promise<{
   mlsNumber: string;

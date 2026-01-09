@@ -1,0 +1,95 @@
+Implement smart photo auto-selection for flyers using Repliers Image Insights.
+
+Files to modify:
+- server/repliers.ts
+- client/src/components/create-flyer-dialog.tsx
+
+## Part 1: Create Photo Selection Utility (Server)
+
+Add a utility function in server/repliers.ts:
+
+1. Create function: selectBestPhotosForFlyer(imageInsights, images, count = 3)
+
+2. Selection priority for Print Flyer (3 photos):
+   - Photo 1 (Hero): "Front of Structure" OR "Back of Structure" OR first exterior
+     - Highest prediction confidence (>= 0.90)
+     - Tie-breaker: highest quality.quantitative score
+   - Photo 2: "Kitchen"
+     - Highest prediction confidence (>= 0.90)
+     - Tie-breaker: highest quality.quantitative score
+   - Photo 3: "Living Room" OR "Family Room" OR "Dining Room"
+     - Highest prediction confidence (>= 0.90)
+     - Tie-breaker: highest quality.quantitative score
+
+3. Fallback logic:
+   - If category not found, pick next best available room type
+   - If no imageInsights, return first N images from images array
+   - Always ensure we return the requested count (or all if fewer available)
+
+4. Return structure:
+   {
+     selectedPhotos: [
+       { url: "https://cdn.repliers.io/...", classification: "Front of Structure", quality: 4.5, confidence: 0.95 },
+       { url: "https://cdn.repliers.io/...", classification: "Kitchen", quality: 4.2, confidence: 0.99 },
+       { url: "https://cdn.repliers.io/...", classification: "Living Room", quality: 4.0, confidence: 0.98 }
+     ],
+     hasImageInsights: true,
+     selectionMethod: "ai" | "fallback"
+   }
+
+## Part 2: Add API Endpoint for Smart Selection
+
+Create endpoint: GET /api/listings/:mlsNumber/best-photos
+
+1. Fetches listing with imageInsights
+2. Calls selectBestPhotosForFlyer()
+3. Returns the selected photos with metadata
+
+## Part 3: Update Create Flyer Dialog
+
+In create-flyer-dialog.tsx:
+
+1. Add "Auto-Select Best Photos" button (with sparkle icon ✨)
+   - Position: Above the photo grid
+   - Text: "✨ Auto-Select Best Photos"
+   - Only show when Print Flyer format is selected
+
+2. On click:
+   - Call /api/listings/:mlsNumber/best-photos
+   - Auto-select the returned photos in the grid
+   - Show toast: "Selected: Exterior, Kitchen, Living Room" (or actual room types)
+
+3. Show badges on auto-selected photos:
+   - Small label showing room type: "Kitchen", "Exterior", etc.
+   - Quality indicator (star rating or "Excellent" badge)
+
+4. Keep manual selection available:
+   - Agent can still click to change selections
+   - "Auto-Select" just provides smart defaults
+
+## Part 4: Update Photo Grid UI
+
+1. Add room type badges to ALL photo thumbnails (not just selected):
+   - Small overlay label at bottom: "Kitchen", "Living Room", etc.
+   - Subtle, doesn't block the photo
+
+2. Add quality indicator (optional):
+   - Small star icon with quality score
+   - Or color-coded border (green = excellent, yellow = above average)
+
+3. Add filter/sort options (optional):
+   - "Sort by: Quality" dropdown
+   - "Filter by: Room Type" dropdown
+
+## Part 5: Clean Up Debug Endpoint
+
+Remove the temporary diagnostic endpoint:
+- DELETE /api/debug/check-image-insights/:mlsNumber
+
+Test by:
+1. Open Create Flyer dialog (Print Flyer format)
+2. Click "Auto-Select Best Photos"
+3. Verify it selects Exterior + Kitchen + Living Room
+4. Verify room type badges appear on thumbnails
+5. Verify agent can still manually change selection
+6. Generate flyer and confirm selected photos appear correctly

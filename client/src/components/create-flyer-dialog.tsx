@@ -359,6 +359,8 @@ export function CreateFlyerDialog({
   const [localAgentPhoto, setLocalAgentPhoto] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [isAutoSelecting, setIsAutoSelecting] = useState(false);
+  const [photoInsights, setPhotoInsights] = useState<Record<string, { classification: string; quality: number }>>({});
 
   const handleZoomIn = useCallback(() => {
     setZoomLevel(prev => Math.min(prev + 25, 300));
@@ -384,6 +386,10 @@ export function CreateFlyerDialog({
       setSelectedPhotos([]);
     }
     setUploadedPhotos([]);
+    // Clear photo insights when switching to social (not needed there)
+    if (newFormat === "social") {
+      setPhotoInsights({});
+    }
   }, [mlsPhotos]);
 
   useEffect(() => {
@@ -599,6 +605,90 @@ export function CreateFlyerDialog({
   }, [toast]);
 
   const effectiveAgentPhoto = localAgentPhoto || agentPhotoUrl;
+
+  // Helper to extract image ID for matching between API and local URLs
+  const extractImageId = useCallback((url: string): string => {
+    const match = url.match(/IMG-[A-Z0-9]+_\d+\.[a-z]+/i);
+    return match ? match[0].toLowerCase() : url.toLowerCase();
+  }, []);
+
+  const handleAutoSelectPhotos = useCallback(async () => {
+    const mlsNumber = mlsData?.mlsNumber || transaction.mlsNumber;
+    if (!mlsNumber) {
+      toast({
+        title: "No MLS number",
+        description: "Cannot auto-select photos without MLS data.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsAutoSelecting(true);
+    try {
+      const response = await apiRequest("GET", `/api/listings/${mlsNumber}/best-photos?count=${maxPhotos}`);
+      const data = await response.json();
+
+      if (data.selectedPhotos && data.selectedPhotos.length > 0) {
+        // Build a map of image IDs to local mlsPhotos URLs
+        const localUrlMap = new Map<string, string>();
+        for (const url of mlsPhotos) {
+          localUrlMap.set(extractImageId(url), url);
+        }
+
+        // Map API URLs back to local mlsPhotos URLs
+        const selectedUrls = data.selectedPhotos
+          .map((p: any) => {
+            const imageId = extractImageId(p.url);
+            return localUrlMap.get(imageId) || p.url;
+          })
+          .filter((url: string) => mlsPhotos.includes(url));
+
+        setSelectedPhotos(selectedUrls);
+        setUploadedPhotos([]);
+
+        // Build insights map keyed by local mlsPhotos URLs
+        const insights: Record<string, { classification: string; quality: number }> = {};
+        for (const photo of data.allPhotosWithInsights || []) {
+          const imageId = extractImageId(photo.url);
+          const localUrl = localUrlMap.get(imageId);
+          if (localUrl) {
+            insights[localUrl] = {
+              classification: photo.classification,
+              quality: photo.quality,
+            };
+          }
+        }
+        setPhotoInsights(insights);
+
+        const roomTypes = data.selectedPhotos
+          .map((p: any) => p.classification)
+          .filter((c: string) => c !== "Unknown")
+          .join(", ");
+
+        toast({
+          title: data.hasImageInsights ? "AI-selected best photos" : "Selected photos",
+          description: roomTypes 
+            ? `Selected: ${roomTypes}` 
+            : `Selected ${selectedUrls.length} photos`,
+        });
+      } else {
+        toast({
+          title: "No photos available",
+          description: "Could not find photos to select.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Auto-select error:", error);
+      toast({
+        title: "Auto-select failed",
+        description: "Could not auto-select photos. Please select manually.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAutoSelecting(false);
+    }
+  }, [mlsData?.mlsNumber, transaction.mlsNumber, maxPhotos, mlsPhotos, extractImageId, toast]);
 
   const getPhotosForFlyer = useCallback((): string[] => {
     const mlsUrls = selectedPhotos.map(url => 
@@ -1103,15 +1193,39 @@ export function CreateFlyerDialog({
                       <FormLabel className="text-sm">
                         Select {format === "social" ? "1 photo" : "up to 3 photos"}
                       </FormLabel>
-                      <span className="text-xs text-muted-foreground">
-                        {selectedPhotos.length}/{maxPhotos} selected
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {format === "print" && (mlsData?.mlsNumber || transaction.mlsNumber) && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleAutoSelectPhotos}
+                            disabled={isAutoSelecting}
+                            className="h-6 text-xs gap-1"
+                            data-testid="button-auto-select-photos"
+                          >
+                            {isAutoSelecting ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Sparkles className="h-3 w-3" />
+                            )}
+                            Auto-Select
+                          </Button>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {selectedPhotos.length}/{maxPhotos} selected
+                        </span>
+                      </div>
                     </div>
                     <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 sm:gap-1.5 max-h-32 sm:max-h-28 overflow-y-auto p-1.5 sm:p-1 border rounded-md bg-muted/30">
                       {mlsPhotos.map((photo, index) => {
                         const isSelected = selectedPhotos.includes(photo);
                         const selectionIndex = selectedPhotos.indexOf(photo);
                         const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(photo)}`;
+                        const insight = photoInsights[photo];
+                        const roomType = insight?.classification && insight.classification !== "Unknown" 
+                          ? insight.classification 
+                          : null;
                         return (
                           <div key={index} className="relative aspect-square group">
                             <button
@@ -1140,6 +1254,13 @@ export function CreateFlyerDialog({
                               {!isSelected && selectedPhotos.length < maxPhotos && (
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                   <Check className="h-4 w-4 text-white" />
+                                </div>
+                              )}
+                              {roomType && (
+                                <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5">
+                                  <span className="text-[8px] text-white font-medium truncate block">
+                                    {roomType}
+                                  </span>
                                 </div>
                               )}
                             </button>
