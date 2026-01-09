@@ -43,6 +43,7 @@ export const transactions = pgTable("transactions", {
   propertyImages: text("property_images").array(),
   propertyDescription: text("property_description"), // For brochure/marketing materials
   notes: text("notes"),
+  mlsLastSyncedAt: timestamp("mls_last_synced_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

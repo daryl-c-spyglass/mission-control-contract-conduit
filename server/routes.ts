@@ -7,6 +7,7 @@ import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToCh
 import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess } from "./repliers";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
+import { getSyncStatus, triggerManualSync } from "./repliers-sync";
 
 // Helper to generate a Slack channel name in format: buy-123main-joeywilkes or sell-123main-joeywilkes
 function generateSlackChannelName(address: string, transactionType: string = "buy", agentName: string = ""): string {
@@ -850,6 +851,32 @@ export async function registerRoutes(
       res.json({ success: true, message: "Connection successful" });
     } catch (error) {
       res.status(500).json({ message: "Connection test failed" });
+    }
+  });
+
+  // ============ MLS Sync Status ============
+
+  app.get("/api/mls-sync/status", isAuthenticated, async (req, res) => {
+    try {
+      const status = getSyncStatus();
+      const repliersSetting = await storage.getIntegrationSetting("repliers");
+      
+      res.json({
+        ...status,
+        lastSyncStats: repliersSetting?.metadata ? (repliersSetting.metadata as any).lastSyncStats : null,
+        isConfigured: !!process.env.REPLIERS_API_KEY,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get sync status" });
+    }
+  });
+
+  app.post("/api/mls-sync/trigger", isAuthenticated, async (req, res) => {
+    try {
+      await triggerManualSync();
+      res.json({ success: true, message: "MLS sync triggered" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to trigger sync" });
     }
   });
 

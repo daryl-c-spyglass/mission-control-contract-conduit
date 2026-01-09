@@ -41,6 +41,7 @@ export interface IStorage {
   getIntegrationSetting(type: string): Promise<IntegrationSetting | undefined>;
   saveIntegrationSetting(setting: InsertIntegrationSetting): Promise<IntegrationSetting>;
   updateIntegrationSetting(type: string, setting: Partial<InsertIntegrationSetting>): Promise<IntegrationSetting | undefined>;
+  upsertIntegrationSetting(setting: InsertIntegrationSetting): Promise<IntegrationSetting>;
 
   // Activities
   getActivitiesByTransaction(transactionId: string): Promise<Activity[]>;
@@ -163,6 +164,23 @@ export class DatabaseStorage implements IStorage {
       .where(eq(integrationSettings.integrationType, type))
       .returning();
     return updated;
+  }
+
+  async upsertIntegrationSetting(setting: InsertIntegrationSetting): Promise<IntegrationSetting> {
+    const existing = await this.getIntegrationSetting(setting.integrationType);
+    if (existing) {
+      const [updated] = await db
+        .update(integrationSettings)
+        .set(setting)
+        .where(eq(integrationSettings.integrationType, setting.integrationType))
+        .returning();
+      return updated;
+    }
+    const [newSetting] = await db
+      .insert(integrationSettings)
+      .values(setting)
+      .returning();
+    return newSetting;
   }
 
   // Activities
