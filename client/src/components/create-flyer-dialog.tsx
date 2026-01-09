@@ -47,6 +47,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Transaction, MLSData } from "@shared/schema";
 
 import spyglassLogoWhite from "@assets/White-Orange_(1)_1767129299733.png";
+import spyglassLogoBlack from "@assets/SpyglassRealty_Logo_Black_(1)_1767985123384.png";
 
 type FlyerFormat = "social" | "print";
 
@@ -239,22 +240,17 @@ function PrintFlyerPreview({
 
   return (
     <div className="relative w-full aspect-[8.5/11] bg-white rounded-lg overflow-hidden shadow-lg border border-border" style={{ fontFamily: "'League Spartan', 'Montserrat', sans-serif" }}>
-      {/* Header Section - Only Spyglass logo + price badge (NO Leading logo per template) */}
+      {/* Header Section - WHITE background with BLACK logo + gray rectangle badge (per template) */}
       <div className="flex items-center justify-between px-2 py-2 bg-white border-b border-gray-100">
-        <div className="bg-[#1a1a1a] rounded px-1.5 py-1">
-          <img
-            src={spyglassLogoWhite}
-            alt="Spyglass Realty"
-            className="h-4 w-auto"
-          />
-        </div>
-        {/* Price badge - pentagon/arrow shape pointing left (tan color) */}
+        <img
+          src={spyglassLogoBlack}
+          alt="Spyglass Realty"
+          className="h-4 w-auto"
+        />
+        {/* Price badge - simple tan/brown rectangle (per template) */}
         <div 
-          className="text-white px-3 py-1.5 relative"
-          style={{ 
-            backgroundColor: '#8b7355',
-            clipPath: 'polygon(15% 50%, 25% 0%, 100% 0%, 100% 100%, 25% 100%)'
-          }}
+          className="text-white px-3 py-1.5"
+          style={{ backgroundColor: '#8b7355' }}
         >
           <p className="text-[4px] tracking-[0.12em] text-center font-medium">{statusLabel.toUpperCase()} AT</p>
           <p className="text-[9px] font-bold text-center">{price || "$0"}</p>
@@ -355,13 +351,11 @@ function PrintFlyerPreview({
           <p className="text-[7px] font-bold text-[#333] capitalize">{agentName || "Agent Name"}</p>
           <p className="text-[5px] text-gray-500">{agentTitle || "REALTOR®"}</p>
           <p className="text-[6px] text-gray-600">{agentPhone || "(XXX) XXX-XXXX"}</p>
-          <div className="bg-[#1a1a1a] rounded px-1 py-0.5 mx-auto mt-1 inline-block">
-            <img
-              src={spyglassLogoWhite}
-              alt="Logo"
-              className="h-2.5 w-auto"
-            />
-          </div>
+          <img
+            src={spyglassLogoBlack}
+            alt="Logo"
+            className="h-3 w-auto mx-auto mt-1"
+          />
         </div>
       </div>
 
@@ -996,6 +990,9 @@ export function CreateFlyerDialog({
     canvas.width = 2550;
     canvas.height = 3300;
     
+    // Clear canvas for clean render
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
     const GOLD_COLOR = "#c4a962";
     const DARK_TEXT = "#333333";
     const FONT_LEAGUE = "League Spartan, sans-serif";
@@ -1031,58 +1028,42 @@ export function CreateFlyerDialog({
     // ============ HEADER SECTION (height: ~250px) ============
     const headerHeight = 250;
     
-    // Load and draw Spyglass logo (left)
+    // WHITE header background (per template)
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, headerHeight);
+    
+    // Load and draw BLACK Spyglass logo (left) on white background
     const logo = document.createElement('img');
     logo.crossOrigin = "anonymous";
     await new Promise<void>((resolve) => {
       logo.onload = () => resolve();
       logo.onerror = () => resolve();
-      logo.src = spyglassLogoWhite;
+      logo.src = spyglassLogoBlack;
     });
     
     const logoHeight = 120;
     const logoWidth = (logo.width / logo.height) * logoHeight || 350;
     
-    // Add dark background panel behind logo for visibility
-    const logoBgPadding = 20;
-    ctx.fillStyle = "#1a1a1a";
-    const logoBgRadius = 8;
-    const logoBgX = 60;
-    const logoBgY = 50;
-    const logoBgW = logoWidth + logoBgPadding * 2;
-    const logoBgH = logoHeight + logoBgPadding;
-    ctx.beginPath();
-    ctx.roundRect(logoBgX, logoBgY, logoBgW, logoBgH, logoBgRadius);
-    ctx.fill();
-    
+    // Draw logo directly on white background (no dark panel needed)
     ctx.drawImage(logo, 80, 65, logoWidth, logoHeight);
 
-    // Price badge (right) - pentagon/arrow shape pointing left (tan/brown color)
-    const badgeWidth = 420;
-    const badgeHeight = 140;
+    // Price badge (right) - GRAY RECTANGLE (per template, not pentagon)
+    const badgeWidth = 400;
+    const badgeHeight = 130;
     const badgeX = canvas.width - badgeWidth - 80;
     const badgeY = 55;
-    const arrowIndent = 50; // How far the arrow point goes in
     
-    // Draw pentagon shape pointing left
-    ctx.beginPath();
-    ctx.moveTo(badgeX, badgeY + badgeHeight / 2);           // Left point (arrow tip)
-    ctx.lineTo(badgeX + arrowIndent, badgeY);                // Top left edge
-    ctx.lineTo(badgeX + badgeWidth, badgeY);                 // Top right
-    ctx.lineTo(badgeX + badgeWidth, badgeY + badgeHeight);   // Bottom right
-    ctx.lineTo(badgeX + arrowIndent, badgeY + badgeHeight);  // Bottom left edge
-    ctx.closePath();
-    ctx.fillStyle = '#8b7355'; // Tan/brown color from template
-    ctx.fill();
+    // Simple rectangle, tan/brown color per template
+    ctx.fillStyle = '#8b7355'; // Tan/brown from template
+    ctx.fillRect(badgeX, badgeY, badgeWidth, badgeHeight);
     
     ctx.fillStyle = "#ffffff";
-    ctx.font = `500 22px ${FONT_LEAGUE}`;
+    ctx.font = `500 24px ${FONT_LEAGUE}`;
     ctx.textAlign = "center";
-    // Center text in the pentagon (offset slightly right due to arrow indent)
-    const badgeCenterX = badgeX + arrowIndent + (badgeWidth - arrowIndent) / 2;
-    ctx.fillText(`${statusLabel.toUpperCase()} AT`, badgeCenterX, badgeY + 50);
-    ctx.font = `700 52px ${FONT_LEAGUE}`;
-    ctx.fillText(data.price || "$0", badgeCenterX, badgeY + 110);
+    const badgeCenterX = badgeX + badgeWidth / 2;
+    ctx.fillText(`${statusLabel.toUpperCase()} AT`, badgeCenterX, badgeY + 45);
+    ctx.font = `700 54px ${FONT_LEAGUE}`;
+    ctx.fillText(data.price || "$0", badgeCenterX, badgeY + 100);
 
     // ============ ADDRESS BAR (height: ~100px) ============
     const addressBarY = headerHeight;
@@ -1401,26 +1382,22 @@ export function CreateFlyerDialog({
     ctx.font = `400 30px ${FONT_MONTSERRAT}`;
     ctx.fillText(data.agentPhone || "(XXX) XXX-XXXX", agentCenterX, agentPhotoY + agentCircleR * 2 + 135);
 
-    // Small Spyglass logo under agent info with dark background
-    const smallLogoHeight = 50;
-    const smallLogoWidth = (logo.width / logo.height) * smallLogoHeight || 150;
-    const smallLogoBgPadding = 12;
+    // Small Spyglass logo under agent info - use BLACK logo on white background
+    // (Since bottom section has white background, use black logo directly)
+    const agentLogo = document.createElement('img');
+    agentLogo.crossOrigin = "anonymous";
+    await new Promise<void>((resolve) => {
+      agentLogo.onload = () => resolve();
+      agentLogo.onerror = () => resolve();
+      agentLogo.src = spyglassLogoBlack;
+    });
+    
+    const smallLogoHeight = 55;
+    const smallLogoWidth = (agentLogo.width / agentLogo.height) * smallLogoHeight || 160;
     const smallLogoX = agentCenterX - smallLogoWidth / 2;
     const smallLogoY = agentPhotoY + agentCircleR * 2 + 180;
     
-    // Draw dark background for logo visibility
-    ctx.fillStyle = "#1a1a1a";
-    ctx.beginPath();
-    ctx.roundRect(
-      smallLogoX - smallLogoBgPadding,
-      smallLogoY - smallLogoBgPadding / 2,
-      smallLogoWidth + smallLogoBgPadding * 2,
-      smallLogoHeight + smallLogoBgPadding,
-      6
-    );
-    ctx.fill();
-    
-    ctx.drawImage(logo, smallLogoX, smallLogoY, smallLogoWidth, smallLogoHeight);
+    ctx.drawImage(agentLogo, smallLogoX, smallLogoY, smallLogoWidth, smallLogoHeight);
 
     // Clean agent section - no QR code, no decorative squares
   };
