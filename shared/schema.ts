@@ -160,6 +160,7 @@ export interface CMAComparable {
   daysOnMarket: number;
   distance: number;
   imageUrl?: string;
+  photos?: string[];
   mlsNumber?: string;
   status?: string;
   listDate?: string;

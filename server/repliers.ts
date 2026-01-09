@@ -128,6 +128,7 @@ export interface CMAComparable {
   daysOnMarket: number;
   distance: number;
   imageUrl?: string;
+  photos?: string[];
   mlsNumber?: string;
   status?: string;
   listDate?: string;
@@ -483,6 +484,7 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
         if (comp.address?.streetSuffix) compAddressParts.push(comp.address.streetSuffix);
         const compStreetAddress = compAddressParts.join(" ");
         
+        const compPhotos = normalizeImageUrls(comp.images || comp.media || comp.photos);
         return {
           address: comp.address?.full || compStreetAddress || "",
           price: parseFloat(comp.listPrice) || parseFloat(comp.soldPrice) || 0,
@@ -491,7 +493,8 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
           sqft: comp.livingArea || comp.buildingAreaTotal || comp.details?.sqft || comp.sqft || 0,
           daysOnMarket: comp.daysOnMarket || comp.simpleDaysOnMarket || comp.dom || 0,
           distance: comp.distance || 0,
-          imageUrl: normalizeImageUrls(comp.images)?.[0] || undefined,
+          imageUrl: compPhotos[0] || undefined,
+          photos: compPhotos,
           mlsNumber: comp.mlsNumber || "",
           status: comp.standardStatus || comp.status || "",
           listDate: comp.listDate || "",
@@ -548,6 +551,7 @@ export async function fetchSimilarListings(mlsNumber: string, radius: number = 5
       if (listing.address?.streetName) addressParts.push(listing.address.streetName);
       const streetAddress = addressParts.join(" ");
       
+      const listingPhotos = normalizeImageUrls(listing.media || listing.images || listing.photos);
       return {
         address: listing.address?.full || streetAddress || "",
         price: parseFloat(listing.listPrice) || parseFloat(listing.soldPrice) || 0,
@@ -556,7 +560,11 @@ export async function fetchSimilarListings(mlsNumber: string, radius: number = 5
         sqft: listing.livingArea || listing.details?.sqft || listing.sqft || 0,
         daysOnMarket: listing.daysOnMarket || listing.dom || 0,
         distance: listing.distance || 0,
-        imageUrl: normalizeImageUrls(listing.media || listing.images)?.[0] || undefined,
+        imageUrl: listingPhotos[0] || undefined,
+        photos: listingPhotos,
+        mlsNumber: listing.mlsNumber || "",
+        status: listing.standardStatus || listing.status || "",
+        listDate: listing.listDate || "",
       };
     });
   } catch (error) {

@@ -50,7 +50,8 @@ import {
   Grid3X3,
   Waves,
 } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Input } from "@/components/ui/input";
 import { CreateFlyerDialog } from "./create-flyer-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -188,6 +189,8 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const mlsData = transaction.mlsData as MLSData | null;
   const cmaData = transaction.cmaData as CMAComparable[] | null;
   const [selectedCMAProperty, setSelectedCMAProperty] = useState<CMAComparable | null>(null);
+  const [cmaPhotoIndex, setCmaPhotoIndex] = useState(0);
+  const [cmaFullscreenOpen, setCmaFullscreenOpen] = useState(false);
   
   // Photo navigation for MLS gallery
   const photos = mlsData?.photos || mlsData?.images || [];
@@ -1889,110 +1892,285 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
       </Tabs>
 
       {/* CMA Property Detail Modal */}
-      <Dialog open={!!selectedCMAProperty} onOpenChange={(open) => !open && setSelectedCMAProperty(null)}>
-        <DialogContent className="max-w-lg" data-testid="dialog-cma-property">
-          {selectedCMAProperty && (
-            <div className="space-y-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold">{selectedCMAProperty.address}</h2>
-                  {selectedCMAProperty.mlsNumber && (
-                    <p className="text-sm text-muted-foreground flex items-center gap-1">
-                      <Hash className="h-3.5 w-3.5" />
-                      MLS# {selectedCMAProperty.mlsNumber}
+      <Dialog open={!!selectedCMAProperty} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedCMAProperty(null);
+          setCmaPhotoIndex(0);
+        }
+      }}>
+        <DialogContent className="max-w-3xl" data-testid="dialog-cma-property">
+          <VisuallyHidden>
+            <DialogTitle>CMA Property Details</DialogTitle>
+          </VisuallyHidden>
+          {selectedCMAProperty && (() => {
+            const cmaPhotos = selectedCMAProperty.photos || (selectedCMAProperty.imageUrl ? [selectedCMAProperty.imageUrl] : []);
+            const displayThumbnails = cmaPhotos.slice(0, 6);
+            const hasMorePhotos = cmaPhotos.length > 6;
+            
+            return (
+              <div className="space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-semibold">{selectedCMAProperty.address}</h2>
+                    {selectedCMAProperty.mlsNumber && (
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <Hash className="h-3.5 w-3.5" />
+                        MLS# {selectedCMAProperty.mlsNumber}
+                      </p>
+                    )}
+                  </div>
+                  <Badge variant="outline">
+                    {selectedCMAProperty.distance.toFixed(1)} mi away
+                  </Badge>
+                </div>
+
+                {/* Photo Gallery */}
+                {cmaPhotos.length > 0 ? (
+                  <div className="flex gap-3 h-64">
+                    {/* Main Photo - 60% width */}
+                    <div className="relative w-3/5 rounded-lg overflow-hidden bg-muted">
+                      <img
+                        src={`/api/proxy-image?url=${encodeURIComponent(cmaPhotos[cmaPhotoIndex] || cmaPhotos[0])}`}
+                        alt={selectedCMAProperty.address}
+                        className="w-full h-full object-cover"
+                        data-testid="cma-main-photo"
+                      />
+                      {/* Photo quality badge */}
+                      <div className="absolute top-2 left-2 bg-green-600 text-white text-xs font-medium px-2 py-1 rounded">
+                        HD
+                      </div>
+                      {/* Navigation arrows */}
+                      {cmaPhotos.length > 1 && (
+                        <>
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 bg-background/80 hover:bg-background"
+                            onClick={() => setCmaPhotoIndex((prev) => (prev - 1 + cmaPhotos.length) % cmaPhotos.length)}
+                            data-testid="cma-photo-prev"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 bg-background/80 hover:bg-background"
+                            onClick={() => setCmaPhotoIndex((prev) => (prev + 1) % cmaPhotos.length)}
+                            data-testid="cma-photo-next"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                      {/* Photo counter */}
+                      <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                        {cmaPhotoIndex + 1} / {cmaPhotos.length}
+                      </div>
+                    </div>
+                    
+                    {/* Thumbnail Grid - 40% width, 2x3 */}
+                    <div className="w-2/5 grid grid-cols-2 grid-rows-3 gap-1.5">
+                      {displayThumbnails.map((photo, idx) => {
+                        const isLastAndMore = idx === 5 && hasMorePhotos;
+                        return (
+                          <div
+                            key={idx}
+                            className={`relative rounded overflow-hidden cursor-pointer transition-opacity ${
+                              cmaPhotoIndex === idx ? 'ring-2 ring-primary' : 'hover:opacity-80'
+                            }`}
+                            onClick={() => isLastAndMore ? setCmaFullscreenOpen(true) : setCmaPhotoIndex(idx)}
+                            data-testid={`cma-thumbnail-${idx}`}
+                          >
+                            <img
+                              src={`/api/proxy-image?url=${encodeURIComponent(photo)}`}
+                              alt={`Photo ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            {isLastAndMore && (
+                              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                <span className="text-white text-sm font-medium">
+                                  See all {cmaPhotos.length} photos
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {/* Fill empty slots if less than 6 photos */}
+                      {displayThumbnails.length < 6 && Array.from({ length: 6 - displayThumbnails.length }).map((_, idx) => (
+                        <div key={`empty-${idx}`} className="rounded bg-muted" />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-48 rounded-lg bg-muted flex items-center justify-center">
+                    <div className="text-center text-muted-foreground">
+                      <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No photos available</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="text-2xl font-bold text-primary">
+                  {formatPrice(selectedCMAProperty.price)}
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="text-center p-3 bg-muted rounded-lg">
+                    <Bed className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                    <p className="text-lg font-semibold">{selectedCMAProperty.bedrooms}</p>
+                    <p className="text-xs text-muted-foreground">Bedrooms</p>
+                  </div>
+                  <div className="text-center p-3 bg-muted rounded-lg">
+                    <Bath className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                    <p className="text-lg font-semibold">{selectedCMAProperty.bathrooms}</p>
+                    <p className="text-xs text-muted-foreground">Bathrooms</p>
+                  </div>
+                  <div className="text-center p-3 bg-muted rounded-lg">
+                    <Square className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                    <p className="text-lg font-semibold">
+                      {typeof selectedCMAProperty.sqft === 'number' 
+                        ? selectedCMAProperty.sqft.toLocaleString() 
+                        : selectedCMAProperty.sqft}
                     </p>
+                    <p className="text-xs text-muted-foreground">Sq Ft</p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Days on Market
+                    </span>
+                    <span className="font-medium">{selectedCMAProperty.daysOnMarket}</span>
+                  </div>
+                  {selectedCMAProperty.status && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground flex items-center gap-2">
+                        <Activity className="h-4 w-4" />
+                        Status
+                      </span>
+                      <Badge variant="secondary">{selectedCMAProperty.status}</Badge>
+                    </div>
+                  )}
+                  {selectedCMAProperty.listDate && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        List Date
+                      </span>
+                      <span className="font-medium">{formatDate(selectedCMAProperty.listDate)}</span>
+                    </div>
+                  )}
+                  {selectedCMAProperty.sqft && selectedCMAProperty.price && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground flex items-center gap-2">
+                        <DollarSign className="h-4 w-4" />
+                        Price per Sq Ft
+                      </span>
+                      <span className="font-medium">
+                        {formatPrice(
+                          selectedCMAProperty.price / 
+                          (typeof selectedCMAProperty.sqft === 'number' 
+                            ? selectedCMAProperty.sqft 
+                            : parseFloat(selectedCMAProperty.sqft) || 1)
+                        )}
+                      </span>
+                    </div>
                   )}
                 </div>
-                <Badge variant="outline">
-                  {selectedCMAProperty.distance.toFixed(1)} mi away
-                </Badge>
               </div>
-
-              {selectedCMAProperty.imageUrl && (
-                <div className="aspect-video rounded-lg overflow-hidden bg-muted">
-                  <img
-                    src={`/api/proxy-image?url=${encodeURIComponent(selectedCMAProperty.imageUrl)}`}
-                    alt={selectedCMAProperty.address}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-
-              <div className="text-2xl font-bold text-primary">
-                {formatPrice(selectedCMAProperty.price)}
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="text-center p-3 bg-muted rounded-lg">
-                  <Bed className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-                  <p className="text-lg font-semibold">{selectedCMAProperty.bedrooms}</p>
-                  <p className="text-xs text-muted-foreground">Bedrooms</p>
-                </div>
-                <div className="text-center p-3 bg-muted rounded-lg">
-                  <Bath className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-                  <p className="text-lg font-semibold">{selectedCMAProperty.bathrooms}</p>
-                  <p className="text-xs text-muted-foreground">Bathrooms</p>
-                </div>
-                <div className="text-center p-3 bg-muted rounded-lg">
-                  <Square className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-                  <p className="text-lg font-semibold">
-                    {typeof selectedCMAProperty.sqft === 'number' 
-                      ? selectedCMAProperty.sqft.toLocaleString() 
-                      : selectedCMAProperty.sqft}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Sq Ft</p>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Days on Market
-                  </span>
-                  <span className="font-medium">{selectedCMAProperty.daysOnMarket}</span>
-                </div>
-                {selectedCMAProperty.status && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-2">
-                      <Activity className="h-4 w-4" />
-                      Status
-                    </span>
-                    <Badge variant="secondary">{selectedCMAProperty.status}</Badge>
-                  </div>
-                )}
-                {selectedCMAProperty.listDate && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      List Date
-                    </span>
-                    <span className="font-medium">{formatDate(selectedCMAProperty.listDate)}</span>
-                  </div>
-                )}
-                {selectedCMAProperty.sqft && selectedCMAProperty.price && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-2">
-                      <DollarSign className="h-4 w-4" />
-                      Price per Sq Ft
-                    </span>
-                    <span className="font-medium">
-                      {formatPrice(
-                        selectedCMAProperty.price / 
-                        (typeof selectedCMAProperty.sqft === 'number' 
-                          ? selectedCMAProperty.sqft 
-                          : parseFloat(selectedCMAProperty.sqft) || 1)
-                      )}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
+
+      {/* CMA Fullscreen Photo Gallery */}
+      {selectedCMAProperty && (() => {
+        const cmaPhotos = selectedCMAProperty.photos || (selectedCMAProperty.imageUrl ? [selectedCMAProperty.imageUrl] : []);
+        return (
+          <Dialog open={cmaFullscreenOpen} onOpenChange={setCmaFullscreenOpen}>
+            <DialogContent className="max-w-5xl h-[90vh] p-0 bg-black/95" data-testid="dialog-cma-fullscreen">
+              <VisuallyHidden>
+                <DialogTitle>CMA Photo Gallery</DialogTitle>
+              </VisuallyHidden>
+              <div className="relative w-full h-full flex flex-col">
+                {/* Header */}
+                <div className="flex items-center justify-between p-4 text-white">
+                  <div>
+                    <h3 className="font-medium">{selectedCMAProperty.address}</h3>
+                    <p className="text-sm text-white/70">{cmaPhotoIndex + 1} of {cmaPhotos.length} photos</p>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="text-white hover:bg-white/10"
+                    onClick={() => setCmaFullscreenOpen(false)}
+                    data-testid="cma-fullscreen-close"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+                
+                {/* Main image */}
+                <div className="flex-1 relative flex items-center justify-center px-16">
+                  <img
+                    src={`/api/proxy-image?url=${encodeURIComponent(cmaPhotos[cmaPhotoIndex])}`}
+                    alt={`Photo ${cmaPhotoIndex + 1}`}
+                    className="max-w-full max-h-full object-contain"
+                  />
+                  {cmaPhotos.length > 1 && (
+                    <>
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="absolute left-4 top-1/2 -translate-y-1/2 h-10 w-10 bg-white/10 hover:bg-white/20 text-white"
+                        onClick={() => setCmaPhotoIndex((prev) => (prev - 1 + cmaPhotos.length) % cmaPhotos.length)}
+                        data-testid="cma-fullscreen-prev"
+                      >
+                        <ChevronLeft className="h-6 w-6" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 h-10 w-10 bg-white/10 hover:bg-white/20 text-white"
+                        onClick={() => setCmaPhotoIndex((prev) => (prev + 1) % cmaPhotos.length)}
+                        data-testid="cma-fullscreen-next"
+                      >
+                        <ChevronRight className="h-6 w-6" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+                
+                {/* Thumbnail strip */}
+                <div className="p-4 overflow-x-auto">
+                  <div className="flex gap-2 justify-center">
+                    {cmaPhotos.map((photo, idx) => (
+                      <div
+                        key={idx}
+                        className={`w-16 h-12 rounded overflow-hidden cursor-pointer flex-shrink-0 transition-all ${
+                          cmaPhotoIndex === idx ? 'ring-2 ring-primary scale-105' : 'opacity-60 hover:opacity-100'
+                        }`}
+                        onClick={() => setCmaPhotoIndex(idx)}
+                      >
+                        <img
+                          src={`/api/proxy-image?url=${encodeURIComponent(photo)}`}
+                          alt={`Thumbnail ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }
