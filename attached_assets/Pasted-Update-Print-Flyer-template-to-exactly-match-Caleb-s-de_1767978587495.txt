@@ -1,0 +1,133 @@
+Update Print Flyer template to exactly match Caleb's design (Flyer.jpg reference).
+
+Files to modify:
+- client/src/components/create-flyer-dialog.tsx
+- Add font files to project
+
+## Part 1: Add Fonts
+
+1. Add these Google Fonts (or upload the provided font files):
+   - League Spartan (headers, address, headline)
+   - Montserrat (body text, property stats, agent info)
+
+2. Import in CSS/component:
+```css
+   @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap');
+```
+
+## Part 2: Update Canvas Layout (2550x3300px for 8.5x11 at 300 DPI)
+
+### Header Section (height: ~250px)
+- Background: White
+- Left (x: 80): Spyglass Realty logo (use existing logo)
+- Center (x: ~800): "Leading Real Estate Companies of the World" logo
+  - Use the script "Leading" text + "REAL ESTATE COMPANIES OF THE WORLD" below
+  - If logo not available, render as styled text
+- Right (x: ~2100): Price badge
+  - Background: Gold/tan color (#c4a962 or similar from template)
+  - "LISTED AT" - small caps, spaced letters, League Spartan
+  - "$XXX,XXX" - larger, bold, League Spartan
+  - Padding: 30px
+
+### Address Bar (height: ~100px, y: ~250)
+- Full width
+- Text: Address in UPPERCASE with letter spacing
+- Format: "10202 GOLDEN QUAIL DR AUSTIN, TX 78758"
+- NOT individual spaced characters - use CSS letter-spacing instead
+- Font: League Spartan, weight 500, letter-spacing: 0.3em
+- Centered horizontally
+- Color: Dark gray (#333)
+
+### Photos Section (y: ~350, height: ~1700px)
+
+**Main Photo (hero):**
+- Width: Full width (2550px - margins)
+- Height: ~1100px
+- Position: Top of photo section
+- Object-fit: cover
+
+**Secondary Photos (below main):**
+- Two photos side by side
+- Each: ~1225px wide (half width minus gap)
+- Height: ~550px each
+- Gap between: ~20px
+- Object-fit: cover
+
+### Bottom Info Section (y: ~2100, height: ~700px)
+
+**Three-column layout:**
+
+**Left Column (x: 80, width: ~600px) - Property Stats:**
+- Vertical stack with icons:
+- [Bed icon] "3 bedrooms" - Montserrat, 600 weight
+- [Bath icon] "2 bathrooms" - Montserrat, 600 weight  
+- [Square icon] "1,446 sq. ft" - Montserrat, 600 weight
+- Icons: Simple line icons, ~40px
+- Spacing between items: ~40px
+- Font size: ~36px
+
+**Center Column (x: ~750, width: ~900px) - Description:**
+- Headline (optional): 
+  - "A PRIME OPPORTUNITY IN NORTH EAST AUSTIN"
+  - League Spartan, 600 weight, ~32px
+  - Uppercase, letter-spacing: 0.1em
+  - Margin bottom: 20px
+- Description text:
+  - Montserrat, 400 weight, ~28px
+  - Line height: 1.5
+  - Max 115 characters (truncated at word boundary)
+
+**Right Column (x: ~1750, width: ~700px) - Agent Info:**
+- Agent photo:
+  - Circular, ~200px diameter
+  - Centered in column
+  - Border: subtle shadow or border
+- Team logo:
+  - Spyglass logo (small), ~150px wide
+  - Below agent photo, right-aligned
+- Agent name:
+  - Montserrat, 700 weight, ~42px
+  - "Sunny Tracey"
+- Agent title:
+  - Montserrat, 400 weight, ~24px
+  - "REALTOR®, Spyglass Realty"
+- Agent phone:
+  - Montserrat, 400 weight, ~28px
+  - "512-877-5272"
+
+## Part 3: Color Palette (from template)
+
+- Price badge background: #c4a962 (gold/tan)
+- Price badge text: White
+- Header background: White
+- Address text: #333333
+- Body text: #333333
+- Icons: #333333
+
+## Part 4: Update Preview
+
+- Preview should show scaled version matching this exact layout
+- All fonts should render correctly in preview
+- Verify alignment matches Flyer.jpg reference
+
+## Part 5: Canvas Drawing Order
+
+1. Fill white background
+2. Draw header section (logos, price badge)
+3. Draw address bar
+4. Draw main photo
+5. Draw secondary photos
+6. Draw bottom section background (white)
+7. Draw property stats with icons
+8. Draw headline and description
+9. Draw agent section (photo, logo, text)
+
+Test by:
+1. Open Create Property Flyer
+2. Select Print Flyer format
+3. Fill in all fields including agent info
+4. Preview should match Flyer.jpg layout exactly
+5. Download and compare to reference
+6. Verify fonts are correct (League Spartan, Montserrat)
+7. Verify colors match template
+8. Verify spacing and alignment match
