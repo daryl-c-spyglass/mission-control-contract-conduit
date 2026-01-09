@@ -1,0 +1,127 @@
+Update Print Flyer to match Caleb's exact template design (142_N_STEEL_FLYER.pdf).
+
+File: client/src/components/create-flyer-dialog.tsx
+
+## Part 1: Add Agent Info Fields (Print Flyer format only)
+
+When "Print Flyer" is selected, show additional fields below Description:
+
+1. Add a section divider: "Agent Information"
+
+2. Add these fields:
+   - Agent Name (text input, required for Print Flyer)
+     - Placeholder: "Enter your name"
+   
+   - Agent Title (text input)
+     - Default value: "REALTOR®"
+   
+   - Agent Phone (text input)
+     - Placeholder: "(512) 555-1234"
+   
+   - Agent Photo (image upload)
+     - Small upload area with "Upload Photo" button
+     - Show circular preview when uploaded
+     - Placeholder: gray circle with user icon
+
+3. Add optional field:
+   - Listing Headline (text input, 39 char max)
+     - Placeholder: "e.g., OPEN HOUSE SATURDAY"
+     - Helper text: "Optional headline (39 characters max)"
+     - This appears above the description on the flyer
+
+4. Hide these agent fields when "Social Media" format is selected
+
+## Part 2: Update Print Flyer Canvas Layout
+
+Match the exact layout from 142_N_STEEL_FLYER.pdf:
+
+### Dimensions
+- 8.5" x 11" at 300 DPI = 2550 x 3300 pixels
+- White background
+
+### Header Section (top ~300px)
+- Background: Black bar across top
+- Left side: Spyglass Realty logo (white version)
+- Center: "Leading Real Estate Companies of the World" logo (use text placeholder for now)
+- Right side: Price badge
+  - Gold/brown background (#b39960 or similar)
+  - "LISTED AT" in small uppercase spaced letters
+  - Price "$XXX,XXX" in larger text below
+
+### Address Bar (~100px below header)
+- Full address in UPPERCASE with SPACED LETTERS
+- Example: "1 3 1 0 6   N E W   B O S T O N,   A U S T I N,   T X   7 8 7 2 9"
+- Centered, dark text on white background
+
+### Photos Section (~1800px)
+- Main photo: Full width, approximately 60% of photo area height
+- Two secondary photos below: 
+  - Side by side, equal width (50% each)
+  - Approximately 40% of photo area height
+- All photos: object-fit cover, no gaps between them
+
+### Bottom Info Section (~800px) - Three Columns
+
+**Left Column - Property Stats (with icons):**
+- Bed icon + "X bedrooms"
+- Bath icon + "X bathrooms"
+- Square footage icon + "X,XXX sq. ft"
+- Stack vertically with spacing
+- Use simple line icons
+
+**Center Column - Description:**
+- Listing Headline (if provided) - uppercase, spaced letters, bold
+  - Example: "A PRIME OPPORTUNITY IN NORTH EAST AUSTIN"
+- Property description below (115 char max, truncated at word boundary)
+- Text aligned left or justified
+
+**Right Column - Agent Info:**
+- Agent photo (circular, ~150px diameter)
+- Team logo placeholder (small Spyglass logo)
+- Agent name (bold, larger text)
+- Agent title "REALTOR®, Spyglass Realty"
+- Agent phone number
+- Optional: QR code placeholder
+
+### Background Decorations
+- Black and white checkered/squares pattern in bottom section (subtle)
+- Keep it clean and professional
+
+## Part 3: Update Preview
+
+- Preview should show scaled-down version of exact layout
+- All elements visible in preview
+- Preview updates in real-time as user fills in fields
+
+## Part 4: Validation for Print Flyer
+
+When generating Print Flyer, validate:
+- At least 1 photo selected (3 recommended)
+- Agent Name is filled in
+- Agent Phone is filled in
+- Show warning if missing: "Please fill in agent information"
+
+## Summary of Print Flyer Elements
+
+| Element | Source | Required |
+|---------|--------|----------|
+| Spyglass Logo | Static asset | Yes |
+| Price | MLS auto-fill | Yes |
+| Address | Transaction data | Yes |
+| 3 Photos | MLS selection | Yes (min 1) |
+| Beds/Baths/Sqft | MLS auto-fill | Yes |
+| Headline | Manual input | No |
+| Description | MLS auto-fill (editable) | Yes |
+| Agent Photo | Manual upload | No (shows placeholder) |
+| Agent Name | Manual input | Yes |
+| Agent Title | Manual input | Has default |
+| Agent Phone | Manual input | Yes |
+
+Test by:
+1. Select "Print Flyer" format
+2. Verify agent info fields appear
+3. Fill in agent name, phone
+4. Upload agent photo (optional)
+5. Add a headline (optional)
+6. Check preview matches the template layout
+7. Download and compare to 142_N_STEEL_FLYER.pdf

@@ -62,6 +62,17 @@ The Templates tab in transaction details provides marketing template generation:
 - Live previews with property photos, pricing, and description overlays
 - Uses `/api/listings/search` endpoint with `searchByAddress` fallback to MLS lookup
 
+### Create Property Flyer Dialog (January 2026)
+Enhanced flyer creation dialog with UX improvements for mobile and desktop:
+- **Dual Format Support**: Social Media (1:1 aspect ratio, 350 char limit) and Print Flyer (8.5x11, 250 char limit)
+- **Preview Enlarge Lightbox**: Click preview thumbnail to open full-size modal with enlarged view
+- **Photo Thumbnail Expand**: Hover shows ZoomIn icon, click opens photo in full-size lightbox
+- **Replace Mode for Uploads**: When 3/3 photos selected, new uploads clear previous selections and replace
+- **Collapsible Upload Section**: Accordion-style toggle with ChevronUp/Down, shows "Replace with custom photos" when limit reached
+- **Full Description Loading**: Textarea loads complete MLS description, truncation only at canvas generation time
+- **Dynamic Character Limits**: Shows "{current}/{limit}" counter, amber warning when over limit
+- **Mobile Optimized**: Touch-friendly controls, responsive layouts, proper scrolling on iOS/Android
+
 ### Enhanced MLS Data Tab (January 2026)
 The MLS Data tab provides comprehensive property information visualization:
 - **Photo Gallery**: Fullscreen modal with navigation arrows, thumbnail strip, and photo counter
