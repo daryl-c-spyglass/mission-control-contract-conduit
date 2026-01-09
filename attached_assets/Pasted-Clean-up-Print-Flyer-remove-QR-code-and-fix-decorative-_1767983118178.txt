@@ -1,0 +1,79 @@
+Clean up Print Flyer - remove QR code and fix decorative squares.
+
+File: client/src/components/create-flyer-dialog.tsx
+
+## Issue 1: Remove QR Code
+
+The QR code placeholder looks rough and unfinished. Remove it entirely for now.
+
+Delete the QR code drawing code:
+- Remove the "Scan for listing" text
+- Remove the QR code placeholder squares
+
+We can add a proper QR code generator in a future update.
+
+## Issue 2: Fix or Remove Decorative Squares
+
+The black/white checkered squares around the agent photo look messy and don't match the template properly.
+
+Option A (Recommended): Remove them entirely for cleaner look
+- Delete the decorative squares drawing code
+- Keep the agent section clean and simple
+
+Option B: If keeping, make them subtle
+- Position them better (only in corner, not overlapping agent photo)
+- Make them smaller and more refined
+- Match the template placement exactly
+
+For MVP, let's go with Option A - remove the decorative squares for a cleaner professional look.
+
+## Issue 3: Reduce Remaining White Space
+
+There's still too much white space at the bottom of the flyer.
+
+Options to fix:
+1. Move the entire bottom section down slightly
+2. Add more vertical spacing between elements in the info section
+3. Increase font sizes slightly
+4. Or add a subtle footer element
+
+## Issue 4: Agent Name Capitalization
+
+Current: "daryl camingao" (lowercase)
+Should be: "Daryl Camingao" (Title Case)
+
+Apply proper capitalization to agent name:
+```javascript
+function toTitleCase(str) {
+  return str.replace(/\w\S*/g, (txt) => 
+    txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
+  );
+}
+```
+
+## Updated Agent Section Layout (Clean Version)
+
+After removing QR and decorative squares:
+[Agent Photo - circular, 180px]
+Agent Name (Title Case, bold)
+REALTOR®
+Phone Number
+[Spyglass Logo - small]
+
+Centered vertically and horizontally in the right column.
+
+## Summary of Changes
+
+1. ❌ Remove QR code and "Scan for listing" text
+2. ❌ Remove decorative black/white squares
+3. ✅ Fix agent name capitalization (Title Case)
+4. ✅ Adjust spacing to reduce bottom white space
+5. ✅ Keep agent section clean and professional
+
+Test by:
+1. Generate Print Flyer
+2. Verify QR code is gone
+3. Verify decorative squares are gone
+4. Verify agent name is properly capitalized
+5. Verify cleaner overall appearance
+6. Compare to template - should look more professional now

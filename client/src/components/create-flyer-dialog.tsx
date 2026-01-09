@@ -339,19 +339,8 @@ function PrintFlyerPreview({
           )}
         </div>
 
-        {/* Right Column - Agent Info (larger with checkerboard hint + QR) */}
-        <div className="text-center pr-0.5 space-y-0.5 relative">
-          {/* Decorative checkerboard pattern (simplified) */}
-          <div className="absolute -left-1 top-0 flex flex-col gap-px">
-            <div className="flex gap-px">
-              <div className="w-1 h-1 bg-[#1a1a1a]" />
-              <div className="w-1 h-1 bg-white border border-gray-200" />
-            </div>
-            <div className="flex gap-px">
-              <div className="w-1 h-1 bg-white border border-gray-200" />
-              <div className="w-1 h-1 bg-[#1a1a1a]" />
-            </div>
-          </div>
+        {/* Right Column - Agent Info (clean, no decorative elements) */}
+        <div className="text-center pr-0.5 space-y-0.5">
           {agentPhotoUrl ? (
             <img 
               src={agentPhotoUrl} 
@@ -363,25 +352,16 @@ function PrintFlyerPreview({
               <User className="h-4 w-4 text-gray-400" />
             </div>
           )}
-          <p className="text-[7px] font-bold text-[#333]">{agentName || "Agent Name"}</p>
-          <p className="text-[5px] text-gray-500">{agentTitle || "REALTOR®, Spyglass Realty"}</p>
+          <p className="text-[7px] font-bold text-[#333] capitalize">{agentName || "Agent Name"}</p>
+          <p className="text-[5px] text-gray-500">{agentTitle || "REALTOR®"}</p>
           <p className="text-[6px] text-gray-600">{agentPhone || "(XXX) XXX-XXXX"}</p>
-          <div className="bg-[#1a1a1a] rounded px-1 py-0.5 mx-auto mt-0.5 inline-block">
+          <div className="bg-[#1a1a1a] rounded px-1 py-0.5 mx-auto mt-1 inline-block">
             <img
               src={spyglassLogoWhite}
               alt="Logo"
-              className="h-2 w-auto"
+              className="h-2.5 w-auto"
             />
           </div>
-          {/* QR Code placeholder */}
-          <div className="w-4 h-4 mx-auto mt-1 border border-gray-400 bg-white">
-            <div className="grid grid-cols-3 gap-px p-px h-full">
-              {[1,0,1,0,1,0,1,0,1].map((v, i) => (
-                <div key={i} className={v ? "bg-gray-800" : "bg-white"} />
-              ))}
-            </div>
-          </div>
-          <p className="text-[3px] text-gray-400">Scan for listing</p>
         </div>
       </div>
 
@@ -1399,10 +1379,18 @@ export function CreateFlyerDialog({
       ctx.fill();
     }
 
-    // Agent name
+    // Helper: Title Case for agent name
+    const toTitleCase = (str: string): string => {
+      return str.replace(/\w\S*/g, (txt) => 
+        txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
+      );
+    };
+
+    // Agent name (Title Case)
     ctx.fillStyle = DARK_TEXT;
     ctx.font = `700 44px ${FONT_MONTSERRAT}`;
-    ctx.fillText(data.agentName || "Agent Name", agentCenterX, agentPhotoY + agentCircleR * 2 + 55);
+    const formattedAgentName = data.agentName ? toTitleCase(data.agentName) : "Agent Name";
+    ctx.fillText(formattedAgentName, agentCenterX, agentPhotoY + agentCircleR * 2 + 55);
     
     // Agent title
     ctx.fillStyle = "#666666";
@@ -1413,63 +1401,12 @@ export function CreateFlyerDialog({
     ctx.font = `400 30px ${FONT_MONTSERRAT}`;
     ctx.fillText(data.agentPhone || "(XXX) XXX-XXXX", agentCenterX, agentPhotoY + agentCircleR * 2 + 135);
 
-    // Decorative checkerboard squares around agent photo area
-    const squareSize = 25;
-    const checkerboardX = agentCenterX - agentCircleR - squareSize * 2;
-    const checkerboardY = agentPhotoY - squareSize;
-    
-    // Draw 3x4 grid of alternating black/white squares behind agent area
-    for (let row = 0; row < 4; row++) {
-      for (let col = 0; col < 3; col++) {
-        const isBlack = (row + col) % 2 === 0;
-        ctx.fillStyle = isBlack ? '#1a1a1a' : '#ffffff';
-        ctx.fillRect(
-          checkerboardX + col * squareSize,
-          checkerboardY + row * squareSize,
-          squareSize,
-          squareSize
-        );
-        // Add subtle border
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(
-          checkerboardX + col * squareSize,
-          checkerboardY + row * squareSize,
-          squareSize,
-          squareSize
-        );
-      }
-    }
-    
-    // Also draw on right side of agent area
-    const checkerboardX2 = agentCenterX + agentCircleR;
-    for (let row = 0; row < 4; row++) {
-      for (let col = 0; col < 3; col++) {
-        const isBlack = (row + col + 1) % 2 === 0; // Offset pattern
-        ctx.fillStyle = isBlack ? '#1a1a1a' : '#ffffff';
-        ctx.fillRect(
-          checkerboardX2 + col * squareSize,
-          checkerboardY + row * squareSize,
-          squareSize,
-          squareSize
-        );
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(
-          checkerboardX2 + col * squareSize,
-          checkerboardY + row * squareSize,
-          squareSize,
-          squareSize
-        );
-      }
-    }
-
     // Small Spyglass logo under agent info with dark background
     const smallLogoHeight = 50;
     const smallLogoWidth = (logo.width / logo.height) * smallLogoHeight || 150;
     const smallLogoBgPadding = 12;
     const smallLogoX = agentCenterX - smallLogoWidth / 2;
-    const smallLogoY = agentPhotoY + agentCircleR * 2 + 160;
+    const smallLogoY = agentPhotoY + agentCircleR * 2 + 180;
     
     // Draw dark background for logo visibility
     ctx.fillStyle = "#1a1a1a";
@@ -1485,42 +1422,7 @@ export function CreateFlyerDialog({
     
     ctx.drawImage(logo, smallLogoX, smallLogoY, smallLogoWidth, smallLogoHeight);
 
-    // QR Code placeholder below agent info
-    const qrSize = 80;
-    const qrX = agentCenterX - qrSize / 2;
-    const qrY = smallLogoY + smallLogoHeight + 30;
-    
-    // QR code border
-    ctx.strokeStyle = '#333333';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(qrX, qrY, qrSize, qrSize);
-    
-    // Simple QR-like pattern inside
-    const cellSize = qrSize / 6;
-    const pattern = [
-      [1, 1, 1, 0, 1, 1],
-      [1, 0, 1, 1, 0, 1],
-      [1, 1, 1, 0, 1, 0],
-      [0, 1, 0, 1, 1, 1],
-      [1, 0, 1, 0, 1, 1],
-      [1, 1, 0, 1, 1, 1]
-    ];
-    ctx.fillStyle = '#333333';
-    for (let row = 0; row < 6; row++) {
-      for (let col = 0; col < 6; col++) {
-        if (pattern[row][col]) {
-          ctx.fillRect(qrX + col * cellSize, qrY + row * cellSize, cellSize, cellSize);
-        }
-      }
-    }
-    
-    // Label under QR code
-    ctx.fillStyle = '#666666';
-    ctx.font = `300 18px ${FONT_MONTSERRAT}`;
-    ctx.textAlign = 'center';
-    ctx.fillText('Scan for listing', agentCenterX, qrY + qrSize + 25);
-    
-    // NO gold footer bar - template doesn't have one
+    // Clean agent section - no QR code, no decorative squares
   };
 
   const generateFlyer = async (data: FormValues) => {
