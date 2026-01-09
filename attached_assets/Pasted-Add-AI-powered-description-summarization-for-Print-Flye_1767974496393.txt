@@ -1,0 +1,88 @@
+Add AI-powered description summarization for Print Flyer.
+
+Files to modify:
+- client/src/components/create-flyer-dialog.tsx
+- server/routes.ts (add new API endpoint)
+
+## Part 1: Add Server Endpoint for AI Summary
+
+Create a new API endpoint: POST /api/summarize-description
+
+1. Request body:
+   {
+     "description": "full MLS description text",
+     "maxLength": 115,
+     "propertyInfo": {
+       "address": "123 Main St",
+       "beds": 4,
+       "baths": 2,
+       "sqft": 1850
+     }
+   }
+
+2. Use Anthropic Claude API (or OpenAI if preferred):
+   - API key from environment: ANTHROPIC_API_KEY or OPENAI_API_KEY
+   
+3. Prompt for AI:
+   """
+   Summarize this real estate listing description into exactly {maxLength} characters or less. 
+   Keep the most compelling selling points. Write in an engaging, professional tone.
+   Do not include the address, beds, baths, or sqft (those are shown separately).
+   
+   Property: {address}
+   
+   Original description:
+   {description}
+   
+   Provide only the summary, no quotes or explanation.
+   """
+
+4. Response:
+   {
+     "summary": "AI-generated summary text..."
+   }
+
+5. Error handling:
+   - If AI fails, return truncated version as fallback
+   - Rate limit protection
+
+## Part 2: Add "AI Summarize" Button in Dialog
+
+In create-flyer-dialog.tsx:
+
+1. Add an "AI Summarize" button next to the Description field:
+   - Icon: sparkles/magic wand ✨
+   - Text: "AI Summarize"
+   - Only show when Print Flyer format is selected
+
+2. Button behavior:
+   - On click, show loading spinner on button
+   - Call /api/summarize-description endpoint
+   - Replace description textarea content with AI summary
+   - Show success toast: "Description summarized!"
+
+3. Button states:
+   - Default: "✨ AI Summarize"
+   - Loading: "Summarizing..." with spinner
+   - Success: Brief checkmark, then back to default
+   - Error: Show error message, keep original text
+
+4. Add helper text below description:
+   - "Tip: Click 'AI Summarize' to create a concise summary for your flyer"
+
+## Part 3: Character Counter Update
+
+1. Show character count: "85/115 characters"
+2. Color coding:
+   - Green: Under limit
+   - Yellow: Within 10 of limit
+   - Red: Over limit
+3. If over limit, show warning: "Description will be truncated"
+
+Test by:
+1. Select Print Flyer format
+2. See full description loaded
+3. Click "AI Summarize" button
+4. Verify AI generates a compelling ~115 char summary
+5. Verify summary replaces the description text
+6. Generate flyer and confirm summary appears correctly
