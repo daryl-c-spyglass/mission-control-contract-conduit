@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -203,24 +203,20 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
     `${mlsData.address}, ${mlsData.city}, ${mlsData.state} ${mlsData.zipCode}` : 
     transaction.propertyAddress;
   
-  // Fetch map embed URL
-  const { data: mapData } = useQuery<{ embedUrl: string }>({
-    queryKey: ["/api/maps-embed", mlsData?.coordinates?.latitude, mlsData?.coordinates?.longitude, fullAddress],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (mlsData?.coordinates?.latitude && mlsData?.coordinates?.longitude) {
-        params.set("lat", mlsData.coordinates.latitude.toString());
-        params.set("lng", mlsData.coordinates.longitude.toString());
-      } else {
-        params.set("address", fullAddress);
-      }
-      const res = await fetch(`/api/maps-embed?${params.toString()}`, { credentials: "include" });
-      if (!res.ok) return { embedUrl: "" };
-      return res.json();
-    },
-    enabled: !!mlsData || !!transaction.propertyAddress,
-    staleTime: 1000 * 60 * 60, // Cache for 1 hour
-  });
+  // Build Google Maps embed URL using frontend API key
+  const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const hasCoordinates = mlsData?.coordinates?.latitude && mlsData?.coordinates?.longitude;
+  const mapEmbedUrl = useMemo(() => {
+    if (!googleMapsApiKey) return null;
+    if (hasCoordinates) {
+      const lat = mlsData.coordinates!.latitude;
+      const lng = mlsData.coordinates!.longitude;
+      return `https://www.google.com/maps/embed/v1/place?key=${googleMapsApiKey}&q=${lat},${lng}&zoom=15`;
+    } else if (fullAddress) {
+      return `https://www.google.com/maps/embed/v1/place?key=${googleMapsApiKey}&q=${encodeURIComponent(fullAddress)}&zoom=15`;
+    }
+    return null;
+  }, [googleMapsApiKey, hasCoordinates, mlsData?.coordinates, fullAddress]);
   
   // Reset photo index when MLS data or photos change
   useEffect(() => {
@@ -979,7 +975,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 )}
                 
                 {/* Location Map */}
-                {mapData?.embedUrl && (
+                {mapEmbedUrl && (
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center gap-2">
@@ -990,7 +986,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                     <CardContent className="p-0">
                       <div className="relative w-full h-[300px] rounded-b-lg overflow-hidden">
                         <iframe
-                          src={mapData.embedUrl}
+                          src={mapEmbedUrl}
                           width="100%"
                           height="100%"
                           style={{ border: 0 }}
