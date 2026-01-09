@@ -82,14 +82,34 @@ type FormValues = z.infer<typeof formSchema>;
 
 function truncateDescription(text: string, maxLength: number): string {
   if (!text || text.length <= maxLength) return text || "";
-  // Reserve 3 chars for ellipsis to ensure total length doesn't exceed maxLength
-  const effectiveMax = maxLength - 3;
-  const truncated = text.substring(0, effectiveMax);
+  
+  // If text ends with proper punctuation (complete sentence), truncate at last sentence
+  const truncated = text.substring(0, maxLength);
+  
+  // Find last complete sentence ending
+  const lastPeriod = truncated.lastIndexOf('.');
+  const lastExclaim = truncated.lastIndexOf('!');
+  const lastQuestion = truncated.lastIndexOf('?');
+  const lastSentenceEnd = Math.max(lastPeriod, lastExclaim, lastQuestion);
+  
+  // If we have a complete sentence within the limit, use it (no ellipsis needed)
+  if (lastSentenceEnd > maxLength * 0.4) {
+    return truncated.substring(0, lastSentenceEnd + 1);
+  }
+  
+  // Otherwise truncate at word boundary and add period (not ellipsis)
   const lastSpace = truncated.lastIndexOf(' ');
   if (lastSpace > 0) {
-    return truncated.substring(0, lastSpace).trim() + '...';
+    let result = truncated.substring(0, lastSpace).trim();
+    // Remove trailing punctuation before adding period
+    result = result.replace(/[,;:\-]$/, '');
+    // Ensure ends with proper punctuation
+    if (!/[.!?]$/.test(result)) {
+      result += '.';
+    }
+    return result;
   }
-  return truncated.trim() + '...';
+  return truncated.trim();
 }
 
 interface PreviewProps {
@@ -240,14 +260,21 @@ function PrintFlyerPreview({
 
   return (
     <div className="relative w-full aspect-[8.5/11] bg-white rounded-lg overflow-hidden shadow-lg border border-border" style={{ fontFamily: "'League Spartan', 'Montserrat', sans-serif" }}>
-      {/* Header Section - WHITE background with BLACK logo + gray rectangle badge (per template) */}
+      {/* Header Section - WHITE background with Logo + Leading + Price (per template) */}
       <div className="flex items-center justify-between px-2 py-2 bg-white border-b border-gray-100">
+        {/* Left: Larger Spyglass logo */}
         <img
           src={spyglassLogoBlack}
           alt="Spyglass Realty"
-          className="h-4 w-auto"
+          className="h-6 w-auto"
         />
-        {/* Price badge - simple tan/brown rectangle (per template) */}
+        {/* Center: Leading Real Estate Companies */}
+        <div className="text-center flex-shrink-0">
+          <p className="text-[5px] italic text-[#1a1a1a]">Leading</p>
+          <p className="text-[3px] font-semibold text-[#1a1a1a] tracking-wider">REAL ESTATE COMPANIES</p>
+          <p className="text-[3px] font-semibold text-[#1a1a1a] tracking-wider">OF THE WORLD</p>
+        </div>
+        {/* Right: Price badge - tan/brown rectangle (per template) */}
         <div 
           className="text-white px-3 py-1.5"
           style={{ backgroundColor: '#8b7355' }}
@@ -305,18 +332,31 @@ function PrintFlyerPreview({
 
       {/* Info Section - 3 Columns (expanded per template) */}
       <div className="bg-white px-2 py-3 grid grid-cols-3 gap-2">
-        {/* Left Column - Property Stats (larger) */}
+        {/* Left Column - Property Stats with custom icons (matching template) */}
         <div className="space-y-1.5 pl-0.5">
           <div className="flex items-center gap-1.5 text-[#333]">
-            <Bed className="h-3 w-3" strokeWidth={1.5} />
+            {/* Custom bed icon - matching template style */}
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M3 18v-6a2 2 0 012-2h14a2 2 0 012 2v6M3 18h18M3 12V8a2 2 0 012-2h4v6M7 6v4"/>
+              <rect x="3" y="18" width="18" height="2" fill="none"/>
+            </svg>
             <span className="text-[7px] font-semibold">{bedrooms || "—"} bedrooms</span>
           </div>
           <div className="flex items-center gap-1.5 text-[#333]">
-            <Bath className="h-3 w-3" strokeWidth={1.5} />
+            {/* Custom bath icon - matching template style */}
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M4 12h16a2 2 0 012 2v2a4 4 0 01-4 4H6a4 4 0 01-4-4v-2a2 2 0 012-2z"/>
+              <path d="M6 12V6a2 2 0 012-2h1a1 1 0 011 1v1a1 1 0 001 1h2"/>
+              <path d="M6 20v2M18 20v2"/>
+            </svg>
             <span className="text-[7px] font-semibold">{bathrooms || "—"} bathrooms</span>
           </div>
           <div className="flex items-center gap-1.5 text-[#333]">
-            <Square className="h-3 w-3" strokeWidth={1.5} />
+            {/* Custom sqft icon - rectangle with diagonal measurement */}
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="3" y="5" width="18" height="14" rx="1"/>
+              <path d="M7 15l10-6M17 9l-2 1M17 9l-1 2"/>
+            </svg>
             <span className="text-[7px] font-semibold">{sqft ? parseInt(sqft).toLocaleString() : "—"} sq. ft</span>
           </div>
         </div>
@@ -335,8 +375,21 @@ function PrintFlyerPreview({
           )}
         </div>
 
-        {/* Right Column - Agent Info (clean, no decorative elements) */}
-        <div className="text-center pr-0.5 space-y-0.5">
+        {/* Right Column - Agent Info with decorative squares */}
+        <div className="text-center pr-0.5 space-y-0.5 relative">
+          {/* Decorative checkerboard squares (per template) */}
+          <div className="absolute -top-1 right-0 grid grid-cols-3 gap-0">
+            {[...Array(12)].map((_, i) => (
+              <div
+                key={i}
+                className="w-1 h-1"
+                style={{
+                  backgroundColor: (Math.floor(i / 3) + (i % 3)) % 2 === 0 ? '#000' : '#fff',
+                  border: (Math.floor(i / 3) + (i % 3)) % 2 !== 0 ? '0.5px solid #ccc' : 'none',
+                }}
+              />
+            ))}
+          </div>
           {agentPhotoUrl ? (
             <img 
               src={agentPhotoUrl} 
@@ -1032,7 +1085,7 @@ export function CreateFlyerDialog({
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, headerHeight);
     
-    // Load and draw BLACK Spyglass logo (left) on white background
+    // Load and draw BLACK Spyglass logo (left) on white background - LARGER per template
     const logo = document.createElement('img');
     logo.crossOrigin = "anonymous";
     await new Promise<void>((resolve) => {
@@ -1041,13 +1094,23 @@ export function CreateFlyerDialog({
       logo.src = spyglassLogoBlack;
     });
     
-    const logoHeight = 120;
-    const logoWidth = (logo.width / logo.height) * logoHeight || 350;
+    const logoHeight = 180; // Larger logo per template (was 120)
+    const logoWidth = (logo.width / logo.height) * logoHeight || 500;
     
     // Draw logo directly on white background (no dark panel needed)
-    ctx.drawImage(logo, 80, 65, logoWidth, logoHeight);
+    ctx.drawImage(logo, 60, 35, logoWidth, logoHeight);
+    
+    // CENTER: "Leading Real Estate Companies of the World" text (per template)
+    const centerX = canvas.width / 2;
+    ctx.fillStyle = "#1a1a1a";
+    ctx.font = `italic 400 32px ${FONT_MONTSERRAT}`;
+    ctx.textAlign = "center";
+    ctx.fillText("Leading", centerX, 90);
+    ctx.font = `600 20px ${FONT_MONTSERRAT}`;
+    ctx.fillText("REAL ESTATE COMPANIES", centerX, 120);
+    ctx.fillText("OF THE WORLD", centerX, 145);
 
-    // Price badge (right) - GRAY RECTANGLE (per template, not pentagon)
+    // Price badge (right) - TAN/BROWN RECTANGLE (per template)
     const badgeWidth = 400;
     const badgeHeight = 130;
     const badgeX = canvas.width - badgeWidth - 80;
@@ -1399,7 +1462,33 @@ export function CreateFlyerDialog({
     
     ctx.drawImage(agentLogo, smallLogoX, smallLogoY, smallLogoWidth, smallLogoHeight);
 
-    // Clean agent section - no QR code, no decorative squares
+    // Decorative black/white checkerboard squares (per template)
+    const squareSize = 25;
+    const squaresStartX = agentCenterX + 160;
+    const squaresStartY = agentPhotoY - 10;
+    
+    for (let row = 0; row < 4; row++) {
+      for (let col = 0; col < 3; col++) {
+        ctx.fillStyle = (row + col) % 2 === 0 ? '#000000' : '#FFFFFF';
+        ctx.fillRect(
+          squaresStartX + col * squareSize,
+          squaresStartY + row * squareSize,
+          squareSize,
+          squareSize
+        );
+        // Add border for white squares so they're visible
+        if ((row + col) % 2 !== 0) {
+          ctx.strokeStyle = '#cccccc';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(
+            squaresStartX + col * squareSize,
+            squaresStartY + row * squareSize,
+            squareSize,
+            squareSize
+          );
+        }
+      }
+    }
   };
 
   const generateFlyer = async (data: FormValues) => {

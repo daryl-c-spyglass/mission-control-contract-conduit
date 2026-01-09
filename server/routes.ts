@@ -1213,10 +1213,13 @@ export async function registerRoutes(
     // Remove any quotes the AI might have added
     cleaned = cleaned.replace(/^["']|["']$/g, "");
     
-    // Remove trailing "..." if present
-    if (cleaned.endsWith('...')) {
-      cleaned = cleaned.slice(0, -3).trim();
+    // Remove trailing "..." or "…" if present - CRITICAL to avoid truncated feel
+    while (cleaned.endsWith('...') || cleaned.endsWith('…')) {
+      cleaned = cleaned.replace(/\.{3}$|…$/, '').trim();
     }
+    
+    // Remove trailing incomplete phrases (common AI truncation patterns)
+    cleaned = cleaned.replace(/\s+(and|or|with|in|at|for|to|the|a|an|is|are|has|have|this|that)\s*\.?$/i, '.');
     
     // If still over limit, truncate at last complete sentence
     if (cleaned.length > maxLength) {
@@ -1226,26 +1229,34 @@ export async function registerRoutes(
       const lastQuestion = truncated.lastIndexOf('?');
       const lastSentenceEnd = Math.max(lastPeriod, lastExclaim, lastQuestion);
       
-      if (lastSentenceEnd > maxLength * 0.5) {
-        // Use last complete sentence if it's not too short
+      if (lastSentenceEnd > maxLength * 0.4) {
+        // Use last complete sentence if it's reasonably long
         cleaned = truncated.substring(0, lastSentenceEnd + 1);
       } else {
         // Otherwise truncate at last space and add period
         const lastSpace = truncated.lastIndexOf(' ');
         if (lastSpace > 0) {
           cleaned = truncated.substring(0, lastSpace);
-          // Remove trailing punctuation before adding period
-          cleaned = cleaned.replace(/[,;:\-]$/, '');
+          // Remove trailing punctuation/incomplete words before adding period
+          cleaned = cleaned.replace(/[,;:\-\s]+$/, '');
+          // Also remove trailing incomplete words (articles, prepositions)
+          cleaned = cleaned.replace(/\s+(and|or|with|in|at|for|to|the|a|an|is|are|has|have|this|that)$/i, '');
           cleaned += '.';
         } else {
-          cleaned = truncated + '.';
+          cleaned = truncated;
         }
       }
     }
     
-    // Ensure ends with punctuation
+    // Ensure ends with proper punctuation (never "...")
+    cleaned = cleaned.replace(/\.{2,}$/, '.');
     if (!/[.!?]$/.test(cleaned)) {
       cleaned += '.';
+    }
+    
+    // Final check: if still ends with "..." somehow, fix it
+    if (cleaned.endsWith('...')) {
+      cleaned = cleaned.slice(0, -3) + '.';
     }
     
     return cleaned;

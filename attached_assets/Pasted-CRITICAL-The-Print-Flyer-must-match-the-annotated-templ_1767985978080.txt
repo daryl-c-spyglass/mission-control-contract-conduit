@@ -1,0 +1,154 @@
+CRITICAL: The Print Flyer must match the annotated template (Ad_Graphics_Square_Annotation_copy.psd) exactly.
+
+File: client/src/components/create-flyer-dialog.tsx
+
+## REFERENCE: Annotated Template Elements
+
+From the annotated PSD, here are ALL required elements:
+
+### HEADER SECTION:
+- LEFT: "COMPANY LOGO" - Spyglass Realty logo (large, clear)
+- CENTER: "Leading Real Estate Companies of the World" logo (BACKGROUND BLACK area)
+- RIGHT: "LISTING PRICE" with "BACKGROUND (GOLD BROWN)" - price badge
+
+### ADDRESS BAR:
+- "LISTING ADDRESS" - Full address with letter spacing
+- Dark/black background
+
+### PHOTOS:
+- "LISTING PHOTO" (main) - Large hero image
+- "LISTING PHOTO" x2 - Two secondary photos side by side
+
+### BOTTOM INFO SECTION (Three Columns):
+
+**LEFT COLUMN - Property Stats:**
+- "LISTING BEDROOM #" with bed icon
+- "LISTING BATHROOM #" with bath icon  
+- "LISTING SQFT #" with sqft icon
+- "BACKGROUND (ICONS)" - specific icon designs
+
+**CENTER COLUMN - Description:**
+- "LISTING HEADLINE (39 CHARACTER MAX)" 
+- "LISTING DESCRIPTION (115 CHARACTER MAX)"
+
+**RIGHT COLUMN - Agent Info:**
+- "AGENT PHOTO" - circular photo
+- "SPACE FOR TEAM LOGO" - Spyglass logo
+- "AGENT INFORMATION" - name, title, phone
+- "BACKGROUND (BLACK AND WHITE SQUARES)" - decorative element
+
+---
+
+## FIX 1: Header Must Have Three Elements
+
+Current: Only logo on left, price on right
+Template: Logo LEFT + "Leading" CENTER + Price RIGHT
+
+Add back the "Leading Real Estate Companies" in the center:
+```javascript
+// Header layout (white background)
+// LEFT (x: 40): Spyglass logo - MAKE IT LARGER (~200px wide)
+// CENTER (x: ~800): "Leading Real Estate Companies of the World" text/logo
+// RIGHT (x: ~2100): Price badge
+```
+
+For the center "Leading" element, either:
+1. Use styled text: "Leading" in script font + "REAL ESTATE COMPANIES OF THE WORLD" below
+2. Or just use text styled appropriately
+
+## FIX 2: Make Spyglass Logo Larger and Clearer
+
+Current logo is tiny and unclear. Make it much larger:
+- Width: ~200-250px
+- Should clearly show the circular arc design + "SPYGLASS REALTY" text
+- Use the SpyglassRealty_Logo_Black.png asset
+
+## FIX 3: Description Must Be Complete (No "...")
+
+Current: "The single-story, four bedroom home you've been waiting for! This beautiful move-in ready home is nestled in a..."
+
+This is STILL being cut off! The AI Summarize must generate a COMPLETE sentence under 115 characters.
+
+Fix the AI prompt to STRICTLY enforce:
+- Maximum 115 characters
+- Must end with complete sentence (period, not "...")
+- Never truncate mid-thought
+
+Server-side validation:
+```javascript
+// After AI generates, verify it's complete
+if (summary.endsWith('...') || summary.length > 115) {
+  // Regenerate or truncate at last complete sentence
+  const lastPeriod = summary.lastIndexOf('.');
+  if (lastPeriod > 50) {
+    summary = summary.substring(0, lastPeriod + 1);
+  }
+}
+```
+
+## FIX 4: Add Decorative Black/White Squares
+
+The annotated template shows "BACKGROUND (BLACK AND WHITE SQUARES)" around the agent section.
+
+Add these back:
+```javascript
+// Decorative squares - position near agent photo area
+const squareSize = 25;
+const startX = agentX + 150; // Right of agent photo
+const startY = agentY - 20;
+
+// Draw 3x4 grid of alternating squares
+for (let row = 0; row < 4; row++) {
+  for (let col = 0; col < 3; col++) {
+    ctx.fillStyle = (row + col) % 2 === 0 ? '#000000' : '#FFFFFF';
+    ctx.fillRect(
+      startX + col * squareSize,
+      startY + row * squareSize,
+      squareSize,
+      squareSize
+    );
+  }
+}
+```
+
+Make them subtle and positioned like in the template (corner area near agent).
+
+## FIX 5: Reduce Bottom White Space
+
+Still ~40% of bottom is empty. The content should fill more space:
+
+1. Increase font sizes:
+   - Property stats: 48px bold
+   - Headline: 36px bold
+   - Description: 28px regular
+   - Agent name: 42px bold
+
+2. Increase spacing between elements:
+   - Gap between each property stat: 80px
+   - Gap between headline and description: 30px
+
+3. Move content lower to fill the page
+
+## FIX 6: Icons Must Match Template "BACKGROUND (ICONS)"
+
+The annotated template shows specific icon designs. They should be:
+
+**Bed icon:** Horizontal bed frame with headboard posts
+**Bath icon:** Bathtub with faucet and legs
+**Sqft icon:** Rectangle with diagonal measurement line
+
+Current icons are too basic (simple rectangles). Need more detailed line drawings.
+
+## SUMMARY CHECKLIST
+
+After changes, verify against annotated template:
+- [ ] Header: Logo (large) + Leading (center) + Price (right)
+- [ ] Address: Full with city, state, zip on dark background
+- [ ] Photos: 1 main + 2 secondary
+- [ ] Property stats: With proper bed/bath/sqft icons
+- [ ] Headline: Under 39 characters
+- [ ] Description: Complete sentence, under 115 characters (NO "...")
+- [ ] Agent section: Photo + decorative squares + name/title/phone + logo
+- [ ] Minimal white space at bottom
+
+Test by generating flyer and comparing EVERY element to the annotated template.
