@@ -1,0 +1,570 @@
+Rebuild Print Flyer using HTML/CSS + Puppeteer instead of Canvas drawing.
+
+This approach will give us much better control over styling, fonts, and layout.
+
+## Overview
+
+Instead of drawing on canvas, we will:
+1. Create an HTML template that matches the flyer design exactly
+2. Inject MLS data and agent info into the HTML
+3. Use Puppeteer to render the HTML and screenshot it as PNG
+4. Return the PNG for download
+
+## Part 1: Install Puppeteer
+
+Add Puppeteer to the project:
+```bash
+npm install puppeteer
+```
+
+## Part 2: Create HTML Flyer Template
+
+Create file: server/templates/flyer-template.html
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Playfair+Display:ital@1&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      width: 2550px;
+      height: 3300px;
+      font-family: 'Montserrat', sans-serif;
+      background: #fff;
+    }
+    
+    /* HEADER */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 40px 60px;
+      height: 200px;
+      background: #fff;
+    }
+    
+    .header-logo {
+      height: 120px;
+    }
+    
+    .header-center {
+      text-align: center;
+    }
+    
+    .leading-text {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: 36px;
+      color: #333;
+    }
+    
+    .leading-subtext {
+      font-size: 18px;
+      letter-spacing: 0.15em;
+      color: #333;
+      margin-top: 5px;
+    }
+    
+    .price-badge {
+      background: #8b7d6b;
+      color: #fff;
+      padding: 25px 40px;
+      text-align: center;
+    }
+    
+    .price-label {
+      font-size: 20px;
+      letter-spacing: 0.2em;
+      margin-bottom: 5px;
+    }
+    
+    .price-value {
+      font-size: 48px;
+      font-weight: 700;
+    }
+    
+    /* ADDRESS BAR */
+    .address-bar {
+      background: #4a4a4a;
+      color: #fff;
+      text-align: center;
+      padding: 30px;
+      font-size: 32px;
+      letter-spacing: 0.3em;
+      font-weight: 500;
+    }
+    
+    /* PHOTOS */
+    .main-photo {
+      width: 100%;
+      height: 1200px;
+      object-fit: cover;
+    }
+    
+    .secondary-photos {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .secondary-photo {
+      width: 50%;
+      height: 600px;
+      object-fit: cover;
+    }
+    
+    /* BOTTOM SECTION */
+    .bottom-section {
+      display: flex;
+      padding: 60px 80px;
+      min-height: 900px;
+      position: relative;
+    }
+    
+    /* LEFT COLUMN - Stats */
+    .stats-column {
+      width: 30%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 50px;
+      padding-top: 20px;
+    }
+    
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    
+    .stat-icon {
+      width: 60px;
+      height: 60px;
+    }
+    
+    .stat-text {
+      font-size: 42px;
+      font-weight: 600;
+      color: #333;
+    }
+    
+    /* CENTER COLUMN - Description */
+    .description-column {
+      width: 40%;
+      padding: 20px 40px;
+      text-align: center;
+    }
+    
+    .listing-headline {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      margin-bottom: 30px;
+      color: #333;
+    }
+    
+    .listing-description {
+      font-size: 28px;
+      line-height: 1.6;
+      color: #444;
+    }
+    
+    /* RIGHT COLUMN - Agent */
+    .agent-column {
+      width: 30%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+    
+    .decorative-squares {
+      position: absolute;
+      top: 0;
+      right: 0;
+      display: grid;
+      grid-template-columns: repeat(3, 30px);
+      grid-template-rows: repeat(3, 30px);
+    }
+    
+    .square {
+      width: 30px;
+      height: 30px;
+    }
+    
+    .square-black { background: #000; }
+    .square-white { background: #fff; border: 1px solid #000; }
+    
+    .agent-photo {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-bottom: 25px;
+    }
+    
+    .agent-photo-placeholder {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: #e0e0e0;
+      margin-bottom: 25px;
+    }
+    
+    .agent-name {
+      font-size: 42px;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 10px;
+    }
+    
+    .agent-title {
+      font-size: 24px;
+      color: #666;
+      margin-bottom: 5px;
+    }
+    
+    .agent-phone {
+      font-size: 28px;
+      color: #333;
+      margin-bottom: 30px;
+    }
+    
+    .agent-logo {
+      width: 150px;
+    }
+  </style>
+</head>
+<body>
+  <!-- HEADER -->
+  <div class="header">
+    <img src="{{spyglassLogoBlack}}" class="header-logo" alt="Spyglass Realty">
+    
+    <div class="header-center">
+      <div class="leading-text">Leading</div>
+      <div class="leading-subtext">REAL ESTATE COMPANIES OF THE WORLD</div>
+    </div>
+    
+    <div class="price-badge">
+      <div class="price-label">{{statusLabel}}</div>
+      <div class="price-value">{{price}}</div>
+    </div>
+  </div>
+  
+  <!-- ADDRESS BAR -->
+  <div class="address-bar">{{address}}</div>
+  
+  <!-- PHOTOS -->
+  <img src="{{mainPhoto}}" class="main-photo" alt="Property">
+  
+  <div class="secondary-photos">
+    <img src="{{photo2}}" class="secondary-photo" alt="Property">
+    <img src="{{photo3}}" class="secondary-photo" alt="Property">
+  </div>
+  
+  <!-- BOTTOM SECTION -->
+  <div class="bottom-section">
+    <!-- Stats Column -->
+    <div class="stats-column">
+      <div class="stat-item">
+        <img src="{{bedIcon}}" class="stat-icon" alt="">
+        <span class="stat-text">{{beds}} bedrooms</span>
+      </div>
+      <div class="stat-item">
+        <img src="{{bathIcon}}" class="stat-icon" alt="">
+        <span class="stat-text">{{baths}} bathrooms</span>
+      </div>
+      <div class="stat-item">
+        <img src="{{sqftIcon}}" class="stat-icon" alt="">
+        <span class="stat-text">{{sqft}} sq. ft</span>
+      </div>
+    </div>
+    
+    <!-- Description Column -->
+    <div class="description-column">
+      <div class="listing-headline">{{headline}}</div>
+      <div class="listing-description">{{description}}</div>
+    </div>
+    
+    <!-- Agent Column -->
+    <div class="agent-column">
+      <div class="decorative-squares">
+        <div class="square square-black"></div>
+        <div class="square square-white"></div>
+        <div class="square square-black"></div>
+        <div class="square square-white"></div>
+        <div class="square square-black"></div>
+        <div class="square square-white"></div>
+        <div class="square square-black"></div>
+        <div class="square square-white"></div>
+        <div class="square square-black"></div>
+      </div>
+      
+      {{#if agentPhoto}}
+      <img src="{{agentPhoto}}" class="agent-photo" alt="{{agentName}}">
+      {{else}}
+      <div class="agent-photo-placeholder"></div>
+      {{/if}}
+      
+      <div class="agent-name">{{agentName}}</div>
+      <div class="agent-title">{{agentTitle}}</div>
+      <div class="agent-phone">{{agentPhone}}</div>
+      
+      <img src="{{spyglassLogoBlack}}" class="agent-logo" alt="Spyglass Realty">
+    </div>
+  </div>
+</body>
+</html>
+```
+
+## Part 3: Create SVG Icons
+
+Create icon files in public/assets/icons/:
+
+**bed-icon.svg:**
+```svg
+<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+  <path d="M5 45 L5 15 L15 15 L15 25 L55 25 L55 45" stroke="#333" stroke-width="3" fill="none"/>
+  <path d="M5 35 L55 35" stroke="#333" stroke-width="3"/>
+  <path d="M10 45 L10 50 M50 45 L50 50" stroke="#333" stroke-width="3"/>
+</svg>
+```
+
+**bath-icon.svg:**
+```svg
+<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+  <path d="M10 5 L10 25 L50 25 L50 5" stroke="#333" stroke-width="3" fill="none"/>
+  <path d="M5 25 L55 25" stroke="#333" stroke-width="3"/>
+  <path d="M8 25 Q8 50 15 50 L45 50 Q52 50 52 25" stroke="#333" stroke-width="3" fill="none"/>
+  <path d="M15 50 L12 58 M45 50 L48 58" stroke="#333" stroke-width="3"/>
+</svg>
+```
+
+**sqft-icon.svg:**
+```svg
+<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+  <rect x="5" y="10" width="50" height="40" stroke="#333" stroke-width="3" fill="none"/>
+  <path d="M15 40 L45 20" stroke="#333" stroke-width="3"/>
+  <path d="M45 20 L35 20 M45 20 L45 30" stroke="#333" stroke-width="2"/>
+</svg>
+```
+
+## Part 4: Create Puppeteer Service
+
+Create file: server/services/flyer-generator.ts
+```typescript
+import puppeteer from 'puppeteer';
+import fs from 'fs';
+import path from 'path';
+import Handlebars from 'handlebars';
+
+interface FlyerData {
+  spyglassLogoBlack: string;
+  statusLabel: string;
+  price: string;
+  address: string;
+  mainPhoto: string;
+  photo2: string;
+  photo3: string;
+  beds: number;
+  baths: number;
+  sqft: number;
+  headline: string;
+  description: string;
+  agentName: string;
+  agentTitle: string;
+  agentPhone: string;
+  agentPhoto?: string;
+  bedIcon: string;
+  bathIcon: string;
+  sqftIcon: string;
+}
+
+export async function generateFlyer(data: FlyerData): Promise<Buffer> {
+  // Load template
+  const templatePath = path.join(__dirname, '../templates/flyer-template.html');
+  const templateHtml = fs.readFileSync(templatePath, 'utf-8');
+  
+  // Compile with Handlebars
+  const template = Handlebars.compile(templateHtml);
+  const html = template(data);
+  
+  // Launch Puppeteer
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+  
+  const page = await browser.newPage();
+  
+  // Set viewport to flyer size (8.5x11 at 300 DPI)
+  await page.setViewport({
+    width: 2550,
+    height: 3300,
+    deviceScaleFactor: 1
+  });
+  
+  // Load HTML
+  await page.setContent(html, { waitUntil: 'networkidle0' });
+  
+  // Screenshot as PNG
+  const screenshot = await page.screenshot({
+    type: 'png',
+    fullPage: true
+  });
+  
+  await browser.close();
+  
+  return screenshot as Buffer;
+}
+```
+
+## Part 5: Create API Endpoint
+
+Add to server/routes.ts:
+```typescript
+import { generateFlyer } from './services/flyer-generator';
+
+app.post('/api/generate-flyer-html', async (req, res) => {
+  try {
+    const {
+      status,
+      price,
+      address,
+      photos,
+      beds,
+      baths,
+      sqft,
+      headline,
+      description,
+      agentName,
+      agentTitle,
+      agentPhone,
+      agentPhoto
+    } = req.body;
+    
+    const statusLabels = {
+      'just_listed': 'JUST LISTED AT',
+      'for_sale': 'FOR SALE AT',
+      'open_house': 'OPEN HOUSE',
+      'price_improvement': 'PRICE REDUCED TO',
+      'under_contract': 'UNDER CONTRACT',
+      'just_sold': 'JUST SOLD FOR'
+    };
+    
+    const flyerData = {
+      spyglassLogoBlack: '/assets/SpyglassRealty_Logo_Black.png',
+      statusLabel: statusLabels[status] || 'LISTED AT',
+      price: `$${Number(price).toLocaleString()}`,
+      address: formatAddress(address),
+      mainPhoto: photos[0],
+      photo2: photos[1],
+      photo3: photos[2],
+      beds,
+      baths,
+      sqft: Number(sqft).toLocaleString(),
+      headline: headline?.toUpperCase() || '',
+      description,
+      agentName,
+      agentTitle,
+      agentPhone,
+      agentPhoto,
+      bedIcon: '/assets/icons/bed-icon.svg',
+      bathIcon: '/assets/icons/bath-icon.svg',
+      sqftIcon: '/assets/icons/sqft-icon.svg'
+    };
+    
+    const pngBuffer = await generateFlyer(flyerData);
+    
+    res.set('Content-Type', 'image/png');
+    res.set('Content-Disposition', `attachment; filename="${address.replace(/[^a-z0-9]/gi, '_')}_flyer.png"`);
+    res.send(pngBuffer);
+    
+  } catch (error) {
+    console.error('Flyer generation error:', error);
+    res.status(500).json({ error: 'Failed to generate flyer' });
+  }
+});
+
+function formatAddress(address: string): string {
+  return address.toUpperCase().split('').join(' ').replace(/  /g, '   ');
+}
+```
+
+## Part 6: Update Frontend to Use New Endpoint
+
+In create-flyer-dialog.tsx, update the download function:
+```typescript
+const handleDownloadFlyer = async () => {
+  setIsGenerating(true);
+  
+  try {
+    const response = await fetch('/api/generate-flyer-html', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status,
+        price,
+        address: transaction.address,
+        photos: selectedPhotos,
+        beds,
+        baths,
+        sqft,
+        headline,
+        description,
+        agentName,
+        agentTitle,
+        agentPhone,
+        agentPhoto
+      })
+    });
+    
+    if (!response.ok) throw new Error('Generation failed');
+    
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${transaction.address.replace(/[^a-z0-9]/gi, '_')}_flyer.png`;
+    a.click();
+    
+    URL.revokeObjectURL(url);
+    
+  } catch (error) {
+    console.error('Error:', error);
+    toast.error('Failed to generate flyer');
+  } finally {
+    setIsGenerating(false);
+  }
+};
+```
+
+## Part 7: Install Dependencies
+```bash
+npm install puppeteer handlebars
+```
+
+## Benefits of HTML/CSS Approach
+
+1. **Easier to style** - CSS is more intuitive than canvas drawing
+2. **Better fonts** - Google Fonts load properly
+3. **Precise layouts** - Flexbox/Grid for positioning
+4. **Easier debugging** - Can view HTML in browser
+5. **Responsive** - Easy to adjust for different sizes
+6. **Icons as images** - SVG icons load cleanly
+
+## Testing
+
+1. Start the server
+2. Open Create Property Flyer dialog
+3. Fill in all fields
+4. Click Download Flyer
+5. Verify PNG output matches template exactly
+6. Compare to 142_N_STEEL_FLYER.pdf reference
