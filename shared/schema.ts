@@ -213,6 +213,12 @@ export interface MLSData {
   utilities?: string[];
   constructionMaterials?: string[];
   
+  // Detail fields from Repliers details object
+  viewType?: string;
+  patio?: string;
+  extras?: string;
+  subdivision?: string;
+  
   // Financial
   hoaFee: number | null;
   hoaFrequency: string;

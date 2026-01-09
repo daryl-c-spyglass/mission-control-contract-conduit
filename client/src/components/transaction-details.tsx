@@ -49,6 +49,7 @@ import {
   Maximize2,
   Grid3X3,
   Waves,
+  Eye,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -799,27 +800,37 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 
                 {/* Feature Tags Row */}
                 {(() => {
-                  const featureTags = [];
-                  if (mlsData.garage) {
-                    featureTags.push({ icon: Car, label: mlsData.garage });
+                  const featureTags: { icon: any; label: string }[] = [];
+                  
+                  // View type from details.viewType
+                  if (mlsData.viewType && mlsData.viewType !== "None") {
+                    featureTags.push({ icon: Eye, label: mlsData.viewType });
                   }
+                  
+                  // Garage from details.garage
+                  if (mlsData.garage) {
+                    const garageLabel = mlsData.garage.includes("Car") ? mlsData.garage : `${mlsData.garage} Car Garage`;
+                    featureTags.push({ icon: Car, label: garageLabel });
+                  }
+                  
+                  // Patio from details.patio
+                  if (mlsData.patio && mlsData.patio !== "None") {
+                    featureTags.push({ icon: Sofa, label: mlsData.patio });
+                  }
+                  
+                  // Pool from details.swimmingPool
                   if (mlsData.pool && mlsData.pool !== "None") {
                     featureTags.push({ icon: Waves, label: mlsData.pool });
                   }
-                  const hasFireplace = mlsData.interiorFeatures?.some(f => 
-                    f.toLowerCase().includes('fireplace')
-                  ) || mlsData.exteriorFeatures?.some(f => 
-                    f.toLowerCase().includes('fireplace')
-                  );
+                  
+                  // Fireplace check from extras or interior features
+                  const hasFireplace = mlsData.extras?.toLowerCase().includes('fireplace') ||
+                    mlsData.interiorFeatures?.some(f => f.toLowerCase().includes('fireplace'));
                   if (hasFireplace) {
                     featureTags.push({ icon: Flame, label: "Fireplace" });
                   }
-                  const hasPatio = mlsData.exteriorFeatures?.some(f => 
-                    f.toLowerCase().includes('patio') || f.toLowerCase().includes('deck') || f.toLowerCase().includes('porch')
-                  );
-                  if (hasPatio) {
-                    featureTags.push({ icon: Sofa, label: "Patio/Deck" });
-                  }
+                  
+                  // Stories
                   if (mlsData.stories && mlsData.stories > 1) {
                     featureTags.push({ icon: Building, label: `${mlsData.stories} Stories` });
                   }
@@ -841,17 +852,75 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                   );
                 })()}
                 
-                {/* Description */}
+                {/* About This Home */}
                 {mlsData.description && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Property Description</CardTitle>
+                      <CardTitle className="text-base">About This Home</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm text-muted-foreground leading-relaxed">{mlsData.description}</p>
                     </CardContent>
                   </Card>
                 )}
+                
+                {/* Property Details Grid (2 columns) */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Property Details</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                      {mlsData.mlsNumber && (
+                        <>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">MLS #</span>
+                            <span className="font-mono">{mlsData.mlsNumber}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Status</span>
+                            <span>{mlsData.status || 'Unknown'}</span>
+                          </div>
+                        </>
+                      )}
+                      
+                      {mlsData.propertyType && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Property Type</span>
+                          <span>{mlsData.propertyType}</span>
+                        </div>
+                      )}
+                      
+                      {mlsData.yearBuilt && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Year Built</span>
+                          <span>{mlsData.yearBuilt}</span>
+                        </div>
+                      )}
+                      
+                      {mlsData.listDate && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Listed Date</span>
+                          <span>{new Date(mlsData.listDate).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                      
+                      {mlsData.daysOnMarket !== undefined && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Days on Market</span>
+                          <span>{mlsData.daysOnMarket}</span>
+                        </div>
+                      )}
+                      
+                      {mlsData.subdivision && (
+                        <div className="flex justify-between text-sm col-span-2">
+                          <span className="text-muted-foreground">Subdivision</span>
+                          <span>{mlsData.subdivision}</span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
                 
                 {/* Property Features */}
                 {((mlsData.interiorFeatures?.length || 0) > 0 || (mlsData.exteriorFeatures?.length || 0) > 0 || (mlsData.appliances?.length || 0) > 0 || (mlsData.heatingCooling?.length || 0) > 0 || (mlsData.flooring?.length || 0) > 0 || (mlsData.parking?.length || 0) > 0 || (mlsData.constructionMaterials?.length || 0) > 0 || mlsData.roofMaterial || mlsData.foundation || mlsData.pool || mlsData.waterSource || mlsData.sewer) && (

@@ -88,6 +88,12 @@ export interface MLSListingData {
   utilities: string[];
   constructionMaterials: string[];
   
+  // Detail fields from Repliers details object
+  viewType: string;
+  patio: string;
+  extras: string;
+  subdivision: string;
+  
   // Financial
   hoaFee: number | null;
   hoaFrequency: string;
@@ -428,6 +434,12 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
       sewer: listing.sewer || listing.details?.sewer || "",
       utilities: parseFeatures(listing.utilities),
       constructionMaterials: parseFeatures(listing.constructionMaterials || listing.details?.exteriorConstruction1),
+      
+      // Detail fields from Repliers details object
+      viewType: listing.details?.viewType || "",
+      patio: listing.details?.patio || "",
+      extras: listing.details?.extras || "",
+      subdivision: listing.subdivision || listing.details?.subdivision || "",
       
       hoaFee: listing.associationFee || listing.hoaFee || null,
       hoaFrequency: listing.associationFeeFrequency || listing.hoaFrequency || "Monthly",
