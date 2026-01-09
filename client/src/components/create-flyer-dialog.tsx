@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, X, Upload, Check, Download, Image, FileText, Bed, Bath, Square, ZoomIn, ChevronDown, ChevronUp, Maximize2 } from "lucide-react";
+import { Loader2, X, Upload, Check, Download, Image, FileText, Bed, Bath, Square, ZoomIn, ChevronDown, ChevronUp, Maximize2, User } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +51,10 @@ const formSchema = z.object({
   bathrooms: z.string().optional(),
   sqft: z.string().optional(),
   description: z.string().optional(),
+  agentName: z.string().optional(),
+  agentTitle: z.string().optional(),
+  agentPhone: z.string().optional(),
+  listingHeadline: z.string().max(39, "Max 39 characters").optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -74,6 +78,11 @@ interface PreviewProps {
   bathrooms?: string;
   sqft?: string;
   description?: string;
+  agentName?: string;
+  agentTitle?: string;
+  agentPhone?: string;
+  agentPhotoUrl?: string;
+  listingHeadline?: string;
 }
 
 function SocialMediaPreview({
@@ -181,11 +190,16 @@ function PrintFlyerPreview({
   bathrooms,
   sqft,
   description,
+  agentName,
+  agentTitle,
+  agentPhone,
+  agentPhotoUrl,
+  listingHeadline,
 }: PreviewProps) {
   const [imagesLoaded, setImagesLoaded] = useState<Record<number, boolean>>({});
   
   const statusLabel = STATUS_OPTIONS.find(s => s.value === status)?.label || "Just Listed";
-  const truncatedDesc = truncateDescription(description || "", 250);
+  const truncatedDesc = truncateDescription(description || "", 115);
   
   const spacedAddress = address.split(",")[0].split("").join(" ").toUpperCase();
   const cityStateZip = address.split(",").slice(1).join(",").trim().toUpperCase();
@@ -275,6 +289,11 @@ function PrintFlyerPreview({
 
         {/* Center Column - Description */}
         <div className="text-center px-0.5">
+          {listingHeadline && (
+            <p className="text-[5px] font-bold text-gray-800 tracking-wider uppercase mb-1">
+              {listingHeadline}
+            </p>
+          )}
           {truncatedDesc && (
             <p className="text-[5px] text-gray-600 leading-relaxed line-clamp-4">
               {truncatedDesc}
@@ -284,12 +303,20 @@ function PrintFlyerPreview({
 
         {/* Right Column - Agent Info */}
         <div className="text-center pr-1 space-y-0.5">
-          <div className="w-5 h-5 mx-auto bg-gray-300 rounded-full flex items-center justify-center">
-            <span className="text-[4px] text-gray-500">Photo</span>
-          </div>
-          <p className="text-[5px] font-bold text-gray-800">Agent Name</p>
-          <p className="text-[4px] text-gray-500">REALTOR®</p>
-          <p className="text-[4px] text-gray-600">(XXX) XXX-XXXX</p>
+          {agentPhotoUrl ? (
+            <img 
+              src={agentPhotoUrl} 
+              alt="Agent" 
+              className="w-5 h-5 mx-auto rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-5 h-5 mx-auto bg-gray-300 rounded-full flex items-center justify-center">
+              <User className="h-2.5 w-2.5 text-gray-500" />
+            </div>
+          )}
+          <p className="text-[5px] font-bold text-gray-800">{agentName || "Agent Name"}</p>
+          <p className="text-[4px] text-gray-500">{agentTitle || "REALTOR®"}</p>
+          <p className="text-[4px] text-gray-600">{agentPhone || "(XXX) XXX-XXXX"}</p>
         </div>
       </div>
 
@@ -327,6 +354,7 @@ export function CreateFlyerDialog({
   const [showUploadSection, setShowUploadSection] = useState(false);
   const [previewEnlarged, setPreviewEnlarged] = useState(false);
   const [expandedPhotoUrl, setExpandedPhotoUrl] = useState<string | null>(null);
+  const [localAgentPhoto, setLocalAgentPhoto] = useState<string | null>(null);
 
   const mlsData = transaction.mlsData as MLSData | null;
   const maxPhotos = format === "social" ? 1 : 3;
@@ -357,6 +385,7 @@ export function CreateFlyerDialog({
       setUploadedPhotos([]);
       setShowUploadSection(false);
       setFormat("social");
+      setLocalAgentPhoto(null);
     }
   }, [open]);
 
@@ -369,6 +398,10 @@ export function CreateFlyerDialog({
       bathrooms: mlsData?.bathrooms?.toString() || transaction.bathrooms?.toString() || "",
       sqft: mlsData?.sqft?.toString() || transaction.sqft?.toString() || "",
       description: mlsData?.description || "",
+      agentName: agentName || "",
+      agentTitle: "REALTOR®",
+      agentPhone: agentPhone || "",
+      listingHeadline: "",
     },
   });
 
@@ -455,6 +488,25 @@ export function CreateFlyerDialog({
   const removeUploadedPhoto = (index: number) => {
     setUploadedPhotos((prev) => prev.filter((_, i) => i !== index));
   };
+
+  const handleAgentPhotoUpload = useCallback((file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload an image file",
+        variant: "destructive",
+      });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setLocalAgentPhoto(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  }, [toast]);
+
+  const effectiveAgentPhoto = localAgentPhoto || agentPhotoUrl;
 
   const getPhotosForFlyer = useCallback((): string[] => {
     const mlsUrls = selectedPhotos.map(url => 
@@ -736,19 +788,31 @@ export function CreateFlyerDialog({
     ctx.fillText(`${data.bathrooms || "—"} bathrooms`, leftColumnX, infoY + 100);
     ctx.fillText(`${data.sqft ? parseInt(data.sqft).toLocaleString() : "—"} sq. ft`, leftColumnX, infoY + 150);
 
-    // Center Column - Description
+    // Center Column - Headline + Description
+    const descX = canvas.width / 2;
+    let descStartY = infoY + 40;
+    
+    if (data.listingHeadline) {
+      ctx.font = "bold 32px Inter, sans-serif";
+      ctx.fillStyle = "#1a1a1a";
+      ctx.textAlign = "center";
+      ctx.letterSpacing = "3px";
+      ctx.fillText(data.listingHeadline.toUpperCase(), descX, descStartY);
+      descStartY += 50;
+    }
+    
     if (data.description) {
-      const truncatedDesc = truncateDescription(data.description, 250);
+      const truncatedDesc = truncateDescription(data.description, 115);
       ctx.font = "28px Inter, sans-serif";
       ctx.fillStyle = "#444444";
       ctx.textAlign = "center";
+      ctx.letterSpacing = "0px";
       
       const maxWidth = columnWidth - 40;
       const words = truncatedDesc.split(" ");
       let line = "";
-      let descY = infoY + 40;
+      let descY = descStartY;
       const lineHeight = 38;
-      const descX = canvas.width / 2;
       
       words.forEach((word) => {
         const testLine = line + word + " ";
@@ -766,28 +830,48 @@ export function CreateFlyerDialog({
       }
     }
 
-    // Right Column - Agent Info (placeholder)
+    // Right Column - Agent Info
     const rightColumnX = photosPadding + columnWidth * 2 + columnWidth / 2;
     ctx.textAlign = "center";
     
-    // Agent photo placeholder (circle)
+    // Agent photo (circle)
     const agentCircleR = 60;
-    ctx.beginPath();
-    ctx.arc(rightColumnX, infoY + 50, agentCircleR, 0, Math.PI * 2);
-    ctx.fillStyle = "#cccccc";
-    ctx.fill();
-    ctx.fillStyle = "#666666";
-    ctx.font = "20px Inter, sans-serif";
-    ctx.fillText("Photo", rightColumnX, infoY + 55);
+    if (effectiveAgentPhoto) {
+      const agentImg = document.createElement('img');
+      agentImg.crossOrigin = "anonymous";
+      await new Promise<void>((resolve) => {
+        agentImg.onload = () => resolve();
+        agentImg.onerror = () => resolve();
+        agentImg.src = effectiveAgentPhoto;
+      });
+      if (agentImg.complete && agentImg.naturalWidth > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(rightColumnX, infoY + 50, agentCircleR, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(agentImg, rightColumnX - agentCircleR, infoY + 50 - agentCircleR, agentCircleR * 2, agentCircleR * 2);
+        ctx.restore();
+      } else {
+        ctx.beginPath();
+        ctx.arc(rightColumnX, infoY + 50, agentCircleR, 0, Math.PI * 2);
+        ctx.fillStyle = "#cccccc";
+        ctx.fill();
+      }
+    } else {
+      ctx.beginPath();
+      ctx.arc(rightColumnX, infoY + 50, agentCircleR, 0, Math.PI * 2);
+      ctx.fillStyle = "#cccccc";
+      ctx.fill();
+    }
 
     ctx.fillStyle = "#1a1a1a";
     ctx.font = "bold 32px Inter, sans-serif";
-    ctx.fillText("Agent Name", rightColumnX, infoY + 140);
+    ctx.fillText(data.agentName || "Agent Name", rightColumnX, infoY + 140);
     
     ctx.fillStyle = "#666666";
     ctx.font = "24px Inter, sans-serif";
-    ctx.fillText("REALTOR®", rightColumnX, infoY + 175);
-    ctx.fillText("(XXX) XXX-XXXX", rightColumnX, infoY + 210);
+    ctx.fillText(data.agentTitle || "REALTOR®", rightColumnX, infoY + 175);
+    ctx.fillText(data.agentPhone || "(XXX) XXX-XXXX", rightColumnX, infoY + 210);
 
     // Bottom decorative bar - gold
     ctx.fillStyle = "#b39960";
@@ -804,6 +888,25 @@ export function CreateFlyerDialog({
         variant: "destructive",
       });
       return;
+    }
+
+    if (format === "print") {
+      if (!data.agentName?.trim()) {
+        toast({
+          title: "Agent name required",
+          description: "Please fill in your name for the print flyer",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!data.agentPhone?.trim()) {
+        toast({
+          title: "Agent phone required",
+          description: "Please fill in your phone number for the print flyer",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     setIsGenerating(true);
@@ -1233,16 +1336,157 @@ export function CreateFlyerDialog({
                       </FormControl>
                       <FormDescription className="flex items-center justify-between text-xs">
                         <span className="text-muted-foreground">
-                          Will be truncated to {maxDescriptionLength} chars on flyer
+                          Will be truncated to {format === "print" ? "115" : maxDescriptionLength} chars on flyer
                         </span>
-                        <span className={currentDescriptionLength > maxDescriptionLength ? "text-amber-600 font-medium" : ""}>
-                          {currentDescriptionLength}/{maxDescriptionLength}
+                        <span className={currentDescriptionLength > (format === "print" ? 115 : maxDescriptionLength) ? "text-amber-600 font-medium" : ""}>
+                          {currentDescriptionLength}/{format === "print" ? 115 : maxDescriptionLength}
                         </span>
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
+                {format === "print" && (
+                  <>
+                    <div className="border-t pt-3 mt-2">
+                      <FormLabel className="text-sm font-medium text-muted-foreground">Agent Information</FormLabel>
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="listingHeadline"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">Listing Headline (optional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., OPEN HOUSE SATURDAY"
+                              className="h-8"
+                              maxLength={39}
+                              data-testid="input-listing-headline"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormDescription className="text-xs">
+                            Optional headline (39 characters max) - appears above description
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <FormField
+                        control={form.control}
+                        name="agentName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">Agent Name *</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Enter your name"
+                                className="h-8"
+                                data-testid="input-agent-name"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="agentTitle"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">Agent Title</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="REALTOR®"
+                                className="h-8"
+                                data-testid="input-agent-title"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="agentPhone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">Agent Phone *</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="(512) 555-1234"
+                              className="h-8"
+                              data-testid="input-agent-phone"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="space-y-2">
+                      <FormLabel className="text-sm">Agent Photo</FormLabel>
+                      <div className="flex items-center gap-3">
+                        {effectiveAgentPhoto ? (
+                          <div className="relative">
+                            <img
+                              src={effectiveAgentPhoto}
+                              alt="Agent"
+                              className="w-14 h-14 rounded-full object-cover border-2 border-muted"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setLocalAgentPhoto(null)}
+                              className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                              data-testid="button-remove-agent-photo"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center border-2 border-dashed border-muted-foreground/25">
+                            <User className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            id="agent-photo-upload"
+                            onChange={(e) => handleAgentPhotoUpload(e.target.files?.[0] || null)}
+                            data-testid="input-agent-photo"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => document.getElementById("agent-photo-upload")?.click()}
+                            data-testid="button-upload-agent-photo"
+                          >
+                            <Upload className="h-3 w-3 mr-1" />
+                            {effectiveAgentPhoto ? "Change Photo" : "Upload Photo"}
+                          </Button>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            Optional - shows placeholder if not uploaded
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="w-full lg:w-48 flex-shrink-0 order-first lg:order-last">
@@ -1276,6 +1520,11 @@ export function CreateFlyerDialog({
                         bathrooms={watchedValues.bathrooms}
                         sqft={watchedValues.sqft}
                         description={watchedValues.description}
+                        agentName={watchedValues.agentName}
+                        agentTitle={watchedValues.agentTitle}
+                        agentPhone={watchedValues.agentPhone}
+                        agentPhotoUrl={effectiveAgentPhoto || undefined}
+                        listingHeadline={watchedValues.listingHeadline}
                       />
                     )}
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
@@ -1352,6 +1601,11 @@ export function CreateFlyerDialog({
                     bathrooms={watchedValues.bathrooms}
                     sqft={watchedValues.sqft}
                     description={watchedValues.description}
+                    agentName={watchedValues.agentName}
+                    agentTitle={watchedValues.agentTitle}
+                    agentPhone={watchedValues.agentPhone}
+                    agentPhotoUrl={effectiveAgentPhoto || undefined}
+                    listingHeadline={watchedValues.listingHeadline}
                   />
                 )}
               </div>
