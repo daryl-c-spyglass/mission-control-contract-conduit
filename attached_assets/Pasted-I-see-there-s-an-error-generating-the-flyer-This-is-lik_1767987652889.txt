@@ -1,0 +1,136 @@
+I see there's an error generating the flyer. This is likely a Puppeteer issue on Replit. Let me create a debug prompt:
+
+Debug: "Error generating flyer" when using HTML/CSS Puppeteer approach.
+
+The flyer generation is failing. Check the server logs for the specific error.
+
+## Step 1: Check Server Logs
+
+Look at the console/terminal output when clicking "Download Flyer" to see the actual error message.
+
+Common issues:
+1. Puppeteer not installed correctly
+2. Missing dependencies for headless Chrome
+3. File paths incorrect
+4. Template file not found
+
+## Step 2: Add Better Error Logging
+
+Update the /api/generate-flyer-html endpoint to log detailed errors:
+```typescript
+app.post('/api/generate-flyer-html', async (req, res) => {
+  try {
+    console.log('Starting flyer generation...');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    
+    // ... existing code ...
+    
+    console.log('Flyer data prepared:', flyerData);
+    
+    const pngBuffer = await generateFlyer(flyerData);
+    
+    console.log('Flyer generated successfully, size:', pngBuffer.length);
+    
+    // ... rest of code ...
+    
+  } catch (error) {
+    console.error('Flyer generation error:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to generate flyer',
+      details: error.message 
+    });
+  }
+});
+```
+
+## Step 3: Puppeteer Replit Configuration
+
+Puppeteer requires special configuration on Replit. Update the launch options:
+```typescript
+const browser = await puppeteer.launch({
+  headless: 'new',
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-accelerated-2d-canvas',
+    '--no-first-run',
+    '--no-zygote',
+    '--single-process',
+    '--disable-gpu'
+  ]
+});
+```
+
+## Step 4: Alternative - Use Puppeteer-Core + Chrome
+
+If Puppeteer bundled Chrome doesn't work on Replit, try puppeteer-core:
+```bash
+npm uninstall puppeteer
+npm install puppeteer-core
+```
+
+Then use Replit's Chrome:
+```typescript
+import puppeteer from 'puppeteer-core';
+
+const browser = await puppeteer.launch({
+  executablePath: '/usr/bin/chromium-browser', // or find Replit's Chrome path
+  headless: 'new',
+  args: ['--no-sandbox', '--disable-setuid-sandbox']
+});
+```
+
+## Step 5: Check Template File Path
+
+Verify the template file exists and path is correct:
+```typescript
+import path from 'path';
+import fs from 'fs';
+
+const templatePath = path.join(__dirname, '../templates/flyer-template.html');
+console.log('Template path:', templatePath);
+console.log('Template exists:', fs.existsSync(templatePath));
+```
+
+## Step 6: Fallback - Keep Canvas Approach
+
+If Puppeteer continues to fail on Replit, we may need to:
+1. Keep the canvas approach for now
+2. Fix the remaining styling issues in canvas
+3. Consider Puppeteer only for local/production deployment
+
+## Quick Test
+
+Add a simple test endpoint to verify Puppeteer works:
+```typescript
+app.get('/api/test-puppeteer', async (req, res) => {
+  try {
+    const puppeteer = require('puppeteer');
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    const page = await browser.newPage();
+    await page.setContent('<html><body><h1>Test</h1></body></html>');
+    const screenshot = await page.screenshot();
+    await browser.close();
+    
+    res.set('Content-Type', 'image/png');
+    res.send(screenshot);
+  } catch (error) {
+    console.error('Puppeteer test error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+```
+
+Then visit /api/test-puppeteer to see if basic Puppeteer works.
+
+## Report Back
+
+Please share:
+1. The exact error message from server logs
+2. Result of the test endpoint
+3. We'll determine next steps based on the error

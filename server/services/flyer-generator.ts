@@ -2,6 +2,33 @@ import puppeteer from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
 import Handlebars from 'handlebars';
+import { execSync } from 'child_process';
+
+function findChromiumPath(): string {
+  // Try environment variable first
+  if (process.env.CHROMIUM_PATH && fs.existsSync(process.env.CHROMIUM_PATH)) {
+    return process.env.CHROMIUM_PATH;
+  }
+  
+  // Try to find chromium using which
+  try {
+    const chromiumPath = execSync('which chromium 2>/dev/null || which chromium-browser 2>/dev/null', { encoding: 'utf-8' }).trim();
+    if (chromiumPath && fs.existsSync(chromiumPath)) {
+      return chromiumPath;
+    }
+  } catch (e) {
+    // Ignore error
+  }
+  
+  // Fallback to common Nix store path
+  const nixPath = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
+  if (fs.existsSync(nixPath)) {
+    return nixPath;
+  }
+  
+  // Let Puppeteer try to find its own
+  return '';
+}
 
 export interface FlyerData {
   spyglassLogoUrl: string;
@@ -29,7 +56,11 @@ export async function generatePrintFlyer(data: FlyerData): Promise<Buffer> {
   const template = Handlebars.compile(templateHtml);
   const html = template(data);
   
-  const browser = await puppeteer.launch({
+  // Find system-installed Chromium
+  const chromiumPath = findChromiumPath();
+  console.log('Using Chromium at:', chromiumPath || 'Puppeteer default');
+  
+  const launchOptions: any = {
     headless: true,
     args: [
       '--no-sandbox',
@@ -38,9 +69,16 @@ export async function generatePrintFlyer(data: FlyerData): Promise<Buffer> {
       '--disable-gpu',
       '--no-first-run',
       '--no-zygote',
-      '--single-process'
+      '--single-process',
+      '--disable-extensions'
     ]
-  });
+  };
+  
+  if (chromiumPath) {
+    launchOptions.executablePath = chromiumPath;
+  }
+  
+  const browser = await puppeteer.launch(launchOptions);
   
   try {
     const page = await browser.newPage();
