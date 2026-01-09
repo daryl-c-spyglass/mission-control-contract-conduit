@@ -1,6 +1,7 @@
 // Real Repliers MLS API integration using REPLIERS_API_KEY
 
 const REPLIERS_API_BASE = "https://api.repliers.io";
+const REPLIERS_CDN_BASE = "https://cdn.repliers.io/";
 
 async function repliersRequest(endpoint: string, params?: Record<string, string>): Promise<any> {
   const apiKey = process.env.REPLIERS_API_KEY;
@@ -135,13 +136,28 @@ function normalizeImageUrls(images: any): string[] {
   
   return images
     .map((img: any) => {
-      if (typeof img === "string") return img;
-      if (typeof img === "object" && img !== null) {
-        return img.mediaUrl || img.url || img.src || img.href || img.imageUrl || "";
+      // Handle object format {url: "..."} or {href: "..."}
+      const rawUrl = typeof img === "string" 
+        ? img 
+        : (img?.mediaUrl || img?.url || img?.src || img?.href || img?.imageUrl || img?.Uri || "");
+      
+      if (!rawUrl || typeof rawUrl !== "string") return null;
+      
+      // Already a full URL
+      if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
+        return rawUrl;
       }
-      return "";
+      
+      // Relative path - prepend CDN base URL
+      if (rawUrl.length > 0) {
+        // Remove leading slash if present
+        const cleanPath = rawUrl.startsWith("/") ? rawUrl.slice(1) : rawUrl;
+        return `${REPLIERS_CDN_BASE}${cleanPath}`;
+      }
+      
+      return null;
     })
-    .filter((url: string) => url && typeof url === "string" && url.startsWith("http"));
+    .filter((url): url is string => url !== null);
 }
 
 function parseFeatures(features: any): string[] {
@@ -344,6 +360,9 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
     
     const photos = normalizeImageUrls(rawImages);
     console.log("After normalizeImageUrls:", photos.length, "valid URLs");
+    if (photos.length > 0) {
+      console.log("Sample normalized URLs:", photos.slice(0, 3));
+    }
     
     const addressParts = [];
     if (listing.address?.streetNumber) addressParts.push(listing.address.streetNumber);
