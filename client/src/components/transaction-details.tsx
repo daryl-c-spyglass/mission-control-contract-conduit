@@ -187,6 +187,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const status = statusConfig[transaction.status] || statusConfig.in_contract;
   const mlsData = transaction.mlsData as MLSData | null;
   const cmaData = transaction.cmaData as CMAComparable[] | null;
+  const [selectedCMAProperty, setSelectedCMAProperty] = useState<CMAComparable | null>(null);
   
   // Photo navigation for MLS gallery
   const photos = mlsData?.photos || mlsData?.images || [];
@@ -1253,7 +1254,12 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           {cmaData && cmaData.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {cmaData.map((comp, index) => (
-                <Card key={index}>
+                <Card 
+                  key={index} 
+                  className="cursor-pointer hover-elevate transition-all"
+                  onClick={() => setSelectedCMAProperty(comp)}
+                  data-testid={`card-cma-${index}`}
+                >
                   <CardContent className="pt-4 space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
@@ -1275,13 +1281,19 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                       </div>
                       <div className="flex items-center gap-1">
                         <Square className="h-3.5 w-3.5" />
-                        {comp.sqft.toLocaleString()}
+                        {typeof comp.sqft === 'number' ? comp.sqft.toLocaleString() : comp.sqft}
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       <Clock className="h-3.5 w-3.5" />
                       {comp.daysOnMarket} days on market
                     </div>
+                    {comp.mlsNumber && (
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Hash className="h-3 w-3" />
+                        {comp.mlsNumber}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -1875,6 +1887,112 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* CMA Property Detail Modal */}
+      <Dialog open={!!selectedCMAProperty} onOpenChange={(open) => !open && setSelectedCMAProperty(null)}>
+        <DialogContent className="max-w-lg" data-testid="dialog-cma-property">
+          {selectedCMAProperty && (
+            <div className="space-y-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold">{selectedCMAProperty.address}</h2>
+                  {selectedCMAProperty.mlsNumber && (
+                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                      <Hash className="h-3.5 w-3.5" />
+                      MLS# {selectedCMAProperty.mlsNumber}
+                    </p>
+                  )}
+                </div>
+                <Badge variant="outline">
+                  {selectedCMAProperty.distance.toFixed(1)} mi away
+                </Badge>
+              </div>
+
+              {selectedCMAProperty.imageUrl && (
+                <div className="aspect-video rounded-lg overflow-hidden bg-muted">
+                  <img
+                    src={`/api/proxy-image?url=${encodeURIComponent(selectedCMAProperty.imageUrl)}`}
+                    alt={selectedCMAProperty.address}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+
+              <div className="text-2xl font-bold text-primary">
+                {formatPrice(selectedCMAProperty.price)}
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center p-3 bg-muted rounded-lg">
+                  <Bed className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-lg font-semibold">{selectedCMAProperty.bedrooms}</p>
+                  <p className="text-xs text-muted-foreground">Bedrooms</p>
+                </div>
+                <div className="text-center p-3 bg-muted rounded-lg">
+                  <Bath className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-lg font-semibold">{selectedCMAProperty.bathrooms}</p>
+                  <p className="text-xs text-muted-foreground">Bathrooms</p>
+                </div>
+                <div className="text-center p-3 bg-muted rounded-lg">
+                  <Square className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-lg font-semibold">
+                    {typeof selectedCMAProperty.sqft === 'number' 
+                      ? selectedCMAProperty.sqft.toLocaleString() 
+                      : selectedCMAProperty.sqft}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Sq Ft</p>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Days on Market
+                  </span>
+                  <span className="font-medium">{selectedCMAProperty.daysOnMarket}</span>
+                </div>
+                {selectedCMAProperty.status && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-2">
+                      <Activity className="h-4 w-4" />
+                      Status
+                    </span>
+                    <Badge variant="secondary">{selectedCMAProperty.status}</Badge>
+                  </div>
+                )}
+                {selectedCMAProperty.listDate && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      List Date
+                    </span>
+                    <span className="font-medium">{formatDate(selectedCMAProperty.listDate)}</span>
+                  </div>
+                )}
+                {selectedCMAProperty.sqft && selectedCMAProperty.price && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" />
+                      Price per Sq Ft
+                    </span>
+                    <span className="font-medium">
+                      {formatPrice(
+                        selectedCMAProperty.price / 
+                        (typeof selectedCMAProperty.sqft === 'number' 
+                          ? selectedCMAProperty.sqft 
+                          : parseFloat(selectedCMAProperty.sqft) || 1)
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

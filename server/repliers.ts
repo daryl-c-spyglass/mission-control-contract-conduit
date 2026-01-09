@@ -124,10 +124,13 @@ export interface CMAComparable {
   price: number;
   bedrooms: number;
   bathrooms: number;
-  sqft: number;
+  sqft: number | string;
   daysOnMarket: number;
   distance: number;
   imageUrl?: string;
+  mlsNumber?: string;
+  status?: string;
+  listDate?: string;
 }
 
 function normalizeImageUrls(images: any): string[] {

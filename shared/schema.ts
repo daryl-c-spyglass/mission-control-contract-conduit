@@ -156,10 +156,13 @@ export interface CMAComparable {
   price: number;
   bedrooms: number;
   bathrooms: number;
-  sqft: number;
+  sqft: number | string;
   daysOnMarket: number;
   distance: number;
   imageUrl?: string;
+  mlsNumber?: string;
+  status?: string;
+  listDate?: string;
 }
 
 // MLS Data type - matches the Repliers API response structure
