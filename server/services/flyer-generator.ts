@@ -4,6 +4,52 @@ import path from 'path';
 import Handlebars from 'handlebars';
 import { execSync } from 'child_process';
 
+// Helper function to convert image URL to base64
+async function imageToBase64(imageUrl: string): Promise<string> {
+  if (!imageUrl) return '';
+  
+  try {
+    // If it's already a data URI, return as-is
+    if (imageUrl.startsWith('data:')) {
+      return imageUrl;
+    }
+    
+    // If it's a local file path
+    if (imageUrl.startsWith('/') && !imageUrl.startsWith('//') && !imageUrl.startsWith('http')) {
+      const localPath = path.join(import.meta.dirname, '../../public', imageUrl);
+      if (fs.existsSync(localPath)) {
+        const buffer = fs.readFileSync(localPath);
+        const ext = path.extname(localPath).slice(1).toLowerCase();
+        const mimeType = ext === 'svg' ? 'image/svg+xml' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+        return `data:${mimeType};base64,${buffer.toString('base64')}`;
+      }
+    }
+    
+    // Ensure URL is absolute
+    let fetchUrl = imageUrl;
+    if (fetchUrl.startsWith('//')) {
+      fetchUrl = `https:${fetchUrl}`;
+    }
+    
+    // Fetch remote URL and convert to base64
+    console.log('Fetching image:', fetchUrl);
+    const response = await fetch(fetchUrl);
+    if (!response.ok) {
+      console.error('Failed to fetch image:', fetchUrl, response.status);
+      return '';
+    }
+    
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    return `data:${contentType};base64,${buffer.toString('base64')}`;
+    
+  } catch (error) {
+    console.error('Error converting image to base64:', imageUrl, error);
+    return '';
+  }
+}
+
 function findChromiumPath(): string {
   // Try environment variable first
   if (process.env.CHROMIUM_PATH && fs.existsSync(process.env.CHROMIUM_PATH)) {
@@ -50,11 +96,40 @@ export interface FlyerData {
 }
 
 export async function generatePrintFlyer(data: FlyerData): Promise<Buffer> {
+  console.log('Converting images to base64...');
+  
+  // Convert all images to base64 in parallel
+  const [logoB64, mainPhotoB64, photo2B64, photo3B64, agentPhotoB64] = await Promise.all([
+    imageToBase64(data.spyglassLogoUrl),
+    data.mainPhoto ? imageToBase64(data.mainPhoto) : Promise.resolve(''),
+    data.photo2 ? imageToBase64(data.photo2) : Promise.resolve(''),
+    data.photo3 ? imageToBase64(data.photo3) : Promise.resolve(''),
+    data.agentPhoto ? imageToBase64(data.agentPhoto) : Promise.resolve('')
+  ]);
+  
+  console.log('Images converted:', {
+    logo: logoB64 ? 'OK' : 'FAILED',
+    mainPhoto: mainPhotoB64 ? 'OK' : 'FAILED/EMPTY',
+    photo2: photo2B64 ? 'OK' : 'FAILED/EMPTY',
+    photo3: photo3B64 ? 'OK' : 'FAILED/EMPTY',
+    agentPhoto: agentPhotoB64 ? 'OK' : 'EMPTY'
+  });
+  
+  // Create data with base64 images
+  const dataWithBase64 = {
+    ...data,
+    spyglassLogoUrl: logoB64,
+    mainPhoto: mainPhotoB64,
+    photo2: photo2B64,
+    photo3: photo3B64,
+    agentPhoto: agentPhotoB64
+  };
+  
   const templatePath = path.join(import.meta.dirname, '../templates/flyer-template.html');
   const templateHtml = fs.readFileSync(templatePath, 'utf-8');
   
   const template = Handlebars.compile(templateHtml);
-  const html = template(data);
+  const html = template(dataWithBase64);
   
   // Find system-installed Chromium
   const chromiumPath = findChromiumPath();

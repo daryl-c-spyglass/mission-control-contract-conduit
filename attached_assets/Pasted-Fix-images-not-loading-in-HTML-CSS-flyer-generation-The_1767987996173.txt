@@ -1,0 +1,230 @@
+Fix images not loading in HTML/CSS flyer generation.
+
+The flyer HTML structure is working, but images show broken/alt text because Puppeteer can't access the URLs.
+
+## Issue: Images Not Loading
+
+Puppeteer runs in an isolated environment and can't always fetch external URLs or relative paths. We need to convert images to base64 data URIs.
+
+## Solution: Convert Images to Base64 Before Rendering
+
+Update server/services/flyer-generator.ts:
+```typescript
+import puppeteer from 'puppeteer';
+import fs from 'fs';
+import path from 'path';
+import Handlebars from 'handlebars';
+import fetch from 'node-fetch';
+
+// Helper function to convert image URL to base64
+async function imageToBase64(imageUrl: string): Promise<string> {
+  try {
+    // If it's already a data URI, return as-is
+    if (imageUrl.startsWith('data:')) {
+      return imageUrl;
+    }
+    
+    // If it's a local file path
+    if (imageUrl.startsWith('/') && !imageUrl.startsWith('//')) {
+      const localPath = path.join(__dirname, '../../public', imageUrl);
+      if (fs.existsSync(localPath)) {
+        const buffer = fs.readFileSync(localPath);
+        const ext = path.extname(localPath).slice(1);
+        const mimeType = ext === 'svg' ? 'image/svg+xml' : `image/${ext}`;
+        return `data:${mimeType};base64,${buffer.toString('base64')}`;
+      }
+    }
+    
+    // Fetch remote URL and convert to base64
+    const response = await fetch(imageUrl);
+    const buffer = await response.buffer();
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    return `data:${contentType};base64,${buffer.toString('base64')}`;
+    
+  } catch (error) {
+    console.error('Error converting image to base64:', imageUrl, error);
+    return ''; // Return empty string for failed images
+  }
+}
+
+// Convert all images in flyer data to base64
+async function prepareImagesAsBase64(data: FlyerData): Promise<FlyerData> {
+  console.log('Converting images to base64...');
+  
+  const [
+    mainPhotoB64,
+    photo2B64,
+    photo3B64,
+    logoB64,
+    bedIconB64,
+    bathIconB64,
+    sqftIconB64,
+    agentPhotoB64
+  ] = await Promise.all([
+    imageToBase64(data.mainPhoto),
+    imageToBase64(data.photo2),
+    imageToBase64(data.photo3),
+    imageToBase64(data.spyglassLogoBlack),
+    imageToBase64(data.bedIcon),
+    imageToBase64(data.bathIcon),
+    imageToBase64(data.sqftIcon),
+    data.agentPhoto ? imageToBase64(data.agentPhoto) : Promise.resolve('')
+  ]);
+  
+  console.log('Images converted successfully');
+  
+  return {
+    ...data,
+    mainPhoto: mainPhotoB64,
+    photo2: photo2B64,
+    photo3: photo3B64,
+    spyglassLogoBlack: logoB64,
+    bedIcon: bedIconB64,
+    bathIcon: bathIconB64,
+    sqftIcon: sqftIconB64,
+    agentPhoto: agentPhotoB64
+  };
+}
+
+export async function generateFlyer(data: FlyerData): Promise<Buffer> {
+  // Convert all images to base64 first
+  const dataWithBase64Images = await prepareImagesAsBase64(data);
+  
+  // Load template
+  const templatePath = path.join(__dirname, '../templates/flyer-template.html');
+  const templateHtml = fs.readFileSync(templatePath, 'utf-8');
+  
+  // Compile with Handlebars
+  const template = Handlebars.compile(templateHtml);
+  const html = template(dataWithBase64Images);
+  
+  // Launch Puppeteer
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-web-security' // Allow loading mixed content
+    ]
+  });
+  
+  const page = await browser.newPage();
+  
+  // Set viewport
+  await page.setViewport({
+    width: 2550,
+    height: 3300,
+    deviceScaleFactor: 1
+  });
+  
+  // Load HTML with base64 images already embedded
+  await page.setContent(html, { 
+    waitUntil: 'networkidle0',
+    timeout: 30000
+  });
+  
+  // Wait a moment for any rendering
+  await page.waitForTimeout(500);
+  
+  // Screenshot
+  const screenshot = await page.screenshot({
+    type: 'png',
+    fullPage: true
+  });
+  
+  await browser.close();
+  
+  return screenshot as Buffer;
+}
+```
+
+## Fix 2: Update API Endpoint with Correct Image URLs
+
+In the API endpoint, ensure photo URLs are complete (not relative):
+```typescript
+app.post('/api/generate-flyer-html', async (req, res) => {
+  try {
+    const { photos, ...rest } = req.body;
+    
+    // Ensure photo URLs are absolute
+    const absolutePhotos = photos.map((photo: string) => {
+      if (photo.startsWith('http')) return photo;
+      if (photo.startsWith('//')) return `https:${photo}`;
+      return photo;
+    });
+    
+    // For Repliers CDN photos, ensure full URL
+    const processedPhotos = absolutePhotos.map((photo: string) => {
+      if (!photo.startsWith('http') && !photo.startsWith('data:')) {
+        // Add Repliers CDN base if needed
+        return `https://cdn.repliers.io/${photo}`;
+      }
+      return photo;
+    });
+    
+    console.log('Processing photos:', processedPhotos);
+    
+    const flyerData = {
+      ...rest,
+      mainPhoto: processedPhotos[0],
+      photo2: processedPhotos[1] || processedPhotos[0],
+      photo3: processedPhotos[2] || processedPhotos[0],
+      // Use absolute paths for local assets
+      spyglassLogoBlack: path.join(__dirname, '../public/assets/SpyglassRealty_Logo_Black.png'),
+      bedIcon: path.join(__dirname, '../public/assets/icons/bed-icon.svg'),
+      bathIcon: path.join(__dirname, '../public/assets/icons/bath-icon.svg'),
+      sqftIcon: path.join(__dirname, '../public/assets/icons/sqft-icon.svg'),
+    };
+    
+    const pngBuffer = await generateFlyer(flyerData);
+    
+    res.set('Content-Type', 'image/png');
+    res.send(pngBuffer);
+    
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+```
+
+## Fix 3: Install node-fetch if not present
+```bash
+npm install node-fetch
+```
+
+## Fix 4: Description Should Use Summarized Text
+
+The description is showing the FULL MLS text instead of the summarized version.
+
+Make sure the frontend sends the CURRENT description from the textarea (after AI summarization), not the original:
+```typescript
+// In create-flyer-dialog.tsx
+const handleDownloadFlyer = async () => {
+  // Send the current description state (which is the summarized version)
+  body: JSON.stringify({
+    ...otherFields,
+    description: description, // This should be the summarized text from state
+  })
+};
+```
+
+## Fix 5: Debug Logging
+
+Add logging to see what's happening:
+```typescript
+console.log('Photo URLs being processed:');
+console.log('- Main:', data.mainPhoto);
+console.log('- Photo 2:', data.photo2);
+console.log('- Photo 3:', data.photo3);
+console.log('- Logo:', data.spyglassLogoBlack);
+```
+
+## Testing
+
+After these changes:
+1. Generate flyer
+2. Check server logs for image conversion messages
+3. Verify all images appear in the downloaded PNG
+4. Verify description is summarized (115 char max)
