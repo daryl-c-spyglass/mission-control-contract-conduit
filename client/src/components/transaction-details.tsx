@@ -1207,21 +1207,12 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           {/* Fullscreen Photo Modal - only render if photos exist */}
           {photos.length > 0 && (
             <Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
-              <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black/95 border-none">
+              <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black/95 border-none [&>button]:bg-white/10 [&>button]:text-white [&>button]:hover:bg-white/20 [&>button]:rounded-full [&>button]:opacity-100 [&>button]:p-2 [&>button]:hover:opacity-100">
                 <VisuallyHidden>
                   <DialogTitle>Property Photo Gallery</DialogTitle>
                   <DialogDescription>View property photos in fullscreen mode</DialogDescription>
                 </VisuallyHidden>
                 <div className="relative w-full h-full flex items-center justify-center min-h-[80vh]">
-                  {/* Close Button */}
-                  <button
-                    onClick={() => setFullscreenOpen(false)}
-                    className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors z-10"
-                    data-testid="button-close-fullscreen"
-                  >
-                    <X className="h-6 w-6" />
-                  </button>
-                  
                   {/* Photo Counter */}
                   <div className="absolute top-4 left-4 px-4 py-2 bg-white/10 text-white rounded-full text-sm">
                     {currentPhoto + 1} of {photos.length}
@@ -2123,7 +2114,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         const cmaPhotos = selectedCMAProperty.photos || (selectedCMAProperty.imageUrl ? [selectedCMAProperty.imageUrl] : []);
         return (
           <Dialog open={cmaFullscreenOpen} onOpenChange={setCmaFullscreenOpen}>
-            <DialogContent className="max-w-5xl h-[90vh] p-0 bg-black/95" data-testid="dialog-cma-fullscreen">
+            <DialogContent className="max-w-5xl h-[90vh] p-0 bg-black/95 [&>button]:bg-white/10 [&>button]:text-white [&>button]:hover:bg-white/20 [&>button]:rounded-full [&>button]:opacity-100 [&>button]:p-2 [&>button]:hover:opacity-100" data-testid="dialog-cma-fullscreen">
               <VisuallyHidden>
                 <DialogTitle>CMA Photo Gallery</DialogTitle>
               </VisuallyHidden>
@@ -2134,15 +2125,6 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                     <h3 className="font-medium">{selectedCMAProperty.address}</h3>
                     <p className="text-sm text-white/70">{cmaPhotoIndex + 1} of {cmaPhotos.length} photos</p>
                   </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="text-white hover:bg-white/10"
-                    onClick={() => setCmaFullscreenOpen(false)}
-                    data-testid="cma-fullscreen-close"
-                  >
-                    <X className="h-5 w-5" />
-                  </Button>
                 </div>
                 
                 {/* Main image */}
