@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, X, Upload, Check, Download, Image, FileText, Bed, Bath, Square } from "lucide-react";
+import { Loader2, X, Upload, Check, Download, Image, FileText, Bed, Bath, Square, ZoomIn, ChevronDown, ChevronUp, Maximize2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -325,10 +325,12 @@ export function CreateFlyerDialog({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [showUploadSection, setShowUploadSection] = useState(false);
+  const [previewEnlarged, setPreviewEnlarged] = useState(false);
+  const [expandedPhotoUrl, setExpandedPhotoUrl] = useState<string | null>(null);
 
   const mlsData = transaction.mlsData as MLSData | null;
   const maxPhotos = format === "social" ? 1 : 3;
-  const maxDescriptionLength = format === "social" ? 200 : 115;
+  const maxDescriptionLength = format === "social" ? 350 : 250;
 
   const resetPhotoSelection = useCallback((newFormat: FlyerFormat) => {
     const limit = newFormat === "social" ? 1 : 3;
@@ -366,20 +368,16 @@ export function CreateFlyerDialog({
       bedrooms: mlsData?.bedrooms?.toString() || transaction.bedrooms?.toString() || "",
       bathrooms: mlsData?.bathrooms?.toString() || transaction.bathrooms?.toString() || "",
       sqft: mlsData?.sqft?.toString() || transaction.sqft?.toString() || "",
-      description: truncateDescription(mlsData?.description || "", 400),
+      description: mlsData?.description || "",
     },
   });
 
   const watchedValues = useWatch({ control: form.control });
+  const currentDescriptionLength = watchedValues.description?.length || 0;
 
   const handleFormatChange = (newFormat: FlyerFormat) => {
     setFormat(newFormat);
     resetPhotoSelection(newFormat);
-    const newMaxLength = newFormat === "social" ? 350 : 250;
-    const currentDescription = form.getValues("description") || "";
-    if (currentDescription.length > newMaxLength) {
-      form.setValue("description", truncateDescription(currentDescription, newMaxLength));
-    }
   };
 
   const togglePhotoSelection = (photoUrl: string) => {
@@ -403,14 +401,18 @@ export function CreateFlyerDialog({
     
     const totalPhotos = selectedPhotos.length + uploadedPhotos.length;
     const remainingSlots = maxPhotos - totalPhotos;
+    
     if (remainingSlots <= 0) {
+      setSelectedPhotos([]);
+      setUploadedPhotos([]);
       toast({
-        title: "Maximum photos reached",
-        description: `You can only use ${maxPhotos === 1 ? "1 photo" : `up to ${maxPhotos} photos`}. Deselect photos to upload more.`,
+        title: "Replacing photos",
+        description: `Previous photos cleared. Your new photos will be used instead.`,
       });
-      return;
     }
-    const filesToProcess = Array.from(files).slice(0, remainingSlots);
+    
+    const effectiveSlots = remainingSlots <= 0 ? maxPhotos : remainingSlots;
+    const filesToProcess = Array.from(files).slice(0, effectiveSlots);
     
     filesToProcess.forEach((file) => {
       if (!file.type.startsWith("image/")) {
@@ -914,63 +916,139 @@ export function CreateFlyerDialog({
                       {mlsPhotos.map((photo, index) => {
                         const isSelected = selectedPhotos.includes(photo);
                         const selectionIndex = selectedPhotos.indexOf(photo);
+                        const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(photo)}`;
                         return (
-                          <button
-                            key={index}
-                            type="button"
-                            onClick={() => togglePhotoSelection(photo)}
-                            className={`relative aspect-square rounded overflow-hidden group transition-all ${
-                              isSelected 
-                                ? "ring-2 ring-primary ring-offset-1" 
-                                : "hover:ring-1 hover:ring-muted-foreground/50"
-                            }`}
-                            data-testid={`button-mls-photo-${index}`}
-                          >
-                            <img
-                              src={`/api/proxy-image?url=${encodeURIComponent(photo)}`}
-                              alt={`MLS Photo ${index + 1}`}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                            />
-                            {isSelected && (
-                              <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                                <div className="bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold">
-                                  {selectionIndex + 1}
+                          <div key={index} className="relative aspect-square group">
+                            <button
+                              type="button"
+                              onClick={() => togglePhotoSelection(photo)}
+                              className={`w-full h-full rounded overflow-hidden group transition-all ${
+                                isSelected 
+                                  ? "ring-2 ring-primary ring-offset-1" 
+                                  : "hover:ring-1 hover:ring-muted-foreground/50"
+                              }`}
+                              data-testid={`button-mls-photo-${index}`}
+                            >
+                              <img
+                                src={proxyUrl}
+                                alt={`MLS Photo ${index + 1}`}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                              />
+                              {isSelected && (
+                                <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                                  <div className="bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold">
+                                    {selectionIndex + 1}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                            {!isSelected && selectedPhotos.length < maxPhotos && (
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <Check className="h-4 w-4 text-white" />
-                              </div>
-                            )}
-                          </button>
+                              )}
+                              {!isSelected && selectedPhotos.length < maxPhotos && (
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <Check className="h-4 w-4 text-white" />
+                                </div>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedPhotoUrl(proxyUrl);
+                              }}
+                              className="absolute top-0.5 right-0.5 p-0.5 bg-black/50 hover:bg-black/70 rounded text-white opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                              data-testid={`button-expand-photo-${index}`}
+                            >
+                              <ZoomIn className="h-3 w-3" />
+                            </button>
+                          </div>
                         );
                       })}
                     </div>
                   </div>
                 )}
 
-                {mlsPhotos.length > 0 && !showUploadSection && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowUploadSection(true)}
-                    className="text-muted-foreground text-xs h-7"
-                    data-testid="button-show-upload"
-                  >
-                    <Upload className="h-3 w-3 mr-1" />
-                    Or upload your own
-                  </Button>
+                {mlsPhotos.length > 0 && (
+                  <div className="border rounded-md overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setShowUploadSection(!showUploadSection)}
+                      className="w-full flex items-center justify-between px-3 py-2 text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
+                      data-testid="button-toggle-upload"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Upload className="h-3.5 w-3.5" />
+                        {totalSelectedPhotos >= maxPhotos ? "Replace with custom photos" : "Upload custom photos"}
+                      </span>
+                      {showUploadSection ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </button>
+                    
+                    {showUploadSection && (
+                      <div className="px-3 pb-3 pt-1 border-t space-y-2">
+                        <div
+                          className={`border-2 border-dashed rounded-md p-3 text-center transition-colors ${
+                            isDragOver ? "border-primary bg-primary/5" : "border-muted-foreground/25"
+                          }`}
+                          onDrop={handleDrop}
+                          onDragOver={handleDragOver}
+                          onDragLeave={handleDragLeave}
+                          data-testid="dropzone-photos"
+                        >
+                          <Upload className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                          <p className="text-xs text-muted-foreground mb-1">
+                            {totalSelectedPhotos >= maxPhotos 
+                              ? "Upload to replace MLS photos" 
+                              : "Drag photos or click to browse"}
+                          </p>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            id="photo-upload"
+                            onChange={(e) => handleFileUpload(e.target.files)}
+                            data-testid="input-photo-upload"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-6 text-xs"
+                            onClick={() => document.getElementById("photo-upload")?.click()}
+                            data-testid="button-browse-photos"
+                          >
+                            {totalSelectedPhotos >= maxPhotos ? "Replace Photos" : "Browse"}
+                          </Button>
+                        </div>
+                        
+                        {uploadedPhotos.length > 0 && (
+                          <div className="flex gap-1.5 flex-wrap">
+                            {uploadedPhotos.map((photo, index) => (
+                              <div key={index} className="relative w-12 h-12 rounded overflow-hidden group">
+                                <img src={photo} alt={`Upload ${index + 1}`} className="w-full h-full object-cover" />
+                                <button
+                                  type="button"
+                                  onClick={() => removeUploadedPhoto(index)}
+                                  className="absolute top-0.5 right-0.5 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  data-testid={`button-remove-photo-${index}`}
+                                >
+                                  <X className="h-2 w-2" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
 
-                {(showUploadSection || mlsPhotos.length === 0) && (
+                {mlsPhotos.length === 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <FormLabel className="text-sm">
-                        {mlsPhotos.length > 0 ? "Upload Custom Photos" : "Property Photos"}
-                      </FormLabel>
+                      <FormLabel className="text-sm">Property Photos</FormLabel>
                       <span className="text-xs text-muted-foreground">
                         {maxPhotos - totalSelectedPhotos} slot{maxPhotos - totalSelectedPhotos !== 1 ? 's' : ''} left
                       </span>
@@ -993,7 +1071,7 @@ export function CreateFlyerDialog({
                         accept="image/*"
                         multiple
                         className="hidden"
-                        id="photo-upload"
+                        id="photo-upload-no-mls"
                         onChange={(e) => handleFileUpload(e.target.files)}
                         disabled={totalSelectedPhotos >= maxPhotos}
                         data-testid="input-photo-upload"
@@ -1003,7 +1081,7 @@ export function CreateFlyerDialog({
                         variant="outline"
                         size="sm"
                         className="h-6 text-xs"
-                        onClick={() => document.getElementById("photo-upload")?.click()}
+                        onClick={() => document.getElementById("photo-upload-no-mls")?.click()}
                         disabled={totalSelectedPhotos >= maxPhotos}
                         data-testid="button-browse-photos"
                       >
@@ -1148,14 +1226,18 @@ export function CreateFlyerDialog({
                       <FormControl>
                         <Textarea
                           placeholder="Enter a brief property description..."
-                          className="resize-none h-16"
-                          maxLength={maxDescriptionLength}
+                          className="resize-none h-20"
                           data-testid="input-flyer-description"
                           {...field}
                         />
                       </FormControl>
-                      <FormDescription className="text-right text-xs">
-                        {field.value?.length || 0}/{maxDescriptionLength}
+                      <FormDescription className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">
+                          Will be truncated to {maxDescriptionLength} chars on flyer
+                        </span>
+                        <span className={currentDescriptionLength > maxDescriptionLength ? "text-amber-600 font-medium" : ""}>
+                          {currentDescriptionLength}/{maxDescriptionLength}
+                        </span>
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -1168,31 +1250,43 @@ export function CreateFlyerDialog({
                   <p className="text-xs font-medium text-muted-foreground mb-2 text-center">
                     Preview
                   </p>
-                  <div className="flex justify-center lg:block">
-                  {format === "social" ? (
-                    <SocialMediaPreview
-                      photoUrls={previewPhotoUrls}
-                      status={watchedValues.status || "just_listed"}
-                      price={watchedValues.price || "$0"}
-                      address={transaction.propertyAddress}
-                      bedrooms={watchedValues.bedrooms}
-                      bathrooms={watchedValues.bathrooms}
-                      sqft={watchedValues.sqft}
-                      description={watchedValues.description}
-                    />
-                  ) : (
-                    <PrintFlyerPreview
-                      photoUrls={previewPhotoUrls}
-                      status={watchedValues.status || "just_listed"}
-                      price={watchedValues.price || "$0"}
-                      address={transaction.propertyAddress}
-                      bedrooms={watchedValues.bedrooms}
-                      bathrooms={watchedValues.bathrooms}
-                      sqft={watchedValues.sqft}
-                      description={watchedValues.description}
-                    />
-                  )}
+                  <div 
+                    className="flex justify-center lg:block cursor-pointer relative group"
+                    onClick={() => setPreviewEnlarged(true)}
+                    data-testid="button-enlarge-preview"
+                  >
+                    {format === "social" ? (
+                      <SocialMediaPreview
+                        photoUrls={previewPhotoUrls}
+                        status={watchedValues.status || "just_listed"}
+                        price={watchedValues.price || "$0"}
+                        address={transaction.propertyAddress}
+                        bedrooms={watchedValues.bedrooms}
+                        bathrooms={watchedValues.bathrooms}
+                        sqft={watchedValues.sqft}
+                        description={watchedValues.description}
+                      />
+                    ) : (
+                      <PrintFlyerPreview
+                        photoUrls={previewPhotoUrls}
+                        status={watchedValues.status || "just_listed"}
+                        price={watchedValues.price || "$0"}
+                        address={transaction.propertyAddress}
+                        bedrooms={watchedValues.bedrooms}
+                        bathrooms={watchedValues.bathrooms}
+                        sqft={watchedValues.sqft}
+                        description={watchedValues.description}
+                      />
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                      <div className="bg-white/90 rounded-full p-2">
+                        <Maximize2 className="h-4 w-4 text-gray-700" />
+                      </div>
+                    </div>
                   </div>
+                  <p className="text-[10px] text-muted-foreground text-center mt-1">
+                    Click to enlarge
+                  </p>
                 </div>
               </div>
             </div>
@@ -1224,6 +1318,79 @@ export function CreateFlyerDialog({
           </form>
         </Form>
       </DialogContent>
+
+      {/* Enlarged Preview Modal */}
+      {previewEnlarged && (
+        <Dialog open={previewEnlarged} onOpenChange={setPreviewEnlarged}>
+          <DialogContent className="w-[95vw] max-w-xl max-h-[90vh] p-4 flex flex-col">
+            <DialogHeader className="pb-2">
+              <DialogTitle>Preview - {format === "social" ? "Social Media" : "Print Flyer"}</DialogTitle>
+              <DialogDescription>
+                Full-size preview of your flyer
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-auto flex justify-center py-4">
+              <div className={format === "social" ? "w-64" : "w-80"}>
+                {format === "social" ? (
+                  <SocialMediaPreview
+                    photoUrls={previewPhotoUrls}
+                    status={watchedValues.status || "just_listed"}
+                    price={watchedValues.price || "$0"}
+                    address={transaction.propertyAddress}
+                    bedrooms={watchedValues.bedrooms}
+                    bathrooms={watchedValues.bathrooms}
+                    sqft={watchedValues.sqft}
+                    description={watchedValues.description}
+                  />
+                ) : (
+                  <PrintFlyerPreview
+                    photoUrls={previewPhotoUrls}
+                    status={watchedValues.status || "just_listed"}
+                    price={watchedValues.price || "$0"}
+                    address={transaction.propertyAddress}
+                    bedrooms={watchedValues.bedrooms}
+                    bathrooms={watchedValues.bathrooms}
+                    sqft={watchedValues.sqft}
+                    description={watchedValues.description}
+                  />
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end pt-2 border-t">
+              <Button variant="outline" onClick={() => setPreviewEnlarged(false)}>
+                Close
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Expanded Photo Modal */}
+      {expandedPhotoUrl && (
+        <Dialog open={!!expandedPhotoUrl} onOpenChange={() => setExpandedPhotoUrl(null)}>
+          <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] p-2">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Photo Preview</DialogTitle>
+              <DialogDescription>Enlarged view of selected photo</DialogDescription>
+            </DialogHeader>
+            <div className="relative">
+              <img
+                src={expandedPhotoUrl}
+                alt="Expanded photo"
+                className="w-full h-auto max-h-[80vh] object-contain rounded"
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                className="absolute top-2 right-2 bg-white/90 hover:bg-white"
+                onClick={() => setExpandedPhotoUrl(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   );
 }
