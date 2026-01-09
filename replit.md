@@ -64,7 +64,7 @@ The Templates tab in transaction details provides marketing template generation:
 
 ### Create Property Flyer Dialog (January 2026)
 Enhanced flyer creation dialog with UX improvements for mobile and desktop:
-- **Dual Format Support**: Social Media (1:1 aspect ratio, 350 char limit) and Print Flyer (8.5x11, 250 char limit)
+- **Dual Format Support**: Social Media (1:1 aspect ratio, 350 char limit) and Print Flyer (8.5x11, 115 char limit)
 - **Preview Enlarge Lightbox**: Click preview thumbnail to open full-size modal with enlarged view
 - **Photo Thumbnail Expand**: Hover shows ZoomIn icon, click opens photo in full-size lightbox
 - **Replace Mode for Uploads**: When 3/3 photos selected, new uploads clear previous selections and replace
@@ -72,6 +72,16 @@ Enhanced flyer creation dialog with UX improvements for mobile and desktop:
 - **Full Description Loading**: Textarea loads complete MLS description, truncation only at canvas generation time
 - **Dynamic Character Limits**: Shows "{current}/{limit}" counter, amber warning when over limit
 - **Mobile Optimized**: Touch-friendly controls, responsive layouts, proper scrolling on iOS/Android
+
+#### Print Flyer Agent Information (January 2026)
+Professional agent branding for print flyers with validated required fields:
+- **Agent Name** (required): Full name displayed on flyer
+- **Agent Title**: Optional title like "REALTOR®" 
+- **Agent Phone** (required): Contact number displayed prominently
+- **Agent Photo**: Optional circular headshot upload with User icon placeholder if not provided
+- **Listing Headline**: Optional 39-character headline (e.g., "OPEN HOUSE SATURDAY") shown above description
+- **Validation**: Toast error prevents generation without required agent name and phone
+- **Live Preview**: Agent section updates in real-time as fields are filled
 
 ### Enhanced MLS Data Tab (January 2026)
 The MLS Data tab provides comprehensive property information visualization:
