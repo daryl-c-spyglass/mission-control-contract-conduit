@@ -1,0 +1,349 @@
+# Mission Control Flyer Generator - Fix Implementation Guide
+
+## Overview
+
+This guide provides the complete solution to fix all the issues in your flyer generator. The main problems and their solutions are documented below.
+
+---
+
+## Issues Fixed
+
+### 1. ✅ Spyglass Logo Not Loading
+
+**Problem:** Logo shows broken alt text instead of the actual image.
+
+**Root Cause:** Puppeteer cannot load images from file paths like `/assets/logo.png`. It needs either:
+- Absolute file:// URLs
+- Base64 data URIs (recommended)
+
+**Solution:** Convert all local assets to base64 before injecting into template:
+
+```typescript
+async function loadLocalAssetAsBase64(assetPath: string): Promise<string> {
+  const fullPath = path.join(process.cwd(), 'public', assetPath);
+  const buffer = fs.readFileSync(fullPath);
+  const ext = path.extname(assetPath).toLowerCase();
+  const contentTypes = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.svg': 'image/svg+xml',
+  };
+  const contentType = contentTypes[ext] || 'image/png';
+  return `data:${contentType};base64,${buffer.toString('base64')}`;
+}
+```
+
+**File to check:** Ensure `public/assets/SpyglassRealty_Logo_Black.png` exists.
+
+---
+
+### 2. ✅ "Leading" Section Needs BLACK Background
+
+**Problem:** The center section showing "JUST LISTED" has a white/missing background instead of black.
+
+**Solution:** Updated CSS for the `.leading-section`:
+
+```css
+.leading-section {
+  background: #000000;  /* BLACK background */
+  color: #ffffff;       /* WHITE text */
+  padding: 20px 60px;
+  text-align: center;
+  flex: 1;
+  margin: 0 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.leading-text {
+  font-family: 'League Spartan', sans-serif;
+  font-size: 42px;
+  font-weight: 600;
+  letter-spacing: 12px;
+  text-transform: uppercase;
+}
+```
+
+---
+
+### 3. ✅ Address Has Too Much Letter Spacing
+
+**Problem:** Address displays as "1 3 1 0 6" instead of "13106"
+
+**Solution:** Reduced `letter-spacing` from excessive value to reasonable:
+
+```css
+.address-text {
+  font-family: 'League Spartan', sans-serif;
+  font-size: 42px;
+  font-weight: 600;
+  color: #333333;
+  letter-spacing: 4px;  /* Was: 0.3em or higher */
+  text-transform: uppercase;
+}
+```
+
+---
+
+### 4. ✅ Bottom Section Has ~35% Empty White Space
+
+**Problem:** Too much empty space in the bottom section.
+
+**Solution:** 
+- Increased font sizes throughout the bottom section
+- Better use of the 3-column layout
+- Increased padding and spacing in description column
+- Added `min-height` to ensure consistent sizing
+
+```css
+.bottom-section {
+  display: grid;
+  grid-template-columns: 350px 1fr 450px;
+  gap: 50px;
+  padding: 50px 30px;
+  align-items: start;
+  min-height: 650px;  /* Ensures consistent height */
+}
+
+.stat-text {
+  font-size: 38px;  /* Increased from smaller size */
+  font-weight: 600;
+}
+
+.property-headline {
+  font-size: 38px;  /* Increased from smaller size */
+}
+
+.property-description {
+  font-size: 28px;  /* Increased from smaller size */
+  line-height: 1.6;
+}
+```
+
+---
+
+### 5. ✅ Need Full Address with City, State, ZIP
+
+**Problem:** Only street address shows, missing city, state, zip.
+
+**Solution:** Created a `buildFullAddress()` helper function:
+
+```typescript
+function buildFullAddress(data: FlyerData): string {
+  const parts = [data.address];
+  if (data.city) parts.push(data.city);
+  if (data.state) parts.push(data.state);
+  if (data.zipCode) parts.push(data.zipCode);
+  return parts.join(', ');
+}
+```
+
+In template:
+```html
+<div class="address-bar">
+  <span class="address-text">{{fullAddress}}</span>
+</div>
+```
+
+---
+
+## File Structure
+
+Your Replit project should have these files:
+
+```
+mission-control/
+├── client/
+│   └── src/
+│       └── components/
+│           └── create-flyer-dialog.tsx
+├── server/
+│   ├── services/
+│   │   └── flyer-generator.ts      ← Main service (copy from flyer-generator.ts)
+│   ├── templates/
+│   │   └── flyer-template.html     ← HTML template (copy from flyer-template.html)
+│   └── routes.ts                   ← Add flyer routes
+└── public/
+    └── assets/
+        ├── SpyglassRealty_Logo_Black.png  ← REQUIRED
+        ├── SpyglassRealty_Logo_White.png
+        └── icons/
+            ├── bed.svg
+            ├── bath.svg
+            └── sqft.svg
+```
+
+---
+
+## Implementation Steps
+
+### Step 1: Update the HTML Template
+
+Replace `server/templates/flyer-template.html` with the provided `flyer-template.html` file.
+
+Key changes:
+- `.leading-section` now has `background: #000000`
+- `.address-text` has reduced `letter-spacing: 4px`
+- All images use `{{variableBase64}}` placeholders
+- Bottom section has larger fonts and better spacing
+
+### Step 2: Update the Flyer Generator Service
+
+Replace `server/services/flyer-generator.ts` with the provided `flyer-generator.ts` file.
+
+Key changes:
+- Added `loadLocalAssetAsBase64()` function for local files
+- Added `fetchImageAsBase64()` for remote CDN images
+- All images converted to base64 before template rendering
+- Added `buildFullAddress()` helper
+
+### Step 3: Add Logo to Public Assets
+
+Ensure the logo file exists at:
+```
+public/assets/SpyglassRealty_Logo_Black.png
+```
+
+If it's in a different location, update this line in `flyer-generator.ts`:
+```typescript
+loadLocalAssetAsBase64('assets/SpyglassRealty_Logo_Black.png'),
+```
+
+### Step 4: Register the Routes
+
+In your `server/routes.ts`, add:
+
+```typescript
+import flyerRoutes from './routes/flyer-routes';
+
+// ... existing routes ...
+
+app.use('/api', flyerRoutes);
+```
+
+### Step 5: Test the Generator
+
+Call the API with test data:
+
+```bash
+curl -X POST http://localhost:3000/api/generate-flyer-html \
+  -H "Content-Type: application/json" \
+  -d '{
+    "address": "50109 Flintrock Drive",
+    "city": "Georgetown",
+    "state": "TX",
+    "zipCode": "78626",
+    "price": "375000",
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "sqft": "1322",
+    "statusType": "Just Listed",
+    "headline": "A PRIME OPPORTUNITY IN GEORGETOWN",
+    "description": "Discover this slice of sheer utopia in the heart of Georgetown!",
+    "mainPhotoUrl": "https://cdn.repliers.io/...",
+    "photo2Url": "https://cdn.repliers.io/...",
+    "photo3Url": "https://cdn.repliers.io/...",
+    "agentName": "Brandon Kennedy",
+    "agentPhone": "(310) 227-7157",
+    "agentPhotoUrl": "https://..."
+  }' \
+  --output test-flyer.png
+```
+
+---
+
+## Troubleshooting
+
+### Logo Still Not Loading
+
+1. Check the file exists:
+   ```bash
+   ls -la public/assets/SpyglassRealty_Logo_Black.png
+   ```
+
+2. Check console logs for errors:
+   ```
+   Error loading local asset assets/SpyglassRealty_Logo_Black.png: ...
+   ```
+
+3. Try an absolute path:
+   ```typescript
+   loadLocalAssetAsBase64('/home/runner/mission-control/public/assets/SpyglassRealty_Logo_Black.png')
+   ```
+
+### Images Not Rendering
+
+1. Check if the CDN URLs are accessible
+2. Look for CORS issues in browser console
+3. Ensure base64 conversion is completing:
+   ```typescript
+   console.log('Logo base64 length:', logoBase64.length);
+   ```
+
+### Puppeteer Crashes
+
+Add these flags to puppeteer.launch():
+```typescript
+const browser = await puppeteer.launch({
+  headless: true,
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
+    '--font-render-hinting=none',
+  ],
+});
+```
+
+---
+
+## Reference: Target Design Layout
+
+Based on `142_N_STEEL_FLYER.pdf`:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  [LOGO]        [LEADING BLACK BOX]        [PRICE BADGE]     │
+│                    JUST LISTED                               │
+├─────────────────────────────────────────────────────────────┤
+│           50109 FLINTROCK DRIVE, GEORGETOWN, TX 78626       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│                    [MAIN PHOTO - LARGE]                     │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│      [PHOTO 2]                    [PHOTO 3]                 │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  🛏 3 bedrooms    │  HEADLINE TEXT        │  [PHOTO] [QR]  │
+│  🛁 2 bathrooms   │                       │                │
+│  📐 1,322 sq.ft   │  Description text...  │  Agent Name    │
+│                   │                       │  Realtor®      │
+│                   │                       │  (310) 227-7157│
+│                   │                       │  ■□■□■         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Files Provided
+
+1. **flyer-template.html** - Complete HTML/CSS template with all fixes
+2. **flyer-generator.ts** - TypeScript service with Puppeteer and base64 handling
+3. **flyer-routes.ts** - Express routes for the API endpoints
+
+Copy these files to your Replit project in the appropriate locations.
+
+---
+
+## Need More Help?
+
+If you encounter issues:
+
+1. Share the current contents of `server/templates/flyer-template.html`
+2. Share any error messages from the console
+3. Share a screenshot of the current output
+
+I can then provide more specific fixes for your exact situation.

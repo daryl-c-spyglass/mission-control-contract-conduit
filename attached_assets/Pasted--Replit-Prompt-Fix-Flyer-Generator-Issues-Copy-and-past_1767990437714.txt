@@ -1,0 +1,211 @@
+# Replit Prompt: Fix Flyer Generator Issues
+
+Copy and paste everything below this line into Replit:
+
+---
+
+I need to fix several issues with my property flyer generator. The flyer uses HTML/CSS rendered by Puppeteer. Here are the issues and fixes needed:
+
+## Issues to Fix:
+
+1. **Spyglass logo not loading** - Shows broken alt text. The logo at `public/assets/SpyglassRealty_Logo_Black.png` needs to be converted to base64 for Puppeteer to render it.
+
+2. **"Leading" section needs BLACK background** - The center header section (showing "JUST LISTED") should have a black background with white text, but it's currently white/missing.
+
+3. **Address has too much letter spacing** - The address displays with excessive spacing like "1 3 1 0 6" instead of "13106". Need to reduce letter-spacing.
+
+4. **Bottom section has ~35% empty white space** - Need larger fonts and better spacing in the bottom 3-column section.
+
+5. **Need full address** - Currently only shows street address, need to include city, state, zip.
+
+## Files to Update:
+
+### 1. Update `server/templates/flyer-template.html`
+
+Replace the header section CSS with:
+
+```css
+/* LEADING section with BLACK background */
+.leading-section {
+  background: #000000;
+  color: #ffffff;
+  padding: 20px 60px;
+  text-align: center;
+  flex: 1;
+  margin: 0 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.leading-text {
+  font-family: 'League Spartan', sans-serif;
+  font-size: 42px;
+  font-weight: 600;
+  letter-spacing: 12px;
+  text-transform: uppercase;
+}
+```
+
+Fix the address spacing CSS:
+
+```css
+.address-text {
+  font-family: 'League Spartan', sans-serif;
+  font-size: 42px;
+  font-weight: 600;
+  color: #333333;
+  letter-spacing: 4px; /* Reduced from higher value */
+  text-transform: uppercase;
+}
+```
+
+Increase bottom section fonts:
+
+```css
+.bottom-section {
+  display: grid;
+  grid-template-columns: 350px 1fr 450px;
+  gap: 50px;
+  padding: 50px 30px;
+  align-items: start;
+  min-height: 650px;
+}
+
+.stat-text {
+  font-size: 38px;
+  font-weight: 600;
+  color: #333333;
+}
+
+.property-headline {
+  font-family: 'League Spartan', sans-serif;
+  font-size: 38px;
+  font-weight: 700;
+  color: #333333;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 25px;
+  line-height: 1.2;
+}
+
+.property-description {
+  font-size: 28px;
+  line-height: 1.6;
+  color: #555555;
+  font-weight: 400;
+}
+
+.agent-name {
+  font-family: 'League Spartan', sans-serif;
+  font-size: 42px;
+  font-weight: 700;
+  color: #333333;
+  margin-bottom: 8px;
+}
+
+.agent-phone {
+  font-size: 28px;
+  color: #333333;
+  font-weight: 600;
+}
+```
+
+### 2. Update `server/services/flyer-generator.ts`
+
+Add this function to load local assets as base64:
+
+```typescript
+import fs from 'fs';
+import path from 'path';
+
+async function loadLocalAssetAsBase64(assetPath: string): Promise<string> {
+  try {
+    const fullPath = path.join(process.cwd(), 'public', assetPath);
+    const buffer = fs.readFileSync(fullPath);
+    
+    const ext = path.extname(assetPath).toLowerCase();
+    const contentTypes: Record<string, string> = {
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.svg': 'image/svg+xml',
+    };
+    
+    const contentType = contentTypes[ext] || 'image/png';
+    return `data:${contentType};base64,${buffer.toString('base64')}`;
+  } catch (error) {
+    console.error(`Error loading local asset ${assetPath}:`, error);
+    return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  }
+}
+```
+
+Add this function to build full address:
+
+```typescript
+function buildFullAddress(address: string, city: string, state: string, zipCode: string): string {
+  const parts = [address];
+  if (city) parts.push(city);
+  if (state) parts.push(state);
+  if (zipCode) parts.push(zipCode);
+  return parts.join(', ');
+}
+```
+
+Update the template data preparation to include the logo as base64:
+
+```typescript
+// In the generateFlyer function, fetch all images including logo as base64:
+const [
+  mainPhotoBase64,
+  photo2Base64,
+  photo3Base64,
+  agentPhotoBase64,
+  logoBase64,
+] = await Promise.all([
+  fetchImageAsBase64(data.mainPhotoUrl),
+  fetchImageAsBase64(data.photo2Url),
+  fetchImageAsBase64(data.photo3Url),
+  fetchImageAsBase64(data.agentPhotoUrl),
+  loadLocalAssetAsBase64('assets/SpyglassRealty_Logo_Black.png'),
+]);
+
+// Add to template data:
+const templateData = {
+  // ... existing fields ...
+  fullAddress: buildFullAddress(data.address, data.city, data.state, data.zipCode),
+  logoBase64,
+  mainPhotoBase64,
+  photo2Base64,
+  photo3Base64,
+  agentPhotoBase64,
+};
+```
+
+### 3. Update the HTML template to use base64 variables
+
+In the template HTML, change the logo img tag:
+
+```html
+<img src="{{logoBase64}}" alt="Spyglass Realty">
+```
+
+Change the address display:
+
+```html
+<div class="address-bar">
+  <span class="address-text">{{fullAddress}}</span>
+</div>
+```
+
+## Summary of Changes:
+
+1. Add `loadLocalAssetAsBase64()` function to convert local files to base64
+2. Add `buildFullAddress()` function to combine address parts
+3. Load logo as base64 along with other images
+4. Pass `logoBase64` and `fullAddress` to template
+5. Update CSS: black background on `.leading-section`, reduced letter-spacing on `.address-text`, larger fonts in bottom section
+6. Update HTML: use `{{logoBase64}}` for logo src, use `{{fullAddress}}` for address
+
+Please make these changes to fix all the flyer generator issues.
