@@ -1,0 +1,131 @@
+Fix multiple issues in Create Property Flyer dialog.
+
+File: client/src/components/create-flyer-dialog.tsx
+
+## Issue 1: AI Summarize Missing on Social Media Format
+
+Currently AI Summarize only shows for Print Flyer. Fix:
+1. Show "✨ AI Summarize" button for BOTH Social Media and Print Flyer formats
+2. Adjust character limit based on format:
+   - Social Media: 200 characters
+   - Print Flyer: 115 characters
+
+## Issue 2: AI Summarize Should Be Re-Runnable
+
+1. Allow clicking "AI Summarize" multiple times to get different variations
+2. Each click generates a new AI summary
+3. Add subtle text below button: "Click again for a different variation"
+
+## Issue 3: Add Undo/Revert for AI Summarization
+
+1. Store the original MLS description when dialog opens:
+   - Save to state: originalDescription = mlsData.description
+
+2. Store previous description before each AI summarization:
+   - Save to state: previousDescription = currentDescription
+
+3. Add "↩ Revert" button next to AI Summarize:
+   - Shows only AFTER AI Summarize has been used
+   - Dropdown or two buttons:
+     - "Revert to Previous" - goes back one step
+     - "Revert to Original" - restores full MLS description
+
+4. Button states:
+   - Before any AI use: Only "✨ AI Summarize" visible
+   - After AI use: "✨ AI Summarize" + "↩ Revert" dropdown visible
+
+## Issue 4: AI Summarization Source
+
+Ensure AI Summarization uses the FULL original MLS description:
+1. When calling /api/summarize-description, always send the ORIGINAL description from MLS
+2. Do NOT send the already-truncated or previously-summarized text
+3. The API should receive the complete "About This Home" text
+
+Update the API call:
+```javascript
+// Always use original MLS description as source
+const response = await fetch('/api/summarize-description', {
+  body: JSON.stringify({
+    description: originalDescription, // Full MLS description, NOT current textarea value
+    maxLength: format === 'social' ? 200 : 115,
+    propertyInfo: { address, beds, baths, sqft }
+  })
+});
+```
+
+## Issue 5: Print Flyer Address Spacing
+
+The address bar shows incorrect spacing. Current: "1 3 1 0 6 N E W B O S T O N"
+Should have proper spacing between words, not just letters.
+
+Fix the address formatting function:
+```javascript
+function formatAddressSpaced(address: string): string {
+  // Split into words first, then space letters within each word
+  // Add extra space between words
+  return address
+    .toUpperCase()
+    .split(' ')
+    .map(word => word.split('').join(' '))
+    .join('   '); // Triple space between words
+}
+
+// Example output: "1 3 1 0 6   N E W   B O S T O N"
+// Or even better, keep numbers together:
+// "13106   N E W   B O S T O N"
+```
+
+Better approach - only space the letters, keep numbers grouped:
+```javascript
+function formatAddressSpaced(address: string): string {
+  return address
+    .toUpperCase()
+    .split(' ')
+    .map(word => {
+      // If word is all numbers (street number), keep together
+      if (/^\d+$/.test(word)) {
+        return word;
+      }
+      // Otherwise space the letters
+      return word.split('').join(' ');
+    })
+    .join('   '); // Triple space between words
+}
+
+// Output: "13106   N E W   B O S T O N"
+```
+
+## Issue 6: Preview Modal White Space
+
+The expanded preview has too much white space on left and right sides.
+
+1. Reduce modal padding on sides
+2. Make the preview image/canvas take up more width
+3. Center the preview content better
+4. Adjust based on zoom level - when zoomed in, image should fill more space
+
+CSS fixes:
+- Reduce horizontal padding from modal content area
+- Set preview image max-width to 95% or 100% of container
+- When zoomed > 100%, allow horizontal scroll instead of white space
+- Center the image properly at all zoom levels
+
+## Summary of Changes
+
+1. ✅ Show AI Summarize on both formats (Social Media + Print Flyer)
+2. ✅ Allow multiple AI Summarize clicks for variations
+3. ✅ Add Revert dropdown (Previous / Original)
+4. ✅ AI uses full original MLS description as source
+5. ✅ Fix address spacing (keep numbers together, space letters)
+6. ✅ Reduce white space in preview modal
+
+Test by:
+1. Open Create Flyer with Social Media format
+2. Verify AI Summarize button appears
+3. Click AI Summarize - verify summary generated
+4. Click AI Summarize again - verify new variation
+5. Click Revert to Original - verify full description restored
+6. Switch to Print Flyer format
+7. Verify address shows as "13106   N E W   B O S T O N" (numbers together)
+8. Open preview - verify less white space on sides
+9. Zoom in/out - verify image fills space properly

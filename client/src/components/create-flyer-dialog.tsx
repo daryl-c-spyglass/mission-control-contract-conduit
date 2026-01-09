@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, X, Upload, Check, Download, Image, FileText, Bed, Bath, Square, ZoomIn, ChevronDown, ChevronUp, Maximize2, User, RotateCcw, Plus, Minus, Sparkles } from "lucide-react";
+import { Loader2, X, Upload, Check, Download, Image, FileText, Bed, Bath, Square, ZoomIn, ChevronDown, ChevronUp, Maximize2, User, RotateCcw, Plus, Minus, Sparkles, Undo2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -31,6 +31,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import type { Transaction, MLSData } from "@shared/schema";
 
@@ -63,7 +69,9 @@ type FormValues = z.infer<typeof formSchema>;
 
 function truncateDescription(text: string, maxLength: number): string {
   if (!text || text.length <= maxLength) return text || "";
-  const truncated = text.substring(0, maxLength);
+  // Reserve 3 chars for ellipsis to ensure total length doesn't exceed maxLength
+  const effectiveMax = maxLength - 3;
+  const truncated = text.substring(0, effectiveMax);
   const lastSpace = truncated.lastIndexOf(' ');
   if (lastSpace > 0) {
     return truncated.substring(0, lastSpace).trim() + '...';
@@ -108,7 +116,7 @@ function SocialMediaPreview({
 
   const statusLabel = STATUS_OPTIONS.find(s => s.value === status)?.label || "Just Listed";
   const addressParts = address.split(",");
-  const truncatedDesc = truncateDescription(description || "", 350);
+  const truncatedDesc = truncateDescription(description || "", 200);
 
   const specs = [];
   if (bedrooms) specs.push(`${bedrooms} bed`);
@@ -203,7 +211,22 @@ function PrintFlyerPreview({
   const statusLabel = STATUS_OPTIONS.find(s => s.value === status)?.label || "Just Listed";
   const truncatedDesc = truncateDescription(description || "", 115);
   
-  const spacedAddress = address.split(",")[0].split("").join(" ").toUpperCase();
+  // Format address: keep numbers together, space letters, triple space between words
+  const formatAddressSpaced = (addr: string): string => {
+    return addr
+      .toUpperCase()
+      .split(' ')
+      .map(word => {
+        // If word is all numbers (street number), keep together
+        if (/^\d+$/.test(word)) {
+          return word;
+        }
+        // Otherwise space the letters
+        return word.split('').join(' ');
+      })
+      .join('   '); // Triple space between words
+  };
+  const spacedAddress = formatAddressSpaced(address.split(",")[0]);
   const cityStateZip = address.split(",").slice(1).join(",").trim().toUpperCase();
 
   return (
@@ -361,6 +384,9 @@ export function CreateFlyerDialog({
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isAutoSelecting, setIsAutoSelecting] = useState(false);
   const [photoInsights, setPhotoInsights] = useState<Record<string, { classification: string; quality: number }>>({});
+  const [originalDescription, setOriginalDescription] = useState<string>("");
+  const [previousDescription, setPreviousDescription] = useState<string | null>(null);
+  const [hasSummarized, setHasSummarized] = useState(false);
 
   const handleZoomIn = useCallback(() => {
     setZoomLevel(prev => Math.min(prev + 25, 300));
@@ -376,7 +402,7 @@ export function CreateFlyerDialog({
 
   const mlsData = transaction.mlsData as MLSData | null;
   const maxPhotos = format === "social" ? 1 : 3;
-  const maxDescriptionLength = format === "social" ? 350 : 250;
+  const maxDescriptionLength = format === "social" ? 200 : 115;
 
   const resetPhotoSelection = useCallback((newFormat: FlyerFormat) => {
     const limit = newFormat === "social" ? 1 : 3;
@@ -398,8 +424,13 @@ export function CreateFlyerDialog({
       if (mlsPhotos.length === 0) {
         setShowUploadSection(true);
       }
+      // Store original MLS description when dialog opens
+      const mlsDescription = mlsData?.description || "";
+      setOriginalDescription(mlsDescription);
+      setPreviousDescription(null);
+      setHasSummarized(false);
     }
-  }, [open, mlsPhotos.length]);
+  }, [open, mlsPhotos.length, mlsData?.description]);
 
   useEffect(() => {
     if (!open) {
@@ -460,21 +491,28 @@ export function CreateFlyerDialog({
   const currentDescriptionLength = watchedValues.description?.length || 0;
 
   const handleSummarize = useCallback(async () => {
-    const currentDescription = form.getValues("description");
-    if (!currentDescription || currentDescription.trim().length === 0) {
+    // Always use the FULL original MLS description as source
+    if (!originalDescription || originalDescription.trim().length === 0) {
       toast({
         title: "No description",
-        description: "Please enter a description to summarize.",
+        description: "No MLS description available to summarize.",
         variant: "destructive",
       });
       return;
     }
 
+    // Store current description before summarizing (for revert)
+    const currentDescription = form.getValues("description");
+    setPreviousDescription(currentDescription || null);
+
     setIsSummarizing(true);
     try {
+      // Use format-specific character limits
+      const maxLength = format === "social" ? 200 : 115;
+      
       const response = await apiRequest("POST", "/api/summarize-description", {
-        description: currentDescription,
-        maxLength: 115,
+        description: originalDescription, // Always use ORIGINAL MLS description
+        maxLength,
         propertyInfo: {
           address: transaction.propertyAddress,
           beds: form.getValues("bedrooms"),
@@ -487,6 +525,7 @@ export function CreateFlyerDialog({
       
       if (data.summary) {
         form.setValue("description", data.summary);
+        setHasSummarized(true);
         toast({
           title: data.fallback ? "Description truncated" : "Description summarized!",
           description: data.fallback 
@@ -504,7 +543,29 @@ export function CreateFlyerDialog({
     } finally {
       setIsSummarizing(false);
     }
-  }, [form, transaction.propertyAddress, toast]);
+  }, [form, transaction.propertyAddress, toast, originalDescription, format]);
+
+  const handleRevertToPrevious = useCallback(() => {
+    if (previousDescription !== null) {
+      const currentDesc = form.getValues("description");
+      form.setValue("description", previousDescription);
+      setPreviousDescription(currentDesc || null);
+      toast({
+        title: "Reverted",
+        description: "Description reverted to previous version.",
+      });
+    }
+  }, [form, previousDescription, toast]);
+
+  const handleRevertToOriginal = useCallback(() => {
+    const currentDesc = form.getValues("description");
+    setPreviousDescription(currentDesc || null);
+    form.setValue("description", originalDescription);
+    toast({
+      title: "Reverted to original",
+      description: "Full MLS description restored.",
+    });
+  }, [form, originalDescription, toast]);
 
   const handleFormatChange = (newFormat: FlyerFormat) => {
     setFormat(newFormat);
@@ -756,7 +817,7 @@ export function CreateFlyerDialog({
     }
 
     if (data.description) {
-      const truncatedDesc = truncateDescription(data.description, 350);
+      const truncatedDesc = truncateDescription(data.description, 200);
       ctx.font = "24px Inter, sans-serif";
       ctx.fillStyle = "#cccccc";
       const maxWidth = canvas.width - 120;
@@ -1537,21 +1598,22 @@ export function CreateFlyerDialog({
                   control={form.control}
                   name="description"
                   render={({ field }) => {
-                    const charLimit = format === "print" ? 115 : maxDescriptionLength;
-                    const isOverLimit = currentDescriptionLength > charLimit;
-                    const isNearLimit = currentDescriptionLength > charLimit - 10 && currentDescriptionLength <= charLimit;
+                    // Use maxDescriptionLength directly for consistency
+                    const isOverLimit = currentDescriptionLength > maxDescriptionLength;
+                    const isNearLimit = currentDescriptionLength > maxDescriptionLength - 10 && currentDescriptionLength <= maxDescriptionLength;
                     
                     return (
                       <FormItem>
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
                           <FormLabel className="text-sm">Description</FormLabel>
-                          {format === "print" && (
+                          <div className="flex items-center gap-1.5">
+                            {/* AI Summarize button - shown for BOTH formats */}
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
                               onClick={handleSummarize}
-                              disabled={isSummarizing || !field.value}
+                              disabled={isSummarizing || !originalDescription}
                               className="h-7 text-xs"
                               data-testid="button-ai-summarize"
                             >
@@ -1567,7 +1629,41 @@ export function CreateFlyerDialog({
                                 </>
                               )}
                             </Button>
-                          )}
+                            
+                            {/* Revert dropdown - shown after AI has been used */}
+                            {hasSummarized && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs px-2"
+                                    data-testid="button-revert-dropdown"
+                                  >
+                                    <Undo2 className="h-3 w-3 mr-1" />
+                                    Revert
+                                    <ChevronDown className="h-3 w-3 ml-1" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem 
+                                    onClick={handleRevertToPrevious}
+                                    disabled={previousDescription === null}
+                                    data-testid="button-revert-previous"
+                                  >
+                                    Revert to Previous
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={handleRevertToOriginal}
+                                    data-testid="button-revert-original"
+                                  >
+                                    Revert to Original
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                          </div>
                         </div>
                         <FormControl>
                           <Textarea
@@ -1577,23 +1673,25 @@ export function CreateFlyerDialog({
                             {...field}
                           />
                         </FormControl>
-                        <FormDescription className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">
-                            {format === "print" 
-                              ? "Tip: Click 'AI Summarize' to create a concise summary"
-                              : `Will be truncated to ${charLimit} chars on flyer`
-                            }
-                          </span>
-                          <span className={
-                            isOverLimit 
-                              ? "text-red-600 font-medium" 
-                              : isNearLimit 
-                                ? "text-amber-600 font-medium" 
-                                : "text-green-600"
-                          }>
-                            {currentDescriptionLength}/{charLimit}
-                            {isOverLimit && " (will truncate)"}
-                          </span>
+                        <FormDescription className="flex flex-col gap-1 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">
+                              {hasSummarized 
+                                ? "Click AI Summarize again for a different variation"
+                                : "Click 'AI Summarize' to create a concise summary"
+                              }
+                            </span>
+                            <span className={
+                              isOverLimit 
+                                ? "text-red-600 font-medium" 
+                                : isNearLimit 
+                                  ? "text-amber-600 font-medium" 
+                                  : "text-green-600"
+                            }>
+                              {currentDescriptionLength}/{maxDescriptionLength}
+                              {isOverLimit && " (will truncate)"}
+                            </span>
+                          </div>
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -1825,31 +1923,33 @@ export function CreateFlyerDialog({
       {/* Enlarged Preview Modal */}
       {previewEnlarged && (
         <Dialog open={previewEnlarged} onOpenChange={setPreviewEnlarged}>
-          <DialogContent className="w-[95vw] max-w-[min(90vw,1200px)] max-h-[90vh] p-4 flex flex-col">
-            <DialogHeader className="pb-2">
-              <DialogTitle>Preview - {format === "social" ? "Social Media" : "Print Flyer"}</DialogTitle>
-              <DialogDescription>
+          <DialogContent className="w-[95vw] max-w-[min(95vw,1000px)] max-h-[90vh] p-2 sm:p-3 flex flex-col">
+            <DialogHeader className="pb-1 px-2">
+              <DialogTitle className="text-base">Preview - {format === "social" ? "Social Media" : "Print Flyer"}</DialogTitle>
+              <DialogDescription className="text-xs">
                 Full-size preview of your flyer
               </DialogDescription>
             </DialogHeader>
 
             {/* Zoom Controls Toolbar */}
-            <div className="flex items-center justify-center gap-2 py-2 border-b">
+            <div className="flex items-center justify-center gap-2 py-1.5 border-b">
               <Button
                 variant="outline"
                 size="icon"
+                className="h-8 w-8"
                 onClick={handleZoomOut}
                 disabled={zoomLevel <= 50}
                 data-testid="button-zoom-out"
               >
                 <Minus className="h-4 w-4" />
               </Button>
-              <div className="w-16 text-center text-sm font-medium" data-testid="text-zoom-level">
+              <div className="w-14 text-center text-sm font-medium" data-testid="text-zoom-level">
                 {zoomLevel}%
               </div>
               <Button
                 variant="outline"
                 size="icon"
+                className="h-8 w-8"
                 onClick={handleZoomIn}
                 disabled={zoomLevel >= 300}
                 data-testid="button-zoom-in"
@@ -1859,7 +1959,7 @@ export function CreateFlyerDialog({
               <Button
                 variant="outline"
                 size="sm"
-                className="ml-2"
+                className="ml-2 h-8"
                 onClick={handleZoomReset}
                 disabled={zoomLevel === 100}
                 data-testid="button-zoom-fit"
@@ -1869,14 +1969,15 @@ export function CreateFlyerDialog({
               </Button>
             </div>
 
-            {/* Scrollable Preview Area */}
+            {/* Scrollable Preview Area - Reduced padding */}
             <ScrollArea className="flex-1 min-h-0">
-              <div className="flex justify-center py-4">
+              <div className="flex justify-center py-2 px-1">
                 <div 
                   className="transition-transform duration-200 ease-out origin-top"
                   style={{ transform: `scale(${zoomLevel / 100})` }}
                 >
-                  <div className={format === "social" ? "w-64" : "w-80"}>
+                  {/* Larger preview sizes for better fill */}
+                  <div className={format === "social" ? "w-72 sm:w-80" : "w-[340px] sm:w-[400px]"}>
                     {format === "social" ? (
                       <SocialMediaPreview
                         photoUrls={previewPhotoUrls}
