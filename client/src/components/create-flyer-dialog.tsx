@@ -1,8 +1,8 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, X, Upload, Image as ImageIcon } from "lucide-react";
+import { Loader2, X, Upload, Check, ImageIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -57,6 +57,7 @@ interface CreateFlyerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction: Transaction;
+  mlsPhotos?: string[];
   agentName?: string;
   agentPhone?: string;
   agentPhotoUrl?: string;
@@ -66,16 +67,35 @@ export function CreateFlyerDialog({
   open,
   onOpenChange,
   transaction,
+  mlsPhotos = [],
   agentName = "",
   agentPhone = "",
   agentPhotoUrl,
 }: CreateFlyerDialogProps) {
   const { toast } = useToast();
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
+  const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [showUploadSection, setShowUploadSection] = useState(false);
 
   const mlsData = transaction.mlsData as MLSData | null;
+
+  useEffect(() => {
+    if (open && mlsPhotos.length > 0) {
+      setSelectedPhotos(mlsPhotos.slice(0, 3));
+    } else if (open && mlsPhotos.length === 0) {
+      setShowUploadSection(true);
+    }
+  }, [open, mlsPhotos]);
+
+  useEffect(() => {
+    if (!open) {
+      setSelectedPhotos([]);
+      setUploadedPhotos([]);
+      setShowUploadSection(false);
+    }
+  }, [open]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -89,10 +109,34 @@ export function CreateFlyerDialog({
     },
   });
 
+  const togglePhotoSelection = (photoUrl: string) => {
+    setSelectedPhotos((prev) => {
+      if (prev.includes(photoUrl)) {
+        return prev.filter((p) => p !== photoUrl);
+      }
+      if (prev.length >= 3) {
+        toast({
+          title: "Maximum photos selected",
+          description: "You can select up to 3 photos for the flyer",
+        });
+        return prev;
+      }
+      return [...prev, photoUrl];
+    });
+  };
+
   const handleFileUpload = useCallback((files: FileList | null) => {
     if (!files) return;
     
-    const remainingSlots = 3 - photos.length;
+    const totalPhotos = selectedPhotos.length + uploadedPhotos.length;
+    const remainingSlots = 3 - totalPhotos;
+    if (remainingSlots <= 0) {
+      toast({
+        title: "Maximum photos reached",
+        description: "You can only use up to 3 photos. Deselect MLS photos to upload more.",
+      });
+      return;
+    }
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
     
     filesToProcess.forEach((file) => {
@@ -108,14 +152,14 @@ export function CreateFlyerDialog({
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
-        setPhotos((prev) => {
+        setUploadedPhotos((prev) => {
           if (prev.length >= 3) return prev;
           return [...prev, result];
         });
       };
       reader.readAsDataURL(file);
     });
-  }, [photos.length, toast]);
+  }, [selectedPhotos.length, uploadedPhotos.length, toast]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -133,15 +177,25 @@ export function CreateFlyerDialog({
     setIsDragOver(false);
   }, []);
 
-  const removePhoto = (index: number) => {
-    setPhotos((prev) => prev.filter((_, i) => i !== index));
+  const removeUploadedPhoto = (index: number) => {
+    setUploadedPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const getPhotosForFlyer = (): string[] => {
+    const mlsUrls = selectedPhotos.map(url => 
+      url.startsWith('data:') ? url : `/api/proxy-image?url=${encodeURIComponent(url)}`
+    );
+    const combined = [...mlsUrls, ...uploadedPhotos];
+    return combined.slice(0, 3);
   };
 
   const generateFlyer = async (data: FormValues) => {
-    if (photos.length === 0) {
+    const photosToUse = getPhotosForFlyer();
+    
+    if (photosToUse.length === 0) {
       toast({
         title: "Photos required",
-        description: "Please upload at least one photo for the flyer",
+        description: "Please select or upload at least one photo for the flyer",
         variant: "destructive",
       });
       return;
@@ -165,7 +219,7 @@ export function CreateFlyerDialog({
       await new Promise<void>((resolve, reject) => {
         mainPhoto.onload = () => resolve();
         mainPhoto.onerror = () => reject(new Error("Failed to load photo"));
-        mainPhoto.src = photos[0];
+        mainPhoto.src = photosToUse[0];
       });
 
       const photoHeight = 900;
@@ -301,76 +355,158 @@ export function CreateFlyerDialog({
     }
   };
 
+  const photosForFlyer = getPhotosForFlyer();
+  const hasPhotosSelected = photosForFlyer.length > 0;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Create Property Flyer</DialogTitle>
           <DialogDescription>
-            Upload photos and customize details to generate a printable property flyer.
+            Select photos and customize details to generate a printable property flyer.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(generateFlyer)} className="space-y-6 overflow-y-auto flex-1 pr-2">
-            <div className="space-y-2">
-              <FormLabel>Property Photos (up to 3)</FormLabel>
-              <div
-                className={`border-2 border-dashed rounded-md p-6 text-center transition-colors ${
-                  isDragOver ? "border-primary bg-primary/5" : "border-muted-foreground/25"
-                } ${photos.length >= 3 ? "opacity-50 pointer-events-none" : ""}`}
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                data-testid="dropzone-photos"
-              >
-                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mb-2">
-                  Drag and drop photos here, or click to browse
-                </p>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  id="photo-upload"
-                  onChange={(e) => handleFileUpload(e.target.files)}
-                  disabled={photos.length >= 3}
-                  data-testid="input-photo-upload"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => document.getElementById("photo-upload")?.click()}
-                  disabled={photos.length >= 3}
-                  data-testid="button-browse-photos"
-                >
-                  Browse Files
-                </Button>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {photos.length}/3 photos uploaded
+            {mlsPhotos.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <FormLabel>Select Photos from MLS ({mlsPhotos.length} available)</FormLabel>
+                  <span className="text-sm text-muted-foreground">
+                    {selectedPhotos.length}/3 selected
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto p-1 border rounded-md bg-muted/30">
+                  {mlsPhotos.map((photo, index) => {
+                    const isSelected = selectedPhotos.includes(photo);
+                    const selectionIndex = selectedPhotos.indexOf(photo);
+                    return (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => togglePhotoSelection(photo)}
+                        className={`relative aspect-square rounded-md overflow-hidden group transition-all ${
+                          isSelected 
+                            ? "ring-2 ring-primary ring-offset-2" 
+                            : "hover:ring-2 hover:ring-muted-foreground/50"
+                        }`}
+                        data-testid={`button-mls-photo-${index}`}
+                      >
+                        <img
+                          src={`/api/proxy-image?url=${encodeURIComponent(photo)}`}
+                          alt={`MLS Photo ${index + 1}`}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                            <div className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                              {selectionIndex + 1}
+                            </div>
+                          </div>
+                        )}
+                        {!isSelected && selectedPhotos.length < 3 && (
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Check className="h-6 w-6 text-white" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Click to select photos. First selected photo will be the main image.
                 </p>
               </div>
+            )}
 
-              {photos.length > 0 && (
-                <div className="flex gap-2 flex-wrap mt-3">
-                  {photos.map((photo, index) => (
-                    <div key={index} className="relative w-20 h-20 rounded-md overflow-hidden group">
-                      <img src={photo} alt={`Upload ${index + 1}`} className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => removePhoto(index)}
-                        className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                        data-testid={`button-remove-photo-${index}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
+            {mlsPhotos.length > 0 && !showUploadSection && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowUploadSection(true)}
+                className="text-muted-foreground"
+                data-testid="button-show-upload"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Or upload your own photos
+              </Button>
+            )}
+
+            {(showUploadSection || mlsPhotos.length === 0) && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <FormLabel>
+                    {mlsPhotos.length > 0 ? "Upload Custom Photos" : "Property Photos (up to 3)"}
+                  </FormLabel>
+                  {mlsPhotos.length > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      {3 - selectedPhotos.length} slot{3 - selectedPhotos.length !== 1 ? 's' : ''} available
+                    </span>
+                  )}
                 </div>
-              )}
-            </div>
+                <div
+                  className={`border-2 border-dashed rounded-md p-6 text-center transition-colors ${
+                    isDragOver ? "border-primary bg-primary/5" : "border-muted-foreground/25"
+                  } ${selectedPhotos.length + uploadedPhotos.length >= 3 ? "opacity-50 pointer-events-none" : ""}`}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  data-testid="dropzone-photos"
+                >
+                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Drag and drop photos here, or click to browse
+                  </p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    id="photo-upload"
+                    onChange={(e) => handleFileUpload(e.target.files)}
+                    disabled={selectedPhotos.length + uploadedPhotos.length >= 3}
+                    data-testid="input-photo-upload"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById("photo-upload")?.click()}
+                    disabled={selectedPhotos.length + uploadedPhotos.length >= 3}
+                    data-testid="button-browse-photos"
+                  >
+                    Browse Files
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {uploadedPhotos.length} uploaded
+                    {selectedPhotos.length > 0 && ` + ${selectedPhotos.length} from MLS`}
+                    {' '}({selectedPhotos.length + uploadedPhotos.length}/3 total)
+                  </p>
+                </div>
+
+                {uploadedPhotos.length > 0 && (
+                  <div className="flex gap-2 flex-wrap mt-3">
+                    {uploadedPhotos.map((photo, index) => (
+                      <div key={index} className="relative w-20 h-20 rounded-md overflow-hidden group">
+                        <img src={photo} alt={`Upload ${index + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeUploadedPhoto(index)}
+                          className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          data-testid={`button-remove-photo-${index}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -510,7 +646,7 @@ export function CreateFlyerDialog({
               </Button>
               <Button
                 type="submit"
-                disabled={isGenerating || photos.length === 0}
+                disabled={isGenerating || !hasPhotosSelected}
                 data-testid="button-generate-flyer"
               >
                 {isGenerating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
