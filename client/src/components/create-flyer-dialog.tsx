@@ -224,7 +224,20 @@ function PrintFlyerPreview({
   
   const streetAddress = address.split(",")[0].trim().toUpperCase();
   const cityStateZip = address.split(",").slice(1).join(",").trim().toUpperCase();
-  const fullAddress = `${streetAddress} ${cityStateZip}`;
+  
+  // Format address: keep numbers together, space out letters
+  const formatAddressForFlyer = (addr: string): string => {
+    return addr
+      .split(' ')
+      .map(word => {
+        if (/^\d+$/.test(word)) {
+          return word;
+        }
+        return word.split('').join(' ');
+      })
+      .join('   ');
+  };
+  const formattedStreetAddress = formatAddressForFlyer(streetAddress);
 
   return (
     <div className="relative w-full aspect-[8.5/11] bg-white rounded-lg overflow-hidden shadow-lg border border-border" style={{ fontFamily: "'League Spartan', 'Montserrat', sans-serif" }}>
@@ -238,7 +251,7 @@ function PrintFlyerPreview({
           />
         </div>
         <div className="text-center">
-          <p className="text-[5px] text-gray-500 italic">Leading</p>
+          <p className="text-[7px] text-[#333]" style={{ fontFamily: "'Pinyon Script', cursive" }}>Leading</p>
           <p className="text-[4px] text-gray-500 tracking-wider">REAL ESTATE COMPANIES OF THE WORLD</p>
         </div>
         <div className="bg-[#c4a962] text-white px-2 py-1.5">
@@ -248,9 +261,12 @@ function PrintFlyerPreview({
       </div>
 
       {/* Address Bar - White with dark text */}
-      <div className="py-1.5 px-2 text-center">
-        <p className="text-[6px] text-[#333] tracking-[0.2em] font-medium">
-          {fullAddress}
+      <div className="py-1 px-2 text-center">
+        <p className="text-[6px] text-[#333] tracking-[0.15em] font-semibold">
+          {formattedStreetAddress}
+        </p>
+        <p className="text-[4px] text-gray-500 tracking-wider mt-0.5">
+          {cityStateZip}
         </p>
       </div>
 
@@ -341,16 +357,18 @@ function PrintFlyerPreview({
           <p className="text-[6px] font-bold text-[#333]">{agentName || "Agent Name"}</p>
           <p className="text-[4px] text-gray-500">{agentTitle || "REALTOR®, Spyglass Realty"}</p>
           <p className="text-[5px] text-gray-600">{agentPhone || "(XXX) XXX-XXXX"}</p>
-          <img
-            src={spyglassLogoWhite}
-            alt="Logo"
-            className="h-2 w-auto mx-auto mt-0.5"
-          />
+          <div className="bg-[#1a1a1a] rounded px-1 py-0.5 mx-auto mt-0.5 inline-block">
+            <img
+              src={spyglassLogoWhite}
+              alt="Logo"
+              className="h-2 w-auto"
+            />
+          </div>
         </div>
       </div>
 
       {/* Bottom decorative bar - gold */}
-      <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#c4a962]" />
+      <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-[#c4a962]" />
     </div>
   );
 }
@@ -905,7 +923,23 @@ export function CreateFlyerDialog({
     const addressParts = address.split(",");
     const streetAddress = addressParts[0].trim().toUpperCase();
     const cityStateZip = addressParts.slice(1).join(",").trim().toUpperCase();
-    const fullAddress = `${streetAddress} ${cityStateZip}`;
+    
+    // Format address: keep numbers together, space out letters
+    const formatAddressForFlyer = (addr: string): string => {
+      return addr
+        .split(' ')
+        .map(word => {
+          // Keep numbers together (street number)
+          if (/^\d+$/.test(word)) {
+            return word;
+          }
+          // Space out letters for text words
+          return word.split('').join(' ');
+        })
+        .join('   '); // Triple space between words
+    };
+    
+    const formattedStreetAddress = formatAddressForFlyer(streetAddress);
     const statusLabel = STATUS_OPTIONS.find(s => s.value === data.status)?.label || "Listed";
 
     // Fill white background
@@ -942,12 +976,14 @@ export function CreateFlyerDialog({
     ctx.drawImage(logo, 80, 65, logoWidth, logoHeight);
 
     // Center - "Leading Real Estate Companies of the World" text
-    ctx.fillStyle = "#666666";
-    ctx.font = `italic 28px ${FONT_MONTSERRAT}`;
+    const FONT_SCRIPT = "Pinyon Script, cursive";
+    ctx.fillStyle = "#333333";
+    ctx.font = `48px ${FONT_SCRIPT}`;
     ctx.textAlign = "center";
-    ctx.fillText("Leading", canvas.width / 2, 100);
-    ctx.font = `500 22px ${FONT_MONTSERRAT}`;
-    ctx.fillText("REAL ESTATE COMPANIES OF THE WORLD", canvas.width / 2, 135);
+    ctx.fillText("Leading", canvas.width / 2, 105);
+    ctx.font = `500 20px ${FONT_MONTSERRAT}`;
+    ctx.fillStyle = "#666666";
+    ctx.fillText("REAL ESTATE COMPANIES OF THE WORLD", canvas.width / 2, 140);
 
     // Price badge (right) - gold background
     const badgeWidth = 420;
@@ -968,10 +1004,16 @@ export function CreateFlyerDialog({
     const addressBarY = headerHeight;
     const addressBarHeight = 100;
     
+    // Street address with spaced letters
     ctx.fillStyle = DARK_TEXT;
-    ctx.font = `500 40px ${FONT_LEAGUE}`;
+    ctx.font = `600 42px ${FONT_LEAGUE}`;
     ctx.textAlign = "center";
-    ctx.fillText(fullAddress, canvas.width / 2, addressBarY + 65);
+    ctx.fillText(formattedStreetAddress, canvas.width / 2, addressBarY + 50);
+    
+    // City, State ZIP below
+    ctx.font = `400 28px ${FONT_MONTSERRAT}`;
+    ctx.fillStyle = "#666666";
+    ctx.fillText(cityStateZip, canvas.width / 2, addressBarY + 85);
 
     // ============ PHOTOS SECTION ============
     const photosY = addressBarY + addressBarHeight + 30;
@@ -1222,14 +1264,31 @@ export function CreateFlyerDialog({
     ctx.font = `400 30px ${FONT_MONTSERRAT}`;
     ctx.fillText(data.agentPhone || "(XXX) XXX-XXXX", agentCenterX, agentPhotoY + agentCircleR * 2 + 135);
 
-    // Small Spyglass logo under agent info
+    // Small Spyglass logo under agent info with dark background
     const smallLogoHeight = 50;
     const smallLogoWidth = (logo.width / logo.height) * smallLogoHeight || 150;
-    ctx.drawImage(logo, agentCenterX - smallLogoWidth / 2, agentPhotoY + agentCircleR * 2 + 160, smallLogoWidth, smallLogoHeight);
+    const smallLogoBgPadding = 12;
+    const smallLogoX = agentCenterX - smallLogoWidth / 2;
+    const smallLogoY = agentPhotoY + agentCircleR * 2 + 160;
+    
+    // Draw dark background for logo visibility
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath();
+    ctx.roundRect(
+      smallLogoX - smallLogoBgPadding,
+      smallLogoY - smallLogoBgPadding / 2,
+      smallLogoWidth + smallLogoBgPadding * 2,
+      smallLogoHeight + smallLogoBgPadding,
+      6
+    );
+    ctx.fill();
+    
+    ctx.drawImage(logo, smallLogoX, smallLogoY, smallLogoWidth, smallLogoHeight);
 
-    // Bottom decorative bar - gold
+    // Bottom decorative bar - gold (40px height)
+    const footerHeight = 40;
     ctx.fillStyle = GOLD_COLOR;
-    ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
+    ctx.fillRect(0, canvas.height - footerHeight, canvas.width, footerHeight);
   };
 
   const generateFlyer = async (data: FormValues) => {
