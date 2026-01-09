@@ -223,6 +223,12 @@ export interface MLSData {
   // Photos
   photos: string[];
   
+  // Coordinates for mapping
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+  
   // Legacy compatibility
   images: string[];
   agent?: {

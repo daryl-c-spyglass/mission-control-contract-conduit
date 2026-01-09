@@ -62,6 +62,15 @@ The Templates tab in transaction details provides marketing template generation:
 - Live previews with property photos, pricing, and description overlays
 - Uses `/api/listings/search` endpoint with `searchByAddress` fallback to MLS lookup
 
+### Enhanced MLS Data Tab (January 2026)
+The MLS Data tab provides comprehensive property information visualization:
+- **Photo Gallery**: Fullscreen modal with navigation arrows, thumbnail strip, and photo counter
+- **Browse by Room**: Room type filter UI (Coming Soon - Repliers API doesn't provide room categorization)
+- **Feature Tags**: Dynamic badges extracted from MLS data (garage, pool, fireplace, patio/deck, stories)
+- **Google Maps Integration**: Embedded map showing property location (via secure `/api/maps-embed` endpoint)
+- **Property Details**: Description, collapsible feature sections, price per sqft, HOA fees, tax info
+- All MLS images are proxied through `/api/proxy-image` to avoid CORS issues
+
 ### Key NPM Packages
 - **UI**: Radix UI primitives, shadcn/ui components, Lucide icons, react-icons
 - **Forms**: react-hook-form with zod validation via @hookform/resolvers

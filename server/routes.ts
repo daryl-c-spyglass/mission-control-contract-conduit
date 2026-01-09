@@ -960,6 +960,36 @@ export async function registerRoutes(
     }
   });
 
+  // ============ Google Maps Embed ============
+  // Returns a secure Maps Embed API URL for displaying property locations
+  // The API key is kept server-side and only the embed URL is exposed
+  
+  app.get("/api/maps-embed", isAuthenticated, async (req, res) => {
+    try {
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(404).json({ message: "Google Maps API key not configured" });
+      }
+      
+      const { address, lat, lng } = req.query;
+      
+      // Prefer coordinates if available, otherwise use address
+      let embedUrl: string;
+      if (lat && lng) {
+        embedUrl = `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${lat},${lng}&zoom=15`;
+      } else if (address && typeof address === 'string') {
+        embedUrl = `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(address)}&zoom=15`;
+      } else {
+        return res.status(400).json({ message: "Address or coordinates required" });
+      }
+      
+      res.json({ embedUrl });
+    } catch (error) {
+      console.error("Error generating maps embed:", error);
+      res.status(500).json({ message: "Failed to generate map embed" });
+    }
+  });
+
   // ============ Image Proxy for CORS ============
   // Proxies external MLS images to avoid CORS issues in canvas rendering
 

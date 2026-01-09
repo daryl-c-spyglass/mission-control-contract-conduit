@@ -39,7 +39,18 @@ import {
   Building,
   DollarSign,
   Share2,
+  X,
+  Flame,
+  Car,
+  Trees,
+  Sofa,
+  ChefHat,
+  BedDouble,
+  Maximize2,
+  Grid3X3,
+  Waves,
 } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { CreateFlyerDialog } from "./create-flyer-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -152,6 +163,17 @@ interface TemplateListing {
   };
 }
 
+// Room type filter options
+const ROOM_TYPES = [
+  { id: "all", label: "All", icon: Grid3X3 },
+  { id: "kitchen", label: "Kitchen", icon: ChefHat },
+  { id: "living", label: "Living Room", icon: Sofa },
+  { id: "bedroom", label: "Bedroom", icon: BedDouble },
+  { id: "bathroom", label: "Bathroom", icon: Bath },
+  { id: "patio", label: "Patio", icon: Trees },
+  { id: "exterior", label: "Exterior", icon: Home },
+] as const;
+
 export function TransactionDetails({ transaction, coordinators, activities, onBack, onMarketingClick, initialTab = "overview" }: TransactionDetailsProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const { toast } = useToast();
@@ -161,6 +183,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [templateListing, setTemplateListing] = useState<TemplateListing | null>(null);
   const [templateCategory, setTemplateCategory] = useState<string>("posts");
   const [currentPhoto, setCurrentPhoto] = useState(0);
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const status = statusConfig[transaction.status] || statusConfig.in_contract;
   const mlsData = transaction.mlsData as MLSData | null;
   const cmaData = transaction.cmaData as CMAComparable[] | null;
@@ -169,6 +192,30 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const photos = mlsData?.photos || mlsData?.images || [];
   const nextPhoto = () => setCurrentPhoto((prev) => (prev + 1) % Math.max(photos.length, 1));
   const prevPhoto = () => setCurrentPhoto((prev) => (prev - 1 + photos.length) % Math.max(photos.length, 1));
+  
+  // Build full address for map
+  const fullAddress = mlsData ? 
+    `${mlsData.address}, ${mlsData.city}, ${mlsData.state} ${mlsData.zipCode}` : 
+    transaction.propertyAddress;
+  
+  // Fetch map embed URL
+  const { data: mapData } = useQuery<{ embedUrl: string }>({
+    queryKey: ["/api/maps-embed", mlsData?.coordinates?.latitude, mlsData?.coordinates?.longitude, fullAddress],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (mlsData?.coordinates?.latitude && mlsData?.coordinates?.longitude) {
+        params.set("lat", mlsData.coordinates.latitude.toString());
+        params.set("lng", mlsData.coordinates.longitude.toString());
+      } else {
+        params.set("address", fullAddress);
+      }
+      const res = await fetch(`/api/maps-embed?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) return { embedUrl: "" };
+      return res.json();
+    },
+    enabled: !!mlsData || !!transaction.propertyAddress,
+    staleTime: 1000 * 60 * 60, // Cache for 1 hour
+  });
   
   // Reset photo index when MLS data or photos change
   useEffect(() => {
@@ -652,18 +699,20 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
 
           {mlsData ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left Column - Photos & Description */}
+              {/* Left Column - Photos, Features, Description, Map */}
               <div className="lg:col-span-2 space-y-6">
-                {/* Photo Gallery */}
+                {/* Enhanced Photo Gallery */}
                 {photos.length > 0 && (
                   <Card>
                     <CardContent className="p-0">
+                      {/* Main Photo Display */}
                       <div className="relative">
                         <img 
                           src={`/api/proxy-image?url=${encodeURIComponent(photos[currentPhoto] || '')}`}
                           alt={`Property photo ${currentPhoto + 1}`}
-                          className="w-full h-80 object-cover rounded-t-lg"
+                          className="w-full h-96 object-cover rounded-t-lg cursor-pointer"
                           data-testid="img-mls-main-photo"
+                          onClick={() => setFullscreenOpen(true)}
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23f0f0f0' width='400' height='300'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%23999' dy='0.3em'%3ENo Image%3C/text%3E%3C/svg%3E";
                           }}
@@ -684,21 +733,32 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                             >
                               <ChevronRight className="h-5 w-5" />
                             </button>
-                            <div className="absolute bottom-3 right-3 px-3 py-1 bg-black/60 text-white text-sm rounded-full">
-                              {currentPhoto + 1} / {photos.length}
-                            </div>
                           </>
+                        )}
+                        {/* Photo Counter Badge */}
+                        <div className="absolute bottom-3 left-3 px-3 py-1 bg-black/60 text-white text-sm rounded-full">
+                          {currentPhoto + 1} / {photos.length}
+                        </div>
+                        {/* Fullscreen Button - only show if photos exist */}
+                        {photos.length > 0 && (
+                          <button 
+                            onClick={() => setFullscreenOpen(true)}
+                            className="absolute bottom-3 right-3 p-2 bg-black/60 hover:bg-black/80 rounded-full text-white transition-colors"
+                            data-testid="button-fullscreen-photo"
+                          >
+                            <Maximize2 className="h-4 w-4" />
+                          </button>
                         )}
                       </div>
                       
-                      {/* Thumbnails */}
+                      {/* Thumbnails Strip */}
                       {photos.length > 1 && (
                         <div className="p-3 flex gap-2 overflow-x-auto">
-                          {photos.slice(0, 10).map((photo, i) => (
+                          {photos.slice(0, 5).map((photo, i) => (
                             <button
                               key={i}
                               onClick={() => setCurrentPhoto(i)}
-                              className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
+                              className={`flex-shrink-0 w-20 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
                                 i === currentPhoto ? 'border-primary' : 'border-transparent'
                               }`}
                               data-testid={`button-thumbnail-${i}`}
@@ -706,20 +766,54 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                               <img 
                                 src={`/api/proxy-image?url=${encodeURIComponent(photo)}`} 
                                 alt={`Thumb ${i + 1}`} 
-                                className="w-full h-full object-cover" 
+                                className="w-full h-full object-cover"
+                                loading="lazy"
                                 onError={(e) => {
                                   (e.target as HTMLImageElement).style.display = "none";
                                 }}
                               />
                             </button>
                           ))}
-                          {photos.length > 10 && (
-                            <div className="flex-shrink-0 w-16 h-16 rounded-lg bg-muted flex items-center justify-center text-muted-foreground text-sm">
-                              +{photos.length - 10}
-                            </div>
+                          {photos.length > 5 && (
+                            <button 
+                              onClick={() => setFullscreenOpen(true)}
+                              className="flex-shrink-0 w-20 h-16 rounded-lg bg-muted hover-elevate flex items-center justify-center text-muted-foreground text-sm font-medium"
+                              data-testid="button-see-all-photos"
+                            >
+                              See all {photos.length}
+                            </button>
                           )}
                         </div>
                       )}
+                      
+                      {/* Room Type Browse - Coming Soon */}
+                      <div className="px-4 pb-3 border-t border-border pt-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs font-medium text-muted-foreground">Browse by room</span>
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">Coming Soon</Badge>
+                        </div>
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {ROOM_TYPES.map((roomType) => {
+                            const RoomIcon = roomType.icon;
+                            const isActive = roomType.id === "all";
+                            const isDisabled = roomType.id !== "all";
+                            return (
+                              <Button
+                                key={roomType.id}
+                                variant={isActive ? "default" : "outline"}
+                                size="sm"
+                                className={`gap-1.5 flex-shrink-0 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                disabled={isDisabled}
+                                data-testid={`button-filter-${roomType.id}`}
+                              >
+                                <RoomIcon className="h-3.5 w-3.5" />
+                                {roomType.label}
+                                {roomType.id === "all" && <span className="text-xs opacity-70">({photos.length})</span>}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      </div>
                       
                       {/* Photo Actions */}
                       <div className="px-4 pb-4 flex gap-2 flex-wrap">
@@ -735,6 +829,50 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                     </CardContent>
                   </Card>
                 )}
+                
+                {/* Feature Tags Row */}
+                {(() => {
+                  const featureTags = [];
+                  if (mlsData.garage) {
+                    featureTags.push({ icon: Car, label: mlsData.garage });
+                  }
+                  if (mlsData.pool && mlsData.pool !== "None") {
+                    featureTags.push({ icon: Waves, label: mlsData.pool });
+                  }
+                  const hasFireplace = mlsData.interiorFeatures?.some(f => 
+                    f.toLowerCase().includes('fireplace')
+                  ) || mlsData.exteriorFeatures?.some(f => 
+                    f.toLowerCase().includes('fireplace')
+                  );
+                  if (hasFireplace) {
+                    featureTags.push({ icon: Flame, label: "Fireplace" });
+                  }
+                  const hasPatio = mlsData.exteriorFeatures?.some(f => 
+                    f.toLowerCase().includes('patio') || f.toLowerCase().includes('deck') || f.toLowerCase().includes('porch')
+                  );
+                  if (hasPatio) {
+                    featureTags.push({ icon: Sofa, label: "Patio/Deck" });
+                  }
+                  if (mlsData.stories && mlsData.stories > 1) {
+                    featureTags.push({ icon: Building, label: `${mlsData.stories} Stories` });
+                  }
+                  
+                  if (featureTags.length === 0) return null;
+                  
+                  return (
+                    <div className="flex flex-wrap gap-2" data-testid="feature-tags">
+                      {featureTags.map((tag, idx) => {
+                        const TagIcon = tag.icon;
+                        return (
+                          <Badge key={idx} variant="secondary" className="gap-1.5 px-3 py-1.5">
+                            <TagIcon className="h-3.5 w-3.5" />
+                            {tag.label}
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
                 
                 {/* Description */}
                 {mlsData.description && (
@@ -800,6 +938,33 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                           )}
                         </div>
                       )}
+                    </CardContent>
+                  </Card>
+                )}
+                
+                {/* Location Map */}
+                {mapData?.embedUrl && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        Location
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="relative w-full h-[300px] rounded-b-lg overflow-hidden">
+                        <iframe
+                          src={mapData.embedUrl}
+                          width="100%"
+                          height="100%"
+                          style={{ border: 0 }}
+                          allowFullScreen
+                          loading="lazy"
+                          referrerPolicy="no-referrer-when-downgrade"
+                          title="Property Location Map"
+                          data-testid="iframe-property-map"
+                        />
+                      </div>
                     </CardContent>
                   </Card>
                 )}
@@ -1007,6 +1172,78 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 </Button>
               </CardContent>
             </Card>
+          )}
+          
+          {/* Fullscreen Photo Modal - only render if photos exist */}
+          {photos.length > 0 && (
+            <Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
+              <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black/95 border-none">
+                <div className="relative w-full h-full flex items-center justify-center min-h-[80vh]">
+                  {/* Close Button */}
+                  <button
+                    onClick={() => setFullscreenOpen(false)}
+                    className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors z-10"
+                    data-testid="button-close-fullscreen"
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
+                  
+                  {/* Photo Counter */}
+                  <div className="absolute top-4 left-4 px-4 py-2 bg-white/10 text-white rounded-full text-sm">
+                    {currentPhoto + 1} of {photos.length}
+                  </div>
+                  
+                  {/* Main Image */}
+                  <img
+                    src={`/api/proxy-image?url=${encodeURIComponent(photos[currentPhoto] || '')}`}
+                    alt={`Property photo ${currentPhoto + 1}`}
+                    className="max-w-full max-h-[80vh] object-contain"
+                    data-testid="img-fullscreen-photo"
+                  />
+                  
+                  {/* Navigation Arrows */}
+                  {photos.length > 1 && (
+                    <>
+                      <button
+                        onClick={prevPhoto}
+                        className="absolute left-4 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                        data-testid="button-fullscreen-prev"
+                      >
+                        <ChevronLeft className="h-8 w-8" />
+                      </button>
+                      <button
+                        onClick={nextPhoto}
+                        className="absolute right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                        data-testid="button-fullscreen-next"
+                      >
+                        <ChevronRight className="h-8 w-8" />
+                      </button>
+                    </>
+                  )}
+                  
+                  {/* Thumbnail Strip at Bottom */}
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 p-2 bg-black/50 rounded-lg max-w-[90vw] overflow-x-auto">
+                    {photos.map((photo, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setCurrentPhoto(i)}
+                        className={`flex-shrink-0 w-16 h-12 rounded overflow-hidden border-2 transition-colors ${
+                          i === currentPhoto ? 'border-white' : 'border-transparent opacity-60 hover:opacity-100'
+                        }`}
+                        data-testid={`button-fullscreen-thumb-${i}`}
+                      >
+                        <img
+                          src={`/api/proxy-image?url=${encodeURIComponent(photo)}`}
+                          alt={`Thumbnail ${i + 1}`}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           )}
         </TabsContent>
 

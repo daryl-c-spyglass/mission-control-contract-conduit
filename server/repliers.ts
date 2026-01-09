@@ -102,6 +102,12 @@ export interface MLSListingData {
   // Photos
   photos: string[];
   
+  // Coordinates for mapping
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+  
   // Legacy compatibility
   images: string[];
   agent?: {
@@ -384,6 +390,16 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
       listingAgentEmail: listing.listAgentEmail || listing.agents?.[0]?.email || "",
       
       photos: photos,
+      
+      // Extract coordinates if available
+      coordinates: (listing.map?.latitude && listing.map?.longitude) 
+        ? { latitude: parseFloat(listing.map.latitude), longitude: parseFloat(listing.map.longitude) }
+        : (listing.address?.latitude && listing.address?.longitude)
+          ? { latitude: parseFloat(listing.address.latitude), longitude: parseFloat(listing.address.longitude) }
+          : (listing.latitude && listing.longitude)
+            ? { latitude: parseFloat(listing.latitude), longitude: parseFloat(listing.longitude) }
+            : undefined,
+      
       images: photos,
       agent: listing.agents?.[0] ? {
         name: listing.agents[0].name || "",
