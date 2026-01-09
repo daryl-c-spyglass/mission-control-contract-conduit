@@ -1003,8 +1003,8 @@ export function CreateFlyerDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(generateFlyer)} className="flex-1 overflow-hidden">
-            <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 h-full overflow-y-auto pr-1 sm:pr-2">
+          <form onSubmit={form.handleSubmit(generateFlyer)} className="flex-1 flex flex-col min-h-0">
+            <div className="flex-1 flex flex-col lg:flex-row gap-4 sm:gap-6 overflow-y-auto pr-1 sm:pr-2 min-h-0">
               <div className="flex-1 space-y-3 sm:space-y-4 min-w-0">
                 <div className="space-y-2">
                   <FormLabel className="text-sm">Format</FormLabel>
