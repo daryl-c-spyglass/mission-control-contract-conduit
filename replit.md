@@ -83,6 +83,16 @@ Professional agent branding for print flyers with validated required fields:
 - **Validation**: Toast error prevents generation without required agent name and phone
 - **Live Preview**: Agent section updates in real-time as fields are filled
 
+#### Preview Modal Zoom Controls (January 2026)
+Zoom controls for the enlarged preview modal:
+- **Zoom Toolbar**: [-] [100%] [+] [Fit] layout above preview
+- **Zoom Range**: 50% to 300% in 25% increments
+- **ScrollArea**: Scrollbars appear when zoomed beyond viewport
+- **Smooth Transitions**: CSS transform scale with 200ms ease-out
+- **Keyboard Shortcuts**: Ctrl/Cmd + Plus (zoom in), Minus (zoom out), 0 (reset)
+- **Larger Modal**: max-w-[min(90vw,1200px)] and max-h-[90vh] for more preview space
+- **Auto-Reset**: Zoom level resets to 100% when modal closes
+
 ### Enhanced MLS Data Tab (January 2026)
 The MLS Data tab provides comprehensive property information visualization:
 - **Photo Gallery**: Fullscreen modal with navigation arrows, thumbnail strip, and photo counter
