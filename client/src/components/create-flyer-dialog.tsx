@@ -127,7 +127,6 @@ function SocialMediaPreview({
   }, [mainPhotoUrl]);
 
   const statusLabel = STATUS_OPTIONS.find(s => s.value === status)?.label || "Just Listed";
-  const addressParts = address.split(",");
   const truncatedDesc = truncateDescription(description || "", DESCRIPTION_LIMITS.social);
 
   const specs = [];
@@ -136,8 +135,9 @@ function SocialMediaPreview({
   if (sqft) specs.push(`${parseInt(sqft).toLocaleString()} sqft`);
 
   return (
-    <div className="relative w-full aspect-[9/16] bg-[#1a1a2e] rounded-lg overflow-hidden shadow-lg border border-border">
-      <div className="relative h-[47%] bg-muted">
+    <div className="relative w-full aspect-square bg-[#1a1a2e] rounded-lg overflow-hidden shadow-lg border border-border">
+      {/* Photo takes top 50% for 1:1 square format */}
+      <div className="relative h-[50%] bg-muted">
         {mainPhotoUrl ? (
           <>
             {!imageLoaded && !imageError && (
@@ -157,7 +157,7 @@ function SocialMediaPreview({
               onLoad={() => setImageLoaded(true)}
               onError={() => setImageError(true)}
             />
-            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-[#1a1a2e] to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-[#1a1a2e] to-transparent" />
           </>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -166,37 +166,34 @@ function SocialMediaPreview({
         )}
       </div>
 
-      <div className="p-2.5 space-y-1.5">
-        <p className="text-[9px] font-bold text-amber-500 uppercase tracking-wide">
+      {/* Content area for 1:1 square format - compact spacing */}
+      <div className="p-2 space-y-1">
+        <p className="text-[8px] font-bold text-amber-500 uppercase tracking-wide">
           {statusLabel}
         </p>
-        <p className="text-xs font-bold text-white">
+        <p className="text-[10px] font-bold text-white">
           {price || "$0"}
         </p>
-        <div className="space-y-0.5">
-          {addressParts.map((part, i) => (
-            <p key={i} className="text-[9px] text-white leading-tight">
-              {part.trim()}
-            </p>
-          ))}
-        </div>
+        <p className="text-[8px] text-white leading-tight">
+          {address.toUpperCase()}
+        </p>
         {specs.length > 0 && (
-          <p className="text-[8px] text-gray-400">
+          <p className="text-[7px] text-gray-400">
             {specs.join("  |  ")}
           </p>
         )}
         {truncatedDesc && (
-          <p className="text-[7px] text-gray-300 leading-relaxed line-clamp-3">
+          <p className="text-[6px] text-gray-300 leading-relaxed line-clamp-3">
             {truncatedDesc}
           </p>
         )}
       </div>
 
-      <div className="absolute bottom-1.5 right-1.5">
+      <div className="absolute bottom-1 right-1">
         <img
           src={spyglassLogoWhite}
           alt="Logo"
-          className="h-4 w-auto opacity-90"
+          className="h-3 w-auto opacity-90"
         />
       </div>
     </div>
@@ -261,13 +258,10 @@ function PrintFlyerPreview({
         </div>
       </div>
 
-      {/* Address Bar - White with dark text */}
-      <div className="py-1 px-2 text-center">
-        <p className="text-[6px] text-[#333] tracking-[0.15em] font-semibold">
-          {formattedStreetAddress}
-        </p>
-        <p className="text-[4px] text-gray-500 tracking-wider mt-0.5">
-          {cityStateZip}
+      {/* Address Bar - Dark background with white text (matches template) */}
+      <div className="py-1.5 mx-1.5 bg-[#1a1a1a] text-center">
+        <p className="text-[5px] text-white tracking-[0.12em] font-semibold">
+          {formattedStreetAddress}   {cityStateZip && formatAddressForFlyer(cityStateZip)}
         </p>
       </div>
 
@@ -859,8 +853,9 @@ export function CreateFlyerDialog({
   }, [getPhotosForFlyer]);
 
   const generateSocialFlyer = async (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, data: FormValues, photosToUse: string[]) => {
+    // 1:1 square format for social media
     canvas.width = 1080;
-    canvas.height = 1920;
+    canvas.height = 1080;
 
     ctx.fillStyle = "#1a1a2e";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -873,70 +868,78 @@ export function CreateFlyerDialog({
       mainPhoto.src = photosToUse[0];
     });
 
-    const photoHeight = 900;
+    // For 1:1 square format, photo takes top portion
+    const photoHeight = 540;
     ctx.drawImage(mainPhoto, 0, 0, canvas.width, photoHeight);
 
-    const gradient = ctx.createLinearGradient(0, photoHeight - 200, 0, photoHeight);
+    // Gradient overlay at bottom of photo
+    const gradient = ctx.createLinearGradient(0, photoHeight - 150, 0, photoHeight);
     gradient.addColorStop(0, "rgba(26, 26, 46, 0)");
     gradient.addColorStop(1, "rgba(26, 26, 46, 1)");
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, photoHeight - 200, canvas.width, 200);
+    ctx.fillRect(0, photoHeight - 150, canvas.width, 150);
 
+    // Status label
     const statusLabel = STATUS_OPTIONS.find(s => s.value === data.status)?.label || "Just Listed";
     ctx.fillStyle = "#d97706";
-    ctx.font = "bold 48px Inter, sans-serif";
-    ctx.fillText(statusLabel.toUpperCase(), 60, photoHeight + 80);
-
-    ctx.fillStyle = "#ffffff";
     ctx.font = "bold 36px Inter, sans-serif";
-    ctx.fillText(data.price, 60, photoHeight + 140);
+    ctx.fillText(statusLabel.toUpperCase(), 40, photoHeight + 50);
 
-    const address = transaction.propertyAddress;
-    const addressParts = address.split(",");
-    ctx.font = "32px Inter, sans-serif";
+    // Price
     ctx.fillStyle = "#ffffff";
-    let addressY = photoHeight + 200;
-    addressParts.forEach((part) => {
-      ctx.fillText(part.trim(), 60, addressY);
-      addressY += 45;
-    });
+    ctx.font = "bold 32px Inter, sans-serif";
+    ctx.fillText(data.price, 40, photoHeight + 95);
 
+    // Address - full address on single line for square format
+    const address = transaction.propertyAddress;
+    ctx.font = "24px Inter, sans-serif";
+    ctx.fillStyle = "#ffffff";
+    let addressY = photoHeight + 140;
+    ctx.fillText(address.toUpperCase(), 40, addressY);
+    addressY += 35;
+
+    // Property specs
     if (data.bedrooms || data.bathrooms || data.sqft) {
-      ctx.font = "28px Inter, sans-serif";
+      ctx.font = "22px Inter, sans-serif";
       ctx.fillStyle = "#a0a0a0";
       let specs = [];
-      if (data.bedrooms) specs.push(`${data.bedrooms} bedroom`);
-      if (data.bathrooms) specs.push(`${data.bathrooms} bathroom`);
-      if (data.sqft) specs.push(`${parseInt(data.sqft).toLocaleString()} sq. ft`);
-      ctx.fillText(specs.join("  |  "), 60, addressY + 30);
+      if (data.bedrooms) specs.push(`${data.bedrooms} bed`);
+      if (data.bathrooms) specs.push(`${data.bathrooms} bath`);
+      if (data.sqft) specs.push(`${parseInt(data.sqft).toLocaleString()} sq ft`);
+      ctx.fillText(specs.join("  |  "), 40, addressY + 20);
     }
 
+    // Description (compact for square format)
     if (data.description) {
       const truncatedDesc = truncateDescription(data.description, DESCRIPTION_LIMITS.social);
-      ctx.font = "24px Inter, sans-serif";
+      ctx.font = "20px Inter, sans-serif";
       ctx.fillStyle = "#cccccc";
-      const maxWidth = canvas.width - 120;
+      const maxWidth = canvas.width - 80;
       const words = truncatedDesc.split(" ");
       let line = "";
-      let descY = addressY + 100;
-      const lineHeight = 34;
+      let descY = addressY + 70;
+      const lineHeight = 28;
+      let lineCount = 0;
       
       words.forEach((word) => {
+        if (lineCount >= 4) return; // Max 4 lines for square format
         const testLine = line + word + " ";
         const metrics = ctx.measureText(testLine);
         if (metrics.width > maxWidth && line !== "") {
-          ctx.fillText(line.trim(), 60, descY);
+          ctx.fillText(line.trim(), 40, descY);
           line = word + " ";
           descY += lineHeight;
+          lineCount++;
         } else {
           line = testLine;
         }
       });
-      if (line.trim()) {
-        ctx.fillText(line.trim(), 60, descY);
+      if (line.trim() && lineCount < 4) {
+        ctx.fillText(line.trim(), 40, descY);
       }
     }
 
+    // Logo (bottom right)
     const logo = document.createElement('img');
     logo.crossOrigin = "anonymous";
     await new Promise<void>((resolve) => {
@@ -945,22 +948,24 @@ export function CreateFlyerDialog({
       logo.src = spyglassLogoWhite;
     });
     
-    const logoHeight = 80;
-    const logoWidth = (logo.width / logo.height) * logoHeight || 200;
-    ctx.drawImage(logo, canvas.width - logoWidth - 60, canvas.height - logoHeight - 60, logoWidth, logoHeight);
+    const logoHeight = 50;
+    const logoWidth = (logo.width / logo.height) * logoHeight || 150;
+    ctx.drawImage(logo, canvas.width - logoWidth - 40, canvas.height - logoHeight - 40, logoWidth, logoHeight);
 
+    // Agent info (bottom left, compact)
     if (agentName) {
-      ctx.font = "bold 28px Inter, sans-serif";
+      ctx.font = "bold 22px Inter, sans-serif";
       ctx.fillStyle = "#ffffff";
-      ctx.fillText(agentName, 60, canvas.height - 120);
+      ctx.fillText(agentName, 40, canvas.height - 70);
       
       if (agentPhone) {
-        ctx.font = "24px Inter, sans-serif";
+        ctx.font = "18px Inter, sans-serif";
         ctx.fillStyle = "#a0a0a0";
-        ctx.fillText(agentPhone, 60, canvas.height - 80);
+        ctx.fillText(agentPhone, 40, canvas.height - 45);
       }
     }
 
+    // Agent photo (smaller for square format)
     if (agentPhotoUrl) {
       const agentPhoto = document.createElement('img');
       agentPhoto.crossOrigin = "anonymous";
@@ -971,9 +976,9 @@ export function CreateFlyerDialog({
       });
       
       if (agentPhoto.complete && agentPhoto.naturalWidth > 0) {
-        const size = 100;
-        const x = 60;
-        const y = canvas.height - 240;
+        const size = 60;
+        const x = canvas.width - logoWidth - 40 - size - 20;
+        const y = canvas.height - size - 40;
         
         ctx.save();
         ctx.beginPath();
@@ -1079,16 +1084,20 @@ export function CreateFlyerDialog({
     const addressBarY = headerHeight;
     const addressBarHeight = 100;
     
-    // Street address with spaced letters
-    ctx.fillStyle = DARK_TEXT;
-    ctx.font = `600 42px ${FONT_LEAGUE}`;
-    ctx.textAlign = "center";
-    ctx.fillText(formattedStreetAddress, canvas.width / 2, addressBarY + 50);
+    // Dark background bar behind address (per template)
+    const addressBgHeight = 80;
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(60, addressBarY + 10, canvas.width - 120, addressBgHeight);
     
-    // City, State ZIP below
-    ctx.font = `400 28px ${FONT_MONTSERRAT}`;
-    ctx.fillStyle = "#666666";
-    ctx.fillText(cityStateZip, canvas.width / 2, addressBarY + 85);
+    // Full address on dark background (white text)
+    const fullFormattedAddress = cityStateZip 
+      ? `${formattedStreetAddress}   ${formatAddressForFlyer(cityStateZip)}`
+      : formattedStreetAddress;
+    
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `600 36px ${FONT_LEAGUE}`;
+    ctx.textAlign = "center";
+    ctx.fillText(fullFormattedAddress, canvas.width / 2, addressBarY + 60);
 
     // ============ PHOTOS SECTION ============
     const photosY = addressBarY + addressBarHeight + 30;
@@ -1170,7 +1179,8 @@ export function CreateFlyerDialog({
     }
 
     // ============ BOTTOM INFO SECTION ============
-    const infoY = secondaryY + secondaryHeight + 80;
+    // Reduced gap for less white space (was 80, now 50)
+    const infoY = secondaryY + secondaryHeight + 50;
     
     // Three column layout
     const leftColX = 100;
@@ -1187,14 +1197,26 @@ export function CreateFlyerDialog({
     const statSpacing = 60;
     const iconSize = 36;
     
-    // Helper to draw simple line icons
+    // Helper to draw line icons matching template style
     const drawBedIcon = (x: number, y: number) => {
       ctx.strokeStyle = DARK_TEXT;
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.rect(x, y - iconSize/2 + 8, iconSize, iconSize/2);
-      ctx.moveTo(x, y - iconSize/4 + 8);
-      ctx.lineTo(x + iconSize, y - iconSize/4 + 8);
+      // Headboard (left side, tall rectangle)
+      ctx.moveTo(x, y + iconSize * 0.8);
+      ctx.lineTo(x, y - iconSize * 0.3);
+      ctx.lineTo(x + iconSize * 0.25, y - iconSize * 0.3);
+      ctx.lineTo(x + iconSize * 0.25, y + iconSize * 0.1);
+      // Bed surface (horizontal line from headboard)
+      ctx.moveTo(x, y + iconSize * 0.2);
+      ctx.lineTo(x + iconSize, y + iconSize * 0.2);
+      // Footboard (right side, shorter)
+      ctx.lineTo(x + iconSize, y + iconSize * 0.5);
+      ctx.moveTo(x + iconSize, y + iconSize * 0.2);
+      ctx.lineTo(x + iconSize, y + iconSize * 0.8);
+      // Bottom frame
+      ctx.moveTo(x, y + iconSize * 0.8);
+      ctx.lineTo(x + iconSize, y + iconSize * 0.8);
       ctx.stroke();
     };
     
@@ -1202,9 +1224,25 @@ export function CreateFlyerDialog({
       ctx.strokeStyle = DARK_TEXT;
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(x + iconSize/2, y, iconSize/2 - 4, 0, Math.PI);
-      ctx.moveTo(x + 4, y);
-      ctx.lineTo(x + iconSize - 4, y);
+      // Faucet (left side)
+      ctx.moveTo(x + iconSize * 0.15, y - iconSize * 0.3);
+      ctx.lineTo(x + iconSize * 0.15, y + iconSize * 0.1);
+      ctx.lineTo(x + iconSize * 0.35, y + iconSize * 0.1);
+      // Tub rim (horizontal line)
+      ctx.moveTo(x, y + iconSize * 0.15);
+      ctx.lineTo(x + iconSize, y + iconSize * 0.15);
+      // Tub body (rounded bottom)
+      ctx.moveTo(x + iconSize * 0.05, y + iconSize * 0.15);
+      ctx.lineTo(x + iconSize * 0.05, y + iconSize * 0.55);
+      ctx.quadraticCurveTo(x + iconSize * 0.05, y + iconSize * 0.7, x + iconSize * 0.2, y + iconSize * 0.7);
+      ctx.lineTo(x + iconSize * 0.8, y + iconSize * 0.7);
+      ctx.quadraticCurveTo(x + iconSize * 0.95, y + iconSize * 0.7, x + iconSize * 0.95, y + iconSize * 0.55);
+      ctx.lineTo(x + iconSize * 0.95, y + iconSize * 0.15);
+      // Claw feet
+      ctx.moveTo(x + iconSize * 0.15, y + iconSize * 0.7);
+      ctx.lineTo(x + iconSize * 0.1, y + iconSize * 0.9);
+      ctx.moveTo(x + iconSize * 0.85, y + iconSize * 0.7);
+      ctx.lineTo(x + iconSize * 0.9, y + iconSize * 0.9);
       ctx.stroke();
     };
     
@@ -1212,7 +1250,17 @@ export function CreateFlyerDialog({
       ctx.strokeStyle = DARK_TEXT;
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.rect(x + 4, y - iconSize/2 + 8, iconSize - 8, iconSize - 8);
+      // Rectangle representing floor area
+      ctx.rect(x, y - iconSize * 0.2, iconSize, iconSize * 0.7);
+      ctx.stroke();
+      // Diagonal line with arrow (area measurement symbol)
+      ctx.beginPath();
+      ctx.moveTo(x + iconSize * 0.2, y + iconSize * 0.35);
+      ctx.lineTo(x + iconSize * 0.8, y - iconSize * 0.05);
+      // Arrow head
+      ctx.lineTo(x + iconSize * 0.62, y - iconSize * 0.02);
+      ctx.moveTo(x + iconSize * 0.8, y - iconSize * 0.05);
+      ctx.lineTo(x + iconSize * 0.77, y + iconSize * 0.13);
       ctx.stroke();
     };
     

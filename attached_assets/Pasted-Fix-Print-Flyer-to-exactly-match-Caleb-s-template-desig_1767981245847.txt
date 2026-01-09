@@ -1,0 +1,158 @@
+Fix Print Flyer to exactly match Caleb's template design.
+
+REFERENCE FILES (uploaded to project):
+- 142_N_STEEL_FLYER.pdf - The target flyer design we must match
+- Ad_Graphics_Square_Annotation_copy.jpg - Annotated version showing all elements and their labels
+
+Please examine these reference files closely before making changes.
+
+File to modify: client/src/components/create-flyer-dialog.tsx
+
+## Issue 1: Replace Emoji Icons with Proper SVG Line Icons
+
+Current: Using emojis for bed/bath/sqft icons - looks unprofessional
+Reference: Ad_Graphics_Square_Annotation shows clean line-style icons labeled "BACKGROUND (ICONS)"
+
+The template uses these specific icon styles:
+- Bed icon: Simple bed outline with headboard (see left column in PDF)
+- Bath icon: Bathtub with claw feet style (see left column in PDF)
+- Sqft icon: Rectangle/square with diagonal line representing area
+
+Replace emoji icons with canvas-drawn SVG-style line icons:
+```javascript
+// Bed icon - matches template style
+function drawBedIcon(ctx, x, y, size) {
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  // Headboard (left side, tall)
+  ctx.moveTo(x, y + size);
+  ctx.lineTo(x, y);
+  ctx.lineTo(x + size * 0.2, y);
+  ctx.lineTo(x + size * 0.2, y + size * 0.4);
+  // Bed surface
+  ctx.moveTo(x, y + size * 0.5);
+  ctx.lineTo(x + size, y + size * 0.5);
+  // Footboard (right side, shorter)
+  ctx.lineTo(x + size, y + size * 0.7);
+  ctx.moveTo(x + size, y + size * 0.5);
+  ctx.lineTo(x + size, y + size);
+  ctx.stroke();
+}
+
+// Bath icon - bathtub with legs (matches template)
+function drawBathIcon(ctx, x, y, size) {
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  // Faucet
+  ctx.moveTo(x + size * 0.15, y);
+  ctx.lineTo(x + size * 0.15, y + size * 0.3);
+  ctx.lineTo(x + size * 0.3, y + size * 0.3);
+  // Tub rim
+  ctx.moveTo(x, y + size * 0.35);
+  ctx.lineTo(x + size, y + size * 0.35);
+  // Tub body
+  ctx.moveTo(x + size * 0.05, y + size * 0.35);
+  ctx.lineTo(x + size * 0.05, y + size * 0.75);
+  ctx.quadraticCurveTo(x + size * 0.05, y + size * 0.85, x + size * 0.15, y + size * 0.85);
+  ctx.lineTo(x + size * 0.85, y + size * 0.85);
+  ctx.quadraticCurveTo(x + size * 0.95, y + size * 0.85, x + size * 0.95, y + size * 0.75);
+  ctx.lineTo(x + size * 0.95, y + size * 0.35);
+  // Legs
+  ctx.moveTo(x + size * 0.15, y + size * 0.85);
+  ctx.lineTo(x + size * 0.1, y + size);
+  ctx.moveTo(x + size * 0.85, y + size * 0.85);
+  ctx.lineTo(x + size * 0.9, y + size);
+  ctx.stroke();
+}
+
+// Square footage icon - rectangle with diagonal (area symbol)
+function drawSqftIcon(ctx, x, y, size) {
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  // Rectangle
+  ctx.rect(x, y + size * 0.1, size, size * 0.7);
+  // Diagonal arrow
+  ctx.moveTo(x + size * 0.2, y + size * 0.6);
+  ctx.lineTo(x + size * 0.8, y + size * 0.25);
+  // Arrow head
+  ctx.lineTo(x + size * 0.65, y + size * 0.25);
+  ctx.moveTo(x + size * 0.8, y + size * 0.25);
+  ctx.lineTo(x + size * 0.8, y + size * 0.4);
+  ctx.stroke();
+}
+```
+
+## Issue 2: Full Address with City, State, Zip
+
+Reference: Ad_Graphics_Square_Annotation shows "LISTING ADDRESS" as:
+"10202 GOLDEN QUAIL DR AUSTIN, TX 78758"
+
+Current output: "13106 NEW BOSTON" (missing city, state, zip)
+Should be: "13106 NEW BOSTON, AUSTIN, TX 78729"
+
+Update to pull full address from MLS data:
+```javascript
+const fullAddress = `${streetAddress}, ${city}, ${state} ${zip}`.toUpperCase();
+```
+
+Apply letter spacing to full address or just street name portion per template style.
+
+## Issue 3: Reduce Bottom White Space
+
+Reference: In 142_N_STEEL_FLYER.pdf, the bottom info section fills the space better with minimal gap before the edge.
+
+Current: Too much empty white space below the agent info section
+Fix:
+1. Move bottom info section closer to the photos
+2. Reduce padding between content and page edge
+3. Content should extend closer to the bottom
+
+## Issue 4: Address Bar Background
+
+Reference: Ad_Graphics_Square_Annotation shows address has dark/black background bar
+Current: Address appears on white/light background
+
+Add the dark background bar behind the address text like in the template.
+
+## Issue 5: Three-Column Layout Positioning
+
+Reference: Ad_Graphics_Square_Annotation shows:
+- Left: Property stats with icons (LISTING BEDROOM #, LISTING SQFT #)
+- Center: Headline + Description (LISTING HEADLINE, LISTING DESCRIPTION)
+- Right: Agent info + Team logo (AGENT PHOTO, AGENT INFORMATION, SPACE FOR TEAM LOGO)
+
+Verify the three columns are positioned correctly per the template layout.
+
+## Issue 6: Background Decorative Elements (Lower Priority)
+
+Reference: Ad_Graphics_Square_Annotation shows "BACKGROUND (BLACK AND WHITE SQUARES)"
+This is the decorative checkered/squares pattern in the bottom section.
+
+For MVP: Can skip this decorative element
+Future: Add subtle geometric pattern
+
+## Issue 7: Social Media - Reduce Empty Bottom Space
+
+The Social Media format also has too much empty space between description and logo.
+Reduce the dark section height or move logo closer to content.
+
+## Verification Checklist
+
+After changes, compare output to 142_N_STEEL_FLYER.pdf:
+- [ ] Icons are clean line-style (not emojis)
+- [ ] Address includes city, state, zip
+- [ ] Address has dark background bar
+- [ ] Bottom section has less white space
+- [ ] Three-column layout matches template
+- [ ] Fonts and sizing look professional
+
+Test by:
+1. Generate Print Flyer with all fields filled
+2. Compare side-by-side with 142_N_STEEL_FLYER.pdf
+3. Verify icons match template style
+4. Verify address format matches
+5. Verify spacing matches
+6. Generate Social Media and verify reduced bottom spacing
