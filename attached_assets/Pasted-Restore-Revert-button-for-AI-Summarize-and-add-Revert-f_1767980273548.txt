@@ -1,0 +1,160 @@
+Restore Revert button for AI Summarize and add Revert for AI Headline Generator.
+
+File: client/src/components/create-flyer-dialog.tsx
+
+## Issue 1: Revert Button Missing for Description
+
+The "Revert" dropdown button that was next to "AI Summarize" is now missing. Restore it.
+
+1. Add back the Revert button/dropdown next to AI Summarize:
+   - Position: Right after "AI Summarize" button
+   - Style: Outline button with dropdown
+   - Icon: ↩ or undo icon
+
+2. Revert dropdown options:
+   - "Revert to Previous" - goes back to the description before last AI summary
+   - "Revert to Original" - restores full MLS description from About This Home
+
+3. State management:
+   - Store originalDescription when dialog opens (full MLS description)
+   - Store previousDescription before each AI summarization
+   - Show Revert button only AFTER AI Summarize has been used at least once
+
+4. Apply to BOTH formats:
+   - Social Media: Show Revert next to AI Summarize
+   - Print Flyer: Show Revert next to AI Summarize
+
+## Issue 2: Add Revert for Listing Headline (Print Flyer only)
+
+Add Revert option for the Listing Headline field as well.
+
+1. Add Revert button next to "AI Generate" for Listing Headline:
+   - Position: Right after "AI Generate" button
+   - Same style as Description Revert
+
+2. Revert options for Headline:
+   - "Revert to Previous" - goes back to headline before last AI generation
+   - "Clear" - clears the headline completely (since original is empty)
+
+3. State management:
+   - Store previousHeadline before each AI generation
+   - Show Revert button only AFTER AI Generate has been used at least once
+
+## Implementation
+```jsx
+// Description section (both formats)
+<div className="flex items-center gap-2">
+  <Label>Description</Label>
+  <div className="ml-auto flex gap-2">
+    <Button 
+      variant="outline" 
+      size="sm"
+      onClick={handleAISummarize}
+      disabled={isGenerating}
+    >
+      <Sparkles className="w-4 h-4 mr-1" />
+      AI Summarize
+    </Button>
+    
+    {hasUsedAISummary && (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm">
+            <Undo className="w-4 h-4 mr-1" />
+            Revert
+            <ChevronDown className="w-4 h-4 ml-1" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem onClick={revertToPreviousDescription}>
+            Revert to Previous
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={revertToOriginalDescription}>
+            Revert to Original
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )}
+  </div>
+</div>
+
+// Listing Headline section (Print Flyer only)
+<div className="flex items-center gap-2">
+  <Label>Listing Headline (optional)</Label>
+  <div className="ml-auto flex gap-2">
+    <Button 
+      variant="outline" 
+      size="sm"
+      onClick={handleGenerateHeadline}
+      disabled={isGeneratingHeadline}
+    >
+      <Sparkles className="w-4 h-4 mr-1" />
+      AI Generate
+    </Button>
+    
+    {hasUsedAIHeadline && (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm">
+            <Undo className="w-4 h-4 mr-1" />
+            Revert
+            <ChevronDown className="w-4 h-4 ml-1" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem onClick={revertToPreviousHeadline}>
+            Revert to Previous
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={clearHeadline}>
+            Clear Headline
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )}
+  </div>
+</div>
+```
+
+## State Variables Needed
+```javascript
+// Description state
+const [originalDescription, setOriginalDescription] = useState('');
+const [previousDescription, setPreviousDescription] = useState('');
+const [hasUsedAISummary, setHasUsedAISummary] = useState(false);
+
+// Headline state  
+const [previousHeadline, setPreviousHeadline] = useState('');
+const [hasUsedAIHeadline, setHasUsedAIHeadline] = useState(false);
+
+// On dialog open, save original description
+useEffect(() => {
+  if (mlsData?.description) {
+    setOriginalDescription(mlsData.description);
+  }
+}, [mlsData]);
+
+// Before AI summarize
+const handleAISummarize = async () => {
+  setPreviousDescription(description); // Save current before changing
+  setHasUsedAISummary(true);
+  // ... call AI API
+};
+
+// Before AI headline generate
+const handleGenerateHeadline = async () => {
+  setPreviousHeadline(headline); // Save current before changing
+  setHasUsedAIHeadline(true);
+  // ... call AI API
+};
+```
+
+Test by:
+1. Open Create Property Flyer (Social Media)
+2. Click AI Summarize - verify Revert button appears
+3. Click Revert > "Revert to Original" - verify full MLS description restored
+4. Click AI Summarize again, then Revert > "Revert to Previous"
+5. Switch to Print Flyer format
+6. Verify AI Summarize + Revert works same way
+7. Click AI Generate for headline - verify Revert button appears
+8. Click Revert > "Clear Headline" - verify headline is cleared
+9. Generate again, then Revert > "Revert to Previous" - verify previous headline restored

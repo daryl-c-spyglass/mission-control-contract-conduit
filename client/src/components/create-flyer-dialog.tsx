@@ -1912,11 +1912,17 @@ export function CreateFlyerDialog({
                         </FormControl>
                         <FormDescription className="flex flex-col gap-1 text-xs">
                           <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">
-                              {hasSummarized 
-                                ? "Click AI Summarize again for a different variation"
-                                : "Click 'AI Summarize' to create a concise summary"
-                              }
+                            <span className="text-muted-foreground flex items-center gap-1">
+                              {hasSummarized ? (
+                                <>
+                                  {/[.!?]$/.test(field.value?.trim() || "") ? (
+                                    <Check className="h-3 w-3 text-green-600" />
+                                  ) : null}
+                                  <span>Click AI Summarize for a different variation</span>
+                                </>
+                              ) : (
+                                "Click 'AI Summarize' to create a concise summary"
+                              )}
                             </span>
                             <span className={
                               isOverLimit 

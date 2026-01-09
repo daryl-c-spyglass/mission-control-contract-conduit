@@ -1206,6 +1206,51 @@ export async function registerRoutes(
 
   // ============ AI Description Summarization ============
   
+  // Helper to clean up AI-generated summaries and ensure complete sentences
+  function cleanupSummary(text: string, maxLength: number): string {
+    let cleaned = text.trim();
+    
+    // Remove any quotes the AI might have added
+    cleaned = cleaned.replace(/^["']|["']$/g, "");
+    
+    // Remove trailing "..." if present
+    if (cleaned.endsWith('...')) {
+      cleaned = cleaned.slice(0, -3).trim();
+    }
+    
+    // If still over limit, truncate at last complete sentence
+    if (cleaned.length > maxLength) {
+      const truncated = cleaned.substring(0, maxLength);
+      const lastPeriod = truncated.lastIndexOf('.');
+      const lastExclaim = truncated.lastIndexOf('!');
+      const lastQuestion = truncated.lastIndexOf('?');
+      const lastSentenceEnd = Math.max(lastPeriod, lastExclaim, lastQuestion);
+      
+      if (lastSentenceEnd > maxLength * 0.5) {
+        // Use last complete sentence if it's not too short
+        cleaned = truncated.substring(0, lastSentenceEnd + 1);
+      } else {
+        // Otherwise truncate at last space and add period
+        const lastSpace = truncated.lastIndexOf(' ');
+        if (lastSpace > 0) {
+          cleaned = truncated.substring(0, lastSpace);
+          // Remove trailing punctuation before adding period
+          cleaned = cleaned.replace(/[,;:\-]$/, '');
+          cleaned += '.';
+        } else {
+          cleaned = truncated + '.';
+        }
+      }
+    }
+    
+    // Ensure ends with punctuation
+    if (!/[.!?]$/.test(cleaned)) {
+      cleaned += '.';
+    }
+    
+    return cleaned;
+  }
+  
   app.post("/api/summarize-description", isAuthenticated, async (req, res) => {
     try {
       const { description, maxLength = 115, propertyInfo } = req.body;
@@ -1224,47 +1269,53 @@ export async function registerRoutes(
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
       });
 
-      const prompt = `Summarize this real estate listing description into exactly ${maxLength} characters or less. 
-Keep the most compelling selling points. Write in an engaging, professional tone.
-Do not include the address, beds, baths, or sqft (those are shown separately on the flyer).
-Do not use quotes around the summary.
+      const prompt = `You are a real estate copywriter. Write a compelling property description summary.
+
+CRITICAL REQUIREMENTS:
+- Maximum ${maxLength} characters (strict limit - count carefully!)
+- Must be a COMPLETE thought - end with a full sentence
+- Do NOT end mid-sentence or with "..."
+- Do NOT write more than the limit and truncate
+- The summary should feel finished and polished
+
+STYLE:
+- Engaging and professional
+- Highlight key selling points
+- Focus on: location, features, lifestyle benefits
+- Do not repeat beds/baths/sqft (shown separately)
 
 Property: ${propertyInfo?.address || "N/A"}
 
 Original description:
 ${description}
 
-Provide only the summary text, no quotes or explanation.`;
+Write a summary that is UNDER ${maxLength} characters and ends with a complete sentence.
+Count your characters carefully before responding.
+Return only the summary text, nothing else.`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
+        messages: [
+          { role: "system", content: "You are a real estate copywriter. Always write complete sentences. Never end with '...' or mid-thought. Count characters carefully." },
+          { role: "user", content: prompt }
+        ],
         max_tokens: 200,
         temperature: 0.7,
       });
 
       let summary = response.choices[0]?.message?.content?.trim() || "";
       
-      // Remove any quotes the AI might have added
-      summary = summary.replace(/^["']|["']$/g, "");
-      
-      // Ensure it fits within maxLength
-      if (summary.length > maxLength) {
-        const truncated = summary.substring(0, maxLength - 3);
-        const lastSpace = truncated.lastIndexOf(" ");
-        summary = (lastSpace > 0 ? truncated.substring(0, lastSpace) : truncated) + "...";
-      }
+      // Post-process to ensure complete sentences and proper length
+      summary = cleanupSummary(summary, maxLength);
 
       res.json({ summary });
     } catch (error: any) {
       console.error("AI summarization error:", error);
       
-      // Fallback: simple truncation
+      // Fallback: truncate at sentence boundary
       const { description, maxLength = 115 } = req.body;
       if (description) {
-        const truncated = description.substring(0, maxLength - 3);
-        const lastSpace = truncated.lastIndexOf(" ");
-        const fallback = (lastSpace > 0 ? truncated.substring(0, lastSpace) : truncated) + "...";
+        const fallback = cleanupSummary(description, maxLength);
         return res.json({ summary: fallback, fallback: true });
       }
       
