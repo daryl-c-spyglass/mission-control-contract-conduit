@@ -117,6 +117,9 @@ export interface MLSListingData {
     email: string;
     brokerage: string;
   };
+  
+  // Raw API response for debugging (dev mode only)
+  rawData?: any;
 }
 
 export interface CMAComparable {
@@ -471,6 +474,9 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
           ? listing.listOfficeName?.name 
           : (listing.listOfficeName || ""),
       },
+      
+      // Store raw API response for dev mode debugging
+      rawData: listing,
     };
 
     // Extract comparables from the listing response if available

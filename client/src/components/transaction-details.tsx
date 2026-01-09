@@ -191,6 +191,10 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [selectedCMAProperty, setSelectedCMAProperty] = useState<CMAComparable | null>(null);
   const [cmaPhotoIndex, setCmaPhotoIndex] = useState(0);
   const [cmaFullscreenOpen, setCmaFullscreenOpen] = useState(false);
+  const [showDebugData, setShowDebugData] = useState(false);
+  
+  // Check if we're in development mode
+  const isDev = import.meta.env.DEV;
   
   // Photo navigation for MLS gallery
   const photos = mlsData?.photos || mlsData?.images || [];
@@ -707,6 +711,128 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
               Refresh MLS Data
             </Button>
           </div>
+
+          {/* Dev-only Field Inspector */}
+          {isDev && mlsData && (
+            <Card className="border-dashed border-amber-500/50 bg-amber-50/10">
+              <CardHeader className="py-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                    Dev: Field Inspector
+                  </CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowDebugData(!showDebugData);
+                      if (!showDebugData && mlsData.rawData) {
+                        console.log("Full Repliers listing data:", JSON.stringify(mlsData.rawData, null, 2));
+                      }
+                    }}
+                    data-testid="button-toggle-debug"
+                  >
+                    {showDebugData ? "Hide Raw Data" : "Debug: Show Raw Data"}
+                  </Button>
+                </div>
+              </CardHeader>
+              {showDebugData && (
+                <CardContent className="pt-0">
+                  {/* Field Presence Table */}
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium mb-2">Field Presence Check</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-muted">
+                            <th className="text-left p-2 border">Field</th>
+                            <th className="text-center p-2 border w-16">Exists</th>
+                            <th className="text-left p-2 border">Sample Value</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(() => {
+                            const raw = mlsData.rawData || {};
+                            const fieldsToCheck = [
+                              { name: "images", path: raw.images },
+                              { name: "listPrice / price", path: raw.listPrice || raw.price },
+                              { name: "address", path: raw.address },
+                              { name: "bedrooms / beds", path: raw.bedroomsTotal || raw.details?.numBedrooms || raw.beds },
+                              { name: "bathrooms / baths", path: raw.bathroomsFull || raw.details?.numBathrooms || raw.baths },
+                              { name: "bathroomsHalf", path: raw.bathroomsHalf || raw.details?.numBathroomsHalf },
+                              { name: "livingArea / sqft", path: raw.livingArea || raw.details?.sqft || raw.sqft },
+                              { name: "lotSize / lotSizeArea", path: raw.lotSize || raw.lot?.size || raw.lot?.acres },
+                              { name: "yearBuilt", path: raw.yearBuilt || raw.details?.yearBuilt },
+                              { name: "propertyType", path: raw.propertyType || raw.details?.propertyType },
+                              { name: "propertySubType", path: raw.propertySubType || raw.details?.style },
+                              { name: "mlsNumber", path: raw.mlsNumber },
+                              { name: "latitude", path: raw.map?.latitude || raw.address?.latitude },
+                              { name: "longitude", path: raw.map?.longitude || raw.address?.longitude },
+                              { name: "map.point", path: raw.map?.point },
+                              { name: "details.description", path: raw.details?.description || raw.publicRemarks },
+                              { name: "details.extras", path: raw.details?.extras },
+                              { name: "details.airConditioning", path: raw.details?.airConditioning },
+                              { name: "details.heating", path: raw.details?.heating },
+                              { name: "details.flooringType", path: raw.details?.flooringType },
+                              { name: "details.foundationType", path: raw.details?.foundationType },
+                              { name: "details.roofMaterial", path: raw.details?.roofMaterial },
+                              { name: "details.swimmingPool", path: raw.details?.swimmingPool },
+                              { name: "details.garage", path: raw.details?.garage || raw.details?.numGarageSpaces },
+                              { name: "details.patio", path: raw.details?.patio },
+                              { name: "details.viewType", path: raw.details?.viewType },
+                              { name: "lot.features", path: raw.lot?.features },
+                              { name: "nearby.amenities", path: raw.nearby?.amenities },
+                              { name: "rooms", path: raw.rooms },
+                              { name: "taxes", path: raw.taxes },
+                              { name: "agents", path: raw.agents },
+                              { name: "office.brokerageName", path: raw.office?.brokerageName },
+                              { name: "timestamps", path: raw.timestamps },
+                              { name: "standardStatus", path: raw.standardStatus || raw.status },
+                              { name: "daysOnMarket", path: raw.daysOnMarket || raw.simpleDaysOnMarket },
+                              { name: "history", path: raw.history },
+                              { name: "comparables", path: raw.comparables },
+                            ];
+                            
+                            const formatValue = (val: any): string => {
+                              if (val === null || val === undefined) return "—";
+                              if (Array.isArray(val)) return `Array(${val.length})`;
+                              if (typeof val === "object") return JSON.stringify(val).substring(0, 100) + (JSON.stringify(val).length > 100 ? "..." : "");
+                              return String(val).substring(0, 100) + (String(val).length > 100 ? "..." : "");
+                            };
+                            
+                            return fieldsToCheck.map((field, i) => (
+                              <tr key={i} className={i % 2 === 0 ? "bg-background" : "bg-muted/30"}>
+                                <td className="p-2 border font-mono">{field.name}</td>
+                                <td className="p-2 border text-center">
+                                  {field.path !== null && field.path !== undefined ? (
+                                    <span className="text-green-600 font-bold">Yes</span>
+                                  ) : (
+                                    <span className="text-red-500">No</span>
+                                  )}
+                                </td>
+                                <td className="p-2 border font-mono text-muted-foreground break-all">
+                                  {formatValue(field.path)}
+                                </td>
+                              </tr>
+                            ));
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  
+                  {/* Raw JSON Viewer */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Raw API Response</h4>
+                    <div className="max-h-96 overflow-auto bg-muted/50 rounded-lg p-3">
+                      <pre className="text-xs font-mono whitespace-pre-wrap break-all">
+                        {JSON.stringify(mlsData.rawData, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          )}
 
           {mlsData ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -247,6 +247,9 @@ export interface MLSData {
   listingId?: string;
   features?: string[];
   lotSizeNum?: number;
+  
+  // Raw API response for debugging (dev mode only)
+  rawData?: any;
 }
 
 // Re-export auth models (users and sessions tables for Replit Auth)
