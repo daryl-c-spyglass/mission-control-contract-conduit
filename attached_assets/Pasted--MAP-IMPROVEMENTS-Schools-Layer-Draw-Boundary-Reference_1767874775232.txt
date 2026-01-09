@@ -1,0 +1,431 @@
+### MAP IMPROVEMENTS - Schools Layer & Draw Boundary
+
+**Reference Screenshots:** Zillow map with Schools filter and Draw Boundary feature
+
+**Repliers Documentation:**
+- Geo-spatial filtering: https://help.repliers.com/en/article/filtering-listings-geo-spatially-using-the-map-parameter-7sorw0/
+- GeoJSON polygons: https://help.repliers.com/en/article/handling-detailed-geojson-polygons-in-repliers-api-1lcc5pm/
+
+---
+
+## WHAT REPLIERS SUPPORTS ✅
+
+| Feature | Supported | How |
+|---------|-----------|-----|
+| Draw polygon boundary | ✅ Yes | `map` parameter with GeoJSON |
+| School name filter | ✅ Yes | `raw.ElementarySchool=contains:` |
+| Listings inside boundary | ✅ Yes | Auto-syncs with polygon |
+
+## WHAT REPLIERS DOES NOT SUPPORT ❌
+
+| Feature | Supported | Alternative |
+|---------|-----------|-------------|
+| School boundary overlays | ❌ No | Use school name filter instead |
+| GreatSchools ratings | ❌ No | Cannot implement |
+| Public/Private/Charter | ❌ No | Cannot filter by school type |
+| School zone polygons | ❌ No | Draw custom boundary instead |
+
+---
+
+## 1. ADD - Draw Boundary Feature (Like Zillow)
+
+**Position:** On the map, add "Draw" button next to Schools
+
+**UI:**
+┌─────────────────────────────────────────────────────────┐
+│                         MAP                             │
+│                                                         │
+│   [Schools ▼]  [Draw]  [Remove Boundary ✕]             │
+│                                                         │
+│      ┌──────────────────────┐                          │
+│      │    Drawn Polygon     │                          │
+│      │     ┌─────┐          │                          │
+│      │    /       \         │                          │
+│      │   /  $450K  \        │                          │
+│      │  │  $380K    │       │                          │
+│      │   \         /        │                          │
+│      │    _______/         │                          │
+│      └──────────────────────┘                          │
+│                                                    [+] │
+│                                                    [-] │
+└─────────────────────────────────────────────────────────┘
+
+**Behavior:**
+1. Click "Draw" → cursor changes to crosshair
+2. Click points on map to create polygon vertices
+3. Double-click or click first point to close polygon
+4. Listings automatically filter to show only properties INSIDE the polygon
+5. "Remove Boundary" button appears to clear the polygon
+6. Polygon is semi-transparent (like Zillow's light blue)
+
+**Implementation:**
+```javascript
+// Using Google Maps Drawing Manager
+const [drawingMode, setDrawingMode] = useState(false);
+const [drawnPolygon, setDrawnPolygon] = useState(null);
+const drawingManagerRef = useRef(null);
+
+// Initialize Drawing Manager
+useEffect(() => {
+  if (!map) return;
+  
+  const drawingManager = new google.maps.drawing.DrawingManager({
+    drawingMode: null,
+    drawingControl: false, // We'll use custom buttons
+    polygonOptions: {
+      fillColor: '#2196F3',
+      fillOpacity: 0.2,
+      strokeColor: '#1976D2',
+      strokeWeight: 2,
+      clickable: true,
+      editable: true,
+      draggable: true
+    }
+  });
+  
+  drawingManager.setMap(map);
+  drawingManagerRef.current = drawingManager;
+  
+  // Listen for polygon complete
+  google.maps.event.addListener(drawingManager, 'polygoncomplete', (polygon) => {
+    setDrawnPolygon(polygon);
+    setDrawingMode(false);
+    drawingManager.setDrawingMode(null);
+    
+    // Get polygon coordinates for API
+    const coordinates = getPolygonCoordinates(polygon);
+    filterByPolygon(coordinates);
+  });
+  
+  return () => {
+    drawingManager.setMap(null);
+  };
+}, [map]);
+
+// Start drawing
+const startDrawing = () => {
+  setDrawingMode(true);
+  drawingManagerRef.current.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+};
+
+// Remove boundary
+const removeBoundary = () => {
+  if (drawnPolygon) {
+    drawnPolygon.setMap(null);
+    setDrawnPolygon(null);
+    // Reset filters to show all listings
+    filterByPolygon(null);
+  }
+};
+
+// Get coordinates from polygon
+const getPolygonCoordinates = (polygon) => {
+  const path = polygon.getPath();
+  const coordinates = [];
+  
+  for (let i = 0; i < path.getLength(); i++) {
+    const point = path.getAt(i);
+    coordinates.push([point.lng(), point.lat()]);
+  }
+  
+  // Close the polygon (first point = last point)
+  if (coordinates.length > 0) {
+    coordinates.push(coordinates[0]);
+  }
+  
+  return coordinates;
+};
+```
+
+**API Call with Polygon (Repliers):**
+```javascript
+const filterByPolygon = async (coordinates) => {
+  if (!coordinates) {
+    // No polygon - fetch without map filter
+    const response = await fetch('/api/listings?status=Active&type=Sale');
+    const data = await response.json();
+    setListings(data.listings);
+    return;
+  }
+  
+  // Build GeoJSON for Repliers API
+  const mapParam = {
+    type: "Polygon",
+    coordinates: [coordinates]  // Array of [lng, lat] pairs
+  };
+  
+  // POST request with map parameter
+  const response = await fetch('/api/listings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      map: mapParam,
+      status: 'Active',
+      type: 'Sale',
+      ...otherFilters
+    })
+  });
+  
+  const data = await response.json();
+  setListings(data.listings);
+  setTotalCount(data.count);
+};
+
+// Watch for polygon edits
+useEffect(() => {
+  if (!drawnPolygon) return;
+  
+  // Re-filter when polygon is edited
+  google.maps.event.addListener(drawnPolygon.getPath(), 'set_at', () => {
+    const coordinates = getPolygonCoordinates(drawnPolygon);
+    filterByPolygon(coordinates);
+  });
+  
+  google.maps.event.addListener(drawnPolygon.getPath(), 'insert_at', () => {
+    const coordinates = getPolygonCoordinates(drawnPolygon);
+    filterByPolygon(coordinates);
+  });
+}, [drawnPolygon]);
+```
+
+**Backend - Repliers API Call:**
+```javascript
+// POST /api/listings
+app.post('/api/listings', async (req, res) => {
+  const { map, ...filters } = req.body;
+  
+  // Build query string from filters
+  const queryParams = new URLSearchParams(filters);
+  
+  // Repliers expects map as JSON in body for POST
+  const requestBody = {};
+  if (map) {
+    requestBody.map = map;
+  }
+  
+  const response = await fetch(
+    `https://api.repliers.io/listings?${queryParams}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'repliers-api-key': process.env.REPLIERS_API_KEY
+      },
+      body: JSON.stringify(requestBody)
+    }
+  );
+  
+  const data = await response.json();
+  res.json(data);
+});
+```
+
+---
+
+## 2. ADD - Schools Button on Map
+
+**Position:** Next to "Draw" button on map
+
+**UI:**
+[Schools ▼]  [Draw]
+
+**When clicked, show dropdown:**
+┌─────────────────────────────────────┐
+│  SCHOOLS                         X  │
+├─────────────────────────────────────┤
+│                                     │
+│  🔍 Search school name...           │
+│  ┌─────────────────────────────────┐│
+│  │                                 ││
+│  └─────────────────────────────────┘│
+│                                     │
+│  Filter by Level:                   │
+│  ☑️ Elementary                      │
+│  ☑️ Middle                          │
+│  ☑️ High                            │
+│                                     │
+│  [Apply]  [Clear]                   │
+│                                     │
+└─────────────────────────────────────┘
+
+**Note:** We CAN filter by school level (Elementary/Middle/High) because we search different MLS fields. We CANNOT filter by Public/Private/Charter or ratings.
+
+**Implementation:**
+```javascript
+const [showSchoolsPanel, setShowSchoolsPanel] = useState(false);
+const [schoolSearch, setSchoolSearch] = useState('');
+const [schoolLevels, setSchoolLevels] = useState({
+  elementary: true,
+  middle: true,
+  high: true
+});
+
+const applySchoolFilter = () => {
+  const queries = [];
+  
+  if (schoolSearch) {
+    if (schoolLevels.elementary) {
+      queries.push(`raw.ElementarySchool=contains:${schoolSearch}`);
+    }
+    if (schoolLevels.middle) {
+      queries.push(`raw.MiddleSchool=contains:${schoolSearch}`);
+    }
+    if (schoolLevels.high) {
+      queries.push(`raw.HighSchool=contains:${schoolSearch}`);
+    }
+  }
+  
+  // Apply filters
+  setFilters(prev => ({
+    ...prev,
+    schoolQuery: queries.join('&')
+  }));
+  
+  setShowSchoolsPanel(false);
+};
+```
+
+---
+
+## 3. Map Controls Layout
+
+**Final layout of map controls:**
+┌─────────────────────────────────────────────────────────────┐
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ [Schools ▼]  [Draw]  [Remove Boundary ✕]             │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                             │
+│                         MAP                                 │
+│                                                             │
+│                                                        [+]  │
+│                                                        [-]  │
+│                                              [Map|Satellite] │
+└─────────────────────────────────────────────────────────────┘
+
+**Styling:**
+```css
+.map-controls {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1000;
+  display: flex;
+  gap: 8px;
+}
+
+.map-control-btn {
+  background: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.map-control-btn:hover {
+  background: #f5f5f5;
+}
+
+.map-control-btn.active {
+  background: #E03103;
+  color: white;
+}
+
+.remove-boundary-btn {
+  background: #f5f5f5;
+  color: #666;
+}
+
+.schools-panel {
+  position: absolute;
+  top: 50px;
+  left: 10px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 16px;
+  width: 280px;
+  z-index: 1001;
+}
+```
+
+---
+
+## 4. Sync Listings with Map Movement
+
+**Auto-update listings when map is panned/zoomed:**
+```javascript
+// Listen for map bounds change
+useEffect(() => {
+  if (!map) return;
+  
+  const listener = map.addListener('idle', () => {
+    // Only auto-filter if no custom polygon is drawn
+    if (!drawnPolygon) {
+      const bounds = map.getBounds();
+      const ne = bounds.getNorthEast();
+      const sw = bounds.getSouthWest();
+      
+      // Create bounding box polygon
+      const boundingBox = [
+        [sw.lng(), sw.lat()],
+        [ne.lng(), sw.lat()],
+        [ne.lng(), ne.lat()],
+        [sw.lng(), ne.lat()],
+        [sw.lng(), sw.lat()]
+      ];
+      
+      // Filter listings within visible map area
+      filterByPolygon(boundingBox);
+    }
+  });
+  
+  return () => google.maps.event.removeListener(listener);
+}, [map, drawnPolygon]);
+```
+
+---
+
+## Testing Checklist
+
+**Draw Boundary:**
+- [ ] "Draw" button activates drawing mode
+- [ ] Can click to create polygon points
+- [ ] Double-click closes polygon
+- [ ] Listings filter to show only properties inside polygon
+- [ ] Count updates correctly (e.g., "134 results")
+- [ ] "Remove Boundary" clears polygon and resets listings
+- [ ] Polygon is editable (can drag vertices)
+- [ ] Editing polygon re-filters listings
+
+**Schools Filter:**
+- [ ] "Schools" button opens dropdown panel
+- [ ] Can search school by name
+- [ ] Can toggle Elementary/Middle/High checkboxes
+- [ ] Apply button filters listings
+- [ ] Clear button resets filter
+
+**Map Sync:**
+- [ ] Panning map updates listings (when no custom polygon)
+- [ ] Zooming map updates listings
+- [ ] Map controls positioned correctly
+- [ ] All buttons styled consistently
+
+---
+
+## Summary
+
+| Feature | Status |
+|---------|--------|
+| Draw Polygon | ✅ Implement using Google Maps Drawing Manager + Repliers `map` param |
+| Schools on Map | ⚠️ Simplified - filter by name, not boundaries/ratings |
+| Auto-sync Listings | ✅ Implement using map `idle` event |
+| School Ratings | ❌ Not supported by Repliers |
+| Public/Private/Charter | ❌ Not supported by Repliers |
+
+Summary of what we CAN do (like Zillow):
+FeatureZillowOur BuildDraw boundary✅✅ Can implementFilter inside boundary✅✅ Can implementSchools dropdown on map✅✅ Simplified versionSchool name search✅✅ Can implementSchool ratings✅❌ Not availablePublic/Private/Charter✅❌ Not availableSchool boundary polygons✅❌ Not available

@@ -1,0 +1,87 @@
+## Replit Agent Task — Property Search Grid + Detail Modal
+
+Add a property search/browse feature to the Transactions section of Mission Control.
+
+### Requirements
+
+**1. Property Grid View**
+Create a responsive grid of property cards showing:
+- Property photo (with carousel dots if multiple)
+- "Just Listed" badge (if applicable)
+- Photo quality percentage badge (green/orange)
+- Camera icon button, Heart/favorite button
+- Price (formatted as $XXX,XXX)
+- Full address
+- Beds, Baths, Sqft, Lot size (acres)
+- School district (High School name)
+- Feature icons row (view type, fireplace, garage, patio)
+
+Grid features:
+- Sort dropdown (Relevant, Price, Newest, etc.)
+- View toggle (grid view, list view)
+- Show total listing count (e.g., "21,090 Listings")
+- Pagination or infinite scroll
+
+**2. Property Detail Modal**
+When user clicks a property card, open a modal with:
+
+Header section:
+- "X of Y listings" counter with close (X) button
+- Large main photo with left/right navigation arrows
+- Thumbnail grid (6 thumbnails + "See all X photos" button)
+- Photo quality badge
+
+Property info:
+- Price
+- Full address
+- MLS number
+- Beds, Baths, Sqft, Acres, Year Built
+- Property type (Residential)
+- "Contact Spyglass" button (primary/orange)
+- "Request a Tour" button (outline)
+- Save and Share buttons
+
+Browse by Room Type:
+- Filter tabs: All, Kitchen, Living Room, Bedroom, Bathroom, Patio, Floor Plan
+- Photo grid filtered by room type
+- Feature tags below photos (View type, Fireplace, Garage, Patio details)
+
+About This Home:
+- Full property description text
+
+Property Details grid (2 columns):
+- MLS # | Status
+- Property Type | Year Built
+- Listed Date | Days on Market
+- Elementary School | Middle School
+- High School | Subdivision
+
+Location section:
+- Google Maps embed showing property location
+- Use Google Maps API key from environment variable GOOGLE_MAPS_API_KEY
+
+**3. Data Source**
+- Fetch property data from Repliers API
+- Use REPLIERS_API_KEY from environment secrets
+- Endpoint: GET /listings with pagination
+- For detail view: GET /listings/{listingId}
+
+**4. Technical Requirements**
+- Use React components
+- Responsive design (mobile-friendly)
+- Modal should prevent background scroll
+- Lazy load images for performance
+- Handle loading states and errors gracefully
+
+**5. File Structure**
+Create these components:
+- components/properties/PropertyGrid.jsx
+- components/properties/PropertyCard.jsx
+- components/properties/PropertyModal.jsx
+- components/properties/PhotoGallery.jsx
+- components/properties/PropertyDetails.jsx
+- components/properties/LocationMap.jsx
+
+### References
+- Repliers API docs: https://docs.repliers.io
+- Google Maps JS API: https://developers.google.com/maps/documentation/javascript

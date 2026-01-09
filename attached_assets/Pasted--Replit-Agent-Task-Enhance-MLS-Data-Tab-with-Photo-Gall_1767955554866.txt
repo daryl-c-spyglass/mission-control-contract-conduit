@@ -1,0 +1,79 @@
+## Replit Agent Task — Enhance MLS Data Tab with Photo Gallery & Map
+
+Enhance the existing MLS Data tab within Transaction details to include a rich photo gallery and map view.
+
+### Current Location
+- File: Transaction detail page
+- Tab: "MLS Data" tab (see existing tabs: Overview, MLS Data, CMA, Documents, Marketing, Timeline, Templates)
+
+### Requirements
+
+**1. Photo Gallery Section (add above Property Description)**
+
+Add a photo gallery at the top of the MLS Data tab:
+- Large main photo display with left/right navigation arrows
+- Thumbnail strip showing 4-6 photos + "See all X photos" button
+- Photo quality badge (percentage in green/orange)
+- Clicking "See all" opens a fullscreen photo modal
+
+**2. Browse by Room Type (add below photo gallery)**
+
+Filter tabs for photos:
+- All (default, shows count)
+- Kitchen
+- Living Room
+- Bedroom
+- Bathroom
+- Patio
+- Floor Plan
+
+Below tabs: responsive grid of photos filtered by selected room type
+
+**3. Feature Tags Row**
+Display property feature tags in a horizontal row with icons:
+- View type (e.g., "Park/Greenbelt")
+- Fireplace count
+- Garage (e.g., "3 Car Garage")
+- Patio details
+
+**4. Location Map Section (add at bottom)**
+
+Add a Google Maps section:
+- Section header: "Location"
+- Embedded Google Map showing property pin
+- Use coordinates from listing data
+- API key from environment variable: GOOGLE_MAPS_API_KEY
+- Map should be responsive and ~300px height
+
+**5. Data Source**
+- Photos come from Repliers API listing.images array
+- Room type categorization may be in listing.images[].description or listing.images[].tags
+- Coordinates from listing.coordinates or listing.address.lat/lng
+- Use existing REPLIERS_API_KEY from secrets
+
+**6. Keep Existing Content**
+Preserve these existing sections (reorder as needed):
+- Property Description
+- Property Features (Interior, Exterior, Appliances, Heating & Cooling, etc.)
+- Property Overview sidebar (beds, baths, sqft, year built)
+- Financial Details
+- Listing Information
+
+**7. Suggested Section Order**
+1. Photo Gallery (NEW)
+2. Browse by Room Type (NEW)
+3. Feature Tags (NEW)
+4. Property Description (existing)
+5. Property Features (existing - collapsible sections)
+6. Location Map (NEW)
+7. Sidebar remains: Property Overview, Financial Details, Listing Information
+
+**8. Technical Notes**
+- Lazy load images for performance
+- Handle missing photos gracefully (show placeholder)
+- Room type filters should show (0) and disable if no photos match
+- Map should handle missing coordinates (hide section or show address-based map)
+
+### Environment Variables Needed
+- REPLIERS_API_KEY (existing)
+- GOOGLE_MAPS_API_KEY (add this)
