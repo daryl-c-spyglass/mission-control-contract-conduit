@@ -1,0 +1,104 @@
+The flyer has 40% empty white space at the bottom. The bottom section (stats, description, agent) is WAY too small.
+
+**Quick Fix - Increase ALL these font sizes in server/templates/flyer-template.html:**
+
+```css
+/* STATS - Make bigger */
+.stat-text {
+  font-size: 52px;
+}
+
+.stat-icon, .stat-icon svg, .stat-icon img {
+  width: 65px;
+  height: 65px;
+}
+
+.stats-column {
+  gap: 55px;
+}
+
+/* HEADLINE & DESCRIPTION - Make bigger */
+.property-headline {
+  font-size: 52px;
+  margin-bottom: 40px;
+}
+
+.property-description {
+  font-size: 38px;
+  line-height: 1.6;
+}
+
+/* AGENT - Make bigger */
+.agent-photo-container {
+  width: 240px;
+  height: 240px;
+}
+
+.agent-name {
+  font-size: 52px;
+}
+
+.agent-title {
+  font-size: 30px;
+}
+
+.agent-phone {
+  font-size: 38px;
+}
+
+.agent-logo-small {
+  width: 200px;
+}
+
+/* BOTTOM SECTION CONTAINER - More padding */
+.bottom-section {
+  padding: 80px 60px;
+  gap: 70px;
+  min-height: 900px;
+}
+
+/* REDUCE PHOTO HEIGHTS to give more room to bottom */
+.main-photo {
+  height: 900px;
+}
+
+.secondary-photo {
+  height: 420px;
+}
+```
+
+**Also fix the address** - make sure it shows city, state, zip:
+- In flyer-generator.ts, the fullAddress should be: `${address}, ${city}, ${state} ${zipCode}`
+- In the template, use `{{fullAddress}}` in the address bar
+
+**Fix decorative squares** - should be actual div squares, not an icon:
+```html
+<div class="decorative-squares">
+  <div class="square black"></div>
+  <div class="square white"></div>
+  <div class="square black"></div>
+  <div class="square white"></div>
+  <div class="square black"></div>
+</div>
+```
+
+```css
+.decorative-squares {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.square {
+  width: 40px;
+  height: 40px;
+}
+.square.black {
+  background: #000000;
+}
+.square.white {
+  background: #ffffff;
+  border: 2px solid #000000;
+}
+```
+
+The key issue is EVERYTHING in the bottom section needs to be about 50-70% larger than it currently is.

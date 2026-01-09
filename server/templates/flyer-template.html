@@ -92,7 +92,7 @@
     
     .main-photo {
       width: 100%;
-      height: 1100px;
+      height: 900px;
       object-fit: cover;
       display: block;
     }
@@ -105,7 +105,7 @@
     
     .secondary-photo {
       width: calc(50% - 10px);
-      height: 550px;
+      height: 420px;
       object-fit: cover;
     }
     
@@ -121,18 +121,19 @@
     /* BOTTOM SECTION */
     .bottom-section {
       display: flex;
-      padding: 80px 100px;
-      min-height: 950px;
+      padding: 80px 60px;
+      gap: 70px;
+      min-height: 1200px;
       position: relative;
     }
     
     /* LEFT COLUMN - Stats */
     .stats-column {
-      width: 28%;
+      width: 26%;
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
-      gap: 80px;
+      gap: 55px;
       padding-top: 60px;
     }
     
@@ -147,8 +148,13 @@
       height: 65px;
     }
     
+    .stat-icon svg, .stat-icon img {
+      width: 65px;
+      height: 65px;
+    }
+    
     .stat-text {
-      font-size: 48px;
+      font-size: 52px;
       font-weight: 600;
       color: #333;
     }
@@ -156,29 +162,29 @@
     /* CENTER COLUMN - Description */
     .description-column {
       width: 42%;
-      padding: 60px 50px;
+      padding: 60px 40px;
       text-align: center;
     }
     
     .listing-headline {
       font-family: 'League Spartan', sans-serif;
-      font-size: 38px;
+      font-size: 52px;
       font-weight: 700;
       letter-spacing: 0.08em;
-      margin-bottom: 40px;
+      margin-bottom: 45px;
       color: #333;
       text-transform: uppercase;
     }
     
     .listing-description {
-      font-size: 32px;
-      line-height: 1.8;
+      font-size: 38px;
+      line-height: 1.6;
       color: #444;
     }
     
     /* RIGHT COLUMN - Agent */
     .agent-column {
-      width: 30%;
+      width: 32%;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -190,47 +196,46 @@
       position: absolute;
       top: 10px;
       right: 20px;
-      display: grid;
-      grid-template-columns: repeat(3, 25px);
-      grid-template-rows: repeat(3, 25px);
+      display: flex;
+      gap: 12px;
     }
     
     .square {
-      width: 25px;
-      height: 25px;
+      width: 40px;
+      height: 40px;
     }
     
     .square-black { background: #000; }
-    .square-white { background: #fff; border: 1px solid #000; }
+    .square-white { background: #fff; border: 2px solid #000; }
     
     .agent-photo {
-      width: 250px;
-      height: 250px;
+      width: 280px;
+      height: 280px;
       border-radius: 50%;
       object-fit: cover;
-      margin-bottom: 30px;
+      margin-bottom: 35px;
       border: 3px solid #ddd;
     }
     
     .agent-photo-placeholder {
-      width: 250px;
-      height: 250px;
+      width: 280px;
+      height: 280px;
       border-radius: 50%;
       background: #e0e0e0;
-      margin-bottom: 30px;
+      margin-bottom: 35px;
       display: flex;
       align-items: center;
       justify-content: center;
     }
     
     .agent-photo-placeholder svg {
-      width: 120px;
-      height: 120px;
+      width: 140px;
+      height: 140px;
       fill: #999;
     }
     
     .agent-name {
-      font-size: 48px;
+      font-size: 52px;
       font-weight: 700;
       color: #333;
       margin-bottom: 15px;
@@ -238,21 +243,21 @@
     }
     
     .agent-title {
-      font-size: 28px;
+      font-size: 30px;
       color: #666;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
       text-align: center;
     }
     
     .agent-phone {
-      font-size: 34px;
+      font-size: 38px;
       color: #333;
-      margin-bottom: 45px;
+      margin-bottom: 50px;
       text-align: center;
     }
     
     .agent-logo {
-      width: 200px;
+      width: 220px;
       height: auto;
     }
   </style>
