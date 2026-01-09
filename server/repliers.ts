@@ -532,6 +532,113 @@ export async function searchByAddress(address: string): Promise<MLSListingData |
   }
 }
 
+// Diagnostic function to check if Image Insights is enabled on the account
+export async function checkImageInsights(mlsNumber: string): Promise<{
+  mlsNumber: string;
+  imageInsightsEnabled: boolean;
+  totalImages: number;
+  sampleClassifications: Array<{
+    image: string;
+    classification: string;
+    confidence: number;
+    quality: number;
+  }>;
+  coverImageTest?: {
+    defaultFirstImage: string;
+    withCoverImageParam: string;
+    coverImageChanged: boolean;
+  };
+  rawImageInsightsPreview?: string;
+}> {
+  try {
+    const formattedMLS = mlsNumber.startsWith("ACT") ? mlsNumber : `ACT${mlsNumber}`;
+    
+    // Fetch listing with default params
+    const data = await repliersRequest(`/listings/${formattedMLS}`, { boardId: "53" });
+    
+    if (!data) {
+      return {
+        mlsNumber,
+        imageInsightsEnabled: false,
+        totalImages: 0,
+        sampleClassifications: [],
+      };
+    }
+
+    const listing = data.listings?.[0] || data;
+    const rawImages = listing.media || listing.images || listing.photos || [];
+    const photos = normalizeImageUrls(rawImages);
+    const defaultFirstImage = photos[0] || "";
+
+    // Check for imageInsights field
+    const imageInsights = listing.imageInsights;
+    
+    if (imageInsights) {
+      console.log("[ImageInsights] Found imageInsights field in response!");
+      console.log("[ImageInsights] Raw preview (first 500 chars):", JSON.stringify(imageInsights).substring(0, 500));
+      
+      const images = imageInsights.images || [];
+      const sampleClassifications = images.slice(0, 5).map((img: any) => ({
+        image: img.url || img.image || "unknown",
+        classification: img.classification || img.label || img.category || "unknown",
+        confidence: img.confidence || img.score || 0,
+        quality: img.quality || img.qualityScore || 0,
+      }));
+
+      return {
+        mlsNumber,
+        imageInsightsEnabled: true,
+        totalImages: photos.length,
+        sampleClassifications,
+        rawImageInsightsPreview: JSON.stringify(imageInsights).substring(0, 500),
+      };
+    }
+
+    // Image Insights not found - test coverImage parameter
+    console.log("[ImageInsights] imageInsights field NOT present in response");
+    console.log("[ImageInsights] Testing coverImage parameter...");
+    
+    let coverImageFirstPhoto = defaultFirstImage;
+    try {
+      const dataWithCover = await repliersRequest(`/listings/${formattedMLS}`, { 
+        boardId: "53",
+        coverImage: "exterior front"
+      });
+      
+      const listingWithCover = dataWithCover.listings?.[0] || dataWithCover;
+      const coverImages = listingWithCover.media || listingWithCover.images || listingWithCover.photos || [];
+      const coverPhotos = normalizeImageUrls(coverImages);
+      coverImageFirstPhoto = coverPhotos[0] || "";
+      
+      console.log("[ImageInsights] Default first image:", defaultFirstImage);
+      console.log("[ImageInsights] With coverImage param:", coverImageFirstPhoto);
+      console.log("[ImageInsights] Cover image changed:", coverImageFirstPhoto !== defaultFirstImage);
+    } catch (e) {
+      console.log("[ImageInsights] Error testing coverImage param:", e);
+    }
+
+    return {
+      mlsNumber,
+      imageInsightsEnabled: false,
+      totalImages: photos.length,
+      sampleClassifications: [],
+      coverImageTest: {
+        defaultFirstImage,
+        withCoverImageParam: coverImageFirstPhoto,
+        coverImageChanged: coverImageFirstPhoto !== defaultFirstImage,
+      },
+    };
+  } catch (error) {
+    console.error("[ImageInsights] Error checking image insights:", error);
+    return {
+      mlsNumber,
+      imageInsightsEnabled: false,
+      totalImages: 0,
+      sampleClassifications: [],
+    };
+  }
+}
+
 export async function searchListings(params: {
   city?: string;
   minPrice?: number;

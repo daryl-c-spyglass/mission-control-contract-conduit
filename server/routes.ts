@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema } from "@shared/schema";
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages, watchUserMailbox } from "./gmail";
 import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel } from "./slack";
-import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess } from "./repliers";
+import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess, checkImageInsights } from "./repliers";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
 import { getSyncStatus, triggerManualSync } from "./repliers-sync";
@@ -878,6 +878,17 @@ export async function registerRoutes(
       res.json({ success: true, message: "MLS sync triggered" });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to trigger sync" });
+    }
+  });
+
+  // ============ Debug: Check Image Insights ============
+  // Temporary diagnostic endpoint to check if Repliers Image Insights is enabled
+  app.get("/api/debug/check-image-insights/:mlsNumber", async (req, res) => {
+    try {
+      const result = await checkImageInsights(req.params.mlsNumber);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to check image insights" });
     }
   });
 
