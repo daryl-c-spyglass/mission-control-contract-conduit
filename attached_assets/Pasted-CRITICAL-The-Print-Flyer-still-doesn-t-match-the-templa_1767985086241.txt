@@ -1,0 +1,143 @@
+CRITICAL: The Print Flyer still doesn't match the template. Major changes needed.
+
+REFERENCE FILES:
+- 142_N_STEEL_FLYER.pdf - The exact design to match
+- SpyglassRealty_Logo_Black.png - Use this for header (black logo on white background)
+- SpyglassRealty_Logo_White.png - Use this for agent section (if on dark background)
+- Icon reference screenshot showing exact bed/bath/sqft icons
+
+File: client/src/components/create-flyer-dialog.tsx
+
+## MAJOR FIX 1: Header Background Must Be WHITE
+
+Current: Black header background with white logo
+Template: WHITE header background with BLACK logo
+
+Change:
+```javascript
+// Header background - change from black to white
+ctx.fillStyle = '#FFFFFF'; // WHITE, not black
+ctx.fillRect(0, 0, canvasWidth, headerHeight);
+```
+
+## MAJOR FIX 2: Use Black Spyglass Logo
+
+Upload and use SpyglassRealty_Logo_Black.png for the header.
+
+The logo should be:
+- Black "SPYGLASS REALTY" text with the circular arc design
+- On WHITE background
+- Position: Left side of header
+
+Load the black logo image:
+```javascript
+const blackLogo = new Image();
+blackLogo.src = '/assets/SpyglassRealty_Logo_Black.png';
+// Draw at left side of header
+ctx.drawImage(blackLogo, 40, 20, logoWidth, logoHeight);
+```
+
+## MAJOR FIX 3: Price Badge - Gray Color & Rectangle Shape
+
+Current: Gold pentagon
+Template: Gray/taupe RECTANGLE
+
+Change price badge:
+```javascript
+// Price badge - simple rectangle, gray color
+ctx.fillStyle = '#8b7d6b'; // Gray/taupe color from template
+ctx.fillRect(priceX, priceY, priceWidth, priceHeight);
+
+// "LISTED AT" text
+ctx.fillStyle = '#FFFFFF';
+ctx.font = '24px sans-serif';
+ctx.fillText('LISTED AT', priceX + 20, priceY + 35);
+
+// Price
+ctx.font = 'bold 42px sans-serif';
+ctx.fillText('$434,990', priceX + 20, priceY + 80);
+```
+
+Remove the pentagon/arrow shape - just use a simple rectangle.
+
+## MAJOR FIX 4: Icons Must Match Template Exactly
+
+Look at the icon reference (Image 3 from uploads). The icons are very specific:
+
+**Bed Icon:**
+- Horizontal bed frame
+- Vertical headboard on LEFT with two posts
+- Horizontal slats across the bed
+- Simple line drawing style
+
+**Bath Icon:**
+- Bathtub shape (rounded bottom)
+- Faucet extending UP from left side
+- Two small feet/legs at bottom
+
+**Sqft Icon:**
+- Rectangle/square outline
+- Diagonal line with arrow
+- Represents area measurement
+
+Draw these EXACTLY as shown in the template, not generic shapes.
+
+If canvas drawing is too complex, consider:
+1. Creating SVG files for each icon and loading as images
+2. Using a Unicode character that closely matches
+3. Using an icon library (Lucide, etc.)
+
+## MAJOR FIX 5: Reduce Bottom White Space
+
+The template has the content filling the bottom section properly with minimal white space.
+
+1. Move bottom info section DOWN to start closer to the photos
+2. Increase vertical spacing BETWEEN elements (stats, headline, description)
+3. Make fonts slightly larger
+4. Content should extend closer to page bottom
+
+## MAJOR FIX 6: Full Address Format
+
+Current: "13106 NEW BOSTON"
+Template: "142 N STEEL CREEK CREST HIGHWAY CENTER POINT, TX 78010"
+
+Include full address:
+```javascript
+const fullAddress = `${streetNumber} ${streetName}, ${city}, ${state} ${zip}`;
+// Apply letter spacing
+```
+
+## MAJOR FIX 7: Agent Section Logo
+
+For the small Spyglass logo in the agent section:
+- Use SpyglassRealty_Logo_Black.png (if on white background)
+- Make it appropriately sized (~100-120px wide)
+- Position below agent phone number
+
+## Summary of All Changes
+
+1. ✅ Header: WHITE background (not black)
+2. ✅ Spyglass logo: BLACK version (SpyglassRealty_Logo_Black.png)
+3. ✅ Price badge: Gray rectangle (not gold pentagon)
+4. ✅ Icons: Match exact template style
+5. ✅ Bottom spacing: Reduce white space
+6. ✅ Address: Include city, state, zip
+7. ✅ Agent logo: Use proper black logo
+
+## File Assets to Add to Project
+
+Upload these to the project's public/assets folder:
+- SpyglassRealty_Logo_Black.png (for white backgrounds)
+- SpyglassRealty_Logo_White.png (for dark backgrounds)
+
+Then reference them in the canvas drawing code.
+
+## Testing
+
+After changes, compare side-by-side with 142_N_STEEL_FLYER.pdf:
+- [ ] Header is white with black logo
+- [ ] Price badge is gray rectangle
+- [ ] Icons match template style exactly
+- [ ] Minimal white space at bottom
+- [ ] Full address shown
+- [ ] Overall appearance matches template
