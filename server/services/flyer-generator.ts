@@ -14,9 +14,36 @@ async function imageToBase64(imageUrl: string): Promise<string> {
       return imageUrl;
     }
     
-    // If it's a local file path
+    // Check if it's an absolute file path that exists
+    if (fs.existsSync(imageUrl)) {
+      console.log('Reading local file:', imageUrl);
+      const buffer = fs.readFileSync(imageUrl);
+      const ext = path.extname(imageUrl).slice(1).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'svg': 'image/svg+xml',
+        'gif': 'image/gif'
+      };
+      const mimeType = mimeTypes[ext] || 'image/png';
+      return `data:${mimeType};base64,${buffer.toString('base64')}`;
+    }
+    
+    // Handle proxy URLs - extract the actual CDN URL
+    if (imageUrl.includes('/api/proxy-image?url=')) {
+      const urlMatch = imageUrl.match(/url=([^&]+)/);
+      if (urlMatch) {
+        imageUrl = decodeURIComponent(urlMatch[1]);
+        console.log('Extracted CDN URL from proxy:', imageUrl);
+      }
+    }
+    
+    // If it's a local file path starting with /
     if (imageUrl.startsWith('/') && !imageUrl.startsWith('//') && !imageUrl.startsWith('http')) {
-      const localPath = path.join(import.meta.dirname, '../../public', imageUrl);
+      // Check in public directory
+      const localPath = path.join(process.cwd(), 'public', imageUrl);
+      console.log('Checking local path:', localPath);
       if (fs.existsSync(localPath)) {
         const buffer = fs.readFileSync(localPath);
         const ext = path.extname(localPath).slice(1).toLowerCase();
@@ -25,10 +52,16 @@ async function imageToBase64(imageUrl: string): Promise<string> {
       }
     }
     
-    // Ensure URL is absolute
+    // Ensure URL is absolute for fetch
     let fetchUrl = imageUrl;
     if (fetchUrl.startsWith('//')) {
       fetchUrl = `https:${fetchUrl}`;
+    }
+    
+    // Must be an http URL to fetch
+    if (!fetchUrl.startsWith('http')) {
+      console.error('Cannot fetch non-http URL:', fetchUrl);
+      return '';
     }
     
     // Fetch remote URL and convert to base64
@@ -42,6 +75,7 @@ async function imageToBase64(imageUrl: string): Promise<string> {
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const contentType = response.headers.get('content-type') || 'image/jpeg';
+    console.log('Image fetched successfully, size:', buffer.length, 'type:', contentType);
     return `data:${contentType};base64,${buffer.toString('base64')}`;
     
   } catch (error) {

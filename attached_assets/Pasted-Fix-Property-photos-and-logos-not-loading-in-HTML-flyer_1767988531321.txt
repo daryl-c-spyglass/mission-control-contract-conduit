@@ -1,0 +1,241 @@
+Fix: Property photos and logos not loading in HTML flyer, but agent photo works.
+
+The agent photo loads correctly, but MLS photos and logo files don't. This indicates the base64 conversion is working for uploaded files but failing for:
+1. Repliers CDN photo URLs
+2. Local asset files (logos, icons)
+
+## Debug Step 1: Log What URLs Are Being Processed
+
+Add detailed logging to see what's happening:
+```typescript
+async function imageToBase64(imageUrl: string): Promise<string> {
+  console.log('Converting image:', imageUrl);
+  
+  try {
+    if (!imageUrl) {
+      console.log('Empty image URL');
+      return '';
+    }
+    
+    // If it's already a data URI, return as-is
+    if (imageUrl.startsWith('data:')) {
+      console.log('Already base64, skipping');
+      return imageUrl;
+    }
+    
+    // If it's a local file path starting with /
+    if (imageUrl.startsWith('/') && !imageUrl.startsWith('//')) {
+      const localPath = path.join(process.cwd(), 'public', imageUrl);
+      console.log('Checking local path:', localPath);
+      
+      if (fs.existsSync(localPath)) {
+        console.log('Local file found, converting...');
+        const buffer = fs.readFileSync(localPath);
+        const ext = path.extname(localPath).slice(1).toLowerCase();
+        const mimeType = ext === 'svg' ? 'image/svg+xml' : 
+                         ext === 'png' ? 'image/png' : 'image/jpeg';
+        return `data:${mimeType};base64,${buffer.toString('base64')}`;
+      } else {
+        console.log('Local file NOT found:', localPath);
+      }
+    }
+    
+    // For remote URLs
+    if (imageUrl.startsWith('http')) {
+      console.log('Fetching remote URL...');
+      const response = await fetch(imageUrl);
+      
+      if (!response.ok) {
+        console.log('Fetch failed:', response.status, response.statusText);
+        return '';
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const contentType = response.headers.get('content-type') || 'image/jpeg';
+      console.log('Remote image fetched, size:', buffer.length, 'type:', contentType);
+      return `data:${contentType};base64,${buffer.toString('base64')}`;
+    }
+    
+    console.log('Unknown URL format:', imageUrl);
+    return '';
+    
+  } catch (error) {
+    console.error('Error converting image:', imageUrl, error.message);
+    return '';
+  }
+}
+```
+
+## Fix 1: Ensure Repliers CDN URLs Are Complete
+
+The MLS photos might not have the full CDN URL. Check what URLs are being passed:
+```typescript
+// In the API endpoint, log incoming photos
+app.post('/api/generate-flyer-html', async (req, res) => {
+  console.log('Received photos:', req.body.photos);
+  
+  // Ensure full Repliers CDN URLs
+  const photos = req.body.photos.map((photo: string) => {
+    if (!photo) return '';
+    
+    // Already a full URL
+    if (photo.startsWith('http')) return photo;
+    
+    // Already base64
+    if (photo.startsWith('data:')) return photo;
+    
+    // Relative path - add Repliers CDN
+    if (photo.startsWith('/')) {
+      return `https://cdn.repliers.io${photo}`;
+    }
+    
+    // Just filename - add full CDN path
+    return `https://cdn.repliers.io/${photo}`;
+  });
+  
+  console.log('Processed photo URLs:', photos);
+  
+  // ... rest of code
+});
+```
+
+## Fix 2: Fix Local Asset Paths
+
+The logos and icons are local files. Make sure paths are correct:
+```typescript
+// Get the correct base directory
+const assetsDir = path.join(process.cwd(), 'public', 'assets');
+const iconsDir = path.join(assetsDir, 'icons');
+
+// Check if files exist
+console.log('Assets directory:', assetsDir);
+console.log('Logo exists:', fs.existsSync(path.join(assetsDir, 'SpyglassRealty_Logo_Black.png')));
+console.log('Bed icon exists:', fs.existsSync(path.join(iconsDir, 'bed-icon.svg')));
+
+const flyerData = {
+  // Use absolute file paths for local assets
+  spyglassLogoBlack: path.join(assetsDir, 'SpyglassRealty_Logo_Black.png'),
+  bedIcon: path.join(iconsDir, 'bed-icon.svg'),
+  bathIcon: path.join(iconsDir, 'bath-icon.svg'),
+  sqftIcon: path.join(iconsDir, 'sqft-icon.svg'),
+  // ...
+};
+```
+
+## Fix 3: Handle File Paths in imageToBase64
+
+Update to handle absolute file paths:
+```typescript
+async function imageToBase64(imagePath: string): Promise<string> {
+  try {
+    if (!imagePath) return '';
+    if (imagePath.startsWith('data:')) return imagePath;
+    
+    // Check if it's an absolute file path
+    if (fs.existsSync(imagePath)) {
+      console.log('Reading local file:', imagePath);
+      const buffer = fs.readFileSync(imagePath);
+      const ext = path.extname(imagePath).slice(1).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'svg': 'image/svg+xml',
+        'gif': 'image/gif'
+      };
+      const mimeType = mimeTypes[ext] || 'image/png';
+      return `data:${mimeType};base64,${buffer.toString('base64')}`;
+    }
+    
+    // Handle URLs
+    if (imagePath.startsWith('http')) {
+      const response = await fetch(imagePath);
+      if (!response.ok) {
+        console.error('Failed to fetch:', imagePath, response.status);
+        return '';
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const contentType = response.headers.get('content-type') || 'image/jpeg';
+      return `data:${contentType};base64,${buffer.toString('base64')}`;
+    }
+    
+    console.log('Could not process image:', imagePath);
+    return '';
+    
+  } catch (error) {
+    console.error('imageToBase64 error:', error);
+    return '';
+  }
+}
+```
+
+## Fix 4: Verify Asset Files Exist
+
+Create a debug endpoint to check assets:
+```typescript
+app.get('/api/debug/check-assets', (req, res) => {
+  const assetsDir = path.join(process.cwd(), 'public', 'assets');
+  
+  const files = [
+    'SpyglassRealty_Logo_Black.png',
+    'SpyglassRealty_Logo_White.png',
+    'icons/bed-icon.svg',
+    'icons/bath-icon.svg',
+    'icons/sqft-icon.svg'
+  ];
+  
+  const results = files.map(file => ({
+    file,
+    path: path.join(assetsDir, file),
+    exists: fs.existsSync(path.join(assetsDir, file))
+  }));
+  
+  res.json({
+    assetsDir,
+    cwd: process.cwd(),
+    files: results
+  });
+});
+```
+
+Visit /api/debug/check-assets to see if files exist and where.
+
+## Fix 5: Alternative - Embed Assets Directly in HTML
+
+If file loading keeps failing, embed the logo as inline SVG or base64 directly in the template:
+```html
+<!-- In flyer-template.html -->
+<!-- Instead of loading external logo, use inline base64 -->
+<img src="data:image/png;base64,{{{spyglassLogoBase64}}}" class="header-logo" alt="Spyglass Realty">
+```
+
+Pre-convert assets to base64 at app startup:
+```typescript
+// At server startup, pre-load assets as base64
+const ASSETS = {
+  spyglassLogoBlack: fs.readFileSync(
+    path.join(process.cwd(), 'public/assets/SpyglassRealty_Logo_Black.png')
+  ).toString('base64'),
+  bedIcon: fs.readFileSync(
+    path.join(process.cwd(), 'public/assets/icons/bed-icon.svg')  
+  ).toString('base64'),
+  // ... etc
+};
+
+// Then use in flyer generation
+const flyerData = {
+  spyglassLogoBase64: `data:image/png;base64,${ASSETS.spyglassLogoBlack}`,
+  // ...
+};
+```
+
+## Testing
+
+1. Check server logs for image conversion messages
+2. Visit /api/debug/check-assets to verify files exist
+3. Ensure Repliers photo URLs are complete (https://cdn.repliers.io/...)
+4. Generate flyer and check if images appear
+
+Please share the server console output when generating a flyer so we can see where it's failing.
