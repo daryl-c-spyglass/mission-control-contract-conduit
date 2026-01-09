@@ -1,0 +1,71 @@
+Add Print Flyer template based on Caleb's design (142 N Steel example).
+
+File: client/src/components/create-flyer-dialog.tsx
+
+## Print Flyer Template Layout (8.5x11 at 300 DPI = 2550x3300px)
+
+Based on the provided flyer PDF, create this layout:
+
+### Header Section (top ~200px)
+- Left: Spyglass Realty logo (use existing logo from app)
+- Center: "Leading Real Estate Companies" logo (placeholder for now, use text)
+- Right: Price badge with gold/brown background
+  - "LISTED AT" (small text, uppercase, spaced letters)
+  - "$XXX,XXX" (large text)
+
+### Address Bar (below header, ~80px)
+- Full address in uppercase with spaced letters
+- Example: "1 3 1 0 6   N E W   B O S T O N,   A U S T I N,   T X   7 8 7 2 9"
+- White/light text on dark background
+
+### Photos Section (~1600px height)
+- Main photo: Full width, ~1100px height
+- Two secondary photos below: Side by side, each ~500px height
+- Photos should fill their containers (object-fit: cover)
+
+### Info Section (bottom ~700px)
+Split into 3 columns:
+
+**Left Column - Property Stats:**
+- Bed icon + "X bedrooms"
+- Bath icon + "X bathrooms"  
+- Square icon + "X,XXX sq. ft"
+- Use simple icons (can use emoji or SVG)
+
+**Center Column - Description:**
+- Listing headline (optional, 39 char max) - e.g., "OPEN HOUSE SATURDAY"
+- Sub-headline with date/time if applicable
+- Property description (115 char max, truncate at word boundary)
+
+**Right Column - Agent Info:**
+- Agent photo (circular, ~100px)
+- Team logo (placeholder for now)
+- Agent name (bold)
+- "REALTOR®" text
+- Phone number
+- QR code (placeholder/optional)
+
+For now, use placeholder text for agent section:
+- Photo: Gray circle with "Agent Photo" text
+- Name: "Agent Name"
+- Phone: "(XXX) XXX-XXXX"
+
+### Background Colors
+- Header: Black/dark gray (#1a1a1a)
+- Price badge: Gold/brown (#b39960)
+- Info section: White background with black/white decorative squares
+
+### Canvas Generation
+- Use same Canvas API approach as Social Media template
+- Output dimensions: 2550x3300px (8.5x11 at 300 DPI)
+- Download as PNG (PDF conversion can be added later)
+
+### Preview
+- Show scaled preview in dialog (fit to ~300px width)
+- Maintain aspect ratio (8.5:11)
+
+Test by:
+1. Select "Print Flyer" format
+2. Select 3 photos
+3. Verify preview shows correct layout
+4. Download and verify output matches Caleb's template structure

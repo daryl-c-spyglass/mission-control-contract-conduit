@@ -1,0 +1,79 @@
+Add format selection to Create Flyer dialog - Social Media vs Print Flyer.
+
+File: client/src/components/create-flyer-dialog.tsx
+
+## Part 1: Add Format Selector
+
+1. Add a format toggle/selector at the top of the dialog (before photo selection):
+   - Two options: "Social Media" | "Print Flyer"
+   - Use tabs, toggle buttons, or radio cards
+   - Default selection: "Social Media"
+   - Style to match app theme (orange accent for selected)
+
+2. Format descriptions:
+   - Social Media: "Instagram/Facebook story format (1080x1920)"
+   - Print Flyer: "Printable PDF format (8.5x11)"
+
+## Part 2: Update Photo Selection Based on Format
+
+Social Media format:
+- Show: "Select 1 photo"
+- Max selection: 1 photo
+- Counter: "1/1 selected"
+- Auto-select first MLS photo by default
+
+Print Flyer format:
+- Show: "Select up to 3 photos (first photo will be the main image)"
+- Max selection: 3 photos
+- Counter: "3/3 selected"
+- Auto-select first 3 MLS photos by default
+
+3. When user switches format:
+   - Reset selection to default for that format
+   - Update counter and selection limit
+
+## Part 3: Update Preview Based on Format
+
+Social Media preview (current template):
+- 1080x1920 portrait (9:16 ratio)
+- Single main photo at top
+- Dark gradient bottom section
+- Status, price, address, specs, description
+- Spyglass logo bottom right
+
+Print Flyer preview (new template):
+- 8.5x11 portrait ratio (scaled down in preview)
+- Layout based on Caleb's template:
+  - Header: Spyglass logo (top left), "Listed at $XXX,XXX" badge (top right)
+  - Address below header (uppercase, spaced letters)
+  - Main photo (large, ~60% of flyer)
+  - Two secondary photos below main (side by side)
+  - Bottom section:
+    - Left: Beds/Baths/Sqft with icons
+    - Center: Description (115 char max)
+    - Right: Agent info placeholder (text: "Agent info coming soon")
+  - Spyglass logo bottom area
+
+## Part 4: Update Download Based on Format
+
+Social Media:
+- Output: PNG file
+- Dimensions: 1080x1920
+- Filename: "{address}_social.png"
+
+Print Flyer:
+- Output: PNG file (for now, PDF later)
+- Dimensions: 2550x3300 (8.5x11 at 300 DPI)
+- Filename: "{address}_flyer.png"
+
+## Part 5: Update Button Label
+
+- "Download Flyer" for Print Flyer format
+- "Download Graphic" for Social Media format
+
+Test by:
+1. Open Create Flyer dialog
+2. Toggle between Social Media and Print Flyer
+3. Verify photo selection limit changes (1 vs 3)
+4. Verify preview updates to show correct layout
+5. Download both formats and verify output
