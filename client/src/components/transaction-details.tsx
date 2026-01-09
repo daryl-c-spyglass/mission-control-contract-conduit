@@ -1,5 +1,8 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { MapContainer, TileLayer, Marker } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import {
   ArrowLeft,
   Calendar,
@@ -203,18 +206,8 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
     `${mlsData.address}, ${mlsData.city}, ${mlsData.state} ${mlsData.zipCode}` : 
     transaction.propertyAddress;
   
-  // Build OpenStreetMap embed URL (no API key required)
+  // Check if coordinates are available for map display
   const hasCoordinates = mlsData?.coordinates?.latitude && mlsData?.coordinates?.longitude;
-  const mapEmbedUrl = useMemo(() => {
-    if (hasCoordinates) {
-      const lat = mlsData.coordinates!.latitude;
-      const lng = mlsData.coordinates!.longitude;
-      // OpenStreetMap embed with marker
-      const bbox = `${lng - 0.005},${lat - 0.003},${lng + 0.005},${lat + 0.003}`;
-      return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;
-    }
-    return null;
-  }, [hasCoordinates, mlsData?.coordinates]);
   
   // Reset photo index when MLS data or photos change
   useEffect(() => {
@@ -973,7 +966,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 )}
                 
                 {/* Location Map */}
-                {mapEmbedUrl && (
+                {hasCoordinates && (
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center gap-2">
@@ -982,18 +975,27 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
-                      <div className="relative w-full h-[300px] rounded-b-lg overflow-hidden">
-                        <iframe
-                          src={mapEmbedUrl}
-                          width="100%"
-                          height="100%"
-                          style={{ border: 0 }}
-                          allowFullScreen
-                          loading="lazy"
-                          referrerPolicy="no-referrer-when-downgrade"
-                          title="Property Location - OpenStreetMap"
-                          data-testid="iframe-property-map"
-                        />
+                      <div className="relative w-full h-[300px] rounded-b-lg overflow-hidden" data-testid="map-container">
+                        <MapContainer
+                          center={[mlsData.coordinates!.latitude, mlsData.coordinates!.longitude]}
+                          zoom={15}
+                          scrollWheelZoom={false}
+                          style={{ height: "100%", width: "100%" }}
+                        >
+                          <TileLayer
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                          />
+                          <Marker
+                            position={[mlsData.coordinates!.latitude, mlsData.coordinates!.longitude]}
+                            icon={L.divIcon({
+                              className: "custom-marker",
+                              html: `<div style="background-color: #ef4444; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4);"></div>`,
+                              iconSize: [24, 24],
+                              iconAnchor: [12, 12],
+                            })}
+                          />
+                        </MapContainer>
                       </div>
                     </CardContent>
                   </Card>
