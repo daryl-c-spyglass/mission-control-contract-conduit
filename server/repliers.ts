@@ -278,6 +278,17 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
     try {
       data = await repliersRequest(`/listings/${formattedMLS}`, params);
       console.log("Repliers API full response for MLS", formattedMLS, ":", JSON.stringify(data, null, 2));
+      
+      // Debug: Log image-related fields at top level
+      console.log("Repliers top-level image fields:", JSON.stringify({
+        media: data.media,
+        images: data.images,
+        photos: data.photos,
+        Pictures: data.Pictures,
+        Photo: data.Photo,
+        MediaURL: data.MediaURL,
+        allKeys: Object.keys(data)
+      }, null, 2));
     } catch (directError: any) {
       console.log("Direct lookup failed:", directError.message);
       console.log("Trying POST search as fallback...");
@@ -311,9 +322,28 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
 
     console.log("Processing listing object keys:", Object.keys(listing));
     console.log("Listing details:", listing.details ? Object.keys(listing.details) : "no details");
+    
+    // Debug: Log all image-related fields in the listing object
+    console.log("Listing image fields:", JSON.stringify({
+      media: listing.media ? `Array(${listing.media.length})` : listing.media,
+      images: listing.images ? `Array(${listing.images.length})` : listing.images,
+      photos: listing.photos ? `Array(${listing.photos.length})` : listing.photos,
+      Pictures: listing.Pictures,
+      Photo: listing.Photo,
+      MediaURL: listing.MediaURL,
+      detailsPhotos: listing.details?.photos,
+      detailsImages: listing.details?.images,
+      sampleMedia: listing.media?.[0] ? JSON.stringify(listing.media[0]).substring(0, 200) : null
+    }, null, 2));
 
     const rawImages = listing.media || listing.images || listing.photos || [];
+    console.log("Raw images selected:", rawImages?.length || 0, "items");
+    if (rawImages.length > 0) {
+      console.log("First raw image sample:", JSON.stringify(rawImages[0]).substring(0, 300));
+    }
+    
     const photos = normalizeImageUrls(rawImages);
+    console.log("After normalizeImageUrls:", photos.length, "valid URLs");
     
     const addressParts = [];
     if (listing.address?.streetNumber) addressParts.push(listing.address.streetNumber);
