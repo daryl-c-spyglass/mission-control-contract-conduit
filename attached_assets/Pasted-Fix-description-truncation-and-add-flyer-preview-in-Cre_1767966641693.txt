@@ -1,0 +1,80 @@
+Fix description truncation and add flyer preview in Create Flyer dialog.
+
+File: client/src/components/create-flyer-dialog.tsx
+
+## Part 1: Fix Description Truncation
+
+Issue:
+- Description is being cut off mid-word (e.g., "...trails, pa")
+- Should truncate at a complete word and add "..." 
+
+Fix:
+1. Find where description is truncated (likely around 200 characters)
+2. Update truncation logic to:
+   - Find the last space before the character limit
+   - Cut at that space
+   - Add "..." at the end
+   
+Example function:
+function truncateDescription(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  
+  // Find last space before maxLength
+  const truncated = text.substring(0, maxLength);
+  const lastSpace = truncated.lastIndexOf(' ');
+  
+  if (lastSpace > 0) {
+    return truncated.substring(0, lastSpace) + '...';
+  }
+  return truncated + '...';
+}
+
+Apply this to the description before rendering on canvas.
+
+## Part 2: Add Flyer Preview
+
+Add a live preview so agents can see the flyer before downloading.
+
+1. Update dialog layout:
+   - Left side: Current form (photo selection, fields)
+   - Right side: Live preview of flyer
+   - Or: Add a "Preview" tab/step before "Generate"
+
+2. Preview component:
+   - Show a scaled-down version of the flyer (fit within ~300-400px width)
+   - Update in real-time as user:
+     - Selects different photos
+     - Changes price, status, beds, baths, sqft
+     - Edits description
+   - Use the same canvas rendering logic but scaled down
+   - Add a border/frame around preview
+
+3. Preview should show:
+   - Selected main photo (first selected)
+   - Status label (Just Listed, etc.)
+   - Price
+   - Address
+   - Beds | Baths | Sq Ft
+   - Truncated description (with proper word truncation)
+   - Spyglass logo
+
+4. Update button flow:
+   - Change "Generate Flyer" button to "Download Flyer"
+   - Preview is always visible, so no separate "Preview" button needed
+   - When user clicks "Download Flyer", download the full-resolution version
+
+5. Handle loading state:
+   - Show loading spinner in preview area while images load
+   - Preview updates after images are loaded
+
+6. Responsive behavior:
+   - On smaller screens, stack preview below the form
+   - On larger screens, show side-by-side
+
+Test by:
+1. Open Create Flyer dialog
+2. Verify preview appears showing the flyer
+3. Change photo selection - preview updates
+4. Change price or other fields - preview updates
+5. Verify description ends at complete word with "..."
+6. Click Download Flyer - full resolution PNG downloads
