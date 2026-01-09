@@ -1,0 +1,135 @@
+Add AI Generator for Listing Headline in Print Flyer.
+
+Files to modify:
+- client/src/components/create-flyer-dialog.tsx
+- server/routes.ts (add API endpoint)
+
+## Part 1: Add Server Endpoint for AI Headline Generation
+
+Create a new API endpoint: POST /api/generate-headline
+
+1. Request body:
+   {
+     "description": "full MLS description text",
+     "address": "13106 New Boston, Austin, TX",
+     "beds": 4,
+     "baths": 2,
+     "sqft": 1850,
+     "neighborhood": "NW Austin" // if available
+   }
+
+2. AI Prompt:
+   """
+   You are a real estate marketing expert. Generate a catchy, compelling headline for a property listing flyer.
+
+   Requirements:
+   - Maximum 39 characters (strict limit)
+   - ALL UPPERCASE
+   - Professional real estate broker style
+   - Focus on: location appeal, property highlights, or urgency
+   - No exclamation marks
+   - Should grab attention and create interest
+
+   Examples of good headlines:
+   - "A PRIME OPPORTUNITY IN NORTH EAST AUSTIN"
+   - "STUNNING HILL COUNTRY RETREAT"
+   - "MODERN LUXURY IN DOWNTOWN"
+   - "YOUR DREAM HOME AWAITS"
+   - "MOVE-IN READY IN TARRYTOWN"
+
+   Property details:
+   Address: {address}
+   Beds: {beds} | Baths: {baths} | Sqft: {sqft}
+   
+   Description: {description}
+
+   Generate ONE headline only. Return just the headline text, nothing else.
+   """
+
+3. Response:
+   {
+     "headline": "A PRIME OPPORTUNITY IN NW AUSTIN"
+   }
+
+4. Post-processing:
+   - Convert to uppercase
+   - Trim whitespace
+   - Truncate to 39 chars if needed (at word boundary)
+
+## Part 2: Add AI Generate Button for Headline
+
+In create-flyer-dialog.tsx:
+
+1. Add "✨ AI Generate" button next to Listing Headline field:
+```jsx
+   <div className="space-y-2">
+     <div className="flex justify-between items-center">
+       <Label>Listing Headline (optional)</Label>
+       <Button 
+         variant="outline" 
+         size="sm"
+         onClick={handleGenerateHeadline}
+         disabled={isGeneratingHeadline}
+       >
+         <Sparkles className="w-4 h-4 mr-1" />
+         {isGeneratingHeadline ? "Generating..." : "AI Generate"}
+       </Button>
+     </div>
+     <Input
+       value={headline}
+       onChange={(e) => setHeadline(e.target.value.toUpperCase())}
+       placeholder="e.g., A PRIME OPPORTUNITY IN NW AUSTIN"
+       maxLength={39}
+       className="uppercase"
+     />
+     <p className="text-xs text-muted-foreground">
+       Optional headline (39 characters max) - appears above description
+     </p>
+   </div>
+```
+
+2. Button behavior:
+   - On click, show loading state
+   - Call /api/generate-headline endpoint
+   - Set headline input value to AI response (uppercase)
+   - Show success toast: "Headline generated!"
+
+3. Allow re-generation:
+   - User can click multiple times for variations
+   - Add tooltip: "Click for a different headline variation"
+
+4. Auto-uppercase:
+   - Any text typed in headline field should auto-convert to uppercase
+   - Add text-transform: uppercase to input styling
+
+## Part 3: Character Counter for Headline
+
+1. Show character count: "32/39"
+2. Color coding:
+   - Green: Under 30 chars
+   - Yellow: 30-39 chars
+   - Red: Over 39 (should prevent input beyond 39)
+
+## Part 4: Tooltip for AI Generate Button
+
+Add hover tooltip:
+Generate AI Headline
+Creates a catchy, professional headline
+based on the property description.
+Examples:
+
+"A PRIME OPPORTUNITY IN NW AUSTIN"
+"STUNNING HILL COUNTRY RETREAT"
+"YOUR DREAM HOME AWAITS"
+
+
+Test by:
+1. Open Create Property Flyer
+2. Select Print Flyer format
+3. Click "AI Generate" next to Listing Headline
+4. Verify headline is generated in ALL CAPS
+5. Verify it's under 39 characters
+6. Verify it sounds like professional real estate marketing
+7. Click again to get a different variation
+8. Type manually - verify auto-uppercase works
+9. Check preview shows headline above description

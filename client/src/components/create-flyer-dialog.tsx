@@ -40,6 +40,7 @@ import {
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
@@ -404,6 +405,7 @@ export function CreateFlyerDialog({
   const [localAgentPhoto, setLocalAgentPhoto] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [isGeneratingHeadline, setIsGeneratingHeadline] = useState(false);
   const [isAutoSelecting, setIsAutoSelecting] = useState(false);
   const [photoInsights, setPhotoInsights] = useState<Record<string, { classification: string; quality: number }>>({});
   const [originalDescription, setOriginalDescription] = useState<string>("");
@@ -586,6 +588,47 @@ export function CreateFlyerDialog({
       description: "Full MLS description restored.",
     });
   }, [form, originalDescription, toast]);
+
+  const handleGenerateHeadline = useCallback(async () => {
+    if (!originalDescription || originalDescription.trim().length === 0) {
+      toast({
+        title: "No description",
+        description: "No MLS description available to generate headline from.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingHeadline(true);
+    try {
+      const response = await apiRequest("POST", "/api/generate-headline", {
+        description: originalDescription,
+        address: transaction.propertyAddress,
+        beds: form.getValues("bedrooms"),
+        baths: form.getValues("bathrooms"),
+        sqft: form.getValues("sqft"),
+      });
+
+      const data = await response.json();
+      
+      if (data.headline) {
+        form.setValue("listingHeadline", data.headline);
+        toast({
+          title: "Headline generated!",
+          description: "AI created a catchy headline for your flyer.",
+        });
+      }
+    } catch (error) {
+      console.error("Headline generation error:", error);
+      toast({
+        title: "Generation failed",
+        description: "Could not generate headline. Please try again or enter manually.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingHeadline(false);
+    }
+  }, [originalDescription, form, toast, transaction.propertyAddress]);
 
   const handleFormatChange = (newFormat: FlyerFormat) => {
     setFormat(newFormat);
@@ -1902,24 +1945,79 @@ export function CreateFlyerDialog({
                     <FormField
                       control={form.control}
                       name="listingHeadline"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm">Listing Headline (optional)</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="e.g., OPEN HOUSE SATURDAY"
-                              className="h-8"
-                              maxLength={39}
-                              data-testid="input-listing-headline"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormDescription className="text-xs">
-                            Optional headline (39 characters max) - appears above description
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        const headlineLength = field.value?.length || 0;
+                        const headlineMax = 39;
+                        const headlineNearLimit = headlineLength >= 30;
+                        const headlineAtLimit = headlineLength >= headlineMax;
+                        
+                        return (
+                          <FormItem>
+                            <div className="flex justify-between items-center">
+                              <FormLabel className="text-sm">Listing Headline (optional)</FormLabel>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={handleGenerateHeadline}
+                                      disabled={isGeneratingHeadline || !originalDescription}
+                                      className="h-7 text-xs"
+                                      data-testid="button-ai-generate-headline"
+                                    >
+                                      {isGeneratingHeadline ? (
+                                        <>
+                                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                          Generating...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Sparkles className="h-3 w-3 mr-1" />
+                                          AI Generate
+                                        </>
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-xs">
+                                    <p className="font-medium mb-1">Generate AI Headline</p>
+                                    <p className="text-xs text-muted-foreground mb-2">
+                                      Creates a catchy, professional headline based on the property description.
+                                    </p>
+                                    <p className="text-xs italic text-muted-foreground">
+                                      Examples: "A PRIME OPPORTUNITY IN NW AUSTIN", "STUNNING HILL COUNTRY RETREAT", "YOUR DREAM HOME AWAITS"
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g., A PRIME OPPORTUNITY IN NW AUSTIN"
+                                className="h-8 uppercase"
+                                maxLength={39}
+                                data-testid="input-listing-headline"
+                                {...field}
+                                onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                              />
+                            </FormControl>
+                            <FormDescription className="text-xs flex justify-between">
+                              <span>Optional headline - appears above description</span>
+                              <span className={
+                                headlineAtLimit 
+                                  ? "text-red-600 font-medium" 
+                                  : headlineNearLimit 
+                                    ? "text-amber-600 font-medium" 
+                                    : "text-green-600"
+                              }>
+                                {headlineLength}/{headlineMax}
+                              </span>
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
 
                     <div className="grid grid-cols-2 gap-3">

@@ -1272,5 +1272,82 @@ Provide only the summary text, no quotes or explanation.`;
     }
   });
 
+  // ============ AI Headline Generation ============
+  app.post("/api/generate-headline", isAuthenticated, async (req, res) => {
+    try {
+      const { description, address, beds, baths, sqft, neighborhood } = req.body;
+      
+      if (!description || description.trim().length === 0) {
+        return res.status(400).json({ error: "Description is required" });
+      }
+
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const prompt = `You are a real estate marketing expert. Generate a catchy, compelling headline for a property listing flyer.
+
+Requirements:
+- Maximum 39 characters (strict limit)
+- ALL UPPERCASE
+- Professional real estate broker style
+- Focus on: location appeal, property highlights, or urgency
+- No exclamation marks
+- Should grab attention and create interest
+
+Examples of good headlines:
+- "A PRIME OPPORTUNITY IN NORTH EAST AUSTIN"
+- "STUNNING HILL COUNTRY RETREAT"
+- "MODERN LUXURY IN DOWNTOWN"
+- "YOUR DREAM HOME AWAITS"
+- "MOVE-IN READY IN TARRYTOWN"
+
+Property details:
+Address: ${address || "N/A"}
+Beds: ${beds || "N/A"} | Baths: ${baths || "N/A"} | Sqft: ${sqft || "N/A"}
+${neighborhood ? `Neighborhood: ${neighborhood}` : ""}
+
+Description: ${description}
+
+Generate ONE headline only. Return just the headline text, nothing else.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "You are a real estate marketing expert. Return only the headline text, no quotes or explanation." },
+          { role: "user", content: prompt }
+        ],
+        max_tokens: 60,
+        temperature: 0.8, // Higher for more variation
+      });
+
+      let headline = response.choices[0]?.message?.content?.trim() || "";
+      
+      // Post-processing
+      headline = headline.replace(/^["']|["']$/g, ""); // Remove quotes
+      headline = headline.toUpperCase().trim();
+      
+      // Truncate at word boundary if needed
+      if (headline.length > 39) {
+        const words = headline.split(" ");
+        let truncated = "";
+        for (const word of words) {
+          if ((truncated + " " + word).trim().length <= 39) {
+            truncated = (truncated + " " + word).trim();
+          } else {
+            break;
+          }
+        }
+        headline = truncated || headline.substring(0, 39);
+      }
+
+      res.json({ headline });
+    } catch (error: any) {
+      console.error("Error generating headline:", error);
+      res.status(500).json({ error: "Failed to generate headline" });
+    }
+  });
+
   return httpServer;
 }

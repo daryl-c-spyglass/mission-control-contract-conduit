@@ -1,0 +1,97 @@
+Fix AI Description Summary to generate complete sentences, not truncated text.
+
+Files to modify:
+- server/routes.ts (the /api/summarize-description endpoint)
+
+## Issue
+
+The AI summary is generating text that gets cut off with "..." at the character limit.
+Examples:
+- "...like a Jr Olympic pool and tennis courts. Move-in..." (cut off)
+- "...with easy access..." (cut off)
+
+The description should END as a complete sentence, not mid-thought.
+
+## Fix the AI Prompt
+
+Update the prompt for /api/summarize-description:
+You are a real estate copywriter. Write a compelling property description summary.
+CRITICAL REQUIREMENTS:
+
+Maximum {maxLength} characters (strict limit - count carefully!)
+Must be a COMPLETE thought - end with a full sentence
+Do NOT end mid-sentence or with "..."
+Do NOT write more than the limit and truncate
+The summary should feel finished and polished
+
+STYLE:
+
+Engaging and professional
+Highlight key selling points
+Focus on: location, features, lifestyle benefits
+Do not repeat beds/baths/sqft (shown separately)
+
+Property: {address}
+Original description:
+{description}
+Write a summary that is UNDER {maxLength} characters and ends with a complete sentence.
+Count your characters carefully before responding.
+Return only the summary text, nothing else.
+
+## Additional Server-Side Validation
+
+After receiving AI response:
+
+1. Check if response ends with "..." - if so, remove trailing "..." and find last complete sentence
+2. Check if response ends mid-word - truncate to last complete word
+3. Ensure response ends with proper punctuation (. ! or similar)
+```javascript
+function cleanupSummary(text: string, maxLength: number): string {
+  let cleaned = text.trim();
+  
+  // Remove trailing "..." if present
+  if (cleaned.endsWith('...')) {
+    cleaned = cleaned.slice(0, -3).trim();
+  }
+  
+  // If still over limit, truncate at last sentence
+  if (cleaned.length > maxLength) {
+    // Find last sentence-ending punctuation within limit
+    const truncated = cleaned.substring(0, maxLength);
+    const lastPeriod = truncated.lastIndexOf('.');
+    const lastExclaim = truncated.lastIndexOf('!');
+    const lastSentenceEnd = Math.max(lastPeriod, lastExclaim);
+    
+    if (lastSentenceEnd > maxLength * 0.5) {
+      // Use last complete sentence if it's not too short
+      cleaned = truncated.substring(0, lastSentenceEnd + 1);
+    } else {
+      // Otherwise truncate at last space and add period
+      const lastSpace = truncated.lastIndexOf(' ');
+      cleaned = truncated.substring(0, lastSpace) + '.';
+    }
+  }
+  
+  // Ensure ends with punctuation
+  if (!/[.!?]$/.test(cleaned)) {
+    cleaned += '.';
+  }
+  
+  return cleaned;
+}
+```
+
+## Update Character Display
+
+In the UI, also update the helper text:
+
+Current: "Click AI Summarize again for a different variation"
+Add: Show green checkmark when description is complete (ends with punctuation, under limit)
+Show warning if description appears truncated
+
+Test by:
+1. Click AI Summarize multiple times
+2. Verify each summary ends with a complete sentence
+3. Verify no "..." at the end
+4. Verify summaries feel complete and polished
+5. Check both Social Media (200 char) and Print Flyer (115 char) limits
