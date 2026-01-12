@@ -1,0 +1,260 @@
+REPLIT TASK — MATCH RECHAT FLYER (REFERENCE IMAGE PROVIDED)
+FIX DIVIDERS (VERTICAL + HORIZONTAL), TYPOGRAPHY, SPACING
+PREVIEW MUST MIRROR DOWNLOAD (PIXEL-IDENTICAL)
+
+GOAL
+Match the attached Rechat flyer layout exactly. This is a fixed-size print flyer:
+8.5×11 @ 300 DPI = 2550×3300 rendered via Puppeteer from server/templates/flyer-template.html.
+
+KEY CORRECTION (IMPORTANT)
+There ARE dividers before and after:
+- Listing headline
+- Description
+Only the DESCRIPTION text is left-aligned.
+Headline remains centered (as in reference), and is NOT bold.
+
+========================================================
+AUTHORITATIVE DIAGRAM (MATCH THIS)
+========================================================
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ HEADER (fixed)                                                               │
+│                                                                              │
+│ █  SPYGLASS LOGO        ADDRESS TEXT (NOT bold)             PRICE BADGE ▶     │
+│ █                                                                            │
+│ █ = THICK VERTICAL DIVIDER (header-only, gray)                               │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ HERO PHOTO (full width)                                                      │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ SECONDARY PHOTOS (2-up grid, no lines between photos)                         │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ BOTTOM SECTION (3 columns: STATS | COPY | AGENT)                             │
+│                                                                              │
+│  STATS COLUMN     │      COPY COLUMN                     │   AGENT COLUMN    │
+│                   │                                     │                    │
+│  🛏 0 bedrooms     │   ───────────────────────────       │   agent photo      │
+│  🛁 0 bathrooms    │   LISTING HEADLINE (CENTERED)       │   agent name (1 ln)│
+│  ⬚ 1,235 sq. ft   │   ───────────────────────────       │   agent title      │
+│                   │   ───────────────────────────       │   phone (NOT bold) │
+│                   │   Description (LEFT-ALIGNED)        │   brokerage logo   │
+│                   │   ───────────────────────────       │                    │
+│                                                                              │
+│ NOTE: COPY COLUMN HAS 4 HORIZONTAL RULES:                                    │
+│ 1) before headline  2) after headline  3) before description  4) after desc  │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+========================================================
+HARD REQUIREMENTS (DO NOT DEVIATE)
+========================================================
+
+A) HEADER LEFT DIVIDER (VERTICAL, HEADER-ONLY)
+- Must be vertical (no diagonal), thick, neutral gray.
+- Must NOT touch logo or address text.
+- Must NOT overlap into the hero photo area.
+- Must be clipped to header region.
+
+Implementation requirement:
+- Place divider inside a header-wrap container with overflow hidden.
+
+B) PHOTO SECTION
+- No dividers or borders between photos.
+- Images should butt cleanly with only intentional spacing.
+
+C) BOTTOM SECTION
+- There ARE vertical dividers between:
+  1) Stats and Copy
+  2) Copy and Agent
+- These dividers must NOT overlap any text.
+
+D) COPY COLUMN RULES (MOST IMPORTANT)
+There are FOUR horizontal rules in the COPY column:
+1) Rule BEFORE listing headline
+2) Rule AFTER listing headline
+3) Rule BEFORE description
+4) Rule AFTER description
+
+Headline:
+- Centered
+- Uppercase
+- NOT bold (use ~500 weight)
+Description:
+- LEFT-aligned (only the description is left aligned)
+- Regular weight
+
+E) TYPOGRAPHY RULES
+- Listing headline NOT bold
+- Phone number NOT bold
+- Price badge text black and NOT bold
+- Agent name must fit on ONE line (do not truncate; adjust column widths or allow more horizontal room)
+
+F) PREVIEW MUST MATCH DOWNLOAD
+Preview PNG and Download PDF must be pixel-identical:
+- same HTML template
+- same CSS
+- same Puppeteer viewport 2550×3300
+- deviceScaleFactor 1
+- wait for document.fonts.ready
+- wait for all images loaded
+- no preview-only transforms/scaling
+
+========================================================
+IMPLEMENTATION DETAILS (CSS/STRUCTURE GUIDANCE)
+========================================================
+
+1) HEADER WRAP + LEFT DIVIDER (VERTICAL)
+Ensure header+address are wrapped:
+.header-wrap{
+  position: relative;
+  height: calc(var(--headerH) + var(--addressH));
+  overflow: hidden;
+}
+
+.header-left-divider{
+  position: absolute;
+  left: 64px;
+  top: 18px;
+  width: 10px;                 /* thicker */
+  height: calc(100% - 36px);   /* header-only */
+  background: #b5b5b5;
+  z-index: 1;
+}
+
+.header-content{
+  position: relative;
+  z-index: 2;
+  padding-left: 120px;         /* prevents overlap */
+}
+
+2) BOTTOM SECTION VERTICAL DIVIDERS (STATS|COPY|AGENT)
+Do NOT use arbitrary pseudo elements that can overlap text.
+Use grid columns + explicit border on columns, with internal padding.
+
+.bottom-section{
+  display: grid;
+  grid-template-columns: 480px 1fr 520px;
+  align-items: start;
+}
+
+.stats-column{
+  padding-right: 40px;
+  border-right: 3px solid #b5b5b5;   /* visible divider */
+}
+
+.copy-column{
+  padding: 0 50px;
+  border-right: 3px solid #b5b5b5;   /* divider between copy and agent */
+}
+
+.agent-column{
+  padding-left: 50px;
+}
+
+3) COPY COLUMN — FOUR HORIZONTAL RULES
+Add explicit rule elements so they cannot disappear:
+
+.copy-rule{
+  height: 3px;
+  background: #b5b5b5;
+  width: 100%;
+  margin: 18px auto;
+}
+
+In the HTML inside .copy-column, structure must be:
+
+<div class="copy-column">
+  <div class="copy-rule rule-before-headline"></div>
+
+  <div class="listing-headline">...</div>
+
+  <div class="copy-rule rule-after-headline"></div>
+
+  <div class="copy-rule rule-before-description"></div>
+
+  <div class="listing-description">...</div>
+
+  <div class="copy-rule rule-after-description"></div>
+</div>
+
+Headline styling:
+.listing-headline{
+  text-align: center;
+  text-transform: uppercase;
+  font-weight: 500 !important;   /* NOT bold */
+  letter-spacing: 4px;
+  margin: 0;
+}
+
+Description styling (LEFT aligned ONLY):
+.listing-description{
+  text-align: left !important;
+  font-weight: 400;
+  line-height: 1.45;
+  margin: 0;
+}
+
+4) STATS — ONE LINE PER ROW (ICON + TEXT)
+Make each stat row non-wrapping:
+.stat-item{
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  white-space: nowrap;
+}
+.stat-text{
+  font-weight: 600;
+}
+
+5) AGENT — NAME MUST BE ONE LINE
+.agent-name{
+  white-space: nowrap;
+  overflow: visible;        /* do NOT truncate */
+  text-overflow: clip;
+}
+.agent-phone{
+  font-weight: 500 !important;  /* NOT bold */
+}
+
+6) PRICE BADGE
+- Text color black
+- Not bold
+- Badge shape should be angled tag (not rectangle).
+Use CSS clip-path polygon to match the “tag” shape.
+
+.price-badge{
+  color:#000 !important;
+  font-weight:500 !important;
+  background:#b0a89b;            /* match reference */
+  clip-path: polygon(12% 0, 100% 0, 100% 100%, 12% 100%, 0 50%);
+}
+
+========================================================
+QA CHECKLIST (REPLIT MUST VERIFY EACH ITEM)
+========================================================
+HEADER
+- [ ] Left divider is vertical, thick, gray
+- [ ] Divider does not touch logo or address
+- [ ] Divider does not overlap hero photo (header-wrap clips it)
+- [ ] No stray extra lines in top-left
+
+BOTTOM LAYOUT
+- [ ] Stats|Copy divider visible and does not overlap text
+- [ ] Copy|Agent divider visible and does not overlap text
+
+COPY COLUMN DIVIDERS
+- [ ] Horizontal rule BEFORE headline visible
+- [ ] Horizontal rule AFTER headline visible
+- [ ] Horizontal rule BEFORE description visible
+- [ ] Horizontal rule AFTER description visible
+
+TYPOGRAPHY
+- [ ] Headline centered and NOT bold
+- [ ] Description left-aligned
+- [ ] Phone number NOT bold
+- [ ] Price badge text black and NOT bold
+- [ ] Agent name fits on one line (no truncation)
+
+RENDER CONSISTENCY
+- [ ] Preview PNG matches Download PDF pixel-for-pixel
+- [ ] No preview-only scaling or CSS
+
+END

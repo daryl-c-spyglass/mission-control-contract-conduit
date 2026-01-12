@@ -232,20 +232,12 @@
       align-items: flex-start;
     }
     
-    /* Horizontal divider between photos and bottom section */
-    .h-divider {
-      width: 100%;
-      height: var(--hDividerH);
-      background: var(--hDividerColor);
-      margin: 0;
-    }
-    
-    /* Content band - 3-column layout without vertical dividers */
+    /* Content band - 3-column layout with vertical dividers via borders */
     .bottom-band {
       width: 100%;
       display: grid;
       grid-template-columns: 420px 1fr 480px;
-      gap: 48px;
+      gap: 0;
       height: auto;
       min-height: 400px;
       align-items: flex-start;
@@ -257,7 +249,8 @@
       flex-direction: column;
       justify-content: flex-start;
       gap: 44px;
-      padding: 0;
+      padding: 0 40px 0 0;
+      border-right: var(--hDividerH) solid var(--hDividerColor);
     }
     
     .stat-item {
@@ -289,41 +282,48 @@
       white-space: nowrap;
     }
     
-    /* CENTER COLUMN - Description (anchor to top, left-aligned) */
-    .description-column {
+    /* CENTER COLUMN - Copy (headline + description with horizontal rules) */
+    .copy-column {
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
-      align-items: flex-start;
-      padding: 0;
+      align-items: stretch;
+      padding: 0 50px;
+      border-right: var(--hDividerH) solid var(--hDividerColor);
+    }
+    
+    /* Horizontal rule for copy column */
+    .copy-rule {
+      height: var(--hDividerH);
+      background: var(--hDividerColor);
+      width: 100%;
+      margin: 18px 0;
     }
     
     .listing-headline {
       font-family: 'Montserrat', sans-serif !important;
-      font-size: 64px;
+      font-size: 60px;
       font-weight: 500 !important;  /* NOT bold */
-      letter-spacing: 3px;
+      letter-spacing: 4px;
       text-transform: uppercase;
-      text-align: left;
+      text-align: center;  /* CENTERED per reference */
       line-height: 1.15;
-      margin: 0 0 24px;
+      margin: 0;
       white-space: pre-line;
-      position: relative;
       width: 100%;
-      padding-bottom: 24px;
-      border-bottom: var(--hDividerH) solid var(--hDividerColor);
     }
     
     .listing-description {
-      font-size: 48px;
-      line-height: 1.55;
+      font-size: 46px;
+      line-height: 1.5;
       color: #3b3b3b;
+      font-weight: 400;
       margin: 0 !important;
       max-width: none;
-      text-align: left !important;
+      text-align: left !important;  /* LEFT-aligned only */
       display: -webkit-box;
       -webkit-box-orient: vertical;
-      -webkit-line-clamp: 6;
+      -webkit-line-clamp: 5;
       overflow: hidden;
     }
     
@@ -335,7 +335,7 @@
       align-items: center;
       gap: 18px;
       text-align: center;
-      padding: 0;
+      padding: 0 0 0 50px;
     }
     
     /* Agent photo + logo row side by side */
@@ -465,9 +465,6 @@
     </div>
   </div>
   
-  <!-- Horizontal divider between photos and bottom section -->
-  <div class="h-divider"></div>
-  
   <!-- BOTTOM SECTION -->
   <div class="bottom-section">
     <div class="bottom-band">
@@ -509,12 +506,25 @@
         </div>
       </div>
       
-      <!-- Description Column -->
-      <div class="description-column">
+      <!-- Copy Column (headline + description with 4 horizontal rules) -->
+      <div class="copy-column">
+        <!-- Rule 1: Before headline -->
+        <div class="copy-rule"></div>
+        
         {{#if headline}}
         <div class="listing-headline">{{headline}}</div>
         {{/if}}
+        
+        <!-- Rule 2: After headline -->
+        <div class="copy-rule"></div>
+        
+        <!-- Rule 3: Before description -->
+        <div class="copy-rule"></div>
+        
         <div class="listing-description">{{description}}</div>
+        
+        <!-- Rule 4: After description -->
+        <div class="copy-rule"></div>
       </div>
       
       <!-- Agent Column -->
