@@ -1,0 +1,155 @@
+The flexbox approach isn't working. Let's try a different approach - using explicit large sizes and positioning.
+
+## Issues to fix:
+1. Massive white space at bottom (~40% of page is empty)
+2. "1,850 sq. ft" is wrapping onto two lines
+3. Content needs to be much larger
+
+## NEW APPROACH - Use explicit large values
+
+### 1. Fix the "sq. ft" wrapping issue FIRST
+```css
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+}
+
+.stat-text {
+  font-size: 64px;
+  font-weight: 600;
+  white-space: nowrap;  /* Prevent wrapping */
+}
+```
+
+Or change the HTML to keep "sq. ft" together:
+```html
+<span class="stat-text">1,850&nbsp;sq.&nbsp;ft</span>
+```
+
+### 2. Make the bottom section MUCH taller with explicit height
+```css
+.bottom-section {
+  min-height: 1800px;  /* Force it to be very tall */
+  padding: 150px 100px 200px 100px;
+  display: grid;
+  grid-template-columns: 450px 1fr 500px;
+  gap: 100px;
+  align-items: start;
+  align-content: start;
+}
+```
+
+### 3. Make photos SHORTER to give more room
+```css
+.main-photo {
+  height: 550px;  /* Reduced significantly */
+}
+
+.secondary-photo {
+  height: 250px;  /* Reduced significantly */
+}
+
+.photo-grid {
+  gap: 6px;
+  margin-bottom: 15px;
+}
+
+.secondary-photos {
+  gap: 6px;
+}
+```
+
+### 4. Make ALL content MUCH larger
+```css
+/* STATS - Much bigger */
+.stats-column {
+  gap: 100px;
+}
+
+.stat-icon, .stat-icon svg, .stat-icon img {
+  width: 100px;
+  height: 100px;
+}
+
+.stat-text {
+  font-size: 80px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* HEADLINE & DESCRIPTION - Much bigger */
+.property-headline {
+  font-size: 80px;
+  font-weight: 700;
+  margin-bottom: 80px;
+  line-height: 1.15;
+}
+
+.property-description {
+  font-size: 60px;
+  line-height: 1.7;
+}
+
+.description-column {
+  padding: 60px 80px;
+  border-left: 5px solid #e0e0e0;
+}
+
+/* AGENT - Much bigger */
+.agent-column {
+  gap: 40px;
+  align-items: center;
+}
+
+.agent-photo-container {
+  width: 420px;
+  height: 420px;
+  border: 7px solid #C9A96E;
+}
+
+.agent-name {
+  font-size: 76px;
+  font-weight: 700;
+  margin-top: 40px;
+}
+
+.agent-title {
+  font-size: 44px;
+  letter-spacing: 3px;
+}
+
+.agent-phone {
+  font-size: 60px;
+  font-weight: 600;
+}
+
+.agent-logo-small {
+  width: 340px;
+  margin-top: 40px;
+}
+```
+
+### 5. Alternative: Use calc() to fill remaining space
+```css
+.flyer-container {
+  width: 2550px;
+  height: 3300px;
+  padding: 50px;
+}
+
+/* Calculate: Total height - header - address - photos - padding */
+.bottom-section {
+  min-height: calc(3300px - 150px - 80px - 900px - 150px);  /* ~2020px */
+}
+```
+
+## SUMMARY
+The key changes:
+1. `white-space: nowrap` on `.stat-text` to fix "sq. ft" wrapping
+2. `min-height: 1800px` on `.bottom-section` to force it tall
+3. Reduce photo heights to 550px / 250px
+4. Increase ALL font sizes by ~30-40%
+5. Increase ALL spacing/padding by ~50%
+
+Please apply all these changes. The goal is for the content to fill the entire bottom portion of the page.
