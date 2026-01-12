@@ -1,0 +1,213 @@
+REPLIT TASK — DIVIDERS + LAYOUT (WITH DIAGRAM)
+UPPER-LEFT DIVIDER IS VERTICAL (HEADER ONLY)
+HEADLINE + DESCRIPTION DIVIDERS ARE HORIZONTAL
+NO OVERLAPS ANYWHERE
+PREVIEW MUST ALWAYS MIRROR DOWNLOAD (PIXEL-IDENTICAL)
+
+Context
+We are generating a fixed-size print flyer (8.5×11 @ 300 DPI = 2550×3300) via Puppeteer from server/templates/flyer-template.html. Current output has:
+- Upper-left vertical divider overlapping address text and sometimes bleeding toward the photo area
+- Missing horizontal divider under listing headline and missing horizontal divider under description
+- Dividers overlapping text due to stretching/positioning
+
+Hard constraints
+- Upper-left divider = vertical line ONLY, confined to header+address area ONLY
+- Listing area dividers = horizontal lines ONLY (no vertical lines in listing section)
+- Dividers must never overlap text/photos (no intersection)
+- Preview PNG and Download PDF must be pixel-identical (same HTML/CSS + same Puppeteer render pipeline)
+
+========================================================
+VISUAL DIAGRAM (GROUND TRUTH REFERENCE)
+========================================================
+
+Overall layout (top to bottom):
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  HEADER + ADDRESS WRAP (fixed height = headerH + addressH, overflow hidden)  │
+│                                                                              │
+│  │ (VERTICAL DIVIDER)    [LOGO]                               [PRICE BADGE]  │
+│  │                     ADDRESS TEXT (single line, not bold)                  │
+│                                                                              │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  PHOTOS SECTION                                                               │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │ MAIN PROPERTY PHOTO                                                     │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│  ┌───────────────────────────────┐   ┌───────────────────────────────────┐  │
+│  │ SECONDARY PHOTO (LEFT)         │   │ SECONDARY PHOTO (RIGHT)           │  │
+│  └───────────────────────────────┘   └───────────────────────────────────┘  │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  BOTTOM SECTION (3 columns: STATS | COPY | AGENT)                            │
+│                                                                              │
+│  [STATS COLUMN]        [COPY COLUMN]                      [AGENT COLUMN]     │
+│  🛏 3 bedrooms          LISTING HEADLINE (NOT bold)         agent photo + logo│
+│  🛁 3 bathrooms         ───────────────────────── (H1)      agent name (1 line│
+│  ⬚ 1,747 sq. ft         Description (left aligned)         phone (NOT bold)  │
+│                        ───────────────────────── (H2)                         │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Key divider rules shown in diagram:
+- The ONLY vertical divider is the upper-left one inside HEADER+ADDRESS WRAP.
+- Horizontal divider H1 appears under listing headline.
+- Horizontal divider H2 appears under description.
+- No other dividers exist.
+
+========================================================
+A) UPPER-LEFT DIVIDER MUST BE VERTICAL AND HEADER-ONLY
+========================================================
+
+Goal:
+- A vertical bar at far left that visually matches reference.
+- Must NOT touch logo/address text.
+- Must NEVER enter photo area.
+
+Implementation (deterministic):
+1) Wrap logo + address + badge into a fixed-height container and clip overflow:
+.header-wrap{
+  position: relative;
+  height: calc(var(--headerH) + var(--addressH));
+  overflow: hidden;              /* prevents divider bleeding into photos */
+}
+
+2) Add vertical divider INSIDE .header-wrap:
+.header-left-divider{
+  position: absolute;
+  left: 64px;                    /* ensure it is NOT touching content */
+  top: 18px;
+  width: 10px;                   /* thickness */
+  height: calc(100% - 36px);     /* stays inside header-wrap only */
+  background: #b0b0b0;           /* neutral gray */
+  z-index: 1;
+}
+
+3) Ensure header content has enough left padding so divider never overlaps:
+.header-content{
+  padding-left: 120px;           /* must exceed divider left + divider width + buffer */
+  position: relative;
+  z-index: 2;
+}
+
+Acceptance checks:
+- [ ] Vertical divider does not overlap the address text.
+- [ ] Divider does not touch logo.
+- [ ] Divider stops before photos (no line crossing into photos).
+- [ ] No extra accidental top-left lines.
+
+========================================================
+B) LISTING SECTION MUST HAVE HORIZONTAL DIVIDERS (H1 + H2)
+========================================================
+
+H1: Horizontal divider under listing headline (required now, since it’s missing)
+- Visible, 2–3px, neutral gray.
+- Centered within the copy column width (or full width of copy column).
+
+Implement via pseudo-element OR a dedicated rule element:
+.listing-headline{
+  position: relative;
+  margin: 0 0 14px;
+  font-weight: 500 !important;   /* NOT bold */
+}
+.listing-headline::after{
+  content: "";
+  display: block;
+  height: 3px;
+  width: 520px;                 /* tune to match reference */
+  background: #b0b0b0;
+  margin: 12px 0 0;             /* under headline */
+}
+
+Description must be left aligned:
+.listing-description{
+  text-align: left !important;
+  margin: 0 0 18px;
+}
+
+H2: Horizontal divider under description (required)
+Add <div class="description-divider"></div> directly after description block:
+.description-divider{
+  height: 3px;
+  width: 520px;                 /* match H1 */
+  background: #b0b0b0;
+  margin-top: 18px;
+}
+
+Hard rule:
+- No vertical dividers in the listing/copy section. Remove any border-left/border-right or ::before/::after vertical rules.
+
+Acceptance checks:
+- [ ] H1 appears under headline and is visible.
+- [ ] H2 appears under description and is visible.
+- [ ] No divider overlaps text or icons.
+
+========================================================
+C) STATS MUST BE ONE-LINE PER ROW (ICON + TEXT)
+========================================================
+
+Currently text collides with dividers and wraps.
+Make each stat a single inline string:
+- “3 bedrooms”
+- “3 bathrooms”
+- “1,747 sq. ft”
+
+.stat-item{
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  white-space: nowrap;          /* prevents wrapping */
+}
+
+Ensure HTML does not split number/label into separate stacked elements.
+
+Acceptance checks:
+- [ ] Each stat row stays on one line.
+- [ ] No overlap with any divider.
+
+========================================================
+D) TYPOGRAPHY RULES (NO REGRESSION)
+========================================================
+- Listing headline MUST NOT be bold:
+  .listing-headline{ font-weight: 500 !important; }
+- Phone number MUST NOT be bold:
+  .agent-phone{ font-weight: 500 !important; }
+- Price badge text MUST be black and NOT bold:
+  .price-badge, .price-badge *{ color:#000 !important; font-weight:500 !important; }
+
+Also ensure badge does not overlap photos (must be inside .header-wrap):
+.price-badge{
+  position: absolute;
+  top: 18px;
+  right: 80px;
+  z-index: 2;
+}
+
+========================================================
+E) PREVIEW MUST MIRROR DOWNLOAD (PIXEL-IDENTICAL)
+========================================================
+Enforce that pngPreview and pdf both use the same render pipeline:
+- viewport: 2550×3300
+- deviceScaleFactor: 1
+- emulateMediaType("screen")
+- wait for document.fonts.ready
+- wait for all images to finish loading
+- no preview-only CSS or scaling
+- PDF uses printBackground true and exact px sizing
+- PNG uses clip to exact 2550×3300
+
+Acceptance checks:
+- [ ] Same input data produces identical layout in Preview PNG and Download PDF.
+- [ ] No font weight/spacing/divider differences.
+
+========================================================
+FINAL QA CHECKLIST (MUST PASS ALL)
+========================================================
+- [ ] Upper-left divider is vertical only and confined to header-wrap (no bleed into photos)
+- [ ] Divider does not touch/overlap logo or address text
+- [ ] No accidental extra top-left line
+- [ ] Horizontal divider H1 exists under listing headline
+- [ ] Horizontal divider H2 exists under description
+- [ ] No divider overlaps any text/icons
+- [ ] Stats rows are one-line each (icon + text)
+- [ ] Listing headline is not bold
+- [ ] Phone number is not bold
+- [ ] Price badge text is black and not bold
+- [ ] Preview output mirrors Download output pixel-identically
