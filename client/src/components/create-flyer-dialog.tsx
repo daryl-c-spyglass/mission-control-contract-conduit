@@ -260,21 +260,15 @@ function PrintFlyerPreview({
 
   return (
     <div className="relative w-full aspect-[8.5/11] bg-white rounded-lg overflow-hidden shadow-lg border border-border" style={{ fontFamily: "'League Spartan', 'Montserrat', sans-serif" }}>
-      {/* Header Section - WHITE background with Logo + Leading + Price (per template) */}
+      {/* Header Section - Logo left, Price right only */}
       <div className="flex items-center justify-between px-2 py-2 bg-white border-b border-gray-100">
-        {/* Left: Larger Spyglass logo (~250px wide equivalent) */}
+        {/* Left: Spyglass logo */}
         <img
           src={spyglassLogoBlack}
           alt="Spyglass Realty"
-          className="h-8 w-auto"
+          className="h-7 w-auto"
         />
-        {/* Center: Leading Real Estate Companies */}
-        <div className="text-center flex-shrink-0">
-          <p className="text-[5px] italic text-[#1a1a1a]">Leading</p>
-          <p className="text-[3px] font-semibold text-[#1a1a1a] tracking-wider">REAL ESTATE COMPANIES</p>
-          <p className="text-[3px] font-semibold text-[#1a1a1a] tracking-wider">OF THE WORLD</p>
-        </div>
-        {/* Right: Price badge - tan/brown rectangle (per template) */}
+        {/* Right: Price badge - tan/brown rectangle */}
         <div 
           className="text-white px-3 py-1.5"
           style={{ backgroundColor: '#8b7355' }}
@@ -284,10 +278,10 @@ function PrintFlyerPreview({
         </div>
       </div>
 
-      {/* Address Bar - Dark background with white text (matches template) */}
-      <div className="py-1.5 mx-1.5 bg-[#1a1a1a] text-center">
-        <p className="text-[5px] text-white tracking-[0.12em] font-semibold">
-          {formattedStreetAddress}   {cityStateZip && formatAddressForFlyer(cityStateZip)}
+      {/* Address Bar - Plain text, no dark background */}
+      <div className="py-1.5 px-2 text-left">
+        <p className="text-[5px] text-[#333333] tracking-[0.08em] font-medium uppercase">
+          {streetAddress}
         </p>
       </div>
 
@@ -1100,24 +1094,16 @@ export function CreateFlyerDialog({
     // Draw logo directly on white background (no dark panel needed)
     ctx.drawImage(logo, 60, 35, logoWidth, logoHeight);
     
-    // CENTER: "Leading Real Estate Companies of the World" text (per template)
-    const centerX = canvas.width / 2;
-    ctx.fillStyle = "#1a1a1a";
-    ctx.font = `italic 400 32px ${FONT_MONTSERRAT}`;
-    ctx.textAlign = "center";
-    ctx.fillText("Leading", centerX, 90);
-    ctx.font = `600 20px ${FONT_MONTSERRAT}`;
-    ctx.fillText("REAL ESTATE COMPANIES", centerX, 120);
-    ctx.fillText("OF THE WORLD", centerX, 145);
+    // No "Leading" section - header is just logo + price
 
-    // Price badge (right) - TAN/BROWN RECTANGLE (per template)
+    // Price badge (right) - TAN/BROWN RECTANGLE
     const badgeWidth = 400;
     const badgeHeight = 130;
     const badgeX = canvas.width - badgeWidth - 80;
     const badgeY = 55;
     
-    // Simple rectangle, tan/brown color per template
-    ctx.fillStyle = '#8b7355'; // Tan/brown from template
+    // Simple rectangle, tan/brown color
+    ctx.fillStyle = '#8b7355';
     ctx.fillRect(badgeX, badgeY, badgeWidth, badgeHeight);
     
     ctx.fillStyle = "#ffffff";
@@ -1132,20 +1118,11 @@ export function CreateFlyerDialog({
     const addressBarY = headerHeight;
     const addressBarHeight = 100;
     
-    // Dark background bar behind address (per template)
-    const addressBgHeight = 80;
-    ctx.fillStyle = "#1a1a1a";
-    ctx.fillRect(60, addressBarY + 10, canvas.width - 120, addressBgHeight);
-    
-    // Full address on dark background (white text)
-    const fullFormattedAddress = cityStateZip 
-      ? `${formattedStreetAddress}   ${formatAddressForFlyer(cityStateZip)}`
-      : formattedStreetAddress;
-    
-    ctx.fillStyle = "#ffffff";
-    ctx.font = `600 36px ${FONT_LEAGUE}`;
-    ctx.textAlign = "center";
-    ctx.fillText(fullFormattedAddress, canvas.width / 2, addressBarY + 60);
+    // Plain text address on white background (no dark bar)
+    ctx.fillStyle = "#333333";
+    ctx.font = `500 36px ${FONT_MONTSERRAT}`;
+    ctx.textAlign = "left";
+    ctx.fillText(streetAddress.toUpperCase(), 60, addressBarY + 55);
 
     // ============ PHOTOS SECTION ============
     const photosY = addressBarY + addressBarHeight + 30;
