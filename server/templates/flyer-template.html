@@ -22,8 +22,8 @@
       --headerH: 165px;
       --addressH: 99px;
       --photosH: 1485px;
-      /* Bottom = 3300 - 165 - 99 - 1485 = 1551px (auto-calculated) */
-      --bottomH: 1551px;
+      /* Bottom = H - headerH - addressH - photosH (future-proof calc) */
+      --bottomH: calc(var(--H) - var(--headerH) - var(--addressH) - var(--photosH));
       
       --padX: 80px;
       --gap: 36px;
@@ -31,6 +31,9 @@
       --muted: #6b6b6b;
       --rule: #e6e6e6;
       --badge: #8b7355;
+      
+      /* Separator color for subtle dividers */
+      --sep: rgba(0,0,0,0.12);
     }
     
     html, body {
@@ -168,8 +171,8 @@
       /* Pull content up to avoid the "floating in the lower half" look */
       padding: 48px var(--padX) 70px;
       
-      /* Remove the horizontal rule line (Rechat is mostly whitespace-driven) */
-      border-top: none !important;
+      /* No heavy top border */
+      border-top: none;
       
       display: grid;
       grid-template-columns: 480px 1fr 520px;
@@ -179,6 +182,22 @@
       align-items: flex-start;
       
       min-height: 0;
+      
+      /* Needed for separator pseudo-elements */
+      position: relative;
+    }
+    
+    /* Vertical separator between LEFT and CENTER (Stats | Description) */
+    .bottom-section::after {
+      content: "";
+      position: absolute;
+      
+      /* Line placed at end of left column + half the gap */
+      left: calc(var(--padX) + 480px + (60px / 2));
+      top: 48px;              /* match padding-top */
+      bottom: 70px;           /* match padding-bottom */
+      width: 1px;
+      background: var(--sep);
     }
     
     /* LEFT COLUMN - Stats (anchor to top) */
@@ -231,6 +250,23 @@
       
       min-height: 0;
       padding: 0 20px;
+      
+      /* Needed for right-side separator */
+      position: relative;
+    }
+    
+    /* Vertical separator between CENTER and RIGHT (Description | Agent) */
+    .description-column::after {
+      content: "";
+      position: absolute;
+      
+      /* Absolute positioning uses padding-box as containing block */
+      /* right: 0 = right edge of column, right: -30px = midpoint of 60px gap */
+      right: -30px;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: var(--sep);
     }
     
     .listing-headline {

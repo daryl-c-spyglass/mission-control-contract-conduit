@@ -1,0 +1,165 @@
+REPLIT TASK — ADD RECHAT-LIKE SEPARATORS/BORDERS TO FLYER + DOCUMENT LAYOUT SPEC (NO REFACTOR)
+
+This is a CSS/template-only update. Do NOT change the app architecture, endpoints, or generator service.
+- Keep existing pipeline:
+  - server/templates/flyer-template.html (Handlebars)
+  - server/services/flyer-generator.ts (Puppeteer)
+  - POST /api/flyer/render with outputType: "pngPreview" | "pdf"
+- Preview and Download must remain pixel-identical (same server-side render pipeline).
+
+PROBLEM
+Current downloaded flyer renders correctly, but it is missing Rechat-like separators/borders:
+- The sample Rechat flyer includes subtle divider rules and column separators in the bottom section.
+- Our current template removed the border-top line (correct), but now we need intentional separators:
+  1) A vertical divider between Stats (left) and Description (center)
+  2) A vertical divider between Description (center) and Agent (right)
+  3) Optional subtle separator above the bottom section (VERY light, not heavy)
+
+GOAL
+Implement subtle separators that match Rechat’s “clean print template” style:
+- Use very light gray lines (low opacity)
+- Keep whitespace-driven layout
+- Ensure separators appear both in PNG Preview and PDF Download (same template, same render path)
+
+FILES TO EDIT
+- server/templates/flyer-template.html
+  - Update CSS only (and optionally add two empty divider elements if needed, but prefer CSS-only using pseudo-elements)
+
+===========================================================
+FLYER TEMPLATE LAYOUT SPEC (Print 8.5×11 @ 300 DPI)
+===========================================================
+
+Page Geometry
+- Pixel size: 2550 × 3300 (8.5×11 @ 300 DPI)
+- Fixed vertical zones using explicit height math:
+  --headerH: 165px
+  --addressH: 99px
+  --photosH: 1485px
+  --bottomH: calc(--H - --headerH - --addressH - --photosH) = 1551px
+
+Bottom Section Behavior (Rechat-like)
+- bottom-section fills remaining height (no whitespace at page bottom)
+- stats-column and description-column anchor to top (flex-start)
+- agent-column anchors to bottom (flex-end)
+- separators are subtle and intentional:
+  - two vertical lines between columns
+  - optional faint horizontal rule above bottom (if desired)
+
+===========================================================
+IMPLEMENTATION — EXACT CSS CHANGES (COPY/PASTE)
+===========================================================
+
+1) In :root, ensure bottom height is future-proof (use calc, not hardcoded 1551px):
+Replace:
+  --bottomH: 1551px;
+With:
+  --bottomH: calc(var(--H) - var(--headerH) - var(--addressH) - var(--photosH));
+
+Also add a dedicated separator color token:
+  --sep: rgba(0,0,0,0.12);
+
+2) Update .bottom-section to add vertical separators using pseudo-elements.
+IMPORTANT: Do not reintroduce a heavy border-top line. If you add a top rule, make it extremely subtle.
+
+Replace the entire .bottom-section block with:
+
+/* BOTTOM SECTION - FIXED (fills remainder) */
+.bottom-section {
+  height: var(--bottomH);
+  padding: 48px var(--padX) 70px;
+
+  /* keep no heavy top border; optional very subtle top rule */
+  border-top: none;
+
+  display: grid;
+  grid-template-columns: 480px 1fr 520px;
+  gap: 60px;
+
+  /* anchor columns to top */
+  align-items: flex-start;
+
+  min-height: 0;
+
+  position: relative; /* needed for separators */
+}
+
+/* Optional subtle top divider (if desired) — OFF by default.
+   If you want it on, uncomment this:
+.bottom-section:before{
+  content:"";
+  position:absolute;
+  left: var(--padX);
+  right: var(--padX);
+  top: 0;
+  height: 1px;
+  background: rgba(0,0,0,0.08);
+}
+*/
+
+/* Vertical separator between LEFT and CENTER (Stats | Description) */
+.bottom-section:after{
+  content:"";
+  position:absolute;
+
+  /* line placed at end of left column + half the gap */
+  left: calc(var(--padX) + 480px + (60px / 2));
+  top: 48px;                 /* match padding-top */
+  bottom: 70px;              /* match padding-bottom */
+  width: 1px;
+  background: var(--sep);
+}
+
+3) Add a SECOND vertical separator between CENTER and RIGHT using a pseudo-element on .description-column.
+This avoids requiring markup changes.
+
+Add this block:
+
+/* Vertical separator between CENTER and RIGHT (Description | Agent) */
+.description-column {
+  position: relative; /* needed for its separator */
+}
+
+.description-column:after{
+  content:"";
+  position:absolute;
+
+  /* line placed on the right edge of center column + half gap */
+  right: calc(-60px / 2);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--sep);
+}
+
+4) Keep the column vertical alignment rules as already approved, but confirm they are exactly:
+
+.stats-column { justify-content: flex-start; }
+.description-column { justify-content: flex-start; }
+.agent-column { justify-content: flex-end; }
+
+5) IMPORTANT: Ensure the separators render in both PNG and PDF.
+- Do not change /api/flyer/render or Puppeteer settings.
+- Only CSS updates in the template.
+
+===========================================================
+VERIFICATION CHECKLIST (MUST DO)
+===========================================================
+
+A) Generate PNG Preview (outputType=pngPreview)
+- Confirm you see:
+  - A subtle vertical line between Stats and Description
+  - A subtle vertical line between Description and Agent
+  - No heavy horizontal rule above bottom section
+
+B) Generate PDF (outputType=pdf)
+- Confirm the same separators appear in the PDF
+- Confirm PNG and PDF still match visually (same spacing, same layout)
+
+C) Confirm no other borders were accidentally added to photos/address.
+
+DELIVERABLE
+- Commit changes to server/templates/flyer-template.html (CSS only).
+- Provide a short note describing:
+  - which separators were added
+  - where they appear (Stats|Description and Description|Agent)
+  - confirmation that Preview and Download remain identical by design
