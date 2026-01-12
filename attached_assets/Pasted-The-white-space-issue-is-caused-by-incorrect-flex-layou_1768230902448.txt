@@ -1,0 +1,131 @@
+The white space issue is caused by incorrect flex layout. Here's the CORRECT fix based on how Rechat handles fixed-size print templates:
+
+## THE KEY FIXES:
+
+1. **`min-height: 0`** on bottom section - THIS IS CRITICAL
+2. **Fixed heights using `flex-basis`** for header, address, and photos
+3. **`flex: 1 1 auto`** on bottom section to fill remaining space
+
+## Replace your CSS layout with this:
+
+```css
+@page {
+  size: 8.5in 11in;
+  margin: 0;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 2550px;
+  height: 3300px;
+}
+
+.flyer-container {
+  width: 2550px;
+  height: 3300px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 50px;
+}
+
+/* FIXED ZONES - use flex-basis for exact heights */
+.header {
+  flex: 0 0 150px;  /* Fixed 150px, won't grow or shrink */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.address-bar {
+  flex: 0 0 80px;  /* Fixed 80px */
+  display: flex;
+  align-items: center;
+}
+
+.photo-grid {
+  flex: 0 0 1500px;  /* Fixed 1500px for all photos */
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 10px;
+  overflow: hidden;  /* Prevent photos from expanding */
+}
+
+.main-photo {
+  height: 100%;
+  overflow: hidden;
+}
+
+.main-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.secondary-photos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  height: 400px;  /* Fixed height for secondary photos */
+}
+
+.secondary-photo {
+  overflow: hidden;
+}
+
+.secondary-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* FILL REMAINDER - This is the key fix */
+.bottom-section {
+  flex: 1 1 auto;      /* Grow to fill remaining space */
+  min-height: 0;       /* CRITICAL - allows flex to work properly */
+  display: grid;
+  grid-template-columns: 400px 1fr 450px;
+  gap: 60px;
+  padding: 60px 40px;
+  overflow: hidden;    /* Prevent content from expanding beyond */
+  align-content: start;
+}
+```
+
+## Why this works:
+
+1. **`flex: 0 0 Xpx`** = fixed size, won't grow or shrink
+2. **`flex: 1 1 auto`** = grow to fill remaining space
+3. **`min-height: 0`** = CRITICAL fix that allows flex-grow to work properly (default is `min-height: auto` which breaks flex sizing)
+4. **`overflow: hidden`** = prevents content from pushing layout
+
+## The math:
+- Total height: 3300px
+- Padding: ~100px (50px top + 50px bottom)
+- Header: 150px
+- Address: 80px
+- Photos: 1500px
+- **Bottom section: 3300 - 100 - 150 - 80 - 1500 = 1470px** (automatically calculated)
+
+## Also add text clamping to prevent overflow:
+
+```css
+.property-description {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 6;  /* Limit to 6 lines */
+  -webkit-box-orient: vertical;
+}
+```
+
+## Summary of changes:
+1. Add `min-height: 0` to `.bottom-section` ← **Most important fix**
+2. Use `flex: 0 0 Xpx` for fixed zones (header, address, photos)
+3. Use `flex: 1 1 auto` for bottom section
+4. Add `overflow: hidden` to photo containers
+5. Ensure all images use `object-fit: cover` and `display: block`
+
+This follows the same approach Rechat uses: fixed zones + content adapts to layout (not layout adapts to content).
