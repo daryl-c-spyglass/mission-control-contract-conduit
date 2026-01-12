@@ -1,0 +1,213 @@
+REPLIT TASK — EMERGENCY FIX PASS (HEADER DIVIDER OVERLAP, STAT ROWS ONE-LINE, CENTER DIVIDER HORIZONTAL ONLY, NON-BOLD TYPOGRAPHY, BADGE TEXT BLACK/NON-BOLD)
++ ADD PER-FIX CHECKLIST TESTS
++ PREVIEW MUST ALWAYS MIRROR DOWNLOAD (PIXEL-IDENTICAL)
+
+DO NOT IGNORE
+- Preview PNG and Download PDF MUST ALWAYS be pixel-identical.
+- No frontend UX changes.
+- Allowed changes ONLY:
+  1) server/templates/flyer-template.html (CSS + minimal HTML restructure)
+  2) server/services/flyer-generator.ts (only to enforce Preview==Download parity)
+- Fixed print canvas: 2550×3300.
+
+CURRENT OUTPUT IS WRONG (SEE ATTACHED)
+We need to correct layout and typography to match the reference expectations.
+
+========================================================
+1) HEADER: LEFT DIVIDER OVERLAPS PHOTO + TOO CLOSE TO LOGO/ADDRESS
+========================================================
+REQUIREMENT
+- The upper-left vertical divider MUST:
+  - sit slightly LEFT of the logo/address block (not touching it)
+  - never overlap the property photo area (must remain confined to header/address area)
+  - never visually intersect the photo region
+
+IMPLEMENTATION
+A) Put ALL header elements (logo, divider, badge) inside a single wrapper that is exactly header+address tall:
+.header-wrap{
+  position: relative;
+  height: calc(var(--headerH) + var(--addressH));
+  overflow: hidden;          /* prevents overlap into photo */
+}
+
+B) Divider must live inside .header-wrap and never extend beyond it:
+.header-divider{
+  position: absolute;
+  top: 18px;                 /* add breathing room */
+  left: 92px;                /* move slightly LEFT (more spacing from logo/address) */
+  width: 12px;
+  height: calc(100% - 36px); /* keep within wrapper padding */
+  background: var(--headerDivider);
+}
+
+C) Ensure photo section starts AFTER the header-wrap:
+.photos-section{ margin-top: 0; }
+DO NOT use negative margins anywhere near photos/header.
+
+CHECKLIST TEST
+[ ] In PNG preview, header divider does NOT touch logo or address text.
+[ ] Divider does NOT overlap into the main photo (no vertical line crossing photo edge).
+[ ] In PDF download, same exact result (pixel-identical).
+
+========================================================
+2) STATS: BED/BATH/SQFT MUST BE ONE LINE WITH ICON (NO WRAPS)
+========================================================
+REQUIREMENT
+- Each stat row must appear as: [ICON] [“4 bedrooms”] on one line
+- Same for bathrooms and sq ft
+- No forced line breaks. No “4” on one line and “bedrooms” on the next.
+
+IMPLEMENTATION
+A) Use a single-line flex row:
+.stat-item{
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  white-space: nowrap;       /* prevents wrapping */
+}
+
+B) Make text itself a single inline string (not split into multiple blocks).
+In HTML ensure the content is ONE element, e.g.:
+<div class="stat-text">4 bedrooms</div>
+NOT:
+<div class="stat-text"><span>4</span><span>bedrooms</span></div>
+
+C) Icon sizing:
+.stat-icon{ width: 64px; height: 64px; flex: 0 0 64px; }
+
+CHECKLIST TEST
+[ ] “4 bedrooms” renders on a single line beside the bed icon.
+[ ] “2 bathrooms” renders on a single line beside the bath icon.
+[ ] “1,850 sq. ft” renders on a single line beside the sqft icon.
+[ ] No stat text wraps even at longer values (e.g. “10 bedrooms”).
+
+========================================================
+3) CENTER: DIVIDER BETWEEN LISTING HEADLINE/DESCRIPTION MUST BE HORIZONTAL ONLY
+========================================================
+REQUIREMENT
+- Remove the vertical divider in the center block.
+- Only a thin horizontal rule should separate the headline and the description.
+
+IMPLEMENTATION
+A) Remove any border-left / pseudo-element lines in center column:
+.description-column,
+.description-column::before,
+.description-column::after{
+  border-left: none !important;
+  content: none !important;
+}
+
+B) Add a horizontal rule element under headline (or pseudo-element):
+.listing-headline{
+  margin-bottom: 18px;
+  position: relative;
+}
+.listing-headline::after{
+  content: "";
+  display: block;
+  width: 340px;             /* tune to match reference */
+  height: 4px;              /* thickness */
+  background: #b0b0b0;
+  margin: 18px auto 0;      /* centered line */
+}
+
+C) Description must be LEFT aligned:
+.listing-description{
+  text-align: left !important;
+  margin: 0 !important;
+  max-width: none;
+}
+
+CHECKLIST TEST
+[ ] No vertical line appears in the center column.
+[ ] A horizontal line appears between headline and description.
+[ ] Description is left aligned, not centered.
+
+========================================================
+4) TYPOGRAPHY: HEADLINE + PHONE MUST NOT BE BOLD
+========================================================
+REQUIREMENT
+- Listing Headline NOT bold
+- Phone number NOT bold
+- (Also: badge text NOT bold)
+
+IMPLEMENTATION (FORCE IT)
+.listing-headline{
+  font-weight: 500 !important;   /* NOT bold */
+}
+.agent-phone{
+  font-weight: 500 !important;   /* NOT bold */
+}
+
+If the font still renders heavy, switch headline to Montserrat:
+.listing-headline{
+  font-family: "Montserrat", sans-serif !important;
+  font-weight: 500 !important;
+}
+
+CHECKLIST TEST
+[ ] Headline weight appears medium/regular, not heavy bold.
+[ ] Phone weight appears medium/regular, not heavy bold.
+[ ] Same in PDF + PNG.
+
+========================================================
+5) BADGE (UPPER RIGHT): TEXT MUST BE BLACK + NOT BOLD
+========================================================
+REQUIREMENT
+- “FOR SALE AT $434,990” text:
+  - color black
+  - not bold
+
+IMPLEMENTATION (FORCE IT)
+.price-badge,
+.price-badge *{
+  color: #000 !important;
+  font-weight: 500 !important;
+}
+
+Badge background may remain gray, but text must be black.
+
+Also ensure badge stays inside header-wrap:
+.price-badge{
+  position: absolute;
+  top: 18px;
+  right: 80px;
+  z-index: 2;
+}
+
+CHECKLIST TEST
+[ ] Badge text is black.
+[ ] Badge text is not bold.
+[ ] Badge never overlaps the photo.
+
+========================================================
+6) PREVIEW MUST MIRROR DOWNLOAD (PIXEL-IDENTICAL)
+========================================================
+MANDATORY RENDER RULES (server/services/flyer-generator.ts)
+- Both pngPreview and pdf MUST use the same internal render function.
+- Same:
+  - viewport 2550×3300
+  - deviceScaleFactor 1
+  - emulateMediaType("screen")
+  - wait for document.fonts.ready
+  - wait for all images to finish loading
+- PDF:
+  width/height in px, printBackground true
+- PNG:
+  clip exact 2550×3300
+
+CHECKLIST TEST
+[ ] Same listing+inputs => PNG preview and PDF download match exactly.
+[ ] No spacing / font / divider differences.
+
+========================================================
+DELIVERABLES
+========================================================
+1) Commit changes to server/templates/flyer-template.html implementing ALL fixes above.
+2) If needed, commit flyer-generator.ts parity enforcement.
+3) Provide a short “before/after” note listing what changed:
+   - header divider position + height containment
+   - stat row HTML restructuring (one-line)
+   - center divider replaced with horizontal rule
+   - final font weights for headline/phone/badge
+   - confirm preview==download

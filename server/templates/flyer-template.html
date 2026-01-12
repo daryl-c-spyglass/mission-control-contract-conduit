@@ -82,17 +82,19 @@
       content: none !important;
     }
     
-    /* Header wrap spans logo + address for full divider height */
+    /* Header wrap spans logo + address - contains divider, no photo overlap */
     .header-wrap {
       position: relative;
+      height: calc(var(--headerH) + var(--addressH));
+      overflow: hidden;  /* Prevents divider from extending into photo area */
     }
     
     .header-wrap .header-divider {
       position: absolute;
-      left: calc(var(--padX) - var(--headerDividerW));  /* Right edge flush with logo */
-      top: 40px;  /* Aligned with header padding-top */
-      width: var(--headerDividerW);
-      height: var(--headerDividerH);
+      left: 92px;  /* Slightly left of logo with breathing room */
+      top: 18px;   /* Breathing room from top */
+      width: 12px;
+      height: calc(100% - 36px);  /* Stay within wrapper padding */
       background: var(--headerDivider);
       z-index: 10;
     }
@@ -118,12 +120,15 @@
     
     .price-badge {
       background: var(--badge);
-      color: #fff;
+      color: #000 !important;  /* Black text */
       padding: 22px 34px 22px 44px;
       border-radius: 0;
       text-align: right;
       min-width: 360px;
-      position: relative;
+      position: absolute;
+      top: 18px;
+      right: 80px;
+      z-index: 2;
       /* tag shape with angled left notch */
       clip-path: polygon(
         14% 0%,
@@ -135,17 +140,23 @@
       box-shadow: 0 4px 0 rgba(0,0,0,0.06);
     }
     
+    .price-badge,
+    .price-badge * {
+      color: #000 !important;
+      font-weight: 500 !important;  /* Not bold */
+    }
+    
     .price-label {
       font-size: 24px;
       letter-spacing: 4px;
-      font-weight: 700;
+      font-weight: 500 !important;
       text-transform: uppercase;
       opacity: 0.95;
     }
     
     .price-value {
       font-size: 56px;
-      font-weight: 900;
+      font-weight: 500 !important;
       letter-spacing: 1px;
       margin-top: 8px;
       line-height: 1;
@@ -292,35 +303,32 @@
     }
     
     .stat-item {
-      display: grid;
-      grid-template-columns: 72px 1fr;
+      display: flex;
       align-items: center;
-      column-gap: 22px;
+      gap: 18px;
+      white-space: nowrap;  /* Prevents wrapping - one line */
     }
     
     .stat-icon {
-      width: 72px;
-      height: 72px;
+      width: 64px;
+      height: 64px;
+      flex: 0 0 64px;
       display: flex;
       align-items: center;
       justify-content: center;
     }
     
     .stat-icon svg {
-      width: 72px;
-      height: 72px;
+      width: 64px;
+      height: 64px;
       fill: #111;
     }
     
     .stat-text {
-      font-size: 76px;
-      font-weight: 900;
+      font-size: 68px;
+      font-weight: 700;
       line-height: 1.05;
-    }
-    
-    .stat-text small {
-      font-size: 58px;
-      font-weight: 800;
+      white-space: nowrap;
     }
     
     /* CENTER COLUMN - Description (anchor to top, left-aligned) */
@@ -332,25 +340,44 @@
       padding: 0 48px;
     }
     
+    /* Remove any vertical dividers in center column */
+    .description-column,
+    .description-column::before,
+    .description-column::after {
+      border-left: none !important;
+    }
+    
     .listing-headline {
-      font-family: 'League Spartan', sans-serif;
-      font-size: 76px;
-      font-weight: 600;
+      font-family: 'Montserrat', sans-serif !important;
+      font-size: 68px;
+      font-weight: 500 !important;  /* NOT bold */
       letter-spacing: 4px;
       text-transform: uppercase;
-      text-align: center;
+      text-align: left;
       line-height: 1.1;
-      margin: 0 0 50px;
+      margin: 0 0 18px;
       white-space: pre-line;
+      position: relative;
+      width: 100%;
+    }
+    
+    /* Horizontal rule after headline */
+    .listing-headline::after {
+      content: "";
+      display: block;
+      width: 340px;
+      height: 4px;
+      background: #b0b0b0;
+      margin: 18px 0 0;
     }
     
     .listing-description {
       font-size: 48px;
       line-height: 1.55;
       color: #3b3b3b;
-      margin: 0;
+      margin: 0 !important;
       max-width: none;
-      text-align: left;
+      text-align: left !important;
       display: -webkit-box;
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 6;
@@ -433,7 +460,7 @@
     
     .agent-phone {
       font-size: 48px;
-      font-weight: 600;
+      font-weight: 500 !important;  /* NOT bold */
       letter-spacing: 1px;
       margin-top: 14px;
     }
@@ -511,7 +538,7 @@
               <path d="M2 16H22" stroke="#111" stroke-width="1.5"/>
             </svg>
           </span>
-          <div class="stat-text">{{beds}} <small>bedrooms</small></div>
+          <div class="stat-text">{{beds}} bedrooms</div>
         </div>
         <div class="stat-item">
           <span class="stat-icon">
@@ -521,7 +548,7 @@
               <circle cx="7" cy="7" r="1.5" fill="#111"/>
             </svg>
           </span>
-          <div class="stat-text">{{baths}} <small>bathrooms</small></div>
+          <div class="stat-text">{{baths}} bathrooms</div>
         </div>
         <div class="stat-item stat-sqft">
           <span class="stat-icon">
@@ -533,7 +560,7 @@
               <path d="M15 21H21V15" stroke="#111" stroke-width="2" fill="none"/>
             </svg>
           </span>
-          <div class="stat-text">{{sqft}} <small>sq. ft</small></div>
+          <div class="stat-text">{{sqft}} sq. ft</div>
         </div>
       </div>
       
