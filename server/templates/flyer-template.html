@@ -73,7 +73,7 @@
     
     .main-photo {
       width: 100%;
-      height: 820px;
+      height: 750px;
       object-fit: cover;
       display: block;
     }
@@ -86,7 +86,7 @@
     
     .secondary-photo {
       width: calc(50% - 6px);
-      height: 360px;
+      height: 320px;
       object-fit: cover;
     }
     
@@ -104,8 +104,8 @@
       display: grid;
       grid-template-columns: 450px 1fr 480px;
       gap: 70px;
-      padding: 100px 80px 120px 80px;
-      min-height: 1100px;
+      padding: 120px 80px 150px 80px;
+      min-height: 1300px;
     }
     
     /* LEFT COLUMN - Stats */
@@ -113,7 +113,7 @@
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
-      gap: 60px;
+      gap: 70px;
       padding-top: 40px;
     }
     
@@ -124,41 +124,41 @@
     }
     
     .stat-icon {
-      width: 75px;
-      height: 75px;
+      width: 85px;
+      height: 85px;
     }
     
     .stat-icon svg, .stat-icon img {
-      width: 75px;
-      height: 75px;
+      width: 85px;
+      height: 85px;
     }
     
     .stat-text {
-      font-size: 60px;
+      font-size: 68px;
       font-weight: 600;
       color: #333;
     }
     
     /* CENTER COLUMN - Description */
     .description-column {
-      padding: 40px 30px;
+      padding: 40px 40px;
       text-align: center;
     }
     
     .listing-headline {
       font-family: 'League Spartan', sans-serif;
-      font-size: 60px;
+      font-size: 68px;
       font-weight: 700;
       letter-spacing: 0.08em;
-      margin-bottom: 50px;
+      margin-bottom: 55px;
       color: #333;
       text-transform: uppercase;
       line-height: 1.2;
     }
     
     .listing-description {
-      font-size: 44px;
-      line-height: 1.65;
+      font-size: 50px;
+      line-height: 1.7;
       color: #444;
     }
     
@@ -170,24 +170,9 @@
       padding-top: 20px;
     }
     
-    .decorative-squares {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      margin-top: 30px;
-    }
-    
-    .square {
-      width: 45px;
-      height: 45px;
-    }
-    
-    .square-black { background: #000; }
-    .square-white { background: #fff; border: 2px solid #000; }
-    
     .agent-photo {
-      width: 320px;
-      height: 320px;
+      width: 350px;
+      height: 350px;
       border-radius: 50%;
       object-fit: cover;
       margin-bottom: 40px;
@@ -195,8 +180,8 @@
     }
     
     .agent-photo-placeholder {
-      width: 320px;
-      height: 320px;
+      width: 350px;
+      height: 350px;
       border-radius: 50%;
       background: #e0e0e0;
       margin-bottom: 40px;
@@ -206,13 +191,13 @@
     }
     
     .agent-photo-placeholder svg {
-      width: 160px;
-      height: 160px;
+      width: 175px;
+      height: 175px;
       fill: #999;
     }
     
     .agent-name {
-      font-size: 58px;
+      font-size: 64px;
       font-weight: 700;
       color: #333;
       margin-bottom: 15px;
@@ -220,21 +205,21 @@
     }
     
     .agent-title {
-      font-size: 34px;
+      font-size: 38px;
       color: #666;
       margin-bottom: 14px;
       text-align: center;
     }
     
     .agent-phone {
-      font-size: 44px;
+      font-size: 50px;
       color: #333;
       margin-bottom: 45px;
       text-align: center;
     }
     
     .agent-logo {
-      width: 260px;
+      width: 280px;
       height: auto;
       margin-bottom: 30px;
     }
@@ -335,15 +320,6 @@
       <div class="agent-phone">{{agentPhone}}</div>
       
       <img src="{{spyglassLogoUrl}}" class="agent-logo" alt="Spyglass Realty">
-      
-      <!-- Decorative squares at bottom -->
-      <div class="decorative-squares">
-        <div class="square square-black"></div>
-        <div class="square square-white"></div>
-        <div class="square square-black"></div>
-        <div class="square square-white"></div>
-        <div class="square square-black"></div>
-      </div>
     </div>
   </div>
 </body>

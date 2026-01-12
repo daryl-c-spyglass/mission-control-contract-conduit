@@ -1,0 +1,105 @@
+Two issues remain with the flyer:
+
+## Issue 1: REMOVE the black/white decorative squares COMPLETELY
+
+The alternating black and white squares (■□■□■) need to be removed entirely from the flyer. They appear below the agent info section.
+
+**In the HTML template**, find and DELETE this entire section:
+```html
+<div class="decorative-squares">
+  <div class="square black"></div>
+  <div class="square white"></div>
+  <div class="square black"></div>
+  <div class="square white"></div>
+  <div class="square black"></div>
+</div>
+```
+
+**Also remove the CSS** for `.decorative-squares` and `.square` classes - they're no longer needed.
+
+If you can't find the exact HTML, search for "decorative" or "square" in the template file and remove all related code.
+
+## Issue 2: FILL the bottom white space
+
+There's still too much empty white space at the bottom. The content section needs to expand to fill more of the page.
+
+**Option A - Increase content sizes further:**
+```css
+.bottom-section {
+  padding: 120px 80px 150px 80px;
+  min-height: 1300px;
+  align-items: stretch;
+}
+
+.stat-text {
+  font-size: 68px;
+}
+
+.stats-column {
+  gap: 70px;
+}
+
+.property-headline {
+  font-size: 68px;
+  margin-bottom: 55px;
+}
+
+.property-description {
+  font-size: 50px;
+  line-height: 1.7;
+}
+
+.agent-photo-container {
+  width: 350px;
+  height: 350px;
+}
+
+.agent-name {
+  font-size: 64px;
+}
+
+.agent-title {
+  font-size: 38px;
+}
+
+.agent-phone {
+  font-size: 50px;
+}
+
+.agent-logo-small {
+  width: 280px;
+}
+```
+
+**Option B - Alternatively, reduce photo heights more:**
+```css
+.main-photo {
+  height: 750px;
+}
+
+.secondary-photo {
+  height: 320px;
+}
+```
+
+**Option C - Add more vertical spacing in the bottom section:**
+```css
+.description-column {
+  padding: 40px 60px;
+}
+
+.agent-column {
+  gap: 35px;
+  padding-top: 30px;
+}
+
+.stat-item {
+  margin-bottom: 55px;
+}
+```
+
+## Summary:
+1. **DELETE** all decorative squares HTML and CSS
+2. **INCREASE** bottom section content sizes OR reduce photo heights
+
+The goal is for the content to fill the page with minimal white space at the bottom.
