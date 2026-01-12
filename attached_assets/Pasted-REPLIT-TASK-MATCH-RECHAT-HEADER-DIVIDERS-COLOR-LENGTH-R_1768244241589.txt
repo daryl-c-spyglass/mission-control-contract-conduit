@@ -1,0 +1,176 @@
+REPLIT TASK — MATCH RECHAT HEADER DIVIDERS (COLOR + LENGTH) + REMOVE EXTRA TOP-LEFT LINE + REDUCE BOTTOM WHITESPACE (ENLARGE PHOTOS + INCREASE FONT SIZES) — AND GUARANTEE PREVIEW MATCHES DOWNLOAD (PIXEL-IDENTICAL)
+
+IMPORTANT
+- Do NOT change user-facing UX flows.
+- You MAY update server-side rendering to guarantee identical Preview + Download.
+- Only change:
+  1) server/templates/flyer-template.html (CSS/HTML)
+  2) server/services/flyer-generator.ts (or equivalent Puppeteer generator)
+  3) server/routes.ts only if needed to keep ONE unified pipeline
+- Preview and Download MUST remain pixel-identical for the same listing + inputs.
+
+PRINT CANVAS
+- Fixed size: 2550 × 3300 (8.5×11 @ 300 DPI)
+- Both Preview (PNG) and Download (PDF) MUST be generated from the exact same HTML, viewport, fonts, media type, and waits.
+
+========================================================
+PART 1 — TEMPLATE CHANGES (server/templates/flyer-template.html)
+========================================================
+
+A) HEADER DIVIDER COLOR (MATCH RECHAT WARM GRAY)
+Add/adjust these CSS variables in :root:
+--headerDivider: #9E9A92;     /* warm gray like Rechat */
+--headerDividerW: 12px;       /* thickness */
+--headerDividerH: calc(var(--headerH) + var(--addressH));  /* spans logo + address */
+
+B) REMOVE EXTRA THIN LINE AT MOST UPPER LEFT
+Force removal of stray hairline/border/pseudo-element:
+.flyer-container,
+.header,
+.header-wrap { border-top: none !important; }
+
+.header::before,
+.header-wrap::before,
+.header-left::before,
+.top-rule,
+.header-top-rule{
+  content: none !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+C) BADGE COLOR MUST MATCH RECHAT GRAY (NOT BROWN)
+Set:
+--badge: var(--headerDivider);
+and/or:
+.price-badge{ background: var(--headerDivider) !important; }
+
+Keep the tag/ribbon clip-path shape.
+
+D) HEADER DIVIDER MUST SPAN LOGO + ADDRESS (FULL BAND)
+Anchor divider to wrapper containing BOTH rows.
+Example (adjust selector names to match):
+.header-wrap{ position: relative; }
+.header-wrap .header-divider{
+  position: absolute;
+  left: 80px;                  /* move close to logo/address block */
+  top: 0;
+  width: var(--headerDividerW);
+  height: var(--headerDividerH);
+  background: var(--headerDivider);
+}
+
+E) REDUCE BOTTOM WHITESPACE (ENLARGE PHOTOS + INCREASE FONTS)
+Goal: fill page more like Rechat by increasing photo-zone height and slightly increasing typography.
+
+E1) ENLARGE SECONDARY PHOTO STRIP (3 IMAGES)
+Increase 3-photo strip height by +220px (tune 180–260px).
+Apply to the actual selector used for the strip:
+.secondary-photos, .photo-strip, .photos-row{ height: (current + 220px); }
+
+Ensure cropping:
+.secondary-photos img, .photo-strip img, .photos-row img{
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+E2) KEEP HEIGHT MATH CONSISTENT
+If using variables:
+- increase --photosH by the SAME pixels added to the strip (and main photo if adjusted)
+- keep bottom auto-calc:
+  --bottomH: calc(var(--H) - var(--headerH) - var(--addressH) - var(--photosH))
+
+E3) SLIGHT FONT INCREASES (DO NOT MAKE BOLD)
+Listing headline must NOT be bold:
+.listing-headline{
+  font-weight: 600;
+  font-size: (current + 8px);   /* tune +6 to +12 */
+}
+
+Phone must NOT be bold:
+.agent-phone{
+  font-weight: 600;
+  font-size: (current + 6px);   /* tune +4 to +8 */
+}
+
+Stats/description can grow slightly:
+.stat-text{ font-size: (current + 8px); }
+.stat-text small{ font-size: (current + 6px); }
+.listing-description{ font-size: (current + 6px); }
+
+========================================================
+PART 2 — GUARANTEE PREVIEW = DOWNLOAD (SERVER RENDER PIPELINE)
+========================================================
+This is REQUIRED so template changes render identically in Preview and Download.
+
+1) SINGLE RENDER FUNCTION
+In server/services/flyer-generator.ts:
+Create ONE internal function used by both outputs:
+
+renderFlyerPage(html): returns { page }
+
+Both preview PNG and download PDF MUST call this.
+
+2) IDENTICAL VIEWPORT + DPR FOR BOTH
+Use the exact same viewport + deviceScaleFactor for both outputs:
+await page.setViewport({ width: 2550, height: 3300, deviceScaleFactor: 1 });
+
+3) IDENTICAL MEDIA TYPE FOR BOTH
+Choose one and apply to both:
+await page.emulateMediaType("screen");   (recommended)
+OR "print" (but must be same for both)
+
+4) WAIT FOR FONTS + IMAGES BEFORE EXPORT (BOTH)
+After setContent(..., waitUntil:"networkidle0"):
+await page.evaluate(() => document.fonts && document.fonts.ready);
+
+await page.evaluate(async () => {
+  const imgs = Array.from(document.images || []);
+  await Promise.all(imgs.map(img => {
+    if (img.complete) return Promise.resolve();
+    return new Promise(res => { img.onload = img.onerror = res; });
+  }));
+});
+
+5) PDF SETTINGS MUST MATCH CANVAS EXACTLY
+Generate PDF with exact px dimensions and backgrounds:
+await page.pdf({
+  printBackground: true,
+  width: "2550px",
+  height: "3300px",
+  preferCSSPageSize: true,
+  pageRanges: "1"
+});
+
+Avoid using format:"letter" if it introduces scaling.
+
+6) PNG SETTINGS MUST MATCH CANVAS EXACTLY
+await page.screenshot({
+  type: "png",
+  fullPage: false,
+  clip: { x: 0, y: 0, width: 2550, height: 3300 }
+});
+
+7) SAME TEMPLATE DATA FOR BOTH
+Ensure /api/flyer/render uses identical payload normalization for BOTH outputType values.
+No re-generation or default substitutions only for preview.
+
+========================================================
+VERIFICATION (MANDATORY)
+========================================================
+Render the same listing with same inputs:
+- Preview PNG must match PDF layout exactly (spacing, fonts, dividers, photos)
+- Header divider color/length matches Rechat
+- Extra top-left line removed
+- Photos enlarged, bottom whitespace reduced
+- Headline and phone not bold
+- Preview and Download are pixel-identical
+
+DELIVERABLE
+- Commit updates to server/templates/flyer-template.html and server/services/flyer-generator.ts
+- Report:
+  - final strip height change (+px)
+  - final --photosH value (if used)
+  - mediaType used (screen/print)
+  - viewport + deviceScaleFactor used
