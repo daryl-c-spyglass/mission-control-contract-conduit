@@ -43,13 +43,9 @@
       --sepColor: rgba(0,0,0,0.16);
       --sepW: 2px;
       
-      /* Thick dividers (PSD-matching) */
-      --dividerW: 18px;
-      --dividerColor: rgba(0,0,0,0.32);
-      
-      /* Divider tip alignment offsets */
-      --leftTipOffset: 90px;   /* Aligns left divider tip with sqft row baseline */
-      --rightTipOffset: 110px; /* Aligns right divider tip with description last line */
+      /* Horizontal divider styling */
+      --hDividerColor: #bfbfbf;
+      --hDividerH: 3px;
     }
     
     html, body {
@@ -236,61 +232,23 @@
       align-items: flex-start;
     }
     
-    /* Content band controls where content sits - dividers only span this height */
+    /* Horizontal divider between photos and bottom section */
+    .h-divider {
+      width: 100%;
+      height: var(--hDividerH);
+      background: var(--hDividerColor);
+      margin: 0;
+    }
+    
+    /* Content band - 3-column layout without vertical dividers */
     .bottom-band {
       width: 100%;
       display: grid;
-      /* structural dividers as columns (thick 18px bars) */
-      grid-template-columns: 480px var(--dividerW) 1fr var(--dividerW) 520px;
-      gap: 0;
-      /* band height so dividers don't run through huge whitespace */
-      height: 460px;
-      max-height: 460px;
-      align-items: stretch;
-    }
-    
-    /* Structural vertical divider with bottom tip */
-    .v-divider {
-      position: relative;
-      width: var(--dividerW);
-    }
-    
-    .v-divider::before {
-      content: "";
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      top: 0;
-      width: 6px;
-      height: calc(100% - 90px);  /* Leave room for tip alignment */
-      background: #A6A6A6;
-    }
-    
-    .v-divider::after {
-      content: "";
-      position: absolute;
-      bottom: 90px;  /* Aligned with content baseline */
-      left: 50%;
-      transform: translateX(-50%);
-      width: 60px;
-      height: 6px;
-      background: #A6A6A6;
-    }
-    
-    /* Left divider tip aligns with sqft row */
-    .v-divider.divider-left::before {
-      height: calc(100% - var(--leftTipOffset, 90px));
-    }
-    .v-divider.divider-left::after {
-      bottom: var(--leftTipOffset, 90px);
-    }
-    
-    /* Right divider tip aligns with description last line */
-    .v-divider.divider-right::before {
-      height: calc(100% - var(--rightTipOffset, 110px));
-    }
-    .v-divider.divider-right::after {
-      bottom: var(--rightTipOffset, 110px);
+      grid-template-columns: 420px 1fr 480px;
+      gap: 48px;
+      height: auto;
+      min-height: 400px;
+      align-items: flex-start;
     }
     
     /* LEFT COLUMN - Stats (anchor to top) */
@@ -298,8 +256,8 @@
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
-      gap: 50px;
-      padding-right: 48px;
+      gap: 44px;
+      padding: 0;
     }
     
     .stat-item {
@@ -337,38 +295,23 @@
       flex-direction: column;
       justify-content: flex-start;
       align-items: flex-start;
-      padding: 0 48px;
-    }
-    
-    /* Remove any vertical dividers in center column */
-    .description-column,
-    .description-column::before,
-    .description-column::after {
-      border-left: none !important;
+      padding: 0;
     }
     
     .listing-headline {
       font-family: 'Montserrat', sans-serif !important;
-      font-size: 68px;
+      font-size: 64px;
       font-weight: 500 !important;  /* NOT bold */
-      letter-spacing: 4px;
+      letter-spacing: 3px;
       text-transform: uppercase;
       text-align: left;
-      line-height: 1.1;
-      margin: 0 0 18px;
+      line-height: 1.15;
+      margin: 0 0 24px;
       white-space: pre-line;
       position: relative;
       width: 100%;
-    }
-    
-    /* Horizontal rule after headline */
-    .listing-headline::after {
-      content: "";
-      display: block;
-      width: 340px;
-      height: 4px;
-      background: #b0b0b0;
-      margin: 18px 0 0;
+      padding-bottom: 24px;
+      border-bottom: var(--hDividerH) solid var(--hDividerColor);
     }
     
     .listing-description {
@@ -384,16 +327,15 @@
       overflow: hidden;
     }
     
-    /* RIGHT COLUMN - Agent (aligned within band, not page bottom) */
+    /* RIGHT COLUMN - Agent (aligned within band) */
     .agent-column {
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
       align-items: center;
-      gap: 20px;
+      gap: 18px;
       text-align: center;
-      padding-left: 48px;
-      padding-top: 80px;
+      padding: 0;
     }
     
     /* Agent photo + logo row side by side */
@@ -523,6 +465,9 @@
     </div>
   </div>
   
+  <!-- Horizontal divider between photos and bottom section -->
+  <div class="h-divider"></div>
+  
   <!-- BOTTOM SECTION -->
   <div class="bottom-section">
     <div class="bottom-band">
@@ -564,9 +509,6 @@
         </div>
       </div>
       
-      <!-- Divider (left - aligns with sqft) -->
-      <div class="v-divider divider-left"></div>
-      
       <!-- Description Column -->
       <div class="description-column">
         {{#if headline}}
@@ -574,9 +516,6 @@
         {{/if}}
         <div class="listing-description">{{description}}</div>
       </div>
-      
-      <!-- Divider (right - aligns with description) -->
-      <div class="v-divider divider-right"></div>
       
       <!-- Agent Column -->
       <div class="agent-column">
