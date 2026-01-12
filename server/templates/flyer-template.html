@@ -21,7 +21,7 @@
       /* FIXED ZONE HEIGHTS (explicit math) */
       --headerH: 165px;
       --addressH: 99px;
-      --photosH: 1485px;
+      --photosH: 1635px;  /* increased by 150px to reduce bottom whitespace */
       /* Bottom = H - headerH - addressH - photosH (future-proof calc) */
       --bottomH: calc(var(--H) - var(--headerH) - var(--addressH) - var(--photosH));
       
@@ -89,6 +89,21 @@
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
+    }
+    
+    .header-left {
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+    }
+    
+    .header-divider {
+      position: absolute;
+      left: -20px;
+      top: 0;
+      width: 14px;
+      height: 90px;
+      background: var(--dividerColor);
     }
     
     .header-logo {
@@ -167,7 +182,7 @@
     }
     
     .secondary-photos {
-      height: 380px;
+      height: 530px;  /* increased by 150px to reduce bottom whitespace */
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 20px;
@@ -272,8 +287,8 @@
     .listing-headline {
       font-family: 'League Spartan', sans-serif;
       font-size: 66px;
-      font-weight: 900;
-      letter-spacing: 5px;
+      font-weight: 600;
+      letter-spacing: 4px;
       text-transform: uppercase;
       text-align: center;
       line-height: 1.1;
@@ -349,14 +364,15 @@
     }
     
     .agent-name {
-      font-size: 58px;
-      font-weight: 900;
+      font-size: 56px;
+      font-weight: 700;
       line-height: 1.1;
       margin-top: 10px;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 420px;
+      overflow: visible;
+      text-overflow: clip;
+      max-width: none;
+      width: 100%;
     }
     
     .agent-title {
@@ -369,7 +385,7 @@
     
     .agent-phone {
       font-size: 42px;
-      font-weight: 900;
+      font-weight: 600;
       letter-spacing: 1px;
       margin-top: 14px;
     }
@@ -386,7 +402,10 @@
   <div class="flyer">
   <!-- HEADER - Logo left, Price right -->
   <div class="header">
-    <img src="{{spyglassLogoUrl}}" class="header-logo" alt="Spyglass Realty">
+    <div class="header-left">
+      <div class="header-divider"></div>
+      <img src="{{spyglassLogoUrl}}" class="header-logo" alt="Spyglass Realty">
+    </div>
     
     <div class="price-badge">
       <div class="price-label">{{statusLabel}}</div>

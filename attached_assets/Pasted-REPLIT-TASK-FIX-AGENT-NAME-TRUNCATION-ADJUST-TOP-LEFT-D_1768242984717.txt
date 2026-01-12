@@ -1,0 +1,137 @@
+REPLIT TASK — FIX AGENT NAME TRUNCATION + ADJUST TOP-LEFT DIVIDER + MAKE HEADLINE/PHONE NOT BOLD + REDUCE BOTTOM WHITESPACE BY EXPANDING SECONDARY PHOTOS
+
+IMPORTANT
+- Do NOT change backend, endpoints, Puppeteer service, or frontend logic.
+- Only update server/templates/flyer-template.html (CSS + minimal HTML if required).
+- Preview and Download must remain pixel-identical (same server-side render).
+- Maintain fixed print size: 2550×3300.
+
+ISSUES TO FIX
+1) Agent name still truncates (ellipsis) even though space exists.
+2) Listing headline should NOT be bold.
+3) Phone number should NOT be bold.
+4) Upper-left vertical divider beside logo/address:
+   - move closer next to logo+address
+   - make thicker
+   - keep SAME HEIGHT
+5) Bottom has too much white space:
+   - expand the 3 secondary property photos strip slightly taller
+   - do NOT change overall page size; keep the fixed math consistent
+
+========================================================
+A) AGENT NAME TRUNCATION FIX
+========================================================
+.agent-column{ align-items: stretch; text-align: left; }
+
+.agent-name{
+  font-weight: 700;
+  font-size: 56px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  max-width: none;
+  width: 100%;
+}
+
+If agent photo+logo row constrains width, wrap text in .agent-text:
+
+.agent-text{
+  width: 100%;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+========================================================
+B) LISTING HEADLINE NOT BOLD
+========================================================
+.listing-headline{ font-weight: 600; letter-spacing: 4px; }
+
+========================================================
+C) PHONE NOT BOLD
+========================================================
+.agent-phone{ font-weight: 600; letter-spacing: 1px; }
+
+========================================================
+D) TOP-LEFT DIVIDER (LOGO/ADDRESS) POSITION + THICKNESS (SAME HEIGHT)
+========================================================
+Anchor divider to the logo/address container (not page edge), and thicken it.
+Example (adjust selector names to match template):
+
+.header-left{ position: relative; }
+
+.header-left .header-divider{
+  position: absolute;
+  left: -20px;
+  top: 0;
+  width: 14px;                /* thicker */
+  height: 90px;               /* KEEP SAME HEIGHT */
+  background: rgba(0,0,0,0.32);
+}
+
+Do NOT change divider height.
+
+========================================================
+E) REDUCE BOTTOM WHITESPACE BY EXPANDING SECONDARY PHOTOS STRIP
+========================================================
+We will increase ONLY the height of the "3-photo strip" under the main photo.
+This visually fills the page without distorting bottom layout.
+
+1) Identify the photo zone structure. It appears to be:
+- one large main image
+- a row/strip containing 3 smaller images
+
+2) Increase the small strip height by ~120–180px.
+Example CSS (use the actual selector names from template):
+
+.secondary-photos,
+.photo-strip,
+.photos-row {
+  height: 420px;               /* increase from current (tune as needed) */
+}
+
+3) Ensure images still crop nicely:
+.secondary-photos img,
+.photo-strip img,
+.photos-row img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+4) IMPORTANT — Keep the flyer zone math correct:
+If you are using CSS variables like:
+--photosH and --bottomH
+Then you MUST update:
+- Increase --photosH by the same number of pixels you increased the photo strip
+- Decrease --bottomH accordingly using the existing calc:
+  --bottomH: calc(var(--H) - var(--headerH) - var(--addressH) - var(--photosH))
+
+Example:
+If current --photosH = 1485px and you increase strip by 150px:
+Set --photosH to 1635px (or 1485 + 150)
+Then bottomH will shrink automatically via calc.
+
+If your --photosH is hardcoded, update it.
+If it’s already calculated, adjust the explicit strip height without breaking totals.
+
+5) DO NOT change:
+- overall height 3300
+- headerH/addressH unless necessary
+Only expand photos area and let bottom area reduce.
+
+========================================================
+VERIFICATION CHECKLIST
+========================================================
+Render PNG + PDF and confirm:
+- Less white space in bottom portion
+- 3-photo strip is visibly taller (fills more of page)
+- No overflow/cropping issues
+- Agent name no longer truncates (no ellipsis when it fits)
+- Headline and phone are not bold
+- Top-left divider thicker and closer, same height
+- PNG and PDF identical
+
+DELIVERABLE
+- Commit only server/templates/flyer-template.html updates
+- Note how many pixels secondary photos strip increased and updated --photosH if applicable
