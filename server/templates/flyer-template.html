@@ -125,7 +125,7 @@
       align-items: center;
       font-size: 32px;
       letter-spacing: 2px;
-      font-weight: 700;
+      font-weight: 400;
       text-transform: uppercase;
       border-bottom: var(--sepW) solid var(--sepColor);
     }
@@ -187,7 +187,9 @@
     .bottom-section {
       height: var(--bottomH);
       padding: 48px var(--padX) 70px;
-      border-top: none;
+      
+      /* Top separator line */
+      border-top: var(--sepW) solid var(--sepColor);
       
       display: grid;
       grid-template-columns: 480px 1fr 520px;
@@ -197,41 +199,19 @@
       align-items: flex-start;
       
       min-height: 0;
-      
-      /* Reliable separators using background gradients (visible at 300 DPI) */
-      background-repeat: no-repeat;
-      
-      background-image:
-        /* (1) Top separator across bottom section */
-        linear-gradient(to right, var(--sepColor), var(--sepColor)),
-        /* (2) Vertical line between Stats and Description */
-        linear-gradient(to bottom, var(--sepColor), var(--sepColor)),
-        /* (3) Vertical line between Description and Agent */
-        linear-gradient(to bottom, var(--sepColor), var(--sepColor));
-      
-      /* Sizes: top line is full width, vertical lines are column height */
-      background-size:
-        calc(100% - (2 * var(--padX))) var(--sepW),
-        var(--sepW) calc(100% - 48px - 70px),
-        var(--sepW) calc(100% - 48px - 70px);
-      
-      /* Positions: place lines precisely */
-      background-position:
-        var(--padX) 0,
-        calc(var(--padX) + 480px + (60px / 2)) 48px,
-        calc(100% - var(--padX) - 520px - (60px / 2)) 48px;
     }
     
     /* LEFT COLUMN - Stats (anchor to top) */
     .stats-column {
       display: flex;
       flex-direction: column;
-      
-      /* was center — change to start */
       justify-content: flex-start;
-      
       gap: 50px;
       min-height: 0;
+      
+      /* Vertical separator (border more reliable than gradients at 300 DPI) */
+      border-right: var(--sepW) solid var(--sepColor);
+      padding-right: 24px;
     }
     
     .stat-item {
@@ -266,12 +246,12 @@
     .description-column {
       display: flex;
       flex-direction: column;
-      
-      /* was center — change to start */
       justify-content: flex-start;
-      
       min-height: 0;
-      padding: 0 20px;
+      padding: 0 24px;
+      
+      /* Vertical separator (border more reliable than gradients at 300 DPI) */
+      border-right: var(--sepW) solid var(--sepColor);
     }
     
     .listing-headline {
