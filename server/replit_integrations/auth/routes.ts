@@ -71,6 +71,32 @@ export function registerAuthRoutes(app: Express): void {
       const userId = req.user.claims.sub;
       const { marketingHeadshotUrl, marketingDisplayName, marketingTitle, marketingPhone, marketingEmail } = req.body;
       
+      // Validate headshot URL/base64 - max 7MB to allow for base64 overhead (5MB file ~= 6.67MB base64)
+      if (marketingHeadshotUrl && typeof marketingHeadshotUrl === "string") {
+        if (marketingHeadshotUrl.length > 7 * 1024 * 1024) {
+          return res.status(400).json({ message: "Headshot image is too large. Maximum size is 5MB." });
+        }
+        // Validate it's either a URL or a valid base64 data URL
+        if (!marketingHeadshotUrl.startsWith("data:image/") && !marketingHeadshotUrl.startsWith("http")) {
+          return res.status(400).json({ message: "Invalid headshot format. Must be an image URL or data URL." });
+        }
+      }
+      
+      // Validate string lengths for other fields
+      const maxFieldLength = 200;
+      if (marketingDisplayName && marketingDisplayName.length > maxFieldLength) {
+        return res.status(400).json({ message: "Display name is too long." });
+      }
+      if (marketingTitle && marketingTitle.length > maxFieldLength) {
+        return res.status(400).json({ message: "Title is too long." });
+      }
+      if (marketingPhone && marketingPhone.length > 50) {
+        return res.status(400).json({ message: "Phone number is too long." });
+      }
+      if (marketingEmail && marketingEmail.length > maxFieldLength) {
+        return res.status(400).json({ message: "Email is too long." });
+      }
+      
       const updatedUser = await authStorage.updateUser(userId, {
         marketingHeadshotUrl: marketingHeadshotUrl || null,
         marketingDisplayName: marketingDisplayName || null,

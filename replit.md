@@ -96,6 +96,17 @@ Professional agent branding for print flyers with validated required fields:
 - **Validation**: Toast error prevents generation without required agent name and phone
 - **Live Preview**: Agent section updates in real-time as fields are filled
 
+#### Agent Marketing Profile Settings (January 2026)
+Settings page includes dedicated "Agent Marketing Profile" section:
+- **Headshot Upload**: Base64 image storage (5MB max frontend validation, 7MB backend validation for base64 overhead)
+- **Display Name**: Agent's name for marketing materials
+- **Title**: Professional title (e.g., "REALTOR®")
+- **Phone Number**: Contact number for flyers
+- **Email Address**: Contact email for marketing materials
+- **API Endpoint**: `PATCH /api/user/graphics-settings` handles all marketing profile fields
+- **Database Fields**: `marketing_headshot_url`, `marketing_display_name`, `marketing_title`, `marketing_phone`, `marketing_email` in users table
+- **Server Validation**: Size limits, format validation, and field length checks
+
 #### AI Description Summarization (January 2026)
 AI-powered summarization for property descriptions in both flyer formats:
 - **Dual Format Support**: Available for Social Media (200 chars) and Print Flyer (115 chars)
