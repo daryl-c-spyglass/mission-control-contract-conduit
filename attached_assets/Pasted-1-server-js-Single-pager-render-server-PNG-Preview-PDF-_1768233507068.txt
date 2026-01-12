@@ -1,0 +1,760 @@
+1) server.js — Single pager render server (PNG Preview + PDF Download)
+/**
+ * server.js
+ * Single-file Express server with a single source-of-truth HTML template rendered by Puppeteer.
+ *
+ * Endpoints:
+ *  - GET  /              -> serves UI (public/index.html)
+ *  - POST /api/flyer/png -> returns PNG preview (2550x3300)
+ *  - POST /api/flyer/pdf -> returns PDF download (8.5x11, margin 0)
+ *
+ * Preview == Download because both are rendered from the same HTML/CSS template using Chromium.
+ */
+
+const express = require("express");
+const path = require("path");
+
+// Prefer Puppeteer; if it fails in your Replit environment, switch to Playwright Chromium.
+const puppeteer = require("puppeteer");
+
+const app = express();
+app.use(express.json({ limit: "25mb" }));
+app.use(express.static(path.join(__dirname, "public")));
+
+// 8.5x11 at 300 DPI
+const W = 2550;
+const H = 3300;
+
+// ----------------------
+// SINGLE SOURCE TEMPLATE
+// ----------------------
+function renderFlyerHTML(input) {
+  const d = input || {};
+  const listing = d.listing || {};
+  const images = d.images || {};
+  const agent = d.agent || {};
+  const branding = d.branding || {};
+
+  const logoText = branding.brokerageName || "SPYGLASS REALTY";
+  const badgeLabel = listing.statusLabel || "JUST LISTED AT";
+  const price = listing.price || "$434,990";
+  const addressLine = listing.addressLine || "13106 NEW BOSTON";
+
+  const beds = listing.beds ?? 4;
+  const baths = listing.baths ?? 2;
+  const sqft = listing.sqft ?? "1,850";
+
+  const headline = listing.headline || "MOVE-IN READY IN NW\nAUSTIN";
+  const description =
+    listing.description ||
+    "Discover a charming home in NW Austin with parks, dining, and top schools, offering a vibrant lifestyle.";
+
+  const heroUrl =
+    images.heroUrl ||
+    "https://images.unsplash.com/photo-1568605114967-8130f3a36994?q=80&w=2400&auto=format&fit=crop";
+  const sec1 =
+    images.secondaryUrls?.[0] ||
+    "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=2400&auto=format&fit=crop";
+  const sec2 =
+    images.secondaryUrls?.[1] ||
+    "https://images.unsplash.com/photo-1501183638710-841dd1904471?q=80&w=2400&auto=format&fit=crop";
+
+  const agentName = agent.name || "Daryl Test";
+  const agentTitle = agent.title || "REALTOR®";
+  const agentPhone = agent.phone || "12312312";
+  const agentHeadshot =
+    agent.headshotUrl ||
+    "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=800&auto=format&fit=crop";
+
+  // Brand color (optional)
+  const badgeColor = branding.badgeColor || "#8b7a63";
+
+  // IMPORTANT: fixed zones = consistent fill, no whitespace
+  const headerH = 165;
+  const addressH = 99;
+  const photosH = 1485;
+  const bottomH = H - headerH - addressH - photosH;
+
+  // Escape text for HTML
+  const esc = (s) =>
+    String(s ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;");
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Flyer</title>
+  <style>
+    @page { size: 8.5in 11in; margin: 0; }
+    html, body { margin:0; padding:0; background:#fff; }
+    * { box-sizing: border-box; }
+
+    :root{
+      --W:${W}px;
+      --H:${H}px;
+
+      --headerH:${headerH}px;
+      --addressH:${addressH}px;
+      --photosH:${photosH}px;
+      --bottomH:${bottomH}px;
+
+      --padX:120px;
+      --gap:36px;
+      --ink:#1f1f1f;
+      --muted:#6b6b6b;
+      --rule:#e6e6e6;
+      --badge:${badgeColor};
+    }
+
+    body{
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .flyer{
+      width: var(--W);
+      height: var(--H);
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+      background:#fff;
+    }
+
+    .header{
+      height: var(--headerH);
+      padding: 60px var(--padX) 0 var(--padX);
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+    }
+
+    .logo{
+      display:flex;
+      align-items:center;
+      gap:22px;
+      min-width: 700px;
+    }
+
+    .logo-mark{
+      width:86px;height:86px;border:6px solid #111;border-radius:50%;
+      position:relative;
+    }
+    .logo-mark:after{
+      content:"";
+      position:absolute;
+      inset:18px;
+      border:6px solid #111;
+      border-left-color: transparent;
+      border-bottom-color: transparent;
+      border-radius:50%;
+      transform: rotate(15deg);
+      opacity:.5;
+    }
+
+    .logo-text{ display:flex; flex-direction:column; line-height:1; }
+    .logo-text .brand{
+      font-weight:900;
+      letter-spacing:6px;
+      font-size:42px;
+      text-transform:uppercase;
+    }
+    .logo-text .sub{
+      margin-top:10px;
+      font-weight:700;
+      letter-spacing:8px;
+      font-size:20px;
+      color:var(--muted);
+      text-transform:uppercase;
+    }
+
+    .price-badge{
+      background: var(--badge);
+      color:#fff;
+      padding: 28px 36px;
+      border-radius: 6px;
+      text-align:right;
+      min-width: 380px;
+    }
+    .price-badge .label{
+      font-size:26px;
+      letter-spacing:4px;
+      font-weight:800;
+      text-transform:uppercase;
+      opacity:.95;
+    }
+    .price-badge .price{
+      font-size:62px;
+      font-weight:950;
+      letter-spacing:1px;
+      margin-top:10px;
+      line-height:1;
+    }
+
+    .address{
+      height: var(--addressH);
+      padding: 0 var(--padX);
+      display:flex;
+      align-items:center;
+      font-size:34px;
+      letter-spacing:2px;
+      font-weight:800;
+      text-transform:uppercase;
+    }
+
+    .photos{
+      height: var(--photosH);
+      padding: 0 var(--padX);
+      display:flex;
+      flex-direction:column;
+      gap:22px;
+    }
+
+    .photo-main{
+      flex: 1 1 auto;
+      overflow:hidden;
+      background:#f2f2f2;
+    }
+
+    .photo-row{
+      height:420px;
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:22px;
+      overflow:hidden;
+    }
+
+    img.photo{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+    }
+
+    .bottom{
+      height: var(--bottomH);
+      padding: 80px var(--padX) 110px;
+      border-top: 2px solid var(--rule);
+      display:grid;
+      grid-template-columns: 520px 1fr 560px;
+      gap: 80px;
+      align-items: stretch;
+      min-height:0;
+    }
+
+    .stats{
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      gap:60px;
+      min-height:0;
+    }
+    .stat{
+      font-size:78px;
+      font-weight:950;
+      line-height:1.05;
+    }
+    .stat small{
+      font-size:58px;
+      font-weight:900;
+    }
+
+    .copy{
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      min-height:0;
+      padding: 0 10px;
+    }
+    .headline{
+      font-size:74px;
+      font-weight:950;
+      letter-spacing:6px;
+      text-transform:uppercase;
+      text-align:center;
+      line-height:1.05;
+      margin: 0 0 60px;
+      white-space: pre-line;
+    }
+    .desc{
+      font-size:46px;
+      line-height:1.55;
+      color:#3b3b3b;
+      margin:0 auto;
+      max-width: 920px;
+      text-align:left;
+
+      display:-webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 6;
+      overflow:hidden;
+    }
+
+    .agent{
+      display:flex;
+      flex-direction:column;
+      justify-content:flex-end;
+      align-items:center;
+      gap:28px;
+      min-height:0;
+      text-align:center;
+    }
+
+    .agent-photo{
+      width:260px;height:260px;border-radius:50%;
+      overflow:hidden;
+      border:8px solid #c7b28a;
+      background:#f2f2f2;
+    }
+    .agent-photo img{
+      width:100%;height:100%;object-fit:cover;display:block;
+    }
+    .agent-name{ font-size:64px; font-weight:950; line-height:1.1; margin-top:10px; }
+    .agent-title{ font-size:34px; letter-spacing:6px; color:var(--muted); margin-top:10px; text-transform:uppercase; }
+    .agent-phone{ font-size:46px; font-weight:900; margin-top:18px; }
+
+    .tiny-logo{
+      margin-top:30px;
+      opacity:.95;
+      transform: scale(.9);
+    }
+  </style>
+</head>
+<body>
+  <div class="flyer">
+    <div class="header">
+      <div class="logo">
+        <div class="logo-mark"></div>
+        <div class="logo-text">
+          <div class="brand">${esc(logoText.split(" ")[0] || "SPYGLASS")}</div>
+          <div class="sub">${esc(logoText.split(" ").slice(1).join(" ") || "REALTY")}</div>
+        </div>
+      </div>
+      <div class="price-badge">
+        <div class="label">${esc(badgeLabel)}</div>
+        <div class="price">${esc(price)}</div>
+      </div>
+    </div>
+
+    <div class="address">${esc(addressLine)}</div>
+
+    <div class="photos">
+      <div class="photo-main">
+        <img class="photo" src="${esc(heroUrl)}" alt="Main photo" />
+      </div>
+      <div class="photo-row">
+        <div style="overflow:hidden;background:#f2f2f2;">
+          <img class="photo" src="${esc(sec1)}" alt="Secondary photo 1" />
+        </div>
+        <div style="overflow:hidden;background:#f2f2f2;">
+          <img class="photo" src="${esc(sec2)}" alt="Secondary photo 2" />
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom">
+      <div class="stats">
+        <div class="stat">${esc(beds)} <small>bedrooms</small></div>
+        <div class="stat">${esc(baths)} <small>bathrooms</small></div>
+        <div class="stat">${esc(sqft)} <small>sq. ft</small></div>
+      </div>
+
+      <div class="copy">
+        <h1 class="headline">${esc(headline)}</h1>
+        <p class="desc">${esc(description)}</p>
+      </div>
+
+      <div class="agent">
+        <div class="agent-photo">
+          <img src="${esc(agentHeadshot)}" alt="Agent headshot" />
+        </div>
+
+        <div>
+          <div class="agent-name">${esc(agentName)}</div>
+          <div class="agent-title">${esc(agentTitle)}</div>
+          <div class="agent-phone">${esc(agentPhone)}</div>
+        </div>
+
+        <div class="tiny-logo">
+          <div class="logo" style="justify-content:center;min-width:auto;">
+            <div class="logo-mark" style="width:70px;height:70px;border-width:5px;"></div>
+            <div class="logo-text">
+              <div class="brand" style="font-size:34px;letter-spacing:6px;">${esc(logoText.split(" ")[0] || "SPYGLASS")}</div>
+              <div class="sub" style="font-size:18px;letter-spacing:8px;margin-top:8px;">${esc(logoText.split(" ").slice(1).join(" ") || "REALTY")}</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+// ----------------------
+// PUPPETEER RENDER HELPERS
+// ----------------------
+async function withBrowser(fn) {
+  const browser = await puppeteer.launch({
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--font-render-hinting=medium",
+    ],
+  });
+  try {
+    return await fn(browser);
+  } finally {
+    await browser.close();
+  }
+}
+
+async function renderPNG(input) {
+  const html = renderFlyerHTML(input);
+
+  return withBrowser(async (browser) => {
+    const page = await browser.newPage();
+    await page.setViewport({ width: W, height: H, deviceScaleFactor: 1 });
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    // Ensure fonts and images loaded for consistent rendering
+    await page.evaluate(() => document.fonts && document.fonts.ready);
+    await page.evaluate(async () => {
+      const imgs = Array.from(document.images || []);
+      await Promise.all(
+        imgs.map((img) =>
+          img.complete
+            ? Promise.resolve()
+            : new Promise((res) => {
+                img.onload = res;
+                img.onerror = res;
+              })
+        )
+      );
+    });
+
+    const png = await page.screenshot({
+      type: "png",
+      clip: { x: 0, y: 0, width: W, height: H },
+    });
+
+    await page.close();
+    return png;
+  });
+}
+
+async function renderPDF(input) {
+  const html = renderFlyerHTML(input);
+
+  return withBrowser(async (browser) => {
+    const page = await browser.newPage();
+    await page.setViewport({ width: W, height: H, deviceScaleFactor: 1 });
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    await page.evaluate(() => document.fonts && document.fonts.ready);
+    await page.evaluate(async () => {
+      const imgs = Array.from(document.images || []);
+      await Promise.all(
+        imgs.map((img) =>
+          img.complete
+            ? Promise.resolve()
+            : new Promise((res) => {
+                img.onload = res;
+                img.onerror = res;
+              })
+        )
+      );
+    });
+
+    const pdf = await page.pdf({
+      printBackground: true,
+      preferCSSPageSize: true,
+      margin: { top: 0, right: 0, bottom: 0, left: 0 },
+    });
+
+    await page.close();
+    return pdf;
+  });
+}
+
+// ----------------------
+// API ROUTES
+// ----------------------
+app.post("/api/flyer/png", async (req, res) => {
+  try {
+    const png = await renderPNG(req.body);
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "no-store");
+    res.send(png);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.post("/api/flyer/pdf", async (req, res) => {
+  try {
+    const pdf = await renderPDF(req.body);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", 'attachment; filename="flyer.pdf"');
+    res.setHeader("Cache-Control", "no-store");
+    res.send(pdf);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// Start
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Flyer server running on :${PORT}`));
+
+2) public/index.html — Single pager UI (Preview + Download)
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Flyer Preview & Download</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:#0b0b0b; color:#fff; }
+    .wrap { display:flex; min-height:100vh; }
+    .left { width: 420px; padding: 18px; border-right: 1px solid #2a2a2a; background:#111; }
+    .left h1 { font-size: 16px; margin: 0 0 12px; opacity:.95; }
+    .left label { display:block; font-size: 12px; opacity:.8; margin-top: 12px; }
+    .left input, .left textarea {
+      width:100%; background:#0d0d0d; border:1px solid #2c2c2c; color:#fff;
+      padding:10px; border-radius:8px; margin-top:6px;
+    }
+    .left textarea { min-height: 90px; resize: vertical; }
+    .btns { display:flex; gap:10px; margin-top:16px; }
+    button {
+      flex:1; padding: 12px 10px; border-radius: 10px; border: 1px solid #3a3a3a;
+      background:#1b1b1b; color:#fff; cursor:pointer;
+    }
+    button:hover { background:#232323; }
+    .right { flex:1; padding: 18px; display:flex; flex-direction:column; gap:14px; }
+    .note { font-size: 12px; opacity:.75; }
+
+    /* Preview stage: scaled down but exact aspect ratio */
+    .stage {
+      flex:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:#0b0b0b;
+      border:1px dashed #2b2b2b;
+      border-radius: 14px;
+      overflow:hidden;
+      position:relative;
+    }
+
+    /* The preview image is always the PNG rendered by Puppeteer */
+    .preview-img {
+      max-width: 100%;
+      max-height: 100%;
+      image-rendering: auto;
+      display:block;
+      background:#fff;
+    }
+
+    .loading {
+      position:absolute;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background: rgba(0,0,0,.55);
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .loading.show { display:flex; }
+
+    .row { display:flex; gap:10px; }
+    .row input { flex:1; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="left">
+      <h1>Flyer Generator (Preview == Download)</h1>
+
+      <label>Address line</label>
+      <input id="addressLine" value="13106 NEW BOSTON" />
+
+      <label>Price</label>
+      <input id="price" value="$434,990" />
+
+      <label>Status label</label>
+      <input id="statusLabel" value="JUST LISTED AT" />
+
+      <div class="row">
+        <div style="flex:1">
+          <label>Beds</label>
+          <input id="beds" value="4" />
+        </div>
+        <div style="flex:1">
+          <label>Baths</label>
+          <input id="baths" value="2" />
+        </div>
+        <div style="flex:1">
+          <label>Sqft</label>
+          <input id="sqft" value="1,850" />
+        </div>
+      </div>
+
+      <label>Headline (use line breaks)</label>
+      <textarea id="headline">MOVE-IN READY IN NW
+AUSTIN</textarea>
+
+      <label>Description</label>
+      <textarea id="description">Discover a charming home in NW Austin with parks, dining, and top schools, offering a vibrant lifestyle.</textarea>
+
+      <label>Hero image URL</label>
+      <input id="heroUrl" value="https://images.unsplash.com/photo-1568605114967-8130f3a36994?q=80&w=2400&auto=format&fit=crop" />
+
+      <label>Secondary image 1 URL</label>
+      <input id="sec1" value="https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=2400&auto=format&fit=crop" />
+
+      <label>Secondary image 2 URL</label>
+      <input id="sec2" value="https://images.unsplash.com/photo-1501183638710-841dd1904471?q=80&w=2400&auto=format&fit=crop" />
+
+      <label>Agent name</label>
+      <input id="agentName" value="Daryl Test" />
+
+      <label>Agent phone</label>
+      <input id="agentPhone" value="12312312" />
+
+      <label>Agent headshot URL</label>
+      <input id="headshotUrl" value="https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=800&auto=format&fit=crop" />
+
+      <div class="btns">
+        <button id="btnPreview">Preview</button>
+        <button id="btnDownload">Download PDF</button>
+      </div>
+
+      <p class="note">
+        Preview uses a PNG rendered by Puppeteer on the server. Download uses the same HTML/CSS rendered by the same Chromium instance, so results mirror exactly.
+      </p>
+    </div>
+
+    <div class="right">
+      <div class="note">Rendered PNG Preview (2550×3300) scaled to fit screen</div>
+
+      <div class="stage">
+        <div id="loading" class="loading">Rendering…</div>
+        <img id="previewImg" class="preview-img" alt="Flyer preview" />
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function buildPayload(){
+      return {
+        listing: {
+          addressLine: document.getElementById("addressLine").value,
+          price: document.getElementById("price").value,
+          statusLabel: document.getElementById("statusLabel").value,
+          beds: Number(document.getElementById("beds").value),
+          baths: Number(document.getElementById("baths").value),
+          sqft: document.getElementById("sqft").value,
+          headline: document.getElementById("headline").value,
+          description: document.getElementById("description").value
+        },
+        images: {
+          heroUrl: document.getElementById("heroUrl").value,
+          secondaryUrls: [
+            document.getElementById("sec1").value,
+            document.getElementById("sec2").value
+          ]
+        },
+        agent: {
+          name: document.getElementById("agentName").value,
+          title: "REALTOR®",
+          phone: document.getElementById("agentPhone").value,
+          headshotUrl: document.getElementById("headshotUrl").value
+        },
+        branding: {
+          brokerageName: "SPYGLASS REALTY",
+          badgeColor: "#8b7a63"
+        }
+      };
+    }
+
+    async function postBinary(url, payload){
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type":"application/json" },
+        body: JSON.stringify(payload)
+      });
+      if(!res.ok){
+        const t = await res.text();
+        throw new Error(t || "Request failed");
+      }
+      return await res.blob();
+    }
+
+    function setLoading(on){
+      document.getElementById("loading").classList.toggle("show", !!on);
+    }
+
+    document.getElementById("btnPreview").addEventListener("click", async () => {
+      try {
+        setLoading(true);
+        const payload = buildPayload();
+        const blob = await postBinary("/api/flyer/png", payload);
+        const url = URL.createObjectURL(blob);
+        document.getElementById("previewImg").src = url;
+      } catch (e) {
+        alert("Preview failed: " + e.message);
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    document.getElementById("btnDownload").addEventListener("click", async () => {
+      try {
+        setLoading(true);
+        const payload = buildPayload();
+        const blob = await postBinary("/api/flyer/pdf", payload);
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "flyer.pdf";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (e) {
+        alert("Download failed: " + e.message);
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    // Auto-render preview on load
+    window.addEventListener("load", () => {
+      document.getElementById("btnPreview").click();
+    });
+  </script>
+</body>
+</html>
+
+Minimal “how to run” in Replit
+
+Add dependencies:
+
+express
+
+puppeteer
+
+Set your Replit “Run” command to:
+
+node server.js

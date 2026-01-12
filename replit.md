@@ -78,11 +78,13 @@ Print flyers use HTML/CSS + Puppeteer for server-side rendering (replaced canvas
 - **Template**: `server/templates/flyer-template.html` with Handlebars placeholders
 - **Fonts**: League Spartan (headlines) and Montserrat (body) via Google Fonts
 - **Generator Service**: `server/services/flyer-generator.ts` launches headless Chromium
-- **API Endpoint**: `POST /api/generate-flyer-html` returns PNG screenshot
+- **Unified API Endpoint**: `POST /api/flyer/render` with `outputType` parameter ('pngPreview' or 'pdf')
+- **Pixel-Identical Output**: Both preview and download use same Puppeteer rendering for exact parity
 - **Address Formatting**: Letter-spaced styling preserving state abbreviations and ZIP codes
 - **Price Badge**: Tan/brown rectangle (#8b7355) with price display
 - **Puppeteer Config**: Runs with --no-sandbox, --disable-setuid-sandbox for Replit compatibility
 - **Social flyers** still use client-side canvas rendering for speed
+- **Preview Rendering**: "Render Preview" button triggers server-side Puppeteer preview identical to download
 
 #### Print Flyer Agent Information (January 2026)
 Professional agent branding for print flyers with validated required fields:

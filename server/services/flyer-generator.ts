@@ -129,7 +129,14 @@ export interface FlyerData {
   agentPhoto?: string;
 }
 
-export async function generatePrintFlyer(data: FlyerData): Promise<Buffer> {
+// 8.5x11 at 300 DPI
+const FLYER_WIDTH = 2550;
+const FLYER_HEIGHT = 3300;
+
+export type OutputType = 'pngPreview' | 'pdf';
+
+export async function generatePrintFlyer(data: FlyerData, outputType: OutputType = 'pngPreview'): Promise<Buffer> {
+  console.log(`Generating ${outputType} flyer...`);
   console.log('Converting images to base64...');
   
   // Convert all images to base64 in parallel
@@ -179,7 +186,8 @@ export async function generatePrintFlyer(data: FlyerData): Promise<Buffer> {
       '--no-first-run',
       '--no-zygote',
       '--single-process',
-      '--disable-extensions'
+      '--disable-extensions',
+      '--font-render-hinting=medium'
     ]
   };
   
@@ -192,9 +200,10 @@ export async function generatePrintFlyer(data: FlyerData): Promise<Buffer> {
   try {
     const page = await browser.newPage();
     
+    // Set viewport to exact flyer dimensions for pixel-identical output
     await page.setViewport({
-      width: 2550,
-      height: 3300,
+      width: FLYER_WIDTH,
+      height: FLYER_HEIGHT,
       deviceScaleFactor: 1
     });
     
@@ -203,18 +212,40 @@ export async function generatePrintFlyer(data: FlyerData): Promise<Buffer> {
       timeout: 30000
     });
     
-    await page.waitForFunction(() => {
-      const images = document.querySelectorAll('img');
-      return Array.from(images).every(img => img.complete);
-    }, { timeout: 15000 }).catch(() => {
+    // Ensure fonts are loaded
+    await page.evaluate(() => document.fonts && document.fonts.ready);
+    
+    // Ensure all images are loaded
+    await page.evaluate(async () => {
+      const imgs = Array.from(document.images || []);
+      await Promise.all(
+        imgs.map((img) =>
+          img.complete
+            ? Promise.resolve()
+            : new Promise((res) => {
+                img.onload = res;
+                img.onerror = res;
+              })
+        )
+      );
     });
     
-    const screenshot = await page.screenshot({
-      type: 'png',
-      fullPage: true
-    });
-    
-    return screenshot as Buffer;
+    if (outputType === 'pdf') {
+      // Generate PDF with exact page size
+      const pdf = await page.pdf({
+        printBackground: true,
+        preferCSSPageSize: true,
+        margin: { top: 0, right: 0, bottom: 0, left: 0 }
+      });
+      return Buffer.from(pdf);
+    } else {
+      // Generate PNG preview with exact clip
+      const screenshot = await page.screenshot({
+        type: 'png',
+        clip: { x: 0, y: 0, width: FLYER_WIDTH, height: FLYER_HEIGHT }
+      });
+      return Buffer.from(screenshot);
+    }
   } finally {
     await browser.close();
   }

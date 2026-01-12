@@ -11,7 +11,7 @@ import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsB
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
 import { getSyncStatus, triggerManualSync } from "./repliers-sync";
 import OpenAI from "openai";
-import { generatePrintFlyer, formatAddressForFlyer, type FlyerData } from "./services/flyer-generator";
+import { generatePrintFlyer, formatAddressForFlyer, type FlyerData, type OutputType } from "./services/flyer-generator";
 
 // Helper to generate a Slack channel name in format: buy-123main-joeywilkes or sell-123main-joeywilkes
 function generateSlackChannelName(address: string, transactionType: string = "buy", agentName: string = ""): string {
@@ -1407,19 +1407,120 @@ Return only the summary text, nothing else.`;
         agentPhoto: agentPhoto
       };
       
-      console.log('Generating HTML flyer for:', address);
-      const pngBuffer = await generatePrintFlyer(flyerData);
+      // Support both PNG preview and PDF download
+      const outputType: OutputType = req.body.outputType === 'pdf' ? 'pdf' : 'pngPreview';
+      
+      console.log(`Generating ${outputType} flyer for:`, address);
+      const buffer = await generatePrintFlyer(flyerData, outputType);
       
       // Create filename from address
       const addressSlug = address.split(',')[0].replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
       
-      res.set('Content-Type', 'image/png');
-      res.set('Content-Disposition', `attachment; filename="${addressSlug}_flyer.png"`);
-      res.send(pngBuffer);
+      if (outputType === 'pdf') {
+        res.set('Content-Type', 'application/pdf');
+        res.set('Content-Disposition', `attachment; filename="${addressSlug}_flyer.pdf"`);
+      } else {
+        res.set('Content-Type', 'image/png');
+        res.set('Content-Disposition', `attachment; filename="${addressSlug}_flyer.png"`);
+      }
+      res.send(buffer);
       
     } catch (error: any) {
       console.error('Flyer generation error:', error);
       res.status(500).json({ error: 'Failed to generate flyer', details: error.message });
+    }
+  });
+
+  // ============ Unified Flyer Render (PNG Preview or PDF) ============
+  // This endpoint is the single source of truth for flyer rendering
+  // Both preview and download use the SAME Puppeteer-rendered output
+  app.post("/api/flyer/render", isAuthenticated, async (req, res) => {
+    try {
+      const {
+        status,
+        price,
+        address,
+        photos,
+        beds,
+        baths,
+        sqft,
+        headline,
+        description,
+        agentName,
+        agentTitle,
+        agentPhone,
+        agentPhoto,
+        outputType = 'pngPreview'
+      } = req.body;
+      
+      // Validate required fields
+      if (!address) {
+        return res.status(400).json({ error: "Address is required" });
+      }
+      if (!agentName) {
+        return res.status(400).json({ error: "Agent name is required" });
+      }
+      if (!agentPhone) {
+        return res.status(400).json({ error: "Agent phone is required" });
+      }
+      if (!photos || photos.length === 0) {
+        return res.status(400).json({ error: "At least one photo is required" });
+      }
+      
+      const statusLabels: Record<string, string> = {
+        'just_listed': 'JUST LISTED AT',
+        'for_sale': 'FOR SALE AT',
+        'open_house': 'OPEN HOUSE',
+        'price_improvement': 'PRICE REDUCED TO',
+        'under_contract': 'UNDER CONTRACT',
+        'just_sold': 'JUST SOLD FOR',
+        'listed': 'LISTED AT'
+      };
+      
+      const logoPath = path.join(process.cwd(), 'public', 'assets', 'SpyglassRealty_Logo_Black.png');
+      
+      const cleanPrice = String(price || '0').replace(/[$,]/g, '');
+      const numericPrice = parseFloat(cleanPrice) || 0;
+      
+      const flyerData: FlyerData = {
+        spyglassLogoUrl: logoPath,
+        statusLabel: statusLabels[status] || 'LISTED AT',
+        price: `$${numericPrice.toLocaleString()}`,
+        address: formatAddressForFlyer(address),
+        mainPhoto: photos[0],
+        photo2: photos[1],
+        photo3: photos[2],
+        beds: String(beds || 0),
+        baths: String(baths || 0),
+        sqft: Number(sqft || 0).toLocaleString(),
+        headline: headline?.toUpperCase() || '',
+        description: description || '',
+        agentName: agentName,
+        agentTitle: agentTitle || 'REALTOR®',
+        agentPhone: agentPhone,
+        agentPhoto: agentPhoto
+      };
+      
+      const validOutputType: OutputType = outputType === 'pdf' ? 'pdf' : 'pngPreview';
+      console.log(`Unified flyer render: ${validOutputType} for ${address}`);
+      
+      const buffer = await generatePrintFlyer(flyerData, validOutputType);
+      
+      const addressSlug = address.split(',')[0].replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+      
+      if (validOutputType === 'pdf') {
+        res.set('Content-Type', 'application/pdf');
+        res.set('Content-Disposition', `attachment; filename="${addressSlug}_flyer.pdf"`);
+      } else {
+        res.set('Content-Type', 'image/png');
+        // For preview, don't set as attachment so it can be displayed
+        res.set('Content-Disposition', `inline; filename="${addressSlug}_flyer.png"`);
+      }
+      res.send(buffer);
+      
+    } catch (error: any) {
+      console.error('Unified flyer render error:', error);
+      res.status(500).json({ error: 'Failed to render flyer', details: error.message });
     }
   });
 

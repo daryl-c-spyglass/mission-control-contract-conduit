@@ -1,0 +1,103 @@
+You are building a real estate 8.5x11 print flyer generator inside our Mission Control app.
+
+GOAL
+- Produce a fixed-size flyer (8.5x11 inches at 300 DPI = 2550x3300px).
+- The in-app Preview rendering must be pixel-identical to the downloaded PDF/PNG output (mirror/identical).
+
+HARD REQUIREMENTS (MOST IMPORTANT)
+1) Preview and Download must use the exact same HTML/CSS and data model.
+2) Preview must be generated using the same Chromium rendering engine as Download.
+   - Do NOT “approximate” preview with a different CSS/layout engine.
+   - Either:
+     A) Use Puppeteer to generate a PNG preview and display that PNG in the UI, OR
+     B) Use the same HTML in an iframe + also use Puppeteer with the same CSS/page settings, and ensure the preview iframe is exactly 2550x3300 px and uses the same fonts/assets. (Preferred: Option A for guaranteed identical output.)
+3) Font rendering must match:
+   - Use local/embedded fonts or load fonts and wait for document.fonts.ready before capture.
+4) No PDF margins or scaling:
+   - @page size 8.5in 11in, margin 0
+   - puppeteer pdf: preferCSSPageSize: true, margin 0, printBackground: true
+   - viewport: width 2550 height 3300 deviceScaleFactor 1
+5) Images must be deterministic:
+   - Use object-fit: cover and fixed containers.
+   - Ensure images are loaded before capture (networkidle0 + explicit image load check).
+6) Preview and Download must be generated from the same endpoint/service so output matches.
+
+FEATURES TO IMPLEMENT
+A) Flyer Template (HTML/CSS)
+- Build a drop-in template that matches Rechat-like layout zones:
+  - Header (~5% height): Logo left + price badge right
+  - Address bar (~3%)
+  - Photos (~45%): 1 main image + 2 secondary
+  - Bottom section (remaining height): left stats, center headline/description, right agent block anchored to bottom
+- The bottom section MUST fill the remaining height exactly (no whitespace).
+  - Use fixed zone heights + bottom height = calc(total - others).
+  - Do not rely solely on flex-grow. Use explicit height math.
+
+B) Data Model
+- Define a FlyerInput object:
+  - listing: address, city, state, zip, price, statusLabel, beds, baths, sqft, description, headline
+  - images: heroUrl, secondaryUrls[2]
+  - branding: brokerageName, logoUrl (optional), primaryColor (optional)
+  - agent: name, title, phone, headshotUrl
+- Provide sample mock data and wire to UI.
+
+C) Backend Render Service (single source of truth)
+- Implement an API route: POST /api/flyer/render
+  Input: FlyerInput + outputType (“pngPreview” | “pdf”)
+  Output:
+   - For pngPreview: return image/png bytes (or store and return signed URL)
+   - For pdf: return application/pdf bytes
+
+- Use Puppeteer (or Playwright) server-side.
+- Use the exact same HTML template for both preview and PDF.
+- Ensure fonts/images are fully loaded:
+  - waitUntil: networkidle0
+  - await page.evaluate(() => document.fonts.ready)
+  - await page.evaluate(async () => { await Promise.all([...document.images].map(img => img.complete ? Promise.resolve() : new Promise(res => { img.onload=res; img.onerror=res; }))); })
+
+- Puppeteer settings:
+  - page.setViewport({ width: 2550, height: 3300, deviceScaleFactor: 1 })
+  - page.setContent(html, { waitUntil: "networkidle0" })
+  - For PNG: page.screenshot({ type:"png", fullPage:false, clip:{x:0,y:0,width:2550,height:3300} })
+  - For PDF:
+    @page { size: 8.5in 11in; margin: 0; }
+    page.pdf({
+      printBackground:true,
+      preferCSSPageSize:true,
+      margin:{top:0,right:0,bottom:0,left:0}
+    })
+
+D) Frontend UX
+- In the transaction screen, implement:
+  - “Preview Flyer” button:
+     calls POST /api/flyer/render with outputType=pngPreview and displays the returned PNG in a modal at responsive scale (fit-to-screen) but preserve aspect ratio.
+  - “Download Flyer” button:
+     calls POST /api/flyer/render with outputType=pdf and downloads the PDF.
+- IMPORTANT: The preview must display the rendered PNG from Puppeteer so it matches the PDF exactly.
+
+E) Pixel Identity Validation (must add)
+- Add a developer-only endpoint or script:
+  - Generate PNG preview and also render the PDF to PNG using the same Chromium (or pdf-to-image) and compare.
+  - At minimum, log dimensions and ensure both are exactly 2550x3300.
+- Provide a simple “Preview vs Download match” checklist in code comments.
+
+TECHNICAL STACK ASSUMPTIONS
+- Next.js (or Express) backend in Replit
+- React frontend
+- Puppeteer installed and working in Replit
+- If Puppeteer fails in Replit environment, fall back to Playwright Chromium.
+
+DELIVERABLES
+1) The HTML/CSS flyer template as a function that returns an HTML string (single source).
+2) /api/flyer/render endpoint implemented with Puppeteer.
+3) UI modal that shows the PNG preview.
+4) Download button that downloads PDF.
+5) Ensure Preview and Download are mirror/identical by design (same render service, same HTML, same fonts, same viewport/page settings).
+
+DO NOT
+- Do not build preview by “recreating the layout with React components” separately from the export HTML.
+- Do not use different CSS for preview vs export.
+- Do not rely on browser print dialog for download.
+- Do not add margins or scaling.
+
+Now implement this end-to-end.

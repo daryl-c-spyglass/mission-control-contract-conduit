@@ -437,6 +437,8 @@ export function CreateFlyerDialog({
   const [hasSummarized, setHasSummarized] = useState(false);
   const [previousHeadline, setPreviousHeadline] = useState<string | null>(null);
   const [hasGeneratedHeadline, setHasGeneratedHeadline] = useState(false);
+  const [renderedPreviewUrl, setRenderedPreviewUrl] = useState<string | null>(null);
+  const [isRenderingPreview, setIsRenderingPreview] = useState(false);
 
   const handleZoomIn = useCallback(() => {
     setZoomLevel(prev => Math.min(prev + 25, 300));
@@ -493,8 +495,21 @@ export function CreateFlyerDialog({
       setFormat("social");
       setLocalAgentPhoto(null);
       setZoomLevel(100);
+      // Clear rendered preview when dialog closes
+      if (renderedPreviewUrl) {
+        URL.revokeObjectURL(renderedPreviewUrl);
+        setRenderedPreviewUrl(null);
+      }
     }
   }, [open]);
+
+  // Clear rendered preview when format changes
+  useEffect(() => {
+    if (renderedPreviewUrl) {
+      URL.revokeObjectURL(renderedPreviewUrl);
+      setRenderedPreviewUrl(null);
+    }
+  }, [format]);
 
   useEffect(() => {
     if (!previewEnlarged) {
@@ -689,6 +704,11 @@ export function CreateFlyerDialog({
   const handleFormatChange = (newFormat: FlyerFormat) => {
     setFormat(newFormat);
     resetPhotoSelection(newFormat);
+    // Clear rendered preview when switching formats
+    if (renderedPreviewUrl) {
+      URL.revokeObjectURL(renderedPreviewUrl);
+      setRenderedPreviewUrl(null);
+    }
   };
 
   const togglePhotoSelection = (photoUrl: string) => {
@@ -881,6 +901,88 @@ export function CreateFlyerDialog({
   const previewPhotoUrls = useMemo(() => {
     return getPhotosForFlyer();
   }, [getPhotosForFlyer]);
+
+  // Render pixel-identical preview using Puppeteer (same as download)
+  const renderActualPreview = useCallback(async () => {
+    if (format !== "print") return;
+    
+    const photosToUse = getPhotosForFlyer();
+    if (photosToUse.length === 0) {
+      toast({
+        title: "Photos required",
+        description: "Please select at least one photo first",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const data = form.getValues();
+    if (!data.agentName?.trim() || !data.agentPhone?.trim()) {
+      toast({
+        title: "Agent info required",
+        description: "Please fill in agent name and phone",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsRenderingPreview(true);
+    
+    try {
+      const effectiveAgentPhoto = localAgentPhoto || agentPhotoUrl || "";
+      
+      const response = await fetch('/api/flyer/render', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: data.status,
+          price: data.price,
+          address: transaction.propertyAddress,
+          photos: photosToUse,
+          beds: mlsData?.bedrooms || 0,
+          baths: mlsData?.bathrooms || 0,
+          sqft: mlsData?.sqft || 0,
+          headline: data.listingHeadline,
+          description: data.description,
+          agentName: data.agentName,
+          agentTitle: data.agentTitle,
+          agentPhone: data.agentPhone,
+          agentPhoto: effectiveAgentPhoto,
+          outputType: 'pngPreview'
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to render preview');
+      }
+      
+      const blob = await response.blob();
+      
+      // Revoke old URL if exists
+      if (renderedPreviewUrl) {
+        URL.revokeObjectURL(renderedPreviewUrl);
+      }
+      
+      const url = URL.createObjectURL(blob);
+      setRenderedPreviewUrl(url);
+      
+      toast({
+        title: "Preview rendered",
+        description: "Showing actual output preview",
+      });
+    } catch (error) {
+      console.error("Preview render error:", error);
+      toast({
+        title: "Preview failed",
+        description: "Could not render preview. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRenderingPreview(false);
+    }
+  }, [format, form, toast, transaction.propertyAddress, mlsData, localAgentPhoto, agentPhotoUrl, renderedPreviewUrl, getPhotosForFlyer]);
 
   const generateSocialFlyer = async (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, data: FormValues, photosToUse: string[]) => {
     // 1:1 square format for social media
@@ -1481,8 +1583,8 @@ export function CreateFlyerDialog({
           description: "Your social media graphic has been saved",
         });
       } else {
-        // Print flyer uses HTML/Puppeteer (server-side)
-        const response = await fetch('/api/generate-flyer-html', {
+        // Print flyer uses unified /api/flyer/render endpoint (same as preview for pixel-identical output)
+        const response = await fetch('/api/flyer/render', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1500,7 +1602,8 @@ export function CreateFlyerDialog({
             agentName: data.agentName,
             agentTitle: data.agentTitle,
             agentPhone: data.agentPhone,
-            agentPhoto: effectiveAgentPhoto
+            agentPhoto: effectiveAgentPhoto,
+            outputType: 'pngPreview' // PNG for download (PDF support available with 'pdf')
           }),
         });
         
@@ -2330,6 +2433,17 @@ export function CreateFlyerDialog({
                         sqft={watchedValues.sqft}
                         description={watchedValues.description}
                       />
+                    ) : renderedPreviewUrl ? (
+                      <div className="relative w-[140px] lg:w-full">
+                        <img 
+                          src={renderedPreviewUrl} 
+                          alt="Rendered flyer preview"
+                          className="w-full h-auto rounded-lg border shadow-sm"
+                        />
+                        <div className="absolute top-1 right-1 bg-green-500 text-white text-[8px] px-1 py-0.5 rounded">
+                          Rendered
+                        </div>
+                      </div>
                     ) : (
                       <PrintFlyerPreview
                         photoUrls={previewPhotoUrls}
@@ -2356,6 +2470,32 @@ export function CreateFlyerDialog({
                   <p className="text-[10px] text-muted-foreground text-center mt-1">
                     Click to enlarge
                   </p>
+                  {format === "print" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2 h-7 text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        renderActualPreview();
+                      }}
+                      disabled={isRenderingPreview || !hasPhotosSelected}
+                      data-testid="button-render-preview"
+                    >
+                      {isRenderingPreview ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          Rendering...
+                        </>
+                      ) : (
+                        <>
+                          <Image className="h-3 w-3 mr-1" />
+                          {renderedPreviewUrl ? "Re-render Preview" : "Render Preview"}
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -2457,6 +2597,17 @@ export function CreateFlyerDialog({
                         sqft={watchedValues.sqft}
                         description={watchedValues.description}
                       />
+                    ) : renderedPreviewUrl ? (
+                      <div className="relative">
+                        <img 
+                          src={renderedPreviewUrl} 
+                          alt="Rendered flyer preview"
+                          className="w-full h-auto rounded-lg border shadow-sm"
+                        />
+                        <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded">
+                          Rendered
+                        </div>
+                      </div>
                     ) : (
                       <PrintFlyerPreview
                         photoUrls={previewPhotoUrls}

@@ -2,97 +2,145 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    /* PIXEL-IDENTICAL TEMPLATE - Fixed zone heights with explicit math */
+    @page { size: 8.5in 11in; margin: 0; }
+    
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
     
-    body {
-      width: 2550px;
-      height: 3300px;
-      font-family: 'Montserrat', sans-serif;
-      background: #fff;
-      display: flex;
-      flex-direction: column;
-      padding: 50px;
+    :root {
+      /* 8.5x11 at 300 DPI = 2550x3300 */
+      --W: 2550px;
+      --H: 3300px;
+      
+      /* FIXED ZONE HEIGHTS (explicit math) */
+      --headerH: 165px;
+      --addressH: 99px;
+      --photosH: 1485px;
+      /* Bottom = 3300 - 165 - 99 - 1485 = 1551px (auto-calculated) */
+      --bottomH: 1551px;
+      
+      --padX: 80px;
+      --gap: 36px;
+      --ink: #1f1f1f;
+      --muted: #6b6b6b;
+      --rule: #e6e6e6;
+      --badge: #8b7355;
     }
     
-    /* HEADER - FIXED ZONE */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: var(--W);
+      height: var(--H);
+      overflow: hidden;
+      background: #fff;
+    }
+    
+    body {
+      font-family: 'Montserrat', sans-serif;
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    .flyer {
+      width: var(--W);
+      height: var(--H);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #fff;
+    }
+    
+    /* HEADER - FIXED 165px */
     .header {
-      flex: 0 0 150px;
+      height: var(--headerH);
+      padding: 40px var(--padX) 0;
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      padding: 0 10px;
-      background: #fff;
+      align-items: flex-start;
     }
     
     .header-logo {
-      height: 120px;
+      height: 100px;
       width: auto;
     }
     
-    /* Leading section removed - header is just logo + price */
-    
     .price-badge {
-      background: #8b7355;
+      background: var(--badge);
       color: #fff;
-      padding: 25px 50px;
-      text-align: center;
+      padding: 24px 40px;
+      border-radius: 4px;
+      text-align: right;
+      min-width: 340px;
     }
     
     .price-label {
-      font-size: 22px;
-      letter-spacing: 0.15em;
-      margin-bottom: 8px;
-      font-weight: 500;
+      font-size: 24px;
+      letter-spacing: 4px;
+      font-weight: 700;
+      text-transform: uppercase;
+      opacity: 0.95;
     }
     
     .price-value {
-      font-size: 52px;
-      font-weight: 700;
+      font-size: 56px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      margin-top: 8px;
+      line-height: 1;
     }
     
-    /* ADDRESS BAR - FIXED ZONE */
+    /* ADDRESS - FIXED 99px */
     .address-bar {
-      flex: 0 0 80px;
+      height: var(--addressH);
+      padding: 0 var(--padX);
       display: flex;
       align-items: center;
-      background: transparent;
-      color: #333333;
-      text-align: left;
-      padding: 0 10px;
-      font-family: 'Montserrat', sans-serif;
       font-size: 32px;
       letter-spacing: 2px;
-      font-weight: 500;
+      font-weight: 700;
       text-transform: uppercase;
     }
     
-    /* PHOTOS - FIXED ZONE */
+    /* PHOTOS - FIXED 1485px */
     .photos-section {
-      flex: 0 0 850px;
-      padding: 0 10px;
+      height: var(--photosH);
+      padding: 0 var(--padX);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    .main-photo-container {
+      flex: 1 1 auto;
       overflow: hidden;
+      background: #f2f2f2;
     }
     
     .main-photo {
       width: 100%;
-      height: 550px;
+      height: 100%;
       object-fit: cover;
       display: block;
     }
     
     .secondary-photos {
+      height: 380px;
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 10px;
-      height: 280px;
+      gap: 20px;
       overflow: hidden;
+    }
+    
+    .secondary-photo-container {
+      overflow: hidden;
+      background: #f2f2f2;
     }
     
     .secondary-photo {
@@ -103,144 +151,167 @@
     }
     
     .photo-placeholder {
+      width: 100%;
+      height: 100%;
       background: #f0f0f0;
       display: flex;
       align-items: center;
       justify-content: center;
       color: #999;
-      font-size: 36px;
+      font-size: 32px;
     }
     
-    /* BOTTOM SECTION - FILLS REMAINING SPACE */
+    /* BOTTOM SECTION - FIXED 1551px (fills remainder) */
     .bottom-section {
-      flex: 1 1 auto;
-      min-height: 0;
-      overflow: hidden;
+      height: var(--bottomH);
+      padding: 60px var(--padX) 80px;
+      border-top: 2px solid var(--rule);
       display: grid;
-      grid-template-columns: 450px 1fr 500px;
-      gap: 100px;
-      padding: 100px 60px;
-      align-content: start;
+      grid-template-columns: 480px 1fr 520px;
+      gap: 60px;
+      align-items: stretch;
+      min-height: 0;
     }
     
     /* LEFT COLUMN - Stats */
     .stats-column {
       display: flex;
       flex-direction: column;
-      justify-content: flex-start;
-      gap: 100px;
-      padding-top: 40px;
+      justify-content: center;
+      gap: 50px;
+      min-height: 0;
     }
     
     .stat-item {
       display: flex;
       align-items: center;
-      gap: 35px;
+      gap: 30px;
     }
     
     .stat-icon {
-      width: 100px;
-      height: 100px;
+      width: 80px;
+      height: 80px;
+      flex-shrink: 0;
     }
     
-    .stat-icon svg, .stat-icon img {
-      width: 100px;
-      height: 100px;
+    .stat-icon svg {
+      width: 80px;
+      height: 80px;
     }
     
     .stat-text {
-      font-size: 80px;
-      font-weight: 700;
-      color: #333;
-      white-space: nowrap;
+      font-size: 68px;
+      font-weight: 900;
+      line-height: 1.05;
+    }
+    
+    .stat-text small {
+      font-size: 52px;
+      font-weight: 800;
     }
     
     /* CENTER COLUMN - Description */
     .description-column {
-      padding: 60px 80px;
-      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 0;
+      padding: 0 20px;
     }
     
     .listing-headline {
       font-family: 'League Spartan', sans-serif;
-      font-size: 80px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      margin-bottom: 80px;
-      color: #333;
+      font-size: 66px;
+      font-weight: 900;
+      letter-spacing: 5px;
       text-transform: uppercase;
-      line-height: 1.15;
+      text-align: center;
+      line-height: 1.1;
+      margin: 0 0 50px;
+      white-space: pre-line;
     }
     
     .listing-description {
-      font-size: 60px;
-      line-height: 1.7;
-      color: #444;
+      font-size: 42px;
+      line-height: 1.55;
+      color: #3b3b3b;
+      margin: 0 auto;
+      max-width: 880px;
+      text-align: left;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 6;
+      overflow: hidden;
     }
     
     /* RIGHT COLUMN - Agent */
     .agent-column {
       display: flex;
       flex-direction: column;
+      justify-content: flex-end;
       align-items: center;
-      padding-top: 20px;
-      gap: 40px;
+      gap: 24px;
+      min-height: 0;
+      text-align: center;
     }
     
     .agent-photo {
-      width: 420px;
-      height: 420px;
+      width: 240px;
+      height: 240px;
       border-radius: 50%;
       object-fit: cover;
-      border: 7px solid #C9A96E;
+      border: 7px solid #c7b28a;
+      background: #f2f2f2;
     }
     
     .agent-photo-placeholder {
-      width: 420px;
-      height: 420px;
+      width: 240px;
+      height: 240px;
       border-radius: 50%;
       background: #e0e0e0;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 7px solid #C9A96E;
+      border: 7px solid #c7b28a;
     }
     
     .agent-photo-placeholder svg {
-      width: 210px;
-      height: 210px;
+      width: 120px;
+      height: 120px;
       fill: #999;
     }
     
     .agent-name {
-      font-size: 76px;
-      font-weight: 700;
-      color: #333;
-      text-align: center;
+      font-size: 58px;
+      font-weight: 900;
+      line-height: 1.1;
+      margin-top: 10px;
     }
     
     .agent-title {
-      font-size: 44px;
-      color: #666;
-      text-align: center;
-      letter-spacing: 3px;
+      font-size: 30px;
+      letter-spacing: 5px;
+      color: var(--muted);
+      margin-top: 8px;
+      text-transform: uppercase;
     }
     
     .agent-phone {
-      font-size: 60px;
-      font-weight: 600;
-      color: #333;
-      text-align: center;
+      font-size: 42px;
+      font-weight: 800;
+      margin-top: 14px;
     }
     
     .agent-logo {
-      width: 340px;
+      width: 260px;
       height: auto;
-      margin-top: 40px;
+      margin-top: 24px;
+      opacity: 0.95;
     }
   </style>
 </head>
 <body>
+  <div class="flyer">
   <!-- HEADER - Logo left, Price right -->
   <div class="header">
     <img src="{{spyglassLogoUrl}}" class="header-logo" alt="Spyglass Realty">
@@ -256,24 +327,29 @@
   
   <!-- PHOTOS -->
   <div class="photos-section">
-    {{#if mainPhoto}}
-    <img src="{{mainPhoto}}" class="main-photo" alt="Property">
-    {{else}}
-    <div class="main-photo photo-placeholder">Main Photo</div>
-    {{/if}}
+    <div class="main-photo-container">
+      {{#if mainPhoto}}
+      <img src="{{mainPhoto}}" class="main-photo" alt="Property">
+      {{else}}
+      <div class="photo-placeholder">Main Photo</div>
+      {{/if}}
+    </div>
     
     <div class="secondary-photos">
-      {{#if photo2}}
-      <img src="{{photo2}}" class="secondary-photo" alt="Property">
-      {{else}}
-      <div class="secondary-photo photo-placeholder">Photo 2</div>
-      {{/if}}
-      
-      {{#if photo3}}
-      <img src="{{photo3}}" class="secondary-photo" alt="Property">
-      {{else}}
-      <div class="secondary-photo photo-placeholder">Photo 3</div>
-      {{/if}}
+      <div class="secondary-photo-container">
+        {{#if photo2}}
+        <img src="{{photo2}}" class="secondary-photo" alt="Property">
+        {{else}}
+        <div class="photo-placeholder">Photo 2</div>
+        {{/if}}
+      </div>
+      <div class="secondary-photo-container">
+        {{#if photo3}}
+        <img src="{{photo3}}" class="secondary-photo" alt="Property">
+        {{else}}
+        <div class="photo-placeholder">Photo 3</div>
+        {{/if}}
+      </div>
     </div>
   </div>
   
@@ -281,32 +357,9 @@
   <div class="bottom-section">
     <!-- Stats Column -->
     <div class="stats-column">
-      <div class="stat-item">
-        <svg class="stat-icon" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-          <path d="M5 45 L5 15 L18 15 L18 28 L55 28 L55 45" stroke="#333" stroke-width="3" fill="none"/>
-          <path d="M5 38 L55 38" stroke="#333" stroke-width="3"/>
-          <path d="M10 45 L10 50 M50 45 L50 50" stroke="#333" stroke-width="3"/>
-        </svg>
-        <span class="stat-text">{{beds}} bedrooms</span>
-      </div>
-      <div class="stat-item">
-        <svg class="stat-icon" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 8 L12 24" stroke="#333" stroke-width="3" fill="none"/>
-          <path d="M12 24 L22 24" stroke="#333" stroke-width="3"/>
-          <path d="M5 24 L55 24" stroke="#333" stroke-width="3"/>
-          <path d="M8 24 Q8 48 18 48 L42 48 Q52 48 52 24" stroke="#333" stroke-width="3" fill="none"/>
-          <path d="M18 48 L15 55 M42 48 L45 55" stroke="#333" stroke-width="3"/>
-        </svg>
-        <span class="stat-text">{{baths}} bathrooms</span>
-      </div>
-      <div class="stat-item">
-        <svg class="stat-icon" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-          <rect x="5" y="12" width="50" height="36" stroke="#333" stroke-width="3" fill="none"/>
-          <path d="M15 38 L45 22" stroke="#333" stroke-width="3"/>
-          <path d="M45 22 L36 24 M45 22 L43 31" stroke="#333" stroke-width="2"/>
-        </svg>
-        <span class="stat-text">{{sqft}} sq. ft</span>
-      </div>
+      <div class="stat-text">{{beds}} <small>bedrooms</small></div>
+      <div class="stat-text">{{baths}} <small>bathrooms</small></div>
+      <div class="stat-text">{{sqft}} <small>sq. ft</small></div>
     </div>
     
     <!-- Description Column -->
@@ -336,6 +389,7 @@
       
       <img src="{{spyglassLogoUrl}}" class="agent-logo" alt="Spyglass Realty">
     </div>
+  </div>
   </div>
 </body>
 </html>
