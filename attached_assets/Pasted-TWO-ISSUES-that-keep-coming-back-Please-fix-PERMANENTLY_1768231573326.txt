@@ -1,0 +1,250 @@
+TWO ISSUES that keep coming back. Please fix PERMANENTLY:
+
+## ISSUE 1: DELETE the black/white decorative squares (■□■□■)
+
+These squares keep reappearing. PERMANENTLY DELETE them from the HTML template.
+
+**Search the template file for ANY of these and DELETE:**
+- `decorative-squares`
+- `square black`
+- `square white`
+- `checkered`
+- Any div with alternating black/white pattern
+
+**In server/templates/flyer-template.html, find and DELETE this entire block:**
+```html
+<div class="decorative-squares">
+  <div class="square black"></div>
+  <div class="square white"></div>
+  <div class="square black"></div>
+  <div class="square white"></div>
+  <div class="square black"></div>
+</div>
+```
+
+**Also DELETE the CSS:**
+```css
+.decorative-squares { ... }
+.square { ... }
+.square.black { ... }
+.square.white { ... }
+```
+
+DO NOT add them back. They should be completely removed from the codebase.
+
+---
+
+## ISSUE 2: Fix the white space with CORRECT flex layout
+
+The current flex setup is not working. Here's the COMPLETE corrected CSS:
+
+**Replace the entire layout CSS with this:**
+
+```css
+@page {
+  size: 8.5in 11in;
+  margin: 0;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 2550px;
+  height: 3300px;
+  overflow: hidden;
+}
+
+.flyer-container {
+  width: 2550px;
+  height: 3300px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 40px 50px;
+  background: #ffffff;
+}
+
+/* HEADER - Fixed height */
+.header {
+  flex: 0 0 120px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+/* ADDRESS - Fixed height */
+.address-bar {
+  flex: 0 0 60px;
+  display: flex;
+  align-items: center;
+}
+
+/* PHOTOS - Fixed height (this is key!) */
+.photo-grid {
+  flex: 0 0 1400px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.main-photo {
+  flex: 1;
+  overflow: hidden;
+}
+
+.main-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.secondary-photos {
+  flex: 0 0 350px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.secondary-photo {
+  overflow: hidden;
+}
+
+.secondary-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* BOTTOM SECTION - Fill remaining space */
+.bottom-section {
+  flex: 1 1 auto;
+  min-height: 0;           /* CRITICAL - enables flex to work */
+  display: grid;
+  grid-template-columns: 350px 1fr 400px;
+  gap: 50px;
+  padding: 50px 30px;
+  overflow: hidden;
+  align-items: start;
+  align-content: start;
+}
+
+/* Stats column */
+.stats-column {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.stat-icon {
+  width: 50px;
+  height: 50px;
+  flex-shrink: 0;
+}
+
+.stat-text {
+  font-size: 48px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Description column */
+.description-column {
+  padding: 0 40px;
+  border-left: 3px solid #e5e5e5;
+}
+
+.property-headline {
+  font-size: 48px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 30px;
+  line-height: 1.2;
+}
+
+.property-description {
+  font-size: 36px;
+  line-height: 1.6;
+  color: #555;
+}
+
+/* Agent column */
+.agent-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.agent-photo-container {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid #C9A96E;
+}
+
+.agent-photo-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.agent-name {
+  font-size: 42px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.agent-title {
+  font-size: 24px;
+  color: #777;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.agent-phone {
+  font-size: 36px;
+  font-weight: 600;
+}
+
+.agent-logo-small {
+  width: 160px;
+  margin-top: 15px;
+}
+
+.agent-logo-small img {
+  width: 100%;
+  height: auto;
+}
+```
+
+## HEIGHT CALCULATION:
+- Total: 3300px
+- Padding: 80px (40 top + 40 bottom)
+- Header: 120px
+- Address: 60px
+- Photos: 1400px
+- Gaps/margins: ~40px
+- **Bottom section: ~1600px** (fills remainder automatically)
+
+## CHECKLIST:
+- [ ] DELETE all decorative-squares HTML
+- [ ] DELETE all .square CSS
+- [ ] Add `flex: 0 0 1400px` to .photo-grid
+- [ ] Add `flex: 1 1 auto` to .bottom-section
+- [ ] Add `min-height: 0` to .bottom-section
+- [ ] Add `overflow: hidden` to photo containers
+
+The decorative squares should NEVER come back. They are not part of the design.

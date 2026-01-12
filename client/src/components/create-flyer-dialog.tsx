@@ -393,19 +393,6 @@ function PrintFlyerPreview({
         </div>
       </div>
 
-      {/* Decorative checkerboard squares in top-right corner (per template) */}
-      <div className="absolute top-[72%] right-1 grid grid-cols-3 gap-0">
-        {[...Array(9)].map((_, i) => (
-          <div
-            key={i}
-            className="w-1.5 h-1.5 border border-black"
-            style={{
-              backgroundColor: (Math.floor(i / 3) + (i % 3)) % 2 === 0 ? '#000' : '#fff',
-            }}
-          />
-        ))}
-      </div>
-
       {/* NO gold footer bar per template */}
     </div>
   );
@@ -1438,33 +1425,6 @@ export function CreateFlyerDialog({
     const smallLogoY = agentPhotoY + agentCircleR * 2 + 190;
     
     ctx.drawImage(agentLogo, smallLogoX, smallLogoY, smallLogoWidth, smallLogoHeight);
-
-    // Decorative black/white checkerboard squares (per template)
-    // Position in TOP-RIGHT CORNER of agent section, not overlapping photo
-    const squareSize = 20;
-    const squaresStartX = canvas.width - 100; // Far right corner
-    const squaresStartY = infoY + 10; // Top of info section
-    
-    for (let row = 0; row < 3; row++) {
-      for (let col = 0; col < 3; col++) {
-        ctx.fillStyle = (row + col) % 2 === 0 ? '#000000' : '#FFFFFF';
-        ctx.fillRect(
-          squaresStartX + col * squareSize,
-          squaresStartY + row * squareSize,
-          squareSize,
-          squareSize
-        );
-        // Add border for all squares
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(
-          squaresStartX + col * squareSize,
-          squaresStartY + row * squareSize,
-          squareSize,
-          squareSize
-        );
-      }
-    }
   };
 
   const generateFlyer = async (data: FormValues) => {
