@@ -46,6 +46,10 @@
       /* Thick dividers (PSD-matching) */
       --dividerW: 18px;
       --dividerColor: rgba(0,0,0,0.32);
+      
+      /* Divider tip alignment offsets */
+      --leftTipOffset: 90px;   /* Aligns left divider tip with sqft row baseline */
+      --rightTipOffset: 110px; /* Aligns right divider tip with description last line */
     }
     
     html, body {
@@ -234,10 +238,48 @@
       align-items: stretch;
     }
     
-    /* Structural vertical divider (PSD-matching: thick visible bars) */
+    /* Structural vertical divider with bottom tip */
     .v-divider {
+      position: relative;
       width: var(--dividerW);
-      background: var(--dividerColor);
+    }
+    
+    .v-divider::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 0;
+      width: 6px;
+      height: calc(100% - 90px);  /* Leave room for tip alignment */
+      background: #A6A6A6;
+    }
+    
+    .v-divider::after {
+      content: "";
+      position: absolute;
+      bottom: 90px;  /* Aligned with content baseline */
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60px;
+      height: 6px;
+      background: #A6A6A6;
+    }
+    
+    /* Left divider tip aligns with sqft row */
+    .v-divider.divider-left::before {
+      height: calc(100% - var(--leftTipOffset, 90px));
+    }
+    .v-divider.divider-left::after {
+      bottom: var(--leftTipOffset, 90px);
+    }
+    
+    /* Right divider tip aligns with description last line */
+    .v-divider.divider-right::before {
+      height: calc(100% - var(--rightTipOffset, 110px));
+    }
+    .v-divider.divider-right::after {
+      bottom: var(--rightTipOffset, 110px);
     }
     
     /* LEFT COLUMN - Stats (anchor to top) */
@@ -250,20 +292,24 @@
     }
     
     .stat-item {
-      display: flex;
+      display: grid;
+      grid-template-columns: 72px 1fr;
       align-items: center;
-      gap: 30px;
+      column-gap: 22px;
     }
     
     .stat-icon {
-      width: 80px;
-      height: 80px;
-      flex-shrink: 0;
+      width: 72px;
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     
     .stat-icon svg {
-      width: 80px;
-      height: 80px;
+      width: 72px;
+      height: 72px;
+      fill: #111;
     }
     
     .stat-text {
@@ -277,11 +323,12 @@
       font-weight: 800;
     }
     
-    /* CENTER COLUMN - Description (anchor to top) */
+    /* CENTER COLUMN - Description (anchor to top, left-aligned) */
     .description-column {
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
+      align-items: flex-start;
       padding: 0 48px;
     }
     
@@ -301,8 +348,8 @@
       font-size: 48px;
       line-height: 1.55;
       color: #3b3b3b;
-      margin: 0 auto;
-      max-width: 880px;
+      margin: 0;
+      max-width: none;
       text-align: left;
       display: -webkit-box;
       -webkit-box-orient: vertical;
@@ -454,13 +501,44 @@
     <div class="bottom-band">
       <!-- Stats Column -->
       <div class="stats-column">
-        <div class="stat-text">{{beds}} <small>bedrooms</small></div>
-        <div class="stat-text">{{baths}} <small>bathrooms</small></div>
-        <div class="stat-text">{{sqft}} <small>sq. ft</small></div>
+        <div class="stat-item">
+          <span class="stat-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="12" width="20" height="4" rx="1" fill="#111"/>
+              <path d="M4 12V7C4 6.45 4.45 6 5 6H10C10.55 6 11 6.45 11 7V12" stroke="#111" stroke-width="1.5" fill="none"/>
+              <path d="M13 12V7C13 6.45 13.45 6 14 6H19C19.55 6 20 6.45 20 7V12" stroke="#111" stroke-width="1.5" fill="none"/>
+              <path d="M3 16V20M21 16V20" stroke="#111" stroke-width="2"/>
+              <path d="M2 16H22" stroke="#111" stroke-width="1.5"/>
+            </svg>
+          </span>
+          <div class="stat-text">{{beds}} <small>bedrooms</small></div>
+        </div>
+        <div class="stat-item">
+          <span class="stat-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 12H20V16C20 18.2091 18.2091 20 16 20H8C5.79086 20 4 18.2091 4 16V12Z" fill="#111"/>
+              <path d="M6 12V8C6 5.79086 7.79086 4 10 4H10.5C11.8807 4 13 5.11929 13 6.5V12" stroke="#111" stroke-width="2" fill="none"/>
+              <circle cx="7" cy="7" r="1.5" fill="#111"/>
+            </svg>
+          </span>
+          <div class="stat-text">{{baths}} <small>bathrooms</small></div>
+        </div>
+        <div class="stat-item stat-sqft">
+          <span class="stat-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 21L21 3" stroke="#111" stroke-width="2"/>
+              <path d="M3 21H9M3 21V15" stroke="#111" stroke-width="2"/>
+              <path d="M21 3H15M21 3V9" stroke="#111" stroke-width="2"/>
+              <path d="M9 3H3V9" stroke="#111" stroke-width="2" fill="none"/>
+              <path d="M15 21H21V15" stroke="#111" stroke-width="2" fill="none"/>
+            </svg>
+          </span>
+          <div class="stat-text">{{sqft}} <small>sq. ft</small></div>
+        </div>
       </div>
       
-      <!-- Divider -->
-      <div class="v-divider"></div>
+      <!-- Divider (left - aligns with sqft) -->
+      <div class="v-divider divider-left"></div>
       
       <!-- Description Column -->
       <div class="description-column">
@@ -470,8 +548,8 @@
         <div class="listing-description">{{description}}</div>
       </div>
       
-      <!-- Divider -->
-      <div class="v-divider"></div>
+      <!-- Divider (right - aligns with description) -->
+      <div class="v-divider divider-right"></div>
       
       <!-- Agent Column -->
       <div class="agent-column">

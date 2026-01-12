@@ -1,0 +1,206 @@
+REPLIT TASK — FINAL FLYER POLISH (ADD STAT ICONS, LEFT-ALIGN DESCRIPTION, FIX BOTTOM DIVIDER “TIPS” ALIGNMENT)
++ KEEP PREVIEW == DOWNLOAD (PIXEL-IDENTICAL)
+
+IMPORTANT (DO NOT IGNORE)
+- Preview PNG and Download PDF MUST ALWAYS BE PIXEL-IDENTICAL.
+- No frontend UX changes.
+- Allowed changes ONLY:
+  1) server/templates/flyer-template.html (CSS + minimal HTML restructure)
+  2) server/services/flyer-generator.ts (only to enforce Preview==Download)
+- Fixed print canvas: 2550 × 3300.
+
+NEW ITEMS TO ADD (FROM LATEST REVIEW)
+1) Stat icons are missing for bedrooms, bathrooms, and sq ft.
+   - Add bed icon beside bedrooms
+   - Bath icon beside bathrooms
+   - Ruler/area icon beside sq ft
+   - Match Rechat sample: icon left, text right, consistent vertical alignment
+2) Description indentation/format:
+   - The description text must be LEFT-ALIGNED (not centered/indented)
+   - The headline can stay centered if desired, but description must be left aligned like reference
+3) Bottom dividers need “tips” (small horizontal foot) aligned:
+   - Left divider bottom tip aligns horizontally with the sq ft row baseline
+   - Right divider bottom tip aligns with the last line/last word baseline of the description block
+   - These tips are the small horizontal strokes at the bottom of the vertical dividers (see reference)
+
+HARD REQUIREMENT
+All of these must render identically in Preview and Download.
+
+========================================================
+PART 1 — TEMPLATE UPDATES (server/templates/flyer-template.html)
+========================================================
+
+A) ADD STAT ICONS (BED / BATH / SQFT)
+1) HTML
+In the stats list (left column), each stat row must contain:
+<div class="stat-item">
+  <span class="stat-icon">[inline SVG]</span>
+  <div class="stat-text">...</div>
+</div>
+
+If stat rows currently only have text, update them to include .stat-icon with inline SVG.
+Do NOT rely on external icon libs. Use inline SVG so PDF/PNG always match.
+
+2) CSS
+.stat-item{
+  display: grid;
+  grid-template-columns: 72px 1fr;   /* icon + text */
+  align-items: center;
+  column-gap: 22px;
+}
+
+.stat-icon{
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-icon svg{
+  width: 72px;
+  height: 72px;
+  fill: #111;
+}
+
+3) Provide 3 simple inline SVGs:
+- bed icon
+- bath icon
+- ruler/triangle/area icon (sq ft)
+
+Use minimal, bold icon silhouettes similar to reference.
+
+========================================================
+B) DESCRIPTION MUST BE LEFT-ALIGNED (REMOVE INDENT/CENTER FEEL)
+========================================================
+Ensure the description block is left aligned and not centered inside the center column.
+
+.listing-description{
+  text-align: left !important;
+  margin: 0;                 /* remove auto-centering */
+  max-width: none;           /* let it use the column width */
+}
+
+If the center column itself is centered, change:
+.description-column{
+  align-items: flex-start;
+}
+
+Headline may remain centered if desired, but description must be left.
+
+========================================================
+C) BOTTOM DIVIDERS — ADD “TIPS” + ALIGN THEM TO CONTENT BASELINES
+========================================================
+Current: dividers are just vertical lines.
+Needed: vertical dividers with a small horizontal “foot/tip” at the bottom, aligned like reference:
+- Left divider tip aligns to the sq ft row baseline
+- Right divider tip aligns to the last line baseline of the description block
+
+IMPLEMENTATION STRATEGY (ROBUST)
+Create two divider elements (or pseudo-elements) positioned in the bottom grid, each with:
+- vertical line (full height as needed)
+- bottom tip (horizontal segment)
+And anchor their bottom alignment using CSS grid + absolute positioning within each column container.
+
+1) Add wrapper containers for alignment anchors:
+- Stats column: add a class on the sq ft row, e.g. .stat-item.sqft
+- Description column: wrap the description text in a container, e.g. .desc-wrap, and use its last line baseline as best as possible via padding-bottom
+
+2) Left divider with tip aligned to sqft row:
+Place divider in its own narrow column (you already have divider columns).
+Set divider column container position: relative.
+Then position divider bottom tip using the sqft row offset:
+
+.divider-left-col{ position: relative; }
+
+.divider-left{
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  width: 6px;
+  background: #a9a9a9;       /* same as divider color */
+  height: calc(100% - var(--leftTipOffset));
+}
+
+.divider-left::after{
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 60px;               /* tip length */
+  height: 6px;               /* tip thickness */
+  background: #a9a9a9;
+}
+
+Then define --leftTipOffset so the bottom of divider lands at sqft baseline:
+Compute offset by anchoring to the sqft stat item via CSS variable set on the stats column:
+.stats-column{ --leftTipOffset: 90px; }  /* tune until tip aligns with sqft baseline */
+
+This is acceptable because sqft row is consistently placed in your template.
+
+3) Right divider with tip aligned to description last line:
+Do the same approach:
+.divider-right-col{ position: relative; }
+
+.divider-right{
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  width: 6px;
+  background: #a9a9a9;
+  height: calc(100% - var(--rightTipOffset));
+}
+
+.divider-right::after{
+  content: "";
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 60px;
+  height: 6px;
+  background: #a9a9a9;
+}
+
+Define --rightTipOffset in the description column so it aligns to the last line:
+.description-column{ --rightTipOffset: 110px; }  /* tune based on font/line-height */
+
+NOTE:
+Pure CSS cannot perfectly “detect last line baseline”, but in a fixed template with fixed clamp + font sizes, this variable offset approach matches the reference reliably.
+
+4) Divider thickness:
+Increase divider thickness to match reference:
+- vertical width: 6px
+- tip height: 6px
+- color: a mid gray like #A6A6A6
+
+========================================================
+PART 2 — KEEP PREVIEW == DOWNLOAD (MANDATORY)
+========================================================
+Reconfirm the server render path:
+- same viewport 2550×3300
+- deviceScaleFactor 1
+- emulateMediaType("screen") for both
+- wait for document.fonts.ready and images before export
+- pdf width/height in px + printBackground
+- png uses exact clip 2550×3300
+No scaling differences.
+
+========================================================
+VERIFICATION CHECKLIST
+========================================================
+- Bedrooms/bathrooms/sqft icons appear (inline SVG) and align like reference
+- Description is left-aligned
+- Left divider bottom tip aligns with sqft row baseline
+- Right divider bottom tip aligns with last line of description text
+- Divider thickness/color matches the sample
+- Preview PNG matches PDF download exactly
+
+DELIVERABLE
+- Commit server/templates/flyer-template.html changes
+- If needed, commit flyer-generator.ts to enforce Preview==Download
+- Report the final tuned values:
+  --leftTipOffset
+  --rightTipOffset
+  divider thickness + tip length
