@@ -1,0 +1,156 @@
+REPLIT TASK — FIX DIVIDER STYLE + LOCK AGENT BLOCK TO RECHAT BAND (NO REFRACTOR)
+
+DO NOT change:
+- /api/flyer/render endpoint
+- Puppeteer service flow
+- any frontend code
+Only edit server/templates/flyer-template.html (CSS + minimal HTML changes allowed).
+
+CURRENT ISSUES (from latest flyer)
+1) Dividers/borders look bad:
+   - divider thickness/opacity/style do not match Rechat/Caleb PSD
+   - dividers extend through too much empty space and feel “heavy”
+2) Agent profile block moves downward too far:
+   - currently .agent-column is flex-end (bottom anchored), so when center content is short it sinks low
+   - reference flyer keeps agent block vertically aligned to the bottom content band (not the entire bottom region height)
+
+TARGET (match Rechat / Caleb flyer)
+- Use structural dividers but style them like PSD:
+  - thin-to-medium gray line (NOT thick dark bars)
+  - divider height should match the “content band” height, not the full bottom region height
+- Agent column should align to the same band: photo + name should sit higher (not stuck at page bottom)
+
+========================================================
+A) BOTTOM SECTION: CREATE A CONTENT BAND WRAPPER
+========================================================
+We will keep .bottom-section full height (var(--bottomH)), but create a centered "bottom-band"
+with a fixed max height that matches PSD proportions, so content + dividers don’t stretch into whitespace.
+
+1) In HTML inside .bottom-section, wrap all columns + dividers in ONE wrapper:
+
+<div class="bottom-band">
+  <div class="stats-column">...</div>
+  <div class="v-divider"></div>
+  <div class="description-column">...</div>
+  <div class="v-divider"></div>
+  <div class="agent-column">...</div>
+</div>
+
+(Only add this wrapper; keep existing column content intact.)
+
+========================================================
+B) CSS: BOTTOM SECTION + BAND
+========================================================
+Replace bottom-section CSS with:
+
+.bottom-section{
+  height: var(--bottomH);
+  padding: 48px var(--padX) 70px;
+  display: flex;
+  align-items: flex-start;
+}
+
+/* This band controls where content actually sits */
+.bottom-band{
+  width: 100%;
+  display: grid;
+
+  /* structural dividers as columns */
+  grid-template-columns: 480px 4px 1fr 4px 520px;
+  gap: 0;
+
+  /* IMPORTANT: band height so dividers don't run through huge whitespace */
+  max-height: 460px;          /* tune: 420–520 depending on PSD */
+  height: 460px;
+
+  align-items: stretch;
+}
+
+========================================================
+C) DIVIDER STYLE — MATCH PSD (SUBTLE GRAY)
+========================================================
+Replace .v-divider with:
+
+.v-divider{
+  width: 4px;
+  background: rgba(0,0,0,0.28);   /* medium gray like PSD */
+}
+
+If still too strong, reduce alpha to 0.18.
+Do NOT use black/dark and do NOT use 6px bars.
+
+========================================================
+D) COLUMN PADDING + ALIGNMENT (BAND ALIGNED)
+========================================================
+Update columns to align with PSD spacing:
+
+.stats-column{
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+  padding-right: 36px;
+}
+
+.description-column{
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+  padding: 0 36px;
+}
+
+/* Agent should NOT be flex-end (it sinks too low).
+   PSD aligns agent block mid-to-lower in the band. */
+.agent-column{
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;   /* CHANGE from flex-end */
+  align-items:center;
+  padding-left: 36px;
+  text-align:center;
+
+  /* pushes agent content down slightly but not to page bottom */
+  padding-top: 90px;            /* tune: 60–120 depending on PSD */
+}
+
+========================================================
+E) FIX AGENT NAME/PHOTO DRIFT
+========================================================
+Make agent photo block stable:
+
+.agent-photo,
+.agent-photo-placeholder{
+  margin-top: 0;
+}
+
+Ensure no extra top margins are applied to .agent-name, etc.
+
+========================================================
+F) ADDRESS SHOULD NOT BE BOLD (CONFIRM)
+========================================================
+Address styling must be:
+
+.address, .listing-address{
+  font-weight: 400;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.7);
+}
+
+Remove any <strong> wrapper or inherited bold.
+
+========================================================
+VERIFICATION (MUST DO)
+========================================================
+1) Render PNG preview:
+  - dividers should look like reference: subtle medium gray and only as tall as the bottom content band
+  - agent block should no longer sink to page bottom; it should sit within the band like PSD
+2) Render PDF:
+  - identical layout and dividers
+3) If agent is too high/low:
+  - adjust .agent-column padding-top (60–120)
+4) If band too tall/short:
+  - adjust .bottom-band height (420–520)
+
+DELIVERABLE
+- Commit changes only to server/templates/flyer-template.html
+- Provide final band height and divider alpha used.
