@@ -1,0 +1,154 @@
+Fix these issues with the flyer:
+
+## HEADER FIXES
+
+### 1. REMOVE "Leading Real Estate Companies" section
+Delete or hide this completely. The header should only have logo on left and price badge on right.
+
+```css
+.leading-section {
+  display: none;
+}
+```
+
+Or remove it from the HTML entirely.
+
+### 2. ADDRESS - Plain text, no background
+```css
+.address-bar {
+  background: transparent;
+  text-align: left;
+  padding: 25px 60px;
+}
+
+.address-text {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 32px;
+  font-weight: 500;
+  color: #333333;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+```
+
+### 3. Header layout
+```css
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 40px 60px;
+  background: #ffffff;
+}
+```
+
+---
+
+## BOTTOM SECTION FIXES
+
+### 4. Remove misplaced decorative squares
+There's a row of black/white squares appearing in the wrong place (near photos). Remove this. Only keep small decorative squares under the agent info.
+
+### 5. Remove QR code
+Remove QR code from template completely.
+
+### 6. Fill the bottom white space - INCREASE ALL SIZES
+
+```css
+.bottom-section {
+  display: grid;
+  grid-template-columns: 450px 1fr 480px;
+  gap: 70px;
+  padding: 100px 80px 120px 80px;
+  min-height: 1100px;
+}
+
+.stat-text {
+  font-size: 60px;
+  font-weight: 600;
+}
+
+.stat-icon, .stat-icon svg, .stat-icon img {
+  width: 75px;
+  height: 75px;
+}
+
+.stats-column {
+  gap: 60px;
+}
+
+.property-headline {
+  font-size: 60px;
+  font-weight: 700;
+  margin-bottom: 50px;
+  line-height: 1.2;
+}
+
+.property-description {
+  font-size: 44px;
+  line-height: 1.65;
+}
+
+.agent-photo-container {
+  width: 320px;
+  height: 320px;
+}
+
+.agent-name {
+  font-size: 58px;
+  font-weight: 700;
+}
+
+.agent-title {
+  font-size: 34px;
+}
+
+.agent-phone {
+  font-size: 44px;
+}
+
+.agent-logo-small {
+  width: 260px;
+}
+
+.decorative-squares {
+  margin-top: 30px;
+}
+
+.square {
+  width: 45px;
+  height: 45px;
+}
+```
+
+### 7. Reduce photo heights to give more room to content
+```css
+.main-photo {
+  height: 820px;
+}
+
+.secondary-photo {
+  height: 360px;
+}
+
+.photo-grid {
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.secondary-photos {
+  gap: 12px;
+}
+```
+
+---
+
+## SUMMARY OF ALL CHANGES:
+1. ❌ Remove "Leading" center section from header
+2. ✏️ Address: plain text, no background, left-aligned
+3. ❌ Remove misplaced decorative squares (keep only under agent)
+4. ❌ Remove QR code
+5. 📐 Reduce photo heights (~15%)
+6. 📈 Increase ALL bottom section sizes (~20% bigger)
+
+Please make all these changes.

@@ -1,0 +1,112 @@
+Fix the flyer header to match the reference design. The header should be simple and clean:
+
+## 1. REMOVE the "Leading Real Estate Companies" center section entirely
+The header should only have:
+- Spyglass logo on the LEFT
+- Price badge on the RIGHT
+- Nothing in the center (just white space)
+
+Remove or hide the `.leading-section` element completely from the HTML template.
+
+## 2. ADDRESS - Plain text on white background
+The address should be simple dark text on a white background, positioned below the header. NO black or colored background bar.
+
+```css
+.address-bar {
+  background: transparent;
+  text-align: left;
+  padding: 25px 60px;
+  margin-bottom: 0;
+}
+
+.address-text {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 32px;
+  font-weight: 500;
+  color: #333333;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+```
+
+## 3. HEADER layout - Logo left, Price right, nothing in center
+
+```css
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 40px 60px;
+  background: #ffffff;
+}
+
+.logo-container {
+  flex: 0 0 auto;
+}
+
+.logo-container img {
+  height: 90px;
+  width: auto;
+}
+
+/* REMOVE or HIDE the leading section */
+.leading-section {
+  display: none;  /* Hide it completely */
+}
+
+/* Price badge stays on the right */
+.price-badge {
+  background: linear-gradient(135deg, #A89078 0%, #8B7355 100%);
+  color: #ffffff;
+  padding: 20px 45px 20px 35px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  clip-path: polygon(15px 0, 100% 0, 100% 100%, 15px 100%, 0 50%);
+}
+
+.price-label {
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.price-value {
+  font-size: 42px;
+  font-weight: 700;
+}
+```
+
+## 4. Update the HTML structure
+
+The header HTML should be:
+```html
+<header class="header">
+  <div class="logo-container">
+    <img src="{{logoBase64}}" alt="Spyglass Realty">
+  </div>
+  
+  <!-- NO leading section here - removed -->
+  
+  <div class="price-badge">
+    <span class="price-label">{{statusType}}</span>
+    <span class="price-value">{{price}}</span>
+  </div>
+</header>
+
+<!-- Address on its own line, plain text -->
+<div class="address-bar">
+  <span class="address-text">{{fullAddress}}</span>
+</div>
+```
+
+## Summary:
+1. Delete/hide the "Leading Real Estate Companies" center section
+2. Address bar: transparent/white background, plain dark text, left-aligned
+3. Header: just logo on left, price badge on right
+4. Keep the tan/brown color for price badge
+
+This matches the clean, minimal header design in the reference screenshots.
