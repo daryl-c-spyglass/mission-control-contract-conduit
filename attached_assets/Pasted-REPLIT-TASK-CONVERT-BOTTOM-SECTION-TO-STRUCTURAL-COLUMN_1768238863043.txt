@@ -1,0 +1,127 @@
+REPLIT TASK — CONVERT BOTTOM SECTION TO STRUCTURAL COLUMN DIVIDERS (MATCH CALEB PSD)
+
+IMPORTANT
+- No architecture changes
+- No service or endpoint changes
+- Only update server/templates/flyer-template.html
+- Preview and PDF must remain identical
+
+PROBLEM
+Decorative/background dividers are not visible because:
+- They sit inside large whitespace
+- They are not structural column boundaries
+- Rechat/Caleb PSD uses real divider columns, not background lines
+
+SOLUTION (REQUIRED)
+Convert the bottom section grid to include REAL divider columns.
+
+================================================
+1) CHANGE GRID STRUCTURE (CRITICAL)
+================================================
+
+Replace:
+grid-template-columns: 480px 1fr 520px;
+gap: 60px;
+
+WITH:
+grid-template-columns:
+  480px
+  6px
+  1fr
+  6px
+  520px;
+
+Remove gap entirely:
+gap: 0;
+
+================================================
+2) ADD DIVIDER ELEMENTS IN MARKUP
+================================================
+
+Inside .bottom-section HTML, structure must be:
+
+<div class="stats-column">...</div>
+<div class="v-divider"></div>
+<div class="description-column">...</div>
+<div class="v-divider"></div>
+<div class="agent-column">...</div>
+
+This matches the PSD and makes dividers unavoidable/visible.
+
+================================================
+3) DIVIDER STYLING (MATCH PSD)
+================================================
+
+.v-divider {
+  width: 6px;
+  background: rgba(0,0,0,0.45);
+}
+
+If too strong, reduce opacity to 0.35 — but NOT thinner.
+
+================================================
+4) BOTTOM SECTION UPDATED CSS (FULL REPLACEMENT)
+================================================
+
+.bottom-section {
+  height: var(--bottomH);
+  padding: 48px var(--padX) 70px;
+  display: grid;
+
+  grid-template-columns:
+    480px
+    6px
+    1fr
+    6px
+    520px;
+
+  align-items: stretch;
+}
+
+.stats-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding-right: 40px;
+}
+
+.description-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 0 40px;
+}
+
+.agent-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  padding-left: 40px;
+}
+
+================================================
+5) ADDRESS TYPOGRAPHY FINAL FIX
+================================================
+
+Address must be LIGHT and tracked, never bold:
+
+.address,
+.listing-address {
+  font-family: "Montserrat", system-ui, sans-serif;
+  font-size: 32px;
+  font-weight: 400;
+  letter-spacing: 7px;
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.7);
+}
+
+Remove any <strong> or heading tags around address text.
+
+================================================
+VERIFICATION (MANDATORY)
+================================================
+- PNG preview shows two dark vertical dividers clearly
+- PDF download shows the SAME dividers
+- Dividers run through the full content area
+- Address no longer looks bold

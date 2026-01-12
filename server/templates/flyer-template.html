@@ -188,17 +188,21 @@
       height: var(--bottomH);
       padding: 48px var(--padX) 70px;
       
-      /* Top separator line */
-      border-top: var(--sepW) solid var(--sepColor);
-      
       display: grid;
-      grid-template-columns: 480px 1fr 520px;
-      gap: 60px;
+      /* 5-column grid: stats | divider | description | divider | agent */
+      grid-template-columns: 480px 6px 1fr 6px 520px;
+      gap: 0;
       
-      /* Anchor columns to the top (not stretched/centered) */
-      align-items: flex-start;
+      /* Stretch columns to fill height for full-length dividers */
+      align-items: stretch;
       
       min-height: 0;
+    }
+    
+    /* Structural vertical divider (PSD-matching) */
+    .v-divider {
+      width: 6px;
+      background: rgba(0,0,0,0.40);
     }
     
     /* LEFT COLUMN - Stats (anchor to top) */
@@ -208,10 +212,7 @@
       justify-content: flex-start;
       gap: 50px;
       min-height: 0;
-      
-      /* Vertical separator (border more reliable than gradients at 300 DPI) */
-      border-right: var(--sepW) solid var(--sepColor);
-      padding-right: 24px;
+      padding-right: 40px;
     }
     
     .stat-item {
@@ -248,10 +249,7 @@
       flex-direction: column;
       justify-content: flex-start;
       min-height: 0;
-      padding: 0 24px;
-      
-      /* Vertical separator (border more reliable than gradients at 300 DPI) */
-      border-right: var(--sepW) solid var(--sepColor);
+      padding: 0 40px;
     }
     
     .listing-headline {
@@ -283,11 +281,12 @@
     .agent-column {
       display: flex;
       flex-direction: column;
-      justify-content: flex-end; /* keep */
+      justify-content: flex-end;
       align-items: center;
       gap: 24px;
       min-height: 0;
       text-align: center;
+      padding-left: 40px;
     }
     
     .agent-photo {
@@ -397,6 +396,9 @@
       <div class="stat-text">{{sqft}} <small>sq. ft</small></div>
     </div>
     
+    <!-- Divider -->
+    <div class="v-divider"></div>
+    
     <!-- Description Column -->
     <div class="description-column">
       {{#if headline}}
@@ -404,6 +406,9 @@
       {{/if}}
       <div class="listing-description">{{description}}</div>
     </div>
+    
+    <!-- Divider -->
+    <div class="v-divider"></div>
     
     <!-- Agent Column -->
     <div class="agent-column">
