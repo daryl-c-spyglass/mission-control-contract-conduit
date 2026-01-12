@@ -32,8 +32,13 @@
       --rule: #e6e6e6;
       --badge: #8b7355;
       
-      /* Separator color for subtle dividers */
-      --sep: rgba(0,0,0,0.12);
+      /* Separator tokens (visible at 300 DPI) */
+      --sepColor: rgba(0,0,0,0.16);
+      --sepW: 2px;
+      
+      /* Left brand bar */
+      --brandBar: #c7b28a;
+      --brandBarW: 10px;
     }
     
     html, body {
@@ -58,6 +63,19 @@
       flex-direction: column;
       overflow: hidden;
       background: #fff;
+      position: relative;
+    }
+    
+    /* Left vertical brand bar (Rechat-style) */
+    .flyer::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 260px;
+      width: var(--brandBarW);
+      background: var(--brandBar);
+      z-index: 5;
     }
     
     /* HEADER - FIXED 165px */
@@ -109,6 +127,7 @@
       letter-spacing: 2px;
       font-weight: 700;
       text-transform: uppercase;
+      border-bottom: var(--sepW) solid var(--sepColor);
     }
     
     /* PHOTOS - FIXED 1485px */
@@ -167,11 +186,7 @@
     /* BOTTOM SECTION - FIXED (fills remainder) */
     .bottom-section {
       height: var(--bottomH);
-      
-      /* Pull content up to avoid the "floating in the lower half" look */
       padding: 48px var(--padX) 70px;
-      
-      /* No heavy top border */
       border-top: none;
       
       display: grid;
@@ -183,21 +198,28 @@
       
       min-height: 0;
       
-      /* Needed for separator pseudo-elements */
-      position: relative;
-    }
-    
-    /* Vertical separator between LEFT and CENTER (Stats | Description) */
-    .bottom-section::after {
-      content: "";
-      position: absolute;
+      /* Reliable separators using background gradients (visible at 300 DPI) */
+      background-repeat: no-repeat;
       
-      /* Line placed at end of left column + half the gap */
-      left: calc(var(--padX) + 480px + (60px / 2));
-      top: 48px;              /* match padding-top */
-      bottom: 70px;           /* match padding-bottom */
-      width: 1px;
-      background: var(--sep);
+      background-image:
+        /* (1) Top separator across bottom section */
+        linear-gradient(to right, var(--sepColor), var(--sepColor)),
+        /* (2) Vertical line between Stats and Description */
+        linear-gradient(to bottom, var(--sepColor), var(--sepColor)),
+        /* (3) Vertical line between Description and Agent */
+        linear-gradient(to bottom, var(--sepColor), var(--sepColor));
+      
+      /* Sizes: top line is full width, vertical lines are column height */
+      background-size:
+        calc(100% - (2 * var(--padX))) var(--sepW),
+        var(--sepW) calc(100% - 48px - 70px),
+        var(--sepW) calc(100% - 48px - 70px);
+      
+      /* Positions: place lines precisely */
+      background-position:
+        var(--padX) 0,
+        calc(var(--padX) + 480px + (60px / 2)) 48px,
+        calc(100% - var(--padX) - 520px - (60px / 2)) 48px;
     }
     
     /* LEFT COLUMN - Stats (anchor to top) */
@@ -250,23 +272,6 @@
       
       min-height: 0;
       padding: 0 20px;
-      
-      /* Needed for right-side separator */
-      position: relative;
-    }
-    
-    /* Vertical separator between CENTER and RIGHT (Description | Agent) */
-    .description-column::after {
-      content: "";
-      position: absolute;
-      
-      /* Absolute positioning uses padding-box as containing block */
-      /* right: 0 = right edge of column, right: -30px = midpoint of 60px gap */
-      right: -30px;
-      top: 0;
-      bottom: 0;
-      width: 1px;
-      background: var(--sep);
     }
     
     .listing-headline {

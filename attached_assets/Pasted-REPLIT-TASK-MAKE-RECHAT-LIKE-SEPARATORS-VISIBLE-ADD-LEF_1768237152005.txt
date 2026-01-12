@@ -1,0 +1,173 @@
+REPLIT TASK — MAKE RECHAT-LIKE SEPARATORS VISIBLE + ADD LEFT VERTICAL BAR (NO REFACTOR)
+
+Do NOT change architecture, endpoints, or Puppeteer service.
+Keep:
+- server/templates/flyer-template.html (Handlebars)
+- server/services/flyer-generator.ts (Puppeteer)
+- POST /api/flyer/render outputType: "pngPreview" | "pdf"
+Preview and PDF must remain identical (same HTML/CSS, same render pipeline).
+
+PROBLEM
+Separators/borders are still not visible in output.
+We need visible, Rechat-like separators:
+1) Left vertical brand bar near the top-left (like Rechat sample)
+2) Subtle horizontal rule under the header/address region (optional but matches sample)
+3) Visible vertical separators in the bottom section:
+   - between Stats and Description
+   - between Description and Agent
+Currently, 1px low-opacity lines can disappear at 300 DPI and under scaling.
+
+SOLUTION
+Use background gradients (not pseudo-elements) for separators, with:
+- thickness: 2px
+- color: rgba(0,0,0,0.16) (visible but still subtle)
+This is much more reliable in Puppeteer PNG/PDF output.
+
+FILES TO EDIT
+- server/templates/flyer-template.html
+  - CSS changes only (no JS changes, no route changes)
+
+===========================================================
+FLYER TEMPLATE LAYOUT SPEC (Print 8.5×11 @ 300 DPI)
+===========================================================
+- Pixel size: 2550 × 3300
+- Fixed vertical zones:
+  --headerH: 165px
+  --addressH: 99px
+  --photosH: 1485px
+  --bottomH: calc(var(--H) - var(--headerH) - var(--addressH) - var(--photosH))
+- Bottom section grid:
+  480px | 1fr | 520px with 60px gap
+- Vertical alignment:
+  Stats: top (flex-start)
+  Description: top (flex-start)
+  Agent: bottom (flex-end)
+
+===========================================================
+IMPLEMENTATION — COPY/PASTE CSS UPDATES
+===========================================================
+
+A) Update :root tokens (add separator tokens and make bottomH calc-based)
+In :root, ensure:
+
+--bottomH: calc(var(--H) - var(--headerH) - var(--addressH) - var(--photosH));
+
+Add these tokens:
+
+--sepColor: rgba(0,0,0,0.16);
+--sepW: 2px;
+--brandBar: #c7b28a;   /* or match brand */
+--brandBarW: 10px;
+
+B) Add a LEFT vertical brand bar (like Rechat) near the top-left
+This should be applied to the overall flyer container (or a top wrapper that spans the full page).
+Find the main flyer wrapper class (often .flyer-container, .flyer, or similar).
+Add:
+
+.flyer-container {
+  position: relative;
+}
+
+.flyer-container:before{
+  content:"";
+  position:absolute;
+  left: 0;
+  top: 0;
+  height: 260px;             /* short bar like the Rechat sample */
+  width: var(--brandBarW);
+  background: var(--brandBar);
+  z-index: 5;
+}
+
+(If your wrapper is named differently, apply to the root page container element used for the flyer.)
+
+C) Add a subtle horizontal rule under the address/header region (optional but matches Rechat)
+Apply to the address bar container (or a wrapper around address + photos).
+If you have .address-bar or similar, add a bottom border:
+
+.address-bar {
+  border-bottom: var(--sepW) solid var(--sepColor);
+}
+
+If no address-bar exists, apply to the photos wrapper top edge instead.
+
+D) Replace .bottom-section separators logic with BACKGROUND GRADIENT LINES (reliable)
+IMPORTANT: we are NOT using :before/:after separators anymore.
+
+Replace your existing .bottom-section block with:
+
+/* BOTTOM SECTION - FIXED (fills remainder) */
+.bottom-section {
+  height: var(--bottomH);
+  padding: 48px var(--padX) 70px;
+
+  border-top: none;
+
+  display: grid;
+  grid-template-columns: 480px 1fr 520px;
+  gap: 60px;
+
+  align-items: flex-start;
+  min-height: 0;
+
+  /* Reliable separators using background gradients */
+  background-repeat: no-repeat;
+
+  /* Two vertical separator lines + optional top line */
+  background-image:
+    /* (1) Optional top separator across bottom section */
+    linear-gradient(to right, var(--sepColor), var(--sepColor)),
+
+    /* (2) Vertical line between Stats and Description */
+    linear-gradient(to bottom, var(--sepColor), var(--sepColor)),
+
+    /* (3) Vertical line between Description and Agent */
+    linear-gradient(to bottom, var(--sepColor), var(--sepColor));
+
+  /* Sizes: top line is full width, vertical lines are tall */
+  background-size:
+    calc(100% - (2 * var(--padX))) var(--sepW),    /* top line width */
+    var(--sepW) calc(100% - 48px - 70px),          /* left vertical */
+    var(--sepW) calc(100% - 48px - 70px);          /* right vertical */
+
+  /* Positions: place lines precisely */
+  background-position:
+    var(--padX) 0,  /* top line at top edge of bottom section */
+
+    /* Left vertical: after left column + half gap */
+    calc(var(--padX) + 480px + (60px / 2)) 48px,
+
+    /* Right vertical: padX + left col + gap + center col width + half gap.
+       Since center is 1fr, we anchor from RIGHT instead (more reliable):
+       right vertical at: (padX + totalWidth - padX) - rightCol - halfGap
+       => calc(100% - var(--padX) - 520px - (60px/2))
+    */
+    calc(100% - var(--padX) - 520px - (60px / 2)) 48px;
+}
+
+E) Keep column alignment fixes (already correct)
+Ensure:
+
+.stats-column { justify-content: flex-start; }
+.description-column { justify-content: flex-start; }
+.agent-column { justify-content: flex-end; }
+
+(Do not re-center stats/description.)
+
+===========================================================
+VERIFICATION CHECKLIST (MUST DO)
+===========================================================
+1) Generate PNG preview (outputType=pngPreview):
+- Confirm you see:
+  - Left vertical brand bar at top-left
+  - Vertical separators in bottom section (two visible lines)
+  - Top separator line above bottom section (subtle but visible)
+2) Generate PDF (outputType=pdf):
+- Confirm the same separators appear in the PDF
+- Confirm PNG and PDF match visually (same lines, positions, spacing)
+3) If lines are still too faint, increase:
+- --sepColor alpha from 0.16 -> 0.20 OR increase --sepW from 2px -> 3px
+
+DELIVERABLE
+- Commit updated CSS in server/templates/flyer-template.html
+- Note which elements received separators and the final token values used.
