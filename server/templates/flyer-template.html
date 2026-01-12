@@ -36,6 +36,10 @@
       --sepColor: rgba(0,0,0,0.16);
       --sepW: 2px;
       
+      /* Thick dividers (PSD-matching) */
+      --dividerW: 18px;
+      --dividerColor: rgba(0,0,0,0.32);
+      
       /* Left brand bar */
       --brandBar: #c7b28a;
       --brandBarW: 10px;
@@ -205,8 +209,8 @@
     .bottom-band {
       width: 100%;
       display: grid;
-      /* structural dividers as columns */
-      grid-template-columns: 480px 4px 1fr 4px 520px;
+      /* structural dividers as columns (thick 18px bars) */
+      grid-template-columns: 480px var(--dividerW) 1fr var(--dividerW) 520px;
       gap: 0;
       /* band height so dividers don't run through huge whitespace */
       height: 460px;
@@ -214,10 +218,10 @@
       align-items: stretch;
     }
     
-    /* Structural vertical divider (PSD-matching: subtle gray) */
+    /* Structural vertical divider (PSD-matching: thick visible bars) */
     .v-divider {
-      width: 4px;
-      background: rgba(0,0,0,0.28);
+      width: var(--dividerW);
+      background: var(--dividerColor);
     }
     
     /* LEFT COLUMN - Stats (anchor to top) */
@@ -226,7 +230,7 @@
       flex-direction: column;
       justify-content: flex-start;
       gap: 50px;
-      padding-right: 36px;
+      padding-right: 48px;
     }
     
     .stat-item {
@@ -262,7 +266,7 @@
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
-      padding: 0 36px;
+      padding: 0 48px;
     }
     
     .listing-headline {
@@ -296,10 +300,26 @@
       flex-direction: column;
       justify-content: flex-start;
       align-items: center;
-      gap: 24px;
+      gap: 20px;
       text-align: center;
-      padding-left: 36px;
-      padding-top: 90px;
+      padding-left: 48px;
+      padding-top: 80px;
+    }
+    
+    /* Agent photo + logo row side by side */
+    .agent-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 22px;
+    }
+    
+    .agent-team-logo {
+      width: 200px;
+      height: 200px;
+      object-fit: contain;
+      border: 10px solid rgba(0,0,0,0.25);
+      background: #fff;
     }
     
     .agent-photo {
@@ -333,6 +353,10 @@
       font-weight: 900;
       line-height: 1.1;
       margin-top: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 420px;
     }
     
     .agent-title {
@@ -345,7 +369,8 @@
     
     .agent-phone {
       font-size: 42px;
-      font-weight: 800;
+      font-weight: 900;
+      letter-spacing: 1px;
       margin-top: 14px;
     }
     
@@ -426,22 +451,23 @@
       
       <!-- Agent Column -->
       <div class="agent-column">
-        {{#if agentPhoto}}
-        <img src="{{agentPhoto}}" class="agent-photo" alt="{{agentName}}">
-        {{else}}
-        <div class="agent-photo-placeholder">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="8" r="4"/>
-            <path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>
-          </svg>
+        <div class="agent-top-row">
+          {{#if agentPhoto}}
+          <img src="{{agentPhoto}}" class="agent-photo" alt="{{agentName}}">
+          {{else}}
+          <div class="agent-photo-placeholder">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="8" r="4"/>
+              <path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>
+            </svg>
+          </div>
+          {{/if}}
+          <img src="{{spyglassLogoUrl}}" class="agent-team-logo" alt="Spyglass Realty">
         </div>
-        {{/if}}
         
         <div class="agent-name">{{agentName}}</div>
         <div class="agent-title">{{agentTitle}}</div>
         <div class="agent-phone">{{agentPhone}}</div>
-        
-        <img src="{{spyglassLogoUrl}}" class="agent-logo" alt="Spyglass Realty">
       </div>
     </div>
   </div>

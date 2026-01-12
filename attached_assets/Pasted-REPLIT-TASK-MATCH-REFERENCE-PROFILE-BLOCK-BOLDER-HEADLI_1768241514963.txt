@@ -1,0 +1,155 @@
+REPLIT TASK — MATCH REFERENCE PROFILE BLOCK + BOLDER HEADLINE/PHONE + THICKER DIVIDERS + MOVE SPYGLASS LOGO BESIDE PHOTO
+
+Do NOT change backend flow, endpoints, Puppeteer service, or frontend.
+Only update server/templates/flyer-template.html (CSS + minimal HTML allowed).
+Preview and PDF must remain identical.
+
+ISSUES TO FIX (based on latest flyer vs reference)
+1) Dividers still too thin:
+   - bottom vertical dividers
+   - header/top divider near logos
+   - vertical divider near headline/description
+2) Headline should be bold (reference is heavy).
+3) Phone number should be bold.
+4) Agent name must stay on ONE LINE (no wrap).
+5) Spyglass logo must be BESIDE the agent photo (not underneath), like reference.
+
+========================================================
+A) DIVIDERS — MAKE THEM ACTUALLY THICK (PSD STYLE)
+========================================================
+Use a true divider element that is thick and visible.
+
+Set these variables in :root:
+--dividerW: 18px;
+--dividerColor: rgba(0,0,0,0.32);
+
+1) Bottom band grid columns:
+Change divider columns to match thickness:
+grid-template-columns: 480px var(--dividerW) 1fr var(--dividerW) 520px;
+
+2) Divider styling:
+.v-divider{
+  background: var(--dividerColor);
+}
+
+3) Header divider between top logos:
+.header-divider{
+  width: var(--dividerW);
+  height: 90px;
+  background: var(--dividerColor);
+}
+
+4) Divider beside headline/description:
+If your center column currently has a thin border/line, replace with a thick rule:
+Add inside description column HTML a divider element:
+<div class="desc-divider"></div>
+
+CSS:
+.desc-divider{
+  width: var(--dividerW);
+  background: var(--dividerColor);
+  align-self: stretch;
+}
+
+If you already have a border-left/border-right, remove it and use this element instead.
+
+========================================================
+B) HEADLINE MUST BE BOLD
+========================================================
+Update .listing-headline:
+.listing-headline{
+  font-family: "League Spartan","Montserrat",sans-serif;
+  font-weight: 900;      /* force bold */
+  letter-spacing: 4px;
+}
+
+If League Spartan doesn’t have 900 weight, fallback to 800–900.
+Do NOT rely on default font weight.
+
+========================================================
+C) PHONE NUMBER MUST BE BOLD
+========================================================
+Update .agent-phone:
+.agent-phone{
+  font-weight: 900;     /* bold like reference */
+  letter-spacing: 1px;
+}
+
+========================================================
+D) AGENT NAME MUST BE ONE LINE
+========================================================
+Update .agent-name:
+.agent-name{
+  font-weight: 900;
+  white-space: nowrap;       /* prevents wrapping */
+  overflow: hidden;
+  text-overflow: ellipsis;   /* just in case name is too long */
+  max-width: 420px;          /* tune if needed */
+}
+
+========================================================
+E) MOVE SPYGLASS LOGO BESIDE AGENT PHOTO (NOT BELOW)
+========================================================
+We need an agent "row" in the right column:
+[ agent photo ] [ spyglass logo square ]
+
+1) In the agent column HTML, wrap photo + logo in a row container:
+
+<div class="agent-top-row">
+  <img class="agent-photo" ... />
+  <img class="agent-team-logo" ... />   (use the Spyglass logo here)
+</div>
+
+Then keep name/title/phone underneath.
+
+2) CSS for layout:
+.agent-top-row{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap: 22px;
+  margin-top: 20px;          /* tune */
+}
+
+.agent-photo{
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.agent-team-logo{
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
+  border: 10px solid rgba(0,0,0,0.25); /* matches boxed logo feel in reference */
+  background: #fff;
+}
+
+IMPORTANT:
+- Remove the old .agent-logo under the phone number (or hide it) so it doesn’t duplicate.
+
+========================================================
+F) AGENT COLUMN VERTICAL POSITION
+========================================================
+To match reference, agent block should sit higher, not sink.
+Set:
+.agent-column{
+  justify-content: flex-start;
+  padding-top: 80px;     /* tune 60–120 */
+}
+
+========================================================
+VERIFICATION
+========================================================
+Render PNG + PDF:
+- Dividers look thick and match PSD feel (not thin hairlines)
+- Headline is bold
+- Phone number is bold
+- Agent name stays on one line
+- Spyglass logo appears beside photo in the agent block
+- PNG and PDF remain identical
+
+DELIVERABLE
+- Commit only server/templates/flyer-template.html changes
+- Note where divider widths and agent top-row were added
