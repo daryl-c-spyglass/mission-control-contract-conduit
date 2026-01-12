@@ -135,8 +135,17 @@ const FLYER_HEIGHT = 3300;
 
 export type OutputType = 'pngPreview' | 'pdf';
 
+// Unified render config for pixel-identical output
+const RENDER_CONFIG = {
+  width: FLYER_WIDTH,
+  height: FLYER_HEIGHT,
+  deviceScaleFactor: 1,
+  mediaType: 'screen' as const  // Use screen for both PNG and PDF to ensure identical layout
+};
+
 export async function generatePrintFlyer(data: FlyerData, outputType: OutputType = 'pngPreview'): Promise<Buffer> {
-  console.log(`Generating ${outputType} flyer...`);
+  console.log(`[FlyerGenerator] Generating ${outputType} flyer...`);
+  console.log(`[FlyerGenerator] Render config: viewport=${RENDER_CONFIG.width}x${RENDER_CONFIG.height}, dpr=${RENDER_CONFIG.deviceScaleFactor}, mediaType=${RENDER_CONFIG.mediaType}`);
   console.log('Converting images to base64...');
   
   // Convert all images to base64 in parallel
@@ -200,22 +209,28 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
   try {
     const page = await browser.newPage();
     
-    // Set viewport to exact flyer dimensions for pixel-identical output
+    // ===== UNIFIED RENDER PIPELINE (pixel-identical for PNG and PDF) =====
+    
+    // 1. Set viewport to exact flyer dimensions
     await page.setViewport({
-      width: FLYER_WIDTH,
-      height: FLYER_HEIGHT,
-      deviceScaleFactor: 1
+      width: RENDER_CONFIG.width,
+      height: RENDER_CONFIG.height,
+      deviceScaleFactor: RENDER_CONFIG.deviceScaleFactor
     });
     
+    // 2. Emulate consistent media type for both outputs (prevents @media print drift)
+    await page.emulateMediaType(RENDER_CONFIG.mediaType);
+    
+    // 3. Load HTML content
     await page.setContent(html, { 
       waitUntil: 'networkidle0',
       timeout: 30000
     });
     
-    // Ensure fonts are loaded
+    // 4. Wait for fonts to be fully loaded
     await page.evaluate(() => document.fonts && document.fonts.ready);
     
-    // Ensure all images are loaded
+    // 5. Wait for all images to be loaded
     await page.evaluate(async () => {
       const imgs = Array.from(document.images || []);
       await Promise.all(
@@ -230,20 +245,31 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
       );
     });
     
+    // 6. Small delay to ensure layout is fully settled
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    console.log(`[FlyerGenerator] Page ready, capturing ${outputType}...`);
+    
     if (outputType === 'pdf') {
-      // Generate PDF with exact page size
+      // Generate PDF with exact pixel dimensions (not "Letter" format)
       const pdf = await page.pdf({
         printBackground: true,
-        preferCSSPageSize: true,
+        width: `${RENDER_CONFIG.width}px`,
+        height: `${RENDER_CONFIG.height}px`,
+        pageRanges: '1',
+        preferCSSPageSize: false,  // Use our explicit dimensions
         margin: { top: 0, right: 0, bottom: 0, left: 0 }
       });
+      console.log(`[FlyerGenerator] PDF generated, size: ${pdf.length} bytes`);
       return Buffer.from(pdf);
     } else {
-      // Generate PNG preview with exact clip
+      // Generate PNG preview with exact clip (same dimensions as PDF)
       const screenshot = await page.screenshot({
         type: 'png',
-        clip: { x: 0, y: 0, width: FLYER_WIDTH, height: FLYER_HEIGHT }
+        fullPage: false,
+        clip: { x: 0, y: 0, width: RENDER_CONFIG.width, height: RENDER_CONFIG.height }
       });
+      console.log(`[FlyerGenerator] PNG generated, size: ${screenshot.length} bytes`);
       return Buffer.from(screenshot);
     }
   } finally {

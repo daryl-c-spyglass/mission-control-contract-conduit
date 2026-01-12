@@ -1,0 +1,140 @@
+REPLIT TASK — MAKE PREVIEW ALWAYS PIXEL-IDENTICAL TO DOWNLOAD (SAME RENDER PIPELINE, SAME INPUT, SAME VIEWPORT)
+
+GOAL
+The “Preview – Print Flyer” image must ALWAYS be an exact mirror of the Download flyer output (PDF), for the same listing + inputs. No layout drift, no font drift, no viewport drift, no timing drift.
+
+CURRENT SYMPTOM
+Preview render does not match Download render (layout/scale/spacing differ). This usually happens when Preview uses:
+- a different Puppeteer viewport/deviceScaleFactor than PDF
+- different print settings (print CSS vs screen CSS)
+- fonts not fully loaded before screenshot
+- different template data between preview vs download
+- different page sizing (setContent vs setViewport vs pdf format)
+- CSS media differences (screen vs print)
+
+HARD REQUIREMENT
+Use ONE unified server-side rendering path for both preview and download:
+- Both must call the same internal function
+- Both must render the same HTML with the same data
+- Both must use the same viewport + deviceScaleFactor
+- Both must wait for fonts + images before capture
+- Only difference: outputType controls final export (PNG vs PDF), not layout.
+
+DO NOT change the frontend UX; only adjust server logic to enforce identical output.
+
+========================================================
+1) SINGLE SOURCE OF TRUTH: ONE RENDER FUNCTION
+========================================================
+In server/services/flyer-generator.ts (or equivalent), refactor (internally) so there is ONE function:
+
+renderFlyerPage({ html, width, height, dpr }) -> { page }
+
+Both outputs MUST call this exact function.
+
+========================================================
+2) FORCE IDENTICAL VIEWPORT + DPR
+========================================================
+For BOTH preview PNG and PDF:
+
+- viewport width = 2550
+- viewport height = 3300
+- deviceScaleFactor = 1   (IMPORTANT: keep constant)
+
+Example:
+await page.setViewport({ width: 2550, height: 3300, deviceScaleFactor: 1 });
+
+Do NOT set different scale for preview vs PDF.
+
+========================================================
+3) ENSURE PDF IS GENERATED FROM THE SAME LAYOUT AS PNG
+========================================================
+When generating PDF:
+- use exact width/height in px (not "Letter" format), and print background.
+
+await page.pdf({
+  printBackground: true,
+  width: "2550px",
+  height: "3300px",
+  pageRanges: "1",
+  preferCSSPageSize: true
+});
+
+Avoid format: "letter" if it causes different margins/scaling.
+
+========================================================
+4) ENSURE PNG PREVIEW IS CAPTURED FROM THE SAME LAYOUT AS PDF
+========================================================
+For preview:
+- capture a full-page screenshot of the same viewport
+
+await page.screenshot({
+  type: "png",
+  fullPage: false,
+  clip: { x: 0, y: 0, width: 2550, height: 3300 }
+});
+
+Do NOT resize or downscale server-side. The client can display it scaled.
+
+========================================================
+5) WAIT FOR FONTS + IMAGES BEFORE BOTH OUTPUTS
+========================================================
+After page.setContent(html, { waitUntil: "networkidle0" }) add:
+
+- Wait for fonts:
+await page.evaluate(() => document.fonts && document.fonts.ready);
+
+- Wait for images:
+await page.evaluate(async () => {
+  const imgs = Array.from(document.images || []);
+  await Promise.all(imgs.map(img => {
+    if (img.complete) return Promise.resolve();
+    return new Promise(res => { img.onload = img.onerror = res; });
+  }));
+});
+
+This prevents preview capturing before fonts load (most common mismatch).
+
+========================================================
+6) FORCE CSS MEDIA CONSISTENCY
+========================================================
+Mismatch can happen if CSS uses @media print rules only applied to PDF.
+
+Solution:
+- emulate "screen" for both OR "print" for both — choose ONE.
+
+Option A (recommended): emulate screen for both:
+await page.emulateMediaType("screen");
+
+And do NOT rely on @media print for layout.
+
+Option B: emulate print for both:
+await page.emulateMediaType("print");
+
+Pick one and apply to BOTH preview and PDF so layout rules match.
+
+========================================================
+7) IDENTICAL INPUT DATA FOR BOTH
+========================================================
+Ensure /api/flyer/render uses the SAME request body for preview and download.
+No “default fallback fields” only in preview.
+No AI-generated fields re-run only for preview.
+
+If frontend currently calls preview with partial data:
+- server should normalize inputs once (same normalization shared by both output types).
+
+========================================================
+8) CACHE-BUSTING & CONSISTENT ASSETS
+========================================================
+If template loads assets (fonts/images) by URL, ensure:
+- same baseURL
+- same cache behavior
+- no environment-specific differences (dev vs prod)
+
+========================================================
+DELIVERABLE
+- Update server/services/flyer-generator.ts and /api/flyer/render handler so:
+  - preview (pngPreview) and download (pdf) use the same render function, same viewport, same media emulation, same waits, same page size.
+- Add a short log line (server-side) printing:
+  outputType, viewport, deviceScaleFactor, mediaType, width/height used
+- Verify with the same listing that:
+  - PNG preview matches PDF output when opened (pixel-identical layout).
