@@ -1,0 +1,175 @@
+REPLIT PROMPT — UPDATE FLYER TEMPLATE CSS (NO REFACTOR)
+
+Context
+- Mission Control uses: Custom Express server (server/index.ts), TypeScript ESM, REST endpoints under /api/*, routes in server/routes.ts
+- Flyer generator already exists and MUST remain as-is:
+  - Template: server/templates/flyer-template.html (Handlebars)
+  - Puppeteer service: server/services/flyer-generator.ts
+  - Unified endpoint: POST /api/flyer/render with outputType: "pngPreview" | "pdf"
+  - Frontend dialog: client/src/components/create-flyer-dialog.tsx
+- Requirement: Preview and Download outputs must remain mirror/identical (do not change the unified render pipeline).
+
+Objective
+Fix the flyer layout to match the Rechat-style sample:
+1) Remove the visible horizontal divider line(s) near the bottom section boundary (and any accidental rules around address/photos).
+2) Remove the “floating/collapsed” bottom content look by anchoring Stats + Description to the TOP of the bottom region (not vertically centered).
+3) Keep Agent column bottom-anchored (as it already is).
+4) Keep the bottom section height math (height: var(--bottomH)) so the page always fills with no extra whitespace at the bottom.
+5) Do NOT introduce any separate preview rendering path. Only update template CSS.
+
+Files to update
+- server/templates/flyer-template.html
+  - ONLY adjust CSS blocks related to:
+    .bottom-section
+    .stats-column
+    .description-column
+    (and optionally global border rules for .address / .photos / hr if present)
+
+Your current relevant CSS (for reference, keep selectors the same):
+/* BOTTOM SECTION - FIXED 1551px (fills remainder) */
+.bottom-section {
+  height: var(--bottomH);
+  padding: 60px var(--padX) 80px;
+  border-top: 2px solid var(--rule);
+  display: grid;
+  grid-template-columns: 480px 1fr 520px;
+  gap: 60px;
+  align-items: stretch;
+  min-height: 0;
+}
+/* LEFT COLUMN - Stats */
+.stats-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 50px;
+  min-height: 0;
+}
+/* CENTER COLUMN - Description */
+.description-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+  padding: 0 20px;
+}
+/* RIGHT COLUMN - Agent */
+.agent-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 24px;
+  min-height: 0;
+  text-align: center;
+}
+
+Required CSS changes (APPLY EXACTLY)
+A) Remove unwanted horizontal divider line(s)
+- The line in the output is coming from border-top on .bottom-section.
+- Remove it completely OR replace with an ultra-light divider (default should be removed).
+
+Update .bottom-section:
+- Change padding to pull content upward (more Rechat-like)
+- Anchor grid items to the top with align-items: start
+- Remove the border-top
+
+B) Anchor stats + description to top (not centered)
+- Change justify-content from center -> flex-start in .stats-column and .description-column
+- Keep agent-column as is (flex-end)
+
+C) Defensive “no line” rules (only if needed)
+- If any hr exists, hide it.
+- Ensure .address/.photos containers do not render borders or shadows.
+
+Drop-in replacement CSS blocks (COPY/PASTE)
+Replace your existing blocks with the following:
+
+/* BOTTOM SECTION - FIXED (fills remainder) */
+.bottom-section {
+  height: var(--bottomH);
+
+  /* Pull content up to avoid the “floating in the lower half” look */
+  padding: 48px var(--padX) 70px;
+
+  /* Remove the horizontal rule line (Rechat is mostly whitespace-driven) */
+  border-top: none !important;
+
+  display: grid;
+  grid-template-columns: 480px 1fr 520px;
+  gap: 60px;
+
+  /* Anchor columns to the top (not stretched/centered) */
+  align-items: start;
+
+  min-height: 0;
+}
+
+/* LEFT COLUMN - Stats (anchor to top) */
+.stats-column {
+  display: flex;
+  flex-direction: column;
+
+  /* was center — change to start */
+  justify-content: flex-start;
+
+  gap: 50px;
+  min-height: 0;
+}
+
+/* CENTER COLUMN - Description (anchor to top) */
+.description-column {
+  display: flex;
+  flex-direction: column;
+
+  /* was center — change to start */
+  justify-content: flex-start;
+
+  min-height: 0;
+  padding: 0 20px;
+}
+
+/* RIGHT COLUMN - Agent (keep bottom-anchored) */
+.agent-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end; /* keep */
+  align-items: center;
+  gap: 24px;
+  min-height: 0;
+  text-align: center;
+}
+
+Optional: If a subtle divider is desired (do NOT enable unless requested)
+- Instead of border-top: none, use:
+  border-top: 1px solid rgba(0,0,0,0.08);
+
+Defensive “remove random horizontal lines” (add only if you still see lines)
+Add these at the end of the CSS in flyer-template.html:
+
+/* Defensive: remove any accidental horizontal rules/borders */
+hr { display: none !important; }
+
+.address, .photos, .photo-main, .photo-row {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+Verification steps (must do)
+1) Generate PNG preview via POST /api/flyer/render (outputType=pngPreview). Confirm:
+   - No horizontal line above the bottom section.
+   - Stats + headline start near the top of the bottom region (not centered).
+   - Agent remains anchored toward the bottom.
+2) Generate PDF via POST /api/flyer/render (outputType=pdf). Confirm:
+   - Preview PNG and PDF visually match (same layout, same spacing, same absence of lines).
+3) Ensure no code changes were made to the Puppeteer service that could break identity between PNG and PDF.
+
+Important constraints
+- Do not change endpoint shape, routing, frontend dialog behavior, or generator service logic unless absolutely necessary.
+- Only update the Handlebars template CSS as specified.
+- Keep selectors the same (.bottom-section, .stats-column, .description-column, .agent-column) so no UI code needs updating.
+
+Deliverable
+- Commit the updated server/templates/flyer-template.html with the above CSS modifications applied.
+- Confirm in a short note what was changed and where (CSS only).

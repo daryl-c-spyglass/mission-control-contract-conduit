@@ -161,23 +161,34 @@
       font-size: 32px;
     }
     
-    /* BOTTOM SECTION - FIXED 1551px (fills remainder) */
+    /* BOTTOM SECTION - FIXED (fills remainder) */
     .bottom-section {
       height: var(--bottomH);
-      padding: 60px var(--padX) 80px;
-      border-top: 2px solid var(--rule);
+      
+      /* Pull content up to avoid the "floating in the lower half" look */
+      padding: 48px var(--padX) 70px;
+      
+      /* Remove the horizontal rule line (Rechat is mostly whitespace-driven) */
+      border-top: none !important;
+      
       display: grid;
       grid-template-columns: 480px 1fr 520px;
       gap: 60px;
-      align-items: stretch;
+      
+      /* Anchor columns to the top (not stretched/centered) */
+      align-items: flex-start;
+      
       min-height: 0;
     }
     
-    /* LEFT COLUMN - Stats */
+    /* LEFT COLUMN - Stats (anchor to top) */
     .stats-column {
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      
+      /* was center — change to start */
+      justify-content: flex-start;
+      
       gap: 50px;
       min-height: 0;
     }
@@ -210,11 +221,14 @@
       font-weight: 800;
     }
     
-    /* CENTER COLUMN - Description */
+    /* CENTER COLUMN - Description (anchor to top) */
     .description-column {
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      
+      /* was center — change to start */
+      justify-content: flex-start;
+      
       min-height: 0;
       padding: 0 20px;
     }
@@ -244,11 +258,11 @@
       overflow: hidden;
     }
     
-    /* RIGHT COLUMN - Agent */
+    /* RIGHT COLUMN - Agent (keep bottom-anchored) */
     .agent-column {
       display: flex;
       flex-direction: column;
-      justify-content: flex-end;
+      justify-content: flex-end; /* keep */
       align-items: center;
       gap: 24px;
       min-height: 0;
