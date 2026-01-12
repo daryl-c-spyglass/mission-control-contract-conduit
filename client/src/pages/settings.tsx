@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Trash2, Loader2, UserPlus, Save, Mail, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
+import { Plus, Trash2, Loader2, UserPlus, Save, Mail, CheckCircle2, ExternalLink, User, Camera } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -41,10 +41,30 @@ export default function Settings() {
     phone: "",
     slackUserId: "",
   });
+  
+  // Marketing profile state
+  const [marketingProfile, setMarketingProfile] = useState({
+    displayName: "",
+    title: "",
+    phone: "",
+    email: "",
+    headshotUrl: "",
+  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user?.slackUserId) {
       setMySlackUserId(user.slackUserId);
+    }
+    // Load marketing profile from user
+    if (user) {
+      setMarketingProfile({
+        displayName: user.marketingDisplayName || "",
+        title: user.marketingTitle || "",
+        phone: user.marketingPhone || "",
+        email: user.marketingEmail || "",
+        headshotUrl: user.marketingHeadshotUrl || "",
+      });
     }
   }, [user]);
 
@@ -108,6 +128,73 @@ export default function Settings() {
     },
   });
 
+  const updateMarketingProfileMutation = useMutation({
+    mutationFn: async (data: {
+      marketingDisplayName?: string;
+      marketingTitle?: string;
+      marketingPhone?: string;
+      marketingEmail?: string;
+      marketingHeadshotUrl?: string;
+    }) => {
+      const res = await apiRequest("PATCH", "/api/user/graphics-settings", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Marketing profile saved", description: "Your agent info will appear on flyers and marketing materials." });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save marketing profile",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleHeadshotUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload an image file (JPG, PNG, etc.)",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please upload an image smaller than 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      setMarketingProfile(prev => ({ ...prev, headshotUrl: base64 }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveMarketingProfile = () => {
+    updateMarketingProfileMutation.mutate({
+      marketingDisplayName: marketingProfile.displayName || undefined,
+      marketingTitle: marketingProfile.title || undefined,
+      marketingPhone: marketingProfile.phone || undefined,
+      marketingEmail: marketingProfile.email || undefined,
+      marketingHeadshotUrl: marketingProfile.headshotUrl || undefined,
+    });
+  };
+
   const handleAddCoordinator = () => {
     if (!newCoordinator.name || !newCoordinator.email) {
       toast({
@@ -163,6 +250,120 @@ export default function Settings() {
               )}
               Save
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
+              <User className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle>Agent Marketing Profile</CardTitle>
+              <CardDescription>
+                Your headshot and contact info will appear on flyers and marketing materials
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div className="flex items-start gap-6 flex-wrap">
+              <div className="flex flex-col items-center gap-3">
+                <Avatar className="h-32 w-32 border-4 border-muted">
+                  {marketingProfile.headshotUrl ? (
+                    <AvatarImage src={marketingProfile.headshotUrl} alt="Agent headshot" />
+                  ) : null}
+                  <AvatarFallback className="text-2xl">
+                    <User className="h-12 w-12 text-muted-foreground" />
+                  </AvatarFallback>
+                </Avatar>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleHeadshotUpload}
+                  data-testid="input-headshot-upload"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="gap-2"
+                  data-testid="button-upload-headshot"
+                >
+                  <Camera className="h-4 w-4" />
+                  {marketingProfile.headshotUrl ? "Change Photo" : "Upload Photo"}
+                </Button>
+              </div>
+              
+              <div className="flex-1 min-w-[280px] space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="marketingDisplayName">Display Name</Label>
+                    <Input
+                      id="marketingDisplayName"
+                      placeholder="John Smith"
+                      value={marketingProfile.displayName}
+                      onChange={(e) => setMarketingProfile(prev => ({ ...prev, displayName: e.target.value }))}
+                      data-testid="input-marketing-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="marketingTitle">Title</Label>
+                    <Input
+                      id="marketingTitle"
+                      placeholder="REALTOR"
+                      value={marketingProfile.title}
+                      onChange={(e) => setMarketingProfile(prev => ({ ...prev, title: e.target.value }))}
+                      data-testid="input-marketing-title"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="marketingPhone">Phone Number</Label>
+                    <Input
+                      id="marketingPhone"
+                      type="tel"
+                      placeholder="(512) 555-1234"
+                      value={marketingProfile.phone}
+                      onChange={(e) => setMarketingProfile(prev => ({ ...prev, phone: e.target.value }))}
+                      data-testid="input-marketing-phone"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="marketingEmail">Email Address</Label>
+                    <Input
+                      id="marketingEmail"
+                      type="email"
+                      placeholder="john@spyglassrealty.com"
+                      value={marketingProfile.email}
+                      onChange={(e) => setMarketingProfile(prev => ({ ...prev, email: e.target.value }))}
+                      data-testid="input-marketing-email"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-end">
+              <Button
+                onClick={handleSaveMarketingProfile}
+                disabled={updateMarketingProfileMutation.isPending}
+                data-testid="button-save-marketing-profile"
+              >
+                {updateMarketingProfileMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save Marketing Profile
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

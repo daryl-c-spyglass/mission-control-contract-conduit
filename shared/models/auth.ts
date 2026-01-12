@@ -31,6 +31,7 @@ export const users = pgTable("users", {
   marketingDisplayName: varchar("marketing_display_name"),
   marketingTitle: varchar("marketing_title"),
   marketingPhone: varchar("marketing_phone"),
+  marketingEmail: varchar("marketing_email"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -69,13 +69,14 @@ export function registerAuthRoutes(app: Express): void {
   app.patch("/api/user/graphics-settings", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { marketingHeadshotUrl, marketingDisplayName, marketingTitle, marketingPhone } = req.body;
+      const { marketingHeadshotUrl, marketingDisplayName, marketingTitle, marketingPhone, marketingEmail } = req.body;
       
       const updatedUser = await authStorage.updateUser(userId, {
         marketingHeadshotUrl: marketingHeadshotUrl || null,
         marketingDisplayName: marketingDisplayName || null,
         marketingTitle: marketingTitle || null,
         marketingPhone: marketingPhone || null,
+        marketingEmail: marketingEmail || null,
       });
       
       res.json(updatedUser);
