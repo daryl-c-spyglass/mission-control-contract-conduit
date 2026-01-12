@@ -1,0 +1,88 @@
+REPLIT TASK — THICKEN COLUMN DIVIDERS + FIX PRICE BADGE SHAPE (TAG/RIBBON) — TEMPLATE ONLY
+
+Do NOT change endpoints or Puppeteer flow.
+Only update server/templates/flyer-template.html (CSS + minimal HTML if needed).
+Preview and PDF must remain identical (same server-side render).
+
+ISSUES
+1) Column dividers are still too thin — must be much thicker (match reference).
+2) Price badge background should be the “tag/ribbon” shape (angled left edge) like the reference screenshot, not a rectangle.
+
+========================================================
+A) THICKEN DIVIDERS (STRUCTURAL GRID DIVIDERS)
+========================================================
+We are using divider columns in the bottom band. Increase divider width and adjust color.
+
+Set divider width to 14px (thick bar), with a slightly softened dark tone.
+
+1) Update the bottom band grid columns:
+Change:
+  grid-template-columns: 480px 4px 1fr 4px 520px;
+To:
+  grid-template-columns: 480px 14px 1fr 14px 520px;
+
+2) Update divider styling:
+Replace .v-divider with:
+
+.v-divider{
+  width: 14px;
+  background: rgba(0,0,0,0.28);  /* thick but not pure black */
+}
+
+If still not bold enough, increase alpha to 0.35.
+
+3) Adjust padding so thick dividers don’t feel cramped:
+.stats-column { padding-right: 48px; }
+.description-column { padding: 0 48px; }
+.agent-column { padding-left: 48px; }
+
+(Keep existing vertical alignment rules.)
+
+========================================================
+B) PRICE BADGE SHAPE — TAG/RIBBON (NOT RECTANGLE)
+========================================================
+The badge must look like a tag with an angled left edge (pentagon shape), like the reference.
+
+Replace .price-badge CSS with:
+
+.price-badge{
+  background: var(--badge);
+  color: #fff;
+  padding: 22px 34px 22px 44px; /* extra left padding because of angled cut */
+  border-radius: 0;
+  min-width: 360px;
+  text-align: right;
+  position: relative;
+
+  /* tag shape with angled left notch */
+  clip-path: polygon(
+    14% 0%,   /* top left inset */
+    100% 0%,  /* top right */
+    100% 100%,/* bottom right */
+    14% 100%, /* bottom left inset */
+    0% 50%    /* middle left point */
+  );
+}
+
+Optionally add a subtle shadow to match print feel:
+.price-badge{
+  box-shadow: 0 4px 0 rgba(0,0,0,0.06);
+}
+
+If clip-path compatibility is a concern for PDF:
+- Keep clip-path; Chromium supports it well.
+- Ensure PDF uses printBackground: true (already should).
+
+========================================================
+VERIFICATION
+========================================================
+1) Render PNG preview:
+- Dividers must be clearly thick bars (14px)
+- Badge must be tag-shaped with angled left edge (NOT rectangle)
+2) Render PDF:
+- Same thick dividers + same badge shape
+- PNG and PDF must match
+
+DELIVERABLE
+- Commit server/templates/flyer-template.html updates (CSS only unless badge markup needed).
+- Confirm final divider width and badge clip-path is applied.
