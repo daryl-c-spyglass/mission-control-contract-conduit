@@ -1,0 +1,172 @@
+REPLIT TASK — MATCH RECHAT HEADER DIVIDERS (COLOR + LENGTH) + REMOVE EXTRA TOP-LEFT LINE + REDUCE BOTTOM WHITESPACE (ENLARGE PHOTOS + INCREASE FONT SIZES)
+
+IMPORTANT
+- Do NOT change backend flow, endpoints, Puppeteer settings, or frontend.
+- Only update server/templates/flyer-template.html (CSS + minimal HTML if required).
+- Preview and Download must remain identical (same Puppeteer render path).
+- Maintain fixed print size: 2550×3300.
+
+REFERENCE
+Use the Rechat screenshot as source of truth for header divider styling and overall “full-page” feel.
+
+========================================================
+A) HEADER DIVIDER COLOR (MATCH RECHAT WARM GRAY)
+========================================================
+Add/adjust these CSS variables in :root:
+--headerDivider: #9E9A92;     /* warm gray like Rechat */
+--headerDividerW: 12px;       /* thickness */
+--headerDividerH: 264px;      /* MUST span BOTH logo row + address row */
+
+NOTE:
+Set --headerDividerH to EXACT combined height of your header + address zones.
+If you already have headerH/addressH variables, you can do:
+--headerDividerH: calc(var(--headerH) + var(--addressH));
+
+========================================================
+B) REMOVE EXTRA THIN LINE AT THE MOST UPPER LEFT
+========================================================
+Find and disable the selector causing the stray hairline (border/pseudo-element).
+Force removal:
+
+.flyer-container,
+.header,
+.header-wrap {
+  border-top: none !important;
+}
+
+.header::before,
+.header-wrap::before,
+.header-left::before,
+.top-rule,
+.header-top-rule {
+  content: none !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+========================================================
+C) BADGE COLOR MUST MATCH RECHAT GRAY (NOT BROWN)
+========================================================
+Set:
+--badge: var(--headerDivider);
+
+Or override directly:
+.price-badge { background: var(--headerDivider) !important; }
+
+Keep your tag/ribbon clip-path shape as-is; only change color.
+
+========================================================
+D) HEADER DIVIDER MUST SPAN LOGO + ADDRESS (FULL HEADER BAND)
+========================================================
+Anchor divider to the wrapper that contains BOTH rows (logo row + address row).
+
+Example (adjust selectors to match your template):
+.header-wrap { position: relative; }
+
+.header-wrap .header-divider{
+  position: absolute;
+  left: 80px;                    /* move close to logo/address block */
+  top: 0;
+  width: var(--headerDividerW);
+  height: var(--headerDividerH); /* spans BOTH rows */
+  background: var(--headerDivider);
+}
+
+If divider currently only spans the logo row, move it to the parent wrapper and use the combined height.
+
+========================================================
+E) REDUCE BOTTOM WHITESPACE (WORKAROUND: ENLARGE PHOTOS + INCREASE FONT SIZES)
+========================================================
+There is still too much empty space at the bottom. Fix by:
+1) Increasing the photo zone height (main + 3-photo strip) so the flyer feels “full-page”
+2) Slightly increasing bottom text sizes (headline, stats, description, agent name) to occupy the content band better
+Do NOT change overall page size — adjust zone heights with the existing math.
+
+----------------------------------------
+E1) ENLARGE THE PHOTO AREA
+----------------------------------------
+Increase the secondary 3-photo strip height and optionally the main photo height.
+
+- Increase the 3-photo strip height by +180px to +260px
+- If needed, increase main photo height by +120px to +200px
+
+Implementation:
+Locate the selectors for:
+- main photo container (hero)
+- secondary strip container (3 images)
+
+Example targets (use your real selectors):
+.main-photo, .hero-photo { height: ???px; }
+.secondary-photos, .photo-strip, .photos-row { height: ???px; }
+
+Set:
+.secondary-photos / .photo-strip height: +220px more than current
+
+Ensure all photos remain cropped properly:
+.main-photo img,
+.secondary-photos img,
+.photo-strip img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+CRITICAL: Keep the height math consistent.
+If using variables:
+- Increase --photosH by the SAME total pixels added to photo area
+- Keep bottom auto-calculated:
+  --bottomH: calc(var(--H) - var(--headerH) - var(--addressH) - var(--photosH))
+
+Example:
+If --photosH was 1485px and you add +220px total, set --photosH = 1705px.
+
+----------------------------------------
+E2) INCREASE FONT SIZES SLIGHTLY (FILL THE BAND WITHOUT CROWDING)
+----------------------------------------
+Increase sizes carefully (not huge), since photo area will take most slack.
+
+1) Stats text:
+.stat-text { font-size: +6px to +10px over current; }
+.stat-text small { font-size: +4px to +8px over current; }
+
+2) Listing headline:
+.listing-headline{
+  font-size: +6px to +12px over current;
+  font-weight: 600;          /* keep NOT bold */
+}
+
+3) Description:
+.listing-description{
+  font-size: +4px to +8px over current;
+  line-height: 1.55;
+  -webkit-line-clamp: 6;     /* keep clamp stable */
+}
+
+4) Agent name (keep one-line rule from previous fix):
+.agent-name{
+  font-size: +6px to +10px over current;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+5) Phone (NOT bold):
+.agent-phone{
+  font-size: +4px to +8px over current;
+  font-weight: 600;
+}
+
+========================================================
+VERIFICATION CHECKLIST (MUST PASS)
+========================================================
+Render PNG preview + PDF:
+- Header divider is warm gray and spans logo+address
+- Badge background matches header divider gray
+- Extra top-left hairline is gone
+- Photos are larger (main/strip) and bottom whitespace is reduced
+- Headline and phone remain NOT bold
+- Preview and Download are identical
+
+DELIVERABLE
+- Commit only server/templates/flyer-template.html updates
+- Report final pixel changes to photo zone heights (before/after)
+- Report font size adjustments applied (headline/description/stats/agent)

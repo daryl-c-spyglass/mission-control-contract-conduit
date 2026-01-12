@@ -21,7 +21,7 @@
       /* FIXED ZONE HEIGHTS (explicit math) */
       --headerH: 165px;
       --addressH: 99px;
-      --photosH: 1635px;  /* increased by 150px to reduce bottom whitespace */
+      --photosH: 1855px;  /* increased by 220px more to reduce bottom whitespace */
       /* Bottom = H - headerH - addressH - photosH (future-proof calc) */
       --bottomH: calc(var(--H) - var(--headerH) - var(--addressH) - var(--photosH));
       
@@ -30,7 +30,14 @@
       --ink: #1f1f1f;
       --muted: #6b6b6b;
       --rule: #e6e6e6;
-      --badge: #8b7355;
+      
+      /* Header divider (Rechat warm gray) */
+      --headerDivider: #9E9A92;
+      --headerDividerW: 12px;
+      --headerDividerH: calc(var(--headerH) + var(--addressH));
+      
+      /* Badge matches header divider */
+      --badge: var(--headerDivider);
       
       /* Separator tokens (visible at 300 DPI) */
       --sepColor: rgba(0,0,0,0.16);
@@ -39,10 +46,6 @@
       /* Thick dividers (PSD-matching) */
       --dividerW: 18px;
       --dividerColor: rgba(0,0,0,0.32);
-      
-      /* Left brand bar */
-      --brandBar: #c7b28a;
-      --brandBarW: 10px;
     }
     
     html, body {
@@ -70,16 +73,24 @@
       position: relative;
     }
     
-    /* Left vertical brand bar (Rechat-style) */
+    /* Remove extra top-left line - no brand bar */
     .flyer::before {
-      content: "";
+      content: none !important;
+    }
+    
+    /* Header wrap spans logo + address for full divider height */
+    .header-wrap {
+      position: relative;
+    }
+    
+    .header-wrap .header-divider {
       position: absolute;
-      left: 0;
-      top: 0;
-      height: 260px;
-      width: var(--brandBarW);
-      background: var(--brandBar);
-      z-index: 5;
+      left: calc(var(--padX) - var(--headerDividerW));  /* Right edge flush with logo */
+      top: 40px;  /* Aligned with header padding-top */
+      width: var(--headerDividerW);
+      height: var(--headerDividerH);
+      background: var(--headerDivider);
+      z-index: 10;
     }
     
     /* HEADER - FIXED 165px */
@@ -92,18 +103,8 @@
     }
     
     .header-left {
-      position: relative;
       display: flex;
       align-items: flex-start;
-    }
-    
-    .header-divider {
-      position: absolute;
-      left: -20px;
-      top: 0;
-      width: 14px;
-      height: 90px;
-      background: var(--dividerColor);
     }
     
     .header-logo {
@@ -182,7 +183,7 @@
     }
     
     .secondary-photos {
-      height: 530px;  /* increased by 150px to reduce bottom whitespace */
+      height: 750px;  /* increased by 220px more to reduce bottom whitespace */
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 20px;
@@ -266,13 +267,13 @@
     }
     
     .stat-text {
-      font-size: 68px;
+      font-size: 76px;
       font-weight: 900;
       line-height: 1.05;
     }
     
     .stat-text small {
-      font-size: 52px;
+      font-size: 58px;
       font-weight: 800;
     }
     
@@ -286,7 +287,7 @@
     
     .listing-headline {
       font-family: 'League Spartan', sans-serif;
-      font-size: 66px;
+      font-size: 76px;
       font-weight: 600;
       letter-spacing: 4px;
       text-transform: uppercase;
@@ -297,7 +298,7 @@
     }
     
     .listing-description {
-      font-size: 42px;
+      font-size: 48px;
       line-height: 1.55;
       color: #3b3b3b;
       margin: 0 auto;
@@ -364,7 +365,7 @@
     }
     
     .agent-name {
-      font-size: 56px;
+      font-size: 64px;
       font-weight: 700;
       line-height: 1.1;
       margin-top: 10px;
@@ -384,7 +385,7 @@
     }
     
     .agent-phone {
-      font-size: 42px;
+      font-size: 48px;
       font-weight: 600;
       letter-spacing: 1px;
       margin-top: 14px;
@@ -400,21 +401,25 @@
 </head>
 <body>
   <div class="flyer">
-  <!-- HEADER - Logo left, Price right -->
-  <div class="header">
-    <div class="header-left">
-      <div class="header-divider"></div>
-      <img src="{{spyglassLogoUrl}}" class="header-logo" alt="Spyglass Realty">
+  <!-- Header wrap spans logo + address for full divider height -->
+  <div class="header-wrap">
+    <div class="header-divider"></div>
+    
+    <!-- HEADER - Logo left, Price right -->
+    <div class="header">
+      <div class="header-left">
+        <img src="{{spyglassLogoUrl}}" class="header-logo" alt="Spyglass Realty">
+      </div>
+      
+      <div class="price-badge">
+        <div class="price-label">{{statusLabel}}</div>
+        <div class="price-value">{{price}}</div>
+      </div>
     </div>
     
-    <div class="price-badge">
-      <div class="price-label">{{statusLabel}}</div>
-      <div class="price-value">{{price}}</div>
-    </div>
+    <!-- ADDRESS BAR -->
+    <div class="address-bar">{{address}}</div>
   </div>
-  
-  <!-- ADDRESS BAR -->
-  <div class="address-bar">{{address}}</div>
   
   <!-- PHOTOS -->
   <div class="photos-section">
