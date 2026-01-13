@@ -1,0 +1,238 @@
+## Audit & Fix: Create Graphics Format Options
+
+### Issue Identified:
+The Marketing Assets gallery shows a "Facebook 16:9" badge, implying there are multiple format options. However, when opening "Create Graphics", there may not be a visible format selector for users to choose different sizes.
+
+---
+
+### Part 1: AUDIT (Report First)
+
+Check `marketing-materials-dialog.tsx` and answer:
+
+1. **Is there a format selector?** (dropdown, tabs, or buttons for choosing output size)
+2. **What formats are currently available?**
+3. **How does the "Facebook 16:9" badge get assigned to saved assets?**
+4. **What canvas dimensions are being generated?**
+
+Report findings before making changes.
+
+---
+
+### Part 2: REQUIRED - Add Format Selector
+
+If format selector is missing or incomplete, add it:
+
+**Format Options to Include:**
+
+| Format | Display Name | Dimensions | Aspect Ratio | Badge Color |
+|--------|--------------|------------|--------------|-------------|
+| `square` | Instagram Post | 1080×1080 | 1:1 | Blue (#3b82f6) |
+| `landscape` | Facebook Post | 1200×630 | 16:9 | Purple (#8b5cf6) |
+| `story` | Instagram Story | 1080×1920 | 9:16 | Pink (#ec4899) |
+
+**UI Implementation:**
+
+Add a format selector above the preview, using tabs or buttons:
+
+```tsx
+const formats = [
+  { id: 'square', name: 'Instagram Post', width: 1080, height: 1080, badge: 'Instagram Post' },
+  { id: 'landscape', name: 'Facebook Post', width: 1200, height: 630, badge: 'Facebook 16:9' },
+  { id: 'story', name: 'Instagram Story', width: 1080, height: 1920, badge: 'Instagram Story' },
+];
+
+const [selectedFormat, setSelectedFormat] = useState(formats[0]);
+```
+
+**Format Selector UI (Tabs Style):**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Marketing Materials                                          ✕  │
+│ Generate professional marketing graphics for 13106 New Boston   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ Format                                                          │
+│ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐    │
+│ │ 📱 Instagram    │ │ 📘 Facebook     │ │ 📖 Story        │    │
+│ │    Post         │ │    Post         │ │                 │    │
+│ │   1:1 Square    │ │   16:9          │ │   9:16          │    │
+│ └─────────────────┘ └─────────────────┘ └─────────────────┘    │
+│       [Selected]                                                │
+│                                                                 │
+│ Status Type                      Social Media Description       │
+│ ┌─────────────────────┐         ┌─────────────────────────────┐│
+│ │ Just Listed       ▼ │         │ e.g. Modern 3BR Home        ││
+│ └─────────────────────┘         └─────────────────────────────┘│
+│                                                                 │
+│ Property Photo (1 of 46)                                        │
+│ [<]  Use arrows to browse  [>]                                  │
+│                                                                 │
+│ ┌───────────────────────────────────────────────────────────┐  │
+│ │                                                           │  │
+│ │                   [Preview Image]                         │  │
+│ │                   (Sized to selected format)              │  │
+│ │                                                           │  │
+│ └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│               [Generate Marketing Graphics]                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Implementation Code:**
+
+```tsx
+// Format selector component
+function FormatSelector({ 
+  formats, 
+  selected, 
+  onChange 
+}: {
+  formats: Format[];
+  selected: Format;
+  onChange: (format: Format) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>Format</Label>
+      <div className="grid grid-cols-3 gap-2">
+        {formats.map((format) => (
+          <button
+            key={format.id}
+            onClick={() => onChange(format)}
+            className={cn(
+              "flex flex-col items-center p-3 rounded-lg border-2 transition-colors",
+              selected.id === format.id
+                ? "border-primary bg-primary/5"
+                : "border-muted hover:border-primary/50"
+            )}
+          >
+            {/* Format icon */}
+            <div className={cn(
+              "w-12 h-12 rounded border-2 border-current mb-2 flex items-center justify-center",
+              format.id === 'square' && "aspect-square",
+              format.id === 'landscape' && "aspect-video",
+              format.id === 'story' && "aspect-[9/16] w-6"
+            )}>
+              <span className="text-xs">{format.id === 'square' ? '1:1' : format.id === 'landscape' ? '16:9' : '9:16'}</span>
+            </div>
+            <span className="text-sm font-medium">{format.name}</span>
+            <span className="text-xs text-muted-foreground">
+              {format.width}×{format.height}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+**Update Canvas Generation:**
+
+The canvas should resize based on selected format:
+
+```tsx
+const generateGraphic = async () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = selectedFormat.width;
+  canvas.height = selectedFormat.height;
+  const ctx = canvas.getContext('2d');
+  
+  // ... rest of drawing code
+  
+  // Save with format info
+  const asset = {
+    imageUrl: canvas.toDataURL('image/png'),
+    type: 'social',
+    format: selectedFormat.id,
+    badge: selectedFormat.badge, // "Instagram Post", "Facebook 16:9", etc.
+  };
+};
+```
+
+**Update Preview to Match Format:**
+
+```tsx
+// Preview container should match aspect ratio
+<div className={cn(
+  "relative overflow-hidden rounded-lg",
+  selectedFormat.id === 'square' && "aspect-square",
+  selectedFormat.id === 'landscape' && "aspect-video",
+  selectedFormat.id === 'story' && "aspect-[9/16] max-h-[500px] mx-auto"
+)}>
+  {/* Preview content */}
+</div>
+```
+
+---
+
+### Part 3: Terminology Recommendation
+
+**Current:** "Create Graphics"
+**Suggested:** "Create Social Post" or "Social Media"
+
+Reasoning:
+- More descriptive of purpose
+- Matches industry terminology (Rechat uses "Social Media Posts")
+- Differentiates from "Create Flyer" more clearly
+
+However, "Create Graphics" is acceptable if you prefer it. The key is that users understand:
+- **Create Graphics** = Quick social media posts (Instagram, Facebook)
+- **Create Flyer** = Professional print materials with agent branding
+
+---
+
+### Part 4: Badge Colors in Gallery
+
+Ensure saved assets show correct colored badges:
+
+```tsx
+const badgeStyles: Record<string, string> = {
+  'square': 'bg-blue-500 text-white',      // Instagram Post
+  'landscape': 'bg-purple-500 text-white', // Facebook 16:9
+  'story': 'bg-pink-500 text-white',       // Instagram Story
+  'print': 'bg-orange-500 text-white',     // Print Flyer
+};
+
+const badgeLabels: Record<string, string> = {
+  'square': 'Instagram Post',
+  'landscape': 'Facebook 16:9',
+  'story': 'Instagram Story',
+  'print': 'Print Flyer',
+};
+
+// In asset card:
+<Badge className={badgeStyles[asset.format]}>
+  {badgeLabels[asset.format]}
+</Badge>
+```
+
+---
+
+### Testing Checklist:
+
+1. [ ] Open "Create Graphics"
+2. [ ] Verify format selector shows 3 options (Instagram Post, Facebook Post, Instagram Story)
+3. [ ] Select each format - preview should change aspect ratio
+4. [ ] Generate graphic with "Instagram Post" selected
+5. [ ] Verify saved asset shows blue "Instagram Post" badge
+6. [ ] Generate graphic with "Facebook Post" selected
+7. [ ] Verify saved asset shows purple "Facebook 16:9" badge
+8. [ ] Generate graphic with "Instagram Story" selected
+9. [ ] Verify saved asset shows pink "Instagram Story" badge
+10. [ ] Verify all generated images have correct dimensions
+
+---
+
+### Files to Modify:
+- `client/src/components/marketing-materials-dialog.tsx` - Add format selector
+- `client/src/components/transaction-details.tsx` - Update badge colors in asset cards
+
+### Summary:
+
+| Before | After |
+|--------|-------|
+| No format selector (or hidden) | Clear format tabs: Instagram Post, Facebook Post, Story |
+| One output size | Three output sizes based on selection |
+| Inconsistent badge colors | Color-coded badges matching format |

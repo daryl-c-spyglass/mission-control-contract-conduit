@@ -46,6 +46,14 @@ const STATUS_OPTIONS = [
 
 type StatusType = typeof STATUS_OPTIONS[number]["value"];
 
+const FORMAT_OPTIONS = [
+  { id: 'square', name: 'Instagram Post', width: 1080, height: 1080, badge: 'Instagram Post', badgeColor: '#3b82f6' },
+  { id: 'landscape', name: 'Facebook Post', width: 1200, height: 630, badge: 'Facebook 16:9', badgeColor: '#8b5cf6' },
+  { id: 'story', name: 'Instagram Story', width: 1080, height: 1920, badge: 'Instagram Story', badgeColor: '#ec4899' },
+] as const;
+
+type FormatType = typeof FORMAT_OPTIONS[number];
+
 export function MarketingMaterialsDialog({ 
   open, 
   onOpenChange, 
@@ -64,11 +72,10 @@ export function MarketingMaterialsDialog({
   const isEditMode = Boolean(initialData && assetId);
   
   const [status, setStatus] = useState<StatusType>("just_listed");
+  const [selectedFormat, setSelectedFormat] = useState<FormatType>(FORMAT_OPTIONS[0]);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedLandscape, setGeneratedLandscape] = useState<string | null>(null);
-  const [generatedSquare, setGeneratedSquare] = useState<string | null>(null);
-  const [generatedAltStyle, setGeneratedAltStyle] = useState<string | null>(null);
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [emailCopied, setEmailCopied] = useState(false);
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
   const [socialDescription, setSocialDescription] = useState("");
@@ -151,10 +158,9 @@ export function MarketingMaterialsDialog({
   useEffect(() => {
     if (!open) {
       setStatus("just_listed");
+      setSelectedFormat(FORMAT_OPTIONS[0]);
       setSelectedPhotoIndex(0);
-      setGeneratedLandscape(null);
-      setGeneratedSquare(null);
-      setGeneratedAltStyle(null);
+      setGeneratedImage(null);
       setUploadedPhotos([]);
       setSocialDescription("");
     }
@@ -230,8 +236,7 @@ export function MarketingMaterialsDialog({
         const dataUrl = event.target?.result as string;
         setUploadedPhotos((prev) => [...prev, dataUrl]);
         setSelectedPhotoIndex(0); // Select the newly uploaded photo
-        setGeneratedLandscape(null);
-        setGeneratedSquare(null);
+        setGeneratedImage(null);
       };
       reader.readAsDataURL(file);
     });
@@ -273,21 +278,22 @@ export function MarketingMaterialsDialog({
         img.src = proxiedUrl;
       });
 
-      // Generate landscape (16:9) graphic
-      const landscapeDataUrl = await generateLandscapeGraphic(img);
-      setGeneratedLandscape(landscapeDataUrl);
-
-      // Generate square (1:1) graphic
-      const squareDataUrl = await generateSquareGraphic(img);
-      setGeneratedSquare(squareDataUrl);
-
-      // Generate alt style graphic (with Leading RE logo)
-      const altStyleDataUrl = await generateAltStyleGraphic(img);
-      setGeneratedAltStyle(altStyleDataUrl);
+      // Generate graphic based on selected format
+      let generatedDataUrl: string;
+      if (selectedFormat.id === 'landscape') {
+        generatedDataUrl = await generateLandscapeGraphic(img);
+      } else if (selectedFormat.id === 'story') {
+        generatedDataUrl = await generateStoryGraphic(img);
+      } else {
+        // Default to square (Instagram Post)
+        generatedDataUrl = await generateSquareGraphic(img);
+      }
+      
+      setGeneratedImage(generatedDataUrl);
 
       toast({
-        title: "Graphics Generated",
-        description: "Scroll down to see download options.",
+        title: "Graphic Generated",
+        description: `${selectedFormat.name} ready to download.`,
       });
 
       // Scroll to the results section
@@ -622,6 +628,166 @@ export function MarketingMaterialsDialog({
           ctx.beginPath();
           ctx.arc(circleX, circleY, circleRadius, 0, Math.PI * 2);
           ctx.stroke();
+        }
+      } catch (e) {
+        // Ignore headshot errors
+      }
+    }
+
+    return canvas.toDataURL("image/png");
+  };
+
+  const generateStoryGraphic = async (img: HTMLImageElement): Promise<string> => {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d")!;
+    
+    // 9:16 aspect ratio at 1080x1920 (Instagram Story)
+    canvas.width = 1080;
+    canvas.height = 1920;
+
+    const headerHeight = 200;
+    const bottomBarHeight = 300;
+    const price = getPropertyPrice();
+    const { street, cityStateZip } = parseAddress(transaction.propertyAddress);
+    const statusLabel = getStatusLabel(status);
+
+    // Draw dark header bar
+    ctx.fillStyle = "#2a2a2a";
+    ctx.fillRect(0, 0, canvas.width, headerHeight);
+
+    // Load and draw Spyglass logo (centered in header)
+    try {
+      const logo = new Image();
+      logo.crossOrigin = "anonymous";
+      await new Promise<void>((resolve) => {
+        logo.onload = () => resolve();
+        logo.onerror = () => resolve();
+        logo.src = spyglassLogoWhite;
+      });
+      
+      if (logo.complete && logo.naturalWidth > 0) {
+        const logoHeight = 80;
+        const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight;
+        const logoX = (canvas.width - logoWidth) / 2;
+        const logoY = 40;
+        ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
+      }
+    } catch (e) {
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 36px Inter, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("SPYGLASS REALTY", canvas.width / 2, 90);
+    }
+
+    // Draw price below logo
+    if (price) {
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 48px Inter, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(formatPrice(price), canvas.width / 2, 170);
+    }
+
+    // Draw property image (main area)
+    const imageY = headerHeight;
+    const imageHeight = canvas.height - headerHeight - bottomBarHeight;
+    
+    // Calculate image dimensions to fill area while maintaining aspect ratio
+    const imgAspect = img.width / img.height;
+    const targetAspect = canvas.width / imageHeight;
+    
+    let drawWidth, drawHeight, drawX, drawY;
+    if (imgAspect > targetAspect) {
+      drawHeight = imageHeight;
+      drawWidth = imageHeight * imgAspect;
+      drawX = (canvas.width - drawWidth) / 2;
+      drawY = imageY;
+    } else {
+      drawWidth = canvas.width;
+      drawHeight = canvas.width / imgAspect;
+      drawX = 0;
+      drawY = imageY + (imageHeight - drawHeight) / 2;
+    }
+
+    // Clip to image area and draw
+    ctx.save();
+    ctx.rect(0, imageY, canvas.width, imageHeight);
+    ctx.clip();
+    ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+    ctx.restore();
+
+    // Draw bottom info bar
+    const bottomY = canvas.height - bottomBarHeight;
+    ctx.fillStyle = "#2a2a2a";
+    ctx.fillRect(0, bottomY, canvas.width, bottomBarHeight);
+
+    // Status badge with colored background
+    const badgeColor = getStatusBadgeColor(status);
+    ctx.font = "bold 28px Inter, sans-serif";
+    const badgeTextWidth = ctx.measureText(statusLabel).width;
+    const badgePadding = 20;
+    const badgeHeight = 50;
+    const badgeX = (canvas.width - badgeTextWidth - badgePadding * 2) / 2;
+    const badgeY = bottomY + 30;
+
+    ctx.fillStyle = badgeColor;
+    ctx.beginPath();
+    ctx.roundRect(badgeX, badgeY, badgeTextWidth + badgePadding * 2, badgeHeight, 8);
+    ctx.fill();
+
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.fillText(statusLabel, canvas.width / 2, badgeY + 36);
+
+    // Address below status badge
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 36px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(street, canvas.width / 2, badgeY + 110);
+    
+    ctx.font = "24px Inter, sans-serif";
+    ctx.fillStyle = "#cccccc";
+    ctx.fillText(cityStateZip, canvas.width / 2, badgeY + 150);
+
+    // Social description if provided
+    if (socialDescription) {
+      ctx.font = "italic 22px Inter, sans-serif";
+      ctx.fillStyle = "#aaaaaa";
+      ctx.fillText(socialDescription.slice(0, 60), canvas.width / 2, badgeY + 195);
+    }
+
+    // Draw agent info if available
+    if (user?.marketingHeadshotUrl || user?.marketingDisplayName) {
+      try {
+        if (user.marketingHeadshotUrl) {
+          const headshot = new Image();
+          headshot.crossOrigin = "anonymous";
+          await new Promise<void>((resolve) => {
+            headshot.onload = () => resolve();
+            headshot.onerror = () => resolve();
+            headshot.src = user.marketingHeadshotUrl!;
+          });
+          
+          if (headshot.complete && headshot.naturalWidth > 0) {
+            const circleRadius = 40;
+            const circleX = canvas.width / 2;
+            const circleY = bottomY + 260;
+            
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(circleX, circleY, circleRadius, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.clip();
+            
+            const headshotSize = circleRadius * 2;
+            ctx.drawImage(headshot, circleX - circleRadius, circleY - circleRadius, headshotSize, headshotSize);
+            ctx.restore();
+            
+            ctx.strokeStyle = "#e5e5e5";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(circleX, circleY, circleRadius, 0, Math.PI * 2);
+            ctx.stroke();
+          }
         }
       } catch (e) {
         // Ignore headshot errors
