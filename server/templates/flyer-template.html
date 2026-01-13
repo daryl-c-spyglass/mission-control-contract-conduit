@@ -21,8 +21,8 @@
       /* FIXED ZONE HEIGHTS (explicit math) */
       --headerH: 165px;
       --addressH: 99px;
-      --photosH: 1855px;  /* increased by 220px more to reduce bottom whitespace */
-      /* Bottom = H - headerH - addressH - photosH (future-proof calc) */
+      --photosH: 1855px;
+      /* Bottom = H - headerH - addressH - photosH */
       --bottomH: calc(var(--H) - var(--headerH) - var(--addressH) - var(--photosH));
       
       --padX: 80px;
@@ -33,8 +33,7 @@
       
       /* Header divider (Rechat warm gray) */
       --headerDivider: #9E9A92;
-      --headerDividerW: 12px;
-      --headerDividerH: calc(var(--headerH) + var(--addressH));
+      --headerDividerW: 10px;
       
       /* Badge matches header divider */
       --badge: var(--headerDivider);
@@ -43,10 +42,9 @@
       --sepColor: rgba(0,0,0,0.16);
       --sepW: 2px;
       
-      /* Divider styling - thicker for visibility */
+      /* Divider styling - Y-axis only */
       --dividerColor: #b5b5b5;
-      --dividerW: 10px;
-      --ruleH: 4px;
+      --dividerW: 6px;
     }
     
     html, body {
@@ -74,34 +72,35 @@
       position: relative;
     }
     
-    /* Remove extra top-left line - no brand bar */
+    /* No brand bar */
     .flyer::before {
       content: none !important;
     }
     
-    /* Header wrap spans logo + address - contains divider, no photo overlap */
+    /* Header wrap spans logo + address - contains short divider */
     .header-wrap {
       position: relative;
       height: calc(var(--headerH) + var(--addressH));
-      overflow: hidden;  /* Prevents divider from extending into photo area */
+      overflow: hidden;
     }
     
+    /* Short vertical divider in header - does NOT touch logo/address/photos */
     .header-wrap .header-divider {
       position: absolute;
-      left: 64px;  /* Left of logo with safe breathing room */
-      top: 18px;   /* Breathing room from top */
-      width: var(--dividerW);  /* Use consistent divider width */
-      height: calc(100% - 36px);  /* Stay within wrapper padding */
+      left: 64px;
+      top: 24px;
+      width: var(--dividerW);
+      height: calc(100% - 48px);
       background: var(--headerDivider);
-      z-index: 0;  /* Behind content */
+      z-index: 0;
     }
     
     /* HEADER - FIXED 165px */
     .header {
       position: relative;
-      z-index: 1;  /* Above divider */
+      z-index: 1;
       height: var(--headerH);
-      padding: 40px var(--padX) 0 120px;  /* Extra left padding to avoid divider */
+      padding: 40px var(--padX) 0 120px;
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
@@ -121,7 +120,7 @@
     
     .price-badge {
       background: var(--badge);
-      color: #000 !important;  /* Black text */
+      color: #000 !important;
       padding: 22px 34px 22px 44px;
       border-radius: 0;
       text-align: right;
@@ -130,7 +129,6 @@
       top: 18px;
       right: 80px;
       z-index: 2;
-      /* tag shape with angled left notch */
       clip-path: polygon(
         14% 0%,
         100% 0%,
@@ -144,7 +142,7 @@
     .price-badge,
     .price-badge * {
       color: #000 !important;
-      font-weight: 500 !important;  /* Not bold */
+      font-weight: 500 !important;
     }
     
     .price-label {
@@ -166,19 +164,19 @@
     /* ADDRESS - FIXED 99px */
     .address-bar {
       position: relative;
-      z-index: 1;  /* Above divider */
+      z-index: 1;
       height: var(--addressH);
-      padding: 0 var(--padX) 0 120px;  /* Extra left padding to avoid divider */
+      padding: 0 var(--padX) 0 120px;
       display: flex;
       align-items: center;
       font-size: 32px;
       letter-spacing: 2px;
-      font-weight: 400;  /* Regular weight, not bold */
+      font-weight: 400;
       text-transform: uppercase;
       border-bottom: var(--sepW) solid var(--sepColor);
     }
     
-    /* PHOTOS - FIXED 1485px */
+    /* PHOTOS - FIXED 1855px */
     .photos-section {
       height: var(--photosH);
       padding: 0 var(--padX);
@@ -201,7 +199,7 @@
     }
     
     .secondary-photos {
-      height: 750px;  /* increased by 220px more to reduce bottom whitespace */
+      height: 750px;
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 20px;
@@ -231,24 +229,30 @@
       font-size: 32px;
     }
     
-    /* BOTTOM SECTION - Uses divider columns so nothing overlaps text */
+    /* BOTTOM SECTION - Flex container for content-height dividers */
     .bottom-section {
       height: var(--bottomH);
       padding: 48px var(--padX) 70px;
-      display: grid;
-      /* STATS | DIV | COPY | DIV | AGENT */
-      grid-template-columns: 480px var(--dividerW) 1fr var(--dividerW) 520px;
-      column-gap: 46px;
-      align-items: start;
-      min-height: 0;
+      display: flex;
+      align-items: flex-start;
       border-top: none !important;
     }
     
-    /* Real divider columns (never overlap because they have their own column) */
-    .v-divider {
-      background: var(--dividerColor);
-      border-radius: 2px;
-      align-self: stretch;
+    /* Content row - shrink-wrapped for divider height */
+    .bottom-row {
+      display: grid;
+      grid-template-columns: 480px 1fr 520px;
+      column-gap: 0;
+      align-items: flex-start;
+      width: 100%;
+      height: fit-content;
+    }
+    
+    /* Y-AXIS DIVIDERS via border-left on inner columns */
+    .copy-column,
+    .agent-column {
+      border-left: var(--dividerW) solid var(--dividerColor);
+      padding-left: 40px;
     }
     
     /* LEFT COLUMN - Stats (anchor to top) */
@@ -256,14 +260,16 @@
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
+      align-items: flex-start;
       gap: 44px;
-      padding-right: 10px;
+      padding-right: 40px;
     }
     
+    /* Stats items - single line each */
     .stat-item {
       display: flex;
       align-items: center;
-      gap: 18px;
+      gap: 24px;
       white-space: nowrap;
     }
     
@@ -289,17 +295,18 @@
       white-space: nowrap;
     }
     
-    /* COPY COLUMN - Simple flex layout (no horizontal rules - vertical dividers only) */
+    /* CENTER COLUMN - Copy (headline + description) */
     .copy-column {
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
-      align-items: stretch;
+      align-items: flex-start;
       gap: 24px;
-      padding: 0 30px;
+      padding-right: 40px;
       min-height: 0;
     }
     
+    /* Headline - centered, NOT bold (font-weight: 500) */
     .listing-headline {
       font-family: 'League Spartan', sans-serif;
       font-size: 60px;
@@ -309,8 +316,10 @@
       text-align: center;
       line-height: 1.15;
       margin: 0;
+      width: 100%;
     }
     
+    /* Description - LEFT aligned, regular weight */
     .listing-description {
       font-size: 40px;
       line-height: 1.5;
@@ -331,7 +340,6 @@
       justify-content: flex-start;
       align-items: flex-start;
       gap: 18px;
-      padding-left: 10px;
     }
     
     /* Agent photo + logo row side by side */
@@ -378,6 +386,7 @@
       fill: #999;
     }
     
+    /* Agent name - ONE LINE, never clipped */
     .agent-name {
       font-size: 54px;
       font-weight: 700;
@@ -396,6 +405,7 @@
       font-weight: 400;
     }
     
+    /* Phone - NOT bold */
     .agent-phone {
       font-size: 34px;
       font-weight: 400 !important;
@@ -409,7 +419,7 @@
       opacity: 0.95;
     }
     
-    /* Disable any previous pseudo element divider system */
+    /* Disable any pseudo element dividers */
     .stats-column::before,
     .stats-column::after,
     .copy-column::before,
@@ -417,7 +427,9 @@
     .agent-column::before,
     .agent-column::after,
     .bottom-section::before,
-    .bottom-section::after {
+    .bottom-section::after,
+    .bottom-row::before,
+    .bottom-row::after {
       content: none !important;
       display: none !important;
     }
@@ -425,7 +437,7 @@
 </head>
 <body>
   <div class="flyer">
-  <!-- Header wrap spans logo + address for full divider height -->
+  <!-- Header wrap spans logo + address for short divider height -->
   <div class="header-wrap">
     <div class="header-divider"></div>
     
@@ -473,79 +485,75 @@
     </div>
   </div>
   
-  <!-- BOTTOM SECTION - Grid with dedicated divider columns -->
+  <!-- BOTTOM SECTION - Grid row with border-left dividers -->
   <div class="bottom-section">
-    <!-- Stats Column -->
-    <div class="stats-column">
-      <div class="stat-item">
-        <span class="stat-icon">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <rect x="2" y="12" width="20" height="4" rx="1" fill="#111"/>
-            <path d="M4 12V7C4 6.45 4.45 6 5 6H10C10.55 6 11 6.45 11 7V12" stroke="#111" stroke-width="1.5" fill="none"/>
-            <path d="M13 12V7C13 6.45 13.45 6 14 6H19C19.55 6 20 6.45 20 7V12" stroke="#111" stroke-width="1.5" fill="none"/>
-            <path d="M3 16V20M21 16V20" stroke="#111" stroke-width="2"/>
-            <path d="M2 16H22" stroke="#111" stroke-width="1.5"/>
-          </svg>
-        </span>
-        <div class="stat-text">{{beds}} bedrooms</div>
-      </div>
-      <div class="stat-item">
-        <span class="stat-icon">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M4 12H20V16C20 18.2091 18.2091 20 16 20H8C5.79086 20 4 18.2091 4 16V12Z" fill="#111"/>
-            <path d="M6 12V8C6 5.79086 7.79086 4 10 4H10.5C11.8807 4 13 5.11929 13 6.5V12" stroke="#111" stroke-width="2" fill="none"/>
-            <circle cx="7" cy="7" r="1.5" fill="#111"/>
-          </svg>
-        </span>
-        <div class="stat-text">{{baths}} bathrooms</div>
-      </div>
-      <div class="stat-item">
-        <span class="stat-icon">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M3 21L21 3" stroke="#111" stroke-width="2"/>
-            <path d="M3 21H9M3 21V15" stroke="#111" stroke-width="2"/>
-            <path d="M21 3H15M21 3V9" stroke="#111" stroke-width="2"/>
-            <path d="M9 3H3V9" stroke="#111" stroke-width="2" fill="none"/>
-            <path d="M15 21H21V15" stroke="#111" stroke-width="2" fill="none"/>
-          </svg>
-        </span>
-        <div class="stat-text">{{sqft}} sq. ft</div>
-      </div>
-    </div>
-    
-    <!-- Vertical Divider 1 -->
-    <div class="v-divider" aria-hidden="true"></div>
-    
-    <!-- Copy Column (headline + description - vertical dividers only, no horizontal rules) -->
-    <div class="copy-column">
-      {{#if headline}}
-      <div class="listing-headline">{{headline}}</div>
-      {{/if}}
-      <div class="listing-description">{{description}}</div>
-    </div>
-    
-    <!-- Vertical Divider 2 -->
-    <div class="v-divider" aria-hidden="true"></div>
-    
-    <!-- Agent Column -->
-    <div class="agent-column">
-      <div class="agent-top-row">
-        {{#if agentPhoto}}
-        <img src="{{agentPhoto}}" class="agent-photo" alt="{{agentName}}">
-        {{else}}
-        <div class="agent-photo-placeholder">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="8" r="4"/>
-            <path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>
-          </svg>
+    <div class="bottom-row">
+      <!-- Stats Column -->
+      <div class="stats-column">
+        <div class="stat-item">
+          <span class="stat-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="12" width="20" height="4" rx="1" fill="#111"/>
+              <path d="M4 12V7C4 6.45 4.45 6 5 6H10C10.55 6 11 6.45 11 7V12" stroke="#111" stroke-width="1.5" fill="none"/>
+              <path d="M13 12V7C13 6.45 13.45 6 14 6H19C19.55 6 20 6.45 20 7V12" stroke="#111" stroke-width="1.5" fill="none"/>
+              <path d="M3 16V20M21 16V20" stroke="#111" stroke-width="2"/>
+              <path d="M2 16H22" stroke="#111" stroke-width="1.5"/>
+            </svg>
+          </span>
+          <div class="stat-text">{{beds}} bedrooms</div>
         </div>
-        {{/if}}
-        <img src="{{spyglassLogoUrl}}" class="agent-team-logo" alt="Spyglass Realty">
+        <div class="stat-item">
+          <span class="stat-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 12H20V16C20 18.2091 18.2091 20 16 20H8C5.79086 20 4 18.2091 4 16V12Z" fill="#111"/>
+              <path d="M6 12V8C6 5.79086 7.79086 4 10 4H10.5C11.8807 4 13 5.11929 13 6.5V12" stroke="#111" stroke-width="2" fill="none"/>
+              <circle cx="7" cy="7" r="1.5" fill="#111"/>
+            </svg>
+          </span>
+          <div class="stat-text">{{baths}} bathrooms</div>
+        </div>
+        <div class="stat-item">
+          <span class="stat-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 21L21 3" stroke="#111" stroke-width="2"/>
+              <path d="M3 21H9M3 21V15" stroke="#111" stroke-width="2"/>
+              <path d="M21 3H15M21 3V9" stroke="#111" stroke-width="2"/>
+              <path d="M9 3H3V9" stroke="#111" stroke-width="2" fill="none"/>
+              <path d="M15 21H21V15" stroke="#111" stroke-width="2" fill="none"/>
+            </svg>
+          </span>
+          <div class="stat-text">{{sqft}} sq. ft</div>
+        </div>
       </div>
       
-      <div class="agent-name">{{agentName}}</div>
-      <div class="agent-title">{{agentTitle}}</div>
-      <div class="agent-phone">{{agentPhone}}</div>
+      <!-- Copy Column (headline + description) -->
+      <div class="copy-column">
+        {{#if headline}}
+        <div class="listing-headline">{{headline}}</div>
+        {{/if}}
+        <div class="listing-description">{{description}}</div>
+      </div>
+      
+      <!-- Agent Column -->
+      <div class="agent-column">
+        <div class="agent-top-row">
+          {{#if agentPhoto}}
+          <img src="{{agentPhoto}}" class="agent-photo" alt="{{agentName}}">
+          {{else}}
+          <div class="agent-photo-placeholder">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="8" r="4"/>
+              <path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>
+            </svg>
+          </div>
+          {{/if}}
+          <img src="{{spyglassLogoUrl}}" class="agent-team-logo" alt="Spyglass Realty">
+        </div>
+        
+        <div class="agent-name">{{agentName}}</div>
+        <div class="agent-title">{{agentTitle}}</div>
+        <div class="agent-phone">{{agentPhone}}</div>
+      </div>
     </div>
   </div>
   </div>
