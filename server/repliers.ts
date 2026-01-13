@@ -162,6 +162,10 @@ export interface CMAComparable {
   mlsNumber?: string;
   status?: string;
   listDate?: string;
+  map?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 function normalizeImageUrls(images: any): string[] {
@@ -492,6 +496,8 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
         const compStreetAddress = compAddressParts.join(" ");
         
         const compPhotos = normalizeImageUrls(comp.images || comp.media || comp.photos);
+        const compLat = comp.map?.latitude || comp.address?.latitude || comp.latitude;
+        const compLng = comp.map?.longitude || comp.address?.longitude || comp.longitude;
         return {
           address: comp.address?.full || compStreetAddress || "",
           price: parseFloat(comp.listPrice) || parseFloat(comp.soldPrice) || 0,
@@ -505,6 +511,10 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
           mlsNumber: comp.mlsNumber || "",
           status: comp.standardStatus || comp.status || "",
           listDate: comp.listDate || "",
+          map: (compLat && compLng) ? {
+            latitude: parseFloat(compLat),
+            longitude: parseFloat(compLng),
+          } : undefined,
         };
       });
     }
@@ -544,6 +554,8 @@ export async function fetchSimilarListings(mlsNumber: string, radius: number = 5
       const streetAddress = addressParts.join(" ");
       
       const listingPhotos = normalizeImageUrls(listing.media || listing.images || listing.photos);
+      const listingLat = listing.map?.latitude || listing.address?.latitude || listing.latitude;
+      const listingLng = listing.map?.longitude || listing.address?.longitude || listing.longitude;
       return {
         address: listing.address?.full || streetAddress || "",
         price: parseFloat(listing.listPrice) || parseFloat(listing.soldPrice) || 0,
@@ -557,6 +569,10 @@ export async function fetchSimilarListings(mlsNumber: string, radius: number = 5
         mlsNumber: listing.mlsNumber || "",
         status: listing.standardStatus || listing.status || "",
         listDate: listing.listDate || "",
+        map: (listingLat && listingLng) ? {
+          latitude: parseFloat(listingLat),
+          longitude: parseFloat(listingLng),
+        } : undefined,
       };
     });
   } catch (error) {

@@ -229,6 +229,10 @@ export interface CMAComparable {
   mlsNumber?: string;
   status?: string;
   listDate?: string;
+  map?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 // MLS Data type - matches the Repliers API response structure
