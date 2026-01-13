@@ -88,18 +88,20 @@
     
     .header-wrap .header-divider {
       position: absolute;
-      left: 92px;  /* Slightly left of logo with breathing room */
+      left: 64px;  /* Left of logo with safe breathing room */
       top: 18px;   /* Breathing room from top */
-      width: 12px;
+      width: var(--dividerW);  /* Use consistent divider width */
       height: calc(100% - 36px);  /* Stay within wrapper padding */
       background: var(--headerDivider);
-      z-index: 10;
+      z-index: 0;  /* Behind content */
     }
     
     /* HEADER - FIXED 165px */
     .header {
+      position: relative;
+      z-index: 1;  /* Above divider */
       height: var(--headerH);
-      padding: 40px var(--padX) 0;
+      padding: 40px var(--padX) 0 120px;  /* Extra left padding to avoid divider */
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
@@ -108,6 +110,8 @@
     .header-left {
       display: flex;
       align-items: flex-start;
+      position: relative;
+      z-index: 2;
     }
     
     .header-logo {
@@ -161,13 +165,15 @@
     
     /* ADDRESS - FIXED 99px */
     .address-bar {
+      position: relative;
+      z-index: 1;  /* Above divider */
       height: var(--addressH);
-      padding: 0 var(--padX);
+      padding: 0 var(--padX) 0 120px;  /* Extra left padding to avoid divider */
       display: flex;
       align-items: center;
       font-size: 32px;
       letter-spacing: 2px;
-      font-weight: 400;
+      font-weight: 400;  /* Regular weight, not bold */
       text-transform: uppercase;
       border-bottom: var(--sepW) solid var(--sepColor);
     }
@@ -283,27 +289,15 @@
       white-space: nowrap;
     }
     
-    /* COPY COLUMN AS ITS OWN GRID (rules are rows, not overlays) */
+    /* COPY COLUMN - Simple flex layout (no horizontal rules - vertical dividers only) */
     .copy-column {
-      display: grid;
-      grid-template-rows:
-        auto  /* rule 1 */
-        auto  /* headline */
-        auto  /* rule 2 */
-        auto  /* rule 3 */
-        1fr   /* description */
-        auto; /* rule 4 */
-      row-gap: 18px;
-      padding: 0 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: stretch;
+      gap: 24px;
+      padding: 0 30px;
       min-height: 0;
-    }
-    
-    /* Horizontal rules (always separate rows) */
-    .h-rule {
-      height: var(--ruleH);
-      background: var(--dividerColor);
-      width: 100%;
-      border-radius: 2px;
     }
     
     .listing-headline {
@@ -522,18 +516,12 @@
     <!-- Vertical Divider 1 -->
     <div class="v-divider" aria-hidden="true"></div>
     
-    <!-- Copy Column (headline + description with horizontal rules as rows) -->
+    <!-- Copy Column (headline + description - vertical dividers only, no horizontal rules) -->
     <div class="copy-column">
-      <div class="h-rule" aria-hidden="true"></div>
       {{#if headline}}
       <div class="listing-headline">{{headline}}</div>
-      {{else}}
-      <div class="listing-headline"></div>
       {{/if}}
-      <div class="h-rule" aria-hidden="true"></div>
-      <div class="h-rule" aria-hidden="true"></div>
       <div class="listing-description">{{description}}</div>
-      <div class="h-rule" aria-hidden="true"></div>
     </div>
     
     <!-- Vertical Divider 2 -->

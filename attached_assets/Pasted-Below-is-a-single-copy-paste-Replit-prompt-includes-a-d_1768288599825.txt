@@ -1,0 +1,250 @@
+Below is a **single copy-paste Replit prompt** (includes a **diagram + checklist**) based on the latest screenshots and your clarification: **only Y-axis (vertical) dividers**. This prompt also enforces **Preview must mirror Download**.
+
+---
+
+## Replit Prompt (copy/paste)
+
+We are building a print flyer generator using **Handlebars HTML/CSS rendered by Puppeteer**. Current architecture must remain:
+
+* Template: `server/templates/flyer-template.html` (Handlebars)
+* Generator: `server/services/flyer-generator.ts` (Puppeteer)
+* Unified endpoint: `POST /api/flyer/render` with `outputType` (`pngPreview` | `pdf`)
+* Frontend: `client/src/components/create-flyer-dialog.tsx`
+
+### Non-negotiable requirement: Preview must always mirror Download
+
+Both preview PNG and download PDF must be produced from the **same exact HTML, CSS, and Puppeteer viewport**. No “preview-only CSS” or different rendering sizes.
+
+Implement/verify:
+
+1. **Single render function** in `flyer-generator.ts` used by both `pngPreview` and `pdf`.
+2. Use **the same viewport** for both:
+
+   * width: 2550, height: 3300, deviceScaleFactor: 1
+3. For PDF, use:
+
+   * `page.pdf({ width: '8.5in', height: '11in', printBackground: true, preferCSSPageSize: true })`
+4. Ensure template uses **one CSS file/inline style** path for both modes (no conditional class changes).
+5. If the preview is scaled in the UI, that’s fine, but the underlying PNG must still be 2550×3300.
+
+---
+
+# Goal Design (match reference)
+
+We are matching the Rechat/Spyglass flyer look (see user-provided screenshots). Main issues to fix:
+
+* Header **left vertical divider** overlaps logo/address and sometimes dips into photo area.
+* Bottom dividers are wrong: we only want **Y-axis vertical dividers**, no X-axis horizontal divider lines.
+* Some dividers are crossing text (overlap).
+* Listing headline + phone number + badge text are incorrectly bold.
+* Bed/bath/sqft rows must be **one-line per stat** (icon + “X bedrooms”), not wrapped.
+* Name gets cut off even when there is available space; do not ellipsize early.
+* White space bottom: adjust photo zone and typography to better fill page without breaking fixed math.
+* Description must be **left aligned**.
+* Listing headline and description have a **divider BEFORE and AFTER** the block, but those dividers should be implemented as **vertical-only layout boundaries** (not horizontal rules).
+
+---
+
+# Layout Diagram (coordinate reference)
+
+Use **page coordinate system**: X increases left→right, Y increases top→bottom.
+
+We want only **vertical dividers (Y-axis lines)** like this:
+
+HEADER (top band)
+┌───────────────────────────────────────────────────────────────┐
+│ [LEFT LOGO]    (no overlapping divider)            [PRICE TAG]│
+│ Address line (regular weight)                                 │
+└───────────────────────────────────────────────────────────────┘
+
+PHOTOS (big main + two small)
+┌───────────────────────────────────────────────────────────────┐
+│                         MAIN PHOTO                            │
+│                                                               │
+├───────────────────────────┬───────────────────────────────────┤
+│        PHOTO 2            │              PHOTO 3              │
+└───────────────────────────┴───────────────────────────────────┘
+
+BOTTOM CONTENT (3 columns separated by vertical lines only)
+┌───────────────┬───────────────────────────┬───────────────────┐
+│ STATS         │ HEADLINE (centered)       │ AGENT             │
+│ icon + text   │ description (LEFT align)  │ photo + logo       │
+│ 1 line each   │                           │ name (no cutoff)   │
+│               │                           │ title + phone      │
+└───────────────┴───────────────────────────┴───────────────────┘
+
+DIVIDER RULES:
+
+* Only the **two vertical separators** between columns.
+* Vertical line thickness must be visible (thicker than current), consistent across header + bottom.
+* Vertical lines must NOT overlap text: enforce padding / z-index / line placement.
+
+---
+
+# Implementation Instructions (do this in code)
+
+## A) Fix header divider (no overlap, no photo intrusion)
+
+1. Identify current “upper left divider” element/class (it appears as a vertical bar).
+2. Constrain it to the **header/address container only**:
+
+   * Position it inside the header wrapper
+   * Set its height to match header band height only (NOT reaching into the photo section)
+3. Move it **closer to the logo/address** but with safe padding:
+
+   * It must not touch logo or address text (leave ~20–30px breathing room)
+4. Ensure it renders behind text, not on top:
+
+   * `z-index` lower than logo/text; text container higher.
+
+Suggested pattern:
+
+* Header wrapper: `position: relative;`
+* Divider: `position: absolute; left: <value>; top: <value>; height: <headerHeightMinusPadding>; width: <thickness>; background: <grey>; z-index: 0;`
+* Logo/address: `position: relative; z-index: 1;`
+
+Also: address text must be **regular weight** (not bold).
+
+## B) Replace all “X-axis” divider lines in bottom section with vertical-only separators
+
+We only want the two vertical lines separating the three columns.
+
+1. Remove any `border-top`, `border-bottom`, pseudo-elements, or `<hr>` that create horizontal lines around headline/description.
+2. Implement the two vertical lines using either:
+
+   * `border-right` on col 1 and col 2 containers, OR
+   * absolutely positioned vertical rules in the grid.
+
+Preferred (simpler, less overlap):
+
+* Column 1 (stats): `border-right: <thick> solid <grey>;`
+* Column 2 (headline+desc): `border-right: <thick> solid <grey>;`
+* Add `padding-right`/`padding-left` so borders don’t collide with text.
+
+Important: borders must NOT cross into text.
+
+* Put padding on columns, e.g. stats column right padding and center column left/right padding.
+
+## C) Vertical line length must align with the content block (not full height)
+
+Right now the vertical line extends too far and visually breaks layout.
+
+Set vertical divider height using one of these approaches:
+
+Option 1 (best): use a wrapper for the bottom content that defines line height:
+
+* Create `.bottom-inner` inside `.bottom-section` with `height: fit-content;` and centered/placed at correct Y.
+* Then place the borders on `.bottom-inner` children so border height matches the content, not the entire bottom section.
+
+Option 2: if keeping column borders:
+
+* Wrap each column’s content in `.col-inner`
+* Apply the `border-right` to `.col-inner` and set consistent padding top/bottom.
+
+## D) Stats rows must be one-line each (icon + “X bedrooms”)
+
+Implement:
+
+* `.stat-item { display:flex; align-items:center; white-space:nowrap; }`
+* `.stat-text { display:flex; gap: 14px; align-items:baseline; }`
+* Ensure label stays on same line: “4 bedrooms”, “2 bathrooms”, “1,850 sq. ft”
+* If needed, reduce font slightly but keep line unbroken.
+
+## E) Typography rules (must match requirements)
+
+* Listing headline: **NOT bold** (use medium/regular weight), centered.
+* Phone number: **NOT bold**.
+* Price badge (“JUST LISTED AT $…”, “FOR SALE AT $…”): text color **black**, not bold.
+* Agent name must not cut off; allow it to use the available width:
+
+  * Remove aggressive ellipsis
+  * Allow name to wrap to 2 lines ONLY if absolutely necessary; otherwise widen the agent text area and reduce unused padding.
+* Description: **left aligned**.
+* Ensure fonts from provided zips can be used (Montserrat / League Spartan), but the key is weight rules above.
+
+## F) Remove extra top-left line and correct top-right grey divider color + length
+
+* There is an unwanted extra line at the top-left: remove it.
+* The top-right divider/shape color must match the grey in reference (not black).
+* The top-right divider length should visually cover the span similar to reference (logo → address area), but must not touch them and must not overlap into the photo area.
+
+## G) Reduce bottom whitespace by adjusting fixed zone heights safely
+
+Do NOT break the fixed 2550×3300 page.
+
+We currently have:
+--headerH, --addressH, --photosH, --bottomH
+
+To reduce excess white space:
+
+1. Increase `--photosH` moderately (expand main + secondary photos)
+2. Recalculate `--bottomH = --H - --headerH - --addressH - --photosH`
+3. Increase font sizing slightly (headline/description) only after dividers stop overlapping.
+
+Make changes incremental so bottom content still fits cleanly.
+
+---
+
+# Checklist (Replit must test each item)
+
+After implementing, run these tests and confirm each is PASS with screenshots for both preview and download:
+
+## Preview vs Download parity
+
+[ ] PNG preview and PDF download are visually identical (same margins, same line positions, same fonts, same photo crop)
+[ ] Same viewport size (2550×3300) used for both
+
+## Header
+
+[ ] Upper-left vertical divider does NOT overlap logo or address
+[ ] Upper-left divider does NOT intrude into photo area
+[ ] Address text is regular weight (not bold)
+[ ] Any extra top-left line removed
+[ ] Upper-right badge: text is black and not bold
+[ ] Upper-right grey divider/shape uses correct grey (not black) and does not touch logo/address
+
+## Bottom dividers
+
+[ ] Only Y-axis vertical dividers exist in bottom section (NO horizontal rules anywhere)
+[ ] Vertical divider thickness is visibly thicker and consistent
+[ ] Dividers do not overlap headline or description text
+[ ] Divider height matches content block (not overly long)
+
+## Stats
+
+[ ] Each stat is one line: icon + “X bedrooms/bathrooms/sq. ft” (no wrapping)
+[ ] Icons appear for bed/bath/sqft and align vertically with text
+
+## Center column
+
+[ ] Headline is centered and NOT bold
+[ ] Description is left aligned
+[ ] No horizontal lines above/below description
+
+## Agent column
+
+[ ] Agent name is not cut off (use available space)
+[ ] Phone number is NOT bold
+[ ] Agent photo and Spyglass logo placement matches reference intent (side-by-side where applicable)
+
+## Page fill
+
+[ ] Reduced bottom whitespace by expanding photo zone and/or typography without breaking layout
+[ ] No content is pushed outside the 2550×3300 page
+
+---
+
+# Files to change (only these; no refactors)
+
+1. `server/templates/flyer-template.html` (CSS + any necessary wrapper elements for clean vertical borders)
+2. `server/services/flyer-generator.ts` (only if needed to enforce preview=download parity)
+
+Do not change routes, do not change frontend architecture. Implement and test against multiple listings.
+
+Return back with:
+
+* What exact CSS/HTML changes were made
+* Before/after screenshots for: header close-up, bottom close-up, full flyer
+* Confirmation that Preview PNG and Download PDF match perfectly
+
+---

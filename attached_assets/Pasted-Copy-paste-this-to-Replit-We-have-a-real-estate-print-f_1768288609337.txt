@@ -1,0 +1,124 @@
+Copy/paste this to Replit:
+
+---
+
+We have a real estate print flyer generator. Critical requirement: **Preview must always mirror Download** (pixel-identical layout, same cropping, same fonts, same dividers), using the **same Puppeteer render pipeline**.
+
+### Current architecture (do not refactor)
+
+* Template: `server/templates/flyer-template.html` (Handlebars)
+* Generator: `server/services/flyer-generator.ts` (Puppeteer)
+* Endpoint: `POST /api/flyer/render` with `outputType` (`pngPreview` | `pdf`)
+* Frontend: `client/src/components/create-flyer-dialog.tsx`
+
+### Problem
+
+Preview output does not match download output (differences in scaling/margins/cropping/line placement). Fix this so preview is always synced to download.
+
+---
+
+# Implementation Requirements (must all be true)
+
+## 1) One render function for both outputs
+
+In `server/services/flyer-generator.ts`, create/ensure a single function that:
+
+* loads the same HTML template
+* injects the same data
+* applies the same CSS
+* uses the same viewport
+* waits for fonts/images
+* then returns either PNG or PDF based on `outputType`
+
+No separate “preview HTML” or “preview CSS” branches.
+
+## 2) Force identical Puppeteer viewport + media mode
+
+Use the exact same viewport for both PNG and PDF:
+
+* `viewport.width = 2550`
+* `viewport.height = 3300`
+* `deviceScaleFactor = 1`
+
+Set media to print (or screen) consistently for both. Pick ONE and apply to both:
+
+* `await page.emulateMediaType('print')` for both outputs
+
+## 3) Ensure PDF uses the same page size as the viewport
+
+When generating PDF, do NOT rely on default `format: 'Letter'` alone. Enforce an identical CSS page size:
+
+* In template CSS:
+
+  * `@page { size: 8.5in 11in; margin: 0; }`
+  * `html, body { width: 2550px; height: 3300px; margin: 0; }`
+
+* In Puppeteer:
+
+  * `preferCSSPageSize: true`
+  * `printBackground: true`
+  * set exact dimensions:
+
+    * `width: '8.5in'`
+    * `height: '11in'`
+  * `margin: { top: 0, right: 0, bottom: 0, left: 0 }`
+
+This guarantees PDF respects the same layout math as PNG.
+
+## 4) Remove any “preview-only” scaling/cropping logic
+
+Audit generator code for any differences such as:
+
+* different viewport for preview
+* using `page.screenshot({ clip })` only in preview
+* adding padding/margins only in PDF
+* changing `scale` in PDF export
+* any conditional CSS class like `.is-preview` vs `.is-pdf`
+
+Delete/disable these. Preview and download must render the same base page.
+
+## 5) Wait for fonts + images the same way
+
+To prevent text reflow differences between preview/download:
+
+* Ensure fonts are loaded:
+
+  * `await page.evaluateHandle('document.fonts.ready')`
+* Ensure images are loaded before capture:
+
+  * wait for `networkidle0` OR implement an image-load wait:
+
+    * `await page.evaluate(() => Promise.all([...document.images].map(img => img.complete ? true : new Promise(r => img.onload = img.onerror = r))))`
+
+Apply the same wait logic for BOTH PNG and PDF.
+
+## 6) PNG preview must be full-size (UI scaling is allowed)
+
+The preview PNG returned by API must be the full flyer render at 2550×3300.
+The frontend can scale it down visually, but the file content must match the PDF layout.
+
+---
+
+# Verification Checklist (Replit must test)
+
+After changes:
+
+[ ] Render a flyer via `outputType=pngPreview` and save the PNG. Confirm it is exactly 2550×3300.
+[ ] Render the same flyer via `outputType=pdf`.
+[ ] Convert the PDF first page to an image at 300 DPI and compare with PNG:
+- margins match
+- text positions match
+- dividers match
+- photo crops match
+- no layout shifts
+
+[ ] Confirm there is only one HTML/CSS rendering path.
+
+Deliverables back to me:
+
+1. What changed in `flyer-generator.ts` (summary + key code areas updated)
+2. Confirmation screenshot evidence: preview and download outputs side-by-side for the same listing, showing identical layout
+
+Do not change routing or frontend behavior besides ensuring it calls the unified endpoint the same way.
+
+---
