@@ -96,8 +96,8 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick, showPolyg
 
   const getPropertyCoordinates = useCallback((property: Property): [number, number] | null => {
     const propAny = property as any;
-    const lat = propAny.map?.latitude || propAny.latitude;
-    const lng = propAny.map?.longitude || propAny.longitude;
+    const lat = propAny.map?.latitude || propAny.coordinates?.latitude || propAny.latitude;
+    const lng = propAny.map?.longitude || propAny.coordinates?.longitude || propAny.longitude;
     if (lat && lng) {
       return [lng, lat];
     }
