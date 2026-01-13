@@ -1,0 +1,58 @@
+Goal: FINAL VISUAL POLISH ONLY — structure is approved and must not change.
+
+ABSOLUTE RULE: PREVIEW MUST BE PIXEL-IDENTICAL TO DOWNLOAD
+- Preview and Download must use the SAME render pipeline, SAME HTML, SAME CSS, SAME Puppeteer config, SAME dimensions, SAME DPI, SAME assets.
+- Preview must simply display a scaled-down version of the exact PNG/PDF used for Download.
+- No separate preview styles, no conditional CSS, no alternate templates.
+- Add a guard check: same input payload must produce identical dimensions and hash (or near-zero pixel diff).
+
+--------------------------------
+VISUAL TUNING TASKS
+--------------------------------
+
+1) Reduce bottom white space (subtle)
+- Reduce vertical padding/margin below the bottom content block (stats + headline/description + agent).
+- Target reduction: ~16–24px.
+- Do NOT stretch images or change photo cropping.
+- The bottom content should sit closer to the page bottom, but never touch it.
+
+2) Increase agent avatar + Spyglass logo size (bottom-right)
+- Increase agent avatar diameter by ~15–20%.
+- Increase avatar border thickness proportionally (keep same color and style).
+- Increase Spyglass logo size by ~15–20%.
+- Keep layout intact:
+  - No overlap with headline/description.
+  - Agent name, title, and phone remain vertically stacked and readable.
+- If needed, slightly reduce internal padding within the agent block to compensate.
+
+3) Soften listing headline further (NOT bold)
+- Force font-weight: 400 (normal).
+- Slightly soften appearance by ONE of the following:
+  - Reduce font-size by 1–2px OR
+  - Slightly reduce letter-spacing.
+- Headline must remain clear and prominent, but not heavy.
+- Phone number must remain NOT bold.
+
+4) Maintain alignment discipline
+- Keep vertical (Y-axis) dividers only — no horizontal divider lines.
+- Stats (beds/baths/sq ft), description, and agent block must remain visually aligned across the same horizontal band.
+- No new layout shifts or column changes.
+
+--------------------------------
+DO NOT CHANGE
+--------------------------------
+- Photo layout, image count, or crop logic.
+- Divider positions (only length may implicitly change due to spacing adjustments).
+- Font families or brand colors.
+- Overall section order.
+
+--------------------------------
+ACCEPTANCE CHECKLIST
+--------------------------------
+- Preview PNG == Download PNG (pixel-identical).
+- Bottom white space visibly reduced but still breathable.
+- Agent avatar and Spyglass logo clearly larger and better balanced.
+- Headline is clearly NOT bold and visually softer.
+- No overlaps, no new dividers, no layout regressions.
+
+After implementing, regenerate one sample flyer and confirm Preview and Download outputs match exactly.
