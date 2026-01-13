@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Download, Image as ImageIcon, FileText, Mail, ChevronLeft, ChevronRight, Loader2, Copy, Check, Upload, MessageSquare } from "lucide-react";
+import { Download, Image as ImageIcon, FileText, Mail, ChevronLeft, ChevronRight, Loader2, Copy, Check, Upload, MessageSquare, Sparkles } from "lucide-react";
 import type { Transaction } from "@shared/schema";
 import spyglassLogoWhite from "@assets/White-Orange_(1)_1767129299733.png";
 import spyglassLogoBlack from "@assets/Large_Logo_1767129431992.jpeg";
@@ -80,6 +80,7 @@ export function MarketingMaterialsDialog({
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
   const [socialDescription, setSocialDescription] = useState("");
   const [postToSlack, setPostToSlack] = useState(true);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
 
   const saveAssetMutation = useMutation({
     mutationFn: async ({ type, imageData, fileName, config }: { type: string; imageData: string; fileName: string; config?: SocialGraphicConfig }) => {
@@ -251,6 +252,64 @@ export function MarketingMaterialsDialog({
     // If already a relative URL or data URL, don't proxy
     if (url.startsWith("/") || url.startsWith("data:")) return url;
     return `/api/proxy-image?url=${encodeURIComponent(url)}`;
+  };
+
+  // Get the MLS property description for AI generation
+  const getPropertyDescription = (): string => {
+    const mlsData = transaction.mlsData as any;
+    return mlsData?.description || transaction.notes || "";
+  };
+
+  // Generate AI social media description from property description
+  const generateAIDescription = async () => {
+    const propertyDescription = getPropertyDescription();
+    
+    if (!propertyDescription) {
+      toast({
+        title: "No Property Description",
+        description: "No MLS description available to generate from.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingAI(true);
+
+    try {
+      const response = await apiRequest("POST", "/api/summarize-description", {
+        description: propertyDescription,
+        maxLength: 20,
+        propertyInfo: {
+          address: transaction.propertyAddress,
+        },
+      });
+
+      const data = await response.json();
+      
+      if (data.summary) {
+        // Clean up and truncate to 20 characters
+        let suggestion = data.summary.replace(/[.!?]+$/, '').trim();
+        if (suggestion.length > 20) {
+          suggestion = suggestion.slice(0, 20).trim();
+        }
+        setSocialDescription(suggestion);
+        setGeneratedImage(null);
+        
+        toast({
+          title: "Description Generated",
+          description: "AI suggested a social media description based on the property.",
+        });
+      }
+    } catch (error) {
+      console.error("AI description error:", error);
+      toast({
+        title: "Generation Failed",
+        description: "Could not generate description. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingAI(false);
+    }
   };
 
   const generateGraphics = async () => {
@@ -1110,7 +1169,24 @@ Thank you for your interest!`;
             </div>
 
             <div className="space-y-2">
-              <Label>Social Media Description</Label>
+              <div className="flex items-center justify-between">
+                <Label>Social Media Description</Label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={generateAIDescription}
+                  disabled={isGeneratingAI || !getPropertyDescription()}
+                  className="h-6 px-2 text-xs gap-1"
+                  data-testid="button-ai-generate-description"
+                >
+                  {isGeneratingAI ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3 w-3" />
+                  )}
+                  AI Suggest
+                </Button>
+              </div>
               <Input
                 placeholder="e.g. Modern 3BR Home"
                 value={socialDescription}
