@@ -1,0 +1,751 @@
+## Consolidate Marketing & Templates Tabs - Remove Duplicates
+
+The Marketing tab and Templates tab have significant overlap and duplicate features. This prompt consolidates everything into ONE Marketing tab while leveraging existing functionality.
+
+---
+
+## CRITICAL: Don't Duplicate - Reuse Existing Features
+
+### Features That ALREADY EXIST (Don't Rebuild):
+
+| Feature | Location | What It Does |
+|---------|----------|--------------|
+| **Create Graphics** | Marketing Tab button | Creates social media posts with photo selection |
+| **Create Flyer** | Marketing Tab button | Creates print flyers (Puppeteer + Handlebars) |
+| **AI Photo Selection** | Repliers Image Insights | Best photo recommendations by room type/quality |
+| **AI Description** | Create Graphics dialog | Generates broker-style marketing copy |
+
+### Features in Templates That Are DUPLICATES:
+
+| Templates Feature | Duplicate Of | Action |
+|-------------------|--------------|--------|
+| Social Media → Posts | Create Graphics (Instagram 1:1) | **REMOVE - Use existing** |
+| Social Media → Stories | Create Graphics (Story 9:16) | **REMOVE - Use existing** |
+| Social Media → Facebook | Create Graphics (Facebook 16:9) | **REMOVE - Use existing** |
+| Print → Flyers | Create Flyer | **REMOVE - Use existing** |
+| Print → Post Cards | Redirects to Create Flyer anyway! | **REMOVE - Fake option** |
+| Print → Brochures | Redirects to Create Flyer anyway! | **REMOVE - Fake option** |
+
+**Result:** Templates tab offers nothing new - it's all duplicates or fake options!
+
+---
+
+## Current Problem Breakdown
+
+### Create Graphics (Marketing Tab) - ALREADY HAS:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Create Marketing Graphics                                       │
+├─────────────────────────────────────────────────────────────────┤
+│ Format: [Instagram Post 1:1] [Story 9:16] [Facebook 16:9]       │
+│                                                                 │
+│ Property Photo:                                                 │
+│ [img1] [img2] [img3] [img4] ← Can use AI to recommend best     │
+│                                                                 │
+│ Status Badge: [Just Listed ▼]                                   │
+│                                                                 │
+│ Description: [________________] [AI Suggest]                    │
+│                                                                 │
+│ [Generate & Download]                                           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Create Flyer (Marketing Tab) - ALREADY HAS:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Create Property Flyer                                           │
+├─────────────────────────────────────────────────────────────────┤
+│ Property Photos (up to 3):                                      │
+│ [Upload/Select photos]                                          │
+│                                                                 │
+│ Price: $434,990    Status: [Just Listed ▼]                      │
+│ Beds: 4  Baths: 2  Sq Ft: 1850                                  │
+│                                                                 │
+│ Description: [AI-generated from MLS description]                │
+│                                                                 │
+│ [Generate Flyer] → Puppeteer renders 2550x3300 PDF              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Templates Tab - ALL DUPLICATES:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Templates Tab                                                   │
+├─────────────────────────────────────────────────────────────────┤
+│ Posts → Opens something similar to Create Graphics  ← DUPLICATE │
+│ Stories → Opens something similar to Create Graphics ← DUPLICATE│
+│ Flyers → Opens Create Flyer dialog                  ← DUPLICATE │
+│ Post Cards → Opens Create Flyer dialog              ← FAKE!     │
+│ Brochures → Opens Create Flyer dialog               ← FAKE!     │
+│                                                                 │
+│ ⚠️ Also shows WRONG LISTING (different property)!              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Solution: Single Marketing Tab with Enhanced Existing Features
+
+### DELETE Templates Tab Entirely
+
+It provides no unique functionality.
+
+### Enhanced Marketing Tab Layout
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Marketing                                                               │
+│ Create and manage marketing materials for 13106 New Boston              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│ ┌─────────────────────────────────────────────────────────────────────┐ │
+│ │ Quick Actions                                                       │ │
+│ │                                                                     │ │
+│ │ ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐      │ │
+│ │ │ 📱 Create       │  │ 🖨️ Create       │  │ ⚡ Quick Create │      │ │
+│ │ │    Graphics     │  │    Flyer        │  │    All Formats  │      │ │
+│ │ │                 │  │                 │  │                 │      │ │
+│ │ │ Social media    │  │ Print-ready     │  │ Generate Post + │      │ │
+│ │ │ posts & stories │  │ PDF flyer       │  │ Story + Facebook│      │ │
+│ │ └─────────────────┘  └─────────────────┘  └─────────────────┘      │ │
+│ └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                         │
+│ MY ASSETS (5)                                          [Filter: All ▼]  │
+│ ─────────────────────────────────────────────────────────────────────── │
+│                                                                         │
+│ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐        │
+│ │             │ │             │ │             │ │             │        │
+│ │  [Photo]    │ │  [Photo]    │ │  [Photo]    │ │  [Flyer]    │        │
+│ │             │ │             │ │             │ │             │        │
+│ ├─────────────┤ ├─────────────┤ ├─────────────┤ ├─────────────┤        │
+│ │ Story 9:16  │ │Instagram 1:1│ │Facebook 16:9│ │ Print Flyer │        │
+│ │ Jan 14      │ │ Jan 14      │ │ Jan 14      │ │ Jan 13      │        │
+│ │ [✏️] [⬇️] [🗑️]│ │ [✏️] [⬇️] [🗑️]│ │ [✏️] [⬇️] [🗑️]│ │ [✏️] [⬇️] [🗑️]│        │
+│ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘        │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Implementation
+
+### Step 1: Remove Templates Tab
+
+```tsx
+// In transaction-details.tsx or wherever tabs are defined
+
+// BEFORE - 7 tabs
+const tabs = ['Overview', 'MLS Data', 'Docs', 'Marketing', 'CMA', 'Templates', 'Timeline'];
+
+// AFTER - 6 tabs (Templates removed)
+const tabs = ['Overview', 'MLS Data', 'Docs', 'Marketing', 'CMA', 'Timeline'];
+```
+
+Delete the Templates tab component file entirely.
+
+### Step 2: Enhanced Marketing Tab Component
+
+```tsx
+// components/marketing-tab.tsx
+
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { 
+  Image, FileText, Sparkles, Download, Pencil, Trash2, 
+  Instagram, Loader2, Wand2
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+
+// Import EXISTING dialogs - don't rebuild!
+import { CreateGraphicsDialog } from '@/components/create-graphics-dialog';
+import { CreateFlyerDialog } from '@/components/create-flyer-dialog';
+
+interface MarketingTabProps {
+  transaction: any;
+  mlsData: any;
+}
+
+// Format badge styling
+const formatStyles: Record<string, { label: string; color: string }> = {
+  'story': { label: 'Story 9:16', color: 'bg-purple-500' },
+  'post': { label: 'Instagram 1:1', color: 'bg-pink-500' },
+  'square': { label: 'Instagram 1:1', color: 'bg-pink-500' },
+  'facebook': { label: 'Facebook 16:9', color: 'bg-blue-500' },
+  'landscape': { label: 'Facebook 16:9', color: 'bg-blue-500' },
+  'flyer': { label: 'Print Flyer', color: 'bg-orange-500' },
+  'print': { label: 'Print Flyer', color: 'bg-orange-500' },
+};
+
+export function MarketingTab({ transaction, mlsData }: MarketingTabProps) {
+  const [createGraphicsOpen, setCreateGraphicsOpen] = useState(false);
+  const [createFlyerOpen, setCreateFlyerOpen] = useState(false);
+  const [filterType, setFilterType] = useState<string>('all');
+  const [isQuickCreating, setIsQuickCreating] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch marketing assets for this transaction
+  const { data: assets = [], isLoading } = useQuery({
+    queryKey: ['marketing-assets', transaction.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/transactions/${transaction.id}/marketing-assets`);
+      if (!res.ok) throw new Error('Failed to fetch assets');
+      return res.json();
+    },
+  });
+
+  // Filter assets
+  const filteredAssets = filterType === 'all' 
+    ? assets 
+    : assets.filter((a: any) => a.format === filterType || a.type === filterType);
+
+  // Quick Create All - generates Post + Story + Facebook in one click
+  const handleQuickCreateAll = async () => {
+    setIsQuickCreating(true);
+    try {
+      // Use AI to select best photo
+      const bestPhoto = getBestPhotoFromInsights(mlsData);
+      const status = getStatusForGraphics(transaction.status);
+      
+      const formats = ['square', 'story', 'landscape']; // 1:1, 9:16, 16:9
+      
+      for (const format of formats) {
+        await fetch('/api/marketing/generate-graphic', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transactionId: transaction.id,
+            mlsNumber: mlsData?.mlsNumber,
+            format,
+            photoUrl: bestPhoto,
+            status,
+            // AI generates description automatically
+          }),
+        });
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ['marketing-assets', transaction.id] });
+      toast({ 
+        title: 'All formats generated!', 
+        description: 'Instagram Post, Story, and Facebook Post created.' 
+      });
+    } catch (error) {
+      toast({ 
+        title: 'Generation failed', 
+        description: 'Please try again or create individually.',
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsQuickCreating(false);
+    }
+  };
+
+  // Delete asset
+  const deleteAsset = async (assetId: string) => {
+    if (!confirm('Delete this asset?')) return;
+    
+    try {
+      await fetch(`/api/marketing-assets/${assetId}`, { method: 'DELETE' });
+      queryClient.invalidateQueries({ queryKey: ['marketing-assets', transaction.id] });
+      toast({ title: 'Asset deleted' });
+    } catch {
+      toast({ title: 'Failed to delete', variant: 'destructive' });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-bold">Marketing</h2>
+        <p className="text-muted-foreground">
+          Create and manage marketing materials for {transaction.address}
+        </p>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Create Graphics - Uses EXISTING dialog */}
+        <Card 
+          className="cursor-pointer hover:border-primary transition-colors"
+          onClick={() => setCreateGraphicsOpen(true)}
+        >
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-pink-500/10 rounded-lg">
+                <Instagram className="h-6 w-6 text-pink-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Create Graphics</h3>
+                <p className="text-sm text-muted-foreground">
+                  Social media posts & stories
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Create Flyer - Uses EXISTING dialog */}
+        <Card 
+          className="cursor-pointer hover:border-primary transition-colors"
+          onClick={() => setCreateFlyerOpen(true)}
+        >
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-orange-500/10 rounded-lg">
+                <FileText className="h-6 w-6 text-orange-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Create Flyer</h3>
+                <p className="text-sm text-muted-foreground">
+                  Print-ready PDF flyer
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Create All - NEW feature */}
+        <Card 
+          className="cursor-pointer hover:border-primary transition-colors bg-gradient-to-br from-primary/5 to-primary/10"
+          onClick={handleQuickCreateAll}
+        >
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-primary/20 rounded-lg">
+                {isQuickCreating ? (
+                  <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                ) : (
+                  <Wand2 className="h-6 w-6 text-primary" />
+                )}
+              </div>
+              <div>
+                <h3 className="font-semibold">Quick Create All</h3>
+                <p className="text-sm text-muted-foreground">
+                  {isQuickCreating 
+                    ? 'Generating...' 
+                    : 'Post + Story + Facebook'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Info about AI features */}
+      <Card className="bg-muted/50">
+        <CardContent className="py-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Sparkles className="h-4 w-4 text-yellow-500" />
+            <span>
+              AI automatically selects the best property photos and generates professional descriptions
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* My Assets */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">My Assets ({assets.length})</h3>
+          <Select value={filterType} onValueChange={setFilterType}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Filter" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Formats</SelectItem>
+              <SelectItem value="post">Instagram Posts</SelectItem>
+              <SelectItem value="story">Stories</SelectItem>
+              <SelectItem value="facebook">Facebook</SelectItem>
+              <SelectItem value="flyer">Flyers</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center h-48">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : filteredAssets.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {filteredAssets.map((asset: any) => (
+              <AssetCard 
+                key={asset.id} 
+                asset={asset} 
+                onDelete={() => deleteAsset(asset.id)}
+              />
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Image className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground mb-4">No marketing assets yet</p>
+              <div className="flex gap-2">
+                <Button onClick={() => setCreateGraphicsOpen(true)}>
+                  <Instagram className="h-4 w-4 mr-2" />
+                  Create Graphics
+                </Button>
+                <Button variant="outline" onClick={() => setCreateFlyerOpen(true)}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Create Flyer
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* EXISTING Dialogs - Don't rebuild, just use them */}
+      <CreateGraphicsDialog
+        open={createGraphicsOpen}
+        onOpenChange={setCreateGraphicsOpen}
+        transaction={transaction}
+        mlsData={mlsData}
+      />
+
+      <CreateFlyerDialog
+        open={createFlyerOpen}
+        onOpenChange={setCreateFlyerOpen}
+        transaction={transaction}
+        mlsData={mlsData}
+      />
+    </div>
+  );
+}
+
+// Asset Card Component
+function AssetCard({ asset, onDelete }: { asset: any; onDelete: () => void }) {
+  const formatConfig = formatStyles[asset.format] || formatStyles[asset.type] || { 
+    label: asset.format || 'Asset', 
+    color: 'bg-gray-500' 
+  };
+
+  const handleDownload = async () => {
+    // Download asset
+    window.open(asset.downloadUrl || asset.imageUrl, '_blank');
+  };
+
+  return (
+    <Card className="overflow-hidden group">
+      <div className="aspect-square relative bg-muted">
+        <img
+          src={asset.imageUrl || asset.thumbnailUrl}
+          alt={formatConfig.label}
+          className="w-full h-full object-cover"
+        />
+        {/* Hover overlay */}
+        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+          <Button size="icon" variant="secondary" className="h-9 w-9">
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="secondary" className="h-9 w-9" onClick={handleDownload}>
+            <Download className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="destructive" className="h-9 w-9" onClick={onDelete}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      <CardContent className="p-3">
+        <div className="flex items-center justify-between">
+          <Badge className={cn("text-white text-xs", formatConfig.color)}>
+            {formatConfig.label}
+          </Badge>
+          <span className="text-xs text-muted-foreground">
+            {new Date(asset.createdAt).toLocaleDateString('en-US', { 
+              month: 'short', 
+              day: 'numeric' 
+            })}
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Helper: Get best photo using Repliers Image Insights
+function getBestPhotoFromInsights(mlsData: any): string {
+  const images = mlsData?.images || [];
+  const insights = mlsData?.imageInsights?.images || [];
+  
+  if (insights.length > 0) {
+    // Find front exterior or highest quality photo
+    const frontPhoto = insights.find((img: any) => 
+      img.classification?.imageOf?.toLowerCase().includes('front') ||
+      img.classification?.imageOf?.toLowerCase().includes('exterior')
+    );
+    
+    if (frontPhoto) {
+      return frontPhoto.url || images[frontPhoto.index] || images[0];
+    }
+    
+    // Otherwise, get highest quality photo
+    const sortedByQuality = [...insights].sort((a: any, b: any) => 
+      (b.quality?.quantitative || 0) - (a.quality?.quantitative || 0)
+    );
+    
+    if (sortedByQuality[0]) {
+      return sortedByQuality[0].url || images[sortedByQuality[0].index] || images[0];
+    }
+  }
+  
+  // Fallback to first image
+  return images[0] || '';
+}
+
+// Helper: Get appropriate status for graphics based on transaction status
+function getStatusForGraphics(transactionStatus: string): string {
+  const status = transactionStatus?.toLowerCase() || '';
+  
+  if (status.includes('active')) return 'Just Listed';
+  if (status.includes('contract')) return 'Under Contract';
+  if (status.includes('pending')) return 'Pending';
+  if (status.includes('sold') || status.includes('closed')) return 'Just Sold';
+  
+  return 'For Sale';
+}
+```
+
+---
+
+## What Gets REMOVED (Templates Tab Features)
+
+| Feature | Why Remove |
+|---------|------------|
+| **Posts templates** | Duplicate of Create Graphics → Instagram Post |
+| **Stories templates** | Duplicate of Create Graphics → Story |
+| **Facebook templates** | Duplicate of Create Graphics → Facebook |
+| **Flyers templates** | Duplicate of Create Flyer |
+| **Post Cards** | Fake - just redirects to Create Flyer |
+| **Brochures** | Fake - just redirects to Create Flyer |
+| **Template "library"** | No unique templates - all use same generation |
+
+---
+
+## What Gets ENHANCED (Existing Features)
+
+### Create Graphics Dialog - Add AI Photo Selection
+
+The existing Create Graphics dialog should leverage Repliers Image Insights:
+
+```tsx
+// Inside CreateGraphicsDialog - enhance photo selection
+
+function PhotoSelector({ mlsData, selectedPhoto, onSelect }: PhotoSelectorProps) {
+  const images = mlsData?.images || [];
+  const insights = mlsData?.imageInsights?.images || [];
+  
+  // Get AI recommendations
+  const recommendations = useMemo(() => {
+    if (!insights.length) return [];
+    
+    return insights
+      .filter((img: any) => 
+        img.classification?.imageOf?.toLowerCase().includes('front') ||
+        img.classification?.imageOf?.toLowerCase().includes('exterior') ||
+        img.quality?.qualitative === 'excellent' ||
+        img.quality?.qualitative === 'above average'
+      )
+      .slice(0, 4);
+  }, [insights]);
+
+  return (
+    <div className="space-y-4">
+      {/* AI Recommended Photos */}
+      {recommendations.length > 0 && (
+        <div>
+          <Label className="flex items-center gap-2 mb-2">
+            <Sparkles className="h-4 w-4 text-yellow-500" />
+            AI Recommended
+          </Label>
+          <div className="flex gap-2">
+            {recommendations.map((rec: any, i: number) => (
+              <button
+                key={i}
+                onClick={() => onSelect(rec.url || images[rec.index])}
+                className={cn(
+                  "relative w-16 h-16 rounded overflow-hidden border-2",
+                  selectedPhoto === (rec.url || images[rec.index])
+                    ? "border-primary ring-2 ring-primary/20"
+                    : "border-transparent hover:border-primary/50"
+                )}
+              >
+                <img 
+                  src={rec.url || images[rec.index]} 
+                  className="w-full h-full object-cover" 
+                />
+                <Badge className="absolute -top-1 -right-1 text-[10px] bg-yellow-500 px-1">
+                  {rec.classification?.imageOf?.split(' ')[0] || 'Best'}
+                </Badge>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* All Photos */}
+      <div>
+        <Label className="mb-2">All Photos</Label>
+        <div className="grid grid-cols-6 gap-2 max-h-32 overflow-y-auto">
+          {images.slice(0, 12).map((photo: string, i: number) => (
+            <button
+              key={i}
+              onClick={() => onSelect(photo)}
+              className={cn(
+                "aspect-square rounded overflow-hidden border-2",
+                selectedPhoto === photo
+                  ? "border-primary"
+                  : "border-transparent hover:border-primary/50"
+              )}
+            >
+              <img src={photo} className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### Create Flyer Dialog - Already Has AI Features
+
+The existing Create Flyer already uses:
+- ✅ AI photo selection from Repliers
+- ✅ AI description summarization
+- ✅ Puppeteer + Handlebars rendering
+- ✅ 2550x3300 print-ready output
+
+**No changes needed** - it's already well-implemented!
+
+---
+
+## Quick Create All - NEW Feature
+
+This is the ONLY new feature to add:
+
+```tsx
+// One-click generation of all social formats
+
+const handleQuickCreateAll = async () => {
+  setIsQuickCreating(true);
+  
+  try {
+    // 1. AI selects best photo
+    const bestPhoto = getBestPhotoFromInsights(mlsData);
+    
+    // 2. AI generates description
+    const description = await generateAIDescription(mlsData);
+    
+    // 3. Determine status badge
+    const status = getStatusForGraphics(transaction.status);
+    
+    // 4. Generate all three formats
+    const formats = [
+      { format: 'square', name: 'Instagram Post' },    // 1:1
+      { format: 'story', name: 'Instagram Story' },    // 9:16
+      { format: 'landscape', name: 'Facebook Post' },  // 16:9
+    ];
+    
+    for (const { format, name } of formats) {
+      await fetch('/api/marketing/generate-graphic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId: transaction.id,
+          mlsNumber: mlsData?.mlsNumber,
+          format,
+          photoUrl: bestPhoto,
+          status,
+          description,
+          address: transaction.address,
+          price: mlsData?.listPrice,
+        }),
+      });
+    }
+    
+    // 5. Refresh assets
+    queryClient.invalidateQueries({ queryKey: ['marketing-assets', transaction.id] });
+    
+    toast({ 
+      title: 'All formats generated!', 
+      description: 'Created Instagram Post, Story, and Facebook Post' 
+    });
+    
+  } catch (error) {
+    toast({ 
+      title: 'Generation failed', 
+      variant: 'destructive' 
+    });
+  } finally {
+    setIsQuickCreating(false);
+  }
+};
+```
+
+---
+
+## Final Tab Order
+
+```tsx
+// After removing Templates tab
+const transactionTabs = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'mls-data', label: 'MLS Data' },
+  { id: 'docs', label: 'Docs', count: docsCount },
+  { id: 'marketing', label: 'Marketing', count: assetsCount },
+  { id: 'cma', label: 'CMA' },
+  { id: 'timeline', label: 'Timeline' },
+];
+
+// Templates tab REMOVED - all functionality is in Marketing
+```
+
+---
+
+## Migration Checklist
+
+### DELETE:
+- [ ] `client/src/components/templates-tab.tsx` - Entire file
+- [ ] Templates tab from tab list in transaction-details
+- [ ] Any Templates-related routes
+
+### KEEP AS-IS (Don't Modify):
+- [ ] `create-graphics-dialog.tsx` - Already works with formats
+- [ ] `create-flyer-dialog.tsx` - Already has AI + Puppeteer
+- [ ] Flyer generation endpoint
+- [ ] Graphics generation endpoint
+
+### ENHANCE:
+- [ ] Marketing tab - Add Quick Actions section
+- [ ] Marketing tab - Add Quick Create All button
+- [ ] Create Graphics dialog - Add AI photo recommendations display
+- [ ] Asset cards - Ensure format badges display correctly
+
+### ADD NEW:
+- [ ] Quick Create All endpoint (or reuse existing generate-graphic endpoint)
+- [ ] AI photo selection helper using Image Insights
+
+---
+
+## Summary
+
+| Before | After |
+|--------|-------|
+| 7 tabs | 6 tabs |
+| Templates = duplicates everything | Deleted entirely |
+| Post Cards = fake (redirects to flyer) | Removed |
+| Brochures = fake (redirects to flyer) | Removed |
+| Confusing which tab to use | Single Marketing tab |
+| Manual photo selection | AI recommends best photos |
+| Create formats one-by-one | Quick Create All option |
+
+**Key Principle:** Don't rebuild - reuse existing Create Graphics and Create Flyer dialogs!

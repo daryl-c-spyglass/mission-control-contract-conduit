@@ -345,6 +345,106 @@ export interface MLSData {
   rawData?: any;
 }
 
+// Property interface for CMA and search results (from Repliers API)
+export interface Property {
+  id: string;
+  mlsNumber?: string;
+  unparsedAddress: string;
+  streetNumber?: string;
+  streetName?: string;
+  streetSuffix?: string;
+  city: string;
+  state?: string;
+  postalCode: string;
+  county?: string;
+  
+  // Property characteristics
+  bedrooms?: number;
+  bathrooms?: number;
+  bathroomsFull?: number;
+  bathroomsHalf?: number;
+  sqft?: number;
+  livingArea?: number;
+  lotSize?: number;
+  lotSizeAcres?: number;
+  yearBuilt?: number;
+  propertyType?: string;
+  propertySubType?: string;
+  stories?: number;
+  garage?: string;
+  garageSpaces?: number;
+  
+  // Status and dates
+  standardStatus?: string;
+  status?: string;
+  listDate?: string;
+  listingContractDate?: string;
+  soldDate?: string;
+  closeDate?: string;
+  daysOnMarket?: number;
+  simpleDaysOnMarket?: number | null;
+  cumulativeDaysOnMarket?: number | null;
+  
+  // Pricing
+  listPrice?: number;
+  originalListPrice?: number;
+  soldPrice?: number;
+  closePrice?: number;
+  pricePerSqft?: number;
+  
+  // Location
+  latitude?: number;
+  longitude?: number;
+  subdivision?: string;
+  neighborhood?: string;
+  
+  // School information
+  schoolDistrict?: string;
+  elementarySchool?: string;
+  middleSchool?: string;
+  highSchool?: string;
+  
+  // Media
+  photos?: string[];
+  photoCount?: number;
+  virtualTourUrl?: string;
+  
+  // Description
+  description?: string;
+  publicRemarks?: string;
+  
+  // Features
+  interiorFeatures?: string[];
+  exteriorFeatures?: string[];
+  appliances?: string[];
+  heatingCooling?: string[];
+  flooring?: string[];
+  pool?: string;
+  
+  // Listing agent info
+  listingAgent?: string;
+  listingAgentName?: string;
+  listingAgentPhone?: string;
+  listingAgentEmail?: string;
+  listingOffice?: string;
+  listingOfficeName?: string;
+  
+  // Financial
+  hoaFee?: number;
+  hoaFrequency?: string;
+  taxAmount?: number;
+  taxYear?: number;
+  
+  // Search API specific fields
+  type?: string;
+  class?: string;
+  transactionType?: string;
+  
+  // Additional raw data
+  details?: Record<string, any>;
+  rawData?: Record<string, any>;
+}
+
 // Re-export auth models (users and sessions tables for Replit Auth)
 export * from "./models/auth";
 

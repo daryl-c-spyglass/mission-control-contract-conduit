@@ -20,6 +20,9 @@ import GraphicsSettings from "@/pages/graphics-settings";
 import Settings from "@/pages/settings";
 import Admin from "@/pages/admin";
 import SharedCMAPage from "@/pages/shared-cma";
+import CMAs from "@/pages/CMAs";
+import CMANew from "@/pages/CMANew";
+import CMADetailPage from "@/pages/CMADetailPage";
 import NotFound from "@/pages/not-found";
 import type { Transaction } from "@shared/schema";
 
@@ -143,6 +146,9 @@ function AuthenticatedApp() {
                 <Route path="/graphics" component={GraphicsSettings} />
                 <Route path="/settings" component={Settings} />
                 <Route path="/admin" component={Admin} />
+                <Route path="/cmas" component={CMAs} />
+                <Route path="/cmas/new" component={CMANew} />
+                <Route path="/cmas/:id" component={CMADetailPage} />
                 <Route component={NotFound} />
               </Switch>
             </div>
