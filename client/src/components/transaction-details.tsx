@@ -187,6 +187,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [editFlyerAsset, setEditFlyerAsset] = useState<{ id: number; config: FlyerAssetConfig } | null>(null);
   const [editGraphicsAsset, setEditGraphicsAsset] = useState<{ id: number; config: SocialGraphicConfig } | null>(null);
   const [graphicsDialogOpen, setGraphicsDialogOpen] = useState(false);
+  const [previewAsset, setPreviewAsset] = useState<MarketingAsset | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [templateSearch, setTemplateSearch] = useState("");
   const [templateListing, setTemplateListing] = useState<TemplateListing | null>(null);
@@ -495,6 +496,97 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           setEditGraphicsAsset(null);
         }}
       />
+
+      {/* Asset Preview Modal */}
+      <Dialog open={Boolean(previewAsset)} onOpenChange={(open) => !open && setPreviewAsset(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <VisuallyHidden>
+            <DialogTitle>Asset Preview</DialogTitle>
+            <DialogDescription>Preview marketing asset</DialogDescription>
+          </VisuallyHidden>
+          {previewAsset && (() => {
+            const metadata = previewAsset.metadata as { format?: string; status?: string; config?: FlyerAssetConfig | SocialGraphicConfig } | null;
+            const isPrintFlyer = previewAsset.type === 'print_flyer' || metadata?.format === 'print';
+            const isSocialFlyer = previewAsset.type === 'social_flyer' || metadata?.format === 'social';
+            const typeLabel = isPrintFlyer ? 'Print Flyer' : 
+                              isSocialFlyer ? 'Social 1:1' :
+                              previewAsset.type === "facebook" ? "Facebook 16:9" : 
+                              previewAsset.type === "instagram" ? "Instagram 1:1" :
+                              previewAsset.type === "alt_style" ? "Alt Style" : previewAsset.type;
+            const createdDate = previewAsset.createdAt ? new Date(previewAsset.createdAt).toLocaleDateString('en-US', { 
+              month: 'long', 
+              day: 'numeric',
+              year: 'numeric'
+            }) : null;
+            
+            return (
+              <div className="space-y-4">
+                {/* Large Image Preview */}
+                <div className="flex justify-center bg-muted rounded-lg p-4">
+                  <img 
+                    src={previewAsset.imageData} 
+                    alt={previewAsset.fileName}
+                    className="max-h-[60vh] object-contain rounded-md"
+                    data-testid="img-asset-preview-large"
+                  />
+                </div>
+                
+                {/* Asset Info */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <Badge variant={isPrintFlyer ? "default" : "secondary"}>
+                      {typeLabel}
+                    </Badge>
+                    {createdDate && (
+                      <p className="text-sm text-muted-foreground">
+                        Created {createdDate}
+                      </p>
+                    )}
+                  </div>
+                  
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 flex-wrap">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        handleEditAsset(previewAsset);
+                        setPreviewAsset(null);
+                      }}
+                      data-testid="button-preview-edit"
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        downloadAsset(previewAsset);
+                        setPreviewAsset(null);
+                      }}
+                      data-testid="button-preview-download"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      onClick={() => {
+                        deleteAssetMutation.mutate(previewAsset.id);
+                        setPreviewAsset(null);
+                      }}
+                      disabled={deleteAssetMutation.isPending}
+                      data-testid="button-preview-delete"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
@@ -1502,7 +1594,11 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 
                 return (
                   <Card key={asset.id} data-testid={`card-asset-${asset.id}`} className="overflow-hidden">
-                    <div className={`bg-muted overflow-hidden ${isPrintFlyer ? 'aspect-[8.5/11]' : 'aspect-square'}`}>
+                    <div 
+                      className={`bg-muted overflow-hidden cursor-pointer hover:opacity-90 transition-opacity ${isPrintFlyer ? 'aspect-[8.5/11]' : 'aspect-square'}`}
+                      onClick={() => setPreviewAsset(asset)}
+                      data-testid={`button-preview-asset-${asset.id}`}
+                    >
                       <img 
                         src={asset.imageData} 
                         alt={asset.fileName}

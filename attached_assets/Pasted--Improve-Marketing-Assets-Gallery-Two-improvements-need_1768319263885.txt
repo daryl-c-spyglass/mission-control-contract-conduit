@@ -1,0 +1,202 @@
+## Improve Marketing Assets Gallery
+
+Two improvements needed:
+1. Fix Create Graphics output (missing overlays/branding)
+2. Add click-to-preview modal for better viewing
+
+---
+
+### Issue 1: Create Graphics Output Missing Overlays
+
+**Current Problem:**
+The "Facebook 16:9" graphic saved to Marketing Assets is just a plain photo - it's missing:
+- Status badge (JUST LISTED, OPEN HOUSE, etc.)
+- Address overlay
+- Price
+- Branding (SPYGLASS REALTY)
+
+The preview in the dialog shows these overlays, but the saved image doesn't have them.
+
+**Fix:**
+Ensure the saved image includes all the overlays shown in the preview. The canvas rendering should capture:
+- Status badge (top-left or bottom-left)
+- Property address
+- Price (if applicable)
+- Brokerage logo/name
+
+Check `marketing-materials-dialog.tsx` - the canvas export should include all overlay elements, not just the base photo.
+
+---
+
+### Issue 2: Add Click-to-Preview Modal
+
+**Requirement:**
+When user clicks on a marketing asset card, open a modal/floating card showing:
+- Large preview of the asset
+- Asset details (type, format, date created)
+- Action buttons (Edit, Download, Delete, Share to Slack)
+
+**Implementation:**
+
+Create a preview modal component:
+
+```tsx
+interface AssetPreviewModalProps {
+  asset: MarketingAsset;
+  isOpen: boolean;
+  onClose: () => void;
+  onEdit: () => void;
+  onDownload: () => void;
+  onDelete: () => void;
+}
+
+function AssetPreviewModal({ 
+  asset, 
+  isOpen, 
+  onClose, 
+  onEdit, 
+  onDownload, 
+  onDelete 
+}: AssetPreviewModalProps) {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl">
+        {/* Large Image Preview */}
+        <div className="flex justify-center bg-gray-100 rounded-lg p-4">
+          <img 
+            src={asset.imageUrl} 
+            alt={asset.type}
+            className="max-h-[70vh] object-contain"
+          />
+        </div>
+        
+        {/* Asset Info */}
+        <div className="flex items-center justify-between mt-4">
+          <div>
+            <Badge>{asset.format}</Badge>
+            <p className="text-sm text-muted-foreground mt-1">
+              Created {formatDate(asset.createdAt)}
+            </p>
+          </div>
+          
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onEdit}>
+              <Pencil className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
+            <Button variant="outline" onClick={onDownload}>
+              <Download className="h-4 w-4 mr-2" />
+              Download
+            </Button>
+            <Button variant="destructive" onClick={onDelete}>
+              <Trash className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+**Update Asset Cards to be Clickable:**
+
+```tsx
+// In the Marketing Assets grid
+{assets.map((asset) => (
+  <div 
+    key={asset.id}
+    className="cursor-pointer hover:opacity-90 transition-opacity"
+    onClick={() => {
+      setSelectedAsset(asset);
+      setPreviewModalOpen(true);
+    }}
+  >
+    {/* Existing card content */}
+    <img src={asset.imageUrl} alt={asset.type} className="rounded-lg" />
+    <div className="flex items-center justify-between mt-2">
+      <Badge>{asset.format}</Badge>
+      <span className="text-sm text-muted-foreground">
+        {formatDate(asset.createdAt)}
+      </span>
+    </div>
+  </div>
+))}
+
+{/* Preview Modal */}
+<AssetPreviewModal
+  asset={selectedAsset}
+  isOpen={previewModalOpen}
+  onClose={() => setPreviewModalOpen(false)}
+  onEdit={() => handleEdit(selectedAsset)}
+  onDownload={() => handleDownload(selectedAsset)}
+  onDelete={() => handleDelete(selectedAsset)}
+/>
+```
+
+---
+
+### Issue 3: Improve Create Graphics Quality
+
+**Suggested improvements for the social media graphics:**
+
+1. **Add status badge overlay** (JUST LISTED, OPEN HOUSE, etc.)
+   - Bold text in branded color
+   - Semi-transparent background
+   - Positioned at bottom-left
+
+2. **Add address overlay**
+   - Street address below status badge
+   - Clean, readable font
+
+3. **Add price** (optional)
+   - Top-right corner
+   - Semi-transparent background
+
+4. **Add brokerage branding**
+   - "SPYGLASS REALTY" watermark or logo
+   - Subtle but visible
+
+**Example layout for 16:9 social graphic:**
+```
+┌────────────────────────────────────────┐
+│                              $434,990  │
+│                                        │
+│         [Property Photo]               │
+│                                        │
+│                                        │
+│ JUST LISTED                            │
+│ 13106 New Boston, Austin TX            │
+│                        SPYGLASS REALTY │
+└────────────────────────────────────────┘
+```
+
+---
+
+### Testing Checklist:
+
+1. **Create Graphics Fix:**
+   - [ ] Create a new social graphic via "Create Graphics"
+   - [ ] Verify preview shows overlays (status, address)
+   - [ ] Generate and save
+   - [ ] Verify saved image in Marketing Assets has overlays (not plain photo)
+
+2. **Preview Modal:**
+   - [ ] Click on any asset card
+   - [ ] Modal opens with large preview
+   - [ ] Edit, Download, Delete buttons work
+   - [ ] Click outside or X to close
+
+3. **Card Interactions:**
+   - [ ] Cards show hover state (cursor pointer, slight opacity change)
+   - [ ] Clicking card opens preview (not downloads immediately)
+   - [ ] Direct download/delete still available in preview modal
+
+---
+
+### Files to Modify:
+- `client/src/components/marketing-materials-dialog.tsx` - Fix canvas export
+- `client/src/components/transaction-details.tsx` - Add preview modal to Marketing tab
+- Create new: `client/src/components/asset-preview-modal.tsx` (optional, can be inline)
