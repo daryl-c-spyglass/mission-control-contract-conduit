@@ -1,0 +1,387 @@
+Replit Prompt (copy/paste)
+
+You are working in this repo:
+
+Server: server/index.ts (Express, TS, ESM)
+
+Routes: server/routes.ts
+
+Flyer template: server/templates/flyer-template.html (Handlebars)
+
+Puppeteer renderer: server/services/flyer-generator.ts
+
+Unified endpoint: POST /api/flyer/render with outputType (currently pngPreview and pdf)
+
+Frontend: client/src/components/create-flyer-dialog.tsx (Preview + Download buttons)
+
+Goal: Match the flyer layout to the PSD/Rechat reference AND ensure Preview always mirrors Download (pixel-identical layout decisions, same fonts, same dividers, same spacing). No refactor; stay inside the current architecture.
+
+A) Hard requirement: Preview MUST mirror Download (single render source of truth)
+
+Right now Preview vs Download diverge visually. Fix this by guaranteeing that both are generated from the same render pass / same HTML / same CSS / same Puppeteer settings.
+
+Implement one of these “single source of truth” approaches (preferred order):
+
+Preferred (best):
+
+In flyer-generator.ts, render PDF first (single canonical output) using:
+
+await page.emulateMediaType('print')
+
+page.pdf({ printBackground: true, preferCSSPageSize: true, margin: {top:0,right:0,bottom:0,left:0} })
+
+For Preview (pngPreview), convert that exact PDF buffer to a PNG (page 1) server-side and return it.
+
+Use an existing lightweight PDF→PNG library available in Replit OR add one dependency (ok).
+
+Result: Preview PNG and Download PDF come from the exact same PDF, so they match.
+
+Acceptable alternative:
+
+Keep output types separate (PDF vs screenshot), but ensure:
+
+same exact template HTML
+
+same exact data
+
+same viewport size
+
+same deviceScaleFactor
+
+same media emulation (print)
+
+same “fonts ready” wait
+
+no differing CSS or conditional logic by outputType
+
+Important: The client must not apply any additional transformations that alter layout.
+
+Preview UI can scale the image for display, but the generated image must be the same composition as the PDF.
+
+Update create-flyer-dialog.tsx so:
+
+“Render Preview” calls the same /api/flyer/render path, and the server guarantees the preview PNG is derived from the same PDF render (preferred).
+
+“Download Flyer” uses the same render inputs as preview (same payload).
+
+Add a simple sanity check in server logs:
+
+log a deterministic renderHash (hash of template version + input payload + output settings) for both preview and download
+
+confirm preview/download for the same listing share the same hash.
+
+B) Layout fixes: dividers, alignment, and “no X-axis lines”
+
+We only want vertical dividers (Y-axis) where shown in the reference.
+We do NOT want horizontal divider rules (X-axis) under the headline/description, and we do NOT want divider lines overlapping any text.
+
+B1) Header left divider (beside logo/address)
+
+Current issue: vertical divider overlaps/too close to logo/address and can overlap the photo area.
+Fix:
+
+The left header divider must:
+
+sit to the left of the logo/address block
+
+have enough left padding so it doesn’t touch the logo or address
+
+never overlap into the hero photo region
+
+be a single clean vertical bar, thicker than before
+
+Implementation approach:
+
+Put the divider as a pseudo-element of the header left wrapper (not positioned globally).
+
+Use explicit dimensions and safe margins.
+
+Example constraints (tune to match PSD):
+
+width: 10–14px
+
+height: exactly header content height (not full page)
+
+left margin: ~40px from page edge
+
+gap between divider and logo/address: ~20–28px
+
+B2) Bottom section dividers (Y-axis only)
+
+We want two vertical dividers:
+
+between Stats column and Copy column
+
+between Copy column and Agent column
+
+Rules:
+
+These are vertical lines only.
+
+Their height must match the content block height (not to the bottom of the PNG).
+
+They must never overlap text.
+
+No horizontal “T” caps and no horizontal rules (no X-axis lines).
+
+How to implement correctly:
+
+Do NOT use borders on the grid container that stretch full height.
+
+Instead, create vertical dividers as absolutely positioned pseudo-elements on the middle column wrapper, or as separate divider elements inside the grid, whose height is derived from the content block.
+
+Key: “divider height equals the text block height”
+
+Wrap the entire bottom content row in a .bottom-inner that defines the vertical span.
+
+Make .bottom-inner height equal to the tallest of (stats block, copy block, agent block) content, and position dividers against that wrapper.
+
+Alternatively, place each divider inside .bottom-inner and set align-self: stretch while .bottom-inner is only as tall as the content (NOT the full bottom region).
+
+B3) Align Stats + Copy + Agent along the same baseline (X alignment, no X-axis line)
+
+Requirement:
+
+The Stats items (bed/bath/sqft), the Copy (headline/description), and the Agent (name/title/phone) should visually align on the same horizontal band.
+
+Specifically: the Stats group’s text baseline should align with the Agent phone number baseline, and the Copy block should align to that same band.
+
+This is an alignment goal only; do not draw any horizontal lines.
+
+Implementation:
+
+Create a shared “row baseline” by controlling padding/margins:
+
+define a consistent top offset for the bottom-inner content
+
+ensure stats list and agent info are vertically aligned via flex alignment and consistent padding-top
+
+Avoid using arbitrary borders that create “x-axis lines”.
+
+B4) Headline/Description rules
+
+There should be vertical dividers before and after the copy column (those are the Y-axis lines).
+
+There should be NO horizontal rule line under the headline, and NO horizontal rule line under the description.
+
+Description text must be left-aligned.
+
+Headline alignment can remain centered if that’s the PSD; but do not add horizontal lines.
+
+B5) Typography rules (per your latest notes)
+
+Listing Headline: NOT bold
+
+Phone number: NOT bold
+
+Top-right badge (“JUST LISTED AT / FOR SALE AT + price”):
+
+text color = black
+
+text weight = not bold
+
+badge shape must be the angled tag (not a rectangle)
+
+Agent name should stay one line (no truncation). If needed:
+
+give agent name more width by slightly reducing logo box width or adjusting copy column width
+
+use white-space: nowrap; and ensure container allows it
+
+B6) Stats should be one-liners with the icons
+
+Each stat row should be: [icon] [value + label on one line]
+
+e.g. icon + “4 bedrooms” on the same line
+
+No multi-line wrapping of “bedrooms/bathrooms/sq. ft” unless absolutely necessary; if it wraps, widen the stats column or reduce font slightly.
+
+B7) Fill the empty bottom whitespace
+
+There’s still too much empty space. We can reduce it by:
+
+slightly increasing photo block heights (the 2 smaller images row)
+
+slightly increasing copy and stats font sizes
+
+slightly increasing bottom section padding density and balancing column sizes
+
+Do this while preserving 8.5x11 @ 300 DPI dimensions and keeping everything within the page.
+
+C) Updated layout diagram (reference)
+
+Overall page: 2550 × 3300
+
+HEADER (fixed height)
+┌──────────────────────────────────────────────────────────────────────────┐
+│ [VERT BAR] LOGO + ADDRESS (no overlap) [ANGLED BADGE] │
+└──────────────────────────────────────────────────────────────────────────┘
+
+PHOTOS (hero + 2/3 images) — fills top portion
+┌──────────────────────────────────────────────────────────────────────────┐
+│ HERO PHOTO │
+├──────────────────────────────────────────────────────────────────────────┤
+│ PHOTO 2 (left) PHOTO 3 (right) │
+└──────────────────────────────────────────────────────────────────────────┘
+
+BOTTOM CONTENT (only Y-axis dividers; no X-axis rules)
+┌──────────────────────────────────────────────────────────────────────────┐
+│ STATS (icons+one-line text) │ COPY (headline + desc) │ AGENT (photo+info) │
+│ │ │ │
+│ [bed] 4 bedrooms │ Headline (NOT bold) │ agent photo + logo│
+│ [bath] 2 bathrooms │ Description (left) │ Name (1 line) │
+│ [sqft] 1,850 sq. ft │ │ Title │
+│ │ │ Phone (NOT bold) │
+│ │ │ │
+│ (Y divider height matches this content block; NOT to page bottom) │
+└──────────────────────────────────────────────────────────────────────────┘
+
+Dividers:
+
+Header: one Y bar at far left near logo/address (thicker, not touching text)
+
+Bottom: two Y bars between columns, height = content block height only
+
+No X-axis lines anywhere (no horizontal rules).
+
+D) Concrete CSS implementation guidance (do this in server/templates/flyer-template.html)
+
+Remove any border-top, border-bottom, or hr used for the bottom copy rules.
+
+Do not use border-left on the full-height .bottom-section container if it forces full-height lines.
+
+Create a .bottom-inner wrapper inside .bottom-section:
+
+.bottom-section remains the fixed region (height math unchanged)
+
+.bottom-inner is display:grid for the 3 columns, but it should size to content height and be top-aligned
+
+Add two vertical dividers as pseudo-elements anchored to .bottom-inner:
+
+positioned at the column boundaries (after stats col; after copy col)
+
+height equals .bottom-inner content height
+
+thickness increased to match PSD (e.g. 6–10px depending on scale)
+
+color a medium gray like the reference (not too light)
+
+Ensure dividers do not overlap text:
+
+dividers sit in the column gap space
+
+provide adequate padding so text never touches lines
+
+Stats rows: enforce one-line layout:
+
+display:flex; align-items:center; white-space:nowrap;
+
+Agent name: enforce one line and prevent truncation:
+
+widen the agent text container or reduce logo box width
+
+white-space:nowrap; overflow:visible; text-overflow:clip;
+
+Also: ensure address text is NOT bold.
+
+E) Icons: match PSD
+
+We’re missing/incorrect icons at times. Use one of these:
+
+Inline SVG icons (preferred for Puppeteer reliability) with consistent sizing.
+
+If you want this even closer to the PSD, extract icon SVGs directly from:
+
+the provided PSDs (hint: /mnt/data/SGR_Flyer-2.psd and /mnt/data/SGR_Flyer-2 (1).psd)
+
+or from the annotated JPG (/mnt/data/Ad_Graphics_Square_Annotation copy (1).jpg)
+Then replace placeholders with those exact SVG paths.
+
+Checklist (Replit must verify each item with a test render)
+
+Render tests must be done for BOTH:
+
+outputType=pdf (Download)
+
+outputType=pngPreview (Preview)
+And they must match because Preview is derived from the same PDF (preferred approach).
+
+Preview mirrors Download
+
+Same renderHash for both
+
+Visual parity confirmed (no layout drift)
+
+Header left vertical divider
+
+Does not overlap logo
+
+Does not touch address text
+
+Does not overlap hero photo
+
+Thicker and positioned correctly
+
+Top-right badge
+
+Angled tag shape (not rectangle)
+
+Text color black
+
+Text not bold
+
+Bottom dividers
+
+Only vertical lines (Y-axis)
+
+Exactly two: between stats|copy and copy|agent
+
+Height matches content block (not to bottom of page)
+
+No overlap with any text
+
+No horizontal rules (no X-axis lines)
+
+None under headline
+
+None under description
+
+None creating “T” caps on vertical dividers
+
+Text formatting
+
+Listing headline NOT bold
+
+Phone number NOT bold
+
+Address NOT bold
+
+Description left-aligned
+
+Alignment
+
+Stats block aligns horizontally with copy and agent info band
+
+Stats text baseline aligns with agent phone baseline
+
+No X-axis divider used to achieve alignment
+
+Stats rows
+
+Each stat is one line with its icon (no wrapping)
+
+Agent block
+
+Agent name stays one line (no truncation)
+
+Spyglass logo sits beside agent photo (as in reference)
+
+Reduce excess bottom whitespace
+
+Adjust photo sizing and/or typography to fill space without breaking layout
+
+Deliverable:
+
+Commit CSS/template changes and any flyer-generator changes required for the “PDF → PNG preview” approach.
+
+Confirm final screenshots: preview and pdf-derived png match.

@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import Handlebars from 'handlebars';
 import { execSync } from 'child_process';
+import crypto from 'crypto';
 
 // Helper function to convert image URL to base64
 async function imageToBase64(imageUrl: string): Promise<string> {
@@ -133,20 +134,61 @@ export interface FlyerData {
 const FLYER_WIDTH = 2550;
 const FLYER_HEIGHT = 3300;
 
+// Template version for cache invalidation
+const TEMPLATE_VERSION = 'v2.0.0';
+
 export type OutputType = 'pngPreview' | 'pdf';
 
-// Unified render config for pixel-identical output
+// Unified render config - MUST be identical for PNG and PDF for pixel parity
 const RENDER_CONFIG = {
   width: FLYER_WIDTH,
   height: FLYER_HEIGHT,
   deviceScaleFactor: 1,
-  mediaType: 'screen' as const  // Use screen for both PNG and PDF to ensure identical layout
+  mediaType: 'print' as const  // Use 'print' for both to match PDF output exactly
 };
 
+// Generate deterministic hash for render verification (preview/download parity check)
+function generateRenderHash(data: FlyerData, outputSettings: typeof RENDER_CONFIG): string {
+  const hashInput = JSON.stringify({
+    templateVersion: TEMPLATE_VERSION,
+    // Only include layout-affecting data (not image content which is huge)
+    address: data.address,
+    price: data.price,
+    statusLabel: data.statusLabel,
+    beds: data.beds,
+    baths: data.baths,
+    sqft: data.sqft,
+    headline: data.headline || '',
+    description: data.description,
+    agentName: data.agentName,
+    agentTitle: data.agentTitle,
+    agentPhone: data.agentPhone,
+    hasMainPhoto: !!data.mainPhoto,
+    hasPhoto2: !!data.photo2,
+    hasPhoto3: !!data.photo3,
+    hasAgentPhoto: !!data.agentPhoto,
+    // Output settings
+    renderWidth: outputSettings.width,
+    renderHeight: outputSettings.height,
+    deviceScaleFactor: outputSettings.deviceScaleFactor,
+    mediaType: outputSettings.mediaType
+  });
+  
+  return crypto.createHash('sha256').update(hashInput).digest('hex').slice(0, 16);
+}
+
 export async function generatePrintFlyer(data: FlyerData, outputType: OutputType = 'pngPreview'): Promise<Buffer> {
-  console.log(`[FlyerGenerator] Generating ${outputType} flyer...`);
-  console.log(`[FlyerGenerator] Render config: viewport=${RENDER_CONFIG.width}x${RENDER_CONFIG.height}, dpr=${RENDER_CONFIG.deviceScaleFactor}, mediaType=${RENDER_CONFIG.mediaType}`);
-  console.log('Converting images to base64...');
+  // Generate render hash for parity verification
+  const renderHash = generateRenderHash(data, RENDER_CONFIG);
+  
+  console.log(`[FlyerGenerator] ===== RENDER START =====`);
+  console.log(`[FlyerGenerator] Output type: ${outputType}`);
+  console.log(`[FlyerGenerator] Render hash: ${renderHash}`);
+  console.log(`[FlyerGenerator] Template version: ${TEMPLATE_VERSION}`);
+  console.log(`[FlyerGenerator] Viewport: ${RENDER_CONFIG.width}x${RENDER_CONFIG.height}`);
+  console.log(`[FlyerGenerator] Device scale: ${RENDER_CONFIG.deviceScaleFactor}`);
+  console.log(`[FlyerGenerator] Media type: ${RENDER_CONFIG.mediaType}`);
+  console.log(`[FlyerGenerator] Converting images to base64...`);
   
   // Convert all images to base64 in parallel
   const [logoB64, mainPhotoB64, photo2B64, photo3B64, agentPhotoB64] = await Promise.all([
@@ -157,11 +199,11 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     data.agentPhoto ? imageToBase64(data.agentPhoto) : Promise.resolve('')
   ]);
   
-  console.log('Images converted:', {
+  console.log('[FlyerGenerator] Images converted:', {
     logo: logoB64 ? 'OK' : 'FAILED',
-    mainPhoto: mainPhotoB64 ? 'OK' : 'FAILED/EMPTY',
-    photo2: photo2B64 ? 'OK' : 'FAILED/EMPTY',
-    photo3: photo3B64 ? 'OK' : 'FAILED/EMPTY',
+    mainPhoto: mainPhotoB64 ? 'OK' : 'EMPTY',
+    photo2: photo2B64 ? 'OK' : 'EMPTY',
+    photo3: photo3B64 ? 'OK' : 'EMPTY',
     agentPhoto: agentPhotoB64 ? 'OK' : 'EMPTY'
   });
   
@@ -183,7 +225,7 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
   
   // Find system-installed Chromium
   const chromiumPath = findChromiumPath();
-  console.log('Using Chromium at:', chromiumPath || 'Puppeteer default');
+  console.log('[FlyerGenerator] Using Chromium at:', chromiumPath || 'Puppeteer default');
   
   const launchOptions: any = {
     headless: true,
@@ -218,7 +260,7 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
       deviceScaleFactor: RENDER_CONFIG.deviceScaleFactor
     });
     
-    // 2. Emulate consistent media type for both outputs (prevents @media print drift)
+    // 2. Emulate 'print' media type for BOTH outputs to ensure identical CSS behavior
     await page.emulateMediaType(RENDER_CONFIG.mediaType);
     
     // 3. Load HTML content
@@ -246,32 +288,39 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     });
     
     // 6. Small delay to ensure layout is fully settled
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 150));
     
     console.log(`[FlyerGenerator] Page ready, capturing ${outputType}...`);
     
+    let result: Buffer;
+    
     if (outputType === 'pdf') {
-      // Generate PDF with exact pixel dimensions (not "Letter" format)
+      // Generate PDF with exact pixel dimensions
       const pdf = await page.pdf({
         printBackground: true,
         width: `${RENDER_CONFIG.width}px`,
         height: `${RENDER_CONFIG.height}px`,
         pageRanges: '1',
-        preferCSSPageSize: false,  // Use our explicit dimensions
+        preferCSSPageSize: false,
         margin: { top: 0, right: 0, bottom: 0, left: 0 }
       });
-      console.log(`[FlyerGenerator] PDF generated, size: ${pdf.length} bytes`);
-      return Buffer.from(pdf);
+      result = Buffer.from(pdf);
+      console.log(`[FlyerGenerator] PDF generated, size: ${result.length} bytes`);
     } else {
-      // Generate PNG preview with exact clip (same dimensions as PDF)
+      // Generate PNG with exact clip (same dimensions as PDF)
       const screenshot = await page.screenshot({
         type: 'png',
         fullPage: false,
         clip: { x: 0, y: 0, width: RENDER_CONFIG.width, height: RENDER_CONFIG.height }
       });
-      console.log(`[FlyerGenerator] PNG generated, size: ${screenshot.length} bytes`);
-      return Buffer.from(screenshot);
+      result = Buffer.from(screenshot);
+      console.log(`[FlyerGenerator] PNG generated, size: ${result.length} bytes`);
     }
+    
+    console.log(`[FlyerGenerator] ===== RENDER COMPLETE =====`);
+    console.log(`[FlyerGenerator] Output: ${outputType}, Hash: ${renderHash}`);
+    
+    return result;
   } finally {
     await browser.close();
   }
@@ -279,7 +328,6 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
 
 export function formatAddressForFlyer(address: string): string {
   // Simple uppercase formatting - no character splitting
-  // Just normalize spacing and uppercase
   const normalized = address.toUpperCase().replace(/\s+/g, ' ').trim();
   return normalized;
 }
