@@ -37,6 +37,7 @@ export const TIMELINE_EVENT_CONFIG: Record<string, TimelineEventConfig> = {
   'asset_downloaded': { icon: Download, color: 'text-green-600', bgColor: 'bg-green-100 dark:bg-green-900/30', label: 'Download' },
   'asset_deleted': { icon: Trash2, color: 'text-red-600', bgColor: 'bg-red-100 dark:bg-red-900/30', label: 'Deleted' },
   'asset_created': { icon: Palette, color: 'text-pink-600', bgColor: 'bg-pink-100 dark:bg-pink-900/30', label: 'Asset' },
+  'marketing_created': { icon: Palette, color: 'text-pink-600', bgColor: 'bg-pink-100 dark:bg-pink-900/30', label: 'Marketing' },
   
   // CMA events
   'cma_created': { icon: TrendingUp, color: 'text-green-600', bgColor: 'bg-green-100 dark:bg-green-900/30', label: 'CMA Created' },
@@ -61,6 +62,8 @@ export const TIMELINE_EVENT_CONFIG: Record<string, TimelineEventConfig> = {
   'slack_notification': { icon: MessageSquare, color: 'text-purple-600', bgColor: 'bg-purple-100 dark:bg-purple-900/30', label: 'Slack' },
   'channel_created': { icon: MessageSquare, color: 'text-purple-600', bgColor: 'bg-purple-100 dark:bg-purple-900/30', label: 'Channel' },
   'filter_created': { icon: FileCheck, color: 'text-blue-600', bgColor: 'bg-blue-100 dark:bg-blue-900/30', label: 'Filter' },
+  'label_created': { icon: FileCheck, color: 'text-blue-600', bgColor: 'bg-blue-100 dark:bg-blue-900/30', label: 'Label' },
+  'gmail_pending': { icon: Clock, color: 'text-yellow-600', bgColor: 'bg-yellow-100 dark:bg-yellow-900/30', label: 'Gmail Pending' },
   
   // Default fallback
   'default': { icon: Pin, color: 'text-gray-600', bgColor: 'bg-gray-100 dark:bg-gray-800/50', label: 'Activity' },
@@ -74,11 +77,11 @@ export function getCategoryFromType(eventType: string): string {
   if (eventType.startsWith('transaction_') || eventType === 'status_changed') return 'transaction';
   if (eventType.startsWith('mls_') || eventType === 'price_changed' || eventType === 'photos_updated') return 'mls';
   if (eventType.startsWith('document_')) return 'documents';
-  if (eventType.includes('graphic') || eventType.includes('flyer') || eventType.includes('asset') || eventType === 'quick_create_all') return 'marketing';
+  if (eventType.includes('graphic') || eventType.includes('flyer') || eventType.includes('asset') || eventType.includes('marketing') || eventType === 'quick_create_all') return 'marketing';
   if (eventType.startsWith('cma_')) return 'cma';
   if (eventType.startsWith('coordinator_') || eventType === 'note_added') return 'team';
   if (eventType.includes('date') || eventType === 'deadline_approaching') return 'dates';
-  if (eventType === 'email_sent' || eventType === 'slack_notification' || eventType === 'channel_created' || eventType === 'filter_created') return 'communication';
+  if (eventType === 'email_sent' || eventType === 'slack_notification' || eventType === 'channel_created' || eventType === 'filter_created' || eventType === 'label_created' || eventType === 'gmail_pending') return 'communication';
   return 'other';
 }
 

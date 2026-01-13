@@ -112,6 +112,7 @@ export async function registerRoutes(
         transactionId: transaction.id,
         type: "transaction_created",
         description: `Transaction created for ${transaction.propertyAddress}`,
+        category: "transaction",
       });
 
       // Create real Slack channel if requested
@@ -149,6 +150,7 @@ export async function registerRoutes(
             transactionId: transaction.id,
             type: "channel_created",
             description: `Slack channel #${slackResult.channelName} created`,
+            category: "team",
           });
 
           // Collect all Slack user IDs to invite (agent + creator + coordinators)
@@ -274,6 +276,7 @@ export async function registerRoutes(
               transactionId: transaction.id,
               type: "gmail_pending",
               description: `Gmail filter pending - waiting for ${onBehalfOfEmail} to enable email filtering`,
+              category: "communication",
             });
           } else if (userId) {
             // Creating for the logged-in user - check their consent
@@ -306,18 +309,21 @@ export async function registerRoutes(
                   transactionId: transaction.id,
                   type: "filter_created",
                   description: `Gmail label and filter created for "${transaction.propertyAddress}"`,
+                  category: "communication",
                 });
               } else if (gmailResult.filterNeedsManualSetup) {
                 await storage.createActivity({
                   transactionId: transaction.id,
                   type: "label_created",
                   description: `Gmail label created for "${transaction.propertyAddress}". Filter requires manual setup in Gmail settings.`,
+                  category: "communication",
                 });
               } else {
                 await storage.createActivity({
                   transactionId: transaction.id,
                   type: "label_created",
                   description: `Gmail label created for "${transaction.propertyAddress}"`,
+                  category: "communication",
                 });
               }
             }
@@ -373,6 +379,7 @@ export async function registerRoutes(
               transactionId: transaction.id,
               type: "mls_fetched",
               description: "MLS data and CMA comparables loaded from Repliers",
+              category: "mls",
             });
 
             // Post MLS listing info to Slack channel if it exists and listing is active/pending
@@ -527,6 +534,7 @@ export async function registerRoutes(
         transactionId: transaction.id,
         type: "mls_refreshed",
         description: mlsData ? `MLS data refreshed with ${mlsData.photos?.length || 0} photos` : "MLS data refresh attempted (no data found)",
+        category: "mls",
       });
 
       res.json(updated);
@@ -692,6 +700,7 @@ export async function registerRoutes(
         transactionId: req.params.id,
         type: "marketing_created",
         description: `Marketing asset created: ${type}`,
+        category: "marketing",
       });
 
       // Upload to Slack if requested and channel exists
@@ -794,6 +803,7 @@ export async function registerRoutes(
         transactionId: req.params.id,
         type: "document_uploaded",
         description: `Contract document uploaded: ${docLabel}`,
+        category: "documents",
       });
 
       // Optionally notify Slack about the upload
@@ -1166,6 +1176,7 @@ export async function registerRoutes(
               transactionId: txn.id,
               type: "filter_created",
               description: `Gmail filter created for "${txn.propertyAddress}" after ${user.email} enabled email filtering`,
+              category: "communication",
             });
             
             processed++;

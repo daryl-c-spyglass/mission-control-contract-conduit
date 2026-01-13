@@ -80,6 +80,7 @@ async function syncTransactionMLS(transaction: Transaction): Promise<SyncResult>
       transactionId: transaction.id,
       type: "mls_auto_synced",
       description: `Auto-synced MLS data: ${mlsData.photos?.length || 0} photos, ${cmaData?.length || 0} comparables`,
+      category: "mls",
     });
 
     result.success = true;
