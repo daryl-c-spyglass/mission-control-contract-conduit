@@ -19,10 +19,20 @@ import spyglassLogoWhite from "@assets/White-Orange_(1)_1767129299733.png";
 import spyglassLogoBlack from "@assets/Large_Logo_1767129431992.jpeg";
 import leadingRELogo from "@assets/download_(3)_1767129649170.png";
 
+// Configuration interface for storing and restoring social graphic settings
+export interface SocialGraphicConfig {
+  status: string;
+  photoUrl?: string;
+  description?: string;
+}
+
 interface MarketingMaterialsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction: Transaction;
+  initialData?: SocialGraphicConfig;
+  assetId?: number;
+  onAssetSaved?: () => void;
 }
 
 const STATUS_OPTIONS = [
@@ -36,13 +46,22 @@ const STATUS_OPTIONS = [
 
 type StatusType = typeof STATUS_OPTIONS[number]["value"];
 
-export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: MarketingMaterialsDialogProps) {
+export function MarketingMaterialsDialog({ 
+  open, 
+  onOpenChange, 
+  transaction,
+  initialData,
+  assetId,
+  onAssetSaved,
+}: MarketingMaterialsDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const squareCanvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  
+  const isEditMode = Boolean(initialData && assetId);
   
   const [status, setStatus] = useState<StatusType>("just_listed");
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
@@ -56,21 +75,38 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
   const [postToSlack, setPostToSlack] = useState(true);
 
   const saveAssetMutation = useMutation({
-    mutationFn: async ({ type, imageData, fileName }: { type: string; imageData: string; fileName: string }) => {
-      const res = await apiRequest("POST", `/api/transactions/${transaction.id}/marketing-assets`, {
-        type,
-        imageData,
-        fileName,
-        postToSlack,
-      });
-      return await res.json();
+    mutationFn: async ({ type, imageData, fileName, config }: { type: string; imageData: string; fileName: string; config?: SocialGraphicConfig }) => {
+      const metadata = { config };
+      
+      if (isEditMode && assetId) {
+        // Update existing asset
+        const res = await apiRequest("PATCH", `/api/transactions/${transaction.id}/marketing-assets/${assetId}`, {
+          imageData,
+          fileName,
+          metadata,
+        });
+        return await res.json();
+      } else {
+        // Create new asset
+        const res = await apiRequest("POST", `/api/transactions/${transaction.id}/marketing-assets`, {
+          type,
+          imageData,
+          fileName,
+          postToSlack,
+          metadata,
+        });
+        return await res.json();
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/transactions/${transaction.id}/marketing-assets`] });
       toast({
-        title: "Asset Saved",
-        description: postToSlack ? "Marketing asset saved and posted to Slack." : "Marketing asset saved.",
+        title: isEditMode ? "Asset Updated" : "Asset Saved",
+        description: isEditMode 
+          ? "Marketing asset updated successfully." 
+          : (postToSlack ? "Marketing asset saved and posted to Slack." : "Marketing asset saved."),
       });
+      onAssetSaved?.();
     },
     onError: (error: Error) => {
       toast({
@@ -86,6 +122,43 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
   const allImages = [...uploadedPhotos, ...propertyImages, ...mlsImages].filter(Boolean);
 
   const currentImage = allImages[selectedPhotoIndex] || null;
+  
+  // Initialize state from initialData when in edit mode
+  useEffect(() => {
+    if (open && isEditMode && initialData) {
+      // Set status from initialData
+      if (initialData.status) {
+        const statusValue = STATUS_OPTIONS.find(s => s.value === initialData.status || s.label === initialData.status)?.value;
+        if (statusValue) {
+          setStatus(statusValue);
+        }
+      }
+      // Set description
+      if (initialData.description) {
+        setSocialDescription(initialData.description);
+      }
+      // If there's a saved photo URL, find it in allImages or add to uploadedPhotos
+      if (initialData.photoUrl) {
+        const photoIndex = allImages.findIndex(img => img === initialData.photoUrl);
+        if (photoIndex >= 0) {
+          setSelectedPhotoIndex(photoIndex);
+        }
+      }
+    }
+  }, [open, isEditMode, initialData]);
+  
+  // Reset state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setStatus("just_listed");
+      setSelectedPhotoIndex(0);
+      setGeneratedLandscape(null);
+      setGeneratedSquare(null);
+      setGeneratedAltStyle(null);
+      setUploadedPhotos([]);
+      setSocialDescription("");
+    }
+  }, [open]);
 
   const getStatusLabel = (statusValue: StatusType) => {
     return STATUS_OPTIONS.find(s => s.value === statusValue)?.label?.toUpperCase() || "JUST LISTED";
@@ -475,8 +548,15 @@ export function MarketingMaterialsDialog({ open, onOpenChange, transaction }: Ma
     link.download = filename;
     link.click();
     
+    // Build config to store with the asset
+    const config: SocialGraphicConfig = {
+      status: status,
+      photoUrl: currentImage,
+      description: socialDescription,
+    };
+    
     // Save to database and optionally post to Slack
-    saveAssetMutation.mutate({ type, imageData: dataUrl, fileName: filename });
+    saveAssetMutation.mutate({ type, imageData: dataUrl, fileName: filename, config });
   };
 
   const generateAltStyleGraphic = async (img: HTMLImageElement): Promise<string> => {
@@ -685,9 +765,11 @@ Thank you for your interest!`;
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Marketing Materials</DialogTitle>
+          <DialogTitle>{isEditMode ? 'Edit Marketing Graphic' : 'Marketing Materials'}</DialogTitle>
           <DialogDescription>
-            Generate professional marketing graphics for {transaction.propertyAddress}
+            {isEditMode 
+              ? 'Update your marketing graphic with new settings.' 
+              : `Generate professional marketing graphics for ${transaction.propertyAddress}`}
           </DialogDescription>
         </DialogHeader>
 
