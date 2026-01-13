@@ -54,9 +54,12 @@ import {
   Eye,
   Pencil,
 } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CreateFlyerDialog, FlyerAssetConfig } from "./create-flyer-dialog";
 import { MarketingMaterialsDialog, SocialGraphicConfig } from "./marketing-materials-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -145,6 +148,281 @@ function FeatureSection({ title, items, defaultOpen = false }: { title: string; 
   );
 }
 
+// Document type options
+type DocumentType = 'contract' | 'amendment' | 'addendum' | 'disclosure' | 'inspection' | 'appraisal' | 'other';
+
+const DOCUMENT_TYPE_OPTIONS: { value: DocumentType; label: string }[] = [
+  { value: 'contract', label: 'Contract' },
+  { value: 'amendment', label: 'Amendment' },
+  { value: 'addendum', label: 'Addendum' },
+  { value: 'disclosure', label: 'Disclosure' },
+  { value: 'inspection', label: 'Inspection Report' },
+  { value: 'appraisal', label: 'Appraisal' },
+  { value: 'other', label: 'Other' },
+];
+
+const DOCUMENT_TYPE_COLORS: Record<DocumentType, string> = {
+  contract: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  amendment: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+  addendum: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  disclosure: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+  inspection: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+  appraisal: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200',
+  other: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+};
+
+interface DocumentUploadDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onUpload: (data: { name: string; documentType: DocumentType; file: File; notes?: string }) => void;
+  isUploading: boolean;
+}
+
+function DocumentUploadDialog({ isOpen, onClose, onUpload, isUploading }: DocumentUploadDialogProps) {
+  const [name, setName] = useState('');
+  const [documentType, setDocumentType] = useState<DocumentType>('contract');
+  const [file, setFile] = useState<File | null>(null);
+  const [notes, setNotes] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      if (!name) {
+        setName(selectedFile.name.replace(/\.[^/.]+$/, ''));
+      }
+    }
+  };
+
+  const handleSubmit = () => {
+    if (!name || !file) return;
+    onUpload({ name, documentType, file, notes: notes || undefined });
+  };
+
+  const handleClose = () => {
+    setName('');
+    setDocumentType('contract');
+    setFile(null);
+    setNotes('');
+    onClose();
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Upload Document</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="doc-name">Document Name *</Label>
+            <Input
+              id="doc-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Sales Contract, Amendment #1"
+              data-testid="input-document-name"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Document Type</Label>
+            <Select value={documentType} onValueChange={(v) => setDocumentType(v as DocumentType)}>
+              <SelectTrigger data-testid="select-document-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DOCUMENT_TYPE_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>File</Label>
+            {file ? (
+              <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-2 min-w-0">
+                  <File className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(file.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setFile(null)}>
+                  Change
+                </Button>
+              </div>
+            ) : (
+              <div 
+                className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  onChange={handleFileSelect}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.jpeg,.png"
+                  data-testid="input-document-file"
+                />
+                <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  Click to select a file
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  PDF, DOC, DOCX, XLS, XLSX, CSV, JPG, PNG
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="doc-notes">Notes (optional)</Label>
+            <Textarea
+              id="doc-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add any notes about this document..."
+              rows={2}
+              data-testid="input-document-notes"
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="outline" onClick={handleClose}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={!name || !file || isUploading} data-testid="button-submit-upload">
+            {isUploading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Upload Document
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface DocumentPreviewModalProps {
+  document: ContractDocument | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onDownload: (doc: ContractDocument) => void;
+}
+
+function DocumentPreviewModal({ document, isOpen, onClose, onDownload }: DocumentPreviewModalProps) {
+  if (!document) return null;
+
+  const getFileExtension = (fileName: string) => {
+    return fileName.split('.').pop()?.toLowerCase() || '';
+  };
+
+  const extension = getFileExtension(document.fileName);
+  const mimeType = document.fileType;
+
+  const renderPreview = () => {
+    if (extension === 'pdf' || mimeType === 'application/pdf') {
+      return (
+        <iframe
+          src={`${document.fileData}#toolbar=1&navpanes=0`}
+          className="w-full h-full min-h-[500px] rounded-lg"
+          title={document.name || document.fileName}
+        />
+      );
+    }
+
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension) || mimeType?.startsWith('image/')) {
+      return (
+        <div className="flex items-center justify-center h-full min-h-[400px] bg-muted rounded-lg p-4">
+          <img
+            src={document.fileData}
+            alt={document.name || document.fileName}
+            className="max-w-full max-h-[60vh] object-contain rounded"
+          />
+        </div>
+      );
+    }
+
+    if (['doc', 'docx'].includes(extension) || mimeType?.includes('word') || mimeType?.includes('document')) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full min-h-[300px] bg-muted rounded-lg p-8 text-center">
+          <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium mb-2">Word Document</h3>
+          <p className="text-muted-foreground mb-4">
+            Word documents cannot be previewed directly in the browser.
+          </p>
+          <Button onClick={() => onDownload(document)}>
+            <Download className="h-4 w-4 mr-2" />
+            Download to View
+          </Button>
+        </div>
+      );
+    }
+
+    if (['xls', 'xlsx', 'csv'].includes(extension) || mimeType?.includes('spreadsheet') || mimeType?.includes('excel')) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full min-h-[300px] bg-muted rounded-lg p-8 text-center">
+          <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium mb-2">Spreadsheet</h3>
+          <p className="text-muted-foreground mb-4">
+            Spreadsheet files cannot be previewed directly in the browser.
+          </p>
+          <Button onClick={() => onDownload(document)}>
+            <Download className="h-4 w-4 mr-2" />
+            Download to View
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center h-full min-h-[300px] bg-muted rounded-lg p-8 text-center">
+        <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-medium mb-2">Preview Not Available</h3>
+        <p className="text-muted-foreground mb-4">
+          This file type cannot be previewed in the browser.
+        </p>
+        <Button onClick={() => onDownload(document)}>
+          <Download className="h-4 w-4 mr-2" />
+          Download File
+        </Button>
+      </div>
+    );
+  };
+
+  const docType = (document.documentType || 'other') as DocumentType;
+  const typeLabel = DOCUMENT_TYPE_OPTIONS.find(o => o.value === docType)?.label || 'Other';
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle>{document.name || document.fileName}</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            {typeLabel} • {document.fileName} ({formatFileSize(document.fileSize)})
+          </p>
+        </DialogHeader>
+        
+        <div className="flex-1 overflow-auto">
+          {renderPreview()}
+        </div>
+
+        <DialogFooter className="flex justify-between sm:justify-between gap-2">
+          <Button variant="outline" onClick={() => onDownload(document)}>
+            <Download className="h-4 w-4 mr-2" />
+            Download
+          </Button>
+          <Button onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // Template listing data type
 interface TemplateListing {
   mlsNumber: string;
@@ -200,6 +478,8 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [selectedCMAProperty, setSelectedCMAProperty] = useState<CMAComparable | null>(null);
   const [cmaPhotoIndex, setCmaPhotoIndex] = useState(0);
   const [cmaFullscreenOpen, setCmaFullscreenOpen] = useState(false);
+  const [documentUploadOpen, setDocumentUploadOpen] = useState(false);
+  const [previewDocument, setPreviewDocument] = useState<ContractDocument | null>(null);
   
   // Photo navigation for MLS gallery
   const photos = mlsData?.photos || mlsData?.images || [];
@@ -237,17 +517,20 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   });
 
   const uploadDocumentMutation = useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async (data: { name: string; documentType: string; file: File; notes?: string }) => {
       const reader = new FileReader();
       return new Promise<ContractDocument>((resolve, reject) => {
         reader.onload = async () => {
           const fileData = reader.result as string;
           try {
             const res = await apiRequest("POST", `/api/transactions/${transaction.id}/documents`, {
-              fileName: file.name,
+              name: data.name,
+              documentType: data.documentType,
+              fileName: data.file.name,
               fileData,
-              fileType: file.type,
-              fileSize: file.size,
+              fileType: data.file.type,
+              fileSize: data.file.size,
+              notes: data.notes,
             });
             resolve(await res.json());
           } catch (error) {
@@ -255,11 +538,12 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           }
         };
         reader.onerror = () => reject(new Error("Failed to read file"));
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(data.file);
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/transactions/${transaction.id}/documents`] });
+      setDocumentUploadOpen(false);
       toast({ title: "Document uploaded successfully" });
     },
     onError: () => {
@@ -280,17 +564,13 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
     },
   });
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      Array.from(files).forEach(file => {
-        uploadDocumentMutation.mutate(file);
-      });
-    }
-    // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+  const handleDocumentUpload = (data: { name: string; documentType: DocumentType; file: File; notes?: string }) => {
+    uploadDocumentMutation.mutate({
+      name: data.name,
+      documentType: data.documentType,
+      file: data.file,
+      notes: data.notes,
+    });
   };
 
   const downloadDocument = (doc: ContractDocument) => {
@@ -1466,93 +1746,114 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         <TabsContent value="documents" className="space-y-6">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <h2 className="text-lg font-semibold">Contract Documents</h2>
-            <div>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                className="hidden"
-                multiple
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                data-testid="input-file-upload"
-              />
-              <Button
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadDocumentMutation.isPending}
-                data-testid="button-upload-document"
-              >
-                {uploadDocumentMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Upload className="h-4 w-4 mr-2" />
-                )}
-                Upload Documents
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              onClick={() => setDocumentUploadOpen(true)}
+              data-testid="button-upload-document"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Documents
+            </Button>
           </div>
 
           {documentsLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-16 w-full rounded-md" />
+                <Skeleton key={i} className="h-24 w-full rounded-md" />
               ))}
             </div>
           ) : documents.length > 0 ? (
             <div className="space-y-3">
-              {documents.map((doc) => (
-                <Card key={doc.id} data-testid={`card-document-${doc.id}`}>
-                  <CardContent className="flex items-center gap-4 py-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
-                      <File className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{doc.fileName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatFileSize(doc.fileSize)} {doc.uploadedBy && `| Uploaded by ${doc.uploadedBy}`}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => downloadDocument(doc)}
-                        data-testid={`button-download-doc-${doc.id}`}
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => deleteDocumentMutation.mutate(doc.id)}
-                        disabled={deleteDocumentMutation.isPending}
-                        data-testid={`button-delete-doc-${doc.id}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {documents.map((doc) => {
+                const docType = (doc.documentType || 'other') as DocumentType;
+                const typeLabel = DOCUMENT_TYPE_OPTIONS.find(o => o.value === docType)?.label || 'Other';
+                const typeColor = DOCUMENT_TYPE_COLORS[docType] || DOCUMENT_TYPE_COLORS.other;
+                
+                return (
+                  <Card key={doc.id} className="hover:bg-muted/50 transition-colors" data-testid={`card-document-${doc.id}`}>
+                    <CardContent className="flex items-start gap-4 py-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-md bg-muted flex-shrink-0">
+                        <FileText className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium truncate">{doc.name || doc.fileName}</h4>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <Badge className={`${typeColor} text-xs`} variant="secondary">
+                            {typeLabel}
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">
+                            Uploaded {formatDate(doc.createdAt ? new Date(doc.createdAt).toISOString() : null)}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1 truncate">
+                          {doc.fileName} ({formatFileSize(doc.fileSize)})
+                        </p>
+                        {doc.notes && (
+                          <p className="text-sm text-muted-foreground mt-2 italic">
+                            "{doc.notes}"
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setPreviewDocument(doc)}
+                          data-testid={`button-preview-doc-${doc.id}`}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => downloadDocument(doc)}
+                          data-testid={`button-download-doc-${doc.id}`}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => deleteDocumentMutation.mutate(doc.id)}
+                          disabled={deleteDocumentMutation.isPending}
+                          data-testid={`button-delete-doc-${doc.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <Card>
               <CardContent className="py-12 text-center">
                 <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
                 <h3 className="font-medium mb-2">No Documents Yet</h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground">
                   Upload contract documents, amendments, and other files for this transaction.
                 </p>
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  data-testid="button-upload-first-document"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Documents
-                </Button>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Use the "Upload Documents" button above to get started.
+                </p>
               </CardContent>
             </Card>
           )}
+
+          <DocumentUploadDialog
+            isOpen={documentUploadOpen}
+            onClose={() => setDocumentUploadOpen(false)}
+            onUpload={handleDocumentUpload}
+            isUploading={uploadDocumentMutation.isPending}
+          />
+
+          <DocumentPreviewModal
+            document={previewDocument}
+            isOpen={!!previewDocument}
+            onClose={() => setPreviewDocument(null)}
+            onDownload={downloadDocument}
+          />
         </TabsContent>
 
         <TabsContent value="marketing" className="space-y-6">

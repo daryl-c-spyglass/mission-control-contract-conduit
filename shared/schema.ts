@@ -95,10 +95,13 @@ export const marketingAssets = pgTable("marketing_assets", {
 export const contractDocuments = pgTable("contract_documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   transactionId: varchar("transaction_id").notNull(),
+  name: text("name").default('Untitled Document'), // User-defined document name
+  documentType: text("document_type").default('other'), // contract, amendment, addendum, disclosure, inspection, appraisal, other
   fileName: text("file_name").notNull(),
   fileData: text("file_data").notNull(), // Base64 encoded file data
   fileType: text("file_type").notNull(), // MIME type (application/pdf, etc.)
   fileSize: integer("file_size").notNull(), // Size in bytes
+  notes: text("notes"), // Optional notes about the document
   uploadedBy: text("uploaded_by"), // User who uploaded
   createdAt: timestamp("created_at").defaultNow(),
 });

@@ -714,7 +714,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
 
-      const { fileName, fileData, fileType, fileSize } = req.body;
+      const { name, documentType, fileName, fileData, fileType, fileSize, notes } = req.body;
       
       if (!fileName || !fileData || !fileType || !fileSize) {
         return res.status(400).json({ message: "Missing required file data" });
@@ -722,24 +722,28 @@ export async function registerRoutes(
 
       const doc = await storage.createContractDocument({
         transactionId: req.params.id,
+        name: name || fileName.replace(/\.[^/.]+$/, ''), // Use name or filename without extension
+        documentType: documentType || 'other',
         fileName,
         fileData,
         fileType,
         fileSize,
+        notes: notes || null,
         uploadedBy: req.user?.claims?.email || req.user?.claims?.sub,
       });
 
+      const docLabel = name || fileName;
       await storage.createActivity({
         transactionId: req.params.id,
         type: "document_uploaded",
-        description: `Contract document uploaded: ${fileName}`,
+        description: `Contract document uploaded: ${docLabel}`,
       });
 
       // Optionally notify Slack about the upload
       if (transaction.slackChannelId) {
         await postToChannel(
           transaction.slackChannelId,
-          `A new contract document has been uploaded: *${fileName}*`
+          `A new contract document has been uploaded: *${docLabel}*`
         );
       }
 
