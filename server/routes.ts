@@ -1006,7 +1006,7 @@ export async function registerRoutes(
   // ============ Mapbox Token ============
   // Returns the Mapbox token for the property map
   app.get("/api/mapbox-token", isAuthenticated, (req, res) => {
-    const token = process.env['Mapbox_Mission-Control'];
+    const token = process.env.MAPBOX_TOKEN;
     if (!token) {
       console.error('Mapbox token not found in environment');
       return res.status(500).json({ error: 'Mapbox token not configured' });
