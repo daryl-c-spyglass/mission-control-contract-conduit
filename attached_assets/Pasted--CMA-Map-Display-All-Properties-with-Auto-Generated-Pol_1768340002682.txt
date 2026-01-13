@@ -1,0 +1,609 @@
+## CMA Map - Display All Properties with Auto-Generated Polygon Boundary
+
+Update the CMA map to show all comparable properties with price markers and automatically draw a polygon boundary around them (like a convex hull).
+
+---
+
+## Visual Goal
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│        ┌─────────────────────────────────────────┐              │
+│       /  $495K        $550K           $385K      \             │
+│      /                                            \            │
+│     /     $370K    $3.4M    $575K                  \           │
+│    │                                                │          │
+│    │  🔵 SUBJECT     $6.97M                        │          │
+│    │    $435K                     $329K            │          │
+│    │                                                │          │
+│     \    $870K    $1000K     $550K                 /           │
+│      \                                            /            │
+│       \      $1.2M        $562K    $347K        /              │
+│        └────────────────────────────────────────┘              │
+│                                                                 │
+│  [Legend: 🔵 Subject  🟢 Active  🔴 Sold]                      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+- All comparable properties shown as green price markers
+- Subject property shown as blue marker
+- Auto-generated polygon boundary encompasses all properties
+- Polygon has semi-transparent fill with border
+
+---
+
+## Implementation
+
+### CMA Map Component with Auto Polygon
+
+```tsx
+// components/cma-map.tsx
+import { useEffect, useRef, useState, useMemo } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { X, Locate, Maximize2 } from 'lucide-react';
+
+interface CMAMapProps {
+  properties: any[];
+  subjectProperty?: any;
+  showPolygon?: boolean;
+}
+
+export function CMAMap({ properties, subjectProperty, showPolygon = true }: CMAMapProps) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState<any>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
+
+  // Calculate convex hull polygon from all property coordinates
+  const polygonCoordinates = useMemo(() => {
+    const coords: [number, number][] = [];
+    
+    // Add subject property
+    if (subjectProperty?.map?.latitude && subjectProperty?.map?.longitude) {
+      coords.push([subjectProperty.map.longitude, subjectProperty.map.latitude]);
+    }
+    
+    // Add all comparable properties
+    properties.forEach(p => {
+      if (p.map?.latitude && p.map?.longitude) {
+        coords.push([p.map.longitude, p.map.latitude]);
+      }
+    });
+    
+    if (coords.length < 3) return null;
+    
+    // Calculate convex hull
+    return calculateConvexHull(coords);
+  }, [properties, subjectProperty]);
+
+  // Initialize map
+  useEffect(() => {
+    if (!mapContainer.current || map.current) return;
+
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '';
+
+    // Calculate center
+    const allCoords = [
+      ...(subjectProperty?.map ? [[subjectProperty.map.longitude, subjectProperty.map.latitude]] : []),
+      ...properties.filter(p => p.map?.latitude).map(p => [p.map.longitude, p.map.latitude])
+    ];
+    
+    const centerLng = allCoords.length > 0 
+      ? allCoords.reduce((sum, c) => sum + c[0], 0) / allCoords.length 
+      : -97.7431;
+    const centerLat = allCoords.length > 0 
+      ? allCoords.reduce((sum, c) => sum + c[1], 0) / allCoords.length 
+      : 30.2672;
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [centerLng, centerLat],
+      zoom: 11,
+    });
+
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    map.current.on('load', () => {
+      setMapLoaded(true);
+    });
+
+    return () => {
+      markersRef.current.forEach(m => m.remove());
+      markersRef.current = [];
+      map.current?.remove();
+      map.current = null;
+    };
+  }, []);
+
+  // Update map when data changes
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    // Clear existing markers
+    markersRef.current.forEach(m => m.remove());
+    markersRef.current = [];
+
+    // Add polygon boundary
+    if (showPolygon && polygonCoordinates) {
+      addPolygonBoundary(polygonCoordinates);
+    }
+
+    // Add subject marker
+    if (subjectProperty?.map?.latitude && subjectProperty?.map?.longitude) {
+      addSubjectMarker();
+    }
+
+    // Add all comparable markers
+    properties.forEach(property => {
+      addPropertyMarker(property);
+    });
+
+    // Fit bounds to show all
+    fitBounds();
+  }, [properties, subjectProperty, mapLoaded, polygonCoordinates, showPolygon]);
+
+  // Add polygon boundary layer
+  const addPolygonBoundary = (coordinates: [number, number][]) => {
+    if (!map.current) return;
+
+    // Remove existing polygon layers
+    if (map.current.getLayer('cma-polygon-fill')) {
+      map.current.removeLayer('cma-polygon-fill');
+      map.current.removeLayer('cma-polygon-line');
+      map.current.removeSource('cma-polygon');
+    }
+
+    // Close the polygon
+    const closedCoords = [...coordinates, coordinates[0]];
+
+    map.current.addSource('cma-polygon', {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'Polygon',
+          coordinates: [closedCoords],
+        },
+      },
+    });
+
+    // Semi-transparent fill (like the blue in the screenshot)
+    map.current.addLayer({
+      id: 'cma-polygon-fill',
+      type: 'fill',
+      source: 'cma-polygon',
+      paint: {
+        'fill-color': '#3b82f6', // Blue
+        'fill-opacity': 0.15,
+      },
+    });
+
+    // Border line
+    map.current.addLayer({
+      id: 'cma-polygon-line',
+      type: 'line',
+      source: 'cma-polygon',
+      paint: {
+        'line-color': '#2563eb', // Darker blue
+        'line-width': 3,
+        'line-opacity': 0.8,
+      },
+    });
+  };
+
+  // Add subject property marker
+  const addSubjectMarker = () => {
+    if (!map.current || !subjectProperty) return;
+
+    const { latitude, longitude } = subjectProperty.map || {};
+    if (!latitude || !longitude) return;
+
+    const price = subjectProperty.listPrice || 0;
+    const priceLabel = formatPrice(price);
+
+    const el = document.createElement('div');
+    el.innerHTML = `
+      <div style="
+        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.5);
+        white-space: nowrap;
+        border: 2px solid white;
+        cursor: pointer;
+        position: relative;
+      ">
+        <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; margin-bottom: 1px;">Subject</div>
+        ${priceLabel}
+        <div style="
+          position: absolute;
+          bottom: -8px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 0;
+          height: 0;
+          border-left: 8px solid transparent;
+          border-right: 8px solid transparent;
+          border-top: 8px solid #1e40af;
+        "></div>
+      </div>
+    `;
+
+    el.addEventListener('click', () => setSelectedProperty({ ...subjectProperty, isSubject: true }));
+
+    const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+      .setLngLat([longitude, latitude])
+      .addTo(map.current);
+
+    markersRef.current.push(marker);
+  };
+
+  // Add comparable property marker
+  const addPropertyMarker = (property: any) => {
+    if (!map.current) return;
+
+    const { latitude, longitude } = property.map || {};
+    if (!latitude || !longitude) return;
+
+    const status = (property.status || '').toLowerCase();
+    const isSold = status.includes('sold') || status.includes('closed');
+    const price = isSold 
+      ? (property.soldPrice || property.closePrice || property.listPrice || 0)
+      : (property.listPrice || 0);
+    const priceLabel = formatPrice(price);
+
+    // Colors based on status
+    const bgColor = isSold ? '#dc2626' : '#16a34a'; // Red for sold, Green for active
+    const shadowColor = isSold ? 'rgba(220, 38, 38, 0.4)' : 'rgba(22, 163, 74, 0.4)';
+
+    const el = document.createElement('div');
+    el.innerHTML = `
+      <div style="
+        background: ${bgColor};
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-weight: 600;
+        font-size: 12px;
+        box-shadow: 0 2px 8px ${shadowColor};
+        white-space: nowrap;
+        cursor: pointer;
+        transition: transform 0.15s, box-shadow 0.15s;
+        border: 1px solid rgba(255,255,255,0.3);
+      " 
+      onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 4px 12px ${shadowColor}';"
+      onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 8px ${shadowColor}';"
+      >
+        ${priceLabel}
+      </div>
+    `;
+
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setSelectedProperty(property);
+    });
+
+    const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+      .setLngLat([longitude, latitude])
+      .addTo(map.current);
+
+    markersRef.current.push(marker);
+  };
+
+  // Fit map to show all markers
+  const fitBounds = () => {
+    if (!map.current) return;
+
+    const coords: [number, number][] = [];
+
+    if (subjectProperty?.map?.longitude && subjectProperty?.map?.latitude) {
+      coords.push([subjectProperty.map.longitude, subjectProperty.map.latitude]);
+    }
+
+    properties.forEach(p => {
+      if (p.map?.longitude && p.map?.latitude) {
+        coords.push([p.map.longitude, p.map.latitude]);
+      }
+    });
+
+    if (coords.length === 0) return;
+
+    if (coords.length === 1) {
+      map.current.setCenter(coords[0]);
+      map.current.setZoom(14);
+      return;
+    }
+
+    const bounds = coords.reduce(
+      (bounds, coord) => bounds.extend(coord),
+      new mapboxgl.LngLatBounds(coords[0], coords[0])
+    );
+
+    map.current.fitBounds(bounds, {
+      padding: 60,
+      maxZoom: 14,
+      duration: 1000,
+    });
+  };
+
+  const centerOnSubject = () => {
+    if (!map.current || !subjectProperty?.map) return;
+    map.current.flyTo({
+      center: [subjectProperty.map.longitude, subjectProperty.map.latitude],
+      zoom: 14,
+    });
+  };
+
+  return (
+    <div className="relative w-full h-[550px] rounded-lg overflow-hidden border bg-gray-100">
+      <div ref={mapContainer} className="w-full h-full" />
+
+      {/* Controls */}
+      <div className="absolute top-4 left-4 flex flex-col gap-2">
+        <Button
+          size="icon"
+          variant="secondary"
+          className="h-8 w-8 shadow-md"
+          onClick={centerOnSubject}
+          title="Center on subject"
+        >
+          <Locate className="h-4 w-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="secondary"
+          className="h-8 w-8 shadow-md"
+          onClick={fitBounds}
+          title="Fit all properties"
+        >
+          <Maximize2 className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Property count */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2">
+        <Badge variant="secondary" className="shadow-md bg-white">
+          {properties.length} comparable{properties.length !== 1 ? 's' : ''} + Subject
+        </Badge>
+      </div>
+
+      {/* Legend */}
+      <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur rounded-lg p-3 shadow-lg">
+        <p className="text-xs font-semibold mb-2">Legend</p>
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-3 rounded bg-blue-600 border border-white shadow"></div>
+            <span className="text-xs">Subject Property</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-3 rounded bg-green-600"></div>
+            <span className="text-xs">Active Listing</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-3 rounded bg-red-600"></div>
+            <span className="text-xs">Sold</span>
+          </div>
+          <div className="flex items-center gap-2 mt-2 pt-2 border-t">
+            <div className="w-4 h-3 rounded bg-blue-500/20 border-2 border-blue-500"></div>
+            <span className="text-xs">Search Area</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Selected property popup */}
+      {selectedProperty && (
+        <PropertyPopup
+          property={selectedProperty}
+          onClose={() => setSelectedProperty(null)}
+        />
+      )}
+
+      {/* Loading */}
+      {!mapLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Property popup component
+function PropertyPopup({ property, onClose }: { property: any; onClose: () => void }) {
+  const status = (property.status || '').toLowerCase();
+  const isSold = status.includes('sold') || status.includes('closed');
+  const isSubject = property.isSubject;
+  const price = isSold
+    ? (property.soldPrice || property.closePrice || property.listPrice || 0)
+    : (property.listPrice || 0);
+
+  return (
+    <div className="absolute top-4 right-4 w-80 bg-white rounded-xl shadow-2xl overflow-hidden">
+      <button
+        className="absolute top-2 right-2 z-10 p-1.5 bg-white/90 hover:bg-white rounded-full shadow"
+        onClick={onClose}
+      >
+        <X className="h-4 w-4" />
+      </button>
+
+      {property.images?.[0] && (
+        <img
+          src={property.images[0]}
+          alt="Property"
+          className="w-full h-32 object-cover"
+        />
+      )}
+
+      <div className="p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Badge className={
+            isSubject ? 'bg-blue-600' : isSold ? 'bg-red-500' : 'bg-green-500'
+          }>
+            {isSubject ? 'Subject' : isSold ? 'Sold' : 'Active'}
+          </Badge>
+          {property.simpleDaysOnMarket !== undefined && (
+            <span className="text-xs text-muted-foreground">
+              {property.simpleDaysOnMarket} DOM
+            </span>
+          )}
+        </div>
+
+        <p className="font-bold text-xl">${price.toLocaleString()}</p>
+        <p className="text-sm text-gray-700 truncate">
+          {property.address?.streetAddress || property.unparsedAddress}
+        </p>
+        <p className="text-xs text-muted-foreground mb-3">
+          {property.address?.city}, {property.address?.state}
+        </p>
+
+        <div className="flex gap-4 text-sm">
+          <span><strong>{property.numBedrooms || property.details?.numBedrooms || '—'}</strong> beds</span>
+          <span><strong>{property.numBathrooms || property.details?.numBathrooms || '—'}</strong> baths</span>
+          <span><strong>{(property.sqft || property.details?.sqft)?.toLocaleString() || '—'}</strong> sqft</span>
+        </div>
+
+        <div className="flex justify-between mt-3 pt-3 border-t text-xs text-muted-foreground">
+          <span>Year: {property.yearBuilt || property.details?.yearBuilt || '—'}</span>
+          <span>${Math.round(price / (property.sqft || property.details?.sqft || 1))}/sqft</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Format price to K/M notation
+function formatPrice(price: number): string {
+  if (price >= 1000000) {
+    const millions = price / 1000000;
+    return millions % 1 === 0 ? `$${millions}M` : `$${millions.toFixed(2)}M`;
+  }
+  return `$${Math.round(price / 1000)}K`;
+}
+
+/**
+ * Calculate convex hull using Graham scan algorithm
+ * Returns array of [longitude, latitude] coordinates forming the hull
+ */
+function calculateConvexHull(points: [number, number][]): [number, number][] {
+  if (points.length < 3) return points;
+
+  // Find the bottom-most point (or left-most in case of tie)
+  let start = 0;
+  for (let i = 1; i < points.length; i++) {
+    if (points[i][1] < points[start][1] ||
+        (points[i][1] === points[start][1] && points[i][0] < points[start][0])) {
+      start = i;
+    }
+  }
+
+  // Swap start point to beginning
+  [points[0], points[start]] = [points[start], points[0]];
+  const pivot = points[0];
+
+  // Sort points by polar angle with respect to pivot
+  const sorted = points.slice(1).sort((a, b) => {
+    const angleA = Math.atan2(a[1] - pivot[1], a[0] - pivot[0]);
+    const angleB = Math.atan2(b[1] - pivot[1], b[0] - pivot[0]);
+    if (angleA !== angleB) return angleA - angleB;
+    // If same angle, closer point comes first
+    const distA = (a[0] - pivot[0]) ** 2 + (a[1] - pivot[1]) ** 2;
+    const distB = (b[0] - pivot[0]) ** 2 + (b[1] - pivot[1]) ** 2;
+    return distA - distB;
+  });
+
+  // Build hull
+  const hull: [number, number][] = [pivot];
+
+  for (const point of sorted) {
+    // Remove points that make clockwise turn
+    while (hull.length > 1 && crossProduct(hull[hull.length - 2], hull[hull.length - 1], point) <= 0) {
+      hull.pop();
+    }
+    hull.push(point);
+  }
+
+  return hull;
+}
+
+// Cross product to determine turn direction
+function crossProduct(o: [number, number], a: [number, number], b: [number, number]): number {
+  return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+}
+```
+
+---
+
+## Alternative: Concave Hull (Tighter Boundary)
+
+If you want a tighter boundary that follows the shape of the properties more closely (concave hull), you can use a library:
+
+```bash
+npm install concaveman
+```
+
+```typescript
+import concaveman from 'concaveman';
+
+function calculateConcaveHull(points: [number, number][]): [number, number][] {
+  if (points.length < 3) return points;
+  
+  // concaveman expects [[x,y], [x,y], ...]
+  // concavity: 2 = more detailed, Infinity = convex hull
+  const hull = concaveman(points, 2, 0);
+  
+  return hull;
+}
+```
+
+---
+
+## Usage in CMA Tab
+
+```tsx
+// In cma-tab.tsx
+
+{activeView === 'map' && (
+  <CMAMap
+    properties={comparables || []}
+    subjectProperty={mlsData}
+    showPolygon={true}  // Show the auto-generated boundary
+  />
+)}
+```
+
+---
+
+## Visual Features
+
+| Feature | Implementation |
+|---------|----------------|
+| Price markers | Green for active, Red for sold, Blue for subject |
+| Price format | $347K, $1.2M, $6.97M (auto-formatted) |
+| Polygon boundary | Blue semi-transparent fill with solid border |
+| Auto-fit | Map automatically fits to show all properties |
+| Click interaction | Shows property details popup |
+| Hover effect | Markers scale up on hover |
+
+---
+
+## Summary
+
+1. **All properties displayed** with price markers (green = active, red = sold)
+2. **Subject property** shown with distinct blue marker labeled "Subject"
+3. **Auto-generated polygon** boundary around all properties using convex hull algorithm
+4. **Blue semi-transparent fill** with darker blue border (like the screenshot)
+5. **Click any marker** to see property details
+6. **Legend** shows what each color means
+7. **Controls** to center on subject or fit all properties
