@@ -1,0 +1,244 @@
+## Migrate Map to Mapbox GL JS
+
+Replace the current map in the MLS Data tab with Mapbox GL JS for better performance and cost savings.
+
+### Documentation Reference
+- Mapbox GL JS: https://docs.mapbox.com/mapbox-gl-js/guides/
+- React integration: https://visgl.github.io/react-map-gl/
+- Installation: https://docs.mapbox.com/mapbox-gl-js/guides/install/
+
+### Step 1: Install Dependencies
+
+```bash
+npm install mapbox-gl react-map-gl
+npm install --save-dev @types/mapbox-gl
+```
+
+### Step 2: Add Mapbox CSS
+
+In your main HTML or layout file, add:
+```html
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet" />
+```
+
+Or import in your React component:
+```javascript
+import 'mapbox-gl/dist/mapbox-gl.css';
+```
+
+### Step 3: Handle the Mapbox Token
+
+The Mapbox token is stored in Replit Secrets as: `Mapbox_Mission-Control`
+
+**Option A: Create an API endpoint to serve the token (Recommended - more secure)**
+
+Create a new endpoint in your server: `server/routes.ts`
+
+```typescript
+// Add this endpoint to serve Mapbox token to frontend
+app.get('/api/mapbox-token', (req, res) => {
+  const token = process.env['Mapbox_Mission-Control'];
+  if (!token) {
+    return res.status(500).json({ error: 'Mapbox token not configured' });
+  }
+  res.json({ token });
+});
+```
+
+**Option B: Add a VITE_ prefixed secret (simpler)**
+
+In Replit Secrets, add another secret:
+- Key: `VITE_MAPBOX_TOKEN`  
+- Value: (copy the value from Mapbox_Mission-Control)
+
+Then access in frontend as: `import.meta.env.VITE_MAPBOX_TOKEN`
+
+### Step 4: Create Mapbox Map Component
+
+Create a new component: `client/src/components/mapbox-property-map.tsx`
+
+```typescript
+import { useRef, useEffect, useState } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+interface PropertyMapProps {
+  latitude: number;
+  longitude: number;
+  address?: string;
+  zoom?: number;
+}
+
+export function MapboxPropertyMap({ 
+  latitude, 
+  longitude, 
+  address,
+  zoom = 15 
+}: PropertyMapProps) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch token from API (Option A)
+  useEffect(() => {
+    fetch('/api/mapbox-token')
+      .then(res => res.json())
+      .then(data => {
+        if (data.token) {
+          setToken(data.token);
+        } else {
+          setError('Failed to load map token');
+        }
+      })
+      .catch(() => setError('Failed to load map'));
+  }, []);
+
+  // Initialize map once token is available
+  useEffect(() => {
+    if (!mapContainer.current || map.current || !token) return;
+    if (!latitude || !longitude) return;
+
+    // Initialize map
+    mapboxgl.accessToken = token;
+    
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/dark-v11', // Dark theme to match app
+      center: [longitude, latitude],
+      zoom: zoom,
+    });
+
+    // Add navigation controls
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    // Add marker for property location
+    new mapboxgl.Marker({ color: '#f97316' }) // Orange to match brand
+      .setLngLat([longitude, latitude])
+      .setPopup(
+        new mapboxgl.Popup({ offset: 25 })
+          .setHTML(`<div style="color: #000; padding: 4px;"><strong>${address || 'Property Location'}</strong></div>`)
+      )
+      .addTo(map.current);
+
+    // Cleanup on unmount
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, [latitude, longitude, address, zoom, token]);
+
+  if (error) {
+    return (
+      <div style={{ 
+        width: '100%', 
+        height: '300px', 
+        borderRadius: '8px',
+        backgroundColor: '#1f1f1f',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#666'
+      }}>
+        {error}
+      </div>
+    );
+  }
+
+  if (!token) {
+    return (
+      <div style={{ 
+        width: '100%', 
+        height: '300px', 
+        borderRadius: '8px',
+        backgroundColor: '#1f1f1f',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#666'
+      }}>
+        Loading map...
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      ref={mapContainer} 
+      style={{ 
+        width: '100%', 
+        height: '300px', 
+        borderRadius: '8px',
+        overflow: 'hidden'
+      }} 
+    />
+  );
+}
+```
+
+### Step 5: Add API Endpoint for Mapbox Token
+
+In `server/routes.ts`, add:
+
+```typescript
+// Mapbox token endpoint
+app.get('/api/mapbox-token', (req, res) => {
+  const token = process.env['Mapbox_Mission-Control'];
+  if (!token) {
+    console.error('Mapbox token not found in environment');
+    return res.status(500).json({ error: 'Mapbox token not configured' });
+  }
+  res.json({ token });
+});
+```
+
+### Step 6: Replace Current Map in MLS Data Tab
+
+Find the current map component in the MLS Data section (likely using Google Maps embed or Leaflet) and replace it with:
+
+```typescript
+import { MapboxPropertyMap } from './mapbox-property-map';
+
+// In your MLS Data tab, replace the existing map with:
+{listing?.latitude && listing?.longitude && (
+  <MapboxPropertyMap
+    latitude={listing.latitude}
+    longitude={listing.longitude}
+    address={`${listing.address}, ${listing.city}, ${listing.state}`}
+  />
+)}
+```
+
+### Step 7: Remove Old Map Code (if applicable)
+
+- Remove any Google Maps embed iframe
+- Remove any `/api/maps-embed` endpoint if no longer needed
+- Remove Leaflet/OpenStreetMap code if present
+
+### Features Included:
+- ✅ Dark theme to match app design
+- ✅ Orange marker matching brand color (#f97316)
+- ✅ Popup with address on marker click
+- ✅ Navigation controls (zoom +/-)
+- ✅ Responsive sizing
+- ✅ Loading state
+- ✅ Error handling
+- ✅ Cleanup on component unmount
+- ✅ Secure token handling via API endpoint
+
+### Testing:
+1. Navigate to a transaction with MLS data
+2. Go to MLS Data tab
+3. Scroll to map section (Location area)
+4. Verify:
+   - Map loads with dark theme
+   - Property marker is visible (orange)
+   - Clicking marker shows address popup
+   - Zoom controls work
+   - Map is centered on property
+
+### DO NOT change:
+- Any other functionality in MLS Data tab
+- Property details display
+- Photo gallery
+- Other tabs
