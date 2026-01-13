@@ -44,6 +44,12 @@ Preferred communication style: Simple, everyday language.
 - **AI Description Summarization**: AI-powered summarization of MLS descriptions for flyers, with character limits and revert functionality.
 - **Preview Modal Zoom Controls**: Interactive zoom functionality for enlarged previews of marketing materials.
 - **Automatic MLS Synchronization**: Background service using node-cron to sync MLS data every 15 minutes for active and in-contract transactions.
+- **Status Badge Color Utility** (`client/src/lib/utils/status-colors.ts`):
+  - `getStatusBadgeStyle(status)`: Returns Tailwind classes using CSS variable tokens for theme-aware coloring
+  - `getStatusLabel(status)`: Returns formatted display labels for transaction statuses
+  - `getStatusColor(status)`: Returns CSS color strings for charts/maps
+  - `getDaysRemainingStyle(days)`: Returns urgency-based text color classes
+  - Color scheme: Active=chart-1 (green), In Contract=chart-2 (orange), Pending=chart-3 (blue), Closed=destructive (red), Withdrawn/Cancelled=muted (gray), Coming Soon=chart-5 (purple)
 - **Shared Listing Utilities** (`shared/lib/listings.ts`):
   - `isRentalOrLease(listing)`: Predicate for detecting rentals via type, propertyType, transactionType, listingCategory, leaseType, details.propertySubType, and class fields
   - `getDisplayDOM(listing)`: Returns accurate Days on Market (prefers simpleDaysOnMarket over daysOnMarket)
