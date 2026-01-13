@@ -44,6 +44,16 @@ Preferred communication style: Simple, everyday language.
 - **AI Description Summarization**: AI-powered summarization of MLS descriptions for flyers, with character limits and revert functionality.
 - **Preview Modal Zoom Controls**: Interactive zoom functionality for enlarged previews of marketing materials.
 - **Automatic MLS Synchronization**: Background service using node-cron to sync MLS data every 15 minutes for active and in-contract transactions.
+- **Shared Listing Utilities** (`shared/lib/listings.ts`):
+  - `isRentalOrLease(listing)`: Predicate for detecting rentals via type/propertyType/class fields
+  - `getDisplayDOM(listing)`: Returns accurate Days on Market (prefers simpleDaysOnMarket over daysOnMarket)
+  - `hasAccurateDOM(listing)`: Checks if simpleDaysOnMarket is available
+  - `excludeRentals(listings)`: Filter helper for arrays
+
+### MLS/IDX/VOW Compliance
+- **Rental Exclusion**: Global filtering applied at API level (`type=Sale`) with local failsafes via `isRentalOrLease` predicate
+- **No External Media Redirects**: Virtual tour URLs are stored but not rendered; `safe-links.ts` utility blocks external redirects
+- **DOM Normalization**: UI uses `getDisplayDOM()` for consistent Days on Market display across all surfaces
 
 ## External Dependencies
 
