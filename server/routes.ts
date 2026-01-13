@@ -1003,6 +1003,17 @@ export async function registerRoutes(
     }
   });
 
+  // ============ Mapbox Token ============
+  // Returns the Mapbox token for the property map
+  app.get("/api/mapbox-token", isAuthenticated, (req, res) => {
+    const token = process.env['Mapbox_Mission-Control'];
+    if (!token) {
+      console.error('Mapbox token not found in environment');
+      return res.status(500).json({ error: 'Mapbox token not configured' });
+    }
+    res.json({ token });
+  });
+
   // ============ Google Maps Embed ============
   // Returns a secure Maps Embed API URL for displaying property locations
   // The API key is kept server-side and only the embed URL is exposed
