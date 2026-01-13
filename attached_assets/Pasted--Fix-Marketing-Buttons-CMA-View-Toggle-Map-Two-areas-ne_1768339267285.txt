@@ -1,0 +1,934 @@
+## Fix Marketing Buttons & CMA View Toggle/Map
+
+Two areas need immediate fixes:
+1. Marketing tab: Create Graphics and Quick Create All not working
+2. CMA tab: View toggle order wrong, Map view not working
+
+---
+
+## PART 1: Marketing Tab - Fix All Three Buttons
+
+### Button Purposes (Clear Separation)
+
+| Button | Purpose | Output Formats |
+|--------|---------|----------------|
+| **Create Graphics** | Social media posts | Instagram Post (1:1), Instagram Story (9:16), Facebook (16:9), X/Twitter (16:9), TikTok (9:16) |
+| **Create Flyer** | Print flyers only | 8.5x11 PDF |
+| **Quick Create All** | Batch generate all social formats | All 5 social formats at once |
+
+### Social Media Format Specifications
+
+```typescript
+// lib/social-formats.ts
+export const SOCIAL_FORMATS = [
+  { 
+    id: 'instagram-post', 
+    name: 'Instagram Post', 
+    platform: 'Instagram',
+    width: 1080, 
+    height: 1080, 
+    ratio: '1:1',
+    icon: 'instagram'
+  },
+  { 
+    id: 'instagram-story', 
+    name: 'Instagram Story', 
+    platform: 'Instagram',
+    width: 1080, 
+    height: 1920, 
+    ratio: '9:16',
+    icon: 'instagram'
+  },
+  { 
+    id: 'facebook-post', 
+    name: 'Facebook Post', 
+    platform: 'Facebook',
+    width: 1200, 
+    height: 630, 
+    ratio: '16:9',
+    icon: 'facebook'
+  },
+  { 
+    id: 'twitter-post', 
+    name: 'X (Twitter) Post', 
+    platform: 'X',
+    width: 1200, 
+    height: 675, 
+    ratio: '16:9',
+    icon: 'twitter'
+  },
+  { 
+    id: 'tiktok-post', 
+    name: 'TikTok Cover', 
+    platform: 'TikTok',
+    width: 1080, 
+    height: 1920, 
+    ratio: '9:16',
+    icon: 'tiktok'
+  },
+];
+```
+
+### Fix: Create Graphics Dialog
+
+```tsx
+// components/create-graphics-dialog.tsx
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2, Sparkles, Download, Instagram, Facebook, Twitter } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+import { SOCIAL_FORMATS } from '@/lib/social-formats';
+
+interface CreateGraphicsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  transaction: any;
+  mlsData: any;
+  onSuccess?: () => void;
+}
+
+const STATUS_OPTIONS = [
+  'Just Listed',
+  'Open House',
+  'Price Reduced',
+  'Under Contract',
+  'Coming Soon',
+  'Just Sold',
+];
+
+// Platform icon mapping
+const PlatformIcon = ({ platform }: { platform: string }) => {
+  switch (platform) {
+    case 'Instagram': return <Instagram className="h-4 w-4" />;
+    case 'Facebook': return <Facebook className="h-4 w-4" />;
+    case 'X': return <Twitter className="h-4 w-4" />;
+    case 'TikTok': return <span className="text-xs font-bold">TT</span>;
+    default: return null;
+  }
+};
+
+export function CreateGraphicsDialog({ 
+  open, 
+  onOpenChange, 
+  transaction, 
+  mlsData,
+  onSuccess 
+}: CreateGraphicsDialogProps) {
+  const [selectedFormat, setSelectedFormat] = useState(SOCIAL_FORMATS[0]);
+  const [selectedPhoto, setSelectedPhoto] = useState<string>('');
+  const [status, setStatus] = useState('Just Listed');
+  const [description, setDescription] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const { toast } = useToast();
+
+  const photos = mlsData?.images || [];
+
+  // Set defaults on open
+  useEffect(() => {
+    if (open && photos.length > 0) {
+      setSelectedPhoto(photos[0]);
+      setStatus(getDefaultStatus(transaction.status));
+    }
+  }, [open]);
+
+  // AI description generation
+  const handleAISuggest = async () => {
+    setIsLoadingAI(true);
+    try {
+      const response = await fetch('/api/ai/generate-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mlsDescription: mlsData?.description || mlsData?.remarks,
+          propertyDetails: {
+            beds: mlsData?.numBedrooms || mlsData?.details?.numBedrooms,
+            baths: mlsData?.numBathrooms || mlsData?.details?.numBathrooms,
+            sqft: mlsData?.sqft || mlsData?.details?.sqft,
+            address: transaction.address,
+            price: mlsData?.listPrice,
+          },
+          maxLength: 80,
+        }),
+      });
+      const data = await response.json();
+      setDescription(data.description || '');
+    } catch (error) {
+      toast({ title: 'Failed to generate description', variant: 'destructive' });
+    } finally {
+      setIsLoadingAI(false);
+    }
+  };
+
+  // Generate graphic
+  const handleGenerate = async () => {
+    if (!selectedPhoto) {
+      toast({ title: 'Please select a photo', variant: 'destructive' });
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/graphics/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId: transaction.id,
+          format: selectedFormat.id,
+          width: selectedFormat.width,
+          height: selectedFormat.height,
+          photoUrl: selectedPhoto,
+          status,
+          description,
+          address: transaction.address,
+          price: mlsData?.listPrice,
+          beds: mlsData?.numBedrooms || mlsData?.details?.numBedrooms,
+          baths: mlsData?.numBathrooms || mlsData?.details?.numBathrooms,
+          sqft: mlsData?.sqft || mlsData?.details?.sqft,
+          brokerageLogo: '/spyglass-logo.png',
+          saveToAssets: true,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to generate');
+
+      const blob = await response.blob();
+      const filename = `${transaction.address.replace(/[^a-z0-9]/gi, '_')}_${selectedFormat.name.replace(/ /g, '_')}.png`;
+      
+      // Download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      toast({ title: `${selectedFormat.name} created!` });
+      onSuccess?.();
+      onOpenChange(false);
+    } catch (error) {
+      toast({ title: 'Failed to generate graphic', variant: 'destructive' });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create Social Media Graphic</DialogTitle>
+        </DialogHeader>
+
+        <div className="grid grid-cols-2 gap-6">
+          {/* Left: Options */}
+          <div className="space-y-5">
+            {/* Platform/Format Selection */}
+            <div>
+              <Label className="mb-3 block">Choose Format</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {SOCIAL_FORMATS.map((format) => (
+                  <button
+                    key={format.id}
+                    onClick={() => setSelectedFormat(format)}
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all",
+                      selectedFormat.id === format.id
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    )}
+                  >
+                    <div className="flex-shrink-0 w-8 h-8 bg-muted rounded flex items-center justify-center">
+                      <PlatformIcon platform={format.platform} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{format.name}</p>
+                      <p className="text-xs text-muted-foreground">{format.ratio} • {format.width}x{format.height}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Photo Selection */}
+            <div>
+              <Label className="mb-2 block">Property Photo</Label>
+              <div className="grid grid-cols-5 gap-2 max-h-32 overflow-y-auto">
+                {photos.slice(0, 15).map((photo: string, i: number) => (
+                  <button
+                    key={i}
+                    onClick={() => setSelectedPhoto(photo)}
+                    className={cn(
+                      "aspect-square rounded overflow-hidden border-2 transition-all",
+                      selectedPhoto === photo
+                        ? "border-primary ring-2 ring-primary/20"
+                        : "border-transparent hover:border-primary/50"
+                    )}
+                  >
+                    <img src={photo} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Status Badge */}
+            <div>
+              <Label className="mb-2 block">Status Badge</Label>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Description */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label>Description (optional)</Label>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleAISuggest}
+                  disabled={isLoadingAI}
+                >
+                  {isLoadingAI ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 mr-1" />
+                  )}
+                  AI Suggest
+                </Button>
+              </div>
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                maxLength={80}
+                placeholder="e.g. Stunning 4BR with Chef's Kitchen"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {description.length}/80 characters
+              </p>
+            </div>
+          </div>
+
+          {/* Right: Preview */}
+          <div className="space-y-3">
+            <Label>Preview</Label>
+            <div 
+              className={cn(
+                "bg-muted rounded-lg flex items-center justify-center overflow-hidden border",
+                selectedFormat.ratio === '1:1' && "aspect-square",
+                selectedFormat.ratio === '9:16' && "aspect-[9/16] max-h-[400px]",
+                selectedFormat.ratio === '16:9' && "aspect-video"
+              )}
+            >
+              {selectedPhoto ? (
+                <img 
+                  src={selectedPhoto} 
+                  alt="Preview" 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <p className="text-muted-foreground text-sm">Select a photo</p>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground text-center">
+              {selectedFormat.name} • {selectedFormat.width} x {selectedFormat.height}px
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleGenerate} disabled={isGenerating || !selectedPhoto}>
+            {isGenerating ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Download className="h-4 w-4 mr-2" />
+            )}
+            Generate & Download
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function getDefaultStatus(transactionStatus: string): string {
+  const status = transactionStatus?.toLowerCase() || '';
+  if (status.includes('active')) return 'Just Listed';
+  if (status.includes('contract')) return 'Under Contract';
+  if (status.includes('pending')) return 'Pending';
+  if (status.includes('sold') || status.includes('closed')) return 'Just Sold';
+  return 'Just Listed';
+}
+```
+
+### Fix: Quick Create All
+
+```tsx
+// In marketing-tab.tsx - handleQuickCreateAll function
+
+const handleQuickCreateAll = async () => {
+  setIsQuickCreating(true);
+  
+  try {
+    const bestPhoto = mlsData?.images?.[0];
+    
+    if (!bestPhoto) {
+      toast({ title: 'No photos available', variant: 'destructive' });
+      setIsQuickCreating(false);
+      return;
+    }
+
+    const status = getDefaultStatus(transaction.status);
+    
+    // Generate all 5 social formats
+    const formats = [
+      { id: 'instagram-post', width: 1080, height: 1080 },
+      { id: 'instagram-story', width: 1080, height: 1920 },
+      { id: 'facebook-post', width: 1200, height: 630 },
+      { id: 'twitter-post', width: 1200, height: 675 },
+      { id: 'tiktok-post', width: 1080, height: 1920 },
+    ];
+
+    let successCount = 0;
+
+    for (const format of formats) {
+      try {
+        const response = await fetch('/api/graphics/render', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transactionId: transaction.id,
+            format: format.id,
+            width: format.width,
+            height: format.height,
+            photoUrl: bestPhoto,
+            status,
+            address: transaction.address,
+            price: mlsData?.listPrice,
+            beds: mlsData?.numBedrooms || mlsData?.details?.numBedrooms,
+            baths: mlsData?.numBathrooms || mlsData?.details?.numBathrooms,
+            sqft: mlsData?.sqft || mlsData?.details?.sqft,
+            brokerageLogo: '/spyglass-logo.png',
+            saveToAssets: true,
+          }),
+        });
+
+        if (response.ok) {
+          successCount++;
+        }
+      } catch (err) {
+        console.error(`Failed to generate ${format.id}:`, err);
+      }
+    }
+
+    // Refresh assets
+    queryClient.invalidateQueries({ queryKey: ['marketing-assets', transaction.id] });
+
+    toast({ 
+      title: 'Quick Create Complete!', 
+      description: `Generated ${successCount} of 5 social media graphics` 
+    });
+
+  } catch (error) {
+    toast({ title: 'Failed to generate graphics', variant: 'destructive' });
+  } finally {
+    setIsQuickCreating(false);
+  }
+};
+```
+
+### Wire Up Buttons in Marketing Tab
+
+```tsx
+// components/marketing-tab.tsx
+
+export function MarketingTab({ transaction, mlsData }: MarketingTabProps) {
+  const [createGraphicsOpen, setCreateGraphicsOpen] = useState(false);
+  const [createFlyerOpen, setCreateFlyerOpen] = useState(false);
+  const [isQuickCreating, setIsQuickCreating] = useState(false);
+  
+  // ... rest of component
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h2 className="text-xl font-semibold">Marketing</h2>
+        <p className="text-muted-foreground">
+          Create and manage marketing materials for {transaction.address}
+        </p>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Create Graphics - CLICKABLE */}
+        <Card 
+          className="cursor-pointer hover:border-primary transition-colors"
+          onClick={() => setCreateGraphicsOpen(true)}
+        >
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-pink-100 rounded-lg">
+                <Instagram className="h-6 w-6 text-pink-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Create Graphics</h3>
+                <p className="text-sm text-muted-foreground">
+                  Social media posts & stories
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Create Flyer - CLICKABLE */}
+        <Card 
+          className="cursor-pointer hover:border-primary transition-colors"
+          onClick={() => setCreateFlyerOpen(true)}
+        >
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-orange-100 rounded-lg">
+                <FileText className="h-6 w-6 text-orange-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Create Flyer</h3>
+                <p className="text-sm text-muted-foreground">
+                  Print-ready PDF flyer
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Create All - CLICKABLE */}
+        <Card 
+          className={cn(
+            "cursor-pointer transition-colors",
+            isQuickCreating ? "opacity-75" : "hover:border-primary"
+          )}
+          onClick={!isQuickCreating ? handleQuickCreateAll : undefined}
+        >
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-orange-50 rounded-lg">
+                {isQuickCreating ? (
+                  <Loader2 className="h-6 w-6 text-orange-600 animate-spin" />
+                ) : (
+                  <Sparkles className="h-6 w-6 text-orange-600" />
+                )}
+              </div>
+              <div>
+                <h3 className="font-semibold">Quick Create All</h3>
+                <p className="text-sm text-muted-foreground">
+                  {isQuickCreating ? 'Generating...' : 'Post + Story + Facebook + X + TikTok'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* My Assets section ... */}
+
+      {/* Dialogs */}
+      <CreateGraphicsDialog
+        open={createGraphicsOpen}
+        onOpenChange={setCreateGraphicsOpen}
+        transaction={transaction}
+        mlsData={mlsData}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['marketing-assets', transaction.id] });
+        }}
+      />
+
+      <CreateFlyerDialog
+        open={createFlyerOpen}
+        onOpenChange={setCreateFlyerOpen}
+        transaction={transaction}
+        mlsData={mlsData}
+      />
+    </div>
+  );
+}
+```
+
+---
+
+## PART 2: CMA Tab - Fix View Toggle Order & Map
+
+### Fix View Toggle Order
+
+Change order from `[Grid] [Analytics] [Map]` to `[Analytics] [Grid] [Map]`
+
+```tsx
+// In CMA tab component
+
+const VIEW_OPTIONS = [
+  { id: 'analytics', icon: BarChart3, label: 'Analytics' },  // FIRST
+  { id: 'grid', icon: LayoutGrid, label: 'Grid' },           // SECOND
+  { id: 'map', icon: MapIcon, label: 'Map' },                // THIRD
+];
+
+// Default to analytics view
+const [activeView, setActiveView] = useState<'analytics' | 'grid' | 'map'>('analytics');
+
+// Render view toggle
+<div className="flex items-center gap-1 border rounded-lg p-1">
+  {VIEW_OPTIONS.map((view) => (
+    <Tooltip key={view.id}>
+      <TooltipTrigger asChild>
+        <Button
+          variant={activeView === view.id ? 'secondary' : 'ghost'}
+          size="sm"
+          onClick={() => setActiveView(view.id as any)}
+          className="px-3"
+        >
+          <view.icon className="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{view.label}</p>
+      </TooltipContent>
+    </Tooltip>
+  ))}
+</div>
+```
+
+### Fix Map View - Implement with Mapbox
+
+```tsx
+// components/cma-map.tsx
+import { useEffect, useRef, useState } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { X } from 'lucide-react';
+
+interface CMAMapProps {
+  properties: any[];
+  subjectProperty?: any;
+  subjectAddress?: string;
+}
+
+export function CMAMap({ properties, subjectProperty, subjectAddress }: CMAMapProps) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const [selectedProperty, setSelectedProperty] = useState<any>(null);
+
+  useEffect(() => {
+    if (!mapContainer.current || map.current) return;
+
+    // Get Mapbox token from environment
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '';
+
+    if (!mapboxgl.accessToken) {
+      console.error('Mapbox access token not found');
+      return;
+    }
+
+    // Calculate center
+    const subjectLat = subjectProperty?.map?.latitude || subjectProperty?.latitude;
+    const subjectLng = subjectProperty?.map?.longitude || subjectProperty?.longitude;
+    
+    const centerLat = subjectLat || properties[0]?.map?.latitude || properties[0]?.latitude || 30.2672;
+    const centerLng = subjectLng || properties[0]?.map?.longitude || properties[0]?.longitude || -97.7431;
+
+    // Initialize map
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [centerLng, centerLat],
+      zoom: 12,
+    });
+
+    // Add navigation controls
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    map.current.on('load', () => {
+      addSubjectMarker();
+      addPropertyMarkers();
+      fitBounds();
+    });
+
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, []);
+
+  // Update markers when properties change
+  useEffect(() => {
+    if (!map.current) return;
+    
+    // Clear existing markers
+    document.querySelectorAll('.comp-marker, .subject-marker').forEach(el => el.remove());
+    
+    if (map.current.loaded()) {
+      addSubjectMarker();
+      addPropertyMarkers();
+      fitBounds();
+    }
+  }, [properties, subjectProperty]);
+
+  const addSubjectMarker = () => {
+    if (!map.current || !subjectProperty) return;
+
+    const lat = subjectProperty.map?.latitude || subjectProperty.latitude;
+    const lng = subjectProperty.map?.longitude || subjectProperty.longitude;
+    const price = subjectProperty.listPrice || 0;
+
+    if (!lat || !lng) return;
+
+    const el = document.createElement('div');
+    el.className = 'subject-marker';
+    el.innerHTML = `
+      <div style="
+        background: #2563eb;
+        color: white;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        white-space: nowrap;
+        position: relative;
+      ">
+        <div style="font-size: 10px; opacity: 0.9; margin-bottom: 2px;">SUBJECT</div>
+        $${(price / 1000).toFixed(0)}K
+        <div style="
+          position: absolute;
+          bottom: -8px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 0;
+          height: 0;
+          border-left: 8px solid transparent;
+          border-right: 8px solid transparent;
+          border-top: 8px solid #2563eb;
+        "></div>
+      </div>
+    `;
+
+    new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+      .setLngLat([lng, lat])
+      .addTo(map.current);
+  };
+
+  const addPropertyMarkers = () => {
+    if (!map.current) return;
+
+    properties.forEach((property) => {
+      const lat = property.map?.latitude || property.latitude;
+      const lng = property.map?.longitude || property.longitude;
+
+      if (!lat || !lng) return;
+
+      const price = property.soldPrice || property.closePrice || property.listPrice || 0;
+      const status = (property.status || property.standardStatus || '').toLowerCase();
+      const isSold = status.includes('sold') || status.includes('closed');
+
+      const el = document.createElement('div');
+      el.className = 'comp-marker';
+      el.style.cursor = 'pointer';
+      el.innerHTML = `
+        <div style="
+          background: ${isSold ? '#ef4444' : '#22c55e'};
+          color: white;
+          padding: 4px 10px;
+          border-radius: 6px;
+          font-weight: 600;
+          font-size: 12px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+          white-space: nowrap;
+          transition: transform 0.2s;
+        " 
+        onmouseover="this.style.transform='scale(1.1)'"
+        onmouseout="this.style.transform='scale(1)'"
+        >
+          $${(price / 1000).toFixed(0)}K
+        </div>
+      `;
+
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setSelectedProperty(property);
+      });
+
+      new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([lng, lat])
+        .addTo(map.current!);
+    });
+  };
+
+  const fitBounds = () => {
+    if (!map.current) return;
+
+    const coords: [number, number][] = [];
+
+    // Add subject
+    if (subjectProperty) {
+      const lng = subjectProperty.map?.longitude || subjectProperty.longitude;
+      const lat = subjectProperty.map?.latitude || subjectProperty.latitude;
+      if (lng && lat) coords.push([lng, lat]);
+    }
+
+    // Add comparables
+    properties.forEach((p) => {
+      const lng = p.map?.longitude || p.longitude;
+      const lat = p.map?.latitude || p.latitude;
+      if (lng && lat) coords.push([lng, lat]);
+    });
+
+    if (coords.length === 0) return;
+
+    const bounds = coords.reduce(
+      (bounds, coord) => bounds.extend(coord),
+      new mapboxgl.LngLatBounds(coords[0], coords[0])
+    );
+
+    map.current.fitBounds(bounds, {
+      padding: 60,
+      maxZoom: 14,
+    });
+  };
+
+  return (
+    <div className="relative w-full h-[500px] rounded-lg overflow-hidden border">
+      <div ref={mapContainer} className="w-full h-full" />
+      
+      {/* Legend */}
+      <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur rounded-lg p-3 shadow-lg">
+        <p className="text-xs font-semibold mb-2">Legend</p>
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-blue-600"></div>
+            <span className="text-xs">Subject Property</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            <span className="text-xs">Active</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+            <span className="text-xs">Sold</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Selected Property Card */}
+      {selectedProperty && (
+        <div className="absolute top-4 right-4 w-72 bg-white rounded-lg shadow-xl overflow-hidden">
+          <button 
+            className="absolute top-2 right-2 z-10 p-1 bg-white rounded-full shadow"
+            onClick={() => setSelectedProperty(null)}
+          >
+            <X className="h-4 w-4" />
+          </button>
+          
+          {selectedProperty.images?.[0] && (
+            <img 
+              src={selectedProperty.images[0]} 
+              alt="Property" 
+              className="w-full h-32 object-cover"
+            />
+          )}
+          
+          <div className="p-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-bold text-lg">
+                ${(selectedProperty.soldPrice || selectedProperty.listPrice || 0).toLocaleString()}
+              </span>
+              <Badge variant={
+                (selectedProperty.status || '').toLowerCase().includes('sold') 
+                  ? 'destructive' 
+                  : 'default'
+              }>
+                {selectedProperty.status || 'Active'}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground truncate">
+              {selectedProperty.address?.streetAddress || selectedProperty.unparsedAddress}
+            </p>
+            <div className="flex gap-3 mt-2 text-sm text-muted-foreground">
+              <span>{selectedProperty.numBedrooms || selectedProperty.bedroomsTotal} bd</span>
+              <span>{selectedProperty.numBathrooms || selectedProperty.bathroomsTotalInteger} ba</span>
+              <span>{(selectedProperty.sqft || selectedProperty.livingArea)?.toLocaleString()} sqft</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              {selectedProperty.simpleDaysOnMarket || selectedProperty.daysOnMarket || 0} days on market
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### Integrate Map in CMA Tab
+
+```tsx
+// In CMA tab component
+
+import { CMAMap } from '@/components/cma-map';
+
+// Inside the render:
+{activeView === 'map' && (
+  <CMAMap
+    properties={comparables}
+    subjectProperty={mlsData}
+    subjectAddress={transaction.address}
+  />
+)}
+```
+
+---
+
+## Summary of Fixes
+
+### Marketing Tab
+
+| Button | Status | Fix |
+|--------|--------|-----|
+| Create Graphics | Not working | Add CreateGraphicsDialog with 5 social formats |
+| Create Flyer | Working | Keep as-is (PDF output) |
+| Quick Create All | Not working | Add batch generation for all 5 formats |
+
+### CMA Tab
+
+| Issue | Fix |
+|-------|-----|
+| View toggle order | Change to Analytics → Grid → Map |
+| Map not working | Implement CMAMap with Mapbox |
+| Map markers | Subject (blue), Active (green), Sold (red) |
+
+### Files to Create/Modify
+
+```
+lib/
+├── social-formats.ts (NEW)
+
+components/
+├── create-graphics-dialog.tsx (NEW or FIX)
+├── cma-map.tsx (NEW)
+├── marketing-tab.tsx (FIX - wire up buttons)
+├── cma-tab.tsx (FIX - view order, add map)
+```

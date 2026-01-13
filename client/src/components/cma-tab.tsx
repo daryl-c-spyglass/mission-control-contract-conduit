@@ -12,7 +12,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getStatusBadgeStyle, getStatusLabel, getStatusColor } from "@/lib/utils/status-colors";
-import type { Transaction, CMAComparable, Cma, PropertyStatistics, CmaStatMetric } from "@shared/schema";
+import { CMAMap } from "@/components/cma-map";
+import type { Transaction, CMAComparable, Cma, PropertyStatistics, CmaStatMetric, Property } from "@shared/schema";
 import { 
   Activity, 
   Share2, 
@@ -145,7 +146,7 @@ function StatCard({
 
 export function CMATab({ transaction }: CMATabProps) {
   const { toast } = useToast();
-  const [viewMode, setViewMode] = useState<'grid' | 'stats' | 'map'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'stats' | 'map'>('stats');
   const [selectedProperty, setSelectedProperty] = useState<CMAComparable | null>(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -241,22 +242,22 @@ export function CMATab({ transaction }: CMATabProps) {
         <div className="flex items-center gap-2">
           <div className="flex items-center border rounded-md">
             <Button
-              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="rounded-r-none"
-              onClick={() => setViewMode('grid')}
-              data-testid="button-view-grid"
-            >
-              <Grid3X3 className="h-4 w-4" />
-            </Button>
-            <Button
               variant={viewMode === 'stats' ? 'secondary' : 'ghost'}
               size="sm"
-              className="rounded-none border-l"
+              className="rounded-r-none"
               onClick={() => setViewMode('stats')}
               data-testid="button-view-stats"
             >
               <BarChart3 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="rounded-none border-l"
+              onClick={() => setViewMode('grid')}
+              data-testid="button-view-grid"
+            >
+              <Grid3X3 className="h-4 w-4" />
             </Button>
             <Button
               variant={viewMode === 'map' ? 'secondary' : 'ghost'}
@@ -323,15 +324,14 @@ export function CMATab({ transaction }: CMATabProps) {
       )}
       
       {viewMode === 'map' && (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <MapPin className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-            <h3 className="font-medium mb-2">Map View Coming Soon</h3>
-            <p className="text-sm text-muted-foreground">
-              Interactive map visualization of comparable properties will be available soon.
-            </p>
-          </CardContent>
-        </Card>
+        <CMAMap
+          properties={cmaData as unknown as Property[]}
+          subjectProperty={transaction.mlsData as unknown as Property | null}
+          onPropertyClick={(property) => {
+            setSelectedProperty(property as unknown as CMAComparable);
+            setPhotoIndex(0);
+          }}
+        />
       )}
       
       {(viewMode === 'grid' || viewMode === 'stats') && (
