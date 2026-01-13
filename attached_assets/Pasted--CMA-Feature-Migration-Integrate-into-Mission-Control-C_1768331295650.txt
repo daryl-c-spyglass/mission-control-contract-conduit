@@ -1,0 +1,1086 @@
+## CMA Feature Migration - Integrate into Mission Control CMA Tab
+
+Migrate the full CMA (Comparative Market Analysis) feature into Mission Control's existing CMA tab within the Transaction detail view.
+
+---
+
+## CURRENT STATE vs TARGET STATE
+
+### Current CMA Tab (Basic)
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ CMA Tab                                                         │
+│ Comparative Market Analysis                                     │
+│                                                                 │
+│ ┌─────────┐ ┌─────────┐ ┌─────────┐                            │
+│ │ $495,000│ │ $299,900│ │ $480,000│  ← Basic property cards    │
+│ │ 4bd 2ba │ │ 3bd 2ba │ │ 4bd 2ba │                            │
+│ └─────────┘ └─────────┘ └─────────┘                            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Target CMA Tab (Full Feature)
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ CMA Tab                                                         │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ Subject: 13106 New Boston  $434,990  4bd/2ba  1,850sqft     │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐           │
+│ │Statistics│ │ Compare  │ │   Map    │ │  Charts  │           │
+│ └──────────┘ └──────────┘ └──────────┘ └──────────┘           │
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ Statistics Cards                                            │ │
+│ │ Avg Price: $425,000  |  Avg $/sqft: $235  |  Avg DOM: 15   │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ Comparables (10 properties)              [Add More] [Share] │ │
+│ │ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐            │ │
+│ │ │ Photo   │ │ Photo   │ │ Photo   │ │ Photo   │            │ │
+│ │ │ $495K   │ │ $299K   │ │ $480K   │ │ $424K   │            │ │
+│ │ └─────────┘ └─────────┘ └─────────┘ └─────────┘            │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ [Save CMA] [Print Report] [Share with Client]                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## INTEGRATION APPROACH
+
+Instead of standalone CMA pages, integrate CMA features INTO the Transaction detail CMA tab:
+
+| Original Structure | Mission Control Integration |
+|-------------------|----------------------------|
+| `/cmas` (list page) | Transaction list shows CMA badge if saved |
+| `/cmas/new` (create) | CMA tab → "Add Comparables" dialog |
+| `/cmas/:id` (detail) | CMA tab content directly |
+| `/share/cma/:token` | Keep as standalone public page |
+
+**Key Principle:** The subject property is ALWAYS the current transaction's listing. CMAs are linked to transactions.
+
+---
+
+## STEP-BY-STEP MIGRATION
+
+### Step 1: Install Dependencies
+
+```bash
+npm install recharts react-leaflet leaflet @types/leaflet leaflet-draw @types/leaflet-draw
+```
+
+### Step 2: Add Leaflet CSS
+
+In `client/src/index.css` or main CSS file:
+
+```css
+@import "leaflet/dist/leaflet.css";
+@import "leaflet-draw/dist/leaflet.draw.css";
+```
+
+### Step 3: Database Schema
+
+Add to `shared/schema.ts`:
+
+```typescript
+// CMA Schema - Links to transactions
+export const cmas = pgTable("cmas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  transactionId: integer("transaction_id").references(() => transactions.id), // Link to transaction
+  userId: varchar("user_id").references(() => users.id),
+  name: text("name").notNull(),
+  subjectPropertyId: text("subject_property_id"), // MLS number of subject
+  comparablePropertyIds: json("comparable_property_ids").$type<string[]>().notNull(),
+  propertiesData: json("properties_data").$type<any[]>(),
+  searchCriteria: json("search_criteria"),
+  notes: text("notes"),
+  publicLink: text("public_link").unique(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCmaSchema = createInsertSchema(cmas).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+export type InsertCma = z.infer<typeof insertCmaSchema>;
+export type Cma = typeof cmas.$inferSelect;
+
+// CMA Statistics Types
+export interface PropertyStatistics {
+  price: { range: { min: number; max: number }; average: number; median: number };
+  pricePerSqFt: { range: { min: number; max: number }; average: number; median: number };
+  daysOnMarket: { range: { min: number; max: number }; average: number; median: number };
+  livingArea: { range: { min: number; max: number }; average: number; median: number };
+  lotSize: { range: { min: number; max: number }; average: number; median: number };
+  acres: { range: { min: number; max: number }; average: number; median: number };
+  bedrooms: { range: { min: number; max: number }; average: number; median: number };
+  bathrooms: { range: { min: number; max: number }; average: number; median: number };
+  yearBuilt: { range: { min: number; max: number }; average: number; median: number };
+}
+
+export interface TimelineDataPoint {
+  date: string;
+  price: number;
+  status: string;
+  propertyId: string;
+  address: string;
+  daysOnMarket: number | null;
+  cumulativeDaysOnMarket: number | null;
+}
+```
+
+### Step 4: Storage Interface
+
+Add to `server/storage.ts`:
+
+```typescript
+// CMA operations
+getCma(id: string): Promise<Cma | undefined>;
+getCmaByTransaction(transactionId: number): Promise<Cma | undefined>;
+getCmaByShareToken(token: string): Promise<Cma | undefined>;
+getCmasByUser(userId: string): Promise<Cma[]>;
+getAllCmas(): Promise<Cma[]>;
+createCma(cma: InsertCma): Promise<Cma>;
+updateCma(id: string, cma: Partial<Cma>): Promise<Cma | undefined>;
+deleteCma(id: string): Promise<boolean>;
+```
+
+Implementations:
+
+```typescript
+async getCma(id: string): Promise<Cma | undefined> {
+  const result = await this.db.select().from(cmas).where(eq(cmas.id, id)).limit(1);
+  return result[0];
+}
+
+async getCmaByTransaction(transactionId: number): Promise<Cma | undefined> {
+  const result = await this.db.select().from(cmas)
+    .where(eq(cmas.transactionId, transactionId))
+    .orderBy(desc(cmas.updatedAt))
+    .limit(1);
+  return result[0];
+}
+
+async getCmaByShareToken(token: string): Promise<Cma | undefined> {
+  const result = await this.db.select().from(cmas).where(eq(cmas.publicLink, token)).limit(1);
+  return result[0];
+}
+
+async getCmasByUser(userId: string): Promise<Cma[]> {
+  return await this.db.select().from(cmas).where(eq(cmas.userId, userId));
+}
+
+async getAllCmas(): Promise<Cma[]> {
+  return await this.db.select().from(cmas);
+}
+
+async createCma(cma: InsertCma): Promise<Cma> {
+  const result = await this.db.insert(cmas).values(cma as any).returning();
+  return result[0];
+}
+
+async updateCma(id: string, updates: Partial<Cma>): Promise<Cma | undefined> {
+  const result = await this.db.update(cmas)
+    .set({ ...updates, updatedAt: new Date() })
+    .where(eq(cmas.id, id))
+    .returning();
+  return result[0];
+}
+
+async deleteCma(id: string): Promise<boolean> {
+  const result = await this.db.delete(cmas).where(eq(cmas.id, id));
+  return result.rowCount! > 0;
+}
+```
+
+### Step 5: API Routes
+
+Add to `server/routes.ts`:
+
+```typescript
+import { randomBytes } from "crypto";
+
+// Helper function for statistics calculation
+function calculateStatistics(properties: any[]) {
+  const computeStats = (values: number[]) => {
+    const filtered = values.filter(v => v > 0);
+    if (filtered.length === 0) {
+      return { average: 0, median: 0, range: { min: 0, max: 0 } };
+    }
+    const sorted = [...filtered].sort((a, b) => a - b);
+    const average = sorted.reduce((a, b) => a + b, 0) / sorted.length;
+    const median = sorted.length % 2 === 0
+      ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+      : sorted[Math.floor(sorted.length / 2)];
+    return {
+      average,
+      median,
+      range: { min: sorted[0], max: sorted[sorted.length - 1] }
+    };
+  };
+
+  // Map Repliers fields to expected fields
+  const prices = properties.map(p => {
+    const status = p.status || p.standardStatus || '';
+    const isClosed = status.toLowerCase().includes('sold') || status.toLowerCase().includes('closed');
+    return isClosed 
+      ? (p.soldPrice || p.closePrice || p.listPrice || 0)
+      : (p.listPrice || 0);
+  });
+  
+  const pricesPerSqFt = properties
+    .filter(p => (p.sqft || p.livingArea) && Number(p.sqft || p.livingArea) > 0)
+    .map(p => {
+      const status = p.status || p.standardStatus || '';
+      const isClosed = status.toLowerCase().includes('sold') || status.toLowerCase().includes('closed');
+      const price = isClosed 
+        ? (p.soldPrice || p.closePrice || p.listPrice || 0)
+        : (p.listPrice || 0);
+      return price / Number(p.sqft || p.livingArea);
+    });
+
+  return {
+    price: computeStats(prices),
+    pricePerSqFt: computeStats(pricesPerSqFt),
+    daysOnMarket: computeStats(properties.map(p => p.daysOnMarket || p.simpleDaysOnMarket || 0)),
+    livingArea: computeStats(properties.map(p => Number(p.sqft || p.livingArea || 0))),
+    lotSize: computeStats(properties.map(p => Number(p.lotSizeSquareFeet || p.lotSize || 0))),
+    acres: computeStats(properties.map(p => Number(p.lotSizeAcres || p.acres || 0))),
+    bedrooms: computeStats(properties.map(p => p.numBedrooms || p.bedroomsTotal || 0)),
+    bathrooms: computeStats(properties.map(p => p.numBathrooms || p.bathroomsTotalInteger || 0)),
+    yearBuilt: computeStats(properties.map(p => p.yearBuilt || 0)),
+  };
+}
+
+// CMA CRUD routes
+app.get("/api/cmas", async (req, res) => {
+  try {
+    const cmas = await storage.getAllCmas();
+    res.json(cmas);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch CMAs" });
+  }
+});
+
+// Get CMA by transaction ID
+app.get("/api/transactions/:transactionId/cma", async (req, res) => {
+  try {
+    const transactionId = parseInt(req.params.transactionId);
+    const cma = await storage.getCmaByTransaction(transactionId);
+    if (!cma) {
+      res.status(404).json({ error: "No CMA found for this transaction" });
+      return;
+    }
+    // Include calculated statistics
+    const properties = (cma as any).propertiesData || [];
+    const statistics = calculateStatistics(properties);
+    res.json({ ...cma, statistics });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch CMA" });
+  }
+});
+
+app.get("/api/cmas/:id", async (req, res) => {
+  try {
+    const cma = await storage.getCma(req.params.id);
+    if (!cma) {
+      res.status(404).json({ error: "CMA not found" });
+      return;
+    }
+    const properties = (cma as any).propertiesData || [];
+    const statistics = calculateStatistics(properties);
+    res.json({ ...cma, statistics });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch CMA" });
+  }
+});
+
+app.post("/api/cmas", async (req, res) => {
+  try {
+    const user = req.user as any;
+    const userId = user?.id || null;
+    
+    const cmaData = insertCmaSchema.parse({
+      ...req.body,
+      userId,
+    });
+    const cma = await storage.createCma(cmaData);
+    res.status(201).json(cma);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: "Invalid CMA data", details: error.errors });
+    } else {
+      res.status(500).json({ error: "Failed to create CMA" });
+    }
+  }
+});
+
+app.put("/api/cmas/:id", async (req, res) => {
+  try {
+    const cma = await storage.updateCma(req.params.id, req.body);
+    if (!cma) {
+      res.status(404).json({ error: "CMA not found" });
+      return;
+    }
+    res.json(cma);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update CMA" });
+  }
+});
+
+app.patch("/api/cmas/:id", async (req, res) => {
+  try {
+    const cma = await storage.updateCma(req.params.id, req.body);
+    if (!cma) {
+      res.status(404).json({ error: "CMA not found" });
+      return;
+    }
+    res.json(cma);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update CMA" });
+  }
+});
+
+app.delete("/api/cmas/:id", async (req, res) => {
+  try {
+    const deleted = await storage.deleteCma(req.params.id);
+    if (!deleted) {
+      res.status(404).json({ error: "CMA not found" });
+      return;
+    }
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete CMA" });
+  }
+});
+
+// CMA Share routes
+app.post("/api/cmas/:id/share", async (req, res) => {
+  try {
+    const cma = await storage.getCma(req.params.id);
+    if (!cma) {
+      res.status(404).json({ error: "CMA not found" });
+      return;
+    }
+    const shareToken = randomBytes(16).toString('hex');
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    await storage.updateCma(req.params.id, {
+      publicLink: shareToken,
+      expiresAt,
+    });
+    res.json({
+      shareToken,
+      shareUrl: `${req.protocol}://${req.get('host')}/share/cma/${shareToken}`,
+      expiresAt,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to generate share link" });
+  }
+});
+
+app.delete("/api/cmas/:id/share", async (req, res) => {
+  try {
+    const updated = await storage.updateCma(req.params.id, {
+      publicLink: null,
+      expiresAt: null,
+    });
+    if (!updated) {
+      res.status(404).json({ error: "CMA not found" });
+      return;
+    }
+    res.json({ message: "Share link removed" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to remove share link" });
+  }
+});
+
+// Public CMA view
+app.get("/api/share/cma/:token", async (req, res) => {
+  try {
+    const cma = await storage.getCmaByShareToken(req.params.token);
+    if (!cma) {
+      res.status(404).json({ error: "CMA not found or link expired" });
+      return;
+    }
+    if (cma.expiresAt && new Date(cma.expiresAt) < new Date()) {
+      res.status(410).json({ error: "This CMA link has expired" });
+      return;
+    }
+    const properties = (cma as any).propertiesData || [];
+    const statistics = calculateStatistics(properties);
+    
+    const timelineData = properties
+      .filter((p: any) => p.soldDate || p.closeDate || p.listingContractDate)
+      .map((p: any) => ({
+        date: p.soldDate || p.closeDate || p.listingContractDate,
+        price: Number(p.soldPrice || p.closePrice || p.listPrice),
+        status: p.status || p.standardStatus || 'Unknown',
+        propertyId: p.mlsNumber || p.id || p.listingId,
+        address: p.address?.streetAddress || p.unparsedAddress || 'Unknown',
+        daysOnMarket: p.daysOnMarket || p.simpleDaysOnMarket || null,
+      }))
+      .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    res.json({
+      cma: {
+        id: cma.id,
+        name: cma.name,
+        notes: cma.notes,
+        createdAt: cma.createdAt,
+        expiresAt: cma.expiresAt,
+        subjectPropertyId: cma.subjectPropertyId,
+      },
+      properties,
+      statistics,
+      timelineData,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to load shared CMA" });
+  }
+});
+
+// CMA Statistics endpoint
+app.get("/api/cmas/:id/statistics", async (req, res) => {
+  try {
+    const cma = await storage.getCma(req.params.id);
+    if (!cma) {
+      res.status(404).json({ error: "CMA not found" });
+      return;
+    }
+    const properties = (cma as any).propertiesData || [];
+    res.json(calculateStatistics(properties));
+  } catch (error) {
+    res.status(500).json({ error: "Failed to calculate statistics" });
+  }
+});
+
+// CMA Timeline endpoint
+app.get("/api/cmas/:id/timeline", async (req, res) => {
+  try {
+    const cma = await storage.getCma(req.params.id);
+    if (!cma) {
+      res.status(404).json({ error: "CMA not found" });
+      return;
+    }
+    const properties = (cma as any).propertiesData || [];
+    const timelineData = properties
+      .filter((p: any) => p.soldDate || p.closeDate || p.listingContractDate)
+      .map((p: any) => ({
+        date: p.soldDate || p.closeDate || p.listingContractDate,
+        price: Number(p.soldPrice || p.closePrice || p.listPrice),
+        status: p.status || p.standardStatus || 'Unknown',
+        propertyId: p.mlsNumber || p.id || p.listingId,
+        address: p.address?.streetAddress || p.unparsedAddress || 'Unknown',
+        daysOnMarket: p.daysOnMarket || p.simpleDaysOnMarket || null,
+      }))
+      .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    res.json(timelineData);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to get timeline data" });
+  }
+});
+```
+
+### Step 6: SQL Migration
+
+```sql
+CREATE TABLE cmas (
+  id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+  transaction_id INTEGER REFERENCES transactions(id),
+  user_id VARCHAR REFERENCES users(id),
+  name TEXT NOT NULL,
+  subject_property_id TEXT,
+  comparable_property_ids JSON NOT NULL,
+  properties_data JSON,
+  search_criteria JSON,
+  notes TEXT,
+  public_link TEXT UNIQUE,
+  expires_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX idx_cmas_transaction_id ON cmas(transaction_id);
+CREATE INDEX idx_cmas_user_id ON cmas(user_id);
+CREATE INDEX idx_cmas_public_link ON cmas(public_link);
+```
+
+---
+
+## STEP 7: COPY SOURCE FILES
+
+Copy these files from the provided `CMA_ALL_SOURCE_FILES.txt`:
+
+### Components to Copy
+
+| File | Copy To | Purpose |
+|------|---------|---------|
+| `CMABuilder.tsx` | `client/src/components/CMABuilder.tsx` | Search form & property selection |
+| `CMAReport.tsx` | `client/src/components/CMAReport.tsx` | Report with stats, charts, map |
+| `PolygonMapSearch.tsx` | `client/src/components/PolygonMapSearch.tsx` | Map polygon drawing |
+| `VisualMatchPanel.tsx` | `client/src/components/VisualMatchPanel.tsx` | AI visual match search |
+| `StatusFilterTabs.tsx` | `client/src/components/StatusFilterTabs.tsx` | Status filter tabs |
+
+### Pages to Copy (Modified)
+
+| File | Copy To | Purpose |
+|------|---------|---------|
+| `SharedCMAView.tsx` | `client/src/pages/SharedCMAView.tsx` | Public shareable view |
+
+**Note:** We do NOT need the standalone CMAs.tsx, CMANew.tsx, CMADetailPage.tsx pages since we're integrating into the Transaction CMA tab.
+
+---
+
+## STEP 8: Create Integrated CMA Tab Component
+
+Create `client/src/components/cma-tab.tsx`:
+
+```tsx
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { 
+  Plus, Share2, Printer, BarChart3, Map, List, 
+  TrendingUp, DollarSign, Home, Calendar, Loader2,
+  Download, Link2, ExternalLink
+} from 'lucide-react';
+import { CMABuilder } from '@/components/CMABuilder';
+import { CMAReport } from '@/components/CMAReport';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+
+interface CMATabProps {
+  transaction: any;
+  mlsData: any;
+  comparables: any[]; // From Repliers API
+}
+
+export function CMATab({ transaction, mlsData, comparables }: CMATabProps) {
+  const [isBuilderOpen, setIsBuilderOpen] = useState(false);
+  const [activeView, setActiveView] = useState<'statistics' | 'compare' | 'map' | 'charts'>('statistics');
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch saved CMA for this transaction
+  const { data: savedCma, isLoading: cmaLoading } = useQuery({
+    queryKey: ['transaction-cma', transaction.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/transactions/${transaction.id}/cma`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error('Failed to fetch CMA');
+      return res.json();
+    },
+  });
+
+  // Use saved CMA properties or Repliers comparables
+  const cmaProperties = savedCma?.propertiesData || comparables || [];
+  const statistics = savedCma?.statistics || calculateLocalStatistics(cmaProperties);
+
+  // Save CMA mutation
+  const saveCmaMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch('/api/cmas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...data,
+          transactionId: transaction.id,
+          subjectPropertyId: mlsData?.mlsNumber,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to save CMA');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transaction-cma', transaction.id] });
+      toast({ title: 'CMA saved successfully' });
+      setIsBuilderOpen(false);
+    },
+    onError: () => {
+      toast({ title: 'Failed to save CMA', variant: 'destructive' });
+    },
+  });
+
+  // Share CMA mutation
+  const shareCmaMutation = useMutation({
+    mutationFn: async () => {
+      if (!savedCma?.id) throw new Error('Save CMA first');
+      const res = await fetch(`/api/cmas/${savedCma.id}/share`, { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to generate share link');
+      return res.json();
+    },
+    onSuccess: (data) => {
+      navigator.clipboard.writeText(data.shareUrl);
+      toast({ 
+        title: 'Share link copied!', 
+        description: `Link expires ${new Date(data.expiresAt).toLocaleDateString()}` 
+      });
+      queryClient.invalidateQueries({ queryKey: ['transaction-cma', transaction.id] });
+    },
+  });
+
+  const handleCreateCMA = (data: any) => {
+    saveCmaMutation.mutate({
+      name: data.name || `CMA for ${transaction.address}`,
+      comparablePropertyIds: data.comparablePropertyIds,
+      propertiesData: data.propertiesData,
+      searchCriteria: data.searchCriteria,
+    });
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  if (cmaLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Comparative Market Analysis</h2>
+          <p className="text-muted-foreground">
+            {cmaProperties.length} comparable properties
+            {savedCma && ` • Last updated ${new Date(savedCma.updatedAt).toLocaleDateString()}`}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Dialog open={isBuilderOpen} onOpenChange={setIsBuilderOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Plus className="h-4 w-4 mr-2" />
+                {savedCma ? 'Edit Comparables' : 'Build CMA'}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {savedCma ? 'Edit CMA Comparables' : 'Build CMA'}
+                </DialogTitle>
+              </DialogHeader>
+              <CMABuilder
+                onCreateCMA={handleCreateCMA}
+                initialData={{
+                  name: savedCma?.name,
+                  searchCriteria: savedCma?.searchCriteria,
+                  comparables: savedCma?.propertiesData || comparables,
+                  subjectProperty: mlsData,
+                }}
+                subjectProperty={mlsData}
+              />
+            </DialogContent>
+          </Dialog>
+
+          {savedCma && (
+            <>
+              <Button 
+                variant="outline" 
+                onClick={() => shareCmaMutation.mutate()}
+                disabled={shareCmaMutation.isPending}
+              >
+                {shareCmaMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Share2 className="h-4 w-4 mr-2" />
+                )}
+                Share
+              </Button>
+              {savedCma.publicLink && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => window.open(`/share/cma/${savedCma.publicLink}`, '_blank')}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  View Public Link
+                </Button>
+              )}
+            </>
+          )}
+
+          <Button variant="outline" onClick={handlePrint}>
+            <Printer className="h-4 w-4 mr-2" />
+            Print
+          </Button>
+        </div>
+      </div>
+
+      {/* Subject Property Card */}
+      {mlsData && (
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="flex items-center gap-4 py-4">
+            {mlsData.images?.[0] && (
+              <img
+                src={mlsData.images[0]}
+                alt="Subject property"
+                className="w-24 h-18 object-cover rounded"
+              />
+            )}
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">Subject Property</Badge>
+              </div>
+              <p className="font-semibold text-lg">{transaction.address}</p>
+              <p className="text-muted-foreground">
+                ${mlsData.listPrice?.toLocaleString()} • 
+                {mlsData.details?.numBedrooms || mlsData.numBedrooms} bed • 
+                {mlsData.details?.numBathrooms || mlsData.numBathrooms} bath • 
+                {(mlsData.sqft || mlsData.details?.sqft)?.toLocaleString()} sqft
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          title="Average Price"
+          value={`$${Math.round(statistics.price.average).toLocaleString()}`}
+          subtitle={`$${statistics.price.range.min.toLocaleString()} - $${statistics.price.range.max.toLocaleString()}`}
+          icon={DollarSign}
+        />
+        <StatCard
+          title="Avg $/Sq Ft"
+          value={`$${Math.round(statistics.pricePerSqFt.average)}`}
+          subtitle={`Median: $${Math.round(statistics.pricePerSqFt.median)}`}
+          icon={TrendingUp}
+        />
+        <StatCard
+          title="Avg Days on Market"
+          value={Math.round(statistics.daysOnMarket.average).toString()}
+          subtitle={`Range: ${statistics.daysOnMarket.range.min} - ${statistics.daysOnMarket.range.max}`}
+          icon={Calendar}
+        />
+        <StatCard
+          title="Avg Sq Ft"
+          value={Math.round(statistics.livingArea.average).toLocaleString()}
+          subtitle={`Median: ${Math.round(statistics.livingArea.median).toLocaleString()}`}
+          icon={Home}
+        />
+      </div>
+
+      {/* View Tabs */}
+      <Tabs value={activeView} onValueChange={(v) => setActiveView(v as any)}>
+        <TabsList>
+          <TabsTrigger value="statistics" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Statistics
+          </TabsTrigger>
+          <TabsTrigger value="compare" className="gap-2">
+            <List className="h-4 w-4" />
+            Compare
+          </TabsTrigger>
+          <TabsTrigger value="map" className="gap-2">
+            <Map className="h-4 w-4" />
+            Map
+          </TabsTrigger>
+          <TabsTrigger value="charts" className="gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Charts
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="statistics">
+          <CMAReport 
+            properties={cmaProperties}
+            subjectProperty={mlsData}
+            statistics={statistics}
+            view="statistics"
+          />
+        </TabsContent>
+
+        <TabsContent value="compare">
+          <CMAReport 
+            properties={cmaProperties}
+            subjectProperty={mlsData}
+            statistics={statistics}
+            view="compare"
+          />
+        </TabsContent>
+
+        <TabsContent value="map">
+          <CMAReport 
+            properties={cmaProperties}
+            subjectProperty={mlsData}
+            statistics={statistics}
+            view="map"
+          />
+        </TabsContent>
+
+        <TabsContent value="charts">
+          <CMAReport 
+            properties={cmaProperties}
+            subjectProperty={mlsData}
+            statistics={statistics}
+            view="charts"
+          />
+        </TabsContent>
+      </Tabs>
+
+      {/* Property Cards Grid */}
+      <div>
+        <h3 className="text-lg font-semibold mb-4">Comparable Properties</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {cmaProperties.map((property: any, index: number) => (
+            <PropertyCard key={property.mlsNumber || property.id || index} property={property} />
+          ))}
+        </div>
+      </div>
+
+      {cmaProperties.length === 0 && (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Home className="h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground mb-4">No comparable properties yet</p>
+            <Button onClick={() => setIsBuilderOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Comparables
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// Helper Components
+function StatCard({ title, value, subtitle, icon: Icon }: any) {
+  return (
+    <Card>
+      <CardContent className="pt-4">
+        <div className="flex items-center gap-2 text-muted-foreground mb-1">
+          <Icon className="h-4 w-4" />
+          <span className="text-sm">{title}</span>
+        </div>
+        <p className="text-2xl font-bold">{value}</p>
+        <p className="text-sm text-muted-foreground">{subtitle}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PropertyCard({ property }: { property: any }) {
+  const status = property.status || property.standardStatus || 'Unknown';
+  const price = property.soldPrice || property.closePrice || property.listPrice;
+  const address = property.address?.streetAddress || property.unparsedAddress || 'Unknown Address';
+  const photo = property.images?.[0] || property.photos?.[0];
+
+  return (
+    <Card className="overflow-hidden">
+      {photo && (
+        <div className="aspect-video relative">
+          <img src={photo} alt={address} className="w-full h-full object-cover" />
+          <Badge className="absolute top-2 right-2">{status}</Badge>
+        </div>
+      )}
+      <CardContent className="pt-4">
+        <p className="font-semibold">${price?.toLocaleString()}</p>
+        <p className="text-sm text-muted-foreground truncate">{address}</p>
+        <div className="flex gap-2 mt-2 text-sm text-muted-foreground">
+          <span>{property.numBedrooms || property.bedroomsTotal} bed</span>
+          <span>•</span>
+          <span>{property.numBathrooms || property.bathroomsTotalInteger} bath</span>
+          <span>•</span>
+          <span>{(property.sqft || property.livingArea)?.toLocaleString()} sqft</span>
+        </div>
+        {property.daysOnMarket && (
+          <p className="text-sm text-muted-foreground mt-1">
+            {property.daysOnMarket} days on market
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Local statistics calculation (fallback)
+function calculateLocalStatistics(properties: any[]) {
+  const computeStats = (values: number[]) => {
+    const filtered = values.filter(v => v > 0);
+    if (filtered.length === 0) {
+      return { average: 0, median: 0, range: { min: 0, max: 0 } };
+    }
+    const sorted = [...filtered].sort((a, b) => a - b);
+    const average = sorted.reduce((a, b) => a + b, 0) / sorted.length;
+    const median = sorted.length % 2 === 0
+      ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+      : sorted[Math.floor(sorted.length / 2)];
+    return { average, median, range: { min: sorted[0], max: sorted[sorted.length - 1] } };
+  };
+
+  const prices = properties.map(p => p.soldPrice || p.closePrice || p.listPrice || 0);
+  const sqfts = properties.map(p => p.sqft || p.livingArea || 0);
+  const pricesPerSqFt = properties
+    .filter(p => (p.sqft || p.livingArea) > 0)
+    .map(p => (p.soldPrice || p.closePrice || p.listPrice || 0) / (p.sqft || p.livingArea));
+
+  return {
+    price: computeStats(prices),
+    pricePerSqFt: computeStats(pricesPerSqFt),
+    daysOnMarket: computeStats(properties.map(p => p.daysOnMarket || p.simpleDaysOnMarket || 0)),
+    livingArea: computeStats(sqfts),
+    lotSize: computeStats(properties.map(p => p.lotSizeSquareFeet || p.lotSize || 0)),
+    acres: computeStats(properties.map(p => p.lotSizeAcres || p.acres || 0)),
+    bedrooms: computeStats(properties.map(p => p.numBedrooms || p.bedroomsTotal || 0)),
+    bathrooms: computeStats(properties.map(p => p.numBathrooms || p.bathroomsTotalInteger || 0)),
+    yearBuilt: computeStats(properties.map(p => p.yearBuilt || 0)),
+  };
+}
+```
+
+---
+
+## STEP 9: Add Shared CMA Route
+
+Add to `App.tsx` routes:
+
+```tsx
+import SharedCMAView from "@/pages/SharedCMAView";
+
+// Add this route
+<Route path="/share/cma/:token" component={SharedCMAView} />
+```
+
+---
+
+## STEP 10: Repliers Field Mapping
+
+Map Repliers API fields to CMA expected fields:
+
+| CMA Field | Repliers Field | Notes |
+|-----------|---------------|-------|
+| `id` / `listingId` | `mlsNumber` | Primary identifier |
+| `standardStatus` | `status` | Active, Sold, etc. |
+| `listPrice` | `listPrice` | Current asking price |
+| `closePrice` / `soldPrice` | `soldPrice` | Final sale price |
+| `livingArea` | `sqft` or `details.sqft` | Square footage |
+| `lotSizeSquareFeet` | `lotSize` | Lot size in sq ft |
+| `lotSizeAcres` | `acres` | Lot size in acres |
+| `bedroomsTotal` | `numBedrooms` or `details.numBedrooms` | Bedroom count |
+| `bathroomsTotalInteger` | `numBathrooms` or `details.numBathrooms` | Bathroom count |
+| `daysOnMarket` | `simpleDaysOnMarket` | Days on market |
+| `yearBuilt` | `yearBuilt` or `details.yearBuilt` | Year built |
+| `unparsedAddress` | `address.streetAddress` | Street address |
+| `city` | `address.city` | City |
+| `subdivisionName` | `address.neighborhood` | Subdivision/neighborhood |
+| `closeDate` | `soldDate` | Date sold |
+| `photos` | `images` | Array of image URLs |
+| `latitude` / `longitude` | `map.latitude` / `map.longitude` | Coordinates |
+
+---
+
+## AUTOCOMPLETE ENDPOINTS
+
+If not already present, add these endpoints for CMABuilder:
+
+```typescript
+// City autocomplete
+app.get("/api/autocomplete/cities", async (req, res) => {
+  const query = req.query.q as string;
+  // Query Repliers aggregates or your database
+  const cities = await getDistinctCities(query);
+  res.json(cities.map(c => ({ value: c.name, count: c.count })));
+});
+
+// Subdivision autocomplete  
+app.get("/api/autocomplete/subdivisions", async (req, res) => {
+  const query = req.query.q as string;
+  const subdivisions = await getDistinctSubdivisions(query);
+  res.json(subdivisions.map(s => ({ value: s.name, count: s.count })));
+});
+
+// Schools autocomplete
+app.get("/api/autocomplete/schools", async (req, res) => {
+  const query = req.query.q as string;
+  const schools = await getDistinctSchools(query);
+  res.json(schools.map(s => ({ value: s.name, count: s.count })));
+});
+```
+
+---
+
+## TESTING CHECKLIST
+
+**Database:**
+- [ ] CMA table created successfully
+- [ ] Can insert/update/delete CMAs
+
+**API Routes:**
+- [ ] GET /api/cmas returns all CMAs
+- [ ] GET /api/transactions/:id/cma returns CMA for transaction
+- [ ] POST /api/cmas creates new CMA
+- [ ] PUT /api/cmas/:id updates CMA
+- [ ] DELETE /api/cmas/:id deletes CMA
+- [ ] POST /api/cmas/:id/share generates share link
+- [ ] GET /api/share/cma/:token returns public CMA
+
+**CMA Tab:**
+- [ ] Shows existing comparables from Repliers
+- [ ] Statistics cards display correct values
+- [ ] "Build CMA" opens CMABuilder dialog
+- [ ] Can search and add comparables
+- [ ] Can save CMA
+- [ ] Can share CMA and copy link
+- [ ] Shared link works in new tab
+
+**CMA Views:**
+- [ ] Statistics tab shows stat cards
+- [ ] Compare tab shows property comparison
+- [ ] Map tab shows Leaflet map with markers
+- [ ] Charts tab shows Recharts timeline
+
+**Print:**
+- [ ] Print button triggers print dialog
+- [ ] Print styles render correctly
+
+---
+
+## FILES SUMMARY
+
+**New Files to Create:**
+```
+client/src/components/
+├── cma-tab.tsx (integrated CMA tab - code above)
+├── CMABuilder.tsx (from source files)
+├── CMAReport.tsx (from source files)
+├── PolygonMapSearch.tsx (from source files)
+├── VisualMatchPanel.tsx (from source files)
+├── StatusFilterTabs.tsx (from source files)
+
+client/src/pages/
+├── SharedCMAView.tsx (from source files)
+
+shared/
+├── schema.ts (add CMA schema)
+
+server/
+├── storage.ts (add CMA methods)
+├── routes.ts (add CMA routes)
+```
+
+**Files to Modify:**
+```
+client/src/App.tsx (add SharedCMAView route)
+client/src/components/transaction-details.tsx (use new CMATab)
+client/src/index.css (add Leaflet CSS)
+package.json (add dependencies)
+```

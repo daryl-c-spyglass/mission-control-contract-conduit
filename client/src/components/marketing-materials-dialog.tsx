@@ -33,6 +33,7 @@ interface MarketingMaterialsDialogProps {
   initialData?: SocialGraphicConfig;
   assetId?: string;
   onAssetSaved?: () => void;
+  initialFormat?: 'square' | 'landscape' | 'story';
 }
 
 const STATUS_OPTIONS = [
@@ -61,6 +62,7 @@ export function MarketingMaterialsDialog({
   initialData,
   assetId,
   onAssetSaved,
+  initialFormat,
 }: MarketingMaterialsDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -154,6 +156,16 @@ export function MarketingMaterialsDialog({
       }
     }
   }, [open, isEditMode, initialData]);
+  
+  // Set initial format when dialog opens with initialFormat prop
+  useEffect(() => {
+    if (open && initialFormat) {
+      const format = FORMAT_OPTIONS.find(f => f.id === initialFormat);
+      if (format) {
+        setSelectedFormat(format);
+      }
+    }
+  }, [open, initialFormat]);
   
   // Reset state when dialog closes
   useEffect(() => {

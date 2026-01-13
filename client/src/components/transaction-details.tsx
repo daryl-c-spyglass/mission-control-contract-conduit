@@ -79,6 +79,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getStatusBadgeStyle, getStatusLabel } from "@/lib/utils/status-colors";
+import { templateDesigns, getTemplatesByCategory, getSubcategoriesForCategory, getSubcategoryLabel, getCategoryLabel, type TemplateDesign, type TemplateCategory, type TemplateSubcategory } from "@/lib/templates/template-designs";
 import type { Transaction, Coordinator, Activity as ActivityType, CMAComparable, MLSData, MarketingAsset, ContractDocument } from "@shared/schema";
 
 interface TransactionDetailsProps {
@@ -494,6 +495,12 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [templateSearch, setTemplateSearch] = useState("");
   const [templateListing, setTemplateListing] = useState<TemplateListing | null>(null);
   const [templateCategory, setTemplateCategory] = useState<string>("posts");
+  
+  const [libraryCategory, setLibraryCategory] = useState<TemplateCategory>("social");
+  const [librarySubcategory, setLibrarySubcategory] = useState<TemplateSubcategory | "all">("all");
+  const [selectedTemplateForCreation, setSelectedTemplateForCreation] = useState<TemplateDesign | null>(null);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [templateFlyerDialogOpen, setTemplateFlyerDialogOpen] = useState(false);
   const [currentPhoto, setCurrentPhoto] = useState(0);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const statusLabel = getStatusLabel(transaction.status);
@@ -2379,368 +2386,227 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         </TabsContent>
 
         <TabsContent value="templates" className="space-y-6">
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Header */}
             <div>
-              <h2 className="text-lg font-semibold">Listing Marketing Templates</h2>
+              <h2 className="text-xl font-bold">Template Library</h2>
               <p className="text-sm text-muted-foreground">
-                Search for a listing by address or MLS number to generate marketing templates
+                Browse and customize professional templates for your listing
               </p>
             </div>
 
-            <form onSubmit={handleTemplateSearch} className="flex gap-2 max-w-xl">
-              <Input
-                placeholder="Enter address or MLS number..."
-                value={templateSearch}
-                onChange={(e) => setTemplateSearch(e.target.value)}
-                data-testid="input-template-search"
-              />
-              <Button 
-                type="submit" 
-                disabled={searchListingMutation.isPending || !templateSearch.trim()}
-                data-testid="button-search-listing"
-              >
-                {searchListingMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4" />
-                )}
-              </Button>
-            </form>
-
-            {templateListing && (
-              <div className="space-y-6">
-                <Card>
-                  <CardContent className="pt-4">
-                    <div className="flex items-start gap-4">
-                      {templateListing.images[0] && (
-                        <div className="w-24 h-16 rounded-md overflow-hidden bg-muted shrink-0">
-                          <img
-                            src={`/api/proxy-image?url=${encodeURIComponent(templateListing.images[0])}`}
-                            alt={templateListing.address}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-semibold">{templateListing.address}</h3>
-                          <Badge className={getStatusBadgeStyle(templateListing.status)}>{getStatusLabel(templateListing.status)}</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {templateListing.city}, {templateListing.state}
-                        </p>
-                        <div className="flex items-center gap-4 mt-2 text-sm">
-                          <span className="font-semibold">{formatPrice(templateListing.listPrice)}</span>
-                          <span className="flex items-center gap-1">
-                            <Bed className="h-3.5 w-3.5" /> {templateListing.bedrooms}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Bath className="h-3.5 w-3.5" /> {templateListing.bathrooms}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Square className="h-3.5 w-3.5" /> {templateListing.sqft.toLocaleString()} sqft
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <div className="flex items-center gap-2 flex-wrap border-b pb-4">
-                  {[
-                    { id: "posts", label: "Posts", icon: Layout },
-                    { id: "stories", label: "Stories", icon: Smartphone },
-                    { id: "flyers", label: "Flyers", icon: Newspaper },
-                    { id: "postcards", label: "Post Cards", icon: CreditCard },
-                    { id: "brochures", label: "Brochures", icon: BookOpen },
-                  ].map((cat) => (
-                    <Button
-                      key={cat.id}
-                      variant={templateCategory === cat.id ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setTemplateCategory(cat.id)}
-                      data-testid={`button-template-cat-${cat.id}`}
-                    >
-                      <cat.icon className="h-4 w-4 mr-2" />
-                      {cat.label}
-                    </Button>
-                  ))}
-                </div>
-
-                <div className="space-y-4">
-                  {templateCategory === "posts" && (
-                    <div>
-                      <h3 className="text-base font-medium mb-4">Social Media Posts</h3>
-                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        {templateListing.images.slice(0, 4).map((img, idx) => (
-                          <Card key={idx} className="overflow-hidden">
-                            <div className="relative aspect-square bg-black">
-                              <img
-                                src={`/api/proxy-image?url=${encodeURIComponent(img)}`}
-                                alt={`Post template ${idx + 1}`}
-                                className="w-full h-full object-cover"
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                              <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
-                                <p className="text-xs font-semibold uppercase tracking-wider mb-1">Just Listed</p>
-                                <p className="text-sm font-medium line-clamp-2">{templateListing.address}</p>
-                                <p className="text-xs mt-1">{formatPrice(templateListing.listPrice)}</p>
-                              </div>
-                              <div className="absolute top-2 right-2 bg-white/90 dark:bg-black/90 px-2 py-1 rounded text-xs font-semibold">
-                                SPYGLASS REALTY
-                              </div>
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
-                    </div>
+            {/* Current Listing Card (auto-loaded from transaction) */}
+            {mlsData ? (
+              <Card className="bg-muted/50">
+                <CardContent className="flex items-center gap-4 py-4">
+                  {photos[0] && (
+                    <img
+                      src={`/api/proxy-image?url=${encodeURIComponent(photos[0])}`}
+                      alt="Property"
+                      className="w-20 h-16 object-cover rounded"
+                    />
                   )}
-
-                  {templateCategory === "stories" && (
-                    <div>
-                      <h3 className="text-base font-medium mb-4">Stories (9:16)</h3>
-                      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-                        {templateListing.images.slice(0, 4).map((img, idx) => (
-                          <Card key={idx} className="overflow-hidden">
-                            <div className="relative aspect-[9/16] bg-black">
-                              <img
-                                src={`/api/proxy-image?url=${encodeURIComponent(img)}`}
-                                alt={`Story template ${idx + 1}`}
-                                className="w-full h-full object-cover"
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                              <div className="absolute top-4 left-0 right-0 text-center text-white">
-                                <p className="text-xs font-semibold uppercase tracking-wider">Spyglass Realty</p>
-                              </div>
-                              <div className="absolute bottom-0 left-0 right-0 p-4 text-white text-center">
-                                <p className="text-lg font-bold">{formatPrice(templateListing.listPrice)}</p>
-                                <p className="text-sm">{templateListing.address}</p>
-                                <p className="text-xs mt-1 opacity-80">
-                                  {templateListing.bedrooms} bed | {templateListing.bathrooms} bath | {templateListing.sqft.toLocaleString()} sqft
-                                </p>
-                              </div>
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {templateCategory === "flyers" && (
-                    <div>
-                      <h3 className="text-base font-medium mb-4">Property Flyers</h3>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <Card className="overflow-hidden">
-                          <div className="relative aspect-[8.5/11] bg-white dark:bg-card p-4">
-                            <div className="h-full border rounded-md p-4 flex flex-col">
-                              <div className="flex items-center justify-between mb-3">
-                                <span className="text-xs font-semibold uppercase tracking-wider">Spyglass Realty</span>
-                                <Badge variant="outline" className="text-xs">Just Listed</Badge>
-                              </div>
-                              {templateListing.images[0] && (
-                                <div className="w-full aspect-video rounded-md overflow-hidden bg-muted mb-3">
-                                  <img
-                                    src={`/api/proxy-image?url=${encodeURIComponent(templateListing.images[0])}`}
-                                    alt="Main photo"
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                              )}
-                              <h4 className="font-semibold text-sm">{templateListing.address}</h4>
-                              <p className="text-xs text-muted-foreground">{templateListing.city}, {templateListing.state}</p>
-                              <p className="text-lg font-bold mt-2">{formatPrice(templateListing.listPrice)}</p>
-                              <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                                <span>{templateListing.bedrooms} Beds</span>
-                                <span>{templateListing.bathrooms} Baths</span>
-                                <span>{templateListing.sqft.toLocaleString()} Sqft</span>
-                              </div>
-                              {templateListing.description && (
-                                <p className="text-xs mt-3 line-clamp-4 text-muted-foreground flex-1">
-                                  {templateListing.description}
-                                </p>
-                              )}
-                              <div className="mt-auto pt-3 border-t text-xs text-center text-muted-foreground">
-                                Contact your agent for more information
-                              </div>
-                            </div>
-                          </div>
-                        </Card>
-                        <Card className="overflow-hidden">
-                          <div className="relative aspect-[8.5/11] bg-white dark:bg-card">
-                            {templateListing.images[0] && (
-                              <img
-                                src={`/api/proxy-image?url=${encodeURIComponent(templateListing.images[0])}`}
-                                alt="Full bleed"
-                                className="w-full h-full object-cover"
-                              />
-                            )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
-                            <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
-                              <span className="text-white text-sm font-semibold">SPYGLASS REALTY</span>
-                              <Badge className="bg-white text-black">Just Listed</Badge>
-                            </div>
-                            <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                              <p className="text-2xl font-bold">{formatPrice(templateListing.listPrice)}</p>
-                              <p className="text-lg font-medium mt-1">{templateListing.address}</p>
-                              <p className="text-sm opacity-80">{templateListing.city}, {templateListing.state}</p>
-                              <div className="flex gap-4 mt-3 text-sm">
-                                <span>{templateListing.bedrooms} Beds</span>
-                                <span>{templateListing.bathrooms} Baths</span>
-                                <span>{templateListing.sqft.toLocaleString()} Sqft</span>
-                              </div>
-                            </div>
-                          </div>
-                        </Card>
-                      </div>
-                    </div>
-                  )}
-
-                  {templateCategory === "postcards" && (
-                    <div>
-                      <h3 className="text-base font-medium mb-4">Post Cards</h3>
-                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        {["Open House", "Just Listed", "Under Contract"].map((type, idx) => (
-                          <Card key={idx} className="overflow-hidden">
-                            <div className="relative aspect-[6/4] bg-white dark:bg-card">
-                              {templateListing.images[0] && (
-                                <img
-                                  src={`/api/proxy-image?url=${encodeURIComponent(templateListing.images[idx % templateListing.images.length] || templateListing.images[0])}`}
-                                  alt={type}
-                                  className="w-full h-full object-cover"
-                                />
-                              )}
-                              <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-transparent" />
-                              <div className="absolute top-0 left-0 bottom-0 w-1/2 p-4 flex flex-col justify-between text-white">
-                                <div>
-                                  <span className="text-xs font-semibold opacity-80">SPYGLASS REALTY</span>
-                                  <p className="text-lg font-bold mt-2">{type}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm font-medium">{templateListing.address}</p>
-                                  <p className="text-xs opacity-80">{templateListing.city}, {templateListing.state}</p>
-                                  <p className="text-base font-bold mt-1">{formatPrice(templateListing.listPrice)}</p>
-                                </div>
-                              </div>
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {templateCategory === "brochures" && (
-                    <div>
-                      <h3 className="text-base font-medium mb-4">Brochures</h3>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <Card className="overflow-hidden">
-                          <div className="relative aspect-[8.5/11] bg-white dark:bg-card p-6">
-                            <div className="h-full flex flex-col">
-                              <div className="text-center mb-4">
-                                <span className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Spyglass Realty</span>
-                              </div>
-                              <p className="text-2xl font-bold text-center">{templateListing.address}</p>
-                              <p className="text-center text-muted-foreground">{templateListing.city}, {templateListing.state}</p>
-                              {templateListing.images[0] && (
-                                <div className="w-full aspect-video rounded-md overflow-hidden bg-muted my-4">
-                                  <img
-                                    src={`/api/proxy-image?url=${encodeURIComponent(templateListing.images[0])}`}
-                                    alt="Main"
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                              )}
-                              <div className="flex justify-center gap-6 mb-4 text-center">
-                                <div>
-                                  <p className="text-xl font-bold">{templateListing.bedrooms}</p>
-                                  <p className="text-xs text-muted-foreground">Beds</p>
-                                </div>
-                                <div>
-                                  <p className="text-xl font-bold">{templateListing.bathrooms}</p>
-                                  <p className="text-xs text-muted-foreground">Baths</p>
-                                </div>
-                                <div>
-                                  <p className="text-xl font-bold">{templateListing.sqft.toLocaleString()}</p>
-                                  <p className="text-xs text-muted-foreground">Sqft</p>
-                                </div>
-                              </div>
-                              <p className="text-2xl font-bold text-center mb-4">{formatPrice(templateListing.listPrice)}</p>
-                              {templateListing.description && (
-                                <p className="text-xs text-muted-foreground line-clamp-6 flex-1">
-                                  {templateListing.description}
-                                </p>
-                              )}
-                              <div className="grid grid-cols-3 gap-2 mt-4">
-                                {templateListing.images.slice(1, 4).map((img, i) => (
-                                  <div key={i} className="aspect-square rounded-md overflow-hidden bg-muted">
-                                    <img
-                                      src={`/api/proxy-image?url=${encodeURIComponent(img)}`}
-                                      alt={`Photo ${i + 2}`}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </Card>
-                        <Card className="overflow-hidden">
-                          <div className="relative aspect-[8.5/11] bg-white dark:bg-card flex">
-                            <div className="w-2/5 p-4 flex flex-col justify-center bg-gradient-to-b from-primary/10 to-primary/5">
-                              <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">Open House</p>
-                              <p className="text-lg font-bold">{formatPrice(templateListing.listPrice)}</p>
-                              <p className="text-sm font-medium mt-2">{templateListing.address}</p>
-                              <p className="text-xs text-muted-foreground">{templateListing.city}, {templateListing.state}</p>
-                              <div className="mt-4 space-y-1 text-sm">
-                                <p>{templateListing.bedrooms} Bedrooms</p>
-                                <p>{templateListing.bathrooms} Bathrooms</p>
-                                <p>{templateListing.sqft.toLocaleString()} Sqft</p>
-                              </div>
-                              <div className="mt-auto pt-4">
-                                <p className="text-xs font-semibold">Spyglass Realty</p>
-                              </div>
-                            </div>
-                            <div className="w-3/5 relative">
-                              {templateListing.images[0] && (
-                                <img
-                                  src={`/api/proxy-image?url=${encodeURIComponent(templateListing.images[0])}`}
-                                  alt="Feature"
-                                  className="w-full h-full object-cover"
-                                />
-                              )}
-                            </div>
-                          </div>
-                        </Card>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {templateListing.images.length === 0 && (
-                  <Card>
-                    <CardContent className="py-8 text-center">
-                      <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                      <h3 className="font-medium mb-2">No Photos Available</h3>
-                      <p className="text-sm text-muted-foreground">
-                        This listing doesn't have any photos to use for templates.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            )}
-
-            {!templateListing && !searchListingMutation.isPending && (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <Search className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                  <h3 className="font-medium mb-2">Search for a Listing</h3>
-                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                    Enter an address or MLS number above to find a listing and generate marketing templates with photos, pricing, and property details.
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold">{transaction.propertyAddress}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatPrice(mlsData.listPrice)} {mlsData.bedrooms && `• ${mlsData.bedrooms} bed`} {mlsData.bathrooms && `• ${mlsData.bathrooms} bath`}
+                    </p>
+                  </div>
+                  <Badge className={getStatusBadgeStyle(transaction.status)}>
+                    {getStatusLabel(transaction.status)}
+                  </Badge>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="bg-muted/50">
+                <CardContent className="py-4 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    No MLS data available. Fetch MLS data from the MLS Data tab first.
                   </p>
                 </CardContent>
               </Card>
             )}
+
+            {/* Category Tabs */}
+            <Tabs value={libraryCategory} onValueChange={(v) => {
+              setLibraryCategory(v as TemplateCategory);
+              setLibrarySubcategory("all");
+            }}>
+              <TabsList>
+                <TabsTrigger value="social" className="gap-2" data-testid="tab-template-social">
+                  <Smartphone className="h-4 w-4" />
+                  Social Media
+                </TabsTrigger>
+                <TabsTrigger value="print" className="gap-2" data-testid="tab-template-print">
+                  <Newspaper className="h-4 w-4" />
+                  Print Materials
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="social" className="space-y-4 mt-4">
+                {/* Sub-filters */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {["all", ...getSubcategoriesForCategory("social")].map((sub) => (
+                    <Badge
+                      key={sub}
+                      variant={librarySubcategory === sub ? "default" : "outline"}
+                      className="cursor-pointer"
+                      onClick={() => setLibrarySubcategory(sub as TemplateSubcategory | "all")}
+                      data-testid={`badge-subcategory-${sub}`}
+                    >
+                      {sub === "all" ? "All" : getSubcategoryLabel(sub as TemplateSubcategory)}
+                    </Badge>
+                  ))}
+                </div>
+
+                {/* Template Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {getTemplatesByCategory("social")
+                    .filter(t => librarySubcategory === "all" || t.subcategory === librarySubcategory)
+                    .map((template) => (
+                      <Card
+                        key={template.id}
+                        className="overflow-hidden cursor-pointer group hover:ring-2 hover:ring-primary transition-all"
+                        onClick={() => {
+                          setSelectedTemplateForCreation(template);
+                          setTemplateDialogOpen(true);
+                        }}
+                        data-testid={`card-template-${template.id}`}
+                      >
+                        <div className={`relative bg-black ${
+                          template.subcategory === "stories" ? "aspect-[9/16]" : 
+                          template.subcategory === "facebook" ? "aspect-video" : "aspect-square"
+                        }`}>
+                          {/* Template Preview with property photo */}
+                          {photos[0] ? (
+                            <img
+                              src={`/api/proxy-image?url=${encodeURIComponent(photos[0])}`}
+                              alt={template.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-muted">
+                              <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                          <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
+                            <p className="text-xs font-semibold uppercase tracking-wider mb-1">Just Listed</p>
+                            <p className="text-sm font-medium line-clamp-1">{transaction.propertyAddress}</p>
+                            {mlsData?.listPrice && (
+                              <p className="text-xs mt-1">{formatPrice(mlsData.listPrice)}</p>
+                            )}
+                          </div>
+                          <div className="absolute top-2 right-2 bg-white/90 dark:bg-black/90 px-2 py-1 rounded text-xs font-semibold">
+                            SPYGLASS
+                          </div>
+                          {/* Hover overlay */}
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Button size="sm" variant="secondary">
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Customize
+                            </Button>
+                          </div>
+                        </div>
+                        <CardContent className="p-3">
+                          <p className="text-sm font-medium">{template.name}</p>
+                          <p className="text-xs text-muted-foreground">{template.format.aspectRatio}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="print" className="space-y-4 mt-4">
+                {/* Sub-filters */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {["all", ...getSubcategoriesForCategory("print")].map((sub) => (
+                    <Badge
+                      key={sub}
+                      variant={librarySubcategory === sub ? "default" : "outline"}
+                      className="cursor-pointer"
+                      onClick={() => setLibrarySubcategory(sub as TemplateSubcategory | "all")}
+                      data-testid={`badge-print-subcategory-${sub}`}
+                    >
+                      {sub === "all" ? "All" : getSubcategoryLabel(sub as TemplateSubcategory)}
+                    </Badge>
+                  ))}
+                </div>
+
+                {/* Print Template Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {getTemplatesByCategory("print")
+                    .filter(t => librarySubcategory === "all" || t.subcategory === librarySubcategory)
+                    .map((template) => (
+                      <Card
+                        key={template.id}
+                        className="overflow-hidden cursor-pointer group hover:ring-2 hover:ring-primary transition-all"
+                        onClick={() => {
+                          setSelectedTemplateForCreation(template);
+                          setTemplateFlyerDialogOpen(true);
+                        }}
+                        data-testid={`card-template-${template.id}`}
+                      >
+                        <div className="relative aspect-[8.5/11] bg-white dark:bg-card">
+                          {/* Print template preview */}
+                          <div className="h-full p-3 flex flex-col">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-[8px] font-semibold uppercase tracking-wider text-muted-foreground">Spyglass Realty</span>
+                              <Badge variant="outline" className="text-[6px] h-4 px-1">Just Listed</Badge>
+                            </div>
+                            {photos[0] ? (
+                              <div className="flex-1 rounded overflow-hidden bg-muted">
+                                <img
+                                  src={`/api/proxy-image?url=${encodeURIComponent(photos[0])}`}
+                                  alt={template.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex-1 rounded bg-muted flex items-center justify-center">
+                                <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="mt-2">
+                              <p className="text-[8px] font-semibold line-clamp-1">{transaction.propertyAddress}</p>
+                              {mlsData?.listPrice && (
+                                <p className="text-[10px] font-bold">{formatPrice(mlsData.listPrice)}</p>
+                              )}
+                            </div>
+                          </div>
+                          {/* Hover overlay */}
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Button size="sm" variant="secondary">
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Customize
+                            </Button>
+                          </div>
+                        </div>
+                        <CardContent className="p-3">
+                          <p className="text-sm font-medium">{template.name}</p>
+                          <p className="text-xs text-muted-foreground">{template.format.aspectRatio}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
+
+          {/* Social Graphics Dialog - triggered from template library */}
+          <MarketingMaterialsDialog
+            open={templateDialogOpen}
+            onOpenChange={setTemplateDialogOpen}
+            transaction={transaction}
+            initialFormat={selectedTemplateForCreation?.dialogFormatId as 'square' | 'landscape' | 'story' | undefined}
+          />
+
+          {/* Flyer Dialog - triggered from template library */}
+          <CreateFlyerDialog
+            open={templateFlyerDialogOpen}
+            onOpenChange={setTemplateFlyerDialogOpen}
+            transaction={transaction}
+          />
         </TabsContent>
       </Tabs>
 
