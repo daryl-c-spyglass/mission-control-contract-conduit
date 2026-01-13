@@ -398,6 +398,22 @@ function PrintFlyerPreview({
   );
 }
 
+export interface FlyerAssetConfig {
+  status: string;
+  description?: string;
+  headline?: string;
+  photoUrls: string[];
+  agentName?: string;
+  agentTitle?: string;
+  agentPhone?: string;
+  agentPhotoUrl?: string;
+  format: 'social' | 'print';
+  price?: string;
+  bedrooms?: string;
+  bathrooms?: string;
+  sqft?: string;
+}
+
 interface CreateFlyerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -407,6 +423,8 @@ interface CreateFlyerDialogProps {
   agentPhone?: string;
   agentPhotoUrl?: string;
   onAssetSaved?: () => void;
+  initialData?: FlyerAssetConfig;
+  assetId?: string;
 }
 
 export function CreateFlyerDialog({
@@ -418,7 +436,10 @@ export function CreateFlyerDialog({
   onAssetSaved,
   agentPhone = "",
   agentPhotoUrl,
+  initialData,
+  assetId,
 }: CreateFlyerDialogProps) {
+  const isEditMode = Boolean(assetId && initialData);
   const { toast } = useToast();
   const [format, setFormat] = useState<FlyerFormat>("social");
   const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
@@ -474,9 +495,31 @@ export function CreateFlyerDialog({
 
   useEffect(() => {
     if (open) {
-      resetPhotoSelection(format);
-      if (mlsPhotos.length === 0) {
-        setShowUploadSection(true);
+      // If editing, restore saved state from initialData
+      if (isEditMode && initialData) {
+        setFormat(initialData.format);
+        setSelectedPhotos(initialData.photoUrls || []);
+        if (initialData.agentPhotoUrl) {
+          setLocalAgentPhoto(initialData.agentPhotoUrl);
+        }
+        // Reset form with saved values
+        form.reset({
+          price: initialData.price || transaction.listPrice ? `$${transaction.listPrice?.toLocaleString()}` : "",
+          status: initialData.status as any || "just_listed",
+          bedrooms: initialData.bedrooms || mlsData?.bedrooms?.toString() || "",
+          bathrooms: initialData.bathrooms || mlsData?.bathrooms?.toString() || "",
+          sqft: initialData.sqft || mlsData?.sqft?.toString() || "",
+          description: initialData.description || mlsData?.description || "",
+          agentName: initialData.agentName || agentName || "",
+          agentTitle: initialData.agentTitle || "REALTOR®",
+          agentPhone: initialData.agentPhone || agentPhone || "",
+          listingHeadline: initialData.headline || "",
+        });
+      } else {
+        resetPhotoSelection(format);
+        if (mlsPhotos.length === 0) {
+          setShowUploadSection(true);
+        }
       }
       // Store original MLS description when dialog opens
       const mlsDescription = mlsData?.description || "";
@@ -487,7 +530,7 @@ export function CreateFlyerDialog({
       setPreviousHeadline(null);
       setHasGeneratedHeadline(false);
     }
-  }, [open, mlsPhotos.length, mlsData?.description]);
+  }, [open, mlsPhotos.length, mlsData?.description, isEditMode, initialData]);
 
   useEffect(() => {
     if (!open) {
@@ -1586,16 +1629,41 @@ export function CreateFlyerDialog({
         // Save to marketing assets
         try {
           const statusLabel = STATUS_OPTIONS.find(s => s.value === data.status)?.label || data.status;
-          await apiRequest("POST", `/api/transactions/${transaction.id}/marketing-assets`, {
-            type: 'social_flyer',
-            imageData: dataUrl,
-            fileName,
-            metadata: {
-              format: 'social',
-              status: statusLabel,
-              dimensions: '1:1',
-            }
-          });
+          const config: FlyerAssetConfig = {
+            status: data.status,
+            description: data.description,
+            photoUrls: photosToUse,
+            format: 'social',
+            price: data.price,
+            bedrooms: data.bedrooms,
+            bathrooms: data.bathrooms,
+            sqft: data.sqft,
+          };
+          
+          if (isEditMode && assetId) {
+            await apiRequest("PATCH", `/api/transactions/${transaction.id}/marketing-assets/${assetId}`, {
+              imageData: dataUrl,
+              fileName,
+              metadata: {
+                format: 'social',
+                status: statusLabel,
+                dimensions: '1:1',
+                config,
+              }
+            });
+          } else {
+            await apiRequest("POST", `/api/transactions/${transaction.id}/marketing-assets`, {
+              type: 'social_flyer',
+              imageData: dataUrl,
+              fileName,
+              metadata: {
+                format: 'social',
+                status: statusLabel,
+                dimensions: '1:1',
+                config,
+              }
+            });
+          }
           onAssetSaved?.();
         } catch (saveError) {
           console.error("Failed to save marketing asset:", saveError);
@@ -1658,17 +1726,48 @@ export function CreateFlyerDialog({
           const imageData = await base64Promise;
           
           const statusLabel = STATUS_OPTIONS.find(s => s.value === data.status)?.label || data.status;
-          await apiRequest("POST", `/api/transactions/${transaction.id}/marketing-assets`, {
-            type: 'print_flyer',
-            imageData,
-            fileName,
-            metadata: {
-              format: 'print',
-              status: statusLabel,
-              dimensions: '8.5x11',
-              headline: data.listingHeadline,
-            }
-          });
+          const config: FlyerAssetConfig = {
+            status: data.status,
+            description: data.description,
+            headline: data.listingHeadline,
+            photoUrls: photosToUse,
+            agentName: data.agentName,
+            agentTitle: data.agentTitle,
+            agentPhone: data.agentPhone,
+            agentPhotoUrl: effectiveAgentPhoto || undefined,
+            format: 'print',
+            price: data.price,
+            bedrooms: data.bedrooms,
+            bathrooms: data.bathrooms,
+            sqft: data.sqft,
+          };
+          
+          if (isEditMode && assetId) {
+            await apiRequest("PATCH", `/api/transactions/${transaction.id}/marketing-assets/${assetId}`, {
+              imageData,
+              fileName,
+              metadata: {
+                format: 'print',
+                status: statusLabel,
+                dimensions: '8.5x11',
+                headline: data.listingHeadline,
+                config,
+              }
+            });
+          } else {
+            await apiRequest("POST", `/api/transactions/${transaction.id}/marketing-assets`, {
+              type: 'print_flyer',
+              imageData,
+              fileName,
+              metadata: {
+                format: 'print',
+                status: statusLabel,
+                dimensions: '8.5x11',
+                headline: data.listingHeadline,
+                config,
+              }
+            });
+          }
           onAssetSaved?.();
         } catch (saveError) {
           console.error("Failed to save marketing asset:", saveError);
@@ -1702,9 +1801,9 @@ export function CreateFlyerDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-4xl max-h-[85vh] sm:max-h-[90vh] flex flex-col p-4 sm:p-6">
         <DialogHeader className="pb-2 sm:pb-4">
-          <DialogTitle className="text-lg sm:text-xl">Create Property Flyer</DialogTitle>
+          <DialogTitle className="text-lg sm:text-xl">{isEditMode ? 'Edit Property Flyer' : 'Create Property Flyer'}</DialogTitle>
           <DialogDescription className="text-xs sm:text-sm">
-            Choose a format, select photos, and customize details.
+            {isEditMode ? 'Update your flyer with new details or photos.' : 'Choose a format, select photos, and customize details.'}
           </DialogDescription>
         </DialogHeader>
 
