@@ -85,7 +85,7 @@ Print flyers use HTML/CSS + Puppeteer for server-side rendering (replaced canvas
 - **Puppeteer Config**: Runs with --no-sandbox, --disable-setuid-sandbox for Replit compatibility
 - **Social flyers** still use client-side canvas rendering for speed
 - **Preview Rendering**: "Render Preview" button triggers server-side Puppeteer preview identical to download
-- **Template Version**: v2.2.1 with baseline alignment and sizing updates
+- **Template Version**: v2.3.0 with reduced whitespace and enlarged agent block
 - **Parity Verification**: `scripts/verify-flyer-parity.ts` validates pixel-identical output
 
 #### Print Flyer Layout Specifications (January 2026)
@@ -96,8 +96,8 @@ Bottom strip layout with PSD-matching baseline alignment:
   - Copy column: description at bottom
   - Agent column: phone number at bottom
 - **Sqft/Phone Alignment**: Sqft baseline aligns horizontally with agent phone baseline
-- **Agent Photo**: 220px diameter with 5px warm gray stroke (#d4c5a9)
-- **Spyglass Logo**: 130px beside agent photo
+- **Agent Photo**: 280px diameter with 6px warm gray stroke (#d4c5a9)
+- **Spyglass Logo**: 165px beside agent photo
 - **Stat Icons**: 56px PNG icons (bedroom, bathroom, sqft) loaded as base64 data URIs
 - **Y-axis Dividers Only**: Vertical dividers match content height, no horizontal rules
 
