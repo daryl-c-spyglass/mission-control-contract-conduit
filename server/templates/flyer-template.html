@@ -19,10 +19,10 @@
       --W: 2550px;
       --H: 3300px;
       
-      /* FIXED ZONE HEIGHTS */
+      /* FIXED ZONE HEIGHTS - optimized to reduce bottom whitespace */
       --headerH: 165px;
       --addressH: 99px;
-      --photosH: 1920px;  /* Increased to reduce bottom whitespace */
+      --photosH: 2016px;  /* +5% to consume bottom whitespace */
       --bottomH: calc(var(--H) - var(--headerH) - var(--addressH) - var(--photosH));
       
       --padX: 80px;
@@ -183,7 +183,7 @@
     }
     
     .secondary-photos {
-      height: 800px;  /* Increased for less whitespace */
+      height: 840px;  /* +5% to consume whitespace */
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 20px;
@@ -216,7 +216,7 @@
     /* ===== BOTTOM SECTION - Y-AXIS DIVIDERS ONLY ===== */
     .bottom-section {
       height: var(--bottomH);
-      padding: 56px var(--padX) 60px;
+      padding: 40px var(--padX) 40px;  /* Reduced padding for tighter fit */
       display: flex;
       align-items: flex-start;  /* Top align everything */
     }
@@ -224,8 +224,8 @@
     /* Inner wrapper - shrink-wrapped to content height for divider sizing */
     .bottom-inner {
       display: grid;
-      grid-template-columns: 520px 1fr 480px;
-      column-gap: 50px;
+      grid-template-columns: 480px 1fr 540px;  /* Agent column wider for larger photo */
+      column-gap: 44px;
       width: 100%;
       position: relative;
       align-items: stretch;  /* All columns stretch to content height */
@@ -245,12 +245,12 @@
     
     /* First divider - between stats and copy columns */
     .bottom-inner::before {
-      left: calc(520px + 21px);  /* After stats column + half gap */
+      left: calc(480px + 18px);  /* After stats column + half gap */
     }
     
     /* Second divider - between copy and agent columns */
     .bottom-inner::after {
-      right: calc(480px + 21px);  /* Before agent column + half gap */
+      right: calc(540px + 18px);  /* Before agent column + half gap */
     }
     
     /* LEFT COLUMN - Stats (icons + one-line text) */
@@ -306,11 +306,11 @@
       padding: 0 10px;
     }
     
-    /* Headline - centered, NOT bold (font-weight: 500) */
+    /* Headline - centered, REGULAR weight (NOT bold) */
     .listing-headline {
       font-family: 'League Spartan', sans-serif;
       font-size: 64px;
-      font-weight: 500 !important;  /* NOT bold */
+      font-weight: 400 !important;  /* REGULAR weight - NOT bold */
       letter-spacing: 4px;
       text-transform: uppercase;
       text-align: center;
@@ -351,37 +351,37 @@
       gap: 16px;
     }
     
-    /* Agent photo - larger to match PSD density */
+    /* Agent photo - enlarged +27% to match PSD density */
     .agent-photo {
-      width: 220px;
-      height: 220px;
+      width: 280px;
+      height: 280px;
       border-radius: 50%;
       object-fit: cover;
-      border: 5px solid #d4c5a9;  /* Light warm gray stroke ring */
+      border: 6px solid #d4c5a9;  /* Scaled border (was 5px) */
       background: #f2f2f2;
     }
     
     .agent-photo-placeholder {
-      width: 220px;
-      height: 220px;
+      width: 280px;
+      height: 280px;
       border-radius: 50%;
       background: #e0e0e0;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 5px solid #d4c5a9;
+      border: 6px solid #d4c5a9;
     }
     
     .agent-photo-placeholder svg {
-      width: 88px;
-      height: 88px;
+      width: 112px;
+      height: 112px;
       fill: #999;
     }
     
-    /* Logo tile to RIGHT of photo - increased to match PSD */
+    /* Logo tile to RIGHT of photo - enlarged +27% */
     .agent-team-logo {
-      width: 130px;
-      height: 130px;
+      width: 165px;
+      height: 165px;
       object-fit: contain;
       background: #fff;
       padding: 4px;
@@ -389,10 +389,10 @@
     
     /* Agent name - ONE LINE, never truncated */
     .agent-name {
-      font-size: 52px;
+      font-size: 48px;  /* Slightly reduced to fit with larger photo */
       font-weight: 700;
       line-height: 1.1;
-      margin-top: 8px;
+      margin-top: 6px;
       white-space: nowrap;
       overflow: visible;
       text-overflow: clip;

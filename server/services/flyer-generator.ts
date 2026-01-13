@@ -135,7 +135,7 @@ const FLYER_WIDTH = 2550;
 const FLYER_HEIGHT = 3300;
 
 // Template version for cache invalidation
-const TEMPLATE_VERSION = 'v2.2.1';
+const TEMPLATE_VERSION = 'v2.3.0';
 
 // Icon paths for stat icons
 const ICON_PATHS = {
