@@ -19,6 +19,7 @@ import Archive from "@/pages/archive";
 import GraphicsSettings from "@/pages/graphics-settings";
 import Settings from "@/pages/settings";
 import Admin from "@/pages/admin";
+import SharedCMAPage from "@/pages/shared-cma";
 import NotFound from "@/pages/not-found";
 import type { Transaction } from "@shared/schema";
 
@@ -159,6 +160,16 @@ function AuthenticatedApp() {
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
+  
+  // Check for public routes that don't require authentication
+  if (window.location.pathname.startsWith('/shared/cma/')) {
+    return (
+      <Switch>
+        <Route path="/shared/cma/:token" component={SharedCMAPage} />
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
 
   if (isLoading) {
     return <LoadingScreen />;

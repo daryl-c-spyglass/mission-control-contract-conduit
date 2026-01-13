@@ -44,6 +44,16 @@ Preferred communication style: Simple, everyday language.
 - **AI Description Summarization**: AI-powered summarization of MLS descriptions for flyers, with character limits and revert functionality.
 - **Preview Modal Zoom Controls**: Interactive zoom functionality for enlarged previews of marketing materials.
 - **Automatic MLS Synchronization**: Background service using node-cron to sync MLS data every 15 minutes for active and in-contract transactions.
+- **CMA (Comparative Market Analysis) System** (`cmas` table + `CMATab` component):
+  - Database-backed CMA storage with `cmas` table supporting transaction linking via `transactionId`
+  - Public share links with `publicLink` token and `expiresAt` expiration
+  - Property data stored as JSONB in `propertiesData` field
+  - Statistics visualization: avg price, price/sqft, DOM, sqft, beds, baths
+  - Multiple view modes: grid, stats, map (when coordinates available)
+  - Photo galleries with fullscreen support
+  - Share link generation with 30-day default expiration
+  - Public sharing page at `/shared/cma/:token` (no auth required)
+  - API endpoints: GET/POST/PATCH/DELETE `/api/cmas`, POST `/api/cmas/:id/share`, GET `/api/shared/cma/:token`
 - **Status Badge Color Utility** (`client/src/lib/utils/status-colors.ts`):
   - `getStatusBadgeStyle(status)`: Returns Tailwind classes using CSS variable tokens for theme-aware coloring
   - `getStatusLabel(status)`: Returns formatted display labels for transaction statuses
