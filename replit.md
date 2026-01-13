@@ -85,7 +85,7 @@ Print flyers use HTML/CSS + Puppeteer for server-side rendering (replaced canvas
 - **Puppeteer Config**: Runs with --no-sandbox, --disable-setuid-sandbox for Replit compatibility
 - **Social flyers** still use client-side canvas rendering for speed
 - **Preview Rendering**: "Render Preview" button triggers server-side Puppeteer preview identical to download
-- **Template Version**: v2.3.0 with reduced whitespace and enlarged agent block
+- **Template Version**: v2.4.0 with Rechat parity locked (reduced whitespace, Y-axis dividers only)
 - **Parity Verification**: `scripts/verify-flyer-parity.ts` validates pixel-identical output
 
 #### Print Flyer Layout Specifications (January 2026)
