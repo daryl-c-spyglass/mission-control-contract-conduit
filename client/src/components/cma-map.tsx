@@ -1,15 +1,17 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useTheme } from '@/hooks/use-theme';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { X, Locate, Maximize2 } from 'lucide-react';
 import type { Property } from '@shared/schema';
 
 interface CMAMapProps {
   properties: Property[];
   subjectProperty: Property | null;
   onPropertyClick?: (property: Property) => void;
+  showPolygon?: boolean;
 }
 
 function formatPrice(price: number | null | undefined): string {
@@ -29,13 +31,45 @@ function formatFullPrice(price: number | null | undefined): string {
   }).format(price);
 }
 
-export function CMAMap({ properties, subjectProperty, onPropertyClick }: CMAMapProps) {
+function cross(o: [number, number], a: [number, number], b: [number, number]): number {
+  return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+}
+
+function calculateConvexHull(points: [number, number][]): [number, number][] {
+  if (points.length < 3) return points;
+
+  const sorted = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+
+  const lower: [number, number][] = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+      lower.pop();
+    }
+    lower.push(p);
+  }
+
+  const upper: [number, number][] = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const p = sorted[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+      upper.pop();
+    }
+    upper.push(p);
+  }
+
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+
+export function CMAMap({ properties, subjectProperty, onPropertyClick, showPolygon = true }: CMAMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
   const { isDark } = useTheme();
 
   const mapStyle = isDark 
@@ -70,6 +104,24 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick }: CMAMapP
     return null;
   }, []);
 
+  const polygonCoordinates = useMemo(() => {
+    const coords: [number, number][] = [];
+    
+    if (subjectProperty) {
+      const c = getPropertyCoordinates(subjectProperty);
+      if (c) coords.push(c);
+    }
+    
+    properties.forEach(p => {
+      const c = getPropertyCoordinates(p);
+      if (c) coords.push(c);
+    });
+    
+    if (coords.length < 3) return null;
+    
+    return calculateConvexHull(coords);
+  }, [properties, subjectProperty, getPropertyCoordinates]);
+
   const getPropertyStatus = useCallback((property: Property): 'active' | 'pending' | 'sold' => {
     const status = ((property.standardStatus || (property as any).status) || '').toLowerCase();
     if (status.includes('closed') || status.includes('sold')) {
@@ -101,9 +153,62 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick }: CMAMapP
     markersRef.current = [];
   }, []);
 
+  const addPolygonBoundary = useCallback((coordinates: [number, number][]) => {
+    if (!map.current) return;
+
+    if (map.current.getLayer('cma-polygon-fill')) {
+      map.current.removeLayer('cma-polygon-fill');
+    }
+    if (map.current.getLayer('cma-polygon-line')) {
+      map.current.removeLayer('cma-polygon-line');
+    }
+    if (map.current.getSource('cma-polygon')) {
+      map.current.removeSource('cma-polygon');
+    }
+
+    const closedCoords = [...coordinates, coordinates[0]];
+
+    map.current.addSource('cma-polygon', {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'Polygon',
+          coordinates: [closedCoords],
+        },
+      },
+    });
+
+    map.current.addLayer({
+      id: 'cma-polygon-fill',
+      type: 'fill',
+      source: 'cma-polygon',
+      paint: {
+        'fill-color': isDark ? '#60a5fa' : '#3b82f6',
+        'fill-opacity': 0.12,
+      },
+    });
+
+    map.current.addLayer({
+      id: 'cma-polygon-line',
+      type: 'line',
+      source: 'cma-polygon',
+      paint: {
+        'line-color': isDark ? '#60a5fa' : '#2563eb',
+        'line-width': 2.5,
+        'line-opacity': 0.7,
+      },
+    });
+  }, [isDark]);
+
   const addMarkers = useCallback(() => {
     if (!map.current) return;
     clearMarkers();
+
+    if (showPolygon && polygonCoordinates && polygonCoordinates.length >= 3) {
+      addPolygonBoundary(polygonCoordinates);
+    }
 
     if (subjectProperty) {
       const coords = getPropertyCoordinates(subjectProperty);
@@ -114,29 +219,30 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick }: CMAMapP
         el.innerHTML = `
           <div style="position: relative; z-index: 100;">
             <div style="
-              background-color: hsl(var(--primary));
+              background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
               color: white;
               padding: 6px 12px;
               border-radius: 8px;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-              font-weight: 600;
+              box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+              font-weight: 700;
               font-size: 12px;
               white-space: nowrap;
               text-align: center;
+              border: 2px solid white;
             ">
-              <span style="font-size: 10px; display: block; opacity: 0.8;">Subject</span>
+              <span style="font-size: 9px; display: block; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.5px;">Subject</span>
               ${formatPrice(price)}
             </div>
             <div style="
               position: absolute;
-              bottom: -6px;
+              bottom: -8px;
               left: 50%;
               transform: translateX(-50%);
               width: 0;
               height: 0;
               border-left: 8px solid transparent;
               border-right: 8px solid transparent;
-              border-top: 8px solid hsl(var(--primary));
+              border-top: 8px solid #1e40af;
             "></div>
           </div>
         `;
@@ -155,11 +261,14 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick }: CMAMapP
       const price = getPropertyPrice(property);
       const status = getPropertyStatus(property);
       
-      let bgColor = '#22c55e';
+      let bgColor = '#16a34a';
+      let shadowColor = 'rgba(22, 163, 74, 0.4)';
       if (status === 'sold') {
-        bgColor = '#ef4444';
+        bgColor = '#dc2626';
+        shadowColor = 'rgba(220, 38, 38, 0.4)';
       } else if (status === 'pending') {
         bgColor = '#f59e0b';
+        shadowColor = 'rgba(245, 158, 11, 0.4)';
       }
 
       const el = document.createElement('div');
@@ -171,12 +280,13 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick }: CMAMapP
             background-color: ${bgColor};
             color: white;
             padding: 4px 8px;
-            border-radius: 6px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            border-radius: 4px;
+            box-shadow: 0 2px 8px ${shadowColor};
             font-weight: 600;
             font-size: 11px;
             white-space: nowrap;
-            transition: transform 0.15s;
+            transition: transform 0.15s, box-shadow 0.15s;
+            border: 1px solid rgba(255,255,255,0.3);
           ">
             ${formatPrice(price)}
           </div>
@@ -201,11 +311,17 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick }: CMAMapP
 
       el.addEventListener('mouseenter', () => {
         const inner = el.querySelector('div > div') as HTMLElement;
-        if (inner) inner.style.transform = 'scale(1.1)';
+        if (inner) {
+          inner.style.transform = 'scale(1.1)';
+          inner.style.boxShadow = `0 4px 12px ${shadowColor}`;
+        }
       });
       el.addEventListener('mouseleave', () => {
         const inner = el.querySelector('div > div') as HTMLElement;
-        if (inner) inner.style.transform = 'scale(1)';
+        if (inner) {
+          inner.style.transform = 'scale(1)';
+          inner.style.boxShadow = `0 2px 8px ${shadowColor}`;
+        }
       });
 
       const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
@@ -215,7 +331,7 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick }: CMAMapP
     });
 
     fitMapToBounds();
-  }, [properties, subjectProperty, getPropertyCoordinates, getPropertyPrice, getPropertyStatus, clearMarkers, onPropertyClick]);
+  }, [properties, subjectProperty, getPropertyCoordinates, getPropertyPrice, getPropertyStatus, clearMarkers, onPropertyClick, showPolygon, polygonCoordinates, addPolygonBoundary]);
 
   const fitMapToBounds = useCallback(() => {
     if (!map.current) return;
@@ -250,6 +366,14 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick }: CMAMapP
     });
   }, [properties, subjectProperty, getPropertyCoordinates]);
 
+  const centerOnSubject = useCallback(() => {
+    if (!map.current || !subjectProperty) return;
+    const coords = getPropertyCoordinates(subjectProperty);
+    if (coords) {
+      map.current.flyTo({ center: coords, zoom: 14 });
+    }
+  }, [subjectProperty, getPropertyCoordinates]);
+
   useEffect(() => {
     if (!token || !mapContainer.current || map.current) return;
 
@@ -270,12 +394,13 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick }: CMAMapP
       container: mapContainer.current,
       style: mapStyle,
       center: [centerLng, centerLat],
-      zoom: 12,
+      zoom: 11,
     });
 
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
     map.current.on('load', () => {
+      setMapLoaded(true);
       addMarkers();
     });
 
@@ -287,23 +412,25 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick }: CMAMapP
   }, [token]);
 
   useEffect(() => {
-    if (map.current?.loaded()) {
+    if (map.current && mapLoaded) {
       addMarkers();
     }
-  }, [properties, subjectProperty, addMarkers]);
+  }, [properties, subjectProperty, addMarkers, mapLoaded]);
 
   useEffect(() => {
     if (map.current) {
       map.current.setStyle(mapStyle);
       map.current.once('styledata', () => {
-        addMarkers();
+        if (mapLoaded) {
+          addMarkers();
+        }
       });
     }
-  }, [isDark, mapStyle, addMarkers]);
+  }, [isDark, mapStyle, addMarkers, mapLoaded]);
 
   if (error) {
     return (
-      <div className="w-full h-[500px] rounded-lg border flex items-center justify-center bg-muted">
+      <div className="w-full h-[550px] rounded-lg border flex items-center justify-center bg-muted">
         <p className="text-muted-foreground">{error}</p>
       </div>
     );
@@ -311,7 +438,7 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick }: CMAMapP
 
   if (!token) {
     return (
-      <div className="w-full h-[500px] rounded-lg border flex items-center justify-center bg-muted">
+      <div className="w-full h-[550px] rounded-lg border flex items-center justify-center bg-muted">
         <p className="text-muted-foreground">Loading map...</p>
       </div>
     );
@@ -321,18 +448,47 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick }: CMAMapP
   const selectedPropAny = selectedProperty as any;
 
   return (
-    <div className="relative w-full h-[500px] rounded-lg overflow-hidden border" data-testid="cma-map-container">
+    <div className="relative w-full h-[550px] rounded-lg overflow-hidden border" data-testid="cma-map-container">
       <div ref={mapContainer} className="w-full h-full" />
+      
+      <div className="absolute top-4 left-4 flex flex-col gap-2">
+        <Button
+          size="icon"
+          variant="secondary"
+          className="h-8 w-8 shadow-md"
+          onClick={centerOnSubject}
+          title="Center on subject"
+          data-testid="button-center-subject"
+        >
+          <Locate className="h-4 w-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="secondary"
+          className="h-8 w-8 shadow-md"
+          onClick={fitMapToBounds}
+          title="Fit all properties"
+          data-testid="button-fit-bounds"
+        >
+          <Maximize2 className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="absolute top-4 left-1/2 -translate-x-1/2">
+        <Badge variant="secondary" className="shadow-md bg-background/90 backdrop-blur">
+          {properties.length} comparable{properties.length !== 1 ? 's' : ''} + Subject
+        </Badge>
+      </div>
       
       <div className="absolute bottom-4 left-4 bg-background/90 dark:bg-background/95 backdrop-blur rounded-lg p-3 shadow-md border">
         <p className="text-xs font-medium mb-2">Legend</p>
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'hsl(var(--primary))' }}></div>
+            <div className="w-3 h-3 rounded-full bg-blue-600"></div>
             <span className="text-xs">Subject Property</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            <div className="w-3 h-3 rounded-full bg-green-600"></div>
             <span className="text-xs">Active Listing</span>
           </div>
           <div className="flex items-center gap-2">
@@ -340,14 +496,20 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick }: CMAMapP
             <span className="text-xs">Pending</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+            <div className="w-3 h-3 rounded-full bg-red-600"></div>
             <span className="text-xs">Sold</span>
           </div>
+          {showPolygon && (
+            <div className="flex items-center gap-2 mt-1 pt-1 border-t">
+              <div className="w-3 h-3 rounded border-2 border-blue-500 bg-blue-500/20"></div>
+              <span className="text-xs">Search Area</span>
+            </div>
+          )}
         </div>
       </div>
 
       {selectedProperty && (
-        <div className="absolute top-4 right-4 bg-background rounded-lg shadow-lg p-4 max-w-xs border" data-testid="selected-property-popup">
+        <div className="absolute top-4 right-14 bg-background rounded-lg shadow-lg p-4 max-w-xs border" data-testid="selected-property-popup">
           <Button
             variant="ghost"
             size="icon"
