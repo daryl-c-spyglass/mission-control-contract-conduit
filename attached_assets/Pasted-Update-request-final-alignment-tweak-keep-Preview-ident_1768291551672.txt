@@ -1,0 +1,81 @@
+Update request: final alignment tweak + keep Preview identical to Download
+
+Context:
+- Flyer template: server/templates/flyer-template.html
+- Renderer: server/services/flyer-generator.ts
+- Client preview: create-flyer-dialog.tsx
+
+Goal (1): Move the left “stats” group (bedrooms/bathrooms/sqft) DOWN slightly, without changing:
+- current sqft baseline alignment with the agent phone number (this is already correct)
+- current divider positions (these are now correct)
+
+Goal (2): Preview must remain identical to Download (no layout drift).
+
+---------------------------------------
+A) Stats group vertical shift (down) while keeping sqft baseline aligned to phone
+---------------------------------------
+
+Current behavior:
+- sqft line is aligned to phone number baseline already (good)
+- bedrooms/bathrooms appear slightly too high relative to that baseline
+Desired:
+- move bedrooms + bathrooms DOWN a bit
+- keep sqft exactly where it is (still aligned to phone baseline)
+
+Implementation requirement:
+- Do NOT move the entire stats column (that would move sqft too).
+- Instead, split stats into two sub-wrappers so only the first two rows move.
+
+Template change (HTML):
+Inside the stats column, wrap the first two stat rows in a group:
+
+<div class="stats-column">
+  <div class="stats-top">
+    <!-- bedrooms row -->
+    <!-- bathrooms row -->
+  </div>
+
+  <div class="stats-bottom">
+    <!-- sqft row -->
+  </div>
+</div>
+
+CSS change:
+- Add a small top margin (or translateY) to .stats-top only.
+- Keep .stats-bottom untouched.
+- Use px units (we’re in fixed 2550x3300 layout).
+
+Example (tune to match visually):
+.stats-top { margin-top: 18px; }  /* or 22px if needed */
+.stats-bottom { margin-top: 0; }
+
+Important:
+- Do NOT introduce any new horizontal rules.
+- Do NOT alter divider heights/positions.
+- Ensure stat rows remain one-line with icons.
+
+After this change, re-render and confirm:
+- sqft line still aligns with phone number baseline
+- bedrooms/bathrooms are slightly lower (more balanced)
+- no other layout changes.
+
+---------------------------------------
+B) Preview must always match Download
+---------------------------------------
+
+Do not change anything that would reintroduce preview/download drift.
+
+Verify:
+1) Preview endpoint and Download endpoint use the same template, same CSS, same font loading wait, same media emulation.
+2) If we already implemented “single source of truth” rendering (PDF-first then PNG from that PDF), keep it.
+3) Add/keep a renderHash log and confirm preview & download for same payload share the same hash.
+4) Confirm the preview image shown in the modal is the server-produced PNG (no client-side transforms besides display scaling).
+
+Acceptance test:
+- Generate Preview, then Download for the same listing and photos
+- They must be visually identical (same placement, same spacing, same dividers, same stats alignment).
+
+Deliverable:
+- Commit the HTML wrapper change + CSS adjustment for .stats-top only
+- No other layout regressions
+- Confirm with screenshot comparison (preview vs download) that they match exactly.

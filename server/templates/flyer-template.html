@@ -259,7 +259,19 @@
       justify-content: flex-start;
       align-items: flex-start;
       gap: 48px;
-      padding-top: 8px;  /* Baseline alignment offset */
+      /* No padding-top - alignment handled by sub-wrappers */
+    }
+    
+    /* Stats sub-groups for fine-tuned vertical alignment */
+    .stats-top {
+      display: flex;
+      flex-direction: column;
+      gap: 48px;
+      margin-top: 18px;  /* Push bedrooms/bathrooms down slightly */
+    }
+    
+    .stats-bottom {
+      margin-top: 0;  /* Keep sqft aligned with phone baseline */
     }
     
     /* Stats items - ONE LINE each */
@@ -460,39 +472,45 @@
       <div class="bottom-inner">
         <!-- Stats Column -->
         <div class="stats-column">
-          <div class="stat-item">
-            <span class="stat-icon">
-              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <rect x="2" y="12" width="20" height="4" rx="1" fill="#111"/>
-                <path d="M4 12V7C4 6.45 4.45 6 5 6H10C10.55 6 11 6.45 11 7V12" stroke="#111" stroke-width="1.5" fill="none"/>
-                <path d="M13 12V7C13 6.45 13.45 6 14 6H19C19.55 6 20 6.45 20 7V12" stroke="#111" stroke-width="1.5" fill="none"/>
-                <path d="M3 16V20M21 16V20" stroke="#111" stroke-width="2"/>
-                <path d="M2 16H22" stroke="#111" stroke-width="1.5"/>
-              </svg>
-            </span>
-            <div class="stat-text">{{beds}} bedrooms</div>
+          <!-- Top group: bedrooms + bathrooms (shifted down slightly) -->
+          <div class="stats-top">
+            <div class="stat-item">
+              <span class="stat-icon">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="2" y="12" width="20" height="4" rx="1" fill="#111"/>
+                  <path d="M4 12V7C4 6.45 4.45 6 5 6H10C10.55 6 11 6.45 11 7V12" stroke="#111" stroke-width="1.5" fill="none"/>
+                  <path d="M13 12V7C13 6.45 13.45 6 14 6H19C19.55 6 20 6.45 20 7V12" stroke="#111" stroke-width="1.5" fill="none"/>
+                  <path d="M3 16V20M21 16V20" stroke="#111" stroke-width="2"/>
+                  <path d="M2 16H22" stroke="#111" stroke-width="1.5"/>
+                </svg>
+              </span>
+              <div class="stat-text">{{beds}} bedrooms</div>
+            </div>
+            <div class="stat-item">
+              <span class="stat-icon">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M4 12H20V16C20 18.2091 18.2091 20 16 20H8C5.79086 20 4 18.2091 4 16V12Z" fill="#111"/>
+                  <path d="M6 12V8C6 5.79086 7.79086 4 10 4H10.5C11.8807 4 13 5.11929 13 6.5V12" stroke="#111" stroke-width="2" fill="none"/>
+                  <circle cx="7" cy="7" r="1.5" fill="#111"/>
+                </svg>
+              </span>
+              <div class="stat-text">{{baths}} bathrooms</div>
+            </div>
           </div>
-          <div class="stat-item">
-            <span class="stat-icon">
-              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4 12H20V16C20 18.2091 18.2091 20 16 20H8C5.79086 20 4 18.2091 4 16V12Z" fill="#111"/>
-                <path d="M6 12V8C6 5.79086 7.79086 4 10 4H10.5C11.8807 4 13 5.11929 13 6.5V12" stroke="#111" stroke-width="2" fill="none"/>
-                <circle cx="7" cy="7" r="1.5" fill="#111"/>
-              </svg>
-            </span>
-            <div class="stat-text">{{baths}} bathrooms</div>
-          </div>
-          <div class="stat-item">
-            <span class="stat-icon">
-              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3 21L21 3" stroke="#111" stroke-width="2"/>
-                <path d="M3 21H9M3 21V15" stroke="#111" stroke-width="2"/>
-                <path d="M21 3H15M21 3V9" stroke="#111" stroke-width="2"/>
-                <path d="M9 3H3V9" stroke="#111" stroke-width="2" fill="none"/>
-                <path d="M15 21H21V15" stroke="#111" stroke-width="2" fill="none"/>
-              </svg>
-            </span>
-            <div class="stat-text">{{sqft}} sq. ft</div>
+          <!-- Bottom group: sqft (keeps baseline alignment with phone) -->
+          <div class="stats-bottom">
+            <div class="stat-item">
+              <span class="stat-icon">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M3 21L21 3" stroke="#111" stroke-width="2"/>
+                  <path d="M3 21H9M3 21V15" stroke="#111" stroke-width="2"/>
+                  <path d="M21 3H15M21 3V9" stroke="#111" stroke-width="2"/>
+                  <path d="M9 3H3V9" stroke="#111" stroke-width="2" fill="none"/>
+                  <path d="M15 21H21V15" stroke="#111" stroke-width="2" fill="none"/>
+                </svg>
+              </span>
+              <div class="stat-text">{{sqft}} sq. ft</div>
+            </div>
           </div>
         </div>
         
