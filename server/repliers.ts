@@ -61,8 +61,31 @@ export interface MLSListingData {
   
   // Status & dates
   status: string;
+  lastStatus: string;
   daysOnMarket: number;
+  simpleDaysOnMarket: number | null;
   listDate: string;
+  
+  // Price history & sale info (from Repliers)
+  originalPrice: number | null;
+  soldPrice: number | null;
+  soldDate: string | null;
+  
+  // Virtual tour
+  virtualTourUrl: string | null;
+  
+  // Photo count
+  photoCount: number;
+  
+  // Permissions (for display control)
+  permissions?: {
+    displayAddressOnInternet: boolean;
+    displayPublic: boolean;
+    displayInternetEntireListing: boolean;
+  };
+  
+  // Neighborhood info
+  neighborhood: string;
   
   // Description
   description: string;
@@ -351,8 +374,31 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
       garage: buildGarage(listing),
       
       status: listing.standardStatus || listing.mlsStatus || listing.status || listing.listingStatus || "",
+      lastStatus: listing.lastStatus || "",
       daysOnMarket: listing.daysOnMarket || listing.dom || 0,
+      simpleDaysOnMarket: listing.simpleDaysOnMarket ?? null,
       listDate: listing.listDate || listing.listingDate || "",
+      
+      // Price history & sale info
+      originalPrice: listing.originalPrice != null ? parseFloat(listing.originalPrice) : null,
+      soldPrice: listing.soldPrice != null ? parseFloat(listing.soldPrice) : null,
+      soldDate: listing.soldDate || listing.timestamps?.closedDate || null,
+      
+      // Virtual tour
+      virtualTourUrl: listing.details?.virtualTourUrl || listing.virtualTourUrl || null,
+      
+      // Photo count
+      photoCount: listing.photoCount || photos.length,
+      
+      // Permissions
+      permissions: listing.permissions ? {
+        displayAddressOnInternet: listing.permissions.displayAddressOnInternet === 'Y',
+        displayPublic: listing.permissions.displayPublic === 'Y',
+        displayInternetEntireListing: listing.permissions.displayInternetEntireListing === 'Y',
+      } : undefined,
+      
+      // Neighborhood
+      neighborhood: listing.address?.neighborhood || "",
       
       description: listing.publicRemarks || listing.privateRemarks || listing.remarks || listing.details?.description || "",
       

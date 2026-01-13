@@ -1,0 +1,432 @@
+## Improve Create Graphics - Comprehensive Update
+
+Multiple improvements needed for the Create Graphics feature and Marketing Assets gallery.
+
+---
+
+## Issue 1: White Space in Asset Cards
+
+**Problem:** The "Facebook 16:9" graphics have excessive white space below them because the landscape aspect ratio doesn't fill the card height like the portrait Print Flyer does.
+
+**Solution:** Use consistent card sizing with object-fit cover or adjust card heights based on content.
+
+**Option A: Fixed Height Cards with Object-Fit Cover**
+
+```tsx
+// All cards same height, images fill the space
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  {assets.map((asset) => (
+    <Card key={asset.id} className="overflow-hidden">
+      {/* Fixed height image container */}
+      <div className="h-64 overflow-hidden bg-muted">
+        <img
+          src={asset.imageUrl}
+          alt={asset.type}
+          className="w-full h-full object-cover"
+        />
+      </div>
+      
+      {/* Card footer - consistent across all cards */}
+      <div className="p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <Badge className={getBadgeStyle(asset.format)}>
+              {getBadgeLabel(asset.format)}
+            </Badge>
+            <p className="text-sm text-muted-foreground mt-1">
+              {formatDate(asset.createdAt)}
+            </p>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={() => handleEdit(asset)}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => handleDownload(asset)}>
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => handleDelete(asset)}>
+              <Trash className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  ))}
+</div>
+```
+
+**Option B: Aspect Ratio Aware Cards (Recommended)**
+
+```tsx
+// Cards adapt to content but maintain minimum height
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  {assets.map((asset) => (
+    <Card key={asset.id} className="overflow-hidden flex flex-col">
+      {/* Aspect-ratio aware container */}
+      <div className={cn(
+        "relative overflow-hidden bg-muted",
+        asset.format === 'print' && "aspect-[8.5/11]", // Portrait flyer
+        asset.format === 'landscape' && "aspect-video", // 16:9
+        asset.format === 'square' && "aspect-square",   // 1:1
+        asset.format === 'story' && "aspect-[9/16] max-h-80", // 9:16 capped
+      )}>
+        <img
+          src={asset.imageUrl}
+          alt={asset.type}
+          className="w-full h-full object-contain"
+        />
+      </div>
+      
+      {/* Card footer */}
+      <div className="p-4 mt-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <Badge className={getBadgeStyle(asset.format)}>
+              {getBadgeLabel(asset.format)}
+            </Badge>
+            <p className="text-sm text-muted-foreground mt-1">
+              {formatDate(asset.createdAt)}
+            </p>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon"><Pencil className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon"><Download className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon"><Trash className="h-4 w-4" /></Button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  ))}
+</div>
+```
+
+**Option C: Masonry-Style Layout (Pinterest-like)**
+
+For truly varied aspect ratios, consider a masonry layout:
+
+```bash
+npm install react-masonry-css
+```
+
+```tsx
+import Masonry from 'react-masonry-css';
+
+const breakpointColumns = {
+  default: 3,
+  1100: 2,
+  700: 1
+};
+
+<Masonry
+  breakpointCols={breakpointColumns}
+  className="flex -ml-6 w-auto"
+  columnClassName="pl-6 bg-clip-padding"
+>
+  {assets.map((asset) => (
+    <Card key={asset.id} className="mb-6 overflow-hidden">
+      <img
+        src={asset.imageUrl}
+        alt={asset.type}
+        className="w-full h-auto"
+      />
+      <div className="p-4">
+        {/* Footer content */}
+      </div>
+    </Card>
+  ))}
+</Masonry>
+```
+
+**Recommendation:** Use **Option A (Fixed Height)** for simplicity and visual consistency.
+
+---
+
+## Issue 2: Add Format Selector to Create Graphics
+
+**Problem:** No visible format selector when creating graphics. User can't choose between Instagram Post, Facebook Post, or Story formats.
+
+**Solution:** Add format tabs/buttons above the preview.
+
+**Formats to Support:**
+
+| Format ID | Display Name | Dimensions | Aspect Ratio | Badge Color |
+|-----------|--------------|------------|--------------|-------------|
+| `square` | Instagram Post | 1080×1080 | 1:1 | Blue (#3b82f6) |
+| `landscape` | Facebook Post | 1200×630 | 16:9 | Purple (#8b5cf6) |
+| `story` | Instagram Story | 1080×1920 | 9:16 | Pink (#ec4899) |
+
+**Add Format Selector UI:**
+
+```tsx
+const formats = [
+  { id: 'square', name: 'Instagram Post', width: 1080, height: 1080, ratio: '1:1' },
+  { id: 'landscape', name: 'Facebook Post', width: 1200, height: 630, ratio: '16:9' },
+  { id: 'story', name: 'Instagram Story', width: 1080, height: 1920, ratio: '9:16' },
+];
+
+const [selectedFormat, setSelectedFormat] = useState(formats[0]);
+
+// In dialog JSX:
+<div className="space-y-2">
+  <Label>Format</Label>
+  <div className="grid grid-cols-3 gap-2">
+    {formats.map((format) => (
+      <button
+        key={format.id}
+        type="button"
+        onClick={() => setSelectedFormat(format)}
+        className={cn(
+          "flex flex-col items-center p-3 rounded-lg border-2 transition-all",
+          selectedFormat.id === format.id
+            ? "border-primary bg-primary/10"
+            : "border-border hover:border-primary/50"
+        )}
+      >
+        {/* Aspect ratio icon */}
+        <div className={cn(
+          "border-2 border-current mb-2 flex items-center justify-center text-xs",
+          format.id === 'square' && "w-10 h-10",
+          format.id === 'landscape' && "w-14 h-8",
+          format.id === 'story' && "w-6 h-10",
+        )}>
+          {format.ratio}
+        </div>
+        <span className="text-sm font-medium">{format.name}</span>
+      </button>
+    ))}
+  </div>
+</div>
+```
+
+**Update Preview to Match Format:**
+
+```tsx
+<div className={cn(
+  "relative overflow-hidden rounded-lg bg-muted mx-auto",
+  selectedFormat.id === 'square' && "aspect-square max-w-md",
+  selectedFormat.id === 'landscape' && "aspect-video max-w-lg",
+  selectedFormat.id === 'story' && "aspect-[9/16] max-w-xs",
+)}>
+  {/* Preview content */}
+</div>
+```
+
+**Update Canvas Generation:**
+
+```tsx
+const generateGraphic = async () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = selectedFormat.width;
+  canvas.height = selectedFormat.height;
+  
+  // ... drawing code ...
+  
+  // Save with correct format
+  const assetData = {
+    imageUrl: canvas.toDataURL('image/png'),
+    type: 'social',
+    format: selectedFormat.id, // 'square', 'landscape', or 'story'
+  };
+};
+```
+
+---
+
+## Issue 3: Badge Colors Not Matching Format
+
+**Current:** "Facebook 16:9" shows but badge color may be inconsistent.
+
+**Solution:** Consistent badge styling:
+
+```tsx
+const getBadgeStyle = (format: string): string => {
+  const styles: Record<string, string> = {
+    'print': 'bg-orange-500 text-white hover:bg-orange-600',
+    'square': 'bg-blue-500 text-white hover:bg-blue-600',
+    'landscape': 'bg-purple-500 text-white hover:bg-purple-600',
+    'story': 'bg-pink-500 text-white hover:bg-pink-600',
+  };
+  return styles[format] || 'bg-gray-500 text-white';
+};
+
+const getBadgeLabel = (format: string): string => {
+  const labels: Record<string, string> = {
+    'print': 'Print Flyer',
+    'square': 'Instagram Post',
+    'landscape': 'Facebook 16:9',
+    'story': 'Instagram Story',
+  };
+  return labels[format] || format;
+};
+```
+
+---
+
+## Issue 4: Enhance Graphics Output Quality
+
+**Current:** Graphics may be plain photos without proper overlays.
+
+**Required Elements on Generated Graphics:**
+
+```
+┌────────────────────────────────────────┐
+│ SPYGLASS                     $434,990  │  ← Brokerage + Price
+│        REALTY                          │
+│                                        │
+│         [Property Photo]               │
+│                                        │
+│                                        │
+│ ┌──────────────┐                       │
+│ │ JUST LISTED  │                       │  ← Status badge
+│ └──────────────┘                       │
+│ 13106 New Boston                       │  ← Address
+│ Austin, TX 78729                       │
+└────────────────────────────────────────┘
+```
+
+**Canvas Drawing Code:**
+
+```tsx
+const generateGraphic = async () => {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d')!;
+  
+  canvas.width = selectedFormat.width;
+  canvas.height = selectedFormat.height;
+  
+  // 1. Draw property photo (full bleed)
+  const img = await loadImage(selectedPhotoUrl);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  
+  // 2. Add gradient overlay at bottom for text readability
+  const gradient = ctx.createLinearGradient(0, canvas.height * 0.5, 0, canvas.height);
+  gradient.addColorStop(0, 'rgba(0,0,0,0)');
+  gradient.addColorStop(1, 'rgba(0,0,0,0.7)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // 3. Draw brokerage name (top-left)
+  ctx.fillStyle = 'white';
+  ctx.font = 'bold 28px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText('SPYGLASS REALTY', 30, 45);
+  
+  // 4. Draw price (top-right)
+  if (price) {
+    ctx.font = 'bold 36px Arial';
+    ctx.textAlign = 'right';
+    ctx.fillText(`$${price.toLocaleString()}`, canvas.width - 30, 50);
+  }
+  
+  // 5. Draw status badge
+  const badgeColors: Record<string, string> = {
+    'Just Listed': '#f97316',
+    'For Sale': '#f97316',
+    'Open House': '#22c55e',
+    'Under Contract': '#3b82f6',
+    'Just Sold': '#ef4444',
+    'Price Improvement': '#8b5cf6',
+    'For Lease': '#06b6d4',
+  };
+  
+  const badgeColor = badgeColors[status] || '#f97316';
+  const badgeText = status.toUpperCase();
+  ctx.font = 'bold 24px Arial';
+  const badgeWidth = ctx.measureText(badgeText).width + 24;
+  const badgeHeight = 36;
+  const badgeX = 30;
+  const badgeY = canvas.height - 110;
+  
+  // Badge background
+  ctx.fillStyle = badgeColor;
+  ctx.beginPath();
+  ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 4);
+  ctx.fill();
+  
+  // Badge text
+  ctx.fillStyle = 'white';
+  ctx.textAlign = 'left';
+  ctx.fillText(badgeText, badgeX + 12, badgeY + 26);
+  
+  // 6. Draw address
+  ctx.fillStyle = 'white';
+  ctx.font = 'bold 28px Arial';
+  ctx.fillText(streetAddress, 30, canvas.height - 50);
+  ctx.font = '22px Arial';
+  ctx.fillText(cityStateZip, 30, canvas.height - 20);
+  
+  return canvas.toDataURL('image/png');
+};
+```
+
+---
+
+## Summary of All Changes
+
+### Marketing Assets Gallery:
+1. ✅ Fix white space - use fixed height cards (h-64) with object-cover
+2. ✅ Consistent badge colors for all formats
+3. ✅ Proper badge labels
+
+### Create Graphics Dialog:
+1. ✅ Add format selector (Instagram Post, Facebook Post, Instagram Story)
+2. ✅ Preview adapts to selected format aspect ratio
+3. ✅ Canvas generates at correct dimensions for each format
+4. ✅ Generated graphics include: brokerage name, price, status badge, address
+5. ✅ Save with correct format ID for badge display
+
+---
+
+## Testing Checklist
+
+**Gallery Cards:**
+- [ ] All cards same height (no excessive white space)
+- [ ] Print Flyer shows orange badge
+- [ ] Facebook 16:9 shows purple badge
+- [ ] Instagram Post shows blue badge
+- [ ] Instagram Story shows pink badge
+
+**Create Graphics Dialog:**
+- [ ] Format selector visible with 3 options
+- [ ] Selecting "Instagram Post" shows square preview
+- [ ] Selecting "Facebook Post" shows landscape preview
+- [ ] Selecting "Instagram Story" shows vertical preview
+- [ ] Generated image includes brokerage name
+- [ ] Generated image includes price
+- [ ] Generated image includes status badge
+- [ ] Generated image includes address
+- [ ] Saved asset shows correct colored badge in gallery
+
+---
+
+## Files to Modify
+
+- `client/src/components/transaction-details.tsx` - Marketing tab asset grid
+- `client/src/components/marketing-materials-dialog.tsx` - Format selector + canvas generation
+
+## Visual Reference
+
+**Before:**
+```
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│ [16:9 img]  │ │             │ │ [16:9 img]  │
+│             │ │ [Portrait]  │ │             │
+│             │ │ [Flyer]     │ │             │
+│  (white     │ │             │ │  (white     │
+│   space)    │ │             │ │   space)    │
+│             │ │             │ │             │
+├─────────────┤ ├─────────────┤ ├─────────────┤
+│ Facebook    │ │ Print Flyer │ │ Facebook    │
+└─────────────┘ └─────────────┘ └─────────────┘
+```
+
+**After (Fixed Height):**
+```
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│ [16:9 img]  │ │ [Portrait]  │ │ [16:9 img]  │
+│ (cropped    │ │ (cropped    │ │ (cropped    │
+│  to fit)    │ │  to fit)    │ │  to fit)    │
+├─────────────┤ ├─────────────┤ ├─────────────┤
+│ Facebook    │ │ Print Flyer │ │ Facebook    │
+└─────────────┘ └─────────────┘ └─────────────┘
+```

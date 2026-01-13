@@ -193,8 +193,31 @@ export interface MLSData {
   
   // Status & dates
   status: string;
+  lastStatus?: string;
   daysOnMarket: number;
+  simpleDaysOnMarket?: number | null;
   listDate: string;
+  
+  // Price history & sale info (from Repliers)
+  originalPrice?: number | null;
+  soldPrice?: number | null;
+  soldDate?: string | null;
+  
+  // Virtual tour
+  virtualTourUrl?: string | null;
+  
+  // Photo count
+  photoCount?: number;
+  
+  // Permissions (for display control)
+  permissions?: {
+    displayAddressOnInternet: boolean;
+    displayPublic: boolean;
+    displayInternetEntireListing: boolean;
+  };
+  
+  // Neighborhood info
+  neighborhood?: string;
   
   // Description
   description: string;

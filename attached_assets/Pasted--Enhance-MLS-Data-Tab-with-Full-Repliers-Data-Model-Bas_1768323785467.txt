@@ -1,0 +1,588 @@
+## Enhance MLS Data Tab with Full Repliers Data Model
+
+Based on Repliers documentation, enhance the MLS Data tab to display all available fields and handle edge cases properly.
+
+**Reference:** https://help.repliers.com/en/article/understanding-the-data-in-a-listings-response-v0gh0d/
+
+---
+
+## Part 1: Audit Current Implementation
+
+First, check what fields are currently displayed vs what Repliers provides.
+
+**Check `server/repliers.ts` and MLS Data tab component for:**
+- Which fields are being fetched from Repliers API
+- Which fields are being displayed in the UI
+- Which fields are being stored but not displayed
+
+---
+
+## Part 2: High Priority Fields to Add
+
+### A) Price History Section (NEW)
+
+Add a "Price History" card showing price changes:
+
+```tsx
+// Price History Card
+<Card>
+  <CardHeader>
+    <CardTitle className="flex items-center gap-2">
+      <TrendingDown className="h-5 w-5" />
+      Price History
+    </CardTitle>
+  </CardHeader>
+  <CardContent>
+    {listing.originalPrice !== listing.listPrice ? (
+      <div className="space-y-2">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Original Price</span>
+          <span className="line-through text-muted-foreground">
+            ${listing.originalPrice?.toLocaleString()}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Current Price</span>
+          <span className="font-bold text-green-600">
+            ${listing.listPrice?.toLocaleString()}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Change</span>
+          <Badge variant={listing.listPrice < listing.originalPrice ? "success" : "destructive"}>
+            {listing.listPrice < listing.originalPrice ? '↓' : '↑'} 
+            {Math.abs(((listing.listPrice - listing.originalPrice) / listing.originalPrice) * 100).toFixed(1)}%
+          </Badge>
+        </div>
+      </div>
+    ) : (
+      <p className="text-muted-foreground">No price changes</p>
+    )}
+  </CardContent>
+</Card>
+```
+
+**Fields needed:**
+- `listPrice` - Current asking price
+- `originalPrice` - Initial listing price
+- `lastStatus` - Shows "Price Change" if recently reduced
+
+### B) Sold Information (for closed transactions)
+
+```tsx
+{listing.soldPrice && (
+  <Card>
+    <CardHeader>
+      <CardTitle>Sale Information</CardTitle>
+    </CardHeader>
+    <CardContent className="space-y-2">
+      <div className="flex justify-between">
+        <span>Sold Price</span>
+        <span className="font-bold">${listing.soldPrice?.toLocaleString()}</span>
+      </div>
+      <div className="flex justify-between">
+        <span>Sold Date</span>
+        <span>{formatDate(listing.soldDate)}</span>
+      </div>
+      <div className="flex justify-between">
+        <span>List vs Sold</span>
+        <Badge variant={listing.soldPrice >= listing.listPrice ? "success" : "warning"}>
+          {listing.soldPrice >= listing.listPrice ? 'At/Above' : 'Below'} List
+          ({((listing.soldPrice / listing.listPrice) * 100).toFixed(1)}%)
+        </Badge>
+      </div>
+    </CardContent>
+  </Card>
+)}
+```
+
+**Fields needed:**
+- `soldPrice`
+- `soldDate`
+
+### C) Days on Market (Improved)
+
+Use `simpleDaysOnMarket` when available (per Repliers recommendation):
+
+```tsx
+<div className="flex justify-between">
+  <span>Days on Market</span>
+  <span className="font-medium">
+    {listing.simpleDaysOnMarket ?? listing.daysOnMarket ?? '—'}
+    {!listing.simpleDaysOnMarket && listing.daysOnMarket && (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger>
+            <Info className="h-3 w-3 ml-1 text-muted-foreground" />
+          </TooltipTrigger>
+          <TooltipContent>
+            May vary based on MLS update timing
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )}
+  </span>
+</div>
+```
+
+**Fields needed:**
+- `simpleDaysOnMarket` (preferred)
+- `daysOnMarket` (fallback)
+
+### D) Virtual Tour Link
+
+```tsx
+{listing.details?.virtualTourUrl && (
+  <Button variant="outline" asChild className="w-full">
+    <a href={listing.details.virtualTourUrl} target="_blank" rel="noopener noreferrer">
+      <Video className="h-4 w-4 mr-2" />
+      View Virtual Tour
+    </a>
+  </Button>
+)}
+```
+
+### E) Status Badges with lastStatus
+
+Show status ribbons based on `lastStatus`:
+
+```tsx
+const getStatusBadge = (listing: Listing) => {
+  const badges = [];
+  
+  // Main status
+  badges.push(
+    <Badge key="status" variant={getStatusVariant(listing.status)}>
+      {listing.status}
+    </Badge>
+  );
+  
+  // lastStatus ribbons
+  if (listing.lastStatus === 'Price Change') {
+    badges.push(
+      <Badge key="price-change" variant="warning" className="bg-yellow-500">
+        Price Reduced
+      </Badge>
+    );
+  }
+  if (listing.lastStatus === 'Back On Market') {
+    badges.push(
+      <Badge key="bom" variant="info" className="bg-blue-500">
+        Back on Market
+      </Badge>
+    );
+  }
+  
+  return badges;
+};
+```
+
+**Fields needed:**
+- `status`
+- `lastStatus`
+
+---
+
+## Part 3: Permissions Handling (IMPORTANT)
+
+**CRITICAL:** Repliers requires checking permissions before displaying certain data.
+
+```typescript
+// Check before displaying address
+const canDisplayAddress = listing.permissions?.displayAddressOnInternet === 'Y';
+const canDisplayPublic = listing.permissions?.displayPublic === 'Y';
+
+// In UI:
+{canDisplayAddress ? (
+  <p>{formatAddress(listing.address)}</p>
+) : (
+  <p className="text-muted-foreground italic">
+    Address not available for public display
+  </p>
+)}
+
+// For map:
+{canDisplayAddress ? (
+  <PropertyMap lat={listing.map.latitude} lng={listing.map.longitude} />
+) : (
+  <div className="bg-muted rounded-lg p-4 text-center">
+    <MapPin className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+    <p className="text-sm text-muted-foreground">
+      Approximate location only
+    </p>
+  </div>
+)}
+```
+
+**Fields needed:**
+- `permissions.displayAddressOnInternet`
+- `permissions.displayPublic`
+- `permissions.displayInternetEntireListing`
+
+---
+
+## Part 4: Enhanced Property Details Section
+
+Reorganize the details section with all available fields:
+
+```tsx
+// Property Overview Card (enhanced)
+<Card>
+  <CardHeader>
+    <CardTitle>Property Overview</CardTitle>
+  </CardHeader>
+  <CardContent>
+    <div className="grid grid-cols-2 gap-4">
+      {/* Basics */}
+      <DetailItem icon={Bed} label="Bedrooms" value={details.numBedrooms} />
+      <DetailItem icon={Bath} label="Bathrooms" value={details.numBathrooms} />
+      <DetailItem icon={Square} label="Sq Ft" value={details.sqft?.toLocaleString()} />
+      <DetailItem icon={Calendar} label="Year Built" value={details.yearBuilt} />
+      
+      {/* Property Type */}
+      <DetailItem icon={Home} label="Type" value={details.propertyType} />
+      <DetailItem icon={Building} label="Style" value={details.style} />
+      
+      {/* Parking */}
+      <DetailItem icon={Car} label="Garage" value={details.numGarageSpaces ? `${details.numGarageSpaces} car` : '—'} />
+      <DetailItem icon={ParkingCircle} label="Parking" value={details.numParkingSpaces || '—'} />
+      
+      {/* Lot (if available) */}
+      {details.lotSize && (
+        <DetailItem icon={Trees} label="Lot Size" value={details.lotSize} />
+      )}
+    </div>
+  </CardContent>
+</Card>
+
+// Systems & Features Card
+<Card>
+  <CardHeader>
+    <CardTitle>Systems & Features</CardTitle>
+  </CardHeader>
+  <CardContent>
+    <div className="grid grid-cols-2 gap-4">
+      <DetailItem icon={Thermometer} label="Heating" value={details.heating} />
+      <DetailItem icon={Wind} label="A/C" value={details.airConditioning} />
+      <DetailItem icon={Layers} label="Flooring" value={details.flooringType} />
+      <DetailItem icon={Home} label="Foundation" value={details.foundationType} />
+      <DetailItem icon={Umbrella} label="Roof" value={details.roofMaterial} />
+      <DetailItem icon={Droplet} label="Water" value={details.waterSource} />
+      <DetailItem icon={Trash2} label="Sewer" value={details.sewer} />
+      
+      {/* Special Features */}
+      {details.swimmingPool && (
+        <DetailItem icon={Waves} label="Pool" value={details.swimmingPool} />
+      )}
+      {details.fireplace && (
+        <DetailItem icon={Flame} label="Fireplace" value={details.fireplace} />
+      )}
+      {details.patio && (
+        <DetailItem icon={Sofa} label="Patio" value={details.patio} />
+      )}
+    </div>
+  </CardContent>
+</Card>
+```
+
+---
+
+## Part 5: Location Section (Enhanced)
+
+Show structured address + neighborhood:
+
+```tsx
+<Card>
+  <CardHeader>
+    <CardTitle>Location</CardTitle>
+  </CardHeader>
+  <CardContent className="space-y-4">
+    {/* Structured Address */}
+    <div>
+      <p className="font-medium">
+        {listing.address.streetNumber} {listing.address.streetName} {listing.address.streetSuffix}
+        {listing.address.unitNumber && `, Unit ${listing.address.unitNumber}`}
+      </p>
+      <p className="text-muted-foreground">
+        {listing.address.city}, {listing.address.state} {listing.address.zip}
+      </p>
+    </div>
+    
+    {/* Neighborhood */}
+    {listing.address.neighborhood && (
+      <div className="flex items-center gap-2">
+        <MapPin className="h-4 w-4 text-muted-foreground" />
+        <span>Neighborhood: <strong>{listing.address.neighborhood}</strong></span>
+      </div>
+    )}
+    
+    {/* Map */}
+    {listing.map?.latitude && listing.map?.longitude && (
+      <div className="h-[200px] rounded-lg overflow-hidden">
+        <MapboxPropertyMap 
+          latitude={listing.map.latitude}
+          longitude={listing.map.longitude}
+          address={formatAddress(listing.address)}
+        />
+      </div>
+    )}
+  </CardContent>
+</Card>
+```
+
+---
+
+## Part 6: Photo Count Display
+
+Show photo count in gallery header:
+
+```tsx
+<CardHeader>
+  <div className="flex items-center justify-between">
+    <CardTitle>Property Photos</CardTitle>
+    <Badge variant="secondary">
+      {listing.photoCount || listing.images?.length || 0} photos
+    </Badge>
+  </div>
+</CardHeader>
+```
+
+---
+
+## Part 7: Class-Specific Sections
+
+Render additional fields based on property class:
+
+```tsx
+{/* Condo-specific fields */}
+{listing.class === 'CondoProperty' && listing.condominium && (
+  <Card>
+    <CardHeader>
+      <CardTitle>Condo Details</CardTitle>
+    </CardHeader>
+    <CardContent>
+      {listing.condominium.condoFees && (
+        <DetailItem label="Condo Fees" value={`$${listing.condominium.condoFees}/mo`} />
+      )}
+      {listing.condominium.locker && (
+        <DetailItem label="Locker" value={listing.condominium.locker} />
+      )}
+      {/* Add other condo-specific fields */}
+    </CardContent>
+  </Card>
+)}
+
+{/* Commercial-specific fields */}
+{listing.class === 'CommercialProperty' && listing.commercial && (
+  <Card>
+    <CardHeader>
+      <CardTitle>Commercial Details</CardTitle>
+    </CardHeader>
+    <CardContent>
+      {listing.commercial.zoning && (
+        <DetailItem label="Zoning" value={listing.commercial.zoning} />
+      )}
+      {/* Add other commercial-specific fields */}
+    </CardContent>
+  </Card>
+)}
+```
+
+---
+
+## Part 8: Financial Details Card
+
+```tsx
+<Card>
+  <CardHeader>
+    <CardTitle>Financial Details</CardTitle>
+  </CardHeader>
+  <CardContent className="space-y-2">
+    <div className="flex justify-between">
+      <span>List Price</span>
+      <span className="font-bold">${listing.listPrice?.toLocaleString()}</span>
+    </div>
+    {listing.originalPrice && listing.originalPrice !== listing.listPrice && (
+      <div className="flex justify-between">
+        <span>Original Price</span>
+        <span className="line-through text-muted-foreground">
+          ${listing.originalPrice?.toLocaleString()}
+        </span>
+      </div>
+    )}
+    <div className="flex justify-between">
+      <span>Price/Sq Ft</span>
+      <span>${(listing.listPrice / parseInt(listing.details?.sqft || '1')).toFixed(0)}</span>
+    </div>
+    {listing.details?.annualTaxes && (
+      <div className="flex justify-between">
+        <span>Annual Taxes</span>
+        <span>${listing.details.annualTaxes?.toLocaleString()}</span>
+      </div>
+    )}
+    {listing.details?.HOAFee && (
+      <div className="flex justify-between">
+        <span>HOA Fee</span>
+        <span>${listing.details.HOAFee}/mo</span>
+      </div>
+    )}
+  </CardContent>
+</Card>
+```
+
+---
+
+## Part 9: Update TypeScript Types
+
+Ensure Listing type includes all Repliers fields:
+
+```typescript
+// shared/types.ts or server/repliers.ts
+
+interface Listing {
+  // Identifiers
+  mlsNumber: string;
+  resource?: string;
+  class: 'ResidentialProperty' | 'CondoProperty' | 'CommercialProperty';
+  type: 'Sale' | 'Lease';
+  originatingSystemName?: string; // ACTRIS
+  
+  // Status
+  status: string;
+  lastStatus?: string;
+  
+  // Pricing
+  listPrice: number;
+  originalPrice?: number;
+  soldPrice?: number;
+  soldDate?: string;
+  listDate?: string;
+  
+  // Days on Market
+  daysOnMarket?: number;
+  simpleDaysOnMarket?: number; // Preferred for display
+  
+  // Location
+  address: {
+    streetNumber?: string;
+    streetName?: string;
+    streetSuffix?: string;
+    unitNumber?: string;
+    city: string;
+    state: string;
+    zip: string;
+    neighborhood?: string;
+    county?: string;
+    subdivision?: string;
+  };
+  
+  map?: {
+    latitude: number;
+    longitude: number;
+    point?: string;
+  };
+  
+  // Permissions (IMPORTANT)
+  permissions?: {
+    displayAddressOnInternet: 'Y' | 'N';
+    displayPublic: 'Y' | 'N';
+    displayInternetEntireListing: 'Y' | 'N';
+  };
+  
+  // Media
+  images: string[];
+  photoCount?: number;
+  
+  // Image Insights (if enabled)
+  imageInsights?: {
+    summary?: { quality: any };
+    images?: Array<{
+      classification?: { imageOf: string; prediction: number };
+      quality?: { qualitative: string; quantitative: number };
+    }>;
+  };
+  
+  // Details
+  details: {
+    description?: string;
+    propertyType?: string;
+    style?: string;
+    sqft?: string;
+    numBedrooms?: number;
+    numBathrooms?: number;
+    yearBuilt?: string;
+    
+    // Systems
+    heating?: string;
+    airConditioning?: string;
+    flooringType?: string;
+    foundationType?: string;
+    roofMaterial?: string;
+    waterSource?: string;
+    sewer?: string;
+    
+    // Parking
+    numGarageSpaces?: number;
+    numParkingSpaces?: number;
+    
+    // Features
+    swimmingPool?: string;
+    fireplace?: string;
+    patio?: string;
+    
+    // Financial
+    annualTaxes?: number;
+    taxYear?: number;
+    HOAFee?: number;
+    
+    // Media
+    virtualTourUrl?: string;
+  };
+  
+  // Class-specific (optional)
+  condominium?: Record<string, any>;
+  commercial?: Record<string, any>;
+  residential?: Record<string, any>;
+  
+  // Agent/Office
+  agent?: {
+    name?: string;
+    office?: string;
+    phone?: string;
+    email?: string;
+  };
+  
+  // Preserve unknown fields
+  _raw?: Record<string, any>;
+}
+```
+
+---
+
+## Testing Checklist
+
+1. [ ] Price History shows when originalPrice ≠ listPrice
+2. [ ] Sold info shows for closed transactions
+3. [ ] Days on Market uses simpleDaysOnMarket when available
+4. [ ] Virtual Tour button appears when virtualTourUrl exists
+5. [ ] Status badges show "Price Reduced" / "Back on Market" based on lastStatus
+6. [ ] Address hidden when permissions.displayAddressOnInternet ≠ 'Y'
+7. [ ] Photo count badge shows correct number
+8. [ ] Condo-specific fields show for CondoProperty class
+9. [ ] All details fields render (heating, A/C, flooring, etc.)
+10. [ ] Financial details show HOA, taxes when available
+
+---
+
+## Files to Modify
+
+- `server/repliers.ts` - Ensure all fields are fetched and typed
+- `shared/types.ts` - Update Listing type
+- `client/src/components/transaction-details.tsx` - MLS Data tab content
+- `client/src/components/mls-data-section.tsx` (if separate component)
+
+## Repliers Documentation References
+
+- Field definitions: https://help.repliers.com/en/article/understanding-the-data-in-a-listings-response-v0gh0d/
+- DOM guidance: https://help.repliers.com/en/article/considerations-when-displaying-the-days-on-market-field-y2hu24/
+- Fields parameter: https://help.repliers.com/en/article/optimizing-api-requests-with-the-fields-parameter-lq416x/

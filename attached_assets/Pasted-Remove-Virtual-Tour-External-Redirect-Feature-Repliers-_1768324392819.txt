@@ -1,0 +1,138 @@
+Remove Virtual Tour / External Redirect Feature (Repliers / ACTRIS)
+Objective
+
+Remove any “Virtual Tour” feature and all external redirect behavior originating from Repliers listing fields (e.g., virtualTourUrl, unbranded tour URLs, video URLs, matterport links, propertypanorama links) to reduce MLS/IDX/VOW compliance risk.
+
+This removal must be global: listing pages, modals, dashboards, map cards, share links, PDFs, and any email/SMS share content.
+
+Scope
+
+Data source: Repliers only
+
+MLS: ACTRIS
+
+Applies to: all listing classes (Residential / Condo / Commercial)
+
+Applies to: all surfaces (web UI + generated PDFs + share pages)
+
+Do not remove photos/images arrays; only remove “tour/video/external media linkouts.”
+
+Tasks
+1) Identify all “external linkout” fields + UI entry points
+
+Search the codebase for:
+
+virtualTour, tourUrl, unbranded, branded, matterport, propertypanorama, videoUrl
+
+any UI labels: “Virtual Tour”, “3D Tour”, “Video Tour”, “Matterport”, “View Tour”
+
+any components that render href from listing data
+
+Deliverable: a checklist in the PR description listing:
+
+files/components touched
+
+the exact field names you found
+
+where each was rendered
+
+2) Remove the feature from UI (no external redirects)
+
+Delete/hide any “Virtual Tour / Video / 3D Tour” buttons/links.
+
+Remove any logic that builds external redirect URLs (including internal redirect endpoints like /redirect?url=).
+
+Ensure no component renders an <a href={listing...}> for these fields.
+
+3) Remove the feature from PDFs + share pages
+
+Update PDF generation to exclude tour/video fields.
+
+Update any share-link landing pages (public or client portal) to exclude tour/video fields.
+
+If there’s a “Copy link” feature that included a tour URL, remove it.
+
+4) Data handling: keep ingesting, but do not expose
+
+Continue parsing/storing these fields if they exist in raw payloads (for future internal use), but do not display them anywhere.
+
+Add a single normalized flag on the listing model like:
+
+hasExternalMediaLinks (boolean) computed at ingest time
+
+This is for internal debugging only and should not render a clickable link.
+
+5) Add a compliance guardrail (prevents regressions)
+
+Implement a centralized “safe links” utility used by all listing renderers:
+
+Allowlist only:
+
+internal routes (same-origin)
+
+Repliers CDN images (if you render images)
+
+Blocklist:
+
+any absolute URL not on allowlist
+
+any virtualTourUrl-like field
+Behavior:
+
+In production: blocked links must not render
+
+In development: log a warning with the field name + listing id to help catch reintroduction
+
+6) QA / regression tests
+
+Add tests to ensure:
+
+No “Virtual Tour” text appears in rendered listing pages
+
+No anchor tags are produced from these fields
+
+PDF output does not include “Virtual Tour / Video / 3D Tour” sections
+
+Share pages do not contain external URLs derived from listing payload
+
+Acceptance Criteria (Definition of Done)
+
+✅ There is zero UI path that results in navigating the user to an MLS-provided external tour/video URL.
+
+✅ PDFs and share pages contain no tour/video URLs and no related labels.
+
+✅ Centralized guardrail prevents future external-link rendering from listing payload fields.
+
+✅ Unit/integration tests cover at least:
+
+listing detail page
+
+listing card/modal
+
+PDF generator
+
+share page
+
+Validation Checklist (manual)
+
+Open any listing that previously had a tour URL:
+
+confirm no “Virtual Tour / 3D Tour / Video” button exists
+
+Generate PDF:
+
+confirm no tour/video fields appear
+
+Copy/share listing:
+
+confirm no tour/video links appear
+
+Inspect DOM:
+
+confirm no external anchors are rendered from listing data
+
+Blockers
+
+If there is a contractual requirement to display virtual tours (some MLS agreements do), stop and surface it as a blocker with evidence.
+
+If the system currently uses a general-purpose redirect endpoint for other features, ensure we are not breaking unrelated flows—split redirects by purpose or remove only the listing-media redirect.

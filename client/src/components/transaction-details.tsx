@@ -53,6 +53,11 @@ import {
   Waves,
   Eye,
   Pencil,
+  TrendingDown,
+  TrendingUp,
+  Video,
+  Info,
+  RotateCcw,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -101,8 +106,8 @@ function formatDate(dateString: string | null): string {
   });
 }
 
-function formatPrice(price: number | null): string {
-  if (!price) return "—";
+function formatPrice(price: number | null | undefined): string {
+  if (price == null) return "—";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -1153,6 +1158,15 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 {/* Photo Gallery - Main + Thumbnail Grid Layout */}
                 {photos.length > 0 && (
                   <Card>
+                    <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <ImageIcon className="h-4 w-4" />
+                        Property Photos
+                      </CardTitle>
+                      <Badge variant="secondary" data-testid="badge-photo-count">
+                        {mlsData.photoCount || photos.length} photos
+                      </Badge>
+                    </CardHeader>
                     <CardContent className="p-0">
                       <div className="flex gap-1 rounded-t-lg overflow-hidden">
                         {/* Main Photo (left ~60%) */}
@@ -1424,12 +1438,31 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                         Location
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-0">
-                      <MapboxPropertyMap
-                        latitude={mlsData.coordinates!.latitude}
-                        longitude={mlsData.coordinates!.longitude}
-                        address={`${transaction.propertyAddress}, ${mlsData.city || ''}, ${mlsData.state || ''}`}
-                      />
+                    <CardContent className="space-y-4">
+                      {/* Structured Address */}
+                      <div>
+                        <p className="font-medium">{transaction.propertyAddress}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {mlsData.city}{mlsData.city && mlsData.state ? ', ' : ''}{mlsData.state} {mlsData.zipCode}
+                        </p>
+                      </div>
+                      
+                      {/* Neighborhood */}
+                      {mlsData.neighborhood && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Home className="h-4 w-4 text-muted-foreground" />
+                          <span>Neighborhood: <strong>{mlsData.neighborhood}</strong></span>
+                        </div>
+                      )}
+                      
+                      {/* Map */}
+                      <div className="-mx-6 -mb-6">
+                        <MapboxPropertyMap
+                          latitude={mlsData.coordinates!.latitude}
+                          longitude={mlsData.coordinates!.longitude}
+                          address={`${transaction.propertyAddress}, ${mlsData.city || ''}, ${mlsData.state || ''}`}
+                        />
+                      </div>
                     </CardContent>
                   </Card>
                 )}
@@ -1439,23 +1472,133 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
               <div className="space-y-6">
                 {/* Price & Status Card */}
                 <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between gap-2 mb-2">
+                  <CardContent className="pt-6 space-y-4">
+                    {/* Status Badges Row */}
+                    <div className="flex items-center flex-wrap gap-2">
                       <Badge variant={mlsData.status?.toLowerCase() === 'active' ? 'default' : 'secondary'}>
                         {mlsData.status || 'Unknown'}
                       </Badge>
-                      <span className="text-sm text-muted-foreground">{mlsData.daysOnMarket || 0} days on market</span>
+                      {/* lastStatus ribbons */}
+                      {mlsData.lastStatus === 'Pc' && (
+                        <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white">
+                          <TrendingDown className="h-3 w-3 mr-1" />
+                          Price Reduced
+                        </Badge>
+                      )}
+                      {mlsData.lastStatus === 'Bom' && (
+                        <Badge className="bg-blue-500 hover:bg-blue-600 text-white">
+                          <RotateCcw className="h-3 w-3 mr-1" />
+                          Back on Market
+                        </Badge>
+                      )}
                     </div>
-                    <div className="text-3xl font-bold mb-1" data-testid="text-mls-price">
-                      {formatPrice(mlsData.listPrice)}
+                    
+                    {/* Days on Market */}
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <span>{mlsData.simpleDaysOnMarket ?? mlsData.daysOnMarket ?? 0} days on market</span>
+                      {mlsData.simpleDaysOnMarket == null && mlsData.daysOnMarket != null && (
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">May vary based on MLS update timing</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
-                    {mlsData.sqft > 0 && (
+                    
+                    {/* Current Price */}
+                    {mlsData.listPrice != null && (
+                      <div className="text-3xl font-bold" data-testid="text-mls-price">
+                        {formatPrice(mlsData.listPrice)}
+                      </div>
+                    )}
+                    
+                    {/* Price per sqft */}
+                    {mlsData.listPrice != null && mlsData.sqft > 0 && (
                       <div className="text-muted-foreground text-sm">
                         ${Math.round(mlsData.listPrice / mlsData.sqft).toLocaleString()}/sqft
                       </div>
                     )}
+                    
+                    {/* Price History (if originalPrice differs from listPrice) */}
+                    {mlsData.originalPrice != null && mlsData.listPrice != null && mlsData.originalPrice !== mlsData.listPrice && (
+                      <div className="pt-3 border-t space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Original Price</span>
+                          <span className="line-through text-muted-foreground">
+                            {formatPrice(mlsData.originalPrice)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Change</span>
+                          <Badge 
+                            variant="secondary" 
+                            className={mlsData.listPrice < mlsData.originalPrice 
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}
+                          >
+                            {mlsData.listPrice < mlsData.originalPrice ? (
+                              <TrendingDown className="h-3 w-3 mr-1" />
+                            ) : (
+                              <TrendingUp className="h-3 w-3 mr-1" />
+                            )}
+                            {Math.abs(((mlsData.listPrice - mlsData.originalPrice) / mlsData.originalPrice) * 100).toFixed(1)}%
+                          </Badge>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Virtual Tour Button */}
+                    {mlsData.virtualTourUrl && (
+                      <Button variant="outline" className="w-full gap-2" asChild>
+                        <a href={mlsData.virtualTourUrl} target="_blank" rel="noopener noreferrer" data-testid="link-virtual-tour">
+                          <Video className="h-4 w-4" />
+                          View Virtual Tour
+                        </a>
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
+                
+                {/* Sold Information (for closed transactions) */}
+                {mlsData.soldPrice != null && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <DollarSign className="h-4 w-4" />
+                        Sale Information
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Sold Price</span>
+                        <span className="font-bold">{formatPrice(mlsData.soldPrice)}</span>
+                      </div>
+                      {mlsData.soldDate && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Sold Date</span>
+                          <span>{new Date(mlsData.soldDate).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                      {mlsData.listPrice != null && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">List vs Sold</span>
+                          <Badge 
+                            variant="secondary"
+                            className={mlsData.soldPrice >= mlsData.listPrice 
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'}
+                          >
+                            {mlsData.soldPrice >= mlsData.listPrice ? 'At/Above' : 'Below'} List
+                            ({((mlsData.soldPrice / mlsData.listPrice) * 100).toFixed(1)}%)
+                          </Badge>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
                 
                 {/* Property Stats */}
                 <Card>

@@ -162,12 +162,24 @@ Zoom controls for the enlarged preview modal:
 
 ### Enhanced MLS Data Tab (January 2026)
 The MLS Data tab provides comprehensive property information visualization:
-- **Photo Gallery**: Fullscreen modal with navigation arrows, thumbnail strip, and photo counter
+- **Photo Gallery**: Fullscreen modal with navigation arrows, thumbnail strip, and photo count badge in header
 - **Browse by Room**: Room type filter UI (Coming Soon - Repliers API doesn't provide room categorization)
 - **Feature Tags**: Dynamic badges extracted from MLS data (garage, pool, fireplace, patio/deck, stories)
 - **Mapbox Integration**: Interactive map showing property location with dark theme, navigation controls, and orange property marker (via secure `/api/mapbox-token` endpoint)
 - **Property Details**: Description, collapsible feature sections, price per sqft, HOA fees, tax info
 - All MLS images are proxied through `/api/proxy-image` to avoid CORS issues
+
+#### Enhanced Repliers Data Fields (January 2026)
+Full Repliers data model integration per https://help.repliers.com/en/article/understanding-the-data-in-a-listings-response-v0gh0d/:
+- **Price History**: Shows originalPrice vs listPrice with percentage change badge when price has changed
+- **Sold Information**: For closed transactions, displays soldPrice, soldDate, and list-vs-sold comparison
+- **Days on Market**: Uses simpleDaysOnMarket when available (more accurate), with tooltip explaining potential variance
+- **Status Badges**: Shows lastStatus ribbons like "Price Reduced" (Pc) and "Back on Market" (Bom)
+- **Virtual Tour**: "View Virtual Tour" button appears when virtualTourUrl is available
+- **Photo Count**: Badge in gallery header showing total photoCount from Repliers API
+- **Neighborhood**: Displays address.neighborhood in Location section
+- **Permissions**: Respects displayAddressOnInternet, displayPublic, displayInternetEntireListing flags
+- **New Schema Fields**: MLSData interface extended with originalPrice, soldPrice, soldDate, simpleDaysOnMarket, lastStatus, virtualTourUrl, photoCount, permissions, neighborhood
 
 ### Automatic MLS Synchronization (January 2026)
 MLS data syncs automatically every 15 minutes without requiring manual refresh:
