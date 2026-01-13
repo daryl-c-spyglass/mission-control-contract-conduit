@@ -1,0 +1,74 @@
+```text
+Goal: FINAL VISUAL TUNING ONLY (no layout redesign). The flyer is structurally correct now. What’s left is visual tuning:
+1) slightly less white space at the bottom
+2) slightly larger agent avatar + Spyglass logo (bottom-right)
+3) slightly softer listing headline (NOT bold)
+
+ABSOLUTE REQUIREMENT: PREVIEW MUST ALWAYS MATCH DOWNLOAD (pixel-identical)
+This is non-negotiable. The “Preview” thumbnail/preview panel must be the exact same render as “Download Flyer”.
+
+1) Single source of truth for rendering
+- There must be ONE render pipeline/function for the print flyer (HTML/CSS → Puppeteer → PNG/PDF).
+- Preview and Download must call the SAME function, using the SAME template, SAME CSS, SAME assets, SAME fonts, SAME viewport, SAME scale/DPI, SAME background, SAME margins, SAME image URLs, SAME cache-busting, SAME everything.
+- Do NOT maintain separate templates/styles for preview vs download.
+- If you currently have separate endpoints/routes (e.g., /preview and /download), both must call the SAME renderFlyer(payload, options) function with identical options.
+
+2) Make preview output identical to download output
+- Preview should render at the exact print size (8.5x11) using the same dimensions/resolution as download.
+  Example target: 2550x3300 @300dpi (or whatever your download uses). Preview can display a scaled-down version in UI, but the source image must be the same.
+- In UI: show the scaled-down image via CSS (max-width / height auto). Do NOT re-render at a different size for preview.
+- Ensure the same font loading path for both:
+  - Wait for fonts to load before screenshot/PDF: `await page.evaluate(() => document.fonts.ready)` (or equivalent).
+  - Use the same local font files and CSS @font-face for both preview and download.
+- Ensure consistent image rendering:
+  - Use identical photo URLs and transformations for both preview and download.
+  - If using signed URLs or temporary URLs, ensure preview and download request the same resolved assets.
+- Ensure Puppeteer settings are identical:
+  - Same `deviceScaleFactor`, same `printBackground`, same `preferCSSPageSize`, same `clip` logic if used.
+  - If download uses PDF then converts to PNG, preview must use the same approach OR both should use direct screenshot from the same page.
+  - Avoid different paths like “preview uses screenshot” and “download uses PDF print” unless they produce identical outputs. Prefer using the same method.
+
+3) Add verification test so this never regresses
+- Add a quick automated check:
+  - Given the same payload, render PREVIEW PNG and DOWNLOAD PNG.
+  - Assert dimensions are identical.
+  - Assert either the hashes match OR run a small pixel-diff with a very low tolerance (only metadata differences allowed).
+  - Fail the build / log a clear error if they differ.
+
+A) Reduce bottom white space (without changing the structure)
+- The bottom band (stats + headline/description + agent block) should “anchor” closer to the bottom edge.
+- Adjust spacing by:
+  - Reduce the vertical gap between the 2-photo row and the bottom band by ~16–24px (or equivalent in your CSS).
+  - Optionally reduce padding-bottom within the page container if it exists, but net effect must be: less blank space BELOW the bottom band.
+- Do NOT stretch the whole page or change image cropping; only tighten vertical spacing/margins/padding so the content fills the page better.
+
+B) Increase agent avatar + Spyglass logo sizes (bottom-right)
+- Increase the agent avatar diameter by +15–20% from current.
+- Increase the avatar border thickness proportionally (example: if border is 1px now, go to 2px; keep same border color).
+- Increase Spyglass logo size by +15–20% from current.
+- Keep the agent block aligned (no overlap):
+  - Agent name, title, phone remain vertically stacked under each other.
+  - The avatar and logo must still fit in the agent column without clipping.
+  - If needed, slightly tighten vertical padding inside the agent block (a few px) to make room.
+
+C) Make listing headline “softer” (explicitly not bold)
+- Force listing headline font-weight to 400 (normal).
+- If it still reads too heavy, reduce font-size by 1–2px OR reduce letter-spacing slightly.
+- Ensure phone number is also NOT bold.
+- The description remains left-aligned (keep as-is).
+
+D) Guardrails / don’ts
+- Do NOT introduce horizontal (X-axis) divider lines.
+- Do NOT change the divider concept; keep vertical (Y-axis) separators only.
+- Do NOT change the photo layout/cropping logic besides the small spacing tightening mentioned above.
+
+E) Acceptance checklist (must verify before marking done)
+1) Preview PNG == Download PNG for same inputs (pixel-identical; same dimensions; hash match or near-zero pixel-diff).
+2) Bottom white space reduced: bottom band sits visibly closer to the bottom edge (no huge blank area).
+3) Avatar + logo are visibly larger (15–20%) and not clipped/overlapping.
+4) Listing headline is clearly NOT bold (font-weight 400), and phone number is NOT bold.
+5) No new horizontal divider lines were added.
+6) Show before/after outputs for the same listing to confirm.
+
+Implement these changes, regenerate a sample flyer, and provide the updated output PNGs for review.
+```
