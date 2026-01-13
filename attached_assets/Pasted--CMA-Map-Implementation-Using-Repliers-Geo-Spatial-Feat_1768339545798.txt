@@ -1,0 +1,770 @@
+## CMA Map Implementation - Using Repliers Geo-Spatial Features
+
+Updated implementation using Repliers' map parameter for geo-spatial filtering and polygon data.
+
+Reference: 
+- https://help.repliers.com/en/article/filtering-listings-geo-spatially-using-the-map-parameter-7sorw0/
+- https://help.repliers.com/en/article/how-to-integrate-listings-in-wordpress-using-the-repliers-api-ik1gxx/
+
+---
+
+## Repliers Map Parameter Structure
+
+Repliers uses the `map` parameter for geo-spatial data:
+
+```json
+{
+  "map": {
+    "latitude": 30.4567,
+    "longitude": -97.7890,
+    "polygons": [
+      {
+        "name": "Search Area",
+        "coordinates": [
+          [longitude, latitude],
+          [longitude, latitude],
+          ...
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Property Location Fields from Repliers
+
+Each listing has these location fields:
+
+```typescript
+interface RepliersListing {
+  mlsNumber: string;
+  address: {
+    streetAddress: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    neighborhood: string;
+  };
+  map: {
+    latitude: number;
+    longitude: number;
+  };
+  // ... other fields
+}
+```
+
+---
+
+## CMA Map Component with Mapbox + Repliers Data
+
+```tsx
+// components/cma-map.tsx
+import { useEffect, useRef, useState, useCallback } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { X, ZoomIn, ZoomOut, Locate } from 'lucide-react';
+
+interface CMAMapProps {
+  properties: any[];          // Comparable properties from Repliers
+  subjectProperty?: any;      // Subject listing from Repliers
+  subjectAddress?: string;
+  polygon?: number[][];       // Optional search polygon coordinates
+  onBoundsChange?: (bounds: { ne: [number, number]; sw: [number, number] }) => void;
+}
+
+export function CMAMap({ 
+  properties, 
+  subjectProperty, 
+  subjectAddress,
+  polygon,
+  onBoundsChange 
+}: CMAMapProps) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState<any>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
+
+  // Initialize map
+  useEffect(() => {
+    if (!mapContainer.current || map.current) return;
+
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '';
+
+    if (!mapboxgl.accessToken) {
+      console.error('Mapbox access token not configured');
+      return;
+    }
+
+    // Get center from subject property or first comparable
+    // Using Repliers map.latitude and map.longitude fields
+    const subjectLat = subjectProperty?.map?.latitude;
+    const subjectLng = subjectProperty?.map?.longitude;
+    
+    const firstCompLat = properties[0]?.map?.latitude;
+    const firstCompLng = properties[0]?.map?.longitude;
+
+    const centerLat = subjectLat || firstCompLat || 30.2672; // Austin default
+    const centerLng = subjectLng || firstCompLng || -97.7431;
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [centerLng, centerLat],
+      zoom: 12,
+    });
+
+    // Add controls
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    map.current.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+
+    map.current.on('load', () => {
+      setMapLoaded(true);
+      
+      // Add polygon layer if provided
+      if (polygon && polygon.length > 0) {
+        addPolygonLayer(polygon);
+      }
+      
+      // Add markers
+      addAllMarkers();
+      
+      // Fit bounds
+      fitMapBounds();
+    });
+
+    // Track bounds changes for potential re-search
+    map.current.on('moveend', () => {
+      if (onBoundsChange && map.current) {
+        const bounds = map.current.getBounds();
+        onBoundsChange({
+          ne: [bounds.getNorthEast().lng, bounds.getNorthEast().lat],
+          sw: [bounds.getSouthWest().lng, bounds.getSouthWest().lat],
+        });
+      }
+    });
+
+    return () => {
+      markersRef.current.forEach(marker => marker.remove());
+      markersRef.current = [];
+      map.current?.remove();
+      map.current = null;
+    };
+  }, []);
+
+  // Update markers when properties change
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    
+    // Clear existing markers
+    markersRef.current.forEach(marker => marker.remove());
+    markersRef.current = [];
+    
+    addAllMarkers();
+    fitMapBounds();
+  }, [properties, subjectProperty, mapLoaded]);
+
+  // Add polygon layer (for search area visualization)
+  const addPolygonLayer = (coordinates: number[][]) => {
+    if (!map.current) return;
+
+    // Close the polygon by adding first point at end if needed
+    const closedCoords = [...coordinates];
+    if (coordinates.length > 0 && 
+        (coordinates[0][0] !== coordinates[coordinates.length - 1][0] ||
+         coordinates[0][1] !== coordinates[coordinates.length - 1][1])) {
+      closedCoords.push(coordinates[0]);
+    }
+
+    // Remove existing polygon layer if present
+    if (map.current.getLayer('search-polygon-fill')) {
+      map.current.removeLayer('search-polygon-fill');
+      map.current.removeLayer('search-polygon-line');
+      map.current.removeSource('search-polygon');
+    }
+
+    // Add polygon source
+    map.current.addSource('search-polygon', {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'Polygon',
+          coordinates: [closedCoords], // GeoJSON requires array of rings
+        },
+      },
+    });
+
+    // Add fill layer
+    map.current.addLayer({
+      id: 'search-polygon-fill',
+      type: 'fill',
+      source: 'search-polygon',
+      paint: {
+        'fill-color': '#3b82f6',
+        'fill-opacity': 0.1,
+      },
+    });
+
+    // Add outline layer
+    map.current.addLayer({
+      id: 'search-polygon-line',
+      type: 'line',
+      source: 'search-polygon',
+      paint: {
+        'line-color': '#3b82f6',
+        'line-width': 2,
+        'line-dasharray': [2, 2],
+      },
+    });
+  };
+
+  // Add all markers (subject + comparables)
+  const addAllMarkers = () => {
+    if (!map.current) return;
+
+    // Add subject property marker
+    if (subjectProperty?.map?.latitude && subjectProperty?.map?.longitude) {
+      const subjectMarker = createSubjectMarker(subjectProperty);
+      if (subjectMarker) {
+        markersRef.current.push(subjectMarker);
+      }
+    }
+
+    // Add comparable property markers
+    properties.forEach((property) => {
+      const marker = createPropertyMarker(property);
+      if (marker) {
+        markersRef.current.push(marker);
+      }
+    });
+  };
+
+  // Create subject property marker (distinct styling)
+  const createSubjectMarker = (property: any): mapboxgl.Marker | null => {
+    if (!map.current) return null;
+
+    const lat = property.map?.latitude;
+    const lng = property.map?.longitude;
+    
+    if (!lat || !lng) return null;
+
+    const price = property.listPrice || 0;
+
+    const el = document.createElement('div');
+    el.className = 'subject-marker';
+    el.innerHTML = `
+      <div style="
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        color: white;
+        padding: 8px 14px;
+        border-radius: 10px;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+        white-space: nowrap;
+        position: relative;
+        border: 2px solid white;
+      ">
+        <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; margin-bottom: 2px;">
+          Subject
+        </div>
+        $${price.toLocaleString()}
+        <div style="
+          position: absolute;
+          bottom: -10px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 0;
+          height: 0;
+          border-left: 10px solid transparent;
+          border-right: 10px solid transparent;
+          border-top: 10px solid #1d4ed8;
+        "></div>
+      </div>
+    `;
+
+    return new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+      .setLngLat([lng, lat])
+      .addTo(map.current);
+  };
+
+  // Create comparable property marker
+  const createPropertyMarker = (property: any): mapboxgl.Marker | null => {
+    if (!map.current) return null;
+
+    // Use Repliers map.latitude and map.longitude
+    const lat = property.map?.latitude;
+    const lng = property.map?.longitude;
+    
+    if (!lat || !lng) return null;
+
+    // Determine price and status
+    const status = (property.status || property.standardStatus || '').toLowerCase();
+    const isSold = status.includes('sold') || status.includes('closed');
+    const price = isSold 
+      ? (property.soldPrice || property.closePrice || property.listPrice || 0)
+      : (property.listPrice || 0);
+
+    // Color based on status
+    const bgColor = isSold ? '#ef4444' : '#22c55e';
+    const shadowColor = isSold ? 'rgba(239, 68, 68, 0.3)' : 'rgba(34, 197, 94, 0.3)';
+
+    const el = document.createElement('div');
+    el.className = 'comp-marker';
+    el.style.cursor = 'pointer';
+    el.innerHTML = `
+      <div style="
+        background: ${bgColor};
+        color: white;
+        padding: 5px 10px;
+        border-radius: 6px;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-weight: 600;
+        font-size: 12px;
+        box-shadow: 0 2px 8px ${shadowColor};
+        white-space: nowrap;
+        transition: transform 0.2s, box-shadow 0.2s;
+        border: 1px solid rgba(255,255,255,0.3);
+      ">
+        $${(price / 1000).toFixed(0)}K
+      </div>
+    `;
+
+    // Hover effect
+    el.addEventListener('mouseenter', () => {
+      el.firstElementChild?.setAttribute('style', 
+        el.firstElementChild.getAttribute('style') + 'transform: scale(1.15); box-shadow: 0 4px 12px ' + shadowColor + ';'
+      );
+    });
+    el.addEventListener('mouseleave', () => {
+      el.firstElementChild?.setAttribute('style', 
+        el.firstElementChild.getAttribute('style')?.replace('transform: scale(1.15);', '') || ''
+      );
+    });
+
+    // Click to select
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setSelectedProperty(property);
+    });
+
+    return new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+      .setLngLat([lng, lat])
+      .addTo(map.current);
+  };
+
+  // Fit map to show all markers
+  const fitMapBounds = () => {
+    if (!map.current) return;
+
+    const coords: [number, number][] = [];
+
+    // Add subject coordinates
+    if (subjectProperty?.map?.longitude && subjectProperty?.map?.latitude) {
+      coords.push([subjectProperty.map.longitude, subjectProperty.map.latitude]);
+    }
+
+    // Add comparable coordinates
+    properties.forEach((p) => {
+      if (p.map?.longitude && p.map?.latitude) {
+        coords.push([p.map.longitude, p.map.latitude]);
+      }
+    });
+
+    if (coords.length === 0) return;
+
+    if (coords.length === 1) {
+      map.current.setCenter(coords[0]);
+      map.current.setZoom(14);
+      return;
+    }
+
+    const bounds = coords.reduce(
+      (bounds, coord) => bounds.extend(coord),
+      new mapboxgl.LngLatBounds(coords[0], coords[0])
+    );
+
+    map.current.fitBounds(bounds, {
+      padding: { top: 50, bottom: 50, left: 50, right: 50 },
+      maxZoom: 15,
+      duration: 1000,
+    });
+  };
+
+  // Re-center on subject property
+  const centerOnSubject = () => {
+    if (!map.current || !subjectProperty?.map?.latitude || !subjectProperty?.map?.longitude) return;
+    
+    map.current.flyTo({
+      center: [subjectProperty.map.longitude, subjectProperty.map.latitude],
+      zoom: 14,
+      duration: 1000,
+    });
+  };
+
+  return (
+    <div className="relative w-full h-[500px] rounded-lg overflow-hidden border bg-gray-100">
+      {/* Map container */}
+      <div ref={mapContainer} className="w-full h-full" />
+      
+      {/* Custom controls */}
+      <div className="absolute top-4 left-4 flex flex-col gap-2">
+        <Button 
+          size="icon" 
+          variant="secondary" 
+          className="h-8 w-8 shadow-md"
+          onClick={centerOnSubject}
+          title="Center on subject property"
+        >
+          <Locate className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Legend */}
+      <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-lg p-3 shadow-lg">
+        <p className="text-xs font-semibold mb-2 text-gray-700">Legend</p>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded bg-blue-600 border-2 border-white shadow"></div>
+            <span className="text-xs text-gray-600">Subject Property</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded bg-green-500"></div>
+            <span className="text-xs text-gray-600">Active Listing</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded bg-red-500"></div>
+            <span className="text-xs text-gray-600">Sold</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Property count badge */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2">
+        <Badge variant="secondary" className="shadow-md">
+          {properties.length} comparable{properties.length !== 1 ? 's' : ''} shown
+        </Badge>
+      </div>
+
+      {/* Selected property popup */}
+      {selectedProperty && (
+        <PropertyPopup 
+          property={selectedProperty} 
+          onClose={() => setSelectedProperty(null)} 
+        />
+      )}
+
+      {/* Loading state */}
+      {!mapLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Property popup component
+function PropertyPopup({ property, onClose }: { property: any; onClose: () => void }) {
+  const status = (property.status || property.standardStatus || '').toLowerCase();
+  const isSold = status.includes('sold') || status.includes('closed');
+  const price = isSold 
+    ? (property.soldPrice || property.closePrice || property.listPrice || 0)
+    : (property.listPrice || 0);
+
+  return (
+    <div className="absolute top-4 right-4 w-80 bg-white rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-right-5">
+      {/* Close button */}
+      <button 
+        className="absolute top-2 right-2 z-10 p-1.5 bg-white/90 hover:bg-white rounded-full shadow transition-colors"
+        onClick={onClose}
+      >
+        <X className="h-4 w-4" />
+      </button>
+      
+      {/* Property image */}
+      {property.images?.[0] && (
+        <div className="relative h-36">
+          <img 
+            src={property.images[0]} 
+            alt="Property" 
+            className="w-full h-full object-cover"
+          />
+          <Badge 
+            className={`absolute bottom-2 left-2 ${isSold ? 'bg-red-500' : 'bg-green-500'}`}
+          >
+            {isSold ? 'Sold' : 'Active'}
+          </Badge>
+        </div>
+      )}
+      
+      {/* Property details */}
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="font-bold text-xl">
+            ${price.toLocaleString()}
+          </span>
+          {property.map?.latitude && (
+            <span className="text-xs text-muted-foreground">
+              {calculateDistance(property)} mi
+            </span>
+          )}
+        </div>
+        
+        <p className="text-sm text-gray-700 font-medium truncate">
+          {property.address?.streetAddress || property.unparsedAddress}
+        </p>
+        <p className="text-xs text-muted-foreground mb-3">
+          {property.address?.city}, {property.address?.state} {property.address?.postalCode}
+        </p>
+        
+        {/* Property stats */}
+        <div className="flex gap-4 text-sm">
+          <div className="flex items-center gap-1">
+            <span className="font-semibold">{property.numBedrooms || property.details?.numBedrooms || '—'}</span>
+            <span className="text-muted-foreground">beds</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="font-semibold">{property.numBathrooms || property.details?.numBathrooms || '—'}</span>
+            <span className="text-muted-foreground">baths</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="font-semibold">
+              {(property.sqft || property.details?.sqft || property.livingArea)?.toLocaleString() || '—'}
+            </span>
+            <span className="text-muted-foreground">sqft</span>
+          </div>
+        </div>
+
+        {/* Additional info */}
+        <div className="flex items-center justify-between mt-3 pt-3 border-t text-xs text-muted-foreground">
+          <span>
+            {property.simpleDaysOnMarket || property.daysOnMarket || 0} days on market
+          </span>
+          <span>
+            ${Math.round(price / (property.sqft || property.details?.sqft || 1))}/sqft
+          </span>
+        </div>
+
+        {/* MLS Number */}
+        <p className="text-xs text-muted-foreground mt-2">
+          MLS# {property.mlsNumber}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Helper function to calculate distance (if subject property is available)
+function calculateDistance(property: any): string {
+  // This would normally calculate from subject property
+  // For now, return the distance if available from Repliers response
+  return property.distance?.toFixed(1) || '—';
+}
+```
+
+---
+
+## Using Repliers Polygon for CMA Search
+
+When searching for comparables, you can use Repliers' map parameter with polygons:
+
+```typescript
+// api/search-comparables.ts
+
+interface SearchParams {
+  latitude?: number;
+  longitude?: number;
+  radius?: number;        // in km
+  polygon?: number[][];   // [[lng, lat], [lng, lat], ...]
+  priceMin?: number;
+  priceMax?: number;
+  beds?: number;
+  baths?: number;
+  status?: string;
+}
+
+async function searchComparables(params: SearchParams) {
+  const queryParams: any = {
+    status: params.status || 'A,U', // Active, Under Contract
+    resultsPerPage: 50,
+    sortBy: 'listPrice',
+  };
+
+  // Add price range
+  if (params.priceMin) queryParams.minListPrice = params.priceMin;
+  if (params.priceMax) queryParams.maxListPrice = params.priceMax;
+
+  // Add beds/baths
+  if (params.beds) queryParams.minBeds = params.beds;
+  if (params.baths) queryParams.minBaths = params.baths;
+
+  // Geo-spatial filtering
+  if (params.polygon && params.polygon.length >= 3) {
+    // Use polygon for search
+    // Repliers expects: map=longitude,latitude|longitude,latitude|...
+    const polygonString = params.polygon
+      .map(coord => `${coord[0]},${coord[1]}`)
+      .join('|');
+    queryParams.map = polygonString;
+  } else if (params.latitude && params.longitude && params.radius) {
+    // Use radius search
+    // Repliers format: map=longitude,latitude,radius(km)
+    queryParams.map = `${params.longitude},${params.latitude},${params.radius}`;
+  }
+
+  const response = await fetch(`/api/repliers/listings?${new URLSearchParams(queryParams)}`);
+  return response.json();
+}
+```
+
+---
+
+## Integration in CMA Tab
+
+```tsx
+// components/cma-tab.tsx
+
+import { CMAMap } from '@/components/cma-map';
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { BarChart3, LayoutGrid, Map as MapIcon } from 'lucide-react';
+
+export function CMATab({ transaction, mlsData, comparables }: CMATabProps) {
+  // View toggle - Analytics FIRST, then Grid, then Map
+  const [activeView, setActiveView] = useState<'analytics' | 'grid' | 'map'>('analytics');
+
+  const VIEW_OPTIONS = [
+    { id: 'analytics', icon: BarChart3, label: 'Analytics & Statistics' },
+    { id: 'grid', icon: LayoutGrid, label: 'Property Grid' },
+    { id: 'map', icon: MapIcon, label: 'Map View' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Header with view toggle */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">Comparative Market Analysis</h2>
+          <p className="text-sm text-muted-foreground">
+            {comparables?.length || 0} comparable properties found
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {/* View Toggle with Tooltips */}
+          <TooltipProvider>
+            <div className="flex items-center gap-1 border rounded-lg p-1 bg-white">
+              {VIEW_OPTIONS.map((view) => (
+                <Tooltip key={view.id}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={activeView === view.id ? 'secondary' : 'ghost'}
+                      size="sm"
+                      onClick={() => setActiveView(view.id as any)}
+                      className="px-3"
+                    >
+                      <view.icon className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>{view.label}</p>
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+          </TooltipProvider>
+
+          {/* Share button */}
+          <Button variant="outline" size="sm">
+            <Share2 className="h-4 w-4 mr-2" />
+            Share
+          </Button>
+        </div>
+      </div>
+
+      {/* Content based on active view */}
+      {activeView === 'analytics' && (
+        <CMAAnalytics 
+          statistics={statistics} 
+          subjectProperty={mlsData}
+          comparableCount={comparables?.length || 0}
+        />
+      )}
+
+      {activeView === 'grid' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {comparables?.map((property: any) => (
+            <PropertyCard key={property.mlsNumber} property={property} />
+          ))}
+        </div>
+      )}
+
+      {activeView === 'map' && (
+        <CMAMap
+          properties={comparables || []}
+          subjectProperty={mlsData}
+          subjectAddress={transaction.address}
+        />
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## Repliers Data Fields Reference
+
+When working with Repliers data, use these field paths:
+
+| Data | Repliers Field Path |
+|------|---------------------|
+| Latitude | `map.latitude` |
+| Longitude | `map.longitude` |
+| Street Address | `address.streetAddress` |
+| City | `address.city` |
+| State | `address.state` |
+| Zip | `address.postalCode` |
+| Neighborhood | `address.neighborhood` |
+| List Price | `listPrice` |
+| Sold Price | `soldPrice` |
+| Status | `status` |
+| Beds | `numBedrooms` or `details.numBedrooms` |
+| Baths | `numBathrooms` or `details.numBathrooms` |
+| Sqft | `sqft` or `details.sqft` |
+| Days on Market | `simpleDaysOnMarket` |
+| Year Built | `yearBuilt` or `details.yearBuilt` |
+| MLS Number | `mlsNumber` |
+| Photos | `images` (array) |
+
+---
+
+## Summary
+
+### Key Changes
+
+1. **View Toggle Order**: Analytics → Grid → Map (with tooltips)
+
+2. **Map Implementation**: 
+   - Uses `map.latitude` and `map.longitude` from Repliers
+   - Subject property = Blue marker with "SUBJECT" label
+   - Active listings = Green markers
+   - Sold properties = Red markers
+   - Click marker = Property details popup
+
+3. **Polygon Support**:
+   - Can display search polygon on map
+   - Uses Repliers' `map` parameter format for geo-spatial search
+   - Format: `longitude,latitude|longitude,latitude|...`
+
+4. **Property Popup**:
+   - Shows photo, price, address
+   - Beds, baths, sqft
+   - Days on market, price per sqft
+   - MLS number

@@ -820,6 +820,17 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         }}
       />
 
+      {/* Create Graphics Dialog */}
+      <MarketingMaterialsDialog
+        open={graphicsDialogOpen && !editGraphicsAsset}
+        onOpenChange={setGraphicsDialogOpen}
+        transaction={transaction}
+        onAssetSaved={() => {
+          queryClient.invalidateQueries({ queryKey: [`/api/transactions/${transaction.id}/marketing-assets`] });
+          setGraphicsDialogOpen(false);
+        }}
+      />
+
       {/* Asset Preview Modal */}
       <Dialog open={Boolean(previewAsset)} onOpenChange={(open) => !open && setPreviewAsset(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
