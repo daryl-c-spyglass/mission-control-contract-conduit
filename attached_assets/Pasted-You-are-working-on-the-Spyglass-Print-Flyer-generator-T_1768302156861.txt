@@ -1,0 +1,145 @@
+You are working on the Spyglass “Print Flyer” generator. The goal is to match the PSD sample layout and FIX the remaining issues. Implement the items below exactly, and add automated visual checks. IMPORTANT: the “Preview” image in the Create Flyer modal must ALWAYS be identical to the “Download Flyer” output (same pixels/layout), just scaled down for UI.
+
+ASSETS (already provided / add to repo if missing)
+- PSD reference: SGR_Flyer-2.psd (and SGR_Flyer-2 (1).psd)
+- Fonts: Montserrat + League Spartan zips
+- New stat icons (use these exact PNGs):
+  - Bedroom.png
+  - Bathroom.png
+  - sq ft.png
+
+ABSOLUTE REQUIREMENT: PREVIEW MUST MATCH DOWNLOAD
+1) Remove any “separate” preview renderer/component.
+2) Use ONE single source of truth rendering pipeline:
+   - One HTML template (same CSS, same layout calculations)
+   - One Puppeteer render function that outputs a PNG at full print resolution
+3) Preview:
+   - The UI “Preview” should display the EXACT SAME rendered PNG bytes that Download uses (or the same URL returned from the same render endpoint), only scaled down in the UI.
+   - Do NOT re-layout with React/CSS for preview. Preview must be the rendered image.
+4) Download:
+   - Download should use the same render endpoint/template.
+5) Add a test that renders “preview” and “download” for the same payload and asserts pixel-identical output (or identical hash).
+
+DESCRIPTION CHARACTER LIMIT CHANGE
+- The UI currently caps Description at 115 characters. Increase this to 150 characters:
+  - Update UI validation + counter to 150.
+  - Update any backend/schema limits to 150.
+  - Ensure AI Summarize can return up to 150 characters (hard cap 150).
+  - Keep a minimum target of 115 characters for AI Summarize, but allow up to 150.
+
+LAYOUT TARGET (MATCH PSD SAMPLE)
+Use this diagram as the reference for spacing and dividers.
+
+PAGE GRID (not to scale, but structure must match)
+┌───────────────────────────────────────────────────────────────┐
+│ HEADER                                                        │
+│  [LEFT VERTICAL BAR]  [Spyglass Logo]  [Address text]   [Badge]│
+│  (NO overlaps. bar/logo/address must NOT touch each other)     │
+├───────────────────────────────────────────────────────────────┤
+│ HERO PHOTO (large)                                             │
+├───────────────────────────────────────────────────────────────┤
+│ 3 PHOTOS ROW (2 smaller photos side-by-side under hero)        │
+├───────────────────────────────────────────────────────────────┤
+│ BOTTOM STRIP (3 columns)                                       │
+│   COL A (stats)   |   COL B (headline+desc)   |   COL C (agent)│
+│                   |                           |                │
+│   ONLY Y-AXIS vertical dividers between cols  |                │
+│   (NO X-axis line across the bottom strip)                     │
+└───────────────────────────────────────────────────────────────┘
+
+DIVIDERS RULES (CRITICAL)
+A) Header: left vertical bar must NOT overlap the logo/address and must NOT overlap into the hero photo.
+   - Add safe padding: the bar sits at far-left margin, logo to the right, address to the right of logo.
+   - Ensure header height is fixed and the hero photo starts BELOW it.
+B) Bottom strip: ONLY vertical dividers (Y-axis) between the 3 columns.
+   - Remove ALL horizontal lines in the bottom strip (no X-axis rule).
+   - Divider height must NOT extend to the bottom of the page.
+   - Divider height MUST align to the content height of the bottom strip (i.e., from the top of the bottom strip content down to the baseline of the last text line in that strip).
+   - No divider should overlap text. Add padding/gap so text never touches the divider.
+
+TOP RIGHT BADGE (PRICE/STATUS)
+- Badge background shape must match the PSD style (pointed/angled left edge, not a plain rectangle).
+- Badge text:
+  - Text color: BLACK
+  - Font weight: NOT bold (use normal/regular)
+  - Top small line: status label (e.g., JUST LISTED AT / FOR SALE AT)
+  - Price line below: larger, still NOT bold (regular weight)
+
+BOTTOM STRIP TYPOGRAPHY (CRITICAL WEIGHTS)
+- Listing Headline: NOT bold (regular/medium only, but not bold). Keep uppercase styling if needed.
+- Agent Phone Number: NOT bold.
+- Address in header: NOT bold.
+
+BOTTOM STRIP ALIGNMENT (THE LAST FIXES)
+1) Stats block (COL A):
+   - Use the provided icons (Bedroom.png, Bathroom.png, sq ft.png).
+   - Each row is ONE line: [icon] [space] [value + label] (e.g., “4 bedrooms”).
+   - Icon size consistent (e.g., 18–20px) and vertically centered with text.
+   - Adjust vertical placement: move the entire stats block slightly DOWN so that:
+     - The “sq ft” row baseline aligns horizontally (same y/baseline) with the agent PHONE number baseline in COL C.
+     - This same baseline also visually matches the last line of the description block in COL B (as close as possible per PSD).
+2) Center block (COL B):
+   - Headline stays higher (do NOT drift downward).
+   - Description is LEFT-aligned (not centered).
+   - Keep comfortable spacing between headline and description, but no horizontal divider lines.
+3) Agent block (COL C):
+   - Increase profile photo size (currently too small). Make it closer to the PSD sample (increase diameter noticeably).
+   - Spyglass logo near the agent photo should also be larger (closer to PSD).
+   - Layout: profile photo + small spyglass logo beside it (same row), then:
+     - Agent name on ONE line (no truncation/cut-off).
+     - Agent title under name.
+     - Phone number under title (regular weight).
+   - If name is long, reduce font-size slightly before truncating. Do not cut off if there is space.
+
+PHOTO SIZING / WHITE SPACE
+- Reduce empty white space in the bottom area:
+  - Slightly increase bottom strip content size (profile photo, icons, and/or font sizes) while maintaining PSD proportions.
+  - Ensure the bottom strip height matches the visual density of the PSD sample.
+
+IMPLEMENTATION GUIDANCE (DO THIS IN CODE, NOT MANUAL TWEAKS)
+- The bottom strip should be a 3-column CSS grid or flex layout with explicit column widths that match PSD.
+- The vertical dividers should be their own elements (not borders that can collapse into content):
+  - Place dividers in dedicated grid columns (e.g., colA | divider | colB | divider | colC)
+  - Give divider a fixed width (e.g., 3–4px) and a light grey color matching PSD.
+  - Divider height should be computed from content:
+    - Easiest: wrap the entire bottom strip content in a container and set divider height: 100% of that container (and ensure container height is content height, not page height).
+- Ensure no overlap:
+  - Add padding inside each column so text never touches dividers.
+  - Enforce header spacing so nothing overlaps the hero photo.
+
+CHECKLIST (RUN THESE BEFORE YOU SAY IT’S DONE)
+1) Preview vs Download:
+   - Render preview and download with identical input payload.
+   - Confirm pixel-identical output (same PNG hash).
+2) Header:
+   - Left vertical bar does not touch/overlap logo or address.
+   - Header does not overlap hero photo.
+   - Badge text is black and not bold.
+3) Bottom strip dividers:
+   - Only two vertical dividers exist (between A|B and B|C).
+   - No horizontal lines exist anywhere in bottom strip.
+   - Dividers do not overlap any text/icons.
+   - Divider height ends at the bottom strip content (not to bottom page).
+4) Typography:
+   - Headline NOT bold.
+   - Phone NOT bold.
+   - Address NOT bold.
+5) Icons:
+   - Bedroom/Bathroom/Sq ft use the provided PNG icons.
+   - Each stat is one line with icon + text.
+6) Alignment:
+   - “sq ft” baseline aligns with agent phone baseline (as in the sample).
+   - Description is left-aligned.
+   - Agent name is one line and not cut off.
+7) Sizing:
+   - Profile photo increased to match PSD density.
+   - Small spyglass logo near agent is increased too.
+   - Reduced excess white space.
+
+DELIVERABLES
+- Update the code so all above is implemented.
+- Provide before/after screenshots of:
+  1) Preview modal image
+  2) Downloaded PNG
+  showing they are identical.
+- Provide the automated test output proving preview/download parity.

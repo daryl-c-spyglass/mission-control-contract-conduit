@@ -54,7 +54,7 @@ type FlyerFormat = "social" | "print";
 // Single source of truth for character limits
 const DESCRIPTION_LIMITS = {
   social: 200,
-  print: 115,
+  print: 150,  // Increased from 115 to allow more description content
 } as const;
 
 const STATUS_OPTIONS = [

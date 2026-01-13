@@ -1267,7 +1267,7 @@ export async function registerRoutes(
   
   app.post("/api/summarize-description", isAuthenticated, async (req, res) => {
     try {
-      const { description, maxLength = 115, propertyInfo } = req.body;
+      const { description, maxLength = 150, propertyInfo } = req.body;
       
       if (!description || description.trim().length === 0) {
         return res.status(400).json({ error: "Description is required" });
@@ -1327,7 +1327,7 @@ Return only the summary text, nothing else.`;
       console.error("AI summarization error:", error);
       
       // Fallback: truncate at sentence boundary
-      const { description, maxLength = 115 } = req.body;
+      const { description, maxLength = 150 } = req.body;
       if (description) {
         const fallback = cleanupSummary(description, maxLength);
         return res.json({ summary: fallback, fallback: true });
