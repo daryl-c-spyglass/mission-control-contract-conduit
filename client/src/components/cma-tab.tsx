@@ -61,7 +61,7 @@ function formatDate(date: string | Date | null): string {
   });
 }
 
-function calculateStatistics(comparables: CMAComparable[]): PropertyStatistics | null {
+export function calculateStatistics(comparables: CMAComparable[]): PropertyStatistics | null {
   if (!comparables || comparables.length === 0) return null;
   
   const calculateMetric = (values: number[]): CmaStatMetric => {

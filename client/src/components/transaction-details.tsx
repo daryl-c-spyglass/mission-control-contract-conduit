@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { MapboxPropertyMap } from "./mapbox-property-map";
+import { CMAAnalytics } from "./cma-analytics";
+import { calculateStatistics } from "./cma-tab";
 import { useTheme } from "@/hooks/use-theme";
 import { getDisplayDOM, hasAccurateDOM } from "@shared/lib/listings";
 import {
@@ -1183,6 +1185,60 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
               </CardContent>
             </Card>
           )}
+
+          {/* CMA Analytics Preview */}
+          {(() => {
+            const cmaData = transaction.cmaData as any[] | null;
+            if (!cmaData || cmaData.length === 0) return null;
+            
+            const statistics = calculateStatistics(cmaData);
+            if (!statistics) return null;
+            
+            const mlsData = transaction.mlsData as Record<string, any> | null;
+            const subjectProperty = mlsData ? {
+              listPrice: mlsData.listPrice || transaction.listPrice,
+              sqft: mlsData.sqft || transaction.sqft,
+              details: {
+                bedrooms: mlsData.details?.bedrooms || transaction.bedrooms,
+                bathrooms: mlsData.details?.bathrooms || transaction.bathrooms,
+              },
+            } : {
+              listPrice: transaction.listPrice,
+              sqft: transaction.sqft,
+              details: {
+                bedrooms: transaction.bedrooms,
+                bathrooms: transaction.bathrooms,
+              },
+            };
+            
+            return (
+              <Card>
+                <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Activity className="h-4 w-4" />
+                    Market Analysis
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setActiveTab('cma')}
+                    className="text-xs"
+                    data-testid="button-view-full-cma"
+                  >
+                    View Full CMA
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <CMAAnalytics 
+                    statistics={statistics}
+                    subjectProperty={subjectProperty as any}
+                    comparableCount={cmaData.length}
+                    variant="compact"
+                  />
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {/* Media Section with Photo Modal */}
           {overviewPhotos.length > 0 && (

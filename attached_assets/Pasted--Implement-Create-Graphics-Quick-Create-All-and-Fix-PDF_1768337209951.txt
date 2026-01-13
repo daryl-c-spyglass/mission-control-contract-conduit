@@ -1,0 +1,1059 @@
+## Implement Create Graphics, Quick Create All, and Fix PDF Output
+
+The Marketing tab consolidation is done. Now we need to implement the actual functionality for Create Graphics and Quick Create All buttons, plus fix the Create Flyer to output PDF instead of PNG.
+
+---
+
+## CURRENT STATE
+
+| Button | Status | Issue |
+|--------|--------|-------|
+| Create Graphics | Not working | No implementation |
+| Create Flyer | Partially working | Says PDF but outputs PNG |
+| Quick Create All | Not working | No implementation |
+
+---
+
+## PART 1: Create Graphics Implementation
+
+Create Graphics should generate high-quality social media images using the **same Puppeteer + Handlebars approach** as Create Flyer for consistent quality.
+
+### Supported Formats
+
+| Format | Dimensions | Aspect Ratio | Use Case |
+|--------|------------|--------------|----------|
+| Instagram Post | 1080 x 1080 | 1:1 | Square post |
+| Instagram Story | 1080 x 1920 | 9:16 | Vertical story |
+| Facebook Post | 1200 x 630 | 16:9 | Landscape post |
+
+### Create Graphics Dialog
+
+```tsx
+// components/create-graphics-dialog.tsx
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2, Sparkles, Download, Eye } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+
+interface CreateGraphicsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  transaction: any;
+  mlsData: any;
+  onSuccess?: () => void;
+}
+
+const FORMAT_OPTIONS = [
+  { id: 'square', label: 'Instagram Post', ratio: '1:1', width: 1080, height: 1080 },
+  { id: 'story', label: 'Instagram Story', ratio: '9:16', width: 1080, height: 1920 },
+  { id: 'landscape', label: 'Facebook Post', ratio: '16:9', width: 1200, height: 630 },
+];
+
+const STATUS_OPTIONS = [
+  'Just Listed',
+  'Open House',
+  'Price Reduced',
+  'Under Contract',
+  'Coming Soon',
+  'Just Sold',
+];
+
+export function CreateGraphicsDialog({ 
+  open, 
+  onOpenChange, 
+  transaction, 
+  mlsData,
+  onSuccess 
+}: CreateGraphicsDialogProps) {
+  const [selectedFormat, setSelectedFormat] = useState('square');
+  const [selectedPhoto, setSelectedPhoto] = useState<string>('');
+  const [status, setStatus] = useState('Just Listed');
+  const [description, setDescription] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const photos = mlsData?.images || [];
+  const aiRecommendedPhotos = getAIRecommendedPhotos(mlsData);
+
+  // Set default photo on open
+  useEffect(() => {
+    if (open && photos.length > 0) {
+      // Use AI recommended photo or first photo
+      setSelectedPhoto(aiRecommendedPhotos[0] || photos[0]);
+      // Set status based on transaction
+      setStatus(getDefaultStatus(transaction.status));
+    }
+  }, [open, photos, transaction]);
+
+  // Generate AI description
+  const handleAISuggest = async () => {
+    setIsLoadingAI(true);
+    try {
+      const response = await fetch('/api/ai/generate-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mlsDescription: mlsData?.description || mlsData?.remarks,
+          propertyDetails: {
+            beds: mlsData?.numBedrooms || mlsData?.details?.numBedrooms,
+            baths: mlsData?.numBathrooms || mlsData?.details?.numBathrooms,
+            sqft: mlsData?.sqft || mlsData?.details?.sqft,
+            address: transaction.address,
+            price: mlsData?.listPrice,
+          },
+          maxLength: 80, // Social media friendly length
+        }),
+      });
+      const data = await response.json();
+      setDescription(data.description || '');
+    } catch (error) {
+      toast({ title: 'Failed to generate description', variant: 'destructive' });
+    } finally {
+      setIsLoadingAI(false);
+    }
+  };
+
+  // Generate preview
+  const handlePreview = async () => {
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/graphics/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          format: selectedFormat,
+          photoUrl: selectedPhoto,
+          status,
+          description,
+          address: transaction.address,
+          price: mlsData?.listPrice,
+          beds: mlsData?.numBedrooms || mlsData?.details?.numBedrooms,
+          baths: mlsData?.numBathrooms || mlsData?.details?.numBathrooms,
+          sqft: mlsData?.sqft || mlsData?.details?.sqft,
+          agentName: 'Daryl Cumming', // From settings
+          agentPhoto: '', // From settings
+          brokerageLogo: '/spyglass-logo.png',
+        }),
+      });
+      const blob = await response.blob();
+      setPreviewUrl(URL.createObjectURL(blob));
+    } catch (error) {
+      toast({ title: 'Failed to generate preview', variant: 'destructive' });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Generate and download
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/graphics/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId: transaction.id,
+          format: selectedFormat,
+          photoUrl: selectedPhoto,
+          status,
+          description,
+          address: transaction.address,
+          price: mlsData?.listPrice,
+          beds: mlsData?.numBedrooms || mlsData?.details?.numBedrooms,
+          baths: mlsData?.numBathrooms || mlsData?.details?.numBathrooms,
+          sqft: mlsData?.sqft || mlsData?.details?.sqft,
+          agentName: 'Daryl Cumming',
+          agentPhoto: '',
+          brokerageLogo: '/spyglass-logo.png',
+          saveToAssets: true, // Save to marketing assets
+        }),
+      });
+
+      const blob = await response.blob();
+      const format = FORMAT_OPTIONS.find(f => f.id === selectedFormat);
+      const filename = `${transaction.address.replace(/[^a-z0-9]/gi, '_')}_${format?.label.replace(' ', '_')}.png`;
+      
+      // Download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      toast({ title: 'Graphic generated and saved!' });
+      onSuccess?.();
+      onOpenChange(false);
+    } catch (error) {
+      toast({ title: 'Failed to generate graphic', variant: 'destructive' });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const currentFormat = FORMAT_OPTIONS.find(f => f.id === selectedFormat);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create Social Media Graphic</DialogTitle>
+        </DialogHeader>
+
+        <div className="grid grid-cols-2 gap-6">
+          {/* Left: Options */}
+          <div className="space-y-5">
+            {/* Format Selection */}
+            <div>
+              <Label className="mb-2 block">Format</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {FORMAT_OPTIONS.map((format) => (
+                  <button
+                    key={format.id}
+                    onClick={() => setSelectedFormat(format.id)}
+                    className={cn(
+                      "flex flex-col items-center p-3 rounded-lg border-2 transition-all",
+                      selectedFormat === format.id
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    )}
+                  >
+                    <div className={cn(
+                      "bg-muted rounded mb-2",
+                      format.id === 'square' && "w-10 h-10",
+                      format.id === 'story' && "w-6 h-10",
+                      format.id === 'landscape' && "w-12 h-7"
+                    )} />
+                    <span className="text-xs font-medium">{format.label}</span>
+                    <span className="text-xs text-muted-foreground">{format.ratio}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Photo Selection */}
+            <div>
+              <Label className="mb-2 block">Property Photo</Label>
+              
+              {/* AI Recommended */}
+              {aiRecommendedPhotos.length > 0 && (
+                <div className="mb-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="h-4 w-4 text-yellow-500" />
+                    <span className="text-xs font-medium">AI Recommended</span>
+                  </div>
+                  <div className="flex gap-2">
+                    {aiRecommendedPhotos.slice(0, 4).map((photo, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setSelectedPhoto(photo)}
+                        className={cn(
+                          "w-16 h-16 rounded-lg overflow-hidden border-2 transition-all",
+                          selectedPhoto === photo
+                            ? "border-primary ring-2 ring-primary/20"
+                            : "border-transparent hover:border-primary/50"
+                        )}
+                      >
+                        <img src={photo} alt="" className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* All Photos */}
+              <div className="grid grid-cols-6 gap-2 max-h-24 overflow-y-auto">
+                {photos.slice(0, 12).map((photo: string, i: number) => (
+                  <button
+                    key={i}
+                    onClick={() => setSelectedPhoto(photo)}
+                    className={cn(
+                      "aspect-square rounded overflow-hidden border-2 transition-all",
+                      selectedPhoto === photo
+                        ? "border-primary"
+                        : "border-transparent hover:border-primary/50"
+                    )}
+                  >
+                    <img src={photo} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Status Badge */}
+            <div>
+              <Label className="mb-2 block">Status Badge</Label>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Description */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label>Description</Label>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleAISuggest}
+                  disabled={isLoadingAI}
+                >
+                  {isLoadingAI ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 mr-1" />
+                  )}
+                  AI Suggest
+                </Button>
+              </div>
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                maxLength={80}
+                placeholder="e.g. Stunning 4BR with Chef's Kitchen"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {description.length}/80 characters
+              </p>
+            </div>
+          </div>
+
+          {/* Right: Preview */}
+          <div className="space-y-4">
+            <Label>Preview</Label>
+            <div 
+              className={cn(
+                "bg-muted rounded-lg flex items-center justify-center overflow-hidden",
+                selectedFormat === 'square' && "aspect-square",
+                selectedFormat === 'story' && "aspect-[9/16] max-h-[400px]",
+                selectedFormat === 'landscape' && "aspect-video"
+              )}
+            >
+              {previewUrl ? (
+                <img src={previewUrl} alt="Preview" className="w-full h-full object-contain" />
+              ) : selectedPhoto ? (
+                <div className="relative w-full h-full">
+                  <img src={selectedPhoto} alt="Selected" className="w-full h-full object-cover opacity-50" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Button variant="secondary" onClick={handlePreview} disabled={isGenerating}>
+                      {isGenerating ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Eye className="h-4 w-4 mr-2" />
+                      )}
+                      Generate Preview
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm">Select a photo</p>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground text-center">
+              Output: {currentFormat?.width} x {currentFormat?.height}px
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleGenerate} disabled={isGenerating || !selectedPhoto}>
+            {isGenerating ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Download className="h-4 w-4 mr-2" />
+            )}
+            Generate & Download
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Helper functions
+function getAIRecommendedPhotos(mlsData: any): string[] {
+  const images = mlsData?.images || [];
+  const insights = mlsData?.imageInsights?.images || [];
+  
+  if (!insights.length) return [];
+  
+  // Find front exterior and high quality photos
+  const recommended = insights
+    .filter((img: any) => 
+      img.classification?.imageOf?.toLowerCase().includes('front') ||
+      img.classification?.imageOf?.toLowerCase().includes('exterior') ||
+      img.quality?.qualitative === 'excellent' ||
+      img.quality?.qualitative === 'above average'
+    )
+    .slice(0, 4)
+    .map((img: any) => img.url || images[img.index]);
+  
+  return recommended.filter(Boolean);
+}
+
+function getDefaultStatus(transactionStatus: string): string {
+  const status = transactionStatus?.toLowerCase() || '';
+  if (status.includes('active')) return 'Just Listed';
+  if (status.includes('contract')) return 'Under Contract';
+  if (status.includes('pending')) return 'Pending';
+  if (status.includes('sold') || status.includes('closed')) return 'Just Sold';
+  return 'Just Listed';
+}
+```
+
+### Backend: Graphics Render Endpoint
+
+Use the **same Puppeteer approach** as flyer rendering for consistent high quality:
+
+```typescript
+// server/routes/graphics.ts
+import puppeteer from 'puppeteer';
+import Handlebars from 'handlebars';
+import path from 'path';
+import fs from 'fs';
+
+const FORMAT_DIMENSIONS = {
+  square: { width: 1080, height: 1080 },
+  story: { width: 1080, height: 1920 },
+  landscape: { width: 1200, height: 630 },
+};
+
+app.post('/api/graphics/render', async (req, res) => {
+  const {
+    transactionId,
+    format,
+    photoUrl,
+    status,
+    description,
+    address,
+    price,
+    beds,
+    baths,
+    sqft,
+    agentName,
+    agentPhoto,
+    brokerageLogo,
+    saveToAssets,
+  } = req.body;
+
+  const dimensions = FORMAT_DIMENSIONS[format as keyof typeof FORMAT_DIMENSIONS];
+  if (!dimensions) {
+    return res.status(400).json({ error: 'Invalid format' });
+  }
+
+  try {
+    // Convert photo URL to base64 for reliable rendering
+    const photoBase64 = await fetchImageAsBase64(photoUrl);
+    
+    // Load template based on format
+    const templatePath = path.join(__dirname, `../templates/graphics/${format}.hbs`);
+    const templateSource = fs.readFileSync(templatePath, 'utf-8');
+    const template = Handlebars.compile(templateSource);
+
+    // Render HTML
+    const html = template({
+      photoBase64,
+      status,
+      description,
+      address,
+      price: price?.toLocaleString(),
+      beds,
+      baths,
+      sqft: sqft?.toLocaleString(),
+      agentName,
+      agentPhoto,
+      brokerageLogo,
+    });
+
+    // Launch Puppeteer
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    const page = await browser.newPage();
+
+    // Set viewport to exact dimensions
+    await page.setViewport({
+      width: dimensions.width,
+      height: dimensions.height,
+      deviceScaleFactor: 1,
+    });
+
+    // Set content and wait for images
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+
+    // Screenshot as PNG (high quality)
+    const imageBuffer = await page.screenshot({
+      type: 'png',
+      fullPage: false,
+    });
+
+    await browser.close();
+
+    // Save to marketing assets if requested
+    if (saveToAssets && transactionId) {
+      await storage.createMarketingAsset({
+        transactionId,
+        type: format,
+        format: format,
+        imageData: imageBuffer,
+        createdAt: new Date(),
+      });
+    }
+
+    // Return image
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `attachment; filename="${format}_graphic.png"`);
+    res.send(imageBuffer);
+
+  } catch (error) {
+    console.error('Graphics render error:', error);
+    res.status(500).json({ error: 'Failed to render graphic' });
+  }
+});
+
+// Helper: Fetch image as base64
+async function fetchImageAsBase64(url: string): Promise<string> {
+  const response = await fetch(url);
+  const buffer = await response.arrayBuffer();
+  const base64 = Buffer.from(buffer).toString('base64');
+  const mimeType = response.headers.get('content-type') || 'image/jpeg';
+  return `data:${mimeType};base64,${base64}`;
+}
+```
+
+### Handlebars Templates for Each Format
+
+Create templates for each format:
+
+**templates/graphics/square.hbs** (1080x1080 Instagram Post):
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1080px;
+      height: 1080px;
+      font-family: 'Inter', 'Helvetica Neue', sans-serif;
+      overflow: hidden;
+    }
+    .container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    .photo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,0.8));
+      padding: 60px 40px 40px;
+    }
+    .status-badge {
+      display: inline-block;
+      background: #22c55e;
+      color: white;
+      font-size: 24px;
+      font-weight: 700;
+      padding: 8px 20px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+    }
+    .price {
+      font-size: 56px;
+      font-weight: 800;
+      color: white;
+      margin-bottom: 8px;
+    }
+    .address {
+      font-size: 28px;
+      color: white;
+      font-weight: 500;
+      margin-bottom: 12px;
+    }
+    .details {
+      font-size: 22px;
+      color: rgba(255,255,255,0.9);
+    }
+    .description {
+      font-size: 20px;
+      color: rgba(255,255,255,0.85);
+      margin-top: 16px;
+      font-style: italic;
+    }
+    .branding {
+      position: absolute;
+      top: 30px;
+      right: 30px;
+      background: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+    }
+    .branding img {
+      height: 40px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img class="photo" src="{{photoBase64}}" alt="Property" />
+    
+    <div class="branding">
+      <img src="{{brokerageLogo}}" alt="Spyglass Realty" />
+    </div>
+    
+    <div class="overlay">
+      <div class="status-badge">{{status}}</div>
+      <div class="price">${{price}}</div>
+      <div class="address">{{address}}</div>
+      <div class="details">{{beds}} Bed | {{baths}} Bath | {{sqft}} Sq Ft</div>
+      {{#if description}}
+      <div class="description">"{{description}}"</div>
+      {{/if}}
+    </div>
+  </div>
+</body>
+</html>
+```
+
+**templates/graphics/story.hbs** (1080x1920 Instagram Story):
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1080px;
+      height: 1920px;
+      font-family: 'Inter', 'Helvetica Neue', sans-serif;
+      overflow: hidden;
+    }
+    .container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    .photo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .top-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(rgba(0,0,0,0.6), transparent);
+      padding: 60px 40px;
+    }
+    .bottom-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,0.85));
+      padding: 100px 40px 80px;
+    }
+    .branding {
+      background: white;
+      padding: 16px 24px;
+      border-radius: 12px;
+      display: inline-block;
+    }
+    .branding img {
+      height: 50px;
+    }
+    .status-badge {
+      display: inline-block;
+      background: #22c55e;
+      color: white;
+      font-size: 28px;
+      font-weight: 700;
+      padding: 12px 28px;
+      border-radius: 8px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 24px;
+    }
+    .price {
+      font-size: 72px;
+      font-weight: 800;
+      color: white;
+      margin-bottom: 16px;
+    }
+    .address {
+      font-size: 36px;
+      color: white;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    .details {
+      font-size: 28px;
+      color: rgba(255,255,255,0.9);
+    }
+    .description {
+      font-size: 26px;
+      color: rgba(255,255,255,0.85);
+      margin-top: 24px;
+      font-style: italic;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img class="photo" src="{{photoBase64}}" alt="Property" />
+    
+    <div class="top-overlay">
+      <div class="branding">
+        <img src="{{brokerageLogo}}" alt="Spyglass Realty" />
+      </div>
+    </div>
+    
+    <div class="bottom-overlay">
+      <div class="status-badge">{{status}}</div>
+      <div class="price">${{price}}</div>
+      <div class="address">{{address}}</div>
+      <div class="details">{{beds}} Bed | {{baths}} Bath | {{sqft}} Sq Ft</div>
+      {{#if description}}
+      <div class="description">"{{description}}"</div>
+      {{/if}}
+    </div>
+  </div>
+</body>
+</html>
+```
+
+**templates/graphics/landscape.hbs** (1200x630 Facebook Post):
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1200px;
+      height: 630px;
+      font-family: 'Inter', 'Helvetica Neue', sans-serif;
+      overflow: hidden;
+    }
+    .container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    .photo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,0.85));
+      padding: 80px 50px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .info {
+      flex: 1;
+    }
+    .status-badge {
+      display: inline-block;
+      background: #22c55e;
+      color: white;
+      font-size: 18px;
+      font-weight: 700;
+      padding: 6px 16px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+    .price {
+      font-size: 48px;
+      font-weight: 800;
+      color: white;
+      margin-bottom: 8px;
+    }
+    .address {
+      font-size: 24px;
+      color: white;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    .details {
+      font-size: 18px;
+      color: rgba(255,255,255,0.9);
+    }
+    .branding {
+      background: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+    }
+    .branding img {
+      height: 36px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img class="photo" src="{{photoBase64}}" alt="Property" />
+    
+    <div class="overlay">
+      <div class="info">
+        <div class="status-badge">{{status}}</div>
+        <div class="price">${{price}}</div>
+        <div class="address">{{address}}</div>
+        <div class="details">{{beds}} Bed | {{baths}} Bath | {{sqft}} Sq Ft</div>
+      </div>
+      <div class="branding">
+        <img src="{{brokerageLogo}}" alt="Spyglass Realty" />
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+```
+
+---
+
+## PART 2: Quick Create All Implementation
+
+Quick Create All generates all three social formats with one click using AI-selected photo and auto-generated description.
+
+```tsx
+// In marketing-tab.tsx
+
+const handleQuickCreateAll = async () => {
+  setIsQuickCreating(true);
+  
+  try {
+    // 1. Get AI recommended photo
+    const bestPhoto = getAIRecommendedPhotos(mlsData)[0] || mlsData?.images?.[0];
+    
+    if (!bestPhoto) {
+      toast({ title: 'No photos available', variant: 'destructive' });
+      return;
+    }
+
+    // 2. Generate AI description
+    const descResponse = await fetch('/api/ai/generate-description', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mlsDescription: mlsData?.description || mlsData?.remarks,
+        propertyDetails: {
+          beds: mlsData?.numBedrooms || mlsData?.details?.numBedrooms,
+          baths: mlsData?.numBathrooms || mlsData?.details?.numBathrooms,
+          sqft: mlsData?.sqft || mlsData?.details?.sqft,
+          address: transaction.address,
+        },
+        maxLength: 80,
+      }),
+    });
+    const { description } = await descResponse.json();
+
+    // 3. Determine status
+    const status = getDefaultStatus(transaction.status);
+
+    // 4. Generate all three formats
+    const formats = ['square', 'story', 'landscape'];
+    const results = [];
+
+    for (const format of formats) {
+      const response = await fetch('/api/graphics/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId: transaction.id,
+          format,
+          photoUrl: bestPhoto,
+          status,
+          description,
+          address: transaction.address,
+          price: mlsData?.listPrice,
+          beds: mlsData?.numBedrooms || mlsData?.details?.numBedrooms,
+          baths: mlsData?.numBathrooms || mlsData?.details?.numBathrooms,
+          sqft: mlsData?.sqft || mlsData?.details?.sqft,
+          agentName: 'Daryl Cumming',
+          brokerageLogo: '/spyglass-logo.png',
+          saveToAssets: true,
+        }),
+      });
+
+      if (response.ok) {
+        results.push(format);
+      }
+    }
+
+    // 5. Refresh assets list
+    queryClient.invalidateQueries({ queryKey: ['marketing-assets', transaction.id] });
+
+    toast({ 
+      title: 'All formats generated!', 
+      description: `Created ${results.length} graphics: Instagram Post, Story, and Facebook Post` 
+    });
+
+  } catch (error) {
+    console.error('Quick create error:', error);
+    toast({ title: 'Failed to generate graphics', variant: 'destructive' });
+  } finally {
+    setIsQuickCreating(false);
+  }
+};
+```
+
+---
+
+## PART 3: Fix Create Flyer - Output PDF Instead of PNG
+
+The Create Flyer says "Print-ready PDF flyer" but outputs PNG. Fix this:
+
+```typescript
+// In flyer render endpoint
+app.post('/api/flyer/render', async (req, res) => {
+  // ... existing code ...
+
+  try {
+    // ... Puppeteer setup ...
+
+    // Check output format
+    const outputFormat = req.body.outputFormat || 'pdf'; // Default to PDF
+
+    if (outputFormat === 'pdf') {
+      // Generate PDF
+      const pdfBuffer = await page.pdf({
+        width: '8.5in',
+        height: '11in',
+        printBackground: true,
+        margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      });
+
+      await browser.close();
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}.pdf"`);
+      res.send(pdfBuffer);
+    } else {
+      // Generate PNG (for preview)
+      const imageBuffer = await page.screenshot({
+        type: 'png',
+        fullPage: true,
+      });
+
+      await browser.close();
+
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}.png"`);
+      res.send(imageBuffer);
+    }
+
+  } catch (error) {
+    // ... error handling ...
+  }
+});
+```
+
+### Update Create Flyer Dialog to Request PDF
+
+```tsx
+// In create-flyer-dialog.tsx
+
+const handleGenerate = async () => {
+  setIsGenerating(true);
+  try {
+    const response = await fetch('/api/flyer/render', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        // ... existing data ...
+        outputFormat: 'pdf', // Request PDF output
+      }),
+    });
+
+    const blob = await response.blob();
+    const filename = `${transaction.address.replace(/[^a-z0-9]/gi, '_')}_Flyer.pdf`;
+    
+    // Download PDF
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    toast({ title: 'Flyer downloaded!' });
+  } catch (error) {
+    toast({ title: 'Failed to generate flyer', variant: 'destructive' });
+  } finally {
+    setIsGenerating(false);
+  }
+};
+```
+
+---
+
+## Summary
+
+| Feature | Implementation |
+|---------|----------------|
+| **Create Graphics** | Puppeteer + Handlebars, same quality as flyer, 3 formats |
+| **Quick Create All** | Batch generates all 3 social formats with AI photo + description |
+| **Create Flyer PDF** | Change output from PNG to actual PDF using `page.pdf()` |
+
+### Files to Create
+
+```
+templates/graphics/
+├── square.hbs      (1080x1080)
+├── story.hbs       (1080x1920)
+├── landscape.hbs   (1200x630)
+
+server/routes/
+├── graphics.ts     (render endpoint)
+
+components/
+├── create-graphics-dialog.tsx
+```
+
+### Files to Modify
+
+```
+server/routes/flyer.ts    (add PDF output option)
+components/marketing-tab.tsx (wire up buttons)
+components/create-flyer-dialog.tsx (request PDF format)
+```
