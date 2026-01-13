@@ -1,0 +1,137 @@
+## Add Edit Button to Marketing Assets
+
+Users should be able to edit previously created marketing assets, not just download or delete them.
+
+### Changes to make:
+
+**1. Add Edit button to asset cards in Marketing Assets gallery**
+
+Location: Marketing tab asset cards (next to download button)
+
+Current buttons: [Download] [Delete]
+New buttons: [Edit] [Download] [Delete]
+
+The Edit button should:
+- Open the appropriate dialog pre-filled with the asset's data
+- For "Print Flyer" assets → Open CreateFlyerDialog with saved data
+- For "Social" assets → Open MarketingMaterialsDialog with saved data
+
+**2. Store editable data when saving assets**
+
+When saving a marketing asset, store the configuration used to create it:
+```typescript
+interface MarketingAsset {
+  id: number;
+  transactionId: number;
+  type: 'flyer' | 'social';
+  format: 'print' | 'square' | 'landscape' | 'story';
+  imageUrl: string;
+  createdAt: string;
+  // Add these fields for edit functionality:
+  config: {
+    status: string;           // "Just Listed", "Open House", etc.
+    description?: string;     // Property description used
+    headline?: string;        // AI headline used
+    photoUrls: string[];      // Photos selected
+    agentName?: string;
+    agentTitle?: string;
+    agentPhone?: string;
+    agentPhotoUrl?: string;
+  };
+}
+```
+
+**3. Update CreateFlyerDialog to accept initial values**
+
+Add optional props to pre-fill the dialog when editing:
+```typescript
+interface CreateFlyerDialogProps {
+  // ... existing props
+  initialData?: {
+    status: string;
+    description: string;
+    headline: string;
+    selectedPhotos: string[];
+    // etc.
+  };
+  assetId?: number; // If editing, update instead of create new
+}
+```
+
+**4. Update MarketingMaterialsDialog to accept initial values**
+
+Same pattern - add optional props for edit mode:
+```typescript
+interface MarketingMaterialsDialogProps {
+  // ... existing props
+  initialData?: {
+    status: string;
+    photoUrl: string;
+    socialDescription: string;
+  };
+  assetId?: number;
+}
+```
+
+**5. Update save logic to handle edit vs. create**
+
+When saving:
+- If `assetId` is provided → Update existing asset (PUT/PATCH)
+- If no `assetId` → Create new asset (POST)
+
+**6. Asset card Edit button implementation**
+
+```tsx
+// In the asset card component
+<Button
+  variant="ghost"
+  size="icon"
+  onClick={() => {
+    if (asset.type === 'flyer') {
+      setEditingFlyerAsset(asset);
+      setShowFlyerDialog(true);
+    } else {
+      setEditingGraphicsAsset(asset);
+      setShowGraphicsDialog(true);
+    }
+  }}
+>
+  <Pencil className="h-4 w-4" />
+</Button>
+```
+
+### UI Layout for Asset Card:
+
+```
+┌─────────────────────────────┐
+│       [Flyer Preview]       │
+│                             │
+│                             │
+├─────────────────────────────┤
+│ Print Flyer                 │
+│ Jan 13                      │
+│ [✏️ Edit] [↓ Download] [🗑] │
+└─────────────────────────────┘
+```
+
+### API Changes (if needed):
+
+Add PATCH endpoint for updating assets:
+```
+PATCH /api/transactions/:id/marketing-assets/:assetId
+Body: { config: {...}, imageUrl: "..." }
+```
+
+### Testing:
+1. Create a Print Flyer and save it
+2. Go to Marketing tab
+3. Click Edit button on the saved flyer
+4. Verify CreateFlyerDialog opens with the saved data pre-filled
+5. Make changes and save
+6. Verify the asset is updated (not duplicated)
+7. Repeat for Social Graphics
+
+### DO NOT change:
+- The generation logic itself
+- Templates tab
+- Other tabs

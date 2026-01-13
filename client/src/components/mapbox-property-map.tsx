@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { useTheme } from '@/hooks/use-theme';
 
 interface PropertyMapProps {
   latitude: number;
@@ -17,8 +18,14 @@ export function MapboxPropertyMap({
 }: PropertyMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const marker = useRef<mapboxgl.Marker | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { isDark } = useTheme();
+
+  const mapStyle = isDark 
+    ? 'mapbox://styles/mapbox/dark-v11' 
+    : 'mapbox://styles/mapbox/light-v11';
 
   useEffect(() => {
     fetch('/api/mapbox-token')
@@ -39,33 +46,48 @@ export function MapboxPropertyMap({
   }, []);
 
   useEffect(() => {
-    if (!mapContainer.current || map.current || !token) return;
+    if (!mapContainer.current || !token) return;
     if (!latitude || !longitude) return;
 
     mapboxgl.accessToken = token;
+
+    const addMarker = () => {
+      if (!map.current) return;
+      
+      if (marker.current) {
+        marker.current.remove();
+      }
+      
+      marker.current = new mapboxgl.Marker({ color: '#f97316' })
+        .setLngLat([longitude, latitude])
+        .setPopup(
+          new mapboxgl.Popup({ offset: 25 })
+            .setHTML(`<div style="color: #000; padding: 4px;"><strong>${address || 'Property Location'}</strong></div>`)
+        )
+        .addTo(map.current);
+    };
     
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/dark-v11',
-      center: [longitude, latitude],
-      zoom: zoom,
-    });
+    if (!map.current) {
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: mapStyle,
+        center: [longitude, latitude],
+        zoom: zoom,
+      });
 
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
-
-    new mapboxgl.Marker({ color: '#f97316' })
-      .setLngLat([longitude, latitude])
-      .setPopup(
-        new mapboxgl.Popup({ offset: 25 })
-          .setHTML(`<div style="color: #000; padding: 4px;"><strong>${address || 'Property Location'}</strong></div>`)
-      )
-      .addTo(map.current);
+      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      map.current.on('load', addMarker);
+      map.current.on('style.load', addMarker);
+    } else {
+      map.current.setStyle(mapStyle);
+    }
 
     return () => {
       map.current?.remove();
       map.current = null;
+      marker.current = null;
     };
-  }, [latitude, longitude, address, zoom, token]);
+  }, [latitude, longitude, address, zoom, token, mapStyle]);
 
   if (error) {
     return (
