@@ -581,6 +581,71 @@ export async function fetchSimilarListings(mlsNumber: string, radius: number = 5
   }
 }
 
+// Fetch coordinates for a single MLS listing (used for backfilling CMA data)
+export async function fetchListingCoordinates(mlsNumber: string): Promise<{ latitude: number; longitude: number } | null> {
+  try {
+    const formattedMLS = mlsNumber.startsWith("ACT") ? mlsNumber : `ACT${mlsNumber}`;
+    const data = await repliersRequest(`/listings/${formattedMLS}`, { boardId: "53" });
+    
+    const lat = data?.map?.latitude || data?.address?.latitude || data?.latitude;
+    const lng = data?.map?.longitude || data?.address?.longitude || data?.longitude;
+    
+    if (lat && lng) {
+      return {
+        latitude: parseFloat(lat),
+        longitude: parseFloat(lng),
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error(`Error fetching coordinates for ${mlsNumber}:`, error);
+    return null;
+  }
+}
+
+// Enrich CMA comparables with coordinates by fetching from Repliers API
+export async function enrichCMAWithCoordinates(comparables: CMAComparable[]): Promise<CMAComparable[]> {
+  // Only process comparables that are missing coordinates
+  const needsEnrichment = comparables.filter(c => !c.map && c.mlsNumber);
+  
+  if (needsEnrichment.length === 0) {
+    return comparables;
+  }
+  
+  console.log(`[CMA] Enriching ${needsEnrichment.length} comparables with coordinates...`);
+  
+  // Fetch coordinates for all missing entries in parallel (with limit)
+  const pLimit = (await import('p-limit')).default;
+  const limit = pLimit(3); // Max 3 concurrent requests
+  
+  const coordinateResults = await Promise.all(
+    needsEnrichment.map(comp => 
+      limit(async () => {
+        const coords = await fetchListingCoordinates(comp.mlsNumber);
+        return { mlsNumber: comp.mlsNumber, coords };
+      })
+    )
+  );
+  
+  // Build a map of MLS number to coordinates
+  const coordsMap = new Map<string, { latitude: number; longitude: number }>();
+  for (const result of coordinateResults) {
+    if (result.coords) {
+      coordsMap.set(result.mlsNumber, result.coords);
+    }
+  }
+  
+  // Merge coordinates back into comparables
+  return comparables.map(comp => {
+    if (comp.map) return comp; // Already has coordinates
+    const coords = coordsMap.get(comp.mlsNumber);
+    if (coords) {
+      return { ...comp, map: coords };
+    }
+    return comp;
+  });
+}
+
 export async function searchByAddress(address: string): Promise<MLSListingData | null> {
   try {
     const data = await repliersRequest("/listings", {

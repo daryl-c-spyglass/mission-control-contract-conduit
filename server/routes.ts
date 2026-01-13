@@ -67,6 +67,34 @@ export async function registerRoutes(
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
       }
+      
+      // Enrich CMA comparables with coordinates if they're missing
+      if (transaction.cmaData && Array.isArray(transaction.cmaData) && transaction.cmaData.length > 0) {
+        const cmaComparables = transaction.cmaData as any[];
+        const missingCount = cmaComparables.filter(c => !c.map && c.mlsNumber).length;
+        
+        if (missingCount > 0) {
+          console.log(`[CMA Enrich] Transaction ${req.params.id} has ${missingCount}/${cmaComparables.length} comparables without coordinates`);
+          try {
+            const { enrichCMAWithCoordinates } = await import("./repliers");
+            const enrichedCMA = await enrichCMAWithCoordinates(cmaComparables);
+            
+            // Check how many were enriched
+            const enrichedCount = enrichedCMA.filter((c: any) => c.map).length;
+            console.log(`[CMA Enrich] Enriched ${enrichedCount}/${cmaComparables.length} comparables with coordinates`);
+            
+            // Update the transaction in database with enriched coordinates
+            await storage.updateTransaction(req.params.id, { cmaData: enrichedCMA });
+            
+            // Return enriched data
+            return res.json({ ...transaction, cmaData: enrichedCMA });
+          } catch (enrichError) {
+            console.error("Error enriching CMA coordinates:", enrichError);
+            // Fall through to return original data
+          }
+        }
+      }
+      
       res.json(transaction);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch transaction" });
