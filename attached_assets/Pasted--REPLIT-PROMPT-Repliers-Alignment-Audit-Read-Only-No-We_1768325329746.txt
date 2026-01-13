@@ -1,0 +1,269 @@
+## REPLIT PROMPT — Repliers Alignment Audit (Read-Only / No Webapp Changes)
+
+### Objective
+
+Run a **read-only audit** to determine whether our current MLS ingestion + normalized listing model are aligned with **Repliers Listings schema** for **ACTRIS**, without modifying any UI, routes, database schemas, or production behavior.
+
+This audit must:
+
+* **Not change the webapp**
+* **Not change any API responses**
+* **Not change any stored data**
+* Produce an **exportable report** we can paste back into ChatGPT.
+
+### Non-negotiables (Project Rules)
+
+* Data source: **Repliers only**
+* MLS: **ACTRIS**
+* **Leasing/rentals excluded globally** (audit must detect violations, but must not change filtering logic in this task)
+* No silent fallbacks: audit must surface parsing errors and missing fields explicitly (but do not alter existing code paths)
+
+---
+
+# Scope
+
+Audit only. Implement as:
+
+* A standalone script under `scripts/` OR
+* A one-off node task runnable from console
+
+**Do not:**
+
+* Add/modify UI components
+* Add new API endpoints
+* Change queries, filters, or normalization logic used by app runtime
+* Change DB schema/migrations
+
+---
+
+# What to Build
+
+## 1) Create a standalone audit script
+
+Create: `scripts/repliers_schema_audit.ts` (or `.js`)
+
+### Inputs (via env)
+
+* `REPLIERS_API_KEY`
+* `REPLIERS_BASE_URL` (default to Repliers API base used in the app)
+* Optional:
+
+  * `AUDIT_LIMIT` (default 50)
+  * `AUDIT_QUERY` (JSON string of filters; default: ACTRIS, active + sold sample if possible)
+
+### Behavior
+
+The script will:
+
+1. Fetch `N` listings from Repliers using the same base URL and authentication method as the app (but **do not reuse app normalization functions** unless they are pure + have no side effects).
+
+2. For each listing, compute:
+
+   * `topLevelKeys`: keys present at root
+   * `missingCriticalKeys`: missing among a defined critical set (below)
+   * `typeShapeIssues`: fields with unexpected types (number vs string vs array)
+   * `presenceByCategory`: % presence for grouped categories
+   * `unknownNormalizedDrops` (only if you can safely compare):
+
+     * If app has a pure normalizer (no IO), compare raw vs normalized keys and record dropped keys.
+     * If not safe, skip this comparison and only report raw payload field coverage.
+
+3. Enforce **audit checks** (report only):
+
+   * Rentals/leasing leak detection (see section 4)
+   * Permissions presence detection (`permissions.*`)
+   * DOM field availability (`daysOnMarket`, `simpleDaysOnMarket` if present)
+   * Media fields presence (`images`, `photoCount`, any tour/video fields)
+
+4. Output:
+
+   * A console report (human-readable)
+   * A JSON artifact written to: `./artifacts/repliers-audit-report.json`
+
+---
+
+## 2) Critical field checklist (must report missing)
+
+Define this set and measure presence:
+
+### Identity / classification
+
+* `mlsNumber`
+* `class`
+* `type`
+* `status`
+* `listPrice`
+* `listDate`
+
+### Location
+
+* `address`
+* `address.city`, `address.state`, `address.zip` (where present)
+* `map.latitude`, `map.longitude` (where present)
+
+### Compliance / permissions
+
+* `permissions.displayAddressOnInternet`
+* `permissions.displayPublic`
+* `permissions.displayInternetEntireListing`
+
+### Core details
+
+* `details`
+* `details.propertyType`
+* `details.description` (if exists)
+* `details.yearBuilt` (if exists)
+* `details.sqft` (if exists)
+* `details.numBedrooms`, `details.numBathrooms` (if exists)
+
+### Media
+
+* `images` (array)
+* `photoCount`
+
+### DOM
+
+* `daysOnMarket`
+* `simpleDaysOnMarket` (if returned in this MLS feed)
+
+### Class-specific blocks
+
+* If `class` indicates condo → check `condominium`
+* If commercial → check `commercial`
+* If residential → check `residential`
+
+---
+
+## 3) Category presence summary (for the report)
+
+Group and output % presence for:
+
+* Basic Info
+* Pricing
+* Status/Lifecycle
+* Location
+* Permissions
+* Details
+* Financial (tax/HOA)
+* Features (heating/cooling/etc.)
+* Media
+* DOM
+* Class-specific
+
+---
+
+## 4) Rentals/leasing leak detection (report-only)
+
+The script must detect if any fetched records appear to be rentals/leasing.
+
+Heuristics (do not modify runtime logic, just report):
+
+* If `type` equals/contains `Lease` / `Rental`
+* If `details.propertyType` indicates lease/rental category (if any)
+* If any rent-related price fields exist (if present in payload)
+
+Output:
+
+* Count of suspected rental/leasing records
+* Sample `mlsNumber` list (max 10) with the field evidence that triggered it
+
+---
+
+## 5) Output format (must match exactly)
+
+### Console output (pasteable)
+
+* Header with run metadata:
+
+  * timestamp
+  * AUDIT_LIMIT
+  * query used
+* Summary table style text:
+
+  * total records fetched
+  * records by `status` (top 10)
+  * records by `class` (top 10)
+  * suspected rentals count
+* Field presence:
+
+  * critical keys missing counts
+  * presence % by category
+* Type issues:
+
+  * list of fields with inconsistent types and example values
+
+### JSON artifact
+
+Write `./artifacts/repliers-audit-report.json` with:
+
+```json
+{
+  "run": { "timestamp": "", "limit": 0, "query": {} },
+  "counts": { "total": 0, "byStatus": {}, "byClass": {} },
+  "rentals": { "suspectedCount": 0, "examples": [] },
+  "criticalFields": { "missingCounts": {}, "examples": {} },
+  "categoryPresence": {},
+  "typeShapeIssues": [],
+  "samples": { "exampleListings": [] }
+}
+```
+
+Include 3–5 `exampleListings` with:
+
+* `mlsNumber`
+* `class`
+* `type`
+* `status`
+* a truncated `raw` preview (first 50 keys or limited depth)
+
+---
+
+# Implementation Notes (Safety)
+
+* **Do not** add dependencies unless necessary.
+* Rate-limit politely (sleep 200–300ms between requests) if requesting multiple pages.
+* Redact secrets from output (never print API keys).
+* If the Repliers API request fails, print:
+
+  * HTTP status
+  * error body (redacted if needed)
+  * exit non-zero
+
+---
+
+# Acceptance Criteria
+
+* ✅ Running `node scripts/repliers_schema_audit.(ts|js)` produces:
+
+  * Console report (pasteable)
+  * `./artifacts/repliers-audit-report.json`
+* ✅ No UI files changed
+* ✅ No server routes changed
+* ✅ No DB schema/migrations
+* ✅ Audit identifies:
+
+  * missing critical fields
+  * rentals/leasing presence (if any)
+  * category presence rates
+  * type inconsistencies
+
+---
+
+# Validation Steps (Replit)
+
+1. Add env vars in Replit Secrets:
+
+   * `REPLIERS_API_KEY`
+   * `REPLIERS_BASE_URL`
+2. Run:
+
+   * `node scripts/repliers_schema_audit.js`
+3. Paste console output + optionally the JSON artifact summary back into ChatGPT.
+
+---
+
+When you paste the audit output back here, I’ll turn it into:
+
+* a precise “alignment verdict” (what’s aligned vs not)
+* a ranked fix list
+* and (only if you ask) a second Replit prompt to remediate, still respecting ACTRIS + “no rentals anywhere.”

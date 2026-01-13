@@ -1,0 +1,858 @@
+{
+  "run": {
+    "timestamp": "2026-01-13T17:30:25.065Z",
+    "limit": 50,
+    "query": {}
+  },
+  "counts": {
+    "total": 50,
+    "byStatus": {
+      "A": 50
+    },
+    "byClass": {
+      "CondoProperty": 29,
+      "ResidentialProperty": 20,
+      "CommercialProperty": 1
+    }
+  },
+  "rentals": {
+    "suspectedCount": 25,
+    "examples": [
+      {
+        "mlsNumber": "ACT2375285",
+        "evidence": [
+          "type: \"Lease\"",
+          "details.propertyType: \"Residential Lease\""
+        ]
+      },
+      {
+        "mlsNumber": "ACT8993938",
+        "evidence": [
+          "type: \"Lease\"",
+          "details.propertyType: \"Residential Lease\""
+        ]
+      },
+      {
+        "mlsNumber": "ACT8556190",
+        "evidence": [
+          "type: \"Lease\"",
+          "details.propertyType: \"Residential Lease\""
+        ]
+      },
+      {
+        "mlsNumber": "ACT3997719",
+        "evidence": [
+          "type: \"Lease\"",
+          "details.propertyType: \"Residential Lease\""
+        ]
+      },
+      {
+        "mlsNumber": "ACT4324308",
+        "evidence": [
+          "type: \"Lease\"",
+          "details.propertyType: \"Residential Lease\""
+        ]
+      },
+      {
+        "mlsNumber": "ACT1254635",
+        "evidence": [
+          "type: \"Lease\"",
+          "details.propertyType: \"Residential Lease\""
+        ]
+      },
+      {
+        "mlsNumber": "ACT3646775",
+        "evidence": [
+          "type: \"Lease\"",
+          "details.propertyType: \"Residential Lease\""
+        ]
+      },
+      {
+        "mlsNumber": "ACT9533320",
+        "evidence": [
+          "type: \"Lease\"",
+          "details.propertyType: \"Residential Lease\""
+        ]
+      },
+      {
+        "mlsNumber": "ACT7043014",
+        "evidence": [
+          "type: \"Lease\"",
+          "details.propertyType: \"Residential Lease\""
+        ]
+      },
+      {
+        "mlsNumber": "ACT6788979",
+        "evidence": [
+          "type: \"Lease\"",
+          "details.propertyType: \"Residential Lease\""
+        ]
+      }
+    ]
+  },
+  "criticalFields": {
+    "missingCounts": {
+      "mlsNumber": 0,
+      "class": 0,
+      "type": 0,
+      "status": 0,
+      "listPrice": 0,
+      "listDate": 0,
+      "address": 0,
+      "address.city": 0,
+      "address.state": 0,
+      "address.zip": 0,
+      "map.latitude": 0,
+      "map.longitude": 0,
+      "permissions.displayAddressOnInternet": 0,
+      "permissions.displayPublic": 0,
+      "permissions.displayInternetEntireListing": 0,
+      "details": 0,
+      "details.propertyType": 0,
+      "details.description": 0,
+      "details.yearBuilt": 2,
+      "details.sqft": 2,
+      "details.numBedrooms": 4,
+      "details.numBathrooms": 3,
+      "images": 0,
+      "photoCount": 0,
+      "daysOnMarket": 43,
+      "simpleDaysOnMarket": 0
+    },
+    "examples": {
+      "mlsNumber": [],
+      "class": [],
+      "type": [],
+      "status": [],
+      "listPrice": [],
+      "listDate": [],
+      "address": [],
+      "address.city": [],
+      "address.state": [],
+      "address.zip": [],
+      "map.latitude": [],
+      "map.longitude": [],
+      "permissions.displayAddressOnInternet": [],
+      "permissions.displayPublic": [],
+      "permissions.displayInternetEntireListing": [],
+      "details": [],
+      "details.propertyType": [],
+      "details.description": [],
+      "details.yearBuilt": [
+        "ACT5918640",
+        "ACT4184277"
+      ],
+      "details.sqft": [
+        "ACT5918640",
+        "ACT4184277"
+      ],
+      "details.numBedrooms": [
+        "ACT3249929",
+        "ACT3646775",
+        "ACT5918640"
+      ],
+      "details.numBathrooms": [
+        "ACT3249929",
+        "ACT5918640",
+        "ACT4184277"
+      ],
+      "images": [],
+      "photoCount": [],
+      "daysOnMarket": [
+        "ACT2375285",
+        "ACT8993938",
+        "ACT1308187"
+      ],
+      "simpleDaysOnMarket": []
+    }
+  },
+  "categoryPresence": {
+    "Basic Info": 100,
+    "Pricing": 100,
+    "Status/Lifecycle": 100,
+    "Location": 100,
+    "Permissions": 100,
+    "Details": 100,
+    "Financial": 100,
+    "Features": 76,
+    "Media": 100,
+    "DOM": 100,
+    "Class-specific": 58
+  },
+  "typeShapeIssues": [],
+  "samples": {
+    "exampleListings": [
+      {
+        "mlsNumber": "ACT2375285",
+        "class": "CondoProperty",
+        "type": "Lease",
+        "status": "A",
+        "rawPreview": {
+          "mlsNumber": "ACT2375285",
+          "resource": "Property:4001",
+          "status": "A",
+          "class": "CondoProperty",
+          "type": "Lease",
+          "listPrice": 1308,
+          "listDate": "2026-01-13T00:00:00.000-00:00",
+          "lastStatus": "New",
+          "soldPrice": null,
+          "soldDate": null,
+          "originalPrice": 1308,
+          "assignment": null,
+          "address": {
+            "area": "Travis",
+            "city": "Austin",
+            "country": "US",
+            "district": null,
+            "majorIntersection": null,
+            "neighborhood": "Chevy Chase South Ph 04 Sec B",
+            "streetDirection": null,
+            "streetName": "Cromwell",
+            "streetNumber": "2430",
+            "streetSuffix": "CIR"
+          },
+          "map": {
+            "latitude": 30.2269999,
+            "longitude": -97.72090029,
+            "point": "POINT (-97.72090029 30.2269999)"
+          },
+          "permissions": {
+            "displayAddressOnInternet": "Y",
+            "displayPublic": "Y",
+            "displayInternetEntireListing": "Y"
+          },
+          "images": "[Array(21)]",
+          "photoCount": 21,
+          "details": {
+            "airConditioning": "Central Air, ENERGY STAR Qualified Equipment",
+            "basement1": null,
+            "basement2": null,
+            "centralVac": null,
+            "den": null,
+            "description": "Lexington Hills | Austin Texas Apartments\n \nWelcome home to Lexington Hills Apartments, located in South Austin, Texas! Our community offers exceptional one and two bedroom apartments, where you'll be sure to find spacious living areas, a fully-equipped kitchen, walk-in closets, and a patio/balcony, all included to create the ideal space for both relaxing and entertaining!\n\nEnjoy a variety of exceptional outdoor amenities, including a swimming pool, picnic area with BBQ grills, 24-hour fitness center, coffee/tea bar, and a business center. For your convenience, we also offer an on-site laundry facility as well as on-site management and maintenance teams. Be sure to find the floorplan that is right for you by taking a walkthrough video tour today, or contact our friendly leasing staff and schedule a personal tour!\n\nOffice Hours:\nMon: 8:30am - 5:30pm\nTue: 8:30am - 5:30pm\nWed: 9:30am - 5:30pm\nThur to Fri: 8:30am to 5:30pm\nSat to Sun: Closed",
+            "elevator": null,
+            "exteriorConstruction1": null,
+            "exteriorConstruction2": null,
+            "extras": "Cooktop, Dishwasher, Disposal, Refrigerator"
+          },
+          "daysOnMarket": null,
+          "occupancy": "Vacant",
+          "updatedOn": "2026-01-13T08:38:09.000-00:00",
+          "condominium": {
+            "buildingInsurance": null,
+            "condoCorp": null,
+            "condoCorpNum": null,
+            "exposure": null,
+            "lockerNumber": null,
+            "locker": null,
+            "parkingType": "See Remarks",
+            "pets": "Cats OK, Dogs OK",
+            "propertyMgr": null,
+            "stories": null
+          },
+          "coopCompensation": null,
+          "lot": {
+            "acres": null,
+            "depth": null,
+            "irregular": null,
+            "legalDescription": "LOT 1 BLK A CHEVY CHASE SOUTH PHS 4 SEC B",
+            "measurement": null,
+            "width": null,
+            "size": null,
+            "source": null,
+            "dimensionsSource": null,
+            "dimensions": null
+          },
+          "nearby": {
+            "amenities": "[Array(6)]"
+          },
+          "office": {
+            "brokerageName": "KX Realty PLLC"
+          },
+          "openHouse": "[Array(0)]",
+          "rooms": "[Array(0)]",
+          "taxes": {
+            "annualAmount": null,
+            "assessmentYear": null
+          },
+          "timestamps": {
+            "idxUpdated": "2026-01-13T08:38:09.000-00:00",
+            "listingUpdated": "2026-01-13T08:38:09.000-00:00",
+            "photosUpdated": "2026-01-13T08:38:09.000-00:00",
+            "conditionalExpiryDate": null,
+            "terminatedDate": null,
+            "suspendedDate": null,
+            "listingEntryDate": "2026-01-13T08:36:58.000-00:00",
+            "closedDate": null,
+            "unavailableDate": null,
+            "expiryDate": null
+          },
+          "agents": "[Array(1)]",
+          "imageInsights": {
+            "summary": {
+              "quality": {
+                "qualitative": {
+                  "features": {
+                    "bedroom": "average",
+                    "bathroom": "average"
+                  },
+                  "overall": "average"
+                },
+                "quantitative": {
+                  "features": {
+                    "bedroom": 3.3481893539,
+                    "bathroom": 3.433842659
+                  },
+                  "overall": 3.2327992916
+                }
+              }
+            },
+            "images": "[Array(7)]"
+          },
+          "boardId": 53,
+          "simpleDaysOnMarket": 1,
+          "standardStatus": "Active"
+        }
+      },
+      {
+        "mlsNumber": "ACT8993938",
+        "class": "CondoProperty",
+        "type": "Lease",
+        "status": "A",
+        "rawPreview": {
+          "mlsNumber": "ACT8993938",
+          "resource": "Property:4001",
+          "status": "A",
+          "class": "CondoProperty",
+          "type": "Lease",
+          "listPrice": 965,
+          "listDate": "2026-01-13T00:00:00.000-00:00",
+          "lastStatus": "New",
+          "soldPrice": null,
+          "soldDate": null,
+          "originalPrice": 965,
+          "assignment": null,
+          "address": {
+            "area": "Travis",
+            "city": "Austin",
+            "country": "US",
+            "district": null,
+            "majorIntersection": null,
+            "neighborhood": "Chevy Chase South Ph 04 Sec B",
+            "streetDirection": null,
+            "streetName": "Cromwell",
+            "streetNumber": "2430",
+            "streetSuffix": "CIR"
+          },
+          "map": {
+            "latitude": 30.22712041,
+            "longitude": -97.72093247,
+            "point": "POINT (-97.72093247 30.22712041)"
+          },
+          "permissions": {
+            "displayAddressOnInternet": "Y",
+            "displayPublic": "Y",
+            "displayInternetEntireListing": "Y"
+          },
+          "images": "[Array(19)]",
+          "photoCount": 19,
+          "details": {
+            "airConditioning": "Central Air, ENERGY STAR Qualified Equipment",
+            "basement1": null,
+            "basement2": null,
+            "centralVac": null,
+            "den": null,
+            "description": "Lexington Hills | Austin Texas Apartments\n \nWelcome home to Lexington Hills Apartments, located in South Austin, Texas! Our community offers exceptional one and two bedroom apartments, where you'll be sure to find spacious living areas, a fully-equipped kitchen, walk-in closets, and a patio/balcony, all included to create the ideal space for both relaxing and entertaining!\n\nEnjoy a variety of exceptional outdoor amenities, including a swimming pool, picnic area with BBQ grills, 24-hour fitness center, coffee/tea bar, and a business center. For your convenience, we also offer an on-site laundry facility as well as on-site management and maintenance teams. Be sure to find the floorplan that is right for you by taking a walkthrough video tour today, or contact our friendly leasing staff and schedule a personal tour!\n\nOffice Hours:\nMon: 8:30am - 5:30pm\nTue: 8:30am - 5:30pm\nWed: 9:30am - 5:30pm\nThur to Fri: 8:30am to 5:30pm\nSat to Sun: Closed",
+            "elevator": null,
+            "exteriorConstruction1": null,
+            "exteriorConstruction2": null,
+            "extras": "Cooktop, Dishwasher, Disposal, Refrigerator"
+          },
+          "daysOnMarket": null,
+          "occupancy": "Vacant",
+          "updatedOn": "2026-01-13T08:02:09.000-00:00",
+          "condominium": {
+            "buildingInsurance": null,
+            "condoCorp": null,
+            "condoCorpNum": null,
+            "exposure": null,
+            "lockerNumber": null,
+            "locker": null,
+            "parkingType": "See Remarks",
+            "pets": "Cats OK, Dogs OK",
+            "propertyMgr": null,
+            "stories": null
+          },
+          "coopCompensation": null,
+          "lot": {
+            "acres": null,
+            "depth": null,
+            "irregular": null,
+            "legalDescription": "LOT 1 BLK A CHEVY CHASE SOUTH PHS 4 SEC B",
+            "measurement": null,
+            "width": null,
+            "size": null,
+            "source": null,
+            "dimensionsSource": null,
+            "dimensions": null
+          },
+          "nearby": {
+            "amenities": "[Array(6)]"
+          },
+          "office": {
+            "brokerageName": "KX Realty PLLC"
+          },
+          "openHouse": "[Array(0)]",
+          "rooms": "[Array(0)]",
+          "taxes": {
+            "annualAmount": null,
+            "assessmentYear": null
+          },
+          "timestamps": {
+            "idxUpdated": "2026-01-13T08:02:09.000-00:00",
+            "listingUpdated": "2026-01-13T08:02:09.000-00:00",
+            "photosUpdated": "2026-01-13T08:02:09.000-00:00",
+            "conditionalExpiryDate": null,
+            "terminatedDate": null,
+            "suspendedDate": null,
+            "listingEntryDate": "2026-01-13T08:00:50.000-00:00",
+            "closedDate": null,
+            "unavailableDate": null,
+            "expiryDate": null
+          },
+          "agents": "[Array(1)]",
+          "imageInsights": {
+            "summary": {
+              "quality": {
+                "qualitative": {
+                  "features": {
+                    "bathroom": "average"
+                  },
+                  "overall": "average"
+                },
+                "quantitative": {
+                  "features": {
+                    "bathroom": 3.5105950832
+                  },
+                  "overall": 3.4851170778
+                }
+              }
+            },
+            "images": "[Array(4)]"
+          },
+          "boardId": 53,
+          "simpleDaysOnMarket": 1,
+          "standardStatus": "Active"
+        }
+      },
+      {
+        "mlsNumber": "ACT1308187",
+        "class": "CondoProperty",
+        "type": "Sale",
+        "status": "A",
+        "rawPreview": {
+          "mlsNumber": "ACT1308187",
+          "resource": "Property:4001",
+          "status": "A",
+          "class": "CondoProperty",
+          "type": "Sale",
+          "listPrice": 520000,
+          "listDate": "2026-01-13T00:00:00.000-00:00",
+          "lastStatus": "New",
+          "soldPrice": null,
+          "soldDate": null,
+          "originalPrice": 520000,
+          "assignment": null,
+          "address": {
+            "area": "Travis",
+            "city": "Austin",
+            "country": "US",
+            "district": null,
+            "majorIntersection": null,
+            "neighborhood": "Summer Wood Phs 02 Sec 01",
+            "streetDirection": null,
+            "streetName": "Summer Side",
+            "streetNumber": "8216",
+            "streetSuffix": "DR"
+          },
+          "map": {
+            "latitude": 30.3709175,
+            "longitude": -97.74592313,
+            "point": "POINT (-97.74592313 30.3709175)"
+          },
+          "permissions": {
+            "displayAddressOnInternet": "Y",
+            "displayPublic": "Y",
+            "displayInternetEntireListing": "Y"
+          },
+          "images": "[Array(32)]",
+          "photoCount": 32,
+          "details": {
+            "airConditioning": "Ceiling Fan(s), Central Air, Dual, Electric",
+            "basement1": null,
+            "basement2": null,
+            "centralVac": null,
+            "den": null,
+            "description": "This comfortable, tranquil townhouse is “Inside the Loop” in North Hills 78759, right at Mopac & Steck . It’s 1,675 SqFt with 2 Bedrooms, 2 Bathrooms, large flex room upstairs and 2-car garage. Downstairs is the generous family room (approximately 16’3” x 13’11”) with sliding door to outdoor patio, a separate wet bar area with sink, the 2-story vaulted ceiling, large picture windows and a woodburning fireplace. The primary bedroom with ensuite bathroom is on the main floor and is approximately 15’11” x 11’6”.  The second bedroom (approximately 11’6” x 11’3”) and bathroom are upstairs with the spacious, versatile flex space (approximately 19’7” x 11’11”) and is perfect for an office(or two!), exercise/gym area, crafting, entertainment/media room or whatever you dream. This unit and its outdoor patio back to a scenic wooded lush green space with your own gate to access the walking trail to the community swimming pool and club house. The HOA mows the front lawn and trims the hedges along the driveway. New roof in 2022. New sliding door to patio and new carpet downstairs. The townhouse has been pre-inspected and over $7,500 in updates and repairs were made to the HVAC system, electrical, plumbing, etc. A rare find in this condition in this location, just a few minutes from downtown Austin, the Domain, restaurants, shopping, and entertainment. If you’ve been looking for a serene sanctuary to retreat to after a busy day, or to work in from home, with great neighborhood amenities and all the benefits of being close in to the best times in Austin, be sure to check it out!",
+            "elevator": null,
+            "exteriorConstruction1": "Brick",
+            "exteriorConstruction2": null,
+            "extras": "Dishwasher, Disposal, Electric Range, Microwave"
+          },
+          "daysOnMarket": null,
+          "occupancy": "Vacant",
+          "updatedOn": "2026-01-13T06:17:09.000-00:00",
+          "condominium": {
+            "buildingInsurance": null,
+            "condoCorp": "Summerwood II HOA 651-233-1307",
+            "condoCorpNum": null,
+            "exposure": null,
+            "lockerNumber": null,
+            "locker": null,
+            "parkingType": "Attached, Door-Single, Driveway, Garage, Garage Door Opener, Garage Faces Front, Inside Entrance, Kitchen Level, Lighted, Off Street",
+            "pets": null,
+            "propertyMgr": null,
+            "stories": null
+          },
+          "coopCompensation": null,
+          "lot": {
+            "acres": 0.0757,
+            "depth": null,
+            "irregular": null,
+            "legalDescription": "LOT 3 BLK G SUMMER WOOD PHS 2 SEC 1",
+            "measurement": null,
+            "width": null,
+            "size": "3297.49",
+            "source": null,
+            "dimensionsSource": null,
+            "dimensions": "28 x 116"
+          },
+          "nearby": {
+            "amenities": "[Array(6)]"
+          },
+          "office": {
+            "brokerageName": "Pure Realty"
+          },
+          "openHouse": "[Array(0)]",
+          "rooms": "[Array(4)]",
+          "taxes": {
+            "annualAmount": 8606.15,
+            "assessmentYear": "2025"
+          },
+          "timestamps": {
+            "idxUpdated": "2026-01-13T06:17:09.000-00:00",
+            "listingUpdated": "2026-01-13T06:17:09.000-00:00",
+            "photosUpdated": "2026-01-13T06:17:09.000-00:00",
+            "conditionalExpiryDate": null,
+            "terminatedDate": null,
+            "suspendedDate": null,
+            "listingEntryDate": "2026-01-13T06:15:21.000-00:00",
+            "closedDate": null,
+            "unavailableDate": null,
+            "expiryDate": null
+          },
+          "agents": "[Array(1)]",
+          "imageInsights": {
+            "summary": {
+              "quality": {
+                "qualitative": {
+                  "features": {
+                    "kitchen": "average",
+                    "bedroom": "average",
+                    "bathroom": "average"
+                  },
+                  "overall": "average"
+                },
+                "quantitative": {
+                  "features": {
+                    "kitchen": 3.3300428391,
+                    "bedroom": 3.2817540169,
+                    "bathroom": 3.8955228329
+                  },
+                  "overall": 3.2143068314
+                }
+              }
+            },
+            "images": "[Array(10)]"
+          },
+          "boardId": 53,
+          "simpleDaysOnMarket": 1,
+          "standardStatus": "Active"
+        }
+      },
+      {
+        "mlsNumber": "ACT8556190",
+        "class": "CondoProperty",
+        "type": "Lease",
+        "status": "A",
+        "rawPreview": {
+          "mlsNumber": "ACT8556190",
+          "resource": "Property:4001",
+          "status": "A",
+          "class": "CondoProperty",
+          "type": "Lease",
+          "listPrice": 999,
+          "listDate": "2026-01-13T00:00:00.000-00:00",
+          "lastStatus": "New",
+          "soldPrice": null,
+          "soldDate": null,
+          "originalPrice": 999,
+          "assignment": null,
+          "address": {
+            "area": "Travis",
+            "city": "Austin",
+            "country": "US",
+            "district": null,
+            "majorIntersection": null,
+            "neighborhood": "Austin South Point Village Residence",
+            "streetDirection": null,
+            "streetName": "S I-35 Frontage",
+            "streetNumber": "6808",
+            "streetSuffix": "RD"
+          },
+          "map": {
+            "latitude": 30.18854131,
+            "longitude": -97.77422955,
+            "point": "POINT (-97.77422955 30.18854131)"
+          },
+          "permissions": {
+            "displayAddressOnInternet": "Y",
+            "displayPublic": "Y",
+            "displayInternetEntireListing": "Y"
+          },
+          "images": "[Array(21)]",
+          "photoCount": 21,
+          "details": {
+            "airConditioning": "See Remarks, Central Air, ENERGY STAR Qualified Equipment",
+            "basement1": null,
+            "basement2": null,
+            "centralVac": null,
+            "den": null,
+            "description": "\"Special Concession\":Sign before Jan 31st to receive 1 month FREE on all vacant units!\n\nBridge at South Point | Austin Texas Apartments\n \nCome visit Bridge at South Point Apartments in South Austin and find your new home today! Bridge at South Point Apartments offers inviting studio, one, and two bedroom apartments. No matter which floorplan you choose, you’ll find spacious living areas, wood plank flooring, walk-in closets, a fully-equipped kitchen with granite-inspired countertops and espresso-colored cabinets, and a private patio or balcony, creating the ideal space for both relaxing and entertaining. Select units also offer a cozy fireplace, tile backsplash, and stainless steel appliances!\n\nBridge at South Point Apartments offers many amenities for our residents to take advantage of. Enjoy our swimming pool with a sundeck where you can kick back and relax! Our welcoming clubhouse features a business center. For your convenience, we also offer a picnic area with BBQ grills, on-site laundry facility, on-site management and patrol service teams, and complimentary Wi-Fi in all common areas. Take a walkthrough video tour now, or contact our friendly leasing staff to set up an appointment for a personal tour of your new home. We look forward to seeing you at Bridge at South Point Apartments!\n\nOffice Hours:\nMonday to Friday: 8:30am to 5:30pm\nSaturday: 10:00am to 5:00pm\nSunday: Closed",
+            "elevator": null,
+            "exteriorConstruction1": null,
+            "exteriorConstruction2": null,
+            "extras": "Cooktop, Dishwasher, Disposal, ENERGY STAR Qualified Appliances, Refrigerator"
+          },
+          "daysOnMarket": null,
+          "occupancy": "Vacant",
+          "updatedOn": "2026-01-13T07:23:09.000-00:00",
+          "condominium": {
+            "buildingInsurance": null,
+            "condoCorp": null,
+            "condoCorpNum": null,
+            "exposure": null,
+            "lockerNumber": null,
+            "locker": null,
+            "parkingType": "See Remarks",
+            "pets": "Cats OK",
+            "propertyMgr": null,
+            "stories": null
+          },
+          "coopCompensation": null,
+          "lot": {
+            "acres": null,
+            "depth": null,
+            "irregular": null,
+            "legalDescription": "LOT 1A AUSTIN SOUTH POINT VILLAGE RESUB OF LOT 1 BLK A",
+            "measurement": null,
+            "width": null,
+            "size": null,
+            "source": null,
+            "dimensionsSource": null,
+            "dimensions": null
+          },
+          "nearby": {
+            "amenities": "[Array(6)]"
+          },
+          "office": {
+            "brokerageName": "KX Realty PLLC"
+          },
+          "openHouse": "[Array(0)]",
+          "rooms": "[Array(0)]",
+          "taxes": {
+            "annualAmount": null,
+            "assessmentYear": null
+          },
+          "timestamps": {
+            "idxUpdated": "2026-01-13T07:23:09.000-00:00",
+            "listingUpdated": "2026-01-13T07:23:09.000-00:00",
+            "photosUpdated": "2026-01-13T07:23:09.000-00:00",
+            "conditionalExpiryDate": null,
+            "terminatedDate": null,
+            "suspendedDate": null,
+            "listingEntryDate": "2026-01-13T07:21:55.000-00:00",
+            "closedDate": null,
+            "unavailableDate": null,
+            "expiryDate": null
+          },
+          "agents": "[Array(1)]",
+          "imageInsights": {
+            "summary": {
+              "quality": {
+                "qualitative": {
+                  "features": {
+                    "kitchen": "average",
+                    "bedroom": "average",
+                    "bathroom": "average"
+                  },
+                  "overall": "average"
+                },
+                "quantitative": {
+                  "features": {
+                    "kitchen": 3.8193337917,
+                    "bedroom": 3.4737920761,
+                    "bathroom": 3.5909569263
+                  },
+                  "overall": 3.36214101315
+                }
+              }
+            },
+            "images": "[Array(11)]"
+          },
+          "boardId": 53,
+          "simpleDaysOnMarket": 1,
+          "standardStatus": "Active"
+        }
+      },
+      {
+        "mlsNumber": "ACT3121477",
+        "class": "CondoProperty",
+        "type": "Sale",
+        "status": "A",
+        "rawPreview": {
+          "mlsNumber": "ACT3121477",
+          "resource": "Property:4001",
+          "status": "A",
+          "class": "CondoProperty",
+          "type": "Sale",
+          "listPrice": 295000,
+          "listDate": "2026-01-13T00:00:00.000-00:00",
+          "lastStatus": "New",
+          "soldPrice": null,
+          "soldDate": null,
+          "originalPrice": 295000,
+          "assignment": null,
+          "address": {
+            "area": "Bastrop",
+            "city": "Elgin",
+            "country": "US",
+            "district": null,
+            "majorIntersection": null,
+            "neighborhood": "Saratoga Farms Sub Sec",
+            "streetDirection": null,
+            "streetName": "Schuylerville",
+            "streetNumber": "117",
+            "streetSuffix": "DR"
+          },
+          "map": {
+            "latitude": 30.34640831,
+            "longitude": -97.39343213,
+            "point": "POINT (-97.39343213 30.34640831)"
+          },
+          "permissions": {
+            "displayAddressOnInternet": "Y",
+            "displayPublic": "Y",
+            "displayInternetEntireListing": "Y"
+          },
+          "images": "[Array(34)]",
+          "photoCount": 34,
+          "details": {
+            "airConditioning": "Central Air",
+            "basement1": null,
+            "basement2": null,
+            "centralVac": null,
+            "den": null,
+            "description": ".",
+            "elevator": null,
+            "exteriorConstruction1": "Brick Veneer, Frame",
+            "exteriorConstruction2": null,
+            "extras": "Dishwasher, Disposal, Free-Standing Electric Range, Refrigerator"
+          },
+          "daysOnMarket": null,
+          "occupancy": "Owner",
+          "updatedOn": "2026-01-13T14:46:10.000-00:00",
+          "condominium": {
+            "buildingInsurance": null,
+            "condoCorp": "Saratoga Farms Residential Community, Inc.",
+            "condoCorpNum": null,
+            "exposure": null,
+            "lockerNumber": null,
+            "locker": null,
+            "parkingType": "Garage",
+            "pets": null,
+            "propertyMgr": null,
+            "stories": null
+          },
+          "coopCompensation": null,
+          "lot": {
+            "acres": 0.154,
+            "depth": null,
+            "irregular": null,
+            "legalDescription": "SARATOGA FARMS SUBDIVISION SECTION FIVE, BLOCK B, LOT 9, ACRES 0.1540",
+            "measurement": null,
+            "width": null,
+            "size": "6708.24",
+            "source": null,
+            "dimensionsSource": null,
+            "dimensions": null
+          },
+          "nearby": {
+            "amenities": "[Array(1)]"
+          },
+          "office": {
+            "brokerageName": "Coldwell Banker Realty"
+          },
+          "openHouse": "[Array(0)]",
+          "rooms": "[Array(0)]",
+          "taxes": {
+            "annualAmount": 6367.33,
+            "assessmentYear": "2025"
+          },
+          "timestamps": {
+            "idxUpdated": "2026-01-13T14:46:10.000-00:00",
+            "listingUpdated": "2026-01-13T14:46:10.000-00:00",
+            "photosUpdated": "2026-01-13T13:29:10.000-00:00",
+            "conditionalExpiryDate": null,
+            "terminatedDate": null,
+            "suspendedDate": null,
+            "listingEntryDate": "2026-01-13T13:27:57.000-00:00",
+            "closedDate": null,
+            "unavailableDate": null,
+            "expiryDate": null
+          },
+          "agents": "[Array(1)]",
+          "imageInsights": {
+            "summary": {
+              "quality": {
+                "qualitative": {
+                  "features": {
+                    "livingRoom": "below average",
+                    "kitchen": "average",
+                    "bedroom": "above average",
+                    "bathroom": "below average"
+                  },
+                  "overall": "average"
+                },
+                "quantitative": {
+                  "features": {
+                    "livingRoom": 2.5998778343,
+                    "kitchen": 3.7397696972,
+                    "bedroom": 4.1448373795,
+                    "bathroom": 2.8022646904
+                  },
+                  "overall": 3.2710171937999997
+                }
+              }
+            },
+            "images": "[Array(16)]"
+          },
+          "boardId": 53,
+          "simpleDaysOnMarket": 1,
+          "standardStatus": "Active"
+        }
+      }
+    ]
+  }
+}
