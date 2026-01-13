@@ -85,6 +85,20 @@ Print flyers use HTML/CSS + Puppeteer for server-side rendering (replaced canvas
 - **Puppeteer Config**: Runs with --no-sandbox, --disable-setuid-sandbox for Replit compatibility
 - **Social flyers** still use client-side canvas rendering for speed
 - **Preview Rendering**: "Render Preview" button triggers server-side Puppeteer preview identical to download
+- **Template Version**: v2.2.0 with baseline alignment and sizing updates
+
+#### Print Flyer Layout Specifications (January 2026)
+Bottom strip layout with PSD-matching baseline alignment:
+- **Three Column Grid**: Stats (520px) | Copy (flexible) | Agent (480px)
+- **Baseline Alignment**: All three columns use `justify-content: flex-end` to align bottom content:
+  - Stats column: sqft row at bottom
+  - Copy column: description at bottom
+  - Agent column: phone number at bottom
+- **Sqft/Phone Alignment**: Sqft baseline aligns horizontally with agent phone baseline
+- **Agent Photo**: 220px diameter with 5px warm gray stroke (#d4c5a9)
+- **Spyglass Logo**: 130px beside agent photo
+- **Stat Icons**: 56px PNG icons (bedroom, bathroom, sqft) loaded as base64 data URIs
+- **Y-axis Dividers Only**: Vertical dividers match content height, no horizontal rules
 
 #### Print Flyer Agent Information (January 2026)
 Professional agent branding for print flyers with validated required fields:
@@ -109,7 +123,7 @@ Settings page includes dedicated "Agent Marketing Profile" section:
 
 #### AI Description Summarization (January 2026)
 AI-powered summarization for property descriptions in both flyer formats:
-- **Dual Format Support**: Available for Social Media (200 chars) and Print Flyer (115 chars)
+- **Dual Format Support**: Available for Social Media (200 chars) and Print Flyer (150 chars)
 - **Single Source of Truth**: Character limits centralized in `DESCRIPTION_LIMITS` constant
 - **Original Source**: Always summarizes from the original MLS description, not edited text
 - **Re-runnable**: Click "AI Summarize" again for a different variation
