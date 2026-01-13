@@ -593,7 +593,6 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           <TabsList className="inline-flex w-auto min-w-full sm:w-auto">
             <TabsTrigger value="overview" className="text-xs sm:text-sm" data-testid="tab-overview">Overview</TabsTrigger>
             <TabsTrigger value="mls" className="text-xs sm:text-sm" data-testid="tab-mls">MLS Data</TabsTrigger>
-            <TabsTrigger value="cma" className="text-xs sm:text-sm" data-testid="tab-cma">CMA</TabsTrigger>
             <TabsTrigger value="documents" className="text-xs sm:text-sm" data-testid="tab-documents">
               Docs
               {documents.length > 0 && (
@@ -606,8 +605,9 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 <Badge variant="secondary" className="ml-1 sm:ml-2 text-[10px] sm:text-xs">{marketingAssets.length}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="timeline" className="text-xs sm:text-sm" data-testid="tab-timeline">Timeline</TabsTrigger>
+            <TabsTrigger value="cma" className="text-xs sm:text-sm" data-testid="tab-cma">CMA</TabsTrigger>
             <TabsTrigger value="templates" className="text-xs sm:text-sm" data-testid="tab-templates">Templates</TabsTrigger>
+            <TabsTrigger value="timeline" className="text-xs sm:text-sm" data-testid="tab-timeline">Timeline</TabsTrigger>
           </TabsList>
         </div>
 
