@@ -2946,69 +2946,76 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         const cmaPhotos = selectedCMAProperty.photos || (selectedCMAProperty.imageUrl ? [selectedCMAProperty.imageUrl] : []);
         return (
           <Dialog open={cmaFullscreenOpen} onOpenChange={setCmaFullscreenOpen}>
-            <DialogContent className="max-w-5xl h-[90vh] p-0 bg-black/95 [&>button]:bg-white/10 [&>button]:text-white [&>button]:hover:bg-white/20 [&>button]:rounded-full [&>button]:opacity-100 [&>button]:p-2 [&>button]:hover:opacity-100" data-testid="dialog-cma-fullscreen">
+            <DialogContent 
+              className="w-[98vw] sm:max-w-[95vw] h-[95vh] sm:max-h-[95vh] p-0 bg-black/95 border-none [&>button]:bg-white/10 [&>button]:text-white [&>button]:hover:bg-white/20 [&>button]:active:bg-white/30 [&>button]:rounded-full [&>button]:opacity-100 [&>button]:p-1.5 sm:[&>button]:p-2 [&>button]:hover:opacity-100" 
+              data-testid="dialog-cma-fullscreen"
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowLeft') {
+                  setCmaPhotoIndex((prev) => (prev - 1 + cmaPhotos.length) % cmaPhotos.length);
+                } else if (e.key === 'ArrowRight') {
+                  setCmaPhotoIndex((prev) => (prev + 1) % cmaPhotos.length);
+                }
+              }}
+            >
               <VisuallyHidden>
                 <DialogTitle>CMA Photo Gallery</DialogTitle>
               </VisuallyHidden>
-              <div className="relative w-full h-full flex flex-col">
-                {/* Header */}
-                <div className="flex items-center justify-between p-4 text-white">
-                  <div>
-                    <h3 className="font-medium">{selectedCMAProperty.address}</h3>
-                    <p className="text-sm text-white/70">{cmaPhotoIndex + 1} of {cmaPhotos.length} photos</p>
+              <div className="relative w-full h-full flex items-center justify-center min-h-[70vh] sm:min-h-[80vh]">
+                {/* Header with Photo Counter */}
+                <div className="absolute top-2 sm:top-4 left-2 sm:left-4 z-10">
+                  <div className="px-3 sm:px-4 py-1.5 sm:py-2 bg-black/60 text-white rounded-full text-xs sm:text-sm">
+                    {cmaPhotoIndex + 1} of {cmaPhotos.length}
                   </div>
+                  <h3 className="font-medium text-white text-sm mt-1 px-1 max-w-[200px] truncate">{selectedCMAProperty.address}</h3>
                 </div>
                 
-                {/* Main image */}
-                <div className="flex-1 relative flex items-center justify-center px-16">
-                  <img
-                    src={`/api/proxy-image?url=${encodeURIComponent(cmaPhotos[cmaPhotoIndex])}`}
-                    alt={`Photo ${cmaPhotoIndex + 1}`}
-                    className="max-w-full max-h-full object-contain"
-                  />
-                  {cmaPhotos.length > 1 && (
-                    <>
-                      <Button
-                        size="icon"
-                        variant="secondary"
-                        className="absolute left-4 top-1/2 -translate-y-1/2 h-10 w-10 bg-white/10 hover:bg-white/20 text-white"
-                        onClick={() => setCmaPhotoIndex((prev) => (prev - 1 + cmaPhotos.length) % cmaPhotos.length)}
-                        data-testid="cma-fullscreen-prev"
-                      >
-                        <ChevronLeft className="h-6 w-6" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="secondary"
-                        className="absolute right-4 top-1/2 -translate-y-1/2 h-10 w-10 bg-white/10 hover:bg-white/20 text-white"
-                        onClick={() => setCmaPhotoIndex((prev) => (prev + 1) % cmaPhotos.length)}
-                        data-testid="cma-fullscreen-next"
-                      >
-                        <ChevronRight className="h-6 w-6" />
-                      </Button>
-                    </>
-                  )}
-                </div>
+                {/* Main Image */}
+                <img
+                  src={`/api/proxy-image?url=${encodeURIComponent(cmaPhotos[cmaPhotoIndex])}`}
+                  alt={`Photo ${cmaPhotoIndex + 1}`}
+                  className="max-w-full max-h-[65vh] sm:max-h-[80vh] object-contain touch-manipulation"
+                  data-testid="img-cma-fullscreen-photo"
+                />
                 
-                {/* Thumbnail strip */}
-                <div className="p-4 overflow-x-auto">
-                  <div className="flex gap-2 justify-center">
-                    {cmaPhotos.map((photo, idx) => (
-                      <div
-                        key={idx}
-                        className={`w-16 h-12 rounded overflow-hidden cursor-pointer flex-shrink-0 transition-all ${
-                          cmaPhotoIndex === idx ? 'ring-2 ring-primary scale-105' : 'opacity-60 hover:opacity-100'
-                        }`}
-                        onClick={() => setCmaPhotoIndex(idx)}
-                      >
-                        <img
-                          src={`/api/proxy-image?url=${encodeURIComponent(photo)}`}
-                          alt={`Thumbnail ${idx + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ))}
-                  </div>
+                {/* Navigation Arrows */}
+                {cmaPhotos.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setCmaPhotoIndex((prev) => (prev - 1 + cmaPhotos.length) % cmaPhotos.length)}
+                      className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-2 sm:p-3 bg-black/50 hover:bg-black/70 active:bg-black/80 rounded-full text-white transition-colors touch-manipulation z-40"
+                      data-testid="button-cma-photo-prev"
+                    >
+                      <ChevronLeft className="h-6 w-6 sm:h-8 sm:w-8" />
+                    </button>
+                    <button
+                      onClick={() => setCmaPhotoIndex((prev) => (prev + 1) % cmaPhotos.length)}
+                      className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-2 sm:p-3 bg-black/50 hover:bg-black/70 active:bg-black/80 rounded-full text-white transition-colors touch-manipulation z-40"
+                      data-testid="button-cma-photo-next"
+                    >
+                      <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
+                    </button>
+                  </>
+                )}
+                
+                {/* Thumbnail Strip at Bottom */}
+                <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 sm:gap-2 p-1.5 sm:p-2 bg-black/50 rounded-lg max-w-[95vw] sm:max-w-[90vw] overflow-x-auto scrollbar-hide">
+                  {cmaPhotos.map((photo, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setCmaPhotoIndex(idx)}
+                      className={`flex-shrink-0 w-12 h-9 sm:w-16 sm:h-12 rounded overflow-hidden border-2 transition-all touch-manipulation ${
+                        idx === cmaPhotoIndex ? 'border-white ring-1 ring-white' : 'border-transparent opacity-60 hover:opacity-100 active:opacity-100'
+                      }`}
+                      data-testid={`button-cma-thumbnail-${idx}`}
+                    >
+                      <img
+                        src={`/api/proxy-image?url=${encodeURIComponent(photo)}`}
+                        alt={`Thumbnail ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    </button>
+                  ))}
                 </div>
               </div>
             </DialogContent>
@@ -3019,7 +3026,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
       {/* Overview Property Photo Gallery Modal */}
       <Dialog open={overviewPhotoModalOpen} onOpenChange={setOverviewPhotoModalOpen}>
         <DialogContent 
-          className="max-w-5xl h-[90vh] p-0 bg-black/95 [&>button]:bg-white/10 [&>button]:text-white [&>button]:hover:bg-white/20 [&>button]:rounded-full [&>button]:opacity-100 [&>button]:p-2 [&>button]:hover:opacity-100" 
+          className="w-[98vw] sm:max-w-[95vw] h-[95vh] sm:max-h-[95vh] p-0 bg-black/95 border-none [&>button]:bg-white/10 [&>button]:text-white [&>button]:hover:bg-white/20 [&>button]:active:bg-white/30 [&>button]:rounded-full [&>button]:opacity-100 [&>button]:p-1.5 sm:[&>button]:p-2 [&>button]:hover:opacity-100" 
           data-testid="dialog-overview-photos"
           onKeyDown={(e) => {
             if (e.key === 'ArrowLeft') {
@@ -3032,74 +3039,64 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           <VisuallyHidden>
             <DialogTitle>Property Photos</DialogTitle>
           </VisuallyHidden>
-          <div className="relative w-full h-full flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 text-white">
-              <div>
-                <h3 className="font-medium">{transaction.propertyAddress}</h3>
-                <p className="text-sm text-white/70">{overviewPhotoIndex + 1} of {overviewPhotos.length} photos</p>
+          <div className="relative w-full h-full flex items-center justify-center min-h-[70vh] sm:min-h-[80vh]">
+            {/* Header with Photo Counter */}
+            <div className="absolute top-2 sm:top-4 left-2 sm:left-4 z-10">
+              <div className="px-3 sm:px-4 py-1.5 sm:py-2 bg-black/60 text-white rounded-full text-xs sm:text-sm">
+                {overviewPhotoIndex + 1} of {overviewPhotos.length}
               </div>
+              <h3 className="font-medium text-white text-sm mt-1 px-1 max-w-[200px] truncate">{transaction.propertyAddress}</h3>
             </div>
             
-            {/* Main image */}
-            <div className="flex-1 relative flex items-center justify-center px-16">
-              {overviewPhotos[overviewPhotoIndex] && (
-                <img
-                  src={`/api/proxy-image?url=${encodeURIComponent(overviewPhotos[overviewPhotoIndex])}`}
-                  alt={`Photo ${overviewPhotoIndex + 1}`}
-                  className="max-w-full max-h-full object-contain"
-                  data-testid="img-fullscreen-photo"
-                />
-              )}
-              {overviewPhotos.length > 1 && (
-                <>
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    className="absolute left-4 top-1/2 -translate-y-1/2 h-10 w-10 bg-white/10 hover:bg-white/20 text-white"
-                    onClick={() => setOverviewPhotoIndex((prev) => (prev - 1 + overviewPhotos.length) % overviewPhotos.length)}
-                    data-testid="button-photo-prev"
-                  >
-                    <ChevronLeft className="h-6 w-6" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    className="absolute right-4 top-1/2 -translate-y-1/2 h-10 w-10 bg-white/10 hover:bg-white/20 text-white"
-                    onClick={() => setOverviewPhotoIndex((prev) => (prev + 1) % overviewPhotos.length)}
-                    data-testid="button-photo-next"
-                  >
-                    <ChevronRight className="h-6 w-6" />
-                  </Button>
-                </>
-              )}
-            </div>
+            {/* Main Image */}
+            {overviewPhotos[overviewPhotoIndex] && (
+              <img
+                src={`/api/proxy-image?url=${encodeURIComponent(overviewPhotos[overviewPhotoIndex])}`}
+                alt={`Photo ${overviewPhotoIndex + 1}`}
+                className="max-w-full max-h-[65vh] sm:max-h-[80vh] object-contain touch-manipulation"
+                data-testid="img-overview-fullscreen-photo"
+              />
+            )}
             
-            {/* Thumbnail strip */}
-            <div className="p-4 overflow-x-auto">
-              <div className="flex gap-2 justify-center">
-                {overviewPhotos.slice(0, 20).map((photo, idx) => (
-                  <div
-                    key={idx}
-                    className={`w-16 h-12 rounded overflow-hidden cursor-pointer flex-shrink-0 transition-all ${
-                      overviewPhotoIndex === idx ? 'ring-2 ring-primary scale-105' : 'opacity-60 hover:opacity-100'
-                    }`}
-                    onClick={() => setOverviewPhotoIndex(idx)}
-                    data-testid={`button-thumbnail-${idx}`}
-                  >
-                    <img
-                      src={`/api/proxy-image?url=${encodeURIComponent(photo)}`}
-                      alt={`Thumbnail ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ))}
-                {overviewPhotos.length > 20 && (
-                  <div className="flex items-center justify-center w-16 h-12 text-white/70 text-xs">
-                    +{overviewPhotos.length - 20}
-                  </div>
-                )}
-              </div>
+            {/* Navigation Arrows */}
+            {overviewPhotos.length > 1 && (
+              <>
+                <button
+                  onClick={() => setOverviewPhotoIndex((prev) => (prev - 1 + overviewPhotos.length) % overviewPhotos.length)}
+                  className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-2 sm:p-3 bg-black/50 hover:bg-black/70 active:bg-black/80 rounded-full text-white transition-colors touch-manipulation z-40"
+                  data-testid="button-overview-photo-prev"
+                >
+                  <ChevronLeft className="h-6 w-6 sm:h-8 sm:w-8" />
+                </button>
+                <button
+                  onClick={() => setOverviewPhotoIndex((prev) => (prev + 1) % overviewPhotos.length)}
+                  className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-2 sm:p-3 bg-black/50 hover:bg-black/70 active:bg-black/80 rounded-full text-white transition-colors touch-manipulation z-40"
+                  data-testid="button-overview-photo-next"
+                >
+                  <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
+                </button>
+              </>
+            )}
+            
+            {/* Thumbnail Strip at Bottom */}
+            <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 sm:gap-2 p-1.5 sm:p-2 bg-black/50 rounded-lg max-w-[95vw] sm:max-w-[90vw] overflow-x-auto scrollbar-hide">
+              {overviewPhotos.map((photo, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setOverviewPhotoIndex(idx)}
+                  className={`flex-shrink-0 w-12 h-9 sm:w-16 sm:h-12 rounded overflow-hidden border-2 transition-all touch-manipulation ${
+                    idx === overviewPhotoIndex ? 'border-white ring-1 ring-white' : 'border-transparent opacity-60 hover:opacity-100 active:opacity-100'
+                  }`}
+                  data-testid={`button-overview-thumbnail-${idx}`}
+                >
+                  <img
+                    src={`/api/proxy-image?url=${encodeURIComponent(photo)}`}
+                    alt={`Thumbnail ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </button>
+              ))}
             </div>
           </div>
         </DialogContent>
