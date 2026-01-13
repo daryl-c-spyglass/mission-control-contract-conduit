@@ -1,0 +1,133 @@
+Replit prompt — Remediation plan (only if/when you’re ready)
+
+You asked earlier for “audit first, no changes.” You’ve done that. The next step is remediation, so here is a strict prompt you can hand to Replit whenever you’re ready.
+
+REPLIT PROMPT — Enforce Global Rental/Lease Exclusion + DOM Normalization (Single Source of Truth)
+Objective
+
+Enforce a global, single-source-of-truth exclusion of rentals/leases across the entire portal (search, counts, CMA, dashboards, charts, PDFs, share links, map cards), using Repliers fields.
+
+Also standardize DOM usage to simpleDaysOnMarket everywhere.
+
+Non-negotiables
+
+Data source: Repliers only
+
+MLS: ACTRIS
+
+Rentals/leasing must be excluded globally:
+
+counts, searches, CMA, DOM, charts, PDFs, share links, floating cards
+
+No section may calculate totals independently
+
+No silent fallbacks (don’t return 0 on errors)
+
+Tasks
+1) Define a single canonical “isRentalOrLease” predicate
+
+Create a pure function in a shared module (example path):
+
+src/lib/listings/isRental.ts
+
+Logic (MUST be centralized and reused everywhere):
+Return true if any of the following are true:
+
+listing.type equals "Lease" (case-insensitive)
+
+listing.details?.propertyType contains "lease" (case-insensitive)
+
+(Optional if present in your payload) transaction type fields indicate rent/lease
+
+Return false otherwise.
+
+Deliverable:
+
+Unit tests covering:
+
+type: Lease
+
+details.propertyType: Residential Lease
+
+standard sale listings
+
+2) Apply rental exclusion at the earliest possible stage
+
+Wherever Repliers search is called:
+
+Apply a Repliers query filter to exclude leases if Repliers supports it in your query
+
+AND apply the local predicate as a failsafe (because upstream filters can be missed)
+
+Important: filtering must occur before any aggregation or totals.
+
+3) Propagate to all surfaces (must be audited)
+
+Replace any ad-hoc filters with the shared predicate in:
+
+Dashboard totals
+
+Properties list
+
+Buyer Search results + counts
+
+CMA comps selection + stats
+
+Seller updates + charts
+
+Map pins + floating cards
+
+PDF generation
+
+Share pages
+
+Acceptance requirement:
+
+The same filtered dataset is used for:
+
+totalProperties
+
+status buckets (active/underContract/soldClosed)
+
+propertyTypeCounts
+
+4) Standardize DOM usage
+
+Create a pure DOM selector:
+
+getDisplayDOM(listing): number | null
+Rules:
+
+Prefer simpleDaysOnMarket always
+
+Fall back to daysOnMarket only if simpleDaysOnMarket missing
+
+Never display 0 unless actual value is 0
+
+Replace all UI references to DOM to use this selector.
+
+5) Add validation tests (blocker to close)
+
+Add a test dataset containing a mix of:
+
+2 sales active
+
+2 leases active
+
+1 sold sale
+
+Ensure:
+
+none of the leases appear anywhere
+
+totals equal sum of buckets and sum of propertyTypeCounts
+
+Acceptance Criteria
+
+✅ Lease/rental listings never appear in ANY surface of the app
+
+✅ All totals remain consistent across all sections
+
+✅ DOM displayed is consistent and uses simpleDaysOnMarket primarily
+
+✅ No regressions in counts or charts

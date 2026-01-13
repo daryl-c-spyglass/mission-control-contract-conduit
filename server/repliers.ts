@@ -1,4 +1,5 @@
 // Real Repliers MLS API integration using REPLIERS_API_KEY
+import { isRentalOrLease, excludeRentals } from "../shared/lib/listings";
 
 const REPLIERS_API_BASE = "https://api.repliers.io";
 const REPLIERS_CDN_BASE = "https://cdn.repliers.io/";
@@ -526,13 +527,17 @@ export async function fetchSimilarListings(mlsNumber: string, radius: number = 5
       mlsNumber: formattedMlsNumber,
       radius: radius.toString(),
       boardId: "53", // Unlock MLS board ID
+      type: "Sale", // GLOBAL RENTAL EXCLUSION: Filter at API level
     });
 
     if (!data.listings || !Array.isArray(data.listings)) {
       return [];
     }
 
-    return data.listings.slice(0, 10).map((listing: any) => {
+    // FAILSAFE: Apply local rental exclusion filter
+    const filteredListings = data.listings.filter((listing: any) => !isRentalOrLease(listing));
+
+    return filteredListings.slice(0, 10).map((listing: any) => {
       const addressParts = [];
       if (listing.address?.streetNumber) addressParts.push(listing.address.streetNumber);
       if (listing.address?.streetName) addressParts.push(listing.address.streetName);
@@ -565,13 +570,20 @@ export async function searchByAddress(address: string): Promise<MLSListingData |
     const data = await repliersRequest("/listings", {
       address: address,
       resultsPerPage: "5",
+      type: "Sale", // GLOBAL RENTAL EXCLUSION: Filter at API level
     });
 
     if (!data.listings || !Array.isArray(data.listings) || data.listings.length === 0) {
       return null;
     }
 
-    const listing = data.listings[0];
+    // FAILSAFE: Apply local rental exclusion filter
+    const filteredListings = data.listings.filter((listing: any) => !isRentalOrLease(listing));
+    if (filteredListings.length === 0) {
+      return null;
+    }
+
+    const listing = filteredListings[0];
     const result = await fetchMLSListing(listing.mlsNumber);
     return result?.mlsData || null;
   } catch (error) {
@@ -914,6 +926,9 @@ export async function searchListings(params: {
     if (params.minBedrooms) queryParams.minBedrooms = params.minBedrooms.toString();
     if (params.propertyType) queryParams.propertyType = params.propertyType;
     queryParams.resultsPerPage = (params.resultsPerPage || 20).toString();
+    
+    // GLOBAL RENTAL EXCLUSION: Filter out leases at API level
+    queryParams.type = "Sale";
 
     const data = await repliersRequest("/listings", queryParams);
 
@@ -921,8 +936,11 @@ export async function searchListings(params: {
       return [];
     }
 
+    // FAILSAFE: Apply local rental exclusion filter
+    const filteredListings = data.listings.filter((listing: any) => !isRentalOrLease(listing));
+
     const results: MLSListingData[] = [];
-    for (const listing of data.listings.slice(0, 20)) {
+    for (const listing of filteredListings.slice(0, 20)) {
       const result = await fetchMLSListing(listing.mlsNumber);
       if (result) {
         results.push(result.mlsData);

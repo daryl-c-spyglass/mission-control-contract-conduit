@@ -1,0 +1,153 @@
+Locate All Repliers Fetch Entry Points (Repo Path Inventory)
+Objective
+
+Produce a definitive list of all module paths in this repo where we call Repliers (listings search, listing detail, aggregates, CMA/comps, map pins, PDFs, share pages, etc.). This is read-only discovery: no behavior changes, no refactors, no UI changes.
+
+Non-negotiables
+
+Do not modify runtime behavior
+
+Do not change filters (even if rentals are leaking)
+
+Output must be pasteable back into ChatGPT
+
+Data source is Repliers only; identify everything touching Repliers
+
+Tasks
+1) Search the repo for Repliers usage patterns
+
+Run the following searches (use rg / ripgrep):
+
+A. Direct Repliers host + endpoints
+
+Search for:
+
+repliers
+
+api.repliers.io
+
+/listings
+
+/aggregates
+
+/statistics
+
+/deleted
+
+/similar
+
+Authorization
+
+REPLIERS_API_KEY
+
+REPLIERS_BASE_URL
+
+B. Common fetch clients
+
+Search for HTTP clients:
+
+fetch(
+
+axios
+
+ky
+
+got
+
+graphql-request (if any)
+
+node-fetch
+
+undici
+
+C. Likely service naming
+
+Search for file/module naming:
+
+repliersClient
+
+repliers.service
+
+mlsClient
+
+listingService
+
+idx
+
+cma
+
+comps
+
+aggregate
+
+Deliverable: a list of matching files with short context.
+
+2) Produce an inventory table (pasteable)
+
+Create a pasteable report called:
+
+REPLIERS_FETCH_INVENTORY.md
+
+Include for each module:
+
+File path
+
+Function(s) that call Repliers
+
+Endpoint(s) used (e.g., POST /listings, GET /listings/:id, POST /aggregates)
+
+Call purpose (search, detail, CMA comps, dashboard counts, PDF, share, etc.)
+
+Who calls it (importer paths or routes)
+
+Notes (does it apply filters? does it build totals? does it touch DOM? does it output to PDF?)
+
+Format example:
+
+src/server/repliers/client.ts
+
+Functions: repliersFetch(), searchListings()
+
+Endpoints: POST /listings
+
+Called by: src/server/routes/search.ts, src/server/services/cma.ts
+
+Notes: uses fields param; no rental filter seen
+
+3) Trace call graph (minimum viable)
+
+For each discovered Repliers fetch module:
+
+Identify at least one upstream caller path (route/controller/service)
+
+If there are multiple, list them (max 5 per module)
+
+Goal: we must know every surface that could leak rentals later.
+
+4) Output requirements
+
+At the end, print:
+
+Total number of files that touch Repliers
+
+A bullet list of primary entry points (the “roots”)
+
+e.g., src/server/repliers/client.ts, src/server/services/listings.ts, etc.
+
+Acceptance Criteria
+
+✅ REPLIERS_FETCH_INVENTORY.md exists and is accurate
+
+✅ Every Repliers call site is captured (direct + indirect)
+
+✅ No production behavior changes
+
+✅ Report is pasteable back into ChatGPT
+
+Validation Steps (Replit)
+
+Run searches (rg ...) and collect results
+
+Create REPLIERS_FETCH_INVENTORY.md
+
+Paste the inventory back into ChatGPT

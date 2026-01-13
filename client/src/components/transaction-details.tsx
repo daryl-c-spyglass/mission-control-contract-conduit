@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { MapboxPropertyMap } from "./mapbox-property-map";
 import { useTheme } from "@/hooks/use-theme";
+import { getDisplayDOM, hasAccurateDOM } from "@shared/lib/listings";
 import {
   ArrowLeft,
   Calendar,
@@ -1500,8 +1501,8 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                     
                     {/* Days on Market */}
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <span>{mlsData.simpleDaysOnMarket ?? mlsData.daysOnMarket ?? 0} days on market</span>
-                      {mlsData.simpleDaysOnMarket == null && mlsData.daysOnMarket != null && (
+                      <span>{getDisplayDOM(mlsData) ?? 0} days on market</span>
+                      {!hasAccurateDOM(mlsData) && getDisplayDOM(mlsData) != null && (
                         <Tooltip>
                           <TooltipTrigger>
                             <Info className="h-3.5 w-3.5 text-muted-foreground" />
