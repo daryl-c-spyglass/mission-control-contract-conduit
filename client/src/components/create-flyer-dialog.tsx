@@ -406,6 +406,7 @@ interface CreateFlyerDialogProps {
   agentName?: string;
   agentPhone?: string;
   agentPhotoUrl?: string;
+  onAssetSaved?: () => void;
 }
 
 export function CreateFlyerDialog({
@@ -414,6 +415,7 @@ export function CreateFlyerDialog({
   transaction,
   mlsPhotos = [],
   agentName = "",
+  onAssetSaved,
   agentPhone = "",
   agentPhotoUrl,
 }: CreateFlyerDialogProps) {
@@ -1572,15 +1574,37 @@ export function CreateFlyerDialog({
         await generateSocialFlyer(ctx, canvas, data, photosToUse);
         
         const dataUrl = canvas.toDataURL("image/png");
-        const link = document.createElement("a");
         const addressSlug = transaction.propertyAddress.split(",")[0].replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, "");
-        link.download = `${addressSlug}_social.png`;
+        const fileName = `${addressSlug}_social.png`;
+        
+        // Download the file
+        const link = document.createElement("a");
+        link.download = fileName;
         link.href = dataUrl;
         link.click();
 
+        // Save to marketing assets
+        try {
+          const statusLabel = STATUS_OPTIONS.find(s => s.value === data.status)?.label || data.status;
+          await apiRequest("POST", `/api/transactions/${transaction.id}/marketing-assets`, {
+            type: 'social_flyer',
+            imageData: dataUrl,
+            fileName,
+            metadata: {
+              format: 'social',
+              status: statusLabel,
+              dimensions: '1:1',
+            }
+          });
+          onAssetSaved?.();
+        } catch (saveError) {
+          console.error("Failed to save marketing asset:", saveError);
+          // Don't show error - the download still worked
+        }
+
         toast({
-          title: "Graphic downloaded",
-          description: "Your social media graphic has been saved",
+          title: "Graphic created",
+          description: "Your social media graphic has been downloaded and saved to Marketing Assets",
         });
       } else {
         // Print flyer uses unified /api/flyer/render endpoint (same as preview for pixel-identical output)
@@ -1614,16 +1638,48 @@ export function CreateFlyerDialog({
         
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
         const addressSlug = transaction.propertyAddress.split(",")[0].replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, "");
-        link.download = `${addressSlug}_flyer.png`;
+        const fileName = `${addressSlug}_flyer.png`;
+        
+        // Download the file
+        const link = document.createElement("a");
+        link.download = fileName;
         link.href = url;
         link.click();
+        
+        // Save to marketing assets
+        try {
+          // Convert blob to base64 for storage
+          const reader = new FileReader();
+          const base64Promise = new Promise<string>((resolve) => {
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          const imageData = await base64Promise;
+          
+          const statusLabel = STATUS_OPTIONS.find(s => s.value === data.status)?.label || data.status;
+          await apiRequest("POST", `/api/transactions/${transaction.id}/marketing-assets`, {
+            type: 'print_flyer',
+            imageData,
+            fileName,
+            metadata: {
+              format: 'print',
+              status: statusLabel,
+              dimensions: '8.5x11',
+              headline: data.listingHeadline,
+            }
+          });
+          onAssetSaved?.();
+        } catch (saveError) {
+          console.error("Failed to save marketing asset:", saveError);
+          // Don't show error - the download still worked
+        }
+        
         window.URL.revokeObjectURL(url);
 
         toast({
-          title: "Flyer downloaded",
-          description: "Your print flyer has been saved",
+          title: "Flyer created",
+          description: "Your print flyer has been downloaded and saved to Marketing Assets",
         });
       }
     } catch (error) {

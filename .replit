@@ -41,3 +41,8 @@ waitForPort = 5000
 
 [agent]
 integrations = ["google-mail:1.0.0", "javascript_log_in_with_replit:2.0.0", "javascript_openai_ai_integrations:2.0.0"]
+
+[userenv]
+
+[userenv.shared]
+Mapbox_Mission-Control = "sk.eyJ1Ijoic3B5Z2xhc3NyZWFsdHkiLCJhIjoiY21rY3BvMHdoMDNsbTNlczYwMjhiZTlkcSJ9.bxsXvVKjAQy6iaJRgK23Mw"

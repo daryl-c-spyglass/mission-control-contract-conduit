@@ -1,0 +1,73 @@
+## Enhance Marketing Tab - Save & Display Assets
+
+The Marketing tab now has "Create Graphics" and "Create Flyer" buttons in the header. Let's improve the experience.
+
+### Changes to make:
+
+**1. Simplify Empty State (remove duplicate buttons)**
+- The header already has "Create Graphics" and "Create Flyer" buttons
+- Empty state should NOT duplicate these buttons
+- Update empty state to just show:
+  ```
+  [icon]
+  No Marketing Assets Yet
+  Use the buttons above to create social media graphics or print flyers.
+  ```
+- Remove the duplicate CTA buttons from empty state
+
+**2. Make CreateFlyerDialog save assets to Marketing tab**
+- Currently: CreateFlyerDialog downloads directly without saving
+- Change: After generating, ALSO save to Marketing Assets (like MarketingMaterialsDialog does)
+- The asset should include:
+  - Image/PDF data (or URL)
+  - Type: "flyer" or "social"
+  - Format: "print" (8.5x11) or "social" (1:1)
+  - Created date
+  - Status used (Just Listed, etc.)
+
+**3. Display saved assets in a gallery grid**
+- When assets exist, show them in a grid layout
+- Each asset card should show:
+  - Thumbnail preview
+  - Type badge (Social / Print Flyer)
+  - Created date
+  - Status (Just Listed, Open House, etc.)
+- Actions on each asset:
+  - Download button
+  - Delete button
+  - (Optional) Re-share to Slack button
+
+**4. Gallery Layout Suggestion**
+```
+Marketing Assets                    [Create Graphics] [Create Flyer]
+─────────────────────────────────────────────────────────────────────
+
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│   [image]   │  │   [image]   │  │   [image]   │  │   [image]   │
+│             │  │             │  │             │  │             │
+├─────────────┤  ├─────────────┤  ├─────────────┤  ├─────────────┤
+│ Social 1:1  │  │ Print Flyer │  │ Social 16:9 │  │ Social 1:1  │
+│ Just Listed │  │ Just Listed │  │ Open House  │  │ For Sale    │
+│ Jan 13      │  │ Jan 12      │  │ Jan 10      │  │ Jan 8       │
+│ [↓] [🗑]    │  │ [↓] [🗑]    │  │ [↓] [🗑]    │  │ [↓] [🗑]    │
+└─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘
+```
+
+### Technical Notes:
+
+- Marketing assets are already stored via API: `/api/transactions/:id/marketing-assets`
+- MarketingMaterialsDialog already saves to this endpoint
+- CreateFlyerDialog needs to be updated to also save here
+- The gallery component may already exist (check current Marketing tab code)
+
+### DO NOT change:
+- CreateFlyerDialog UI or generation logic
+- MarketingMaterialsDialog UI or generation logic
+- Templates tab
+- Any other tabs
+
+### Result:
+- Clean empty state (no duplicate buttons)
+- All created assets saved and visible
+- Users can re-download or delete old assets
+- Single source of truth for marketing materials
