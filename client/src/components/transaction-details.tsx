@@ -1461,6 +1461,11 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                           latitude={mlsData.coordinates!.latitude}
                           longitude={mlsData.coordinates!.longitude}
                           address={`${transaction.propertyAddress}, ${mlsData.city || ''}, ${mlsData.state || ''}`}
+                          price={mlsData.listPrice}
+                          beds={mlsData.bedrooms}
+                          baths={mlsData.bathrooms}
+                          sqft={mlsData.sqft}
+                          status={mlsData.status}
                         />
                       </div>
                     </CardContent>

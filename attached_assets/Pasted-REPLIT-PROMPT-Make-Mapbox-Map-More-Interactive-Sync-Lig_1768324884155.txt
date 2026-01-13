@@ -1,0 +1,198 @@
+REPLIT PROMPT — Make Mapbox Map More Interactive + Sync Light/Dark Mode
+Objective
+
+Upgrade the listing detail Mapbox map from “static embed” to an interactive experience:
+
+Better controls (zoom, fullscreen, scale, geolocate)
+
+Better camera behavior (smooth fly-to, fit bounds)
+
+Stronger marker + popup interaction
+
+Style auto-sync with app theme (light/dark) without layout re-mount issues
+
+Non-negotiables
+
+Do not introduce any external redirects (no tour/video linkouts).
+
+Preserve MLS compliance surfaces: Map attribution must remain visible (Mapbox handles this; don’t hide it).
+
+Do not change listing filtering logic or include rentals; this is purely map UX.
+
+Mapbox features we will use (from Mapbox docs)
+Built-in controls
+
+Add:
+
+NavigationControl (zoom/rotation UI)
+
+FullscreenControl
+
+GeolocateControl (optional; can be disabled by feature flag)
+
+ScaleControl
+These are all supported Mapbox GL JS controls.
+
+Theme sync (light/dark)
+
+Switch map style dynamically using:
+
+map.setStyle(styleUrl) if using raw mapbox-gl
+
+OR update the mapStyle prop if using react-map-gl (preferred; avoids ref mismatch issues).
+
+Camera “fit to marker / bounds”
+
+Use:
+
+fitBounds() when we have polygons/areas or want consistent framing around the pin.
+
+Tasks
+1) Identify current map implementation
+
+Determine whether the app uses:
+
+mapbox-gl directly, OR
+
+react-map-gl
+
+Implementation rule:
+
+If react-map-gl is used, do NOT call setStyle() via ref; instead update mapStyle prop.
+
+If using raw mapbox-gl, it’s fine to use map.setStyle().
+
+Deliverable: PR description must specify which approach the project uses and where the map is initialized.
+
+2) Add interactivity controls (UI)
+
+Add Mapbox GL JS built-in controls:
+
+Top-right: NavigationControl
+
+Top-right (under nav): FullscreenControl
+
+Bottom-left: ScaleControl
+
+Optional: GeolocateControl (guard behind a config flag if we’re worried about permissions UX)
+
+Per Mapbox markers/controls API.
+
+Acceptance: Controls appear, work, and do not overlap existing UI.
+
+3) Improve marker + popup behavior
+
+Replace static marker with:
+
+a clickable marker
+
+a popup showing: price, beds, baths, sqft, status (no external links)
+
+On marker click:
+
+open popup
+
+flyTo({ center, zoom, speed }) for a polished feel
+
+On map load:
+
+auto-center/fly-to listing coordinates
+
+optionally apply a slight pitch (e.g., 35) for modern feel (keep subtle)
+
+Deliverable: Marker and popup are keyboard accessible (at least focusable + closable).
+
+4) Add “fit” behavior
+
+If we only have a single listing point:
+
+Use flyTo on load.
+
+If we also have a boundary polygon or multiple points (e.g., neighborhood polygon or comps later):
+
+Use fitBounds() for consistent framing.
+
+Do not block this change on polygons — implement single-point now, keep fitBounds helper for future.
+
+5) Light/Dark mode synchronization (no remount flicker)
+
+Implement theme-driven style switching:
+
+Mapbox style URLs
+
+Light: mapbox://styles/mapbox/light-v11 (or your preferred light)
+
+Dark: mapbox://styles/mapbox/dark-v11 (or your preferred dark)
+
+If react-map-gl
+
+Store mapStyle in state derived from the app theme
+
+Update by changing prop (not calling setStyle manually).
+
+If raw mapbox-gl
+
+On theme change call map.setStyle(styleUrl) as documented.
+
+IMPORTANT: re-add any custom sources/layers after style load (Mapbox style change resets style layers). (Implement a map.on('style.load', ...) hook if you have custom layers.)
+
+Acceptance:
+
+Toggle app theme → map switches style within 300ms
+
+No full remount (map doesn’t flash white / lose marker)
+
+Marker + popup remain functional after theme switch
+
+Files / Modules Impacted (fill in exact paths in PR)
+
+Listing details page component where the map renders (e.g., src/components/ListingMap.tsx)
+
+Theme provider / hook (where we read light vs dark)
+
+Map style constants (src/constants/mapStyles.ts)
+
+Optional: config flags (src/config/features.ts)
+
+Acceptance Criteria
+
+✅ Map has zoom controls + fullscreen + scale (and optional geolocate)
+
+✅ Marker is interactive with popup (no external redirects)
+
+✅ On page load, map smoothly centers to listing
+
+✅ Map style switches when app theme switches (light/dark) using documented style switching approach
+
+✅ No console errors related to map lifecycle or style switching
+
+Validation Tests
+Manual QA
+
+Open listing detail page:
+
+controls visible and functional
+
+Click marker:
+
+popup opens, close works
+
+Toggle dark mode:
+
+map style updates, marker still present, popup still works
+
+Fullscreen:
+
+map resizes correctly and retains center
+
+Automated (recommended)
+
+Component test asserts style URL changes when theme changes
+
+Smoke test asserts marker exists after theme toggle
+
+Notes / Guardrails
+
+Don’t hide Mapbox attribution UI (required).
+
+Avoid calling setStyle() directly when using react-map-gl because it can desync React state.
