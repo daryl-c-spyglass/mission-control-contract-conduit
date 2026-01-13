@@ -1027,16 +1027,12 @@ Thank you for your interest!`;
 
   const prevImage = () => {
     setSelectedPhotoIndex((prev) => (prev > 0 ? prev - 1 : allImages.length - 1));
-    setGeneratedLandscape(null);
-    setGeneratedSquare(null);
-    setGeneratedAltStyle(null);
+    setGeneratedImage(null);
   };
 
   const nextImage = () => {
     setSelectedPhotoIndex((prev) => (prev < allImages.length - 1 ? prev + 1 : 0));
-    setGeneratedLandscape(null);
-    setGeneratedSquare(null);
-    setGeneratedAltStyle(null);
+    setGeneratedImage(null);
   };
 
   // Check if user has graphics settings configured
@@ -1063,10 +1059,43 @@ Thank you for your interest!`;
         )}
 
         <div className="space-y-6">
+          {/* Format Selector */}
+          <div className="space-y-2">
+            <Label>Format</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {FORMAT_OPTIONS.map((format) => (
+                <button
+                  key={format.id}
+                  onClick={() => { setSelectedFormat(format); setGeneratedImage(null); }}
+                  className={`flex flex-col items-center p-3 rounded-lg border-2 transition-colors ${
+                    selectedFormat.id === format.id
+                      ? "border-primary bg-primary/5"
+                      : "border-muted hover:border-primary/50"
+                  }`}
+                  data-testid={`button-format-${format.id}`}
+                >
+                  <div className={`rounded border-2 border-current mb-2 flex items-center justify-center text-muted-foreground ${
+                    format.id === 'square' ? "w-10 h-10" :
+                    format.id === 'landscape' ? "w-14 h-8" :
+                    "w-6 h-10"
+                  }`}>
+                    <span className="text-[10px]">
+                      {format.id === 'square' ? '1:1' : format.id === 'landscape' ? '16:9' : '9:16'}
+                    </span>
+                  </div>
+                  <span className="text-sm font-medium">{format.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {format.width}×{format.height}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Status Type</Label>
-              <Select value={status} onValueChange={(v) => { setStatus(v as StatusType); setGeneratedLandscape(null); setGeneratedSquare(null); }}>
+              <Select value={status} onValueChange={(v) => { setStatus(v as StatusType); setGeneratedImage(null); }}>
                 <SelectTrigger data-testid="select-status-type">
                   <SelectValue />
                 </SelectTrigger>
@@ -1088,8 +1117,7 @@ Thank you for your interest!`;
                 onChange={(e) => {
                   if (e.target.value.length <= 20) {
                     setSocialDescription(e.target.value);
-                    setGeneratedLandscape(null);
-                    setGeneratedSquare(null);
+                    setGeneratedImage(null);
                   }
                 }}
                 maxLength={20}
@@ -1206,126 +1234,79 @@ Thank you for your interest!`;
             )}
           </Button>
 
-          {(generatedLandscape || generatedSquare || generatedAltStyle) && (
-            <div ref={resultsRef}>
-            <Tabs defaultValue="landscape" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="landscape" data-testid="tab-landscape">
-                  Facebook
-                </TabsTrigger>
-                <TabsTrigger value="square" data-testid="tab-square">
-                  Instagram
-                </TabsTrigger>
-                <TabsTrigger value="altstyle" data-testid="tab-altstyle">
-                  Alt Style
-                </TabsTrigger>
-                <TabsTrigger value="email" data-testid="tab-email">
-                  Email
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="landscape" className="space-y-4">
-                {generatedLandscape && (
-                  <Card>
-                    <CardContent className="pt-4">
-                      <img
-                        src={generatedLandscape}
-                        alt="Landscape graphic"
-                        className="w-full rounded-md"
-                        data-testid="img-landscape-preview"
-                      />
-                      <Button
-                        className="w-full mt-4"
-                        onClick={() => downloadImage(generatedLandscape, `${transaction.propertyAddress.replace(/[^a-z0-9]/gi, "_")}_facebook.png`, "facebook")}
-                        disabled={saveAssetMutation.isPending}
-                        data-testid="button-download-landscape"
-                      >
-                        {saveAssetMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-                        Save & Download Facebook
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-
-              <TabsContent value="square" className="space-y-4">
-                {generatedSquare && (
-                  <Card>
-                    <CardContent className="pt-4">
-                      <img
-                        src={generatedSquare}
-                        alt="Square graphic"
-                        className="w-full max-w-md mx-auto rounded-md"
-                        data-testid="img-square-preview"
-                      />
-                      <Button
-                        className="w-full mt-4"
-                        onClick={() => downloadImage(generatedSquare, `${transaction.propertyAddress.replace(/[^a-z0-9]/gi, "_")}_instagram.png`, "instagram")}
-                        disabled={saveAssetMutation.isPending}
-                        data-testid="button-download-square"
-                      >
-                        {saveAssetMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-                        Save & Download Instagram
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-
-              <TabsContent value="altstyle" className="space-y-4">
-                {generatedAltStyle && (
-                  <Card>
-                    <CardContent className="pt-4">
-                      <img
-                        src={generatedAltStyle}
-                        alt="Alt style graphic"
-                        className="w-full max-w-md mx-auto rounded-md"
-                        data-testid="img-altstyle-preview"
-                      />
-                      <Button
-                        className="w-full mt-4"
-                        onClick={() => downloadImage(generatedAltStyle, `${transaction.propertyAddress.replace(/[^a-z0-9]/gi, "_")}_altstyle.png`, "alt_style")}
-                        disabled={saveAssetMutation.isPending}
-                        data-testid="button-download-altstyle"
-                      >
-                        {saveAssetMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-                        Save & Download Alt Style
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-
-              <TabsContent value="email" className="space-y-4">
-                <Card>
-                  <CardContent className="pt-4">
-                    <Textarea
-                      value={generateEmailTemplate()}
-                      readOnly
-                      className="min-h-[300px] font-mono text-sm"
-                      data-testid="textarea-email-template"
+          {generatedImage && (
+            <div ref={resultsRef} className="space-y-4">
+              <Card>
+                <CardContent className="pt-4">
+                  <div className={`relative overflow-hidden rounded-lg mx-auto ${
+                    selectedFormat.id === 'square' ? "aspect-square max-w-md" :
+                    selectedFormat.id === 'landscape' ? "aspect-video" :
+                    "aspect-[9/16] max-h-[500px]"
+                  }`}>
+                    <img
+                      src={generatedImage}
+                      alt={`${selectedFormat.name} graphic`}
+                      className="w-full h-full object-contain"
+                      data-testid="img-generated-preview"
                     />
-                    <Button
-                      className="w-full mt-4"
-                      onClick={copyEmailTemplate}
-                      data-testid="button-copy-email"
-                    >
-                      {emailCopied ? (
-                        <>
-                          <Check className="h-4 w-4 mr-2" />
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4 mr-2" />
-                          Copy Email Template
-                        </>
-                      )}
-                    </Button>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+                  </div>
+                  <Button
+                    className="w-full mt-4"
+                    onClick={() => {
+                      const formatType = selectedFormat.id === 'landscape' ? 'facebook' : 
+                                        selectedFormat.id === 'story' ? 'story' : 'instagram';
+                      downloadImage(
+                        generatedImage, 
+                        `${transaction.propertyAddress.replace(/[^a-z0-9]/gi, "_")}_${selectedFormat.id}.png`, 
+                        formatType
+                      );
+                    }}
+                    disabled={saveAssetMutation.isPending}
+                    data-testid="button-download-generated"
+                  >
+                    {saveAssetMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                    Save & Download {selectedFormat.name}
+                  </Button>
+                </CardContent>
+              </Card>
+              
+              {/* Email Template Option */}
+              <Card>
+                <CardContent className="pt-4">
+                  <details className="cursor-pointer">
+                    <summary className="font-medium text-sm flex items-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      Email Template
+                    </summary>
+                    <div className="mt-4 space-y-4">
+                      <Textarea
+                        value={generateEmailTemplate()}
+                        readOnly
+                        className="min-h-[200px] font-mono text-sm"
+                        data-testid="textarea-email-template"
+                      />
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={copyEmailTemplate}
+                        data-testid="button-copy-email"
+                      >
+                        {emailCopied ? (
+                          <>
+                            <Check className="h-4 w-4 mr-2" />
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-4 w-4 mr-2" />
+                            Copy Email Template
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </details>
+                </CardContent>
+              </Card>
             </div>
           )}
         </div>
