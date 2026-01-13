@@ -2417,12 +2417,13 @@ export function CreateFlyerDialog({
                   <p className="text-xs font-medium text-muted-foreground mb-2 text-center">
                     Preview
                   </p>
-                  <div 
-                    className="flex justify-center lg:block cursor-pointer relative group"
-                    onClick={() => setPreviewEnlarged(true)}
-                    data-testid="button-enlarge-preview"
-                  >
-                    {format === "social" ? (
+                  {format === "social" ? (
+                    /* Social media uses client-side React preview */
+                    <div 
+                      className="flex justify-center lg:block cursor-pointer relative group"
+                      onClick={() => setPreviewEnlarged(true)}
+                      data-testid="button-enlarge-preview"
+                    >
                       <SocialMediaPreview
                         photoUrls={previewPhotoUrls}
                         status={watchedValues.status || "just_listed"}
@@ -2433,68 +2434,79 @@ export function CreateFlyerDialog({
                         sqft={watchedValues.sqft}
                         description={watchedValues.description}
                       />
-                    ) : renderedPreviewUrl ? (
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                        <div className="bg-white/90 rounded-full p-2">
+                          <Maximize2 className="h-4 w-4 text-gray-700" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : renderedPreviewUrl ? (
+                    /* Print flyer: Show ONLY Puppeteer-rendered PNG (same as download) */
+                    <div 
+                      className="flex justify-center lg:block cursor-pointer relative group"
+                      onClick={() => setPreviewEnlarged(true)}
+                      data-testid="button-enlarge-preview"
+                    >
                       <div className="relative w-[140px] lg:w-full">
                         <img 
                           src={renderedPreviewUrl} 
                           alt="Rendered flyer preview"
                           className="w-full h-auto rounded-lg border shadow-sm"
+                          style={{ aspectRatio: '8.5/11' }}
                         />
-                        <div className="absolute top-1 right-1 bg-green-500 text-white text-[8px] px-1 py-0.5 rounded">
-                          Rendered
+                      </div>
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                        <div className="bg-white/90 rounded-full p-2">
+                          <Maximize2 className="h-4 w-4 text-gray-700" />
                         </div>
                       </div>
-                    ) : (
-                      <PrintFlyerPreview
-                        photoUrls={previewPhotoUrls}
-                        status={watchedValues.status || "just_listed"}
-                        price={watchedValues.price || "$0"}
-                        address={transaction.propertyAddress}
-                        bedrooms={watchedValues.bedrooms}
-                        bathrooms={watchedValues.bathrooms}
-                        sqft={watchedValues.sqft}
-                        description={watchedValues.description}
-                        agentName={watchedValues.agentName}
-                        agentTitle={watchedValues.agentTitle}
-                        agentPhone={watchedValues.agentPhone}
-                        agentPhotoUrl={effectiveAgentPhoto || undefined}
-                        listingHeadline={watchedValues.listingHeadline}
-                      />
-                    )}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
-                      <div className="bg-white/90 rounded-full p-2">
-                        <Maximize2 className="h-4 w-4 text-gray-700" />
-                      </div>
                     </div>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground text-center mt-1">
-                    Click to enlarge
-                  </p>
+                  ) : (
+                    /* Print flyer: No preview yet - show placeholder prompting render */
+                    <div className="relative w-[140px] lg:w-full aspect-[8.5/11] bg-muted rounded-lg border border-dashed border-border flex flex-col items-center justify-center p-2 text-center">
+                      <Image className="h-6 w-6 text-muted-foreground mb-2" />
+                      <p className="text-[9px] text-muted-foreground leading-tight">
+                        Click "Render Preview" to see exact output
+                      </p>
+                    </div>
+                  )}
+                  {format === "social" && (
+                    <p className="text-[10px] text-muted-foreground text-center mt-1">
+                      Click to enlarge
+                    </p>
+                  )}
                   {format === "print" && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="w-full mt-2 h-7 text-xs"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        renderActualPreview();
-                      }}
-                      disabled={isRenderingPreview || !hasPhotosSelected}
-                      data-testid="button-render-preview"
-                    >
-                      {isRenderingPreview ? (
-                        <>
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                          Rendering...
-                        </>
-                      ) : (
-                        <>
-                          <Image className="h-3 w-3 mr-1" />
-                          {renderedPreviewUrl ? "Re-render Preview" : "Render Preview"}
-                        </>
+                    <>
+                      <Button
+                        type="button"
+                        variant={renderedPreviewUrl ? "outline" : "default"}
+                        size="sm"
+                        className="w-full mt-2 h-7 text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          renderActualPreview();
+                        }}
+                        disabled={isRenderingPreview || !hasPhotosSelected}
+                        data-testid="button-render-preview"
+                      >
+                        {isRenderingPreview ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Rendering...
+                          </>
+                        ) : (
+                          <>
+                            <Image className="h-3 w-3 mr-1" />
+                            {renderedPreviewUrl ? "Re-render" : "Render Preview"}
+                          </>
+                        )}
+                      </Button>
+                      {renderedPreviewUrl && (
+                        <p className="text-[10px] text-muted-foreground text-center mt-1">
+                          Click preview to enlarge
+                        </p>
                       )}
-                    </Button>
+                    </>
                   )}
                 </div>
               </div>
@@ -2577,14 +2589,14 @@ export function CreateFlyerDialog({
               </Button>
             </div>
 
-            {/* Scrollable Preview Area - Reduced padding */}
+            {/* Scrollable Preview Area - No padding/margin/clip that changes layout */}
             <ScrollArea className="flex-1 min-h-0">
               <div className="flex justify-center py-2 px-1">
                 <div 
                   className="transition-transform duration-200 ease-out origin-top"
                   style={{ transform: `scale(${zoomLevel / 100})` }}
                 >
-                  {/* Larger preview sizes for better fill */}
+                  {/* Preview container - simple image display only */}
                   <div className={format === "social" ? "w-72 sm:w-80" : "w-[340px] sm:w-[400px]"}>
                     {format === "social" ? (
                       <SocialMediaPreview
@@ -2598,32 +2610,24 @@ export function CreateFlyerDialog({
                         description={watchedValues.description}
                       />
                     ) : renderedPreviewUrl ? (
-                      <div className="relative">
-                        <img 
-                          src={renderedPreviewUrl} 
-                          alt="Rendered flyer preview"
-                          className="w-full h-auto rounded-lg border shadow-sm"
-                        />
-                        <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded">
-                          Rendered
-                        </div>
-                      </div>
-                    ) : (
-                      <PrintFlyerPreview
-                        photoUrls={previewPhotoUrls}
-                        status={watchedValues.status || "just_listed"}
-                        price={watchedValues.price || "$0"}
-                        address={transaction.propertyAddress}
-                        bedrooms={watchedValues.bedrooms}
-                        bathrooms={watchedValues.bathrooms}
-                        sqft={watchedValues.sqft}
-                        description={watchedValues.description}
-                        agentName={watchedValues.agentName}
-                        agentTitle={watchedValues.agentTitle}
-                        agentPhone={watchedValues.agentPhone}
-                        agentPhotoUrl={effectiveAgentPhoto || undefined}
-                        listingHeadline={watchedValues.listingHeadline}
+                      /* Print flyer: Show ONLY Puppeteer-rendered PNG (pixel-identical to download) */
+                      <img 
+                        src={renderedPreviewUrl} 
+                        alt="Rendered flyer preview"
+                        className="w-full h-auto rounded-lg border shadow-sm"
+                        style={{ aspectRatio: '8.5/11' }}
                       />
+                    ) : (
+                      /* Print flyer: No preview yet - prompt user to render */
+                      <div className="w-full aspect-[8.5/11] bg-muted rounded-lg border border-dashed border-border flex flex-col items-center justify-center p-4 text-center">
+                        <Image className="h-12 w-12 text-muted-foreground mb-3" />
+                        <p className="text-sm text-muted-foreground mb-2">
+                          No preview rendered yet
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Close this modal and click "Render Preview" to see exact output
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>
