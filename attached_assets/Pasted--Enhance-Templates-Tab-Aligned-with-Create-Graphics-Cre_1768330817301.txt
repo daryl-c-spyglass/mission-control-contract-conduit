@@ -1,0 +1,751 @@
+## Enhance Templates Tab - Aligned with Create Graphics & Create Flyer
+
+The Templates tab needs to integrate seamlessly with the existing "Create Graphics" and "Create Flyer" features in the Marketing tab.
+
+---
+
+## Current Architecture
+
+```
+Marketing Tab:
+├── Marketing Assets Gallery (view created assets)
+├── [Create Graphics] button → Opens dialog for social posts
+└── [Create Flyer] button → Opens dialog for print flyers
+
+Templates Tab:
+├── Search for listing
+├── Posts | Stories | Flyers | Post Cards | Brochures tabs
+└── Template previews
+```
+
+**Problem:** Overlap and confusion between Marketing and Templates tabs.
+
+---
+
+## Unified Architecture (Recommended)
+
+```
+Marketing Tab:
+├── Marketing Assets Gallery (view/manage created assets)
+├── [Create Graphics] → Quick create with current listing
+└── [Create Flyer] → Quick create with current listing
+
+Templates Tab (Template Library):
+├── Auto-loads current transaction listing
+├── Browse ALL template designs
+├── Categories: Social | Print | Digital
+├── Click template → Opens SAME dialog as Create Graphics/Create Flyer
+│   └── Pre-selects the chosen template design
+└── Created assets saved to Marketing tab gallery
+```
+
+**Key Insight:** Templates tab is the **browsing/discovery** experience. Create Graphics and Create Flyer are the **creation** tools. They should use the SAME underlying components.
+
+---
+
+## Implementation: Shared Components
+
+### 1. Shared Template Designs
+
+```typescript
+// lib/templates/template-designs.ts
+
+export interface TemplateDesign {
+  id: string;
+  name: string;
+  category: 'social' | 'print' | 'digital';
+  subcategory: 'posts' | 'stories' | 'facebook' | 'flyers' | 'postcards' | 'brochures';
+  format: {
+    width: number;
+    height: number;
+    aspectRatio: string;
+  };
+  previewUrl: string;
+  layout: 'minimal' | 'standard' | 'bold' | 'elegant';
+  elements: {
+    logoPosition: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+    pricePosition: 'top' | 'bottom' | 'overlay';
+    statusBadgeStyle: 'banner' | 'badge' | 'ribbon';
+    photoLayout: 'single' | 'collage' | 'grid';
+  };
+}
+
+export const templateDesigns: TemplateDesign[] = [
+  // Social - Posts (1:1)
+  {
+    id: 'social-post-minimal',
+    name: 'Minimal Post',
+    category: 'social',
+    subcategory: 'posts',
+    format: { width: 1080, height: 1080, aspectRatio: '1:1' },
+    previewUrl: '/templates/social-post-minimal.png',
+    layout: 'minimal',
+    elements: {
+      logoPosition: 'top-left',
+      pricePosition: 'bottom',
+      statusBadgeStyle: 'badge',
+      photoLayout: 'single',
+    },
+  },
+  {
+    id: 'social-post-bold',
+    name: 'Bold Post',
+    category: 'social',
+    subcategory: 'posts',
+    format: { width: 1080, height: 1080, aspectRatio: '1:1' },
+    previewUrl: '/templates/social-post-bold.png',
+    layout: 'bold',
+    elements: {
+      logoPosition: 'top-right',
+      pricePosition: 'overlay',
+      statusBadgeStyle: 'banner',
+      photoLayout: 'single',
+    },
+  },
+  // Social - Stories (9:16)
+  {
+    id: 'social-story-minimal',
+    name: 'Minimal Story',
+    category: 'social',
+    subcategory: 'stories',
+    format: { width: 1080, height: 1920, aspectRatio: '9:16' },
+    previewUrl: '/templates/social-story-minimal.png',
+    layout: 'minimal',
+    elements: { /* ... */ },
+  },
+  // Social - Facebook (16:9)
+  {
+    id: 'social-facebook-standard',
+    name: 'Standard Facebook',
+    category: 'social',
+    subcategory: 'facebook',
+    format: { width: 1200, height: 630, aspectRatio: '16:9' },
+    previewUrl: '/templates/social-facebook-standard.png',
+    layout: 'standard',
+    elements: { /* ... */ },
+  },
+  // Print - Flyers
+  {
+    id: 'print-flyer-standard',
+    name: 'Standard Flyer',
+    category: 'print',
+    subcategory: 'flyers',
+    format: { width: 2550, height: 3300, aspectRatio: '8.5:11' },
+    previewUrl: '/templates/print-flyer-standard.png',
+    layout: 'standard',
+    elements: {
+      logoPosition: 'top-left',
+      pricePosition: 'top',
+      statusBadgeStyle: 'banner',
+      photoLayout: 'collage',
+    },
+  },
+  // ... more templates
+];
+
+// Helper to filter templates
+export const getTemplatesByCategory = (category: string) => 
+  templateDesigns.filter(t => t.category === category);
+
+export const getTemplatesBySubcategory = (subcategory: string) => 
+  templateDesigns.filter(t => t.subcategory === subcategory);
+```
+
+### 2. Unified Creation Dialog
+
+Create a single dialog component that handles both Create Graphics and Create Flyer, accepting an optional template parameter:
+
+```tsx
+// components/create-marketing-material-dialog.tsx
+
+interface CreateMarketingMaterialDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  transaction: Transaction;
+  initialTemplate?: TemplateDesign;  // Pre-selected from Templates tab
+  initialCategory?: 'social' | 'print';  // From Create Graphics vs Create Flyer button
+}
+
+function CreateMarketingMaterialDialog({
+  open,
+  onOpenChange,
+  transaction,
+  initialTemplate,
+  initialCategory = 'social',
+}: CreateMarketingMaterialDialogProps) {
+  const [category, setCategory] = useState(initialTemplate?.category || initialCategory);
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateDesign | null>(initialTemplate || null);
+  const [selectedFormat, setSelectedFormat] = useState(initialTemplate?.subcategory || 'posts');
+  const [selectedPhoto, setSelectedPhoto] = useState(transaction.mlsData?.images?.[0] || '');
+  const [status, setStatus] = useState(getDefaultStatus(transaction.status));
+  const [description, setDescription] = useState('');
+
+  // Get available templates based on category
+  const availableTemplates = getTemplatesByCategory(category);
+  const formatOptions = getFormatOptions(category);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {category === 'social' ? 'Create Marketing Graphics' : 'Create Print Material'}
+          </DialogTitle>
+          <DialogDescription>
+            Create professional marketing materials for {transaction.address}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-2 gap-6">
+          {/* Left: Options */}
+          <div className="space-y-6">
+            {/* Category Toggle (if not locked) */}
+            {!initialTemplate && (
+              <div>
+                <Label>Material Type</Label>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant={category === 'social' ? 'default' : 'outline'}
+                    onClick={() => setCategory('social')}
+                  >
+                    <Instagram className="h-4 w-4 mr-2" />
+                    Social Media
+                  </Button>
+                  <Button
+                    variant={category === 'print' ? 'default' : 'outline'}
+                    onClick={() => setCategory('print')}
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Format Selection */}
+            <div>
+              <Label>Format</Label>
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                {formatOptions.map((format) => (
+                  <button
+                    key={format.id}
+                    onClick={() => setSelectedFormat(format.id)}
+                    className={cn(
+                      "flex flex-col items-center p-3 rounded-lg border-2 transition-all",
+                      selectedFormat === format.id
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-primary/50"
+                    )}
+                  >
+                    <div className={cn(
+                      "border-2 border-current mb-2",
+                      format.aspectClass // e.g., "w-8 h-8" for 1:1
+                    )}>
+                      {format.ratio}
+                    </div>
+                    <span className="text-sm">{format.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Template Style Selection */}
+            <div>
+              <Label>Template Style</Label>
+              <div className="grid grid-cols-4 gap-2 mt-2">
+                {availableTemplates
+                  .filter(t => t.subcategory === selectedFormat)
+                  .map((template) => (
+                    <button
+                      key={template.id}
+                      onClick={() => setSelectedTemplate(template)}
+                      className={cn(
+                        "rounded-lg overflow-hidden border-2 transition-all",
+                        selectedTemplate?.id === template.id
+                          ? "border-primary ring-2 ring-primary/20"
+                          : "border-transparent hover:border-primary/50"
+                      )}
+                    >
+                      <img src={template.previewUrl} alt={template.name} className="w-full" />
+                    </button>
+                  ))}
+              </div>
+            </div>
+
+            {/* Photo Selection */}
+            <div>
+              <div className="flex items-center justify-between">
+                <Label>Property Photo</Label>
+                {transaction.mlsData?.imageInsights && (
+                  <Badge variant="secondary" className="text-xs">
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    AI Recommended
+                  </Badge>
+                )}
+              </div>
+              <div className="grid grid-cols-4 gap-2 mt-2">
+                {transaction.mlsData?.images?.slice(0, 8).map((photo, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setSelectedPhoto(photo)}
+                    className={cn(
+                      "aspect-square rounded overflow-hidden border-2",
+                      selectedPhoto === photo ? "border-primary" : "border-transparent"
+                    )}
+                  >
+                    <img src={photo} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Status Selection */}
+            <div>
+              <Label>Status Badge</Label>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger className="mt-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {getStatusOptions(transaction.status).map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Description (for social) */}
+            {category === 'social' && (
+              <div>
+                <div className="flex items-center justify-between">
+                  <Label>Description</Label>
+                  <Button variant="ghost" size="sm" onClick={handleAISuggest}>
+                    <Sparkles className="h-4 w-4 mr-1" />
+                    AI Suggest
+                  </Button>
+                </div>
+                <Input
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  maxLength={80}
+                  placeholder="e.g. Stunning 4BR with Chef's Kitchen"
+                  className="mt-2"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Right: Live Preview */}
+          <div className="bg-muted rounded-lg p-4 flex items-center justify-center">
+            <div className={cn(
+              "relative bg-white shadow-lg",
+              getPreviewAspectClass(selectedFormat)
+            )}>
+              <MaterialPreview
+                template={selectedTemplate}
+                photo={selectedPhoto}
+                status={status}
+                listing={transaction.mlsData}
+                description={description}
+              />
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="mt-6">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleGenerate}>
+            <Download className="h-4 w-4 mr-2" />
+            Generate & Download
+          </Button>
+          <Button onClick={handleSaveToMarketing} variant="secondary">
+            <Save className="h-4 w-4 mr-2" />
+            Save to Marketing
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+### 3. Updated Marketing Tab
+
+```tsx
+// Marketing tab - uses shared dialog
+function MarketingTab({ transaction }: { transaction: Transaction }) {
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [initialCategory, setInitialCategory] = useState<'social' | 'print'>('social');
+
+  const handleCreateGraphics = () => {
+    setInitialCategory('social');
+    setCreateDialogOpen(true);
+  };
+
+  const handleCreateFlyer = () => {
+    setInitialCategory('print');
+    setCreateDialogOpen(true);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-semibold">Marketing Assets</h2>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleCreateGraphics}>
+            <Image className="h-4 w-4 mr-2" />
+            Create Graphics
+          </Button>
+          <Button variant="outline" onClick={handleCreateFlyer}>
+            <FileText className="h-4 w-4 mr-2" />
+            Create Flyer
+          </Button>
+        </div>
+      </div>
+
+      {/* Assets Gallery */}
+      <MarketingAssetsGallery assets={transaction.marketingAssets} />
+
+      {/* Shared Creation Dialog */}
+      <CreateMarketingMaterialDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        transaction={transaction}
+        initialCategory={initialCategory}
+      />
+    </div>
+  );
+}
+```
+
+### 4. Updated Templates Tab
+
+```tsx
+// Templates tab - browses templates, opens same dialog with pre-selected template
+function TemplatesTab({ transaction }: { transaction: Transaction }) {
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateDesign | null>(null);
+  const [category, setCategory] = useState<'social' | 'print' | 'digital'>('social');
+  const [subcategory, setSubcategory] = useState<string>('posts');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  // Auto-load current transaction (no search needed)
+  const listing = transaction.mlsData;
+
+  const handleTemplateClick = (template: TemplateDesign) => {
+    setSelectedTemplate(template);
+    setCreateDialogOpen(true);
+  };
+
+  // Filter templates
+  const filteredTemplates = templateDesigns.filter(t => {
+    if (t.category !== category) return false;
+    if (subcategory !== 'all' && t.subcategory !== subcategory) return false;
+    return true;
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-bold">Template Library</h2>
+        <p className="text-muted-foreground">
+          Browse and customize professional templates for your listing
+        </p>
+      </div>
+
+      {/* Current Listing Card (auto-loaded) */}
+      <Card className="bg-muted/50">
+        <CardContent className="flex items-center gap-4 py-4">
+          {listing?.images?.[0] && (
+            <img
+              src={listing.images[0]}
+              alt="Property"
+              className="w-20 h-16 object-cover rounded"
+            />
+          )}
+          <div className="flex-1">
+            <p className="font-semibold">{transaction.address}</p>
+            <p className="text-sm text-muted-foreground">
+              ${listing?.listPrice?.toLocaleString()} • {listing?.details?.numBedrooms} bed • {listing?.details?.numBathrooms} bath
+            </p>
+          </div>
+          <Badge className={getStatusBadgeStyle(transaction.status)}>
+            {transaction.status}
+          </Badge>
+        </CardContent>
+      </Card>
+
+      {/* Quick Create All */}
+      <Card>
+        <CardContent className="flex items-center justify-between py-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Wand2 className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-medium">Quick Create All Formats</p>
+              <p className="text-sm text-muted-foreground">
+                Generate Instagram Post + Facebook Post + Story with one click
+              </p>
+            </div>
+          </div>
+          <Button onClick={handleQuickCreateAll}>
+            <Sparkles className="h-4 w-4 mr-2" />
+            Generate All
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Category Tabs */}
+      <Tabs value={category} onValueChange={(v) => setCategory(v as any)}>
+        <TabsList>
+          <TabsTrigger value="social" className="gap-2">
+            <Instagram className="h-4 w-4" />
+            Social Media
+          </TabsTrigger>
+          <TabsTrigger value="print" className="gap-2">
+            <Printer className="h-4 w-4" />
+            Print Materials
+          </TabsTrigger>
+          <TabsTrigger value="digital" className="gap-2">
+            <Mail className="h-4 w-4" />
+            Digital
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="social" className="space-y-4">
+          {/* Sub-filters */}
+          <div className="flex items-center gap-4">
+            <div className="flex gap-2">
+              {['all', 'posts', 'stories', 'facebook'].map((sub) => (
+                <Badge
+                  key={sub}
+                  variant={subcategory === sub ? 'default' : 'outline'}
+                  className="cursor-pointer"
+                  onClick={() => setSubcategory(sub)}
+                >
+                  {sub === 'all' ? 'All' : sub.charAt(0).toUpperCase() + sub.slice(1)}
+                </Badge>
+              ))}
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="just-listed">Just Listed</SelectItem>
+                <SelectItem value="open-house">Open House</SelectItem>
+                <SelectItem value="price-reduced">Price Reduced</SelectItem>
+                <SelectItem value="under-contract">Under Contract</SelectItem>
+                <SelectItem value="just-sold">Just Sold</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Template Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {filteredTemplates.map((template) => (
+              <Card
+                key={template.id}
+                className="overflow-hidden cursor-pointer group hover:ring-2 hover:ring-primary transition-all"
+                onClick={() => handleTemplateClick(template)}
+              >
+                <div className="relative aspect-square">
+                  <img
+                    src={template.previewUrl}
+                    alt={template.name}
+                    className="w-full h-full object-cover"
+                  />
+                  {/* Hover overlay */}
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Button size="sm" variant="secondary">
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Customize
+                    </Button>
+                  </div>
+                </div>
+                <CardContent className="p-3">
+                  <p className="text-sm font-medium">{template.name}</p>
+                  <p className="text-xs text-muted-foreground">{template.format.aspectRatio}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="print" className="space-y-4">
+          {/* Similar structure for print templates */}
+          <div className="flex gap-2">
+            {['all', 'flyers', 'postcards', 'brochures'].map((sub) => (
+              <Badge
+                key={sub}
+                variant={subcategory === sub ? 'default' : 'outline'}
+                className="cursor-pointer"
+                onClick={() => setSubcategory(sub)}
+              >
+                {sub === 'all' ? 'All' : sub.charAt(0).toUpperCase() + sub.slice(1)}
+              </Badge>
+            ))}
+          </div>
+          {/* Print template grid */}
+        </TabsContent>
+
+        <TabsContent value="digital">
+          {/* Email templates, presentations */}
+        </TabsContent>
+      </Tabs>
+
+      {/* Shared Creation Dialog */}
+      <CreateMarketingMaterialDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        transaction={transaction}
+        initialTemplate={selectedTemplate}
+      />
+    </div>
+  );
+}
+```
+
+---
+
+## Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           USER JOURNEY                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  QUICK CREATE (Marketing Tab)                                           │
+│  ┌────────────────────┐    ┌────────────────────┐                       │
+│  │  [Create Graphics] │    │  [Create Flyer]    │                       │
+│  └─────────┬──────────┘    └─────────┬──────────┘                       │
+│            │                         │                                  │
+│            ▼                         ▼                                  │
+│  ┌─────────────────────────────────────────────┐                       │
+│  │     CreateMarketingMaterialDialog           │                       │
+│  │     (category pre-set to 'social'/'print')  │                       │
+│  │     (no template pre-selected)              │                       │
+│  └─────────────────────────────────────────────┘                       │
+│                                                                         │
+│  BROWSE & CUSTOMIZE (Templates Tab)                                     │
+│  ┌────────────────────────────────────────────────────────────────┐    │
+│  │  Template Library                                               │    │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐               │    │
+│  │  │ Template│ │ Template│ │ Template│ │ Template│               │    │
+│  │  │   #1    │ │   #2    │ │   #3    │ │   #4    │               │    │
+│  │  └────┬────┘ └─────────┘ └─────────┘ └─────────┘               │    │
+│  └───────│────────────────────────────────────────────────────────┘    │
+│          │                                                              │
+│          ▼ (click)                                                      │
+│  ┌─────────────────────────────────────────────┐                       │
+│  │     CreateMarketingMaterialDialog           │                       │
+│  │     (template pre-selected)                 │                       │
+│  │     (shows template style already chosen)   │                       │
+│  └─────────────────────────────────────────────┘                       │
+│                                                                         │
+│                           ▼                                             │
+│  ┌─────────────────────────────────────────────┐                       │
+│  │     Generate → Save to Marketing Assets     │                       │
+│  └─────────────────────────────────────────────┘                       │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Key Alignment Points
+
+| Feature | Marketing Tab | Templates Tab | Shared |
+|---------|--------------|---------------|--------|
+| **Purpose** | Quick create + view assets | Browse templates | - |
+| **Create Graphics button** | ✅ Opens dialog | - | Same dialog |
+| **Create Flyer button** | ✅ Opens dialog | - | Same dialog |
+| **Template selection** | Optional (pick in dialog) | ✅ Pre-selects | Same templates |
+| **Format options** | Post, Story, Facebook, Flyer | Same | Shared config |
+| **Photo selection** | ✅ | ✅ | Same component |
+| **AI Description** | ✅ | ✅ | Same function |
+| **Status badge** | ✅ | ✅ | Same options |
+| **Output destination** | Marketing Assets gallery | Marketing Assets gallery | Same storage |
+
+---
+
+## Format/Template Configuration
+
+```typescript
+// Shared format configuration
+export const formatConfig = {
+  social: {
+    posts: { width: 1080, height: 1080, ratio: '1:1', name: 'Instagram Post' },
+    stories: { width: 1080, height: 1920, ratio: '9:16', name: 'Instagram Story' },
+    facebook: { width: 1200, height: 630, ratio: '16:9', name: 'Facebook Post' },
+  },
+  print: {
+    flyers: { width: 2550, height: 3300, ratio: '8.5:11', name: 'Flyer (Letter)' },
+    postcards: { width: 1800, height: 1200, ratio: '6:4', name: 'Postcard' },
+    brochures: { width: 2550, height: 3300, ratio: '8.5:11', name: 'Tri-fold Brochure' },
+  },
+  digital: {
+    email: { width: 600, height: 800, ratio: '3:4', name: 'Email Header' },
+  },
+};
+
+// Badge colors (shared - from status-colors.ts)
+export const formatBadgeColors = {
+  posts: 'bg-blue-500',      // Instagram Post
+  stories: 'bg-pink-500',    // Instagram Story  
+  facebook: 'bg-purple-500', // Facebook Post
+  flyers: 'bg-orange-500',   // Print Flyer
+  postcards: 'bg-teal-500',  // Postcard
+  brochures: 'bg-indigo-500',// Brochure
+};
+```
+
+---
+
+## Testing Checklist
+
+**Marketing Tab:**
+- [ ] "Create Graphics" opens dialog with Social category selected
+- [ ] "Create Flyer" opens dialog with Print category selected
+- [ ] Can switch between Social/Print in dialog
+- [ ] Generated asset appears in Marketing Assets gallery
+
+**Templates Tab:**
+- [ ] Auto-loads current transaction (no search needed)
+- [ ] Category tabs (Social/Print/Digital) filter templates
+- [ ] Sub-filters (Posts/Stories/etc.) work correctly
+- [ ] Clicking template opens same creation dialog
+- [ ] Template style is pre-selected when opening from Templates
+- [ ] Generated asset appears in Marketing Assets gallery
+- [ ] "Quick Create All" generates multiple formats
+
+**Shared Dialog:**
+- [ ] Format selector shows correct options
+- [ ] Template style selector shows available designs
+- [ ] Photo selector shows property photos
+- [ ] Status badge options match listing status
+- [ ] AI Suggest description works
+- [ ] Live preview updates as options change
+- [ ] Download generates correct format/size
+- [ ] "Save to Marketing" adds to gallery
+
+---
+
+## Files to Create/Modify
+
+**New shared files:**
+- `lib/templates/template-designs.ts` - Template definitions
+- `lib/templates/format-config.ts` - Format specifications
+- `components/create-marketing-material-dialog.tsx` - Unified creation dialog
+- `components/material-preview.tsx` - Live preview component
+
+**Modify:**
+- `components/marketing-tab.tsx` - Use shared dialog
+- `components/templates-tab.tsx` - Complete rewrite
+- `components/marketing-materials-dialog.tsx` - Remove (replaced by shared dialog)
+- `components/create-flyer-dialog.tsx` - Remove (replaced by shared dialog)
