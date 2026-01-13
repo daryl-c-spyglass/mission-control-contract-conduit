@@ -74,7 +74,8 @@ export const integrationSettings = pgTable("integration_settings", {
 export const activities = pgTable("activities", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   transactionId: varchar("transaction_id").notNull(),
-  type: text("type").notNull(), // channel_created, filter_created, mls_fetched, coordinator_added, status_changed
+  type: text("type").notNull(), // transaction_created, status_changed, mls_synced, price_changed, document_uploaded, graphic_created, flyer_created, cma_created, cma_shared, coordinator_assigned
+  category: text("category"), // transaction, mls, documents, marketing, cma, team, dates, communication
   description: text("description").notNull(),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow(),
