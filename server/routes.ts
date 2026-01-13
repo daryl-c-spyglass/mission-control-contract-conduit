@@ -642,6 +642,7 @@ export async function registerRoutes(
       if (postToSlack && transaction.slackChannelId) {
         const typeLabel = type === "facebook" ? "Facebook (16:9)" : 
                           type === "instagram" ? "Instagram (1:1)" :
+                          type === "story" ? "Story (9:16)" :
                           type === "alt_style" ? "Alternative Style" :
                           type === "flyer" ? "Property Flyer" : type;
         

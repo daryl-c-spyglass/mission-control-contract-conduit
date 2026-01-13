@@ -1937,18 +1937,21 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 const isSocialFlyer = asset.type === 'social_flyer' || metadata?.format === 'social';
                 const isLandscape = asset.type === 'facebook';
                 const isSquare = asset.type === 'instagram' || isSocialFlyer;
+                const isStory = asset.type === 'story';
                 const isAltStyle = asset.type === 'alt_style';
                 
                 const typeLabel = isPrintFlyer ? 'Print Flyer' : 
                                   isLandscape ? 'Facebook 16:9' :
-                                  isSquare ? 'Instagram Post' :
+                                  isSquare ? 'Instagram 1:1' :
+                                  isStory ? 'Story 9:16' :
                                   isAltStyle ? 'Alt Style' : asset.type;
                 
                 const getBadgeStyle = () => {
                   if (isPrintFlyer) return 'bg-orange-500 text-white hover:bg-orange-600';
                   if (isLandscape) return 'bg-purple-500 text-white hover:bg-purple-600';
                   if (isSquare) return 'bg-blue-500 text-white hover:bg-blue-600';
-                  if (isAltStyle) return 'bg-pink-500 text-white hover:bg-pink-600';
+                  if (isStory) return 'bg-pink-500 text-white hover:bg-pink-600';
+                  if (isAltStyle) return 'bg-gray-500 text-white hover:bg-gray-600';
                   return 'bg-gray-500 text-white hover:bg-gray-600';
                 };
                 
@@ -1958,7 +1961,11 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 return (
                   <Card key={asset.id} data-testid={`card-asset-${asset.id}`} className="overflow-hidden">
                     <div 
-                      className={`bg-muted overflow-hidden cursor-pointer hover:opacity-90 transition-opacity ${isPrintFlyer ? 'aspect-[8.5/11]' : 'aspect-square'}`}
+                      className={`bg-muted overflow-hidden cursor-pointer hover:opacity-90 transition-opacity ${
+                        isPrintFlyer ? 'aspect-[8.5/11]' : 
+                        isStory ? 'aspect-[9/16] max-h-64' :
+                        isLandscape ? 'aspect-video' : 'aspect-square'
+                      }`}
                       onClick={() => setPreviewAsset(asset)}
                       data-testid={`button-preview-asset-${asset.id}`}
                     >
