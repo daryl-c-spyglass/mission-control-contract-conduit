@@ -661,6 +661,29 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/transactions/:transactionId/marketing-assets/:id", isAuthenticated, async (req, res) => {
+    try {
+      const existing = await storage.getMarketingAsset(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ message: "Marketing asset not found" });
+      }
+
+      const { imageData, fileName, metadata, type } = req.body;
+      
+      const updateData: any = {};
+      if (imageData) updateData.imageData = imageData;
+      if (fileName) updateData.fileName = fileName;
+      if (metadata) updateData.metadata = metadata;
+      if (type) updateData.type = type;
+
+      const updated = await storage.updateMarketingAsset(req.params.id, updateData);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Marketing asset update error:", error);
+      res.status(500).json({ message: error.message || "Failed to update marketing asset" });
+    }
+  });
+
   app.delete("/api/transactions/:transactionId/marketing-assets/:id", isAuthenticated, async (req, res) => {
     try {
       const deleted = await storage.deleteMarketingAsset(req.params.id);

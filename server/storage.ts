@@ -49,7 +49,9 @@ export interface IStorage {
 
   // Marketing Assets
   getMarketingAssetsByTransaction(transactionId: string): Promise<MarketingAsset[]>;
+  getMarketingAsset(id: string): Promise<MarketingAsset | undefined>;
   createMarketingAsset(asset: InsertMarketingAsset): Promise<MarketingAsset>;
+  updateMarketingAsset(id: string, asset: Partial<InsertMarketingAsset>): Promise<MarketingAsset | undefined>;
   deleteMarketingAsset(id: string): Promise<boolean>;
 
   // Contract Documents
@@ -209,12 +211,26 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(marketingAssets.createdAt));
   }
 
+  async getMarketingAsset(id: string): Promise<MarketingAsset | undefined> {
+    const [asset] = await db.select().from(marketingAssets).where(eq(marketingAssets.id, id));
+    return asset;
+  }
+
   async createMarketingAsset(asset: InsertMarketingAsset): Promise<MarketingAsset> {
     const [newAsset] = await db
       .insert(marketingAssets)
       .values(asset)
       .returning();
     return newAsset;
+  }
+
+  async updateMarketingAsset(id: string, update: Partial<InsertMarketingAsset>): Promise<MarketingAsset | undefined> {
+    const [updated] = await db
+      .update(marketingAssets)
+      .set(update)
+      .where(eq(marketingAssets.id, id))
+      .returning();
+    return updated;
   }
 
   async deleteMarketingAsset(id: string): Promise<boolean> {
