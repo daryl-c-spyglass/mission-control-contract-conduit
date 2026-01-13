@@ -36,7 +36,9 @@ Preferred communication style: Simple, everyday language.
 - **Marketing Tab**: Centralized hub for all marketing asset creation, including social media graphics and flyers.
 - **Templates Feature**: Provides a preview gallery of marketing templates within transaction details.
 - **Enhanced MLS Data Tab**: Comprehensive property information visualization with photo gallery, feature tags, and interactive Mapbox integration.
-- **Print Flyer Architecture**: Utilizes HTML/CSS and Puppeteer for server-side rendering to ensure pixel-identical output for previews and downloads.
+- **Print Flyer Architecture**: Utilizes HTML/CSS and Puppeteer for server-side rendering to ensure pixel-identical output for previews and PDF downloads.
+- **Social Media Graphics**: MarketingMaterialsDialog uses client-side canvas rendering for Instagram Post (1080x1080), Instagram Story (1080x1920), and Facebook Post (1200x630) formats with agent branding and status badges.
+- **Graphics Templates (Server-side)**: Alternative Handlebars templates in `server/templates/graphics/` for future server-side rendering via `/api/graphics/render` endpoint.
 - **Agent Marketing Profile**: Dedicated settings for agent branding on marketing materials, including headshot, name, title, and contact information.
 
 ### Technical Implementations
