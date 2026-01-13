@@ -514,6 +514,19 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [documentUploadOpen, setDocumentUploadOpen] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<ContractDocument | null>(null);
   
+  // Key Dates editing state
+  const [isEditingDates, setIsEditingDates] = useState(false);
+  const [editContractDate, setEditContractDate] = useState(transaction.contractDate || '');
+  const [editClosingDate, setEditClosingDate] = useState(transaction.closingDate || '');
+  
+  // Coordinators editing state
+  const [isAddingCoordinator, setIsAddingCoordinator] = useState(false);
+  const [selectedCoordinatorId, setSelectedCoordinatorId] = useState('');
+  
+  // Overview photo gallery modal state
+  const [overviewPhotoModalOpen, setOverviewPhotoModalOpen] = useState(false);
+  const [overviewPhotoIndex, setOverviewPhotoIndex] = useState(0);
+  
   // Photo navigation for MLS gallery
   const photos = mlsData?.photos || mlsData?.images || [];
   const nextPhoto = () => setCurrentPhoto((prev) => (prev + 1) % Math.max(photos.length, 1));
@@ -690,6 +703,58 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
       toast({ title: "Failed to refresh MLS data", variant: "destructive" });
     },
   });
+
+  const updateTransactionMutation = useMutation({
+    mutationFn: async (data: Partial<Transaction>) => {
+      const res = await apiRequest("PATCH", `/api/transactions/${transaction.id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", transaction.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to update transaction", variant: "destructive" });
+    },
+  });
+
+  const handleSaveDates = async () => {
+    await updateTransactionMutation.mutateAsync({
+      contractDate: editContractDate || null,
+      closingDate: editClosingDate || null,
+    });
+    setIsEditingDates(false);
+    toast({ title: "Key dates updated" });
+  };
+
+  const handleAddCoordinator = async () => {
+    if (!selectedCoordinatorId) return;
+    const updatedIds = [...(transaction.coordinatorIds || []), selectedCoordinatorId];
+    await updateTransactionMutation.mutateAsync({ coordinatorIds: updatedIds });
+    setSelectedCoordinatorId('');
+    setIsAddingCoordinator(false);
+    toast({ title: "Coordinator added" });
+  };
+
+  const handleRemoveCoordinator = async (coordinatorId: string) => {
+    const updatedIds = (transaction.coordinatorIds || []).filter(id => id !== coordinatorId);
+    await updateTransactionMutation.mutateAsync({ coordinatorIds: updatedIds });
+    toast({ title: "Coordinator removed" });
+  };
+
+  // Collect all photos for overview gallery
+  const overviewPhotos: string[] = [];
+  if (transaction.propertyImages && Array.isArray(transaction.propertyImages)) {
+    overviewPhotos.push(...transaction.propertyImages as string[]);
+  }
+  if (mlsData?.images && Array.isArray(mlsData.images)) {
+    overviewPhotos.push(...mlsData.images);
+  }
+
+  // Calculate days until closing
+  const daysUntilClosing = transaction.closingDate 
+    ? Math.ceil((new Date(transaction.closingDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
 
   const searchListingMutation = useMutation({
     mutationFn: async (query: string) => {
@@ -980,30 +1045,98 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
             </Card>
 
             <Card>
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
                   Key Dates
                 </CardTitle>
+                {!isEditingDates ? (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => {
+                      setEditContractDate(transaction.contractDate || '');
+                      setEditClosingDate(transaction.closingDate || '');
+                      setIsEditingDates(true);
+                    }}
+                    data-testid="button-edit-dates"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => setIsEditingDates(false)} data-testid="button-cancel-dates">
+                      Cancel
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      onClick={handleSaveDates} 
+                      disabled={updateTransactionMutation.isPending}
+                      data-testid="button-save-dates"
+                    >
+                      {updateTransactionMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+                    </Button>
+                  </div>
+                )}
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
                   <p className="text-sm text-muted-foreground">Contract Date</p>
-                  <p className="font-medium">{formatDate(transaction.contractDate)}</p>
+                  {isEditingDates ? (
+                    <Input
+                      type="date"
+                      value={editContractDate}
+                      onChange={(e) => setEditContractDate(e.target.value)}
+                      className="mt-1"
+                      data-testid="input-contract-date"
+                    />
+                  ) : (
+                    <p className="font-medium">{formatDate(transaction.contractDate)}</p>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Expected Closing</p>
-                  <p className="font-medium">{formatDate(transaction.closingDate)}</p>
+                  {isEditingDates ? (
+                    <Input
+                      type="date"
+                      value={editClosingDate}
+                      onChange={(e) => setEditClosingDate(e.target.value)}
+                      className="mt-1"
+                      data-testid="input-closing-date"
+                    />
+                  ) : (
+                    <div>
+                      <p className="font-medium">{formatDate(transaction.closingDate)}</p>
+                      {daysUntilClosing !== null && daysUntilClosing >= 0 && (
+                        <Badge variant="outline" className="mt-1">
+                          {daysUntilClosing === 0 ? 'Closing today!' : `${daysUntilClosing} days remaining`}
+                        </Badge>
+                      )}
+                      {daysUntilClosing !== null && daysUntilClosing <= 7 && daysUntilClosing >= 0 && (
+                        <Badge variant="destructive" className="mt-1 ml-1">
+                          Closing soon!
+                        </Badge>
+                      )}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Users className="h-4 w-4" />
                   Coordinators
                 </CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setIsAddingCoordinator(true)}
+                  data-testid="button-add-coordinator"
+                >
+                  <span className="text-lg leading-none">+</span>
+                </Button>
               </CardHeader>
               <CardContent>
                 {transactionCoordinators.length > 0 ? (
@@ -1019,11 +1152,52 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                           <p className="text-sm font-medium truncate">{coord.name}</p>
                           <p className="text-xs text-muted-foreground truncate">{coord.email}</p>
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveCoordinator(coord.id)}
+                          disabled={updateTransactionMutation.isPending}
+                          data-testid={`button-remove-coordinator-${coord.id}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
                     ))}
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">No coordinators assigned</p>
+                )}
+
+                {isAddingCoordinator && (
+                  <div className="mt-4 p-3 border rounded-lg space-y-3">
+                    <Select value={selectedCoordinatorId} onValueChange={setSelectedCoordinatorId}>
+                      <SelectTrigger data-testid="select-coordinator">
+                        <SelectValue placeholder="Select team member" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {coordinators
+                          .filter(c => !transaction.coordinatorIds?.includes(c.id))
+                          .map((coord) => (
+                            <SelectItem key={coord.id} value={coord.id}>
+                              {coord.name} - {coord.email}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setIsAddingCoordinator(false)} data-testid="button-cancel-add-coordinator">
+                        Cancel
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        onClick={handleAddCoordinator} 
+                        disabled={!selectedCoordinatorId || updateTransactionMutation.isPending}
+                        data-testid="button-confirm-add-coordinator"
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -1077,52 +1251,59 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
             </Card>
           )}
 
-          {/* Media Section */}
-          {(() => {
-            const photos: string[] = [];
-            if (transaction.propertyImages && Array.isArray(transaction.propertyImages)) {
-              photos.push(...transaction.propertyImages as string[]);
-            }
-            if (mlsData?.images && Array.isArray(mlsData.images)) {
-              photos.push(...mlsData.images);
-            }
-            
-            if (photos.length > 0) {
-              return (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <ImageIcon className="h-4 w-4" />
-                      Property Photos
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                      {photos.slice(0, 8).map((photo, index) => (
-                        <div key={index} className="aspect-video bg-muted rounded-md overflow-hidden">
-                          <img
-                            src={`/api/proxy-image?url=${encodeURIComponent(photo)}`}
-                            alt={`Property photo ${index + 1}`}
-                            className="w-full h-full object-cover"
-                            data-testid={`img-property-photo-${index}`}
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = "none";
-                            }}
-                          />
-                        </div>
-                      ))}
+          {/* Media Section with Photo Modal */}
+          {overviewPhotos.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4" />
+                  Property Photos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {overviewPhotos.slice(0, 8).map((photo, index) => (
+                    <div 
+                      key={index} 
+                      className="relative aspect-video bg-muted rounded-md overflow-hidden cursor-pointer group"
+                      onClick={() => {
+                        setOverviewPhotoIndex(index);
+                        setOverviewPhotoModalOpen(true);
+                      }}
+                      data-testid={`button-photo-${index}`}
+                    >
+                      <img
+                        src={`/api/proxy-image?url=${encodeURIComponent(photo)}`}
+                        alt={`Property photo ${index + 1}`}
+                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                        data-testid={`img-property-photo-${index}`}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                        <Maximize2 className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
                     </div>
-                    {photos.length > 8 && (
-                      <p className="text-sm text-muted-foreground mt-2 text-center">
-                        +{photos.length - 8} more photos available in MLS Data tab
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            }
-            return null;
-          })()}
+                  ))}
+                </div>
+                {overviewPhotos.length > 8 && (
+                  <Button
+                    variant="outline"
+                    className="w-full mt-4"
+                    onClick={() => {
+                      setOverviewPhotoIndex(0);
+                      setOverviewPhotoModalOpen(true);
+                    }}
+                    data-testid="button-view-all-photos"
+                  >
+                    <ImageIcon className="h-4 w-4 mr-2" />
+                    View all {overviewPhotos.length} photos
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="mls" className="space-y-6">
@@ -2845,6 +3026,95 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           </Dialog>
         );
       })()}
+
+      {/* Overview Property Photo Gallery Modal */}
+      <Dialog open={overviewPhotoModalOpen} onOpenChange={setOverviewPhotoModalOpen}>
+        <DialogContent 
+          className="max-w-5xl h-[90vh] p-0 bg-black/95 [&>button]:bg-white/10 [&>button]:text-white [&>button]:hover:bg-white/20 [&>button]:rounded-full [&>button]:opacity-100 [&>button]:p-2 [&>button]:hover:opacity-100" 
+          data-testid="dialog-overview-photos"
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowLeft') {
+              setOverviewPhotoIndex((prev) => (prev - 1 + overviewPhotos.length) % overviewPhotos.length);
+            } else if (e.key === 'ArrowRight') {
+              setOverviewPhotoIndex((prev) => (prev + 1) % overviewPhotos.length);
+            }
+          }}
+        >
+          <VisuallyHidden>
+            <DialogTitle>Property Photos</DialogTitle>
+          </VisuallyHidden>
+          <div className="relative w-full h-full flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 text-white">
+              <div>
+                <h3 className="font-medium">{transaction.propertyAddress}</h3>
+                <p className="text-sm text-white/70">{overviewPhotoIndex + 1} of {overviewPhotos.length} photos</p>
+              </div>
+            </div>
+            
+            {/* Main image */}
+            <div className="flex-1 relative flex items-center justify-center px-16">
+              {overviewPhotos[overviewPhotoIndex] && (
+                <img
+                  src={`/api/proxy-image?url=${encodeURIComponent(overviewPhotos[overviewPhotoIndex])}`}
+                  alt={`Photo ${overviewPhotoIndex + 1}`}
+                  className="max-w-full max-h-full object-contain"
+                  data-testid="img-fullscreen-photo"
+                />
+              )}
+              {overviewPhotos.length > 1 && (
+                <>
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 h-10 w-10 bg-white/10 hover:bg-white/20 text-white"
+                    onClick={() => setOverviewPhotoIndex((prev) => (prev - 1 + overviewPhotos.length) % overviewPhotos.length)}
+                    data-testid="button-photo-prev"
+                  >
+                    <ChevronLeft className="h-6 w-6" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 h-10 w-10 bg-white/10 hover:bg-white/20 text-white"
+                    onClick={() => setOverviewPhotoIndex((prev) => (prev + 1) % overviewPhotos.length)}
+                    data-testid="button-photo-next"
+                  >
+                    <ChevronRight className="h-6 w-6" />
+                  </Button>
+                </>
+              )}
+            </div>
+            
+            {/* Thumbnail strip */}
+            <div className="p-4 overflow-x-auto">
+              <div className="flex gap-2 justify-center">
+                {overviewPhotos.slice(0, 20).map((photo, idx) => (
+                  <div
+                    key={idx}
+                    className={`w-16 h-12 rounded overflow-hidden cursor-pointer flex-shrink-0 transition-all ${
+                      overviewPhotoIndex === idx ? 'ring-2 ring-primary scale-105' : 'opacity-60 hover:opacity-100'
+                    }`}
+                    onClick={() => setOverviewPhotoIndex(idx)}
+                    data-testid={`button-thumbnail-${idx}`}
+                  >
+                    <img
+                      src={`/api/proxy-image?url=${encodeURIComponent(photo)}`}
+                      alt={`Thumbnail ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
+                {overviewPhotos.length > 20 && (
+                  <div className="flex items-center justify-center w-16 h-12 text-white/70 text-xs">
+                    +{overviewPhotos.length - 20}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,0 +1,767 @@
+## Enhance Overview Tab - Editable Fields, Photo Modal & Agent UX
+
+Improve the Overview tab with editable fields, better photo browsing, and agent-focused features.
+
+---
+
+## Issue 1: Make Key Dates Editable
+
+**Current:** Key Dates shows "—" for Contract Date and Expected Closing with no way to edit.
+
+**Solution:** Add edit functionality with a date picker.
+
+**Implementation:**
+
+```tsx
+// Key Dates Card with Edit Mode
+function KeyDatesCard({ transaction, onUpdate }: KeyDatesCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [contractDate, setContractDate] = useState(transaction.contractDate || '');
+  const [expectedClosing, setExpectedClosing] = useState(transaction.expectedClosing || '');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await onUpdate({
+        contractDate: contractDate || null,
+        expectedClosing: expectedClosing || null,
+      });
+      setIsEditing(false);
+      toast.success('Key dates updated');
+    } catch (error) {
+      toast.error('Failed to update dates');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Calculate days until closing
+  const daysUntilClosing = expectedClosing 
+    ? Math.ceil((new Date(expectedClosing).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-base font-medium flex items-center gap-2">
+          <Calendar className="h-4 w-4" />
+          Key Dates
+        </CardTitle>
+        {!isEditing ? (
+          <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+        ) : (
+          <div className="flex gap-1">
+            <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={isSaving}>
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+            </Button>
+          </div>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {/* Contract Date */}
+        <div>
+          <p className="text-sm text-muted-foreground">Contract Date</p>
+          {isEditing ? (
+            <Input
+              type="date"
+              value={contractDate}
+              onChange={(e) => setContractDate(e.target.value)}
+              className="mt-1"
+            />
+          ) : (
+            <p className="font-medium">
+              {contractDate ? formatDate(contractDate) : '—'}
+            </p>
+          )}
+        </div>
+
+        {/* Expected Closing */}
+        <div>
+          <p className="text-sm text-muted-foreground">Expected Closing</p>
+          {isEditing ? (
+            <Input
+              type="date"
+              value={expectedClosing}
+              onChange={(e) => setExpectedClosing(e.target.value)}
+              className="mt-1"
+            />
+          ) : (
+            <div>
+              <p className="font-medium">
+                {expectedClosing ? formatDate(expectedClosing) : '—'}
+              </p>
+              {daysUntilClosing !== null && daysUntilClosing > 0 && (
+                <Badge variant="outline" className="mt-1">
+                  {daysUntilClosing} days remaining
+                </Badge>
+              )}
+              {daysUntilClosing !== null && daysUntilClosing <= 7 && daysUntilClosing > 0 && (
+                <Badge variant="destructive" className="mt-1">
+                  Closing soon!
+                </Badge>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Option Period (if applicable) */}
+        {transaction.optionPeriodEnd && (
+          <div>
+            <p className="text-sm text-muted-foreground">Option Period Ends</p>
+            <p className="font-medium">{formatDate(transaction.optionPeriodEnd)}</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+**API Endpoint:**
+
+```typescript
+// PATCH /api/transactions/:id/dates
+app.patch('/api/transactions/:id/dates', async (req, res) => {
+  const { id } = req.params;
+  const { contractDate, expectedClosing, optionPeriodEnd } = req.body;
+  
+  const updated = await storage.updateTransaction(id, {
+    contractDate,
+    expectedClosing,
+    optionPeriodEnd,
+  });
+  
+  res.json(updated);
+});
+```
+
+---
+
+## Issue 2: Make Coordinators Editable
+
+**Current:** Shows "No coordinators assigned" with no way to add them.
+
+**Solution:** Add ability to assign team members as coordinators.
+
+**Implementation:**
+
+```tsx
+// Coordinators Card with Assignment
+function CoordinatorsCard({ transaction, teamMembers, onUpdate }: CoordinatorsCardProps) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [selectedMember, setSelectedMember] = useState('');
+
+  const handleAddCoordinator = async () => {
+    if (!selectedMember) return;
+    
+    const updatedCoordinators = [
+      ...(transaction.coordinators || []),
+      selectedMember
+    ];
+    
+    await onUpdate({ coordinators: updatedCoordinators });
+    setSelectedMember('');
+    setIsAdding(false);
+    toast.success('Coordinator added');
+  };
+
+  const handleRemoveCoordinator = async (coordinatorId: string) => {
+    const updatedCoordinators = (transaction.coordinators || [])
+      .filter(id => id !== coordinatorId);
+    
+    await onUpdate({ coordinators: updatedCoordinators });
+    toast.success('Coordinator removed');
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-base font-medium flex items-center gap-2">
+          <Users className="h-4 w-4" />
+          Coordinators
+        </CardTitle>
+        <Button variant="ghost" size="sm" onClick={() => setIsAdding(true)}>
+          <Plus className="h-4 w-4" />
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {transaction.coordinators?.length > 0 ? (
+          <div className="space-y-2">
+            {transaction.coordinators.map((coordinatorId) => {
+              const member = teamMembers.find(m => m.id === coordinatorId);
+              return (
+                <div key={coordinatorId} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={member?.avatar} />
+                      <AvatarFallback>{member?.name?.[0]}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-medium">{member?.name}</p>
+                      <p className="text-xs text-muted-foreground">{member?.role}</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleRemoveCoordinator(coordinatorId)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No coordinators assigned</p>
+        )}
+
+        {/* Add Coordinator Dialog */}
+        {isAdding && (
+          <div className="mt-4 p-3 border rounded-lg space-y-3">
+            <Select value={selectedMember} onValueChange={setSelectedMember}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select team member" />
+              </SelectTrigger>
+              <SelectContent>
+                {teamMembers
+                  .filter(m => !transaction.coordinators?.includes(m.id))
+                  .map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {member.name} - {member.role}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsAdding(false)}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleAddCoordinator} disabled={!selectedMember}>
+                Add
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+---
+
+## Issue 3: Property Photos Modal with Navigation
+
+**Current:** Shows 8 photos with "+38 more photos available in MLS Data tab" but no way to view all.
+
+**Solution:** Click any photo to open a full-screen modal with all photos and arrow navigation.
+
+**Implementation:**
+
+```tsx
+// Photo Gallery with Modal
+function PropertyPhotosSection({ photos, imageInsights }: PropertyPhotosSectionProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const displayPhotos = photos.slice(0, 8);
+  const remainingCount = photos.length - 8;
+
+  const handlePhotoClick = (index: number) => {
+    setCurrentIndex(index);
+    setIsModalOpen(true);
+  };
+
+  const handlePrevious = () => {
+    setCurrentIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1));
+  };
+
+  const handleNext = () => {
+    setCurrentIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1));
+  };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isModalOpen) return;
+      if (e.key === 'ArrowLeft') handlePrevious();
+      if (e.key === 'ArrowRight') handleNext();
+      if (e.key === 'Escape') setIsModalOpen(false);
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isModalOpen]);
+
+  // Get room type from Image Insights
+  const getRoomType = (photoUrl: string) => {
+    const insight = imageInsights?.images?.find(img => 
+      photoUrl.includes(img.image?.split('/').pop() || '')
+    );
+    return insight?.classification?.imageOf || null;
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-medium flex items-center gap-2">
+            <ImageIcon className="h-4 w-4" />
+            Property Photos
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Photo Grid */}
+          <div className="grid grid-cols-4 gap-2">
+            {displayPhotos.map((photo, index) => (
+              <div
+                key={index}
+                className="relative aspect-[4/3] rounded-lg overflow-hidden cursor-pointer group"
+                onClick={() => handlePhotoClick(index)}
+              >
+                <img
+                  src={photo}
+                  alt={`Property photo ${index + 1}`}
+                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                />
+                {/* Room type badge */}
+                {getRoomType(photo) && (
+                  <Badge className="absolute bottom-1 left-1 text-xs bg-black/60">
+                    {getRoomType(photo)}
+                  </Badge>
+                )}
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                  <Expand className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* View All Button */}
+          {remainingCount > 0 && (
+            <Button
+              variant="outline"
+              className="w-full mt-4"
+              onClick={() => handlePhotoClick(0)}
+            >
+              <ImageIcon className="h-4 w-4 mr-2" />
+              View all {photos.length} photos
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Full Screen Photo Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black">
+          {/* Close button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 right-4 z-50 text-white hover:bg-white/20"
+            onClick={() => setIsModalOpen(false)}
+          >
+            <X className="h-6 w-6" />
+          </Button>
+
+          {/* Photo counter */}
+          <div className="absolute top-4 left-4 z-50 text-white bg-black/50 px-3 py-1 rounded-full">
+            {currentIndex + 1} / {photos.length}
+          </div>
+
+          {/* Room type badge */}
+          {getRoomType(photos[currentIndex]) && (
+            <Badge className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-black/50">
+              {getRoomType(photos[currentIndex])}
+            </Badge>
+          )}
+
+          {/* Main image */}
+          <div className="relative w-full h-[85vh] flex items-center justify-center">
+            <img
+              src={photos[currentIndex]}
+              alt={`Property photo ${currentIndex + 1}`}
+              className="max-w-full max-h-full object-contain"
+            />
+          </div>
+
+          {/* Navigation arrows */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute left-4 top-1/2 -translate-y-1/2 h-12 w-12 text-white hover:bg-white/20 rounded-full"
+            onClick={handlePrevious}
+          >
+            <ChevronLeft className="h-8 w-8" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-4 top-1/2 -translate-y-1/2 h-12 w-12 text-white hover:bg-white/20 rounded-full"
+            onClick={handleNext}
+          >
+            <ChevronRight className="h-8 w-8" />
+          </Button>
+
+          {/* Thumbnail strip */}
+          <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-2">
+            <div className="flex gap-2 overflow-x-auto justify-center">
+              {photos.map((photo, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentIndex(index)}
+                  className={cn(
+                    "flex-shrink-0 w-16 h-12 rounded overflow-hidden border-2 transition-all",
+                    index === currentIndex 
+                      ? "border-white" 
+                      : "border-transparent opacity-60 hover:opacity-100"
+                  )}
+                >
+                  <img
+                    src={photo}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+```
+
+---
+
+## Issue 4: Additional Agent UX Improvements (Based on Rechat)
+
+### A) Quick Actions Card
+
+Add a card with common agent actions:
+
+```tsx
+<Card>
+  <CardHeader>
+    <CardTitle className="text-base font-medium flex items-center gap-2">
+      <Zap className="h-4 w-4" />
+      Quick Actions
+    </CardTitle>
+  </CardHeader>
+  <CardContent className="grid grid-cols-2 gap-2">
+    <Button variant="outline" size="sm" className="justify-start">
+      <Mail className="h-4 w-4 mr-2" />
+      Email Client
+    </Button>
+    <Button variant="outline" size="sm" className="justify-start">
+      <FileText className="h-4 w-4 mr-2" />
+      Generate CMA
+    </Button>
+    <Button variant="outline" size="sm" className="justify-start">
+      <Share2 className="h-4 w-4 mr-2" />
+      Share Listing
+    </Button>
+    <Button variant="outline" size="sm" className="justify-start">
+      <Printer className="h-4 w-4 mr-2" />
+      Print Flyer
+    </Button>
+  </CardContent>
+</Card>
+```
+
+### B) Transaction Progress Indicator
+
+Show visual progress through the transaction lifecycle:
+
+```tsx
+<Card>
+  <CardHeader>
+    <CardTitle className="text-base font-medium flex items-center gap-2">
+      <TrendingUp className="h-4 w-4" />
+      Transaction Progress
+    </CardTitle>
+  </CardHeader>
+  <CardContent>
+    <div className="flex items-center justify-between">
+      {['Listed', 'Under Contract', 'Option Period', 'Pending', 'Closed'].map((stage, index) => {
+        const currentStageIndex = getStageIndex(transaction.status);
+        const isCompleted = index < currentStageIndex;
+        const isCurrent = index === currentStageIndex;
+        
+        return (
+          <div key={stage} className="flex flex-col items-center">
+            <div className={cn(
+              "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
+              isCompleted && "bg-green-500 text-white",
+              isCurrent && "bg-orange-500 text-white",
+              !isCompleted && !isCurrent && "bg-muted text-muted-foreground"
+            )}>
+              {isCompleted ? <Check className="h-4 w-4" /> : index + 1}
+            </div>
+            <span className={cn(
+              "text-xs mt-1",
+              isCurrent ? "font-medium" : "text-muted-foreground"
+            )}>
+              {stage}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+    {/* Progress bar */}
+    <div className="mt-4 h-2 bg-muted rounded-full overflow-hidden">
+      <div 
+        className="h-full bg-orange-500 transition-all"
+        style={{ width: `${(getStageIndex(transaction.status) / 4) * 100}%` }}
+      />
+    </div>
+  </CardContent>
+</Card>
+```
+
+### C) Important Deadlines Alert
+
+Show upcoming deadlines prominently:
+
+```tsx
+{(transaction.optionPeriodEnd || transaction.expectedClosing) && (
+  <Card className="border-orange-200 bg-orange-50">
+    <CardHeader className="pb-2">
+      <CardTitle className="text-base font-medium flex items-center gap-2 text-orange-800">
+        <AlertCircle className="h-4 w-4" />
+        Upcoming Deadlines
+      </CardTitle>
+    </CardHeader>
+    <CardContent className="space-y-2">
+      {transaction.optionPeriodEnd && (
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-orange-700">Option Period Ends</span>
+          <div className="text-right">
+            <p className="font-medium text-orange-900">
+              {formatDate(transaction.optionPeriodEnd)}
+            </p>
+            <p className="text-xs text-orange-600">
+              {getDaysRemaining(transaction.optionPeriodEnd)} days remaining
+            </p>
+          </div>
+        </div>
+      )}
+      {transaction.expectedClosing && (
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-orange-700">Expected Closing</span>
+          <div className="text-right">
+            <p className="font-medium text-orange-900">
+              {formatDate(transaction.expectedClosing)}
+            </p>
+            <p className="text-xs text-orange-600">
+              {getDaysRemaining(transaction.expectedClosing)} days remaining
+            </p>
+          </div>
+        </div>
+      )}
+    </CardContent>
+  </Card>
+)}
+```
+
+### D) Notes/Comments Section
+
+Allow agents to add internal notes:
+
+```tsx
+<Card>
+  <CardHeader className="flex flex-row items-center justify-between">
+    <CardTitle className="text-base font-medium flex items-center gap-2">
+      <StickyNote className="h-4 w-4" />
+      Notes
+    </CardTitle>
+    <Button variant="ghost" size="sm" onClick={() => setShowAddNote(true)}>
+      <Plus className="h-4 w-4" />
+    </Button>
+  </CardHeader>
+  <CardContent>
+    {transaction.notes?.length > 0 ? (
+      <div className="space-y-3">
+        {transaction.notes.map((note) => (
+          <div key={note.id} className="p-3 bg-muted rounded-lg">
+            <p className="text-sm">{note.content}</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              {note.author} • {formatDate(note.createdAt)}
+            </p>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <p className="text-sm text-muted-foreground">No notes yet</p>
+    )}
+  </CardContent>
+</Card>
+```
+
+### E) Client Information Card (if applicable)
+
+```tsx
+<Card>
+  <CardHeader className="flex flex-row items-center justify-between">
+    <CardTitle className="text-base font-medium flex items-center gap-2">
+      <User className="h-4 w-4" />
+      Client
+    </CardTitle>
+    <Button variant="ghost" size="sm">
+      <Pencil className="h-4 w-4" />
+    </Button>
+  </CardHeader>
+  <CardContent>
+    {transaction.client ? (
+      <div className="space-y-2">
+        <p className="font-medium">{transaction.client.name}</p>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Phone className="h-3 w-3" />
+          {transaction.client.phone}
+        </div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Mail className="h-3 w-3" />
+          {transaction.client.email}
+        </div>
+      </div>
+    ) : (
+      <Button variant="outline" size="sm" className="w-full">
+        <Plus className="h-4 w-4 mr-2" />
+        Add Client
+      </Button>
+    )}
+  </CardContent>
+</Card>
+```
+
+---
+
+## Updated Overview Tab Layout
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ← 13106 New Boston   [Active Listing]  # ACT2572987                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Overview | MLS Data | Docs | Marketing | CMA | Templates | Timeline     │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐            │
+│ │ Property Details│ │ Key Dates    [✏]│ │ Coordinators [+]│            │
+│ │ $434,990        │ │ Contract: 1/10  │ │ • Jane Smith    │            │
+│ │ 4 bed • 2 bath  │ │ Closing: 2/15   │ │   TC            │            │
+│ │ 1,850 sqft      │ │ [14 days left]  │ │                 │            │
+│ └─────────────────┘ └─────────────────┘ └─────────────────┘            │
+│                                                                         │
+│ ┌─────────────────────────────────────────────────────────────────┐    │
+│ │ ⚠️ Upcoming Deadlines                                           │    │
+│ │ Option Period Ends: Jan 17 (3 days) • Closing: Feb 15 (32 days)│    │
+│ └─────────────────────────────────────────────────────────────────┘    │
+│                                                                         │
+│ ┌─────────────────────────────────────────────────────────────────┐    │
+│ │ Transaction Progress                                             │    │
+│ │ [✓ Listed] ─── [● Under Contract] ─── [○ Pending] ─── [○ Closed]│    │
+│ │ ████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 40%       │    │
+│ └─────────────────────────────────────────────────────────────────┘    │
+│                                                                         │
+│ ┌─────────────────────────────────────────────────────────────────┐    │
+│ │ 📷 Property Photos                              [View all 46]    │    │
+│ │ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐│    │
+│ │ │     │ │     │ │     │ │     │ │     │ │     │ │     │ │     ││    │
+│ │ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘│    │
+│ └─────────────────────────────────────────────────────────────────┘    │
+│                                                                         │
+│ ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐         │
+│ │ 👤 Client     [✏]│ │ ⚡ Quick Actions │ │ 📝 Notes      [+]│         │
+│ │ John Buyer       │ │ [Email] [CMA]   │ │ "Client prefers  │         │
+│ │ 512-555-1234     │ │ [Share] [Print] │ │  morning calls"  │         │
+│ └──────────────────┘ └──────────────────┘ └──────────────────┘         │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Database Schema Updates (if needed)
+
+```sql
+-- Add columns to transactions table
+ALTER TABLE transactions ADD COLUMN contract_date DATE;
+ALTER TABLE transactions ADD COLUMN expected_closing DATE;
+ALTER TABLE transactions ADD COLUMN option_period_end DATE;
+ALTER TABLE transactions ADD COLUMN coordinators JSONB DEFAULT '[]';
+ALTER TABLE transactions ADD COLUMN client JSONB;
+ALTER TABLE transactions ADD COLUMN notes JSONB DEFAULT '[]';
+```
+
+---
+
+## API Endpoints
+
+```typescript
+// Update transaction dates
+PATCH /api/transactions/:id/dates
+Body: { contractDate, expectedClosing, optionPeriodEnd }
+
+// Update coordinators
+PATCH /api/transactions/:id/coordinators
+Body: { coordinators: string[] }
+
+// Add note
+POST /api/transactions/:id/notes
+Body: { content: string }
+
+// Update client
+PATCH /api/transactions/:id/client
+Body: { name, phone, email }
+```
+
+---
+
+## Testing Checklist
+
+**Key Dates:**
+- [ ] Click edit icon on Key Dates card
+- [ ] Date pickers appear for Contract Date and Expected Closing
+- [ ] Save updates the dates
+- [ ] "X days remaining" badge shows for upcoming closing
+
+**Coordinators:**
+- [ ] Click + icon to add coordinator
+- [ ] Dropdown shows available team members
+- [ ] Added coordinator appears with avatar
+- [ ] X button removes coordinator
+
+**Photo Modal:**
+- [ ] Click any photo to open modal
+- [ ] Left/right arrows navigate between photos
+- [ ] Keyboard arrows work (←/→)
+- [ ] ESC closes modal
+- [ ] Photo counter shows "X / Y"
+- [ ] Thumbnail strip at bottom is clickable
+- [ ] Room type badges show (from Image Insights)
+
+**Additional Features:**
+- [ ] Transaction Progress shows correct stage
+- [ ] Upcoming Deadlines alert shows when dates are set
+- [ ] Quick Actions buttons are functional
+- [ ] Notes can be added and displayed
+
+---
+
+## Files to Modify
+
+- `client/src/components/transaction-details.tsx` - Overview tab content
+- `client/src/components/key-dates-card.tsx` (new)
+- `client/src/components/coordinators-card.tsx` (new)
+- `client/src/components/photo-gallery-modal.tsx` (new)
+- `server/routes.ts` - New API endpoints
+- `shared/types.ts` - Update Transaction type
