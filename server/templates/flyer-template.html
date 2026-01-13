@@ -259,7 +259,7 @@
       justify-content: flex-start;
       align-items: flex-start;
       gap: 48px;
-      /* No padding-top - alignment handled by sub-wrappers */
+      padding-top: 20px;  /* Vertical offset to align with agent phone baseline */
     }
     
     /* Stats sub-groups for fine-tuned vertical alignment */
@@ -267,7 +267,7 @@
       display: flex;
       flex-direction: column;
       gap: 48px;
-      margin-top: 18px;  /* Push bedrooms/bathrooms down slightly */
+      /* No extra offset - group moves with stats-column padding */
     }
     
     .stats-bottom {
