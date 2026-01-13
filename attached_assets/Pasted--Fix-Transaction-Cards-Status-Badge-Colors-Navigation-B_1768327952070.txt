@@ -1,0 +1,396 @@
+## Fix Transaction Cards - Status Badge Colors & Navigation Buttons
+
+Multiple issues to fix on the Transactions list page.
+
+---
+
+## IMPORTANT: Global Status Color Consistency
+
+**The status badge colors defined below must be applied consistently across the ENTIRE web application, including:**
+
+- ✅ Transaction list cards (main page)
+- ✅ Transaction detail header (e.g., "13106 New Boston [Active Listing]")
+- ✅ Overview tab status display
+- ✅ MLS Data tab status badge
+- ✅ Any status filters or dropdowns
+- ✅ Timeline events showing status changes
+- ✅ Archive page listings
+- ✅ Any reports or exports showing status
+
+**Create a shared utility function** that can be imported anywhere:
+
+```tsx
+// lib/utils/status-colors.ts (or similar shared location)
+
+export const getStatusBadgeStyle = (status: string): string => {
+  const statusLower = status.toLowerCase();
+  
+  // Active / For Sale
+  if (statusLower.includes('active') || statusLower === 'for sale') {
+    return 'bg-green-500 text-white hover:bg-green-600';
+  }
+  // Under Contract / In Contract
+  if (statusLower.includes('contract')) {
+    return 'bg-orange-500 text-white hover:bg-orange-600';
+  }
+  // Pending
+  if (statusLower.includes('pending')) {
+    return 'bg-blue-500 text-white hover:bg-blue-600';
+  }
+  // Closed / Sold
+  if (statusLower.includes('closed') || statusLower.includes('sold')) {
+    return 'bg-red-500 text-white hover:bg-red-600';
+  }
+  // Withdrawn / Cancelled / Expired
+  if (statusLower.includes('withdrawn') || statusLower.includes('cancel') || statusLower.includes('expired')) {
+    return 'bg-gray-500 text-white hover:bg-gray-600';
+  }
+  // Coming Soon
+  if (statusLower.includes('coming soon')) {
+    return 'bg-purple-500 text-white hover:bg-purple-600';
+  }
+  
+  // Default fallback
+  return 'bg-gray-500 text-white';
+};
+
+// Optional: Get just the color for other uses (borders, text, etc.)
+export const getStatusColor = (status: string): string => {
+  const statusLower = status.toLowerCase();
+  
+  if (statusLower.includes('active') || statusLower === 'for sale') return '#22c55e'; // green-500
+  if (statusLower.includes('contract')) return '#f97316'; // orange-500
+  if (statusLower.includes('pending')) return '#3b82f6'; // blue-500
+  if (statusLower.includes('closed') || statusLower.includes('sold')) return '#ef4444'; // red-500
+  if (statusLower.includes('withdrawn') || statusLower.includes('cancel')) return '#6b7280'; // gray-500
+  if (statusLower.includes('coming soon')) return '#8b5cf6'; // purple-500
+  
+  return '#6b7280'; // gray-500 default
+};
+```
+
+**Then import and use everywhere:**
+
+```tsx
+import { getStatusBadgeStyle } from '@/lib/utils/status-colors';
+
+// Transaction card
+<Badge className={getStatusBadgeStyle(transaction.status)}>
+  {transaction.status}
+</Badge>
+
+// Transaction detail header
+<Badge className={getStatusBadgeStyle(mlsData.status)}>
+  {mlsData.status}
+</Badge>
+
+// MLS Data tab
+<Badge className={getStatusBadgeStyle(listing.status)}>
+  {listing.status}
+</Badge>
+```
+
+---
+
+---
+
+## Issue 1: Status Badge Colors
+
+**Current:** "In Contract" is orange, "Active Listing" has no distinct color (gray/default)
+
+**Required:** Color-code all status badges for quick visual identification
+
+**Status Color Scheme:**
+
+| Status | Color | Hex | Tailwind Class |
+|--------|-------|-----|----------------|
+| Active Listing | Green | #22c55e | `bg-green-500 text-white` |
+| In Contract / Under Contract | Orange | #f97316 | `bg-orange-500 text-white` |
+| Pending | Blue | #3b82f6 | `bg-blue-500 text-white` |
+| Closed / Sold | Red | #ef4444 | `bg-red-500 text-white` |
+| Withdrawn / Cancelled | Gray | #6b7280 | `bg-gray-500 text-white` |
+| Coming Soon | Purple | #8b5cf6 | `bg-purple-500 text-white` |
+
+**Implementation:**
+
+```tsx
+// Status badge styling helper
+const getStatusBadgeStyle = (status: string): string => {
+  const statusLower = status.toLowerCase();
+  
+  if (statusLower.includes('active') || statusLower === 'for sale') {
+    return 'bg-green-500 text-white hover:bg-green-600';
+  }
+  if (statusLower.includes('contract') || statusLower.includes('pending')) {
+    return 'bg-orange-500 text-white hover:bg-orange-600';
+  }
+  if (statusLower.includes('closed') || statusLower.includes('sold')) {
+    return 'bg-red-500 text-white hover:bg-red-600';
+  }
+  if (statusLower.includes('withdrawn') || statusLower.includes('cancel')) {
+    return 'bg-gray-500 text-white hover:bg-gray-600';
+  }
+  if (statusLower.includes('coming soon')) {
+    return 'bg-purple-500 text-white hover:bg-purple-600';
+  }
+  
+  // Default
+  return 'bg-gray-500 text-white';
+};
+
+// In transaction card:
+<Badge className={getStatusBadgeStyle(transaction.status)}>
+  {transaction.status}
+</Badge>
+```
+
+---
+
+## Issue 2: Fix Navigation Buttons
+
+**Current:** 
+- "MLS Sheet" and "Marketing" buttons exist but unclear where they navigate
+- Some cards show "Slack", "Emails", "Marketing" instead
+
+**Required:**
+- "MLS Sheet" → Navigate to transaction detail → MLS Data tab
+- "Marketing" → Navigate to transaction detail → Marketing tab
+- Make buttons consistent across all cards
+
+**Implementation:**
+
+```tsx
+// Navigation helper - opens transaction detail at specific tab
+const navigateToTab = (transactionId: number, tab: string) => {
+  // Option 1: URL parameter
+  navigate(`/transactions/${transactionId}?tab=${tab}`);
+  
+  // Option 2: Hash
+  navigate(`/transactions/${transactionId}#${tab}`);
+};
+
+// In transaction card:
+<div className="flex flex-wrap gap-2 mt-4">
+  <Button
+    variant="outline"
+    size="sm"
+    onClick={(e) => {
+      e.stopPropagation(); // Prevent card click
+      navigateToTab(transaction.id, 'mls-data');
+    }}
+  >
+    <FileText className="h-4 w-4 mr-1" />
+    MLS Sheet
+  </Button>
+  
+  <Button
+    variant="outline"
+    size="sm"
+    onClick={(e) => {
+      e.stopPropagation();
+      navigateToTab(transaction.id, 'marketing');
+    }}
+  >
+    <Image className="h-4 w-4 mr-1" />
+    Marketing
+  </Button>
+</div>
+```
+
+**In Transaction Detail Component:**
+
+```tsx
+// Read tab from URL and set active tab
+import { useSearchParams } from 'react-router-dom'; // or wouter equivalent
+
+function TransactionDetails() {
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'overview';
+  const [activeTab, setActiveTab] = useState(initialTab);
+  
+  // Update tab when URL changes
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+  
+  return (
+    <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <TabsList>
+        <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsTrigger value="mls-data">MLS Data</TabsTrigger>
+        <TabsTrigger value="docs">Docs</TabsTrigger>
+        <TabsTrigger value="marketing">Marketing</TabsTrigger>
+        {/* ... other tabs */}
+      </TabsList>
+      {/* Tab content */}
+    </Tabs>
+  );
+}
+```
+
+---
+
+## Issue 3: Standardize Card Buttons
+
+**Current Problem:** Some cards show different buttons:
+- Active Listing cards: "MLS Sheet", "Marketing"
+- In Contract cards: "Slack", "Emails", "Marketing"
+
+**Decision needed:** Should all cards show the same buttons, or different buttons based on status?
+
+**Option A: Same buttons for all (Recommended for consistency)**
+
+All cards show:
+```
+[MLS Data] [Marketing] [Docs]
+```
+
+**Option B: Context-aware buttons based on status**
+
+| Status | Buttons |
+|--------|---------|
+| Active Listing | MLS Data, Marketing, Create Flyer |
+| In Contract | Docs, Timeline, Slack |
+| Pending | Docs, Timeline |
+| Closed | Docs, Archive |
+
+**Recommended: Option A** - Keep it simple with consistent buttons:
+
+```tsx
+// Standard buttons for all transaction cards
+<div className="flex flex-wrap gap-2 mt-4">
+  <Button
+    variant="outline"
+    size="sm"
+    onClick={(e) => {
+      e.stopPropagation();
+      navigateToTab(transaction.id, 'mls-data');
+    }}
+  >
+    <FileSpreadsheet className="h-4 w-4 mr-1" />
+    MLS Data
+  </Button>
+  
+  <Button
+    variant="outline"
+    size="sm"
+    onClick={(e) => {
+      e.stopPropagation();
+      navigateToTab(transaction.id, 'marketing');
+    }}
+  >
+    <ImageIcon className="h-4 w-4 mr-1" />
+    Marketing
+  </Button>
+  
+  <Button
+    variant="outline"
+    size="sm"
+    onClick={(e) => {
+      e.stopPropagation();
+      navigateToTab(transaction.id, 'docs');
+    }}
+  >
+    <FileText className="h-4 w-4 mr-1" />
+    Docs
+  </Button>
+</div>
+```
+
+---
+
+## Issue 4: "Days Remaining" Color
+
+**Current:** Shows "14 days remaining" or "8 days remaining" in orange/red text
+
+**Enhancement:** Color-code based on urgency:
+
+```tsx
+const getDaysRemainingStyle = (days: number): string => {
+  if (days <= 7) return 'text-red-600 font-medium';      // Urgent
+  if (days <= 14) return 'text-orange-600 font-medium';  // Soon
+  return 'text-muted-foreground';                         // Normal
+};
+
+// In card:
+{daysRemaining !== null && (
+  <p className={getDaysRemainingStyle(daysRemaining)}>
+    {daysRemaining} days remaining
+  </p>
+)}
+```
+
+---
+
+## Summary of Changes
+
+| Item | Before | After |
+|------|--------|-------|
+| Active Listing badge | Gray/default | 🟢 Green |
+| In Contract badge | 🟠 Orange | 🟠 Orange (keep) |
+| Closed badge | ??? | 🔴 Red |
+| MLS Sheet button | Unknown action | → MLS Data tab |
+| Marketing button | Unknown action | → Marketing tab |
+| Card buttons | Inconsistent | Standardized: MLS Data, Marketing, Docs |
+
+---
+
+## Testing Checklist
+
+**Status Badges - Transaction List Page:**
+- [ ] "Active Listing" shows green badge
+- [ ] "In Contract" shows orange badge
+- [ ] "Closed" shows red badge
+- [ ] "Withdrawn" shows gray badge
+
+**Status Badges - Transaction Detail Header:**
+- [ ] Status badge next to address uses same colors
+- [ ] "Active Listing" is green
+- [ ] "In Contract" is orange
+
+**Status Badges - MLS Data Tab:**
+- [ ] Status badge in Property Overview uses same colors
+- [ ] Matches transaction list color
+
+**Status Badges - Other Locations:**
+- [ ] Archive page uses same status colors
+- [ ] Any status dropdowns/filters use consistent colors
+- [ ] Timeline status change events use consistent colors
+
+**Navigation Buttons:**
+- [ ] Click "MLS Data" → Opens transaction at MLS Data tab
+- [ ] Click "Marketing" → Opens transaction at Marketing tab
+- [ ] Click "Docs" → Opens transaction at Docs tab
+- [ ] Clicking button doesn't also trigger card click
+
+**Days Remaining:**
+- [ ] ≤7 days shows red text
+- [ ] 8-14 days shows orange text
+- [ ] >14 days shows normal text
+
+---
+
+## Files to Modify
+
+**Create shared utility (NEW):**
+- `client/src/lib/utils/status-colors.ts` - Shared status color functions
+
+**Update all components using status badges:**
+- `client/src/pages/transactions.tsx` - Transaction list page
+- `client/src/components/transaction-card.tsx` - If separate component
+- `client/src/components/transaction-details.tsx` - Detail header + tabs
+- `client/src/components/mls-data-section.tsx` - MLS Data tab status
+- `client/src/pages/archive.tsx` - Archive page (if exists)
+- Any other component displaying transaction status
+
+**Search codebase for existing status badge usage:**
+```bash
+# Find all files that might have status badges
+grep -r "status" --include="*.tsx" client/src/
+grep -r "Badge" --include="*.tsx" client/src/
+grep -r "Active Listing" --include="*.tsx" client/src/
+grep -r "In Contract" --include="*.tsx" client/src/
+```

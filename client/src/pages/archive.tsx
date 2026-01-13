@@ -10,6 +10,7 @@ import type { Transaction, Coordinator, Activity } from "@shared/schema";
 export default function Archive() {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [initialTab, setInitialTab] = useState<string>("overview");
 
   const { data: transactions = [], isLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
@@ -39,7 +40,11 @@ export default function Archive() {
         transaction={selectedTransaction}
         coordinators={coordinators}
         activities={activities}
-        onBack={() => setSelectedTransaction(null)}
+        onBack={() => {
+          setSelectedTransaction(null);
+          setInitialTab("overview");
+        }}
+        initialTab={initialTab}
       />
     );
   }
@@ -85,6 +90,18 @@ export default function Archive() {
               transaction={transaction}
               coordinators={coordinators}
               onClick={() => setSelectedTransaction(transaction)}
+              onMarketingClick={() => {
+                setInitialTab("marketing");
+                setSelectedTransaction(transaction);
+              }}
+              onMLSClick={() => {
+                setInitialTab("mls");
+                setSelectedTransaction(transaction);
+              }}
+              onDocsClick={() => {
+                setInitialTab("docs");
+                setSelectedTransaction(transaction);
+              }}
             />
           ))}
         </div>

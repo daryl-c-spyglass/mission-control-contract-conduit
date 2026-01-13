@@ -78,6 +78,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getStatusBadgeStyle, getStatusLabel } from "@/lib/utils/status-colors";
 import type { Transaction, Coordinator, Activity as ActivityType, CMAComparable, MLSData, MarketingAsset, ContractDocument } from "@shared/schema";
 
 interface TransactionDetailsProps {
@@ -88,15 +89,6 @@ interface TransactionDetailsProps {
   onMarketingClick?: () => void;
   initialTab?: string;
 }
-
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  active: { label: "Active Listing", variant: "secondary" },
-  in_contract: { label: "In Contract", variant: "default" },
-  pending_inspection: { label: "Pending Inspection", variant: "secondary" },
-  clear_to_close: { label: "Clear to Close", variant: "outline" },
-  closed: { label: "Closed", variant: "secondary" },
-  cancelled: { label: "Cancelled", variant: "destructive" },
-};
 
 function formatDate(dateString: string | null): string {
   if (!dateString) return "—";
@@ -505,7 +497,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [templateCategory, setTemplateCategory] = useState<string>("posts");
   const [currentPhoto, setCurrentPhoto] = useState(0);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
-  const status = statusConfig[transaction.status] || statusConfig.in_contract;
+  const statusLabel = getStatusLabel(transaction.status);
   const mlsData = transaction.mlsData as MLSData | null;
   const cmaData = transaction.cmaData as CMAComparable[] | null;
   const [selectedCMAProperty, setSelectedCMAProperty] = useState<CMAComparable | null>(null);
@@ -801,8 +793,8 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
               <h1 className="text-lg sm:text-2xl font-semibold truncate" data-testid="text-detail-address">
                 {transaction.propertyAddress}
               </h1>
-              <Badge variant={status.variant} className="shrink-0" data-testid="badge-detail-status">
-                {status.label}
+              <Badge className={`shrink-0 ${getStatusBadgeStyle(transaction.status)}`} data-testid="badge-detail-status">
+                {statusLabel}
               </Badge>
             </div>
             {transaction.mlsNumber && (

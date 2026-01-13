@@ -130,9 +130,16 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen }: Das
               transaction={transaction}
               coordinators={coordinators}
               onClick={() => setSelectedTransaction(transaction)}
-              onMarketingClick={() => setMarketingTransaction(transaction)}
+              onMarketingClick={() => {
+                setInitialTab("marketing");
+                setSelectedTransaction(transaction);
+              }}
               onMLSClick={() => {
                 setInitialTab("mls");
+                setSelectedTransaction(transaction);
+              }}
+              onDocsClick={() => {
+                setInitialTab("docs");
                 setSelectedTransaction(transaction);
               }}
             />

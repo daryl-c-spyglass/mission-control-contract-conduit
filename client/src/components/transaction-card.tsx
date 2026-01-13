@@ -1,9 +1,10 @@
-import { Calendar, ExternalLink, Hash, Mail, MessageSquare, Users, Image } from "lucide-react";
+import { Calendar, Hash, Mail, MessageSquare, Users, FileSpreadsheet, Image as ImageIcon, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { Transaction, Coordinator } from "@shared/schema";
+import { getStatusBadgeStyle, getStatusLabel, getDaysRemainingStyle } from "@/lib/utils/status-colors";
 
 interface TransactionCardProps {
   transaction: Transaction;
@@ -11,16 +12,8 @@ interface TransactionCardProps {
   onClick: () => void;
   onMarketingClick?: () => void;
   onMLSClick?: () => void;
+  onDocsClick?: () => void;
 }
-
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  active: { label: "Active Listing", variant: "secondary" },
-  in_contract: { label: "In Contract", variant: "default" },
-  pending_inspection: { label: "Pending Inspection", variant: "secondary" },
-  clear_to_close: { label: "Clear to Close", variant: "outline" },
-  closed: { label: "Closed", variant: "secondary" },
-  cancelled: { label: "Cancelled", variant: "destructive" },
-};
 
 function getDaysRemaining(closingDate: string | null): number | null {
   if (!closingDate) return null;
@@ -39,8 +32,8 @@ function formatDate(dateString: string | null): string {
   });
 }
 
-export function TransactionCard({ transaction, coordinators, onClick, onMarketingClick, onMLSClick }: TransactionCardProps) {
-  const status = statusConfig[transaction.status] || statusConfig.in_contract;
+export function TransactionCard({ transaction, coordinators, onClick, onMarketingClick, onMLSClick, onDocsClick }: TransactionCardProps) {
+  const statusLabel = getStatusLabel(transaction.status);
   const daysRemaining = getDaysRemaining(transaction.closingDate);
   
   const transactionCoordinators = coordinators.filter(
@@ -67,8 +60,8 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
             </div>
           )}
         </div>
-        <Badge variant={status.variant} data-testid={`badge-status-${transaction.id}`}>
-          {status.label}
+        <Badge className={getStatusBadgeStyle(transaction.status)} data-testid={`badge-status-${transaction.id}`}>
+          {statusLabel}
         </Badge>
       </CardHeader>
 
@@ -95,7 +88,7 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
         </div>
 
         {daysRemaining !== null && transaction.status !== "closed" && transaction.status !== "cancelled" && (
-          <div className={`text-sm font-medium ${daysRemaining < 7 ? "text-destructive" : daysRemaining < 14 ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"}`}>
+          <div className={`text-sm ${getDaysRemainingStyle(daysRemaining)}`}>
             {daysRemaining > 0 ? `${daysRemaining} days remaining` : daysRemaining === 0 ? "Closing today" : `${Math.abs(daysRemaining)} days overdue`}
           </div>
         )}
@@ -124,7 +117,43 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
           </div>
         )}
 
-        <div className="flex items-center gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 pt-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+          {onMLSClick && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={onMLSClick}
+              data-testid={`button-mls-${transaction.id}`}
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              MLS Data
+            </Button>
+          )}
+          {onMarketingClick && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={onMarketingClick}
+              data-testid={`button-marketing-${transaction.id}`}
+            >
+              <ImageIcon className="h-3.5 w-3.5" />
+              Marketing
+            </Button>
+          )}
+          {onDocsClick && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={onDocsClick}
+              data-testid={`button-docs-${transaction.id}`}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Docs
+            </Button>
+          )}
           {transaction.slackChannelId && (
             <Button
               size="sm"
@@ -146,30 +175,6 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
             >
               <Mail className="h-3.5 w-3.5" />
               Emails
-            </Button>
-          )}
-          {transaction.mlsData && onMLSClick ? (
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5"
-              onClick={onMLSClick}
-              data-testid={`button-mls-${transaction.id}`}
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              MLS Sheet
-            </Button>
-          ) : null}
-          {onMarketingClick && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5"
-              onClick={onMarketingClick}
-              data-testid={`button-marketing-${transaction.id}`}
-            >
-              <Image className="h-3.5 w-3.5" />
-              Marketing
             </Button>
           )}
         </div>
