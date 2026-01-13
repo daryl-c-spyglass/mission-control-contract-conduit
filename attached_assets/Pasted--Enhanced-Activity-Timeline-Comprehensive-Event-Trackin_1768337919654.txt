@@ -1,0 +1,632 @@
+## Enhanced Activity Timeline - Comprehensive Event Tracking with Emojis
+
+The Timeline tab should capture all important user actions with relevant emojis/icons for each activity type.
+
+---
+
+## Current Problem
+
+The timeline only shows repetitive "Auto-synced MLS data" entries. It should track meaningful user activities across the entire transaction lifecycle.
+
+---
+
+## Activity Types to Track
+
+### Transaction Events
+| Activity | Emoji | Example Message |
+|----------|-------|-----------------|
+| Transaction created | 🏠 | Transaction created for 13106 New Boston |
+| Transaction archived | 📦 | Transaction moved to archive |
+| Transaction restored | ♻️ | Transaction restored from archive |
+| Status changed | 🔄 | Status changed from Active Listing to Under Contract |
+
+### MLS Data Events
+| Activity | Emoji | Example Message |
+|----------|-------|-----------------|
+| MLS data synced | 🔄 | MLS data synced: 23 photos, 10 comparables |
+| Price changed | 💰 | Price updated: $434,990 → $419,990 |
+| Status changed in MLS | 📊 | MLS status changed to Pending |
+| Photos updated | 📷 | 5 new photos added from MLS |
+
+### Document Events
+| Activity | Emoji | Example Message |
+|----------|-------|-----------------|
+| Document uploaded | 📄 | Document uploaded: Purchase_Agreement.pdf |
+| Document deleted | 🗑️ | Document deleted: Old_Contract.pdf |
+| Document downloaded | ⬇️ | Document downloaded: Inspection_Report.pdf |
+| Multiple docs uploaded | 📁 | 3 documents uploaded |
+
+### Marketing Events
+| Activity | Emoji | Example Message |
+|----------|-------|-----------------|
+| Graphic created | 🎨 | Instagram Post graphic created |
+| Flyer created | 📰 | Print flyer generated |
+| Quick create all | ✨ | Generated 3 marketing graphics |
+| Asset downloaded | ⬇️ | Downloaded Story graphic |
+| Asset deleted | 🗑️ | Marketing asset deleted |
+
+### CMA Events
+| Activity | Emoji | Example Message |
+|----------|-------|-----------------|
+| CMA created | 📈 | CMA created with 10 comparables |
+| CMA updated | ✏️ | CMA updated: added 3 properties |
+| CMA shared | 🔗 | CMA share link generated |
+| CMA share revoked | 🚫 | CMA share link removed |
+
+### Team/Coordinator Events
+| Activity | Emoji | Example Message |
+|----------|-------|-----------------|
+| Coordinator assigned | 👤 | Coordinator assigned: Randi Arroyo |
+| Coordinator removed | 👤 | Coordinator removed: John Smith |
+| Note added | 📝 | Note added to transaction |
+
+### Key Dates Events
+| Activity | Emoji | Example Message |
+|----------|-------|-----------------|
+| Contract date set | 📅 | Contract date set: Jan 15, 2025 |
+| Closing date set | 🎯 | Expected closing: Feb 28, 2025 |
+| Date updated | ✏️ | Closing date changed: Feb 28 → Mar 5 |
+| Deadline approaching | ⏰ | Option period ends in 3 days |
+
+### Communication Events
+| Activity | Emoji | Example Message |
+|----------|-------|-----------------|
+| Email sent | 📧 | Email sent to client |
+| Slack notification | 💬 | Posted to #transactions channel |
+
+---
+
+## Implementation
+
+### 1. Database Schema for Timeline Events
+
+```typescript
+// shared/schema.ts
+export const timelineEvents = pgTable("timeline_events", {
+  id: serial("id").primaryKey(),
+  transactionId: integer("transaction_id").references(() => transactions.id).notNull(),
+  userId: varchar("user_id").references(() => users.id),
+  eventType: varchar("event_type", { length: 50 }).notNull(),
+  eventCategory: varchar("event_category", { length: 30 }).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  metadata: json("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type TimelineEvent = typeof timelineEvents.$inferSelect;
+export type InsertTimelineEvent = typeof timelineEvents.$inferInsert;
+```
+
+### 2. Event Type Configuration
+
+```typescript
+// lib/timeline-config.ts
+export const TIMELINE_EVENT_CONFIG: Record<string, { emoji: string; color: string }> = {
+  // Transaction
+  'transaction_created': { emoji: '🏠', color: 'bg-green-500' },
+  'transaction_archived': { emoji: '📦', color: 'bg-gray-500' },
+  'transaction_restored': { emoji: '♻️', color: 'bg-blue-500' },
+  'status_changed': { emoji: '🔄', color: 'bg-purple-500' },
+  
+  // MLS
+  'mls_synced': { emoji: '🔄', color: 'bg-blue-500' },
+  'price_changed': { emoji: '💰', color: 'bg-yellow-500' },
+  'mls_status_changed': { emoji: '📊', color: 'bg-orange-500' },
+  'photos_updated': { emoji: '📷', color: 'bg-pink-500' },
+  
+  // Documents
+  'document_uploaded': { emoji: '📄', color: 'bg-blue-500' },
+  'document_deleted': { emoji: '🗑️', color: 'bg-red-500' },
+  'document_downloaded': { emoji: '⬇️', color: 'bg-green-500' },
+  'documents_batch_uploaded': { emoji: '📁', color: 'bg-blue-500' },
+  
+  // Marketing
+  'graphic_created': { emoji: '🎨', color: 'bg-pink-500' },
+  'flyer_created': { emoji: '📰', color: 'bg-orange-500' },
+  'quick_create_all': { emoji: '✨', color: 'bg-purple-500' },
+  'asset_downloaded': { emoji: '⬇️', color: 'bg-green-500' },
+  'asset_deleted': { emoji: '🗑️', color: 'bg-red-500' },
+  
+  // CMA
+  'cma_created': { emoji: '📈', color: 'bg-green-500' },
+  'cma_updated': { emoji: '✏️', color: 'bg-blue-500' },
+  'cma_shared': { emoji: '🔗', color: 'bg-purple-500' },
+  'cma_share_revoked': { emoji: '🚫', color: 'bg-red-500' },
+  
+  // Team
+  'coordinator_assigned': { emoji: '👤', color: 'bg-blue-500' },
+  'coordinator_removed': { emoji: '👤', color: 'bg-gray-500' },
+  'note_added': { emoji: '📝', color: 'bg-yellow-500' },
+  
+  // Dates
+  'contract_date_set': { emoji: '📅', color: 'bg-blue-500' },
+  'closing_date_set': { emoji: '🎯', color: 'bg-green-500' },
+  'date_updated': { emoji: '✏️', color: 'bg-orange-500' },
+  'deadline_approaching': { emoji: '⏰', color: 'bg-red-500' },
+  
+  // Communication
+  'email_sent': { emoji: '📧', color: 'bg-blue-500' },
+  'slack_notification': { emoji: '💬', color: 'bg-purple-500' },
+  
+  // Default
+  'default': { emoji: '📌', color: 'bg-gray-500' },
+};
+
+export function getEventConfig(eventType: string) {
+  return TIMELINE_EVENT_CONFIG[eventType] || TIMELINE_EVENT_CONFIG['default'];
+}
+```
+
+### 3. Timeline Service (Backend)
+
+```typescript
+// server/services/timeline.ts
+import { storage } from '../storage';
+import { InsertTimelineEvent } from '@shared/schema';
+
+export async function logTimelineEvent(
+  transactionId: number,
+  eventType: string,
+  title: string,
+  options?: {
+    userId?: string;
+    description?: string;
+    metadata?: Record<string, any>;
+  }
+) {
+  const event: InsertTimelineEvent = {
+    transactionId,
+    eventType,
+    eventCategory: getCategoryFromType(eventType),
+    title,
+    userId: options?.userId,
+    description: options?.description,
+    metadata: options?.metadata,
+  };
+
+  return await storage.createTimelineEvent(event);
+}
+
+function getCategoryFromType(eventType: string): string {
+  if (eventType.startsWith('transaction_') || eventType === 'status_changed') return 'transaction';
+  if (eventType.startsWith('mls_') || eventType === 'price_changed' || eventType === 'photos_updated') return 'mls';
+  if (eventType.startsWith('document_')) return 'documents';
+  if (eventType.includes('graphic') || eventType.includes('flyer') || eventType.includes('asset') || eventType === 'quick_create_all') return 'marketing';
+  if (eventType.startsWith('cma_')) return 'cma';
+  if (eventType.startsWith('coordinator_') || eventType === 'note_added') return 'team';
+  if (eventType.includes('date') || eventType === 'deadline_approaching') return 'dates';
+  if (eventType === 'email_sent' || eventType === 'slack_notification') return 'communication';
+  return 'other';
+}
+
+// Convenience functions for common events
+export const TimelineLogger = {
+  // Transaction events
+  transactionCreated: (transactionId: number, address: string, userId?: string) =>
+    logTimelineEvent(transactionId, 'transaction_created', `Transaction created for ${address}`, { userId }),
+
+  statusChanged: (transactionId: number, oldStatus: string, newStatus: string, userId?: string) =>
+    logTimelineEvent(transactionId, 'status_changed', `Status changed from ${oldStatus} to ${newStatus}`, { userId }),
+
+  // MLS events
+  mlsSynced: (transactionId: number, photoCount: number, compCount: number) =>
+    logTimelineEvent(transactionId, 'mls_synced', `MLS data synced: ${photoCount} photos, ${compCount} comparables`),
+
+  priceChanged: (transactionId: number, oldPrice: number, newPrice: number) =>
+    logTimelineEvent(transactionId, 'price_changed', `Price updated: $${oldPrice.toLocaleString()} → $${newPrice.toLocaleString()}`, {
+      metadata: { oldPrice, newPrice, change: newPrice - oldPrice }
+    }),
+
+  // Document events
+  documentUploaded: (transactionId: number, filename: string, userId?: string) =>
+    logTimelineEvent(transactionId, 'document_uploaded', `Document uploaded: ${filename}`, { userId }),
+
+  documentsUploaded: (transactionId: number, count: number, userId?: string) =>
+    logTimelineEvent(transactionId, 'documents_batch_uploaded', `${count} documents uploaded`, { userId }),
+
+  documentDeleted: (transactionId: number, filename: string, userId?: string) =>
+    logTimelineEvent(transactionId, 'document_deleted', `Document deleted: ${filename}`, { userId }),
+
+  // Marketing events
+  graphicCreated: (transactionId: number, format: string, userId?: string) =>
+    logTimelineEvent(transactionId, 'graphic_created', `${format} graphic created`, { userId }),
+
+  flyerCreated: (transactionId: number, userId?: string) =>
+    logTimelineEvent(transactionId, 'flyer_created', `Print flyer generated`, { userId }),
+
+  quickCreateAll: (transactionId: number, count: number, userId?: string) =>
+    logTimelineEvent(transactionId, 'quick_create_all', `Generated ${count} marketing graphics`, { userId }),
+
+  // CMA events
+  cmaCreated: (transactionId: number, compCount: number, userId?: string) =>
+    logTimelineEvent(transactionId, 'cma_created', `CMA created with ${compCount} comparables`, { userId }),
+
+  cmaShared: (transactionId: number, userId?: string) =>
+    logTimelineEvent(transactionId, 'cma_shared', `CMA share link generated`, { userId }),
+
+  // Team events
+  coordinatorAssigned: (transactionId: number, name: string, userId?: string) =>
+    logTimelineEvent(transactionId, 'coordinator_assigned', `Coordinator assigned: ${name}`, { userId }),
+
+  // Date events
+  closingDateSet: (transactionId: number, date: string, userId?: string) =>
+    logTimelineEvent(transactionId, 'closing_date_set', `Expected closing: ${date}`, { userId }),
+};
+```
+
+### 4. Add Timeline Logging to Existing Endpoints
+
+```typescript
+// Example: In document upload endpoint
+app.post('/api/transactions/:id/documents', upload.array('files'), async (req, res) => {
+  const transactionId = parseInt(req.params.id);
+  const files = req.files as Express.Multer.File[];
+  
+  // ... existing upload logic ...
+  
+  // Log to timeline
+  if (files.length === 1) {
+    await TimelineLogger.documentUploaded(transactionId, files[0].originalname, req.user?.id);
+  } else {
+    await TimelineLogger.documentsUploaded(transactionId, files.length, req.user?.id);
+  }
+  
+  res.json({ success: true });
+});
+
+// Example: In graphics render endpoint
+app.post('/api/graphics/render', async (req, res) => {
+  const { transactionId, format } = req.body;
+  
+  // ... existing render logic ...
+  
+  // Log to timeline
+  const formatLabel = format === 'square' ? 'Instagram Post' : 
+                      format === 'story' ? 'Instagram Story' : 'Facebook Post';
+  await TimelineLogger.graphicCreated(transactionId, formatLabel, req.user?.id);
+  
+  res.send(imageBuffer);
+});
+
+// Example: In flyer render endpoint
+app.post('/api/flyer/render', async (req, res) => {
+  const { transactionId } = req.body;
+  
+  // ... existing render logic ...
+  
+  // Log to timeline
+  await TimelineLogger.flyerCreated(transactionId, req.user?.id);
+  
+  res.send(pdfBuffer);
+});
+
+// Example: In CMA share endpoint
+app.post('/api/cmas/:id/share', async (req, res) => {
+  const cma = await storage.getCma(req.params.id);
+  
+  // ... existing share logic ...
+  
+  // Log to timeline
+  if (cma?.transactionId) {
+    await TimelineLogger.cmaShared(cma.transactionId, req.user?.id);
+  }
+  
+  res.json({ shareUrl });
+});
+```
+
+### 5. Enhanced Timeline Tab Component
+
+```tsx
+// components/timeline-tab.tsx
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { cn } from '@/lib/utils';
+import { getEventConfig, TIMELINE_EVENT_CONFIG } from '@/lib/timeline-config';
+
+interface TimelineTabProps {
+  transactionId: number;
+}
+
+const CATEGORY_FILTERS = [
+  { value: 'all', label: 'All Activities' },
+  { value: 'transaction', label: 'Transaction' },
+  { value: 'mls', label: 'MLS Data' },
+  { value: 'documents', label: 'Documents' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'cma', label: 'CMA' },
+  { value: 'team', label: 'Team' },
+  { value: 'dates', label: 'Dates' },
+];
+
+export function TimelineTab({ transactionId }: TimelineTabProps) {
+  const [categoryFilter, setCategoryFilter] = useState('all');
+
+  const { data: events = [], isLoading } = useQuery({
+    queryKey: ['timeline', transactionId, categoryFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (categoryFilter !== 'all') {
+        params.set('category', categoryFilter);
+      }
+      const res = await fetch(`/api/transactions/${transactionId}/timeline?${params}`);
+      if (!res.ok) throw new Error('Failed to fetch timeline');
+      return res.json();
+    },
+  });
+
+  // Group events by date
+  const groupedEvents = groupEventsByDate(events);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Activity Timeline</h2>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CATEGORY_FILTERS.map((filter) => (
+              <SelectItem key={filter.value} value={filter.value}>
+                {filter.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Timeline */}
+      {events.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            No activity recorded yet
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-8">
+          {Object.entries(groupedEvents).map(([date, dateEvents]) => (
+            <div key={date}>
+              {/* Date Header */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-sm font-medium text-muted-foreground">{date}</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              {/* Events for this date */}
+              <div className="space-y-3">
+                {(dateEvents as any[]).map((event) => (
+                  <TimelineEventCard key={event.id} event={event} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TimelineEventCard({ event }: { event: any }) {
+  const config = getEventConfig(event.eventType);
+
+  return (
+    <div className="flex gap-4 items-start">
+      {/* Emoji indicator */}
+      <div className={cn(
+        "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg",
+        config.color.replace('bg-', 'bg-opacity-20 bg-')
+      )}>
+        {config.emoji}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="font-medium text-sm">{event.title}</p>
+          <Badge variant="secondary" className="text-xs">
+            {formatCategory(event.eventCategory)}
+          </Badge>
+        </div>
+        {event.description && (
+          <p className="text-sm text-muted-foreground mt-1">{event.description}</p>
+        )}
+        <p className="text-xs text-muted-foreground mt-1">
+          {formatTime(event.createdAt)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Helper functions
+function groupEventsByDate(events: any[]): Record<string, any[]> {
+  const groups: Record<string, any[]> = {};
+  
+  events.forEach((event) => {
+    const date = new Date(event.createdAt).toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    
+    if (!groups[date]) {
+      groups[date] = [];
+    }
+    groups[date].push(event);
+  });
+  
+  return groups;
+}
+
+function formatTime(dateString: string): string {
+  return new Date(dateString).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+function formatCategory(category: string): string {
+  return category.charAt(0).toUpperCase() + category.slice(1);
+}
+```
+
+### 6. API Endpoint for Timeline
+
+```typescript
+// server/routes.ts
+app.get('/api/transactions/:id/timeline', async (req, res) => {
+  try {
+    const transactionId = parseInt(req.params.id);
+    const category = req.query.category as string | undefined;
+    
+    let events = await storage.getTimelineEvents(transactionId);
+    
+    // Filter by category if specified
+    if (category && category !== 'all') {
+      events = events.filter(e => e.eventCategory === category);
+    }
+    
+    // Sort by newest first
+    events.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    res.json(events);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch timeline' });
+  }
+});
+```
+
+### 7. Storage Methods
+
+```typescript
+// server/storage.ts
+async getTimelineEvents(transactionId: number): Promise<TimelineEvent[]> {
+  return await this.db.select()
+    .from(timelineEvents)
+    .where(eq(timelineEvents.transactionId, transactionId))
+    .orderBy(desc(timelineEvents.createdAt));
+}
+
+async createTimelineEvent(event: InsertTimelineEvent): Promise<TimelineEvent> {
+  const result = await this.db.insert(timelineEvents).values(event).returning();
+  return result[0];
+}
+```
+
+---
+
+## Visual Design
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Activity Timeline                                    [Filter: All ▼]    │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│ ─────────────── Tuesday, January 14, 2025 ───────────────               │
+│                                                                         │
+│ 🎨  Instagram Post graphic created                    Marketing         │
+│     4:44 AM                                                             │
+│                                                                         │
+│ 📰  Print flyer generated                             Marketing         │
+│     4:30 AM                                                             │
+│                                                                         │
+│ 📄  Document uploaded: Purchase_Agreement.pdf         Documents         │
+│     4:15 AM                                                             │
+│                                                                         │
+│ 🔄  MLS data synced: 23 photos, 10 comparables        MLS               │
+│     4:00 AM                                                             │
+│                                                                         │
+│ ─────────────── Monday, January 13, 2025 ────────────────               │
+│                                                                         │
+│ 📈  CMA created with 10 comparables                   CMA               │
+│     3:45 PM                                                             │
+│                                                                         │
+│ 👤  Coordinator assigned: Randi Arroyo                Team              │
+│     2:30 PM                                                             │
+│                                                                         │
+│ 🏠  Transaction created for 13106 New Boston          Transaction       │
+│     2:00 PM                                                             │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## MLS Sync Deduplication
+
+To prevent duplicate "MLS synced" entries, only log when there are actual changes:
+
+```typescript
+// In MLS sync function
+async function syncMLSData(transactionId: number, mlsNumber: string) {
+  const currentData = await storage.getMLSData(transactionId);
+  const newData = await fetchFromRepliers(mlsNumber);
+  
+  // Check for meaningful changes
+  const hasChanges = 
+    currentData?.photoCount !== newData.images?.length ||
+    currentData?.listPrice !== newData.listPrice ||
+    currentData?.status !== newData.status;
+  
+  if (hasChanges) {
+    // Update data
+    await storage.updateMLSData(transactionId, newData);
+    
+    // Log specific changes
+    if (currentData?.listPrice !== newData.listPrice) {
+      await TimelineLogger.priceChanged(transactionId, currentData?.listPrice || 0, newData.listPrice);
+    }
+    
+    if (currentData?.status !== newData.status) {
+      await logTimelineEvent(transactionId, 'mls_status_changed', 
+        `MLS status changed to ${newData.status}`);
+    }
+    
+    // Only log generic sync if nothing specific changed
+    if (currentData?.listPrice === newData.listPrice && currentData?.status === newData.status) {
+      await TimelineLogger.mlsSynced(transactionId, newData.images?.length || 0, newData.comparables?.length || 0);
+    }
+  }
+  // Don't log anything if no changes
+}
+```
+
+---
+
+## Summary
+
+| Component | Purpose |
+|-----------|---------|
+| `timeline_events` table | Store all events |
+| `timeline-config.ts` | Emoji and color mappings |
+| `TimelineLogger` service | Easy event logging |
+| `TimelineTab` component | Display with filters |
+| Endpoint integrations | Log events on user actions |
+
+### Events to Track
+
+- Transaction: created, archived, status changed
+- MLS: synced (with changes), price changed, photos updated
+- Documents: uploaded, deleted, downloaded
+- Marketing: graphics created, flyer created, quick create all
+- CMA: created, updated, shared
+- Team: coordinator assigned/removed
+- Dates: contract date, closing date set/updated

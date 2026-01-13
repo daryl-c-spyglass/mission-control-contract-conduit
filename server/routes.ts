@@ -13,6 +13,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./r
 import { getSyncStatus, triggerManualSync } from "./repliers-sync";
 import OpenAI from "openai";
 import { generatePrintFlyer, formatAddressForFlyer, type FlyerData, type OutputType } from "./services/flyer-generator";
+import { generateGraphic, type GraphicsFormat, type GraphicsData } from "./services/graphics-generator";
 
 // Helper to generate a Slack channel name in format: buy-123main-joeywilkes or sell-123main-joeywilkes
 function generateSlackChannelName(address: string, transactionType: string = "buy", agentName: string = ""): string {
@@ -1877,6 +1878,70 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
     } catch (error: any) {
       console.error('Unified flyer render error:', error);
       res.status(500).json({ error: 'Failed to render flyer', details: error.message });
+    }
+  });
+
+  // ============ Social Media Graphics Render ============
+  app.post("/api/graphics/render", isAuthenticated, async (req, res) => {
+    try {
+      const {
+        format,
+        photoUrl,
+        status,
+        description,
+        address,
+        price,
+        beds,
+        baths,
+        sqft,
+        brokerageLogo,
+      } = req.body;
+
+      if (!format || !['square', 'story', 'landscape'].includes(format)) {
+        return res.status(400).json({ error: "Invalid format. Must be: square, story, or landscape" });
+      }
+      if (!photoUrl) {
+        return res.status(400).json({ error: "Photo URL is required" });
+      }
+      if (!address) {
+        return res.status(400).json({ error: "Address is required" });
+      }
+
+      const logoPath = brokerageLogo || path.join(process.cwd(), 'public', 'assets', 'SpyglassRealty_Logo_Black.png');
+
+      const cleanPrice = String(price || '0').replace(/[$,]/g, '');
+      const numericPrice = parseFloat(cleanPrice) || 0;
+
+      const graphicsData: GraphicsData = {
+        photoUrl,
+        status: status || 'Just Listed',
+        description: description || '',
+        address,
+        price: numericPrice.toLocaleString(),
+        beds: String(beds || 0),
+        baths: String(baths || 0),
+        sqft: Number(sqft || 0).toLocaleString(),
+        brokerageLogo: logoPath,
+      };
+
+      console.log(`Graphics render: ${format} for ${address}`);
+      
+      const buffer = await generateGraphic(graphicsData, format as GraphicsFormat);
+      
+      const addressSlug = address.split(',')[0].replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+      const formatLabels: Record<string, string> = {
+        square: 'Instagram_Post',
+        story: 'Instagram_Story',
+        landscape: 'Facebook_Post'
+      };
+      
+      res.set('Content-Type', 'image/png');
+      res.set('Content-Disposition', `attachment; filename="${addressSlug}_${formatLabels[format]}.png"`);
+      res.send(buffer);
+      
+    } catch (error: any) {
+      console.error('Graphics render error:', error);
+      res.status(500).json({ error: 'Failed to render graphic', details: error.message });
     }
   });
 

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1080px;
+      height: 1080px;
+      font-family: 'Inter', 'Helvetica Neue', sans-serif;
+      overflow: hidden;
+    }
+    .container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    .photo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,0.85));
+      padding: 80px 48px 48px;
+    }
+    .status-badge {
+      display: inline-block;
+      background: {{statusColor}};
+      color: white;
+      font-size: 22px;
+      font-weight: 700;
+      padding: 10px 24px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 20px;
+    }
+    .price {
+      font-size: 64px;
+      font-weight: 800;
+      color: white;
+      margin-bottom: 12px;
+      letter-spacing: -1px;
+    }
+    .address {
+      font-size: 28px;
+      color: white;
+      font-weight: 500;
+      margin-bottom: 16px;
+    }
+    .details {
+      font-size: 22px;
+      color: rgba(255,255,255,0.9);
+      font-weight: 500;
+    }
+    .description {
+      font-size: 20px;
+      color: rgba(255,255,255,0.85);
+      margin-top: 20px;
+      font-style: italic;
+      line-height: 1.4;
+    }
+    .branding {
+      position: absolute;
+      top: 32px;
+      right: 32px;
+      background: white;
+      padding: 14px 24px;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .branding img {
+      height: 44px;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img class="photo" src="{{photoBase64}}" alt="Property" />
+    
+    <div class="branding">
+      <img src="{{brokerageLogo}}" alt="Spyglass Realty" />
+    </div>
+    
+    <div class="overlay">
+      <div class="status-badge">{{status}}</div>
+      <div class="price">${{price}}</div>
+      <div class="address">{{address}}</div>
+      <div class="details">{{beds}} Bed | {{baths}} Bath | {{sqft}} Sq Ft</div>
+      {{#if description}}
+      <div class="description">"{{description}}"</div>
+      {{/if}}
+    </div>
+  </div>
+</body>
+</html>

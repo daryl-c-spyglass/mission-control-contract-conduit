@@ -1695,7 +1695,7 @@ export function CreateFlyerDialog({
             agentTitle: data.agentTitle,
             agentPhone: data.agentPhone,
             agentPhoto: effectiveAgentPhoto,
-            outputType: 'pngPreview' // PNG for download (PDF support available with 'pdf')
+            outputType: 'pdf' // PDF for high-quality printable flyer download
           }),
         });
         
@@ -1707,7 +1707,7 @@ export function CreateFlyerDialog({
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const addressSlug = transaction.propertyAddress.split(",")[0].replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, "");
-        const fileName = `${addressSlug}_flyer.png`;
+        const fileName = `${addressSlug}_flyer.pdf`;
         
         // Download the file
         const link = document.createElement("a");
