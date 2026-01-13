@@ -1,0 +1,277 @@
+✅ REPLIT MASTER PROMPT — SPYGLASS PRINT FLYER (FINAL ALIGNMENT PASS)
+Objective
+
+Fix the remaining layout, alignment, sizing, and preview-sync issues in the Spyglass 8.5×11 Print Flyer so that:
+
+The Preview output is pixel-identical to the Downloaded PNG/PDF
+
+All dividers, icons, text, and photos match the provided Spyglass PSD reference
+
+No divider overlaps any text or images
+
+Bottom section matches the reference sample exactly in alignment and visual weight
+
+This is a layout-only change. Do not change endpoints, data mapping, or rendering pipeline.
+
+1️⃣ CRITICAL RULE — PREVIEW MUST MATCH DOWNLOAD
+
+Hard requirement:
+
+The Preview image must be rendered using the exact same HTML + CSS + Puppeteer render path as the Download Flyer.
+
+No alternate CSS, scaling, containers, or responsive rules for preview.
+
+Preview = scaled-down screenshot of the final rendered print canvas (2550×3300), nothing else.
+
+If Preview and Download differ in spacing, divider length, font size, or alignment, that is a failure.
+
+2️⃣ CANVAS & GRID (DO NOT CHANGE SIZE)
+
+Canvas: 2550 × 3300 px (8.5×11 @ 300 DPI)
+
+Use fixed layout, no responsive behavior
+
+Use CSS Grid for the bottom section
+
+No vh, %, or auto-growing dividers
+
+3️⃣ HEADER FIXES (TOP SECTION)
+Vertical divider (left of logo & address)
+
+Vertical (Y-axis only) — NO horizontal component
+
+Color: same neutral gray as PSD
+
+Thickness: 3–4px
+
+Position:
+
+Offset slightly away from logo and address
+
+Must NOT touch logo text or address text
+
+Must NOT overlap the hero photo
+
+Height:
+
+Only spans the height of the logo + address block
+
+DO NOT extend into the hero image
+
+Address text
+
+Regular weight (NOT bold)
+
+Left-aligned
+
+Vertically centered relative to logo
+
+Price badge (upper right)
+
+Shape: angled tag (not a rectangle)
+
+Text color: black
+
+Font weight: regular (not bold)
+
+No overlap with hero image
+
+Divider color matches PSD gray
+
+4️⃣ PHOTO SECTION
+
+Hero photo spans full width under header
+
+Bottom photo row contains 3 images
+
+Increase bottom photo row height slightly to reduce excess white space below
+
+Maintain consistent gutters between photos
+
+No dividers overlapping images
+
+5️⃣ BOTTOM SECTION — MOST IMPORTANT FIXES
+Layout columns (LEFT → CENTER → RIGHT)
+| Stats (icons) | Headline + Description | Agent |
+
+
+Use CSS Grid with fixed column widths.
+
+LEFT COLUMN — Stats (Bedrooms / Bathrooms / Sq Ft)
+
+Use the provided icons:
+
+Bedroom icon
+
+Bathroom icon
+
+Sq ft icon
+
+Each stat is ONE LINE:
+
+[icon] 4 bedrooms
+[icon] 2 bathrooms
+[icon] 1,850 sq. ft
+
+
+Vertically align this entire block so that:
+
+Sq ft baseline aligns horizontally (X-axis) with the Agent phone number
+
+Bedrooms & bathrooms sit slightly above, as in the PSD
+
+This block may be nudged downward slightly to achieve alignment
+
+Text is regular weight, not bold
+
+CENTER COLUMN — Listing Headline & Description
+Listing Headline
+
+All caps
+
+Regular font weight (NOT bold)
+
+Centered horizontally
+
+Appears above the description
+
+Must NOT drift downward when description length changes
+
+Dividers around headline & description
+
+Vertical dividers only (Y-axis)
+
+No horizontal dividers in this section
+
+Divider height:
+
+Starts at top of headline
+
+Ends at bottom of description text
+
+Exactly matches text height
+
+Divider thickness: 3–4px
+
+Color: PSD gray
+
+Dividers must NEVER overlap text
+
+Description
+
+Left-aligned text
+
+Target length: 115–150 characters
+
+Allow AI Summarize to generate up to 150 chars (do not cap at 115)
+
+Description bottom aligns visually with:
+
+Sq ft text (left)
+
+Agent phone number (right)
+
+RIGHT COLUMN — Agent Info
+
+Increase profile photo size to match PSD reference
+
+Circular crop
+
+Agent name:
+
+Single line only (no wrapping or truncation)
+
+Larger than title
+
+Agent title:
+
+Smaller, lighter weight
+
+Phone number:
+
+Regular weight (NOT bold)
+
+Horizontally aligned with Sq ft on the left column
+
+Spyglass logo:
+
+Larger than current
+
+Positioned to the right of the profile photo
+
+Vertically centered with photo
+
+6️⃣ DIVIDER RULES (GLOBAL)
+
+Use ONLY vertical (Y-axis) dividers
+
+NO horizontal lines anywhere in the bottom section
+
+Divider height must always be content-bound, never full-height
+
+Divider must never:
+
+Overlap text
+
+Touch icons
+
+Extend into white space below content
+
+7️⃣ ALIGNMENT CONSTRAINTS (NON-NEGOTIABLE)
+
+Bedrooms / Bathrooms / Sq ft block
+
+Description text
+
+Agent phone number
+
+👉 All three must align on the same X-axis baseline
+
+8️⃣ ASCII DIAGRAM (REFERENCE)
+TOP HEADER
+|  | LOGO + ADDRESS          PRICE TAG |
+|  |-----------------------------------|
+
+HERO IMAGE (full width)
+
+PHOTO ROW (3 images)
+
+BOTTOM SECTION (Grid)
+-----------------------------------------------------
+| [icon] beds     | HEADLINE (regular weight) | O |
+| [icon] baths    | Description (left-aligned)| O |
+| [icon] sq ft    |                            | O |
+|                 |                            | O |
+-----------------------------------------------------
+
+Legend:
+| = vertical divider (Y-axis only)
+O = agent photo + logo
+
+9️⃣ VALIDATION CHECKLIST (MUST PASS ALL)
+
+Before shipping, confirm:
+
+ Preview and Download images are pixel-identical
+
+ No divider overlaps text or images
+
+ All dividers are vertical only
+
+ Sq ft aligns horizontally with agent phone number
+
+ Description length supports up to 150 characters
+
+ Listing headline and phone number are NOT bold
+
+ Profile photo and Spyglass logo are larger and balanced
+
+ No excessive white space at bottom
+
+ Layout matches Spyglass PSD sample
+
+Final Notes
+
+This is the final layout alignment pass.
+Do not introduce new styles, components, or abstractions.
+Match the PSD first — code second.
