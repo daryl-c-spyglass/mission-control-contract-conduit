@@ -16,25 +16,39 @@
  */
 export function isRentalOrLease(listing: {
   type?: string | null;
+  propertyType?: string | null;
   details?: { propertyType?: string | null } | null;
   class?: string | null;
 }): boolean {
   if (!listing) return false;
   
+  // Check type field (exact match)
   const type = (listing.type || '').toLowerCase().trim();
   if (type === 'lease' || type === 'rental' || type === 'rent') {
     return true;
   }
   
-  const propertyType = (listing.details?.propertyType || '').toLowerCase();
+  // Check top-level propertyType (from normalized mlsData)
+  const topPropertyType = (listing.propertyType || '').toLowerCase();
   if (
-    propertyType.includes('lease') ||
-    propertyType.includes('rental') ||
-    propertyType.includes('rent')
+    topPropertyType.includes('lease') ||
+    topPropertyType.includes('rental') ||
+    topPropertyType.includes('rent')
   ) {
     return true;
   }
   
+  // Check details.propertyType (from raw Repliers data)
+  const detailsPropertyType = (listing.details?.propertyType || '').toLowerCase();
+  if (
+    detailsPropertyType.includes('lease') ||
+    detailsPropertyType.includes('rental') ||
+    detailsPropertyType.includes('rent')
+  ) {
+    return true;
+  }
+  
+  // Check class field
   const listingClass = (listing.class || '').toLowerCase();
   if (listingClass.includes('lease') || listingClass.includes('rental')) {
     return true;
@@ -80,7 +94,7 @@ export function hasAccurateDOM(listing: {
  * Filter an array of listings to exclude rentals/leases.
  * Use this as a failsafe after API calls.
  */
-export function excludeRentals<T extends { type?: string | null; details?: { propertyType?: string | null } | null; class?: string | null }>(
+export function excludeRentals<T extends { type?: string | null; propertyType?: string | null; details?: { propertyType?: string | null } | null; class?: string | null }>(
   listings: T[]
 ): T[] {
   return listings.filter(listing => !isRentalOrLease(listing));

@@ -1,0 +1,240 @@
+Global Rental/Lease Exclusion + DOM Standardization (Repliers / ACTRIS)
+Objective
+
+Enforce a single-source-of-truth exclusion of rental/lease listings across the entire app and all data flows that consume Repliers (search, transaction creation/refresh, sync ingestion, comps/similar, photo insights, debug endpoints).
+
+Also standardize Days on Market usage to simpleDaysOnMarket everywhere (with a safe fallback strategy), based on your audit that daysOnMarket is missing ~86% of the time.
+
+Non-negotiables
+
+Data source: Repliers only
+
+MLS: ACTRIS
+
+Leasing/rental listings must be excluded globally:
+
+counts, searches, CMA/comps, DOM, charts, PDFs, shares, floating cards
+
+No section may calculate totals independently
+
+No silent fallbacks (do not return 0 or empty on errors)
+
+Must not introduce external redirects
+
+Implementation Plan
+1) Create canonical predicate: isLeaseOrRental(listing)
+
+Create file: server/listings/isLeaseOrRental.ts (or similar shared location used by server routes + sync)
+
+Function signature:
+
+export function isLeaseOrRental(listing: any): boolean
+
+
+Rules (centralized, reused everywhere):
+Return true if any condition matches (case-insensitive):
+
+listing.type === "Lease"
+
+listing.details?.propertyType contains "lease" or "rental"
+
+Any other transaction indicator field you already store that implies lease (only if present)
+
+Return false otherwise.
+
+Deliverables
+
+Unit tests for:
+
+{ type: "Lease" } → true
+
+{ type: "Sale", details: { propertyType: "Residential Lease" } } → true
+
+{ type: "Sale", details: { propertyType: "Single Family Residence" } } → false
+
+2) Enforce rental exclusion at the Repliers client boundary
+
+Edit: server/repliers.ts
+
+2.1 Add “type=Sale” upstream filtering for all search/list endpoints
+
+You already do this for:
+
+fetchSimilarListings()
+
+searchByAddress()
+
+Now ensure the same is applied wherever you call Repliers for:
+
+GET /api/listings/search
+
+any listing search used by transaction creation/refresh flows
+
+sync ingestion queries (if they use search endpoints)
+
+Rule: upstream filter must be applied wherever the query supports it, AND we must still apply the local failsafe predicate below.
+
+2.2 Add a local failsafe filter (non-negotiable)
+
+For any function that returns an array of listings, apply:
+
+results.filter(l => !isLeaseOrRental(l))
+
+This is required even if the API query is set to type=Sale, because your audit proves leases are present in the raw feed and filters can be missed in some calls.
+
+3) Block rental ingestion into Transactions (Create/Refresh)
+3.1 POST /api/transactions (Create with MLS data)
+
+If the user is creating a transaction by MLS lookup:
+
+Fetch listing (fetchMLSListing() or equivalent)
+
+If isLeaseOrRental(listing) is true:
+
+Reject with HTTP 422
+
+Error message: "Rental/Lease listings are not supported."
+
+Include a machine-friendly code: RENTAL_EXCLUDED
+
+3.2 POST /api/transactions/:id/refresh-mls
+
+Same behavior:
+
+If MLS listing is lease/rental → do not overwrite the transaction with rental data
+
+Return 422 with RENTAL_EXCLUDED
+
+Important: This prevents “leak” via single-listing endpoints, since fetchMLSListing() is currently “N/A” for sale filtering per your inventory.
+
+4) Enforce rental exclusion in MLS Sync
+
+Edit: server/repliers-sync.ts
+
+Wherever sync imports or updates listings from Repliers:
+
+Before writing/upserting:
+
+If isLeaseOrRental(listing) is true → skip and increment a counter
+
+Log counters in sync status:
+
+skippedLeaseCount
+
+processedCount
+
+erroredCount
+
+Acceptance: Sync never writes lease listings into your persisted store/cache.
+
+5) Standardize DOM: use simpleDaysOnMarket everywhere
+
+Create canonical selector:
+
+Create file: server/listings/getDisplayDOM.ts
+
+export function getDisplayDOM(listing: any): number | null
+
+
+Rules:
+
+Prefer listing.simpleDaysOnMarket if present and numeric
+
+Else use listing.daysOnMarket if present and numeric
+
+Else return null (do NOT return 0)
+
+Replace all server responses and any derived computations that currently use daysOnMarket only.
+
+Targets (at minimum):
+
+any transaction summary fields
+
+listing search responses
+
+dashboard stats if computed server-side
+
+any “best photos” endpoint metadata if it uses DOM
+
+6) “No webapp changes” constraint handling
+
+You said earlier “without any changes on the webapp we’re build” for the audit. This remediation WILL change server behavior (by excluding rentals and rejecting lease-based transaction creation/refresh). That’s required to satisfy your global rule.
+
+To minimize UX churn:
+
+Keep response shapes stable
+
+Only add error code for lease rejection
+
+Do not change UI components in this PR unless they currently crash on 422
+
+Acceptance Criteria
+
+✅ GET /api/listings/search never returns lease/rental listings
+
+✅ fetchSimilarListings() never returns lease/rental listings (upstream + local filter)
+
+✅ searchByAddress() never returns lease/rental listings (upstream + local filter)
+
+✅ POST /api/transactions rejects lease/rental MLS numbers with 422 + RENTAL_EXCLUDED
+
+✅ POST /api/transactions/:id/refresh-mls rejects lease/rental refresh with 422 + RENTAL_EXCLUDED
+
+✅ MLS sync skips lease/rental records and reports skippedLeaseCount
+
+✅ All DOM surfaces use simpleDaysOnMarket first; daysOnMarket only as fallback; otherwise null
+
+✅ No silent fallbacks to 0 for DOM or counts
+
+Validation Tests
+Unit tests
+
+isLeaseOrRental() (3 cases above)
+
+getDisplayDOM():
+
+prefers simpleDaysOnMarket
+
+falls back to daysOnMarket
+
+returns null when missing
+
+Integration tests (API)
+
+Search endpoint returns only Sale:
+
+call GET /api/listings/search and assert no item has type=Lease or details.propertyType contains lease
+
+Transactions create:
+
+use a known lease MLS number from your audit → expect 422 with RENTAL_EXCLUDED
+
+Sync test (if feasible)
+
+Run sync against a small batch:
+
+confirm skippedLeaseCount > 0 if leases exist
+
+confirm no leases in stored dataset
+
+Required Deliverables / Proof
+
+PR includes:
+
+new predicate + DOM selector + tests
+
+modifications to server/repliers.ts, server/repliers-sync.ts, and the transaction routes
+
+Pasteable evidence in PR description:
+
+Before/after counts showing leases excluded from search
+
+One sample 422 response for lease MLS create attempt
+
+Sync run log showing skippedLeaseCount
+
+Blockers
+
+If any workflow explicitly requires rentals (it shouldn’t per your rule), surface it as a blocker immediately.
+
+If fetchMLSListing() is used in critical flows and cannot be safely validated as ACTRIS-only, add logging for originatingSystemName and report mismatches (do not silently coerce).

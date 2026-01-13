@@ -93,22 +93,38 @@
 
 ## Rental Exclusion Coverage
 
-| Entry Point | API-Level Filter | Local Failsafe |
-|-------------|------------------|----------------|
-| `fetchMLSListing()` | None (single listing) | None |
-| `fetchSimilarListings()` | **`type=Sale`** | **`isRentalOrLease()` filter** |
-| `searchByAddress()` | **`type=Sale`** | **`isRentalOrLease()` filter** |
-| `searchListings()` | **`type=Sale`** | **`isRentalOrLease()` filter** |
-| `scripts/repliers_schema_audit.ts` | None (audit only) | `detectRental()` for reporting |
+| Entry Point | API-Level Filter | Local Failsafe | Route-Level Rejection |
+|-------------|------------------|----------------|----------------------|
+| `fetchMLSListing()` | None (single listing) | None | **Routes check + reject 422** |
+| `fetchSimilarListings()` | **`type=Sale`** | **`isRentalOrLease()` filter** | N/A (array filtered) |
+| `searchByAddress()` | **`type=Sale`** | **`isRentalOrLease()` filter** | **Routes check + reject 422** |
+| `scripts/repliers_schema_audit.ts` | None (audit only) | `detectRental()` for reporting | N/A |
+
+### Route-Level Rental Rejection (HTTP 422 + RENTAL_EXCLUDED)
+
+| Route | Rejection Implemented |
+|-------|----------------------|
+| `POST /api/transactions` | **Yes** - Rejects with 422 + deletes created transaction |
+| `POST /api/transactions/:id/refresh-mls` | **Yes** - Rejects with 422, no data update |
+| `GET /api/listings/search` | **Yes** - Rejects with 422 for MLS# or address lookup |
+
+### Sync Service Rental Handling
+
+| Behavior | Implementation |
+|----------|----------------|
+| Skip rental listings | **Yes** - `isRentalOrLease()` check before update |
+| Counter logging | **Yes** - `skippedLeaseCount` tracked in sync stats |
+| Metadata storage | **Yes** - Stats saved to integration settings |
 
 ### Gap Analysis
 
 | Surface | Status | Notes |
 |---------|--------|-------|
-| Transaction MLS fetch | **Covered** | Single listing by MLS#, no search results |
+| Transaction create | **Covered** | Rejects 422 + RENTAL_EXCLUDED, deletes transaction |
+| Transaction refresh | **Covered** | Rejects 422 + RENTAL_EXCLUDED, no data written |
+| Listing search | **Covered** | Rejects 422 + RENTAL_EXCLUDED |
 | Similar listings/CMA | **Covered** | `type=Sale` + `isRentalOrLease` failsafe |
-| Address search | **Covered** | `type=Sale` + `isRentalOrLease` failsafe |
-| Sync service | **Covered** | Uses `fetchMLSListing` + `fetchSimilarListings` |
+| Sync service | **Covered** | Skips rentals, logs `skippedLeaseCount` |
 | Audit script | N/A | Read-only analysis, reports rentals but doesn't filter |
 
 ---

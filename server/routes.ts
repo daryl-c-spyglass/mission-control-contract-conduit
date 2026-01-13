@@ -7,6 +7,7 @@ import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetS
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages, watchUserMailbox } from "./gmail";
 import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel } from "./slack";
 import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess, getBestPhotosForFlyer } from "./repliers";
+import { isRentalOrLease } from "../shared/lib/listings";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
 import { getSyncStatus, triggerManualSync } from "./repliers-sync";
@@ -337,6 +338,18 @@ export async function registerRoutes(
           
           if (mlsResult) {
             const { mlsData, comparables } = mlsResult;
+            
+            // GLOBAL RENTAL EXCLUSION: Reject rental/lease listings
+            // Check both rawData and mlsData itself (rawData may be absent for cached/normalized records)
+            if (isRentalOrLease(mlsData.rawData ?? mlsData)) {
+              // Delete the transaction we just created
+              await storage.deleteTransaction(transaction.id);
+              return res.status(422).json({
+                message: "Rental/Lease listings are not supported.",
+                code: "RENTAL_EXCLUDED",
+                mlsNumber: transaction.mlsNumber,
+              });
+            }
             // Use comparables from listing, fallback to separate API call if none found
             let cmaData = comparables;
             if (!cmaData || cmaData.length === 0) {
@@ -466,6 +479,17 @@ export async function registerRoutes(
           mlsData = mlsResult.mlsData;
           cmaData = mlsResult.comparables;
           console.log("MLS Data returned:", "found", mlsData?.photos?.length, "photos");
+          
+          // GLOBAL RENTAL EXCLUSION: Reject rental/lease listings on refresh
+          // Check both rawData and mlsData itself (rawData may be absent for cached/normalized records)
+          if (isRentalOrLease(mlsData.rawData ?? mlsData)) {
+            return res.status(422).json({
+              message: "Rental/Lease listings are not supported.",
+              code: "RENTAL_EXCLUDED",
+              mlsNumber: transaction.mlsNumber,
+            });
+          }
+          
           // Fallback to separate API call if no comparables in listing
           if (!cmaData || cmaData.length === 0) {
             cmaData = await fetchSimilarListings(transaction.mlsNumber);
@@ -541,14 +565,31 @@ export async function registerRoutes(
       if (isLikelyMLS) {
         const mlsResult = await fetchMLSListing(query.replace(/\s/g, ""));
         if (mlsResult) {
+          // GLOBAL RENTAL EXCLUSION: Check if this is a rental/lease listing
+          // Check both rawData and mlsData itself (rawData may be absent for cached/normalized records)
+          if (isRentalOrLease(mlsResult.mlsData.rawData ?? mlsResult.mlsData)) {
+            return res.status(422).json({
+              message: "Rental/Lease listings are not supported.",
+              code: "RENTAL_EXCLUDED",
+              mlsNumber: query,
+            });
+          }
           listing = mlsResult.mlsData;
         }
       }
       
-      // If not found by MLS, try address search
+      // If not found by MLS, try address search (already has rental filter in searchByAddress)
       if (!listing) {
         const addressResult = await searchByAddress(query);
         if (addressResult) {
+          // GLOBAL RENTAL EXCLUSION: Double-check address search results
+          // Check both rawData and addressResult itself (rawData may be absent for cached/normalized records)
+          if (isRentalOrLease(addressResult.rawData ?? addressResult)) {
+            return res.status(422).json({
+              message: "Rental/Lease listings are not supported.",
+              code: "RENTAL_EXCLUDED",
+            });
+          }
           listing = addressResult;
         }
       }

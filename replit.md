@@ -51,7 +51,11 @@ Preferred communication style: Simple, everyday language.
   - `excludeRentals(listings)`: Filter helper for arrays
 
 ### MLS/IDX/VOW Compliance
-- **Rental Exclusion**: Global filtering applied at API level (`type=Sale`) with local failsafes via `isRentalOrLease` predicate
+- **Rental Exclusion**: Multi-layer enforcement:
+  - API level: `type=Sale` filter on search endpoints
+  - Local failsafe: `isRentalOrLease()` predicate on array results
+  - Route rejection: 422 + `RENTAL_EXCLUDED` code for single-listing endpoints
+  - Sync skip: Rentals skipped with `skippedLeaseCount` logging
 - **No External Media Redirects**: Virtual tour URLs are stored but not rendered; `safe-links.ts` utility blocks external redirects
 - **DOM Normalization**: UI uses `getDisplayDOM()` for consistent Days on Market display across all surfaces
 

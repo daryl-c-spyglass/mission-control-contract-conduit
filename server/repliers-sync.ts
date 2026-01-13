@@ -1,5 +1,6 @@
 import { storage } from "./storage";
 import { fetchMLSListing, fetchSimilarListings } from "./repliers";
+import { isRentalOrLease } from "../shared/lib/listings";
 import type { Transaction, InsertTransaction } from "@shared/schema";
 
 const SYNC_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
@@ -16,6 +17,7 @@ interface SyncResult {
   photosCount?: number;
   comparablesCount?: number;
   error?: string;
+  skippedAsRental?: boolean;
 }
 
 async function syncTransactionMLS(transaction: Transaction): Promise<SyncResult> {
@@ -39,6 +41,15 @@ async function syncTransactionMLS(transaction: Transaction): Promise<SyncResult>
     }
 
     const { mlsData, comparables } = mlsResult;
+    
+    // GLOBAL RENTAL EXCLUSION: Skip rental/lease listings during sync
+    // Check both rawData and mlsData itself (rawData may be absent for cached/normalized records)
+    if (isRentalOrLease(mlsData.rawData ?? mlsData)) {
+      result.skippedAsRental = true;
+      result.error = "Skipped: Rental/Lease listing";
+      console.log(`[ReplierSync] Skipping rental/lease listing: ${transaction.mlsNumber}`);
+      return result;
+    }
     
     let cmaData = comparables;
     if (!cmaData || cmaData.length === 0) {
@@ -132,12 +143,13 @@ async function runSync(): Promise<void> {
     }
 
     const successful = results.filter(r => r.success).length;
-    const failed = results.filter(r => !r.success).length;
+    const skippedLeaseCount = results.filter(r => r.skippedAsRental).length;
+    const failed = results.filter(r => !r.success && !r.skippedAsRental).length;
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     
     lastGlobalSyncAt = new Date();
     
-    console.log(`[ReplierSync] Sync complete: ${successful} success, ${failed} failed, took ${duration}s`);
+    console.log(`[ReplierSync] Sync complete: ${successful} success, ${skippedLeaseCount} skipped (rentals), ${failed} failed, took ${duration}s`);
     
     await storage.upsertIntegrationSetting({
       integrationType: "repliers",
@@ -147,6 +159,7 @@ async function runSync(): Promise<void> {
         lastSyncStats: {
           total: activeTransactions.length,
           successful,
+          skippedLeaseCount,
           failed,
           durationSeconds: parseFloat(duration),
         },
