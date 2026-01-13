@@ -31,7 +31,7 @@ interface MarketingMaterialsDialogProps {
   onOpenChange: (open: boolean) => void;
   transaction: Transaction;
   initialData?: SocialGraphicConfig;
-  assetId?: number;
+  assetId?: string;
   onAssetSaved?: () => void;
 }
 

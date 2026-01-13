@@ -184,8 +184,8 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [activeTab, setActiveTab] = useState(initialTab);
   const { toast } = useToast();
   const [flyerDialogOpen, setFlyerDialogOpen] = useState(false);
-  const [editFlyerAsset, setEditFlyerAsset] = useState<{ id: number; config: FlyerAssetConfig } | null>(null);
-  const [editGraphicsAsset, setEditGraphicsAsset] = useState<{ id: number; config: SocialGraphicConfig } | null>(null);
+  const [editFlyerAsset, setEditFlyerAsset] = useState<{ id: string; config: FlyerAssetConfig } | null>(null);
+  const [editGraphicsAsset, setEditGraphicsAsset] = useState<{ id: string; config: SocialGraphicConfig } | null>(null);
   const [graphicsDialogOpen, setGraphicsDialogOpen] = useState(false);
   const [previewAsset, setPreviewAsset] = useState<MarketingAsset | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -327,27 +327,35 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   };
 
   const handleEditAsset = (asset: MarketingAsset) => {
-    const metadata = asset.metadata as { config?: FlyerAssetConfig | SocialGraphicConfig; format?: string } | null;
-    const config = metadata?.config;
-    
-    if (!config) {
-      toast({ 
-        title: "Cannot edit this asset", 
-        description: "This asset was created before edit functionality was available.", 
-        variant: "destructive" 
-      });
-      return;
-    }
+    const metadata = asset.metadata as { config?: FlyerAssetConfig | SocialGraphicConfig; format?: string; status?: string } | null;
+    const savedConfig = metadata?.config;
     
     const isPrintFlyer = asset.type === 'print_flyer' || metadata?.format === 'print';
     const isSocialFlyer = asset.type === 'social_flyer' || metadata?.format === 'social';
     
     if (isPrintFlyer || isSocialFlyer) {
       // Flyer type - open CreateFlyerDialog in edit mode
-      setEditFlyerAsset({ id: asset.id, config: config as FlyerAssetConfig });
+      // Use saved config or fall back to defaults from MLS data
+      const config: FlyerAssetConfig = savedConfig ? (savedConfig as FlyerAssetConfig) : {
+        format: isPrintFlyer ? 'print' : 'social',
+        status: metadata?.status || 'Just Listed',
+        description: mlsData?.description || '',
+        headline: '',
+        photoUrls: mlsData?.photos?.slice(0, 3) || [],
+        agentName: '',
+        agentTitle: '',
+        agentPhone: '',
+      };
+      setEditFlyerAsset({ id: asset.id, config });
     } else {
       // Social graphics type - open MarketingMaterialsDialog in edit mode
-      setEditGraphicsAsset({ id: asset.id, config: config as SocialGraphicConfig });
+      // Use saved config or fall back to defaults
+      const config: SocialGraphicConfig = savedConfig ? (savedConfig as SocialGraphicConfig) : {
+        status: metadata?.status || 'just_listed',
+        photoUrl: mlsData?.photos?.[0] || '',
+        description: '',
+      };
+      setEditGraphicsAsset({ id: asset.id, config });
       setGraphicsDialogOpen(true);
     }
   };

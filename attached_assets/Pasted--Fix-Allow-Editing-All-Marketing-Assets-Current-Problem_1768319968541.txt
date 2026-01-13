@@ -1,0 +1,137 @@
+## Fix: Allow Editing All Marketing Assets
+
+**Current Problem:**
+When clicking Edit on an asset, error shows: "Cannot edit this asset - This asset was created before edit functionality was available."
+
+**Required Fix:**
+Allow editing ALL assets, regardless of when they were created. For older assets without saved config data, open the dialog with default values.
+
+### Changes to make:
+
+**1. Remove the "cannot edit" check**
+
+Find the code that checks if an asset can be edited and remove or modify it:
+
+```typescript
+// REMOVE or MODIFY this type of check:
+if (!asset.config) {
+  toast.error("Cannot edit this asset", {
+    description: "This asset was created before edit functionality was available."
+  });
+  return;
+}
+```
+
+**2. Handle missing config data gracefully**
+
+When opening the edit dialog, use default values if config is missing:
+
+```typescript
+const handleEdit = (asset: MarketingAsset) => {
+  // Use saved config or fall back to defaults
+  const config = asset.config || {
+    status: 'Just Listed',
+    description: '',
+    headline: '',
+    photoUrls: [],
+    agentName: '',
+    agentTitle: '',
+    agentPhone: '',
+  };
+  
+  if (asset.type === 'flyer') {
+    setFlyerInitialData(config);
+    setEditingAssetId(asset.id);
+    setShowFlyerDialog(true);
+  } else {
+    setGraphicsInitialData(config);
+    setEditingAssetId(asset.id);
+    setShowGraphicsDialog(true);
+  }
+};
+```
+
+**3. For assets without config, pre-populate from current MLS data**
+
+If the asset has no saved config, pull current values from the transaction's MLS data:
+
+```typescript
+const handleEdit = (asset: MarketingAsset) => {
+  const config = asset.config || {
+    // Fall back to current MLS data
+    status: transaction.status || 'Just Listed',
+    description: transaction.mlsData?.description || '',
+    headline: '',
+    photoUrls: transaction.mlsData?.photos?.slice(0, 3) || [],
+    agentName: user?.graphicsSettings?.name || '',
+    agentTitle: user?.graphicsSettings?.title || '',
+    agentPhone: user?.graphicsSettings?.phone || '',
+  };
+  
+  // Continue with edit flow...
+};
+```
+
+**4. Update the dialog to handle edit mode**
+
+The dialog should:
+- Show "Edit [Asset Type]" in the title when editing
+- Pre-fill all fields with the config data
+- On save: Update existing asset (not create new)
+
+```typescript
+// In CreateFlyerDialog or MarketingMaterialsDialog
+<DialogTitle>
+  {editingAssetId ? 'Edit Flyer' : 'Create Property Flyer'}
+</DialogTitle>
+```
+
+**5. Save config data for NEW assets going forward**
+
+Ensure when creating new assets, the config is always saved:
+
+```typescript
+// When saving a new asset
+const newAsset = {
+  type: 'flyer',
+  format: 'print',
+  imageUrl: generatedImageUrl,
+  config: {
+    status: selectedStatus,
+    description: description,
+    headline: headline,
+    photoUrls: selectedPhotos,
+    agentName: agentName,
+    agentTitle: agentTitle,
+    agentPhone: agentPhone,
+  }
+};
+
+await saveMarketingAsset(transactionId, newAsset);
+```
+
+### Expected Behavior After Fix:
+
+| Scenario | Behavior |
+|----------|----------|
+| Edit NEW asset (has config) | Opens dialog pre-filled with saved config |
+| Edit OLD asset (no config) | Opens dialog with defaults from MLS data |
+| Save edited asset | Updates existing asset (same ID) |
+
+### Testing:
+1. Click Edit on an OLD asset (one that shows the error now)
+2. Verify dialog opens (no error)
+3. Verify fields have reasonable defaults (from MLS data)
+4. Make changes and save
+5. Verify asset is updated (not duplicated)
+6. Repeat for both Print Flyer and Social Graphics
+
+### Files to modify:
+- `client/src/components/transaction-details.tsx` - Edit handler logic
+- `client/src/components/create-flyer-dialog.tsx` - Accept initialData prop
+- `client/src/components/marketing-materials-dialog.tsx` - Accept initialData prop
+
+### DO NOT:
+- Delete or break existing assets
+- Change how new assets are created
+- Affect download or delete functionality
