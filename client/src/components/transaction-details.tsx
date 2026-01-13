@@ -183,6 +183,7 @@ function DocumentUploadDialog({ isOpen, onClose, onUpload, isUploading }: Docume
   const [documentType, setDocumentType] = useState<DocumentType>('contract');
   const [file, setFile] = useState<File | null>(null);
   const [notes, setNotes] = useState('');
+  const [showValidation, setShowValidation] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -195,21 +196,31 @@ function DocumentUploadDialog({ isOpen, onClose, onUpload, isUploading }: Docume
     }
   };
 
+  const canSubmit = name.trim() !== '' && file !== null;
+
   const handleSubmit = () => {
-    if (!name || !file) return;
-    onUpload({ name, documentType, file, notes: notes || undefined });
+    setShowValidation(true);
+    if (!canSubmit) return;
+    onUpload({ name: name.trim(), documentType, file, notes: notes.trim() || undefined });
   };
 
-  const handleClose = () => {
+  const resetForm = () => {
     setName('');
     setDocumentType('contract');
     setFile(null);
     setNotes('');
-    onClose();
+    setShowValidation(false);
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      resetForm();
+      onClose();
+    }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Upload Document</DialogTitle>
@@ -223,8 +234,12 @@ function DocumentUploadDialog({ isOpen, onClose, onUpload, isUploading }: Docume
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Sales Contract, Amendment #1"
+              className={showValidation && !name.trim() ? 'border-destructive' : ''}
               data-testid="input-document-name"
             />
+            {showValidation && !name.trim() && (
+              <p className="text-sm text-destructive">Please enter a document name</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -242,7 +257,7 @@ function DocumentUploadDialog({ isOpen, onClose, onUpload, isUploading }: Docume
           </div>
 
           <div className="space-y-2">
-            <Label>File</Label>
+            <Label>File *</Label>
             {file ? (
               <div className="flex items-center justify-between p-3 border rounded-lg">
                 <div className="flex items-center gap-2 min-w-0">
@@ -260,7 +275,7 @@ function DocumentUploadDialog({ isOpen, onClose, onUpload, isUploading }: Docume
               </div>
             ) : (
               <div 
-                className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-muted/50 transition-colors ${showValidation && !file ? 'border-destructive' : ''}`}
                 onClick={() => fileInputRef.current?.click()}
               >
                 <input
@@ -280,6 +295,9 @@ function DocumentUploadDialog({ isOpen, onClose, onUpload, isUploading }: Docume
                 </p>
               </div>
             )}
+            {showValidation && !file && (
+              <p className="text-sm text-destructive">Please select a file to upload</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -296,8 +314,8 @@ function DocumentUploadDialog({ isOpen, onClose, onUpload, isUploading }: Docume
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={handleClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={!name || !file || isUploading} data-testid="button-submit-upload">
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={isUploading} data-testid="button-submit-upload">
             {isUploading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Upload Document
           </Button>
