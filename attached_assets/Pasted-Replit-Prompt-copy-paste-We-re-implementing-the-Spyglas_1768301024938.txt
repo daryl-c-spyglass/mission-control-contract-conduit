@@ -1,0 +1,291 @@
+Replit Prompt (copy/paste)
+
+We’re implementing the Spyglass Print Flyer (8.5x11) and it must match the reference layout (the sample flyer image) with clean vertical dividers only and Preview always identical to Download.
+
+Source references / assets
+
+Reference PSDs available in the repo (uploaded): SGR_Flyer-2.psd and related files.
+
+Fonts: Montserrat + League Spartan are provided as zips and already in the repo.
+
+New icons to use (PNG provided by user):
+
+Bedroom icon: /mnt/data/Bedroom.png
+
+Bathroom icon: /mnt/data/Bathroom.png
+
+Sq ft icon: /mnt/data/sq ft.png
+
+Critical requirement: Preview must always mirror Download
+
+Right now preview and download don’t stay in sync. Fix this by forcing them to use the exact same renderer and same HTML/CSS pipeline.
+
+Implementation requirements
+
+Create a single function like renderFlyer({ data, format }) that:
+
+Builds the same HTML string (same CSS, same layout)
+
+Uses the same Puppeteer settings (viewport, deviceScaleFactor, page size, margins, background)
+
+Renders either:
+
+PNG for preview (thumbnail + full preview)
+
+PNG/PDF for download
+
+The preview endpoint must call the same renderFlyer as download, only changing output size/quality if needed, but NOT layout.
+
+Do not use separate CSS files or conditional CSS for preview vs download (no “preview mode” layout changes).
+
+Ensure the preview uses the same exact base container width/height as download:
+
+Print flyer: 8.5x11 inches at the same DPI used for download.
+
+If preview needs scaling, scale the final PNG in the UI (client-side) rather than changing the render layout.
+
+Acceptance test
+
+A pixel comparison (or manual) should show the same layout for preview PNG vs downloaded PNG (excluding compression artifacts).
+
+Layout rules (must match reference)
+A) Header
+
+Top left: Spyglass logo.
+
+Address line: regular weight (NOT bold).
+
+Top-left vertical divider (thin grey bar) must:
+
+Never overlap logo or address text
+
+Have left padding so it doesn’t “touch” logo/address
+
+Not extend into (overlap) the large property photo area
+
+B) Price tag (top right)
+
+The price badge background is the angled tag shape (not a plain rectangle).
+
+Text inside badge:
+
+Color: black
+
+Weight: not bold
+
+Upper label “JUST LISTED AT” or status label: not bold
+
+Price number: not bold
+
+C) Photos section
+
+Keep the 1 large photo on top and 2 smaller photos below.
+
+Use spacing so no large blank area remains at the bottom. If there is extra whitespace:
+
+Prefer slightly increasing photo block height first (within safe bounds),
+
+Then slightly increasing bottom content sizing.
+
+D) Bottom content grid (3 columns)
+
+Bottom area has 3 columns: Left (stats) | Center (headline+description) | Right (agent) with vertical dividers between columns. No X-axis divider lines.
+
+Important: We only want Y-axis lines (vertical).
+
+Do NOT draw any horizontal line across the bottom section.
+
+Do NOT allow vertical dividers to run all the way to the bottom of the PNG.
+
+Vertical divider height must align to the content block height only.
+
+Vertical dividers
+
+Color: light/medium grey matching reference
+
+Thickness: visible (not hairline) but not overpowering
+
+Height: should start around the top of the bottom content block and end around the bottom of the bottom content block, aligned with text content height
+
+Bottom section specifics (most important)
+1) Left stats column (beds/baths/sqft) – use new icons
+
+Use the user-provided PNG icons (Bedroom/Bathroom/sqft). Do not use generic emoji icons.
+
+Row format
+Each stat must be ONE LINE:
+[ICON] [NUMBER] [label]
+Example:
+(bed icon) 4 bedrooms
+(bath icon) 2 bathrooms
+(sqft icon) 1,850 sq. ft
+
+Alignment requirements
+
+The left stats block should be moved slightly downward (compared to current), matching the user’s last feedback.
+
+The Sq ft baseline should align with the agent phone number baseline on the right column.
+
+The rows should be evenly spaced, consistent line-height, and aligned as a clean vertical stack.
+
+Icon sizing
+
+Keep icons visually consistent in height across the 3 rows.
+
+Use CSS to normalize icon size (e.g., 18–22px height) and align to text baseline.
+
+2) Center column: Listing Headline + Description
+
+Headline: NOT bold.
+
+Headline is centered (as in reference).
+
+There is a vertical divider BEFORE and AFTER this center block (left and right column dividers).
+
+Description: left-aligned (rag-left), NOT centered.
+
+Description length rule
+
+For Print Flyer: enforce description length to be within the UI expectation.
+
+If the product hard-limits at 115 chars, then enforce max 115 (trim and add ellipsis if necessary).
+
+If it supports more, allow up to 150, but never overflow the layout.
+
+Never allow description text to collide with dividers or other elements.
+
+3) Right column: Agent block
+
+Increase profile photo size (currently too small). Match reference proportion:
+
+Circular photo larger and more prominent.
+
+Agent name: single line if possible (reduce font or allow slightly more width). Avoid truncation.
+
+Under name: agent title.
+
+Under title: phone number.
+
+Name/Title/Phone should be regular weight unless reference explicitly bolds the name only (if bolding the name causes mismatch, keep it medium weight but not heavy).
+
+The small Spyglass logo mark should be placed beside the agent photo (as in reference), not floating incorrectly.
+
+Remove unwanted lines / avoid overlaps
+
+Remove any accidental extra “top left line” that appears.
+
+Ensure no divider overlaps any text:
+
+Header divider must not touch/overlap logo/address
+
+Bottom dividers must not cut into stats text, headline, or description
+
+Absolutely no horizontal “x-axis” lines in the bottom section.
+
+Diagram (layout blueprint with coordinates)
+
+Use this diagram as the reference grid. Treat the flyer as a fixed canvas:
+
+PAGE (8.5x11)
+┌──────────────────────────────────────────────────────────────┐
+│ HEADER (fixed height) │
+│ [Y divider] [Spyglass logo] [Address (regular)] [Tag] │
+│ (divider does NOT overlap photos) │
+├──────────────────────────────────────────────────────────────┤
+│ PHOTO AREA │
+│ [Large photo full width] │
+│ [Two photos side-by-side] │
+├──────────────────────────────────────────────────────────────┤
+│ BOTTOM CONTENT (3 columns, Y-axis only) │
+│ Left Stats | Center Head/Desc | Right Agent │
+│ (beds/baths/ | headline centered | photo bigger │
+│ sqft one-line)| desc left-aligned | name/title/phone │
+│ | | small logo beside │
+│ | | │
+│ IMPORTANT: Vertical divider height = content block height │
+│ and stops near the bottom of content, not page bottom. │
+└──────────────────────────────────────────────────────────────┘
+
+Axis note:
+
+Keep ONLY Y-axis dividers (vertical lines) between columns.
+
+Do NOT draw any X-axis divider (horizontal line) anywhere in bottom content.
+
+Checklist (Replit must test each item before shipping)
+Preview/Download Sync
+
+ Preview image is rendered by the same renderer/codepath as download.
+
+ Preview layout is pixel-identical to downloaded PNG for the same inputs.
+
+Header
+
+ Address is NOT bold.
+
+ Left header vertical divider does NOT overlap logo/address and does NOT overlap the top photo.
+
+ No extra stray line on the upper-left.
+
+Price tag
+
+ Badge is angled tag shape (not rectangle).
+
+ Badge text color is black.
+
+ Badge text is NOT bold.
+
+Bottom section structure
+
+ Only vertical dividers exist (no horizontal lines).
+
+ Vertical dividers do not overlap text.
+
+ Divider height ends at content height (not down to page bottom).
+
+Stats block (left column)
+
+ Uses provided PNG icons for bed/bath/sqft (not emojis).
+
+ Each stat is one line: icon + “{n} bedrooms/bathrooms” + “{n} sq. ft”.
+
+ Stats block moved slightly downward so it visually matches reference.
+
+ Sq ft baseline aligns with agent phone baseline.
+
+Center block
+
+ Listing headline is NOT bold and is centered.
+
+ Description is left-aligned.
+
+ Description respects the character limit (115 max if product requires; otherwise up to 150 without overflow).
+
+Agent block
+
+ Profile photo is larger (matches reference proportion).
+
+ Agent name/title/phone stack is correct: name, title, phone.
+
+ Name is not truncated; keep single line if possible by adjusting font-size/spacing.
+
+ Spyglass logo sits beside the profile photo (as in reference).
+
+Icon integration instructions
+
+Convert the PNG icons into data URIs during render (or serve locally) so Puppeteer always renders them.
+
+Normalize icon size in CSS and align to text baseline.
+
+Do not allow icons to push text into dividers.
+
+Deliverable
+
+Update the flyer template implementation so the above checklist passes. Provide before/after screenshots for:
+
+Preview thumbnail
+
+Full Preview
+
+Downloaded PNG
+All three must match layout exactly.
