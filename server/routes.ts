@@ -538,7 +538,21 @@ export async function registerRoutes(
 
   app.get("/api/transactions/:id/activities", isAuthenticated, async (req, res) => {
     try {
-      const activities = await storage.getActivitiesByTransaction(req.params.id);
+      const category = req.query.category as string | undefined;
+      let activities = await storage.getActivitiesByTransaction(req.params.id);
+      
+      // Filter by category if specified
+      if (category && category !== 'all') {
+        activities = activities.filter(a => a.category === category);
+      }
+      
+      // Sort by newest first
+      activities.sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+      
       res.json(activities);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch activities" });

@@ -71,6 +71,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CreateFlyerDialog, FlyerAssetConfig } from "./create-flyer-dialog";
 import { MarketingMaterialsDialog, SocialGraphicConfig } from "./marketing-materials-dialog";
 import { CMATab } from "./cma-tab";
+import { TimelineTab } from "./timeline-tab";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -2364,36 +2365,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         </TabsContent>
 
         <TabsContent value="timeline" className="space-y-6">
-          <h2 className="text-lg font-semibold">Activity Timeline</h2>
-
-          {activities.length > 0 ? (
-            <div className="space-y-4">
-              {activities.map((activity) => (
-                <div key={activity.id} className="flex gap-4">
-                  <div className="flex flex-col items-center">
-                    <div className="h-2 w-2 rounded-full bg-primary mt-2" />
-                    <div className="flex-1 w-px bg-border" />
-                  </div>
-                  <div className="flex-1 pb-4">
-                    <p className="text-sm font-medium">{activity.description}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {formatDateTime(activity.createdAt)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Activity className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                <h3 className="font-medium mb-2">No Activity Yet</h3>
-                <p className="text-sm text-muted-foreground">
-                  Activity will be recorded as actions are taken on this transaction.
-                </p>
-              </CardContent>
-            </Card>
-          )}
+          <TimelineTab transactionId={transaction.id} />
         </TabsContent>
 
       </Tabs>
