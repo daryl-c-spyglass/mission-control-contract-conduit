@@ -2100,13 +2100,9 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 const createdDate = asset.createdAt ? new Date(asset.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null;
                 
                 return (
-                  <Card key={asset.id} data-testid={`card-asset-${asset.id}`} className="overflow-hidden">
+                  <Card key={asset.id} data-testid={`card-asset-${asset.id}`} className="overflow-hidden flex flex-col">
                     <div 
-                      className={`bg-muted overflow-hidden cursor-pointer hover:opacity-90 transition-opacity ${
-                        isPrintFlyer ? 'aspect-[8.5/11]' : 
-                        isStory ? 'aspect-[9/16] max-h-64' :
-                        isLandscape ? 'aspect-video' : 'aspect-square'
-                      }`}
+                      className="h-64 bg-muted overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
                       onClick={() => setPreviewAsset(asset)}
                       data-testid={`button-preview-asset-${asset.id}`}
                     >
