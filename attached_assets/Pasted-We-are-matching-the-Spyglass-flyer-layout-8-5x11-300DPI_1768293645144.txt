@@ -1,0 +1,77 @@
+We are matching the Spyglass flyer layout (8.5x11 @ 300DPI, 2550x3300). The flyer is now close; final fixes are:
+
+CRITICAL RULE: Preview MUST always mirror Download Flyer 1:1.
+- There must be a single rendering pipeline and identical HTML/CSS for preview PNG and download PNG/PDF.
+- The Preview button should call the same backend render used for Download, and display THAT returned PNG (not a separate “preview-only” HTML, not different CSS, not a scaled/alternate template).
+- If there are separate endpoints/functions for preview vs download, refactor so both routes call the same render function with the same template and same viewport settings.
+- Ensure Puppeteer uses the same: page.setViewport, deviceScaleFactor, and the same HTML input for both preview + download.
+
+ASSETS (use these exact icons):
+- /mnt/data/Bedroom.png
+- /mnt/data/Bathroom.png
+- /mnt/data/sq ft.png
+
+Step 1 — Replace current stat icons with the provided PNG icons:
+- In server/templates/flyer-template.html, update the stats icon markup so it uses <img> tags pointing to these icon assets.
+- Make them render reliably in Puppeteer:
+  Option A (preferred): copy icons into a static path (e.g. server/public/icons/bedroom.png, bathroom.png, sqft.png) and reference with absolute path in template (/icons/bedroom.png etc).
+  Option B: inline them as base64 data URIs in the HTML template so there is zero path risk.
+- Icon sizing: ~44–54px square (finalize so text sits on one line).
+- The stat row must be ONE LINE: [icon] [NUMBER + label], e.g. “4 bedrooms”, “2 bathrooms”, “1,850 sq. ft”.
+- Use flex row with gap ~16–20px; vertically center icon + text.
+
+Step 2 — Fix LEFT STATS vertical position (move slightly downward) and align to agent phone baseline:
+Goal: the bottom of the stats block visually aligns on the same horizontal baseline as the agent phone number (your latest screenshot: sqft is already close; move the whole stats group down slightly so bedrooms/bathrooms don’t sit too high).
+- Implement by adding a small top offset ONLY to the stats column content (not the whole bottom section):
+  e.g. .stats-column { padding-top: 18px; } (tune 12–28px as needed)
+- Do NOT change the overall page height math.
+- Keep the stats column aligned to the same vertical band as the agent info and description.
+
+Step 3 — Divider behavior: Y-axis ONLY, height must match content band (NOT the whole remaining white area)
+We only want vertical dividers (Y axis). No horizontal “x-axis” rules anywhere in the bottom band.
+- The left vertical divider (between stats and description) must start/stop aligned with the text band:
+  Start near the first stat line and end near the last stat line (or aligned to the agent phone line if that’s the common baseline).
+- The right vertical divider (between description and agent) must also only span the content band: roughly from listing headline area down to phone baseline.
+- Do NOT allow dividers to stretch to full column height.
+Implementation requirement:
+- Do NOT use border-left on full-height grid columns.
+- Instead, render dividers as pseudo-elements or dedicated divider elements whose height is tied to content:
+  Example approach:
+  - Wrap the bottom content in a “bottom-inner” band with display:flex and align-items:flex-start.
+  - Insert divider elements as their own nodes: <div class="v-divider"></div>
+  - Give .v-divider a fixed height driven by CSS variable or by content measurement (preferred: tie to the tallest content block height in that band).
+  - If you keep CSS Grid, create a nested wrapper in each column and place the divider as absolute-positioned with top/bottom based on padding variables (NOT bottom:0).
+
+Step 4 — Remove any accidental x-axis lines
+In the current output there is sometimes a faint horizontal rule appearing (especially near the bottom of the stats area).
+- Ensure NO border-top / border-bottom rules exist for the bottom band, stats items, description wrapper, or agent wrapper.
+- Only vertical dividers should remain.
+
+Step 5 — Listing headline + description alignment rules (match reference)
+- Headline is centered in its column.
+- Description is LEFT aligned (not centered), and the description block should visually align with the left edge of the text area.
+- Keep typography consistent with our existing fonts, but do not introduce bolding where not intended.
+
+Step 6 — Acceptance checklist (must pass BEFORE merge)
+Create a quick local checklist and verify each with real renders:
+A) Preview == Download
+  - Render Preview PNG and Download PNG for the same listing and compare pixel-diff (or visually confirm they are identical).
+  - Ensure the same template HTML/CSS is used.
+B) Icons
+  - Bedroom/Bathroom/Sqft use the provided PNG icons (not old SVG placeholders).
+  - Each stat row is single-line with icon and text aligned.
+C) Stats position
+  - Stats group nudged slightly downward so bedrooms/bathrooms visually align better with the agent phone baseline (sqft already close).
+D) Dividers
+  - Only Y-axis vertical dividers exist.
+  - Divider heights stop at the content band (do not run into the big white space).
+  - No divider overlaps any text or photos.
+E) No horizontal rules
+  - Confirm there are zero x-axis lines in the bottom section.
+F) No page height break
+  - Flyer remains exactly 2550x3300 and does not introduce extra whitespace shifts.
+
+After changes, generate:
+- one Preview render
+- one Download render
+and confirm they match exactly and the dividers/icons/alignments match the reference behavior.

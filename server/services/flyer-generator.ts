@@ -135,7 +135,14 @@ const FLYER_WIDTH = 2550;
 const FLYER_HEIGHT = 3300;
 
 // Template version for cache invalidation
-const TEMPLATE_VERSION = 'v2.0.0';
+const TEMPLATE_VERSION = 'v2.1.0';
+
+// Icon paths for stat icons
+const ICON_PATHS = {
+  bedroom: path.join(import.meta.dirname, '../public/icons/bedroom.png'),
+  bathroom: path.join(import.meta.dirname, '../public/icons/bathroom.png'),
+  sqft: path.join(import.meta.dirname, '../public/icons/sqft.png')
+};
 
 export type OutputType = 'pngPreview' | 'pdf';
 
@@ -190,13 +197,16 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
   console.log(`[FlyerGenerator] Media type: ${RENDER_CONFIG.mediaType}`);
   console.log(`[FlyerGenerator] Converting images to base64...`);
   
-  // Convert all images to base64 in parallel
-  const [logoB64, mainPhotoB64, photo2B64, photo3B64, agentPhotoB64] = await Promise.all([
+  // Convert all images to base64 in parallel (including stat icons)
+  const [logoB64, mainPhotoB64, photo2B64, photo3B64, agentPhotoB64, bedroomIconB64, bathroomIconB64, sqftIconB64] = await Promise.all([
     imageToBase64(data.spyglassLogoUrl),
     data.mainPhoto ? imageToBase64(data.mainPhoto) : Promise.resolve(''),
     data.photo2 ? imageToBase64(data.photo2) : Promise.resolve(''),
     data.photo3 ? imageToBase64(data.photo3) : Promise.resolve(''),
-    data.agentPhoto ? imageToBase64(data.agentPhoto) : Promise.resolve('')
+    data.agentPhoto ? imageToBase64(data.agentPhoto) : Promise.resolve(''),
+    imageToBase64(ICON_PATHS.bedroom),
+    imageToBase64(ICON_PATHS.bathroom),
+    imageToBase64(ICON_PATHS.sqft)
   ]);
   
   console.log('[FlyerGenerator] Images converted:', {
@@ -204,7 +214,10 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     mainPhoto: mainPhotoB64 ? 'OK' : 'EMPTY',
     photo2: photo2B64 ? 'OK' : 'EMPTY',
     photo3: photo3B64 ? 'OK' : 'EMPTY',
-    agentPhoto: agentPhotoB64 ? 'OK' : 'EMPTY'
+    agentPhoto: agentPhotoB64 ? 'OK' : 'EMPTY',
+    bedroomIcon: bedroomIconB64 ? 'OK' : 'FAILED',
+    bathroomIcon: bathroomIconB64 ? 'OK' : 'FAILED',
+    sqftIcon: sqftIconB64 ? 'OK' : 'FAILED'
   });
   
   // Create data with base64 images
@@ -214,7 +227,10 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     mainPhoto: mainPhotoB64,
     photo2: photo2B64,
     photo3: photo3B64,
-    agentPhoto: agentPhotoB64
+    agentPhoto: agentPhotoB64,
+    bedroomIcon: bedroomIconB64,
+    bathroomIcon: bathroomIconB64,
+    sqftIcon: sqftIconB64
   };
   
   const templatePath = path.join(import.meta.dirname, '../templates/flyer-template.html');
