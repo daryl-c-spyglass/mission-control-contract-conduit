@@ -1,0 +1,115 @@
+Replit instruction (copy/paste)
+
+Goal: Match the sample bottom section layout exactly (see /mnt/data/6a989cd8-6e68-49e1-8a65-ce7f860753c0.png). Update ONLY the bottom info band; do not change header/photos logic. Preview and Download must always use the exact same render pipeline and CSS.
+
+A) Bottom band layout (3 columns)
+
+Implement a 3-column grid for the bottom band:
+
+Left column: stats (bed/bath/sqft) with icons
+
+Middle column: headline + description (description left-aligned)
+
+Right column: agent block (large photo + logo to the right of photo + stacked text)
+
+Use a shared parent container for the bottom band so divider heights are derived from actual content height.
+
+B) Enlarge agent photo + right column structure
+
+Increase agent profile photo size to match sample prominence:
+
+Make photo circle ~86–96px diameter (target 90px)
+
+Keep a thin stroke ring if needed (light warm gray)
+
+Agent block text stack must be exactly:
+
+Line 1: Agent Name (bold)
+
+Line 2: Agent Title (small caps / lighter weight)
+
+Line 3: Phone (regular weight)
+
+Spyglass logo placement:
+
+Place a small square logo tile to the right of the photo, vertically centered with the photo (like sample).
+
+Maintain consistent padding between photo and logo tile.
+
+C) Stats alignment rule (critical)
+
+We need the sq ft row baseline to align with the last line of the description block (like the sample).
+
+Implement this as a deterministic CSS layout rule:
+
+Make the bottom band a grid with align-items: stretch
+
+Inside the left stats column, make it a flex column with justify-content: flex-end
+
+Ensure the last stat row (sqft) sits at the bottom of the bottom band content area
+
+Inside the middle column, description should naturally define the bottom edge; keep it left aligned.
+
+The result must be: sq ft row baseline ≈ description last line baseline (within ~2–4px)
+
+Do NOT use absolute positioning that breaks in Preview vs Download.
+
+D) Dividers (Y-axis only) and height
+
+Only vertical dividers are allowed.
+
+Divider height must equal the computed height of the bottom band content, not the full page.
+
+Dividers must NOT extend into white space below the bottom band.
+
+Dividers must NOT overlap text.
+
+Implementation detail:
+
+Make dividers height: 100% of the bottom-band container, not page height.
+
+Bottom band container height should be driven by content; no fixed huge min-height.
+
+E) Preview must always match Download (non-negotiable)
+
+Currently preview and download can drift when they use different viewport scaling / CSS / render code.
+
+Enforce one pipeline:
+
+Both Preview and Download must call the same renderFlyer(format: 'print') function
+
+Both must load the same HTML template and CSS bundle
+
+Both must use the same Puppeteer settings:
+
+deviceScaleFactor consistent
+
+same viewport size
+
+same page margins
+
+same printBackground: true
+
+If preview uses a screenshot and download uses PDF or different viewport, unify them:
+
+Render a single “print master” image buffer (PNG) from Puppeteer
+
+Preview displays that PNG
+
+Download uses that same PNG and/or PDF generated from the same DOM + CSS (no branching CSS)
+
+F) Acceptance tests checklist (Replit must verify each)
+
+Agent photo is visibly larger (≈90px) and dominates right column like sample.
+
+Agent text is stacked: Name (bold) / Title (lighter) / Phone (regular).
+
+Description is left-aligned (not centered).
+
+Sq ft row baseline aligns with description last line baseline (±4px).
+
+Vertical dividers height matches bottom band content height only.
+
+No horizontal dividers appear in bottom band.
+
+Preview output is pixel-identical to Download output (same render pipeline).
