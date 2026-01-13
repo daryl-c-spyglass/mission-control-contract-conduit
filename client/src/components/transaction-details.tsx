@@ -52,11 +52,13 @@ import {
   Grid3X3,
   Waves,
   Eye,
+  Pencil,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Input } from "@/components/ui/input";
-import { CreateFlyerDialog } from "./create-flyer-dialog";
+import { CreateFlyerDialog, FlyerAssetConfig } from "./create-flyer-dialog";
+import { MarketingMaterialsDialog, SocialGraphicConfig } from "./marketing-materials-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -182,6 +184,9 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [activeTab, setActiveTab] = useState(initialTab);
   const { toast } = useToast();
   const [flyerDialogOpen, setFlyerDialogOpen] = useState(false);
+  const [editFlyerAsset, setEditFlyerAsset] = useState<{ id: number; config: FlyerAssetConfig } | null>(null);
+  const [editGraphicsAsset, setEditGraphicsAsset] = useState<{ id: number; config: SocialGraphicConfig } | null>(null);
+  const [graphicsDialogOpen, setGraphicsDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [templateSearch, setTemplateSearch] = useState("");
   const [templateListing, setTemplateListing] = useState<TemplateListing | null>(null);
@@ -320,6 +325,32 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
     link.click();
   };
 
+  const handleEditAsset = (asset: MarketingAsset) => {
+    const metadata = asset.metadata as { config?: FlyerAssetConfig | SocialGraphicConfig; format?: string } | null;
+    const config = metadata?.config;
+    
+    if (!config) {
+      toast({ 
+        title: "Cannot edit this asset", 
+        description: "This asset was created before edit functionality was available.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    const isPrintFlyer = asset.type === 'print_flyer' || metadata?.format === 'print';
+    const isSocialFlyer = asset.type === 'social_flyer' || metadata?.format === 'social';
+    
+    if (isPrintFlyer || isSocialFlyer) {
+      // Flyer type - open CreateFlyerDialog in edit mode
+      setEditFlyerAsset({ id: asset.id, config: config as FlyerAssetConfig });
+    } else {
+      // Social graphics type - open MarketingMaterialsDialog in edit mode
+      setEditGraphicsAsset({ id: asset.id, config: config as SocialGraphicConfig });
+      setGraphicsDialogOpen(true);
+    }
+  };
+
   const refreshMlsMutation = useMutation({
     mutationFn: async () => {
       console.log("=== REFRESH MLS MUTATION CALLED ===", transaction.id);
@@ -430,6 +461,39 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         transaction={transaction}
         mlsPhotos={mlsData?.photos || mlsData?.images || []}
         onAssetSaved={() => queryClient.invalidateQueries({ queryKey: [`/api/transactions/${transaction.id}/marketing-assets`] })}
+      />
+
+      {/* Edit Flyer Dialog */}
+      <CreateFlyerDialog
+        open={Boolean(editFlyerAsset)}
+        onOpenChange={(open) => {
+          if (!open) setEditFlyerAsset(null);
+        }}
+        transaction={transaction}
+        mlsPhotos={mlsData?.photos || mlsData?.images || []}
+        onAssetSaved={() => {
+          queryClient.invalidateQueries({ queryKey: [`/api/transactions/${transaction.id}/marketing-assets`] });
+          setEditFlyerAsset(null);
+        }}
+        initialData={editFlyerAsset?.config}
+        assetId={editFlyerAsset?.id}
+      />
+
+      {/* Edit Graphics Dialog */}
+      <MarketingMaterialsDialog
+        open={graphicsDialogOpen && Boolean(editGraphicsAsset)}
+        onOpenChange={(open) => {
+          setGraphicsDialogOpen(open);
+          if (!open) setEditGraphicsAsset(null);
+        }}
+        transaction={transaction}
+        initialData={editGraphicsAsset?.config}
+        assetId={editGraphicsAsset?.id}
+        onAssetSaved={() => {
+          queryClient.invalidateQueries({ queryKey: [`/api/transactions/${transaction.id}/marketing-assets`] });
+          setGraphicsDialogOpen(false);
+          setEditGraphicsAsset(null);
+        }}
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -1463,8 +1527,18 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                           <Button
                             size="icon"
                             variant="ghost"
+                            onClick={() => handleEditAsset(asset)}
+                            data-testid={`button-edit-asset-${asset.id}`}
+                            title="Edit"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
                             onClick={() => downloadAsset(asset)}
                             data-testid={`button-download-asset-${asset.id}`}
+                            title="Download"
                           >
                             <Download className="h-4 w-4" />
                           </Button>
@@ -1474,6 +1548,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                             onClick={() => deleteAssetMutation.mutate(asset.id)}
                             disabled={deleteAssetMutation.isPending}
                             data-testid={`button-delete-asset-${asset.id}`}
+                            title="Delete"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
