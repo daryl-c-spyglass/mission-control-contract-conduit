@@ -86,7 +86,6 @@ interface TransactionDetailsProps {
   coordinators: Coordinator[];
   activities: ActivityType[];
   onBack: () => void;
-  onMarketingClick?: () => void;
   initialTab?: string;
 }
 
@@ -483,7 +482,7 @@ const ROOM_TYPES = [
   { id: "exterior", label: "Exterior", icon: Home },
 ] as const;
 
-export function TransactionDetails({ transaction, coordinators, activities, onBack, onMarketingClick, initialTab = "overview" }: TransactionDetailsProps) {
+export function TransactionDetails({ transaction, coordinators, activities, onBack, initialTab = "overview" }: TransactionDetailsProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const { toast } = useToast();
   const [flyerDialogOpen, setFlyerDialogOpen] = useState(false);
@@ -1654,7 +1653,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                   <CardContent className="pt-6 space-y-4">
                     {/* Status Badges Row */}
                     <div className="flex items-center flex-wrap gap-2">
-                      <Badge variant={mlsData.status?.toLowerCase() === 'active' ? 'default' : 'secondary'}>
+                      <Badge className={getStatusBadgeStyle(mlsData.status || 'Unknown')}>
                         {mlsData.status || 'Unknown'}
                       </Badge>
                       {/* lastStatus ribbons */}
@@ -2216,16 +2215,14 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <h2 className="text-lg font-semibold">Marketing Assets</h2>
             <div className="flex items-center gap-2">
-              {onMarketingClick && (
-                <Button 
-                  variant="outline" 
-                  onClick={onMarketingClick}
-                  data-testid="button-create-graphics"
-                >
-                  <ImageIcon className="h-4 w-4 mr-2" />
-                  Create Graphics
-                </Button>
-              )}
+              <Button 
+                variant="outline" 
+                onClick={() => setGraphicsDialogOpen(true)}
+                data-testid="button-create-graphics"
+              >
+                <ImageIcon className="h-4 w-4 mr-2" />
+                Create Graphics
+              </Button>
               <Button 
                 variant="outline" 
                 onClick={() => setFlyerDialogOpen(true)}
@@ -2427,7 +2424,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-semibold">{templateListing.address}</h3>
-                          <Badge variant="outline">{templateListing.status}</Badge>
+                          <Badge className={getStatusBadgeStyle(templateListing.status)}>{getStatusLabel(templateListing.status)}</Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">
                           {templateListing.city}, {templateListing.state}
@@ -2909,7 +2906,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                         <Activity className="h-4 w-4" />
                         Status
                       </span>
-                      <Badge variant="secondary">{selectedCMAProperty.status}</Badge>
+                      <Badge className={getStatusBadgeStyle(selectedCMAProperty.status)}>{getStatusLabel(selectedCMAProperty.status)}</Badge>
                     </div>
                   )}
                   {selectedCMAProperty.listDate && (
