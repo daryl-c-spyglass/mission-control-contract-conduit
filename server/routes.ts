@@ -1376,6 +1376,139 @@ Return only the summary text, nothing else.`;
     }
   });
 
+  // ============ Professional Social Media Tagline Generation ============
+  app.post("/api/generate-social-tagline", isAuthenticated, async (req, res) => {
+    try {
+      const { transactionId } = req.body;
+      
+      if (!transactionId) {
+        return res.status(400).json({ error: "Transaction ID is required" });
+      }
+
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+
+      const mlsData = transaction.mlsData as any;
+      
+      // Extract property details
+      const beds = mlsData?.beds || mlsData?.bedrooms || "";
+      const baths = mlsData?.baths || mlsData?.bathrooms || "";
+      const sqft = mlsData?.sqft || mlsData?.squareFeet || "";
+      const yearBuilt = mlsData?.yearBuilt || "";
+      const propertyType = mlsData?.propertyType || mlsData?.type || "Single Family";
+      const style = mlsData?.style || "";
+      const price = transaction.salePrice || transaction.listPrice || mlsData?.listPrice || "";
+      const description = mlsData?.description || transaction.notes || "";
+
+      // Extract photo highlights from Image Insights if available
+      const imageInsights = mlsData?.imageInsights || mlsData?.images;
+      let featuredRooms: string[] = [];
+      
+      if (imageInsights && Array.isArray(imageInsights)) {
+        // Get unique room types from high-quality images
+        featuredRooms = imageInsights
+          .filter((img: any) => 
+            img.quality?.qualitative === 'excellent' || 
+            img.quality?.qualitative === 'above average' ||
+            img.classification?.imageOf
+          )
+          .map((img: any) => img.classification?.imageOf)
+          .filter((room: any): room is string => Boolean(room))
+          .slice(0, 5);
+        
+        // Remove duplicates
+        featuredRooms = Array.from(new Set(featuredRooms));
+      }
+
+      // Build property context
+      const propertyContext = [
+        beds ? `${beds} bed` : "",
+        baths ? `${baths} bath` : "",
+        sqft ? `${sqft} sq ft` : "",
+      ].filter(Boolean).join(", ");
+
+      const featuredRoomsText = featuredRooms.length > 0 
+        ? `\nStandout Features (from photos):\n${featuredRooms.map(room => `- ${room}`).join('\n')}`
+        : "";
+
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const prompt = `You are a professional real estate broker writing a short, punchy social media tagline for a property listing.
+
+Property Details:
+- ${propertyContext}
+${yearBuilt ? `- Built: ${yearBuilt}` : ""}
+${style ? `- Style: ${style}` : `- Type: ${propertyType}`}
+${price ? `- Price: $${Number(price).toLocaleString()}` : ""}
+${featuredRoomsText}
+
+MLS Description Excerpt:
+"${description?.slice(0, 500) || "N/A"}"
+
+Write a compelling 50-70 character tagline that:
+1. Highlights 1-2 KEY selling points
+2. Uses professional real estate language
+3. Creates urgency or excitement
+4. Avoids generic words like "beautiful", "nice", "great", "amazing"
+5. Sounds like a broker, NOT like AI
+
+PROFESSIONAL LANGUAGE GUIDE:
+- Big kitchen → "Chef's Kitchen" or "Gourmet Kitchen"
+- Nice backyard → "Private Retreat" or "Entertainer's Yard"
+- Updated → "Fully Renovated" or "Turnkey"
+- Good location → "Prime Location" or "Sought-After Area"
+- Nice views → "Panoramic Views" or "Sunset Views"
+- Open layout → "Open Concept" or "Flowing Floor Plan"
+- Pool → "Resort-Style Pool" or "Sparkling Pool"
+- New → "Move-In Ready" or "Like New"
+
+GOOD EXAMPLES:
+- "Stunning 4BR with Chef's Kitchen & Pool"
+- "Move-In Ready in Top-Rated School Zone"
+- "Modern Updates, Huge Lot, Prime Location"
+- "Open Concept Living with Sunset Views"
+- "Elegant Single-Story on Tree-Lined Lot"
+
+BAD EXAMPLES (AVOID):
+- "Beautiful home for sale" (too generic)
+- "Amazing property awaits!" (too salesy)
+- "Don't miss this gem!" (cliché)
+- "Your dream home!" (overused)
+
+Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "You are a professional real estate broker. Write punchy, professional taglines. Never use generic words like beautiful, nice, great, amazing. Never use clichés. Sound like a broker, not like AI. Max 70 characters." },
+          { role: "user", content: prompt }
+        ],
+        max_tokens: 100,
+        temperature: 0.8,
+      });
+
+      let tagline = response.choices[0]?.message?.content?.trim() || "";
+      
+      // Remove any surrounding quotes
+      tagline = tagline.replace(/^["']|["']$/g, '');
+      
+      // Ensure it's within 80 characters
+      if (tagline.length > 80) {
+        tagline = tagline.slice(0, 80).trim();
+      }
+
+      res.json({ tagline });
+    } catch (error: any) {
+      console.error("Social tagline generation error:", error);
+      res.status(500).json({ error: "Failed to generate tagline" });
+    }
+  });
+
   // ============ HTML/Puppeteer Flyer Generation ============
   app.post("/api/generate-flyer-html", isAuthenticated, async (req, res) => {
     try {

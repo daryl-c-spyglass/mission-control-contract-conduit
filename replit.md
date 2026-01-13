@@ -57,11 +57,22 @@ The app follows a Modern Productivity Dashboard approach inspired by Linear, Not
 
 ### Marketing Tab (Consolidated - January 2026)
 The Marketing tab serves as the single destination for all marketing asset creation:
-- **Create Graphics Button**: Opens MarketingMaterialsDialog for social media graphics (16:9/1:1/alt styles, canvas rendering, saves to Marketing Assets, optional Slack posting)
+- **Create Graphics Button**: Opens MarketingMaterialsDialog for social media graphics (16:9/1:1/9:16 formats, canvas rendering, saves to Marketing Assets, optional Slack posting)
 - **Create Flyer Button**: Opens CreateFlyerDialog with dual tabs for Social (1:1) and Print (8.5x11) flyers, AI summarization, agent branding, Puppeteer rendering
 - **Asset Gallery**: Displays all previously created marketing assets with download/delete options
 - **Centralized UX**: Removed marketing buttons from header and Overview tab to reduce confusion
 - **Empty State**: Shows both creation options when no assets exist
+
+#### AI Social Media Tagline Generation (January 2026)
+Professional broker-style tagline generation for social media graphics:
+- **Character Limit**: 50-80 characters (increased from 20 for meaningful descriptions)
+- **AI Suggest Button**: Sparkles icon triggers GPT-4o-mini generation with temperature 0.8
+- **Full Property Context**: Uses beds, baths, sqft, yearBuilt, style, price, and MLS description
+- **Image Insights Integration**: Leverages Repliers API photo classifications (excellent/above average quality rooms)
+- **Professional Language Guide**: Translates generic terms to broker language (e.g., "big kitchen" → "Chef's Kitchen")
+- **Anti-Cringy Prompt**: Explicitly avoids generic words (beautiful, nice, amazing) and clichés (dream home, must see)
+- **API Endpoint**: `POST /api/generate-social-tagline` with transactionId parameter
+- **Example Outputs**: "Stunning 4BR with Chef's Kitchen & Pool", "Move-In Ready in Top-Rated School Zone"
 
 ### Templates Feature (ReChat-like)
 The Templates tab in transaction details provides marketing template preview gallery:

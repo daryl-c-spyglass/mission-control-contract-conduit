@@ -1,0 +1,212 @@
+## Improve AI Suggest for Social Media Description
+
+The current AI Suggest generates "cringy" descriptions. Improve it to sound like a **professional real estate broker** reviewing the property.
+
+---
+
+### Current Problem:
+- AI generates generic or awkward descriptions
+- Only uses MLS text description
+- Doesn't leverage property photos/features
+- Max 20 characters is very limiting
+
+### Solution:
+
+**1. Increase Character Limit**
+Change from 20 characters to **50-80 characters** for more meaningful descriptions.
+
+Professional examples (50-80 chars):
+- "Stunning 4BR with Chef's Kitchen & Pool"
+- "Modern Move-In Ready Home in NW Austin"
+- "Elegant Single-Story on Tree-Lined Lot"
+- "Updated Kitchen, Huge Backyard, Top Schools"
+
+**2. Use Image Insights Data**
+
+We have Repliers Image Insights enabled! Use the photo classifications to inform the description:
+
+```typescript
+// Get top features from Image Insights
+const getPropertyHighlights = (imageInsights: ImageInsights) => {
+  if (!imageInsights?.images) return [];
+  
+  // Find excellent/above average quality rooms
+  const highlights = imageInsights.images
+    .filter(img => 
+      img.quality?.qualitative === 'excellent' || 
+      img.quality?.qualitative === 'above average'
+    )
+    .map(img => img.classification?.imageOf)
+    .filter(Boolean);
+  
+  // Get unique room types
+  return [...new Set(highlights)];
+};
+
+// Example output: ["Kitchen", "Living Room", "Pool", "Patio"]
+```
+
+**3. Improved AI Prompt**
+
+Update the prompt sent to the AI:
+
+```typescript
+const generateSocialDescription = async (listing: Listing) => {
+  // Get key features from Image Insights
+  const photoHighlights = getPropertyHighlights(listing.imageInsights);
+  
+  // Build context for AI
+  const propertyContext = {
+    beds: listing.beds,
+    baths: listing.baths,
+    sqft: listing.sqft,
+    yearBuilt: listing.yearBuilt,
+    price: listing.price,
+    propertyType: listing.propertyType,
+    style: listing.style,
+    // From Image Insights
+    featuredRooms: photoHighlights.slice(0, 4), // Top 4 rooms
+    // From MLS description
+    description: listing.description?.slice(0, 500),
+  };
+
+  const prompt = `You are a professional real estate broker writing a short, punchy social media tagline for a property listing.
+
+Property Details:
+- ${propertyContext.beds} bed, ${propertyContext.baths} bath, ${propertyContext.sqft} sq ft
+- Built: ${propertyContext.yearBuilt}
+- Style: ${propertyContext.style || 'Single Family'}
+- Price: $${propertyContext.price?.toLocaleString()}
+
+Standout Features (from photos):
+${propertyContext.featuredRooms.map(room => `- ${room}`).join('\n')}
+
+MLS Description Excerpt:
+"${propertyContext.description}"
+
+Write a compelling 50-80 character tagline that:
+1. Highlights 1-2 KEY selling points
+2. Uses professional real estate language
+3. Creates urgency or excitement
+4. Avoids generic words like "beautiful", "nice", "great"
+5. Sounds like a broker, NOT like AI
+
+Good examples:
+- "Stunning 4BR with Chef's Kitchen & Pool"
+- "Move-In Ready in Top-Rated School Zone"
+- "Modern Updates, Huge Lot, Prime Location"
+- "Open Concept Living with Sunset Views"
+
+Bad examples (avoid these styles):
+- "Beautiful home for sale" (too generic)
+- "Amazing property awaits!" (too salesy)
+- "Don't miss this gem!" (cliché)
+- "Your dream home!" (overused)
+
+Return ONLY the tagline, no quotes, no explanation.`;
+
+  const response = await anthropic.messages.create({
+    model: 'claude-3-haiku-20240307',
+    max_tokens: 100,
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  return response.content[0].text.trim();
+};
+```
+
+**4. Update the UI**
+
+In `marketing-materials-dialog.tsx`:
+
+```tsx
+// Change character limit
+<p className="text-xs text-muted-foreground">
+  0/80 characters  {/* Was 0/20 */}
+</p>
+
+// Update input maxLength
+<Input
+  value={description}
+  onChange={(e) => setDescription(e.target.value)}
+  maxLength={80}  // Was 20
+  placeholder="e.g. Stunning 4BR with Chef's Kitchen"
+/>
+```
+
+**5. Update API Endpoint**
+
+In `server/routes.ts` (or wherever the summarize endpoint is):
+
+```typescript
+app.post('/api/ai/social-description', async (req, res) => {
+  const { transactionId } = req.body;
+  
+  // Get listing data including Image Insights
+  const transaction = await getTransaction(transactionId);
+  const listing = transaction.mlsData;
+  
+  // Generate professional description
+  const description = await generateSocialDescription(listing);
+  
+  res.json({ description });
+});
+```
+
+---
+
+### Professional Broker Language Guide
+
+**DO use:**
+| Feature | Professional Term |
+|---------|-------------------|
+| Big kitchen | Chef's Kitchen, Gourmet Kitchen |
+| Nice backyard | Private Retreat, Entertainer's Yard |
+| Updated | Fully Renovated, Turnkey |
+| Good location | Prime Location, Sought-After Area |
+| Nice views | Panoramic Views, Sunset Views |
+| Open layout | Open Concept, Flowing Floor Plan |
+| Pool | Resort-Style Pool, Sparkling Pool |
+| New | Move-In Ready, Like New |
+
+**DON'T use:**
+- Beautiful, Nice, Great, Amazing (too generic)
+- Perfect, Dream, Gem (overused)
+- Won't last!, Must see!, Don't miss! (too salesy)
+- Cozy (often means small)
+
+---
+
+### Testing Checklist:
+
+1. [ ] Open Create Graphics dialog
+2. [ ] Click "AI Suggest" button
+3. [ ] Verify generated description is 50-80 characters
+4. [ ] Verify description sounds professional (not cringy)
+5. [ ] Verify description references actual property features
+6. [ ] Test with multiple properties to ensure variety
+7. [ ] Check that Image Insights data is being used (if available)
+
+**Example Expected Outputs:**
+
+For a 4BR home with great kitchen and pool:
+- ✅ "Stunning 4BR with Chef's Kitchen & Pool"
+- ✅ "Modern Updates, Private Pool, Top Schools"
+- ❌ "Beautiful home for sale!" (too generic)
+- ❌ "Amazing property awaits!" (cringy)
+
+---
+
+### Files to Modify:
+- `client/src/components/marketing-materials-dialog.tsx` - Update char limit, input
+- `server/routes.ts` - Update AI prompt endpoint
+- `server/repliers.ts` - Add helper to extract Image Insights highlights
+
+### Summary of Changes:
+
+| Before | After |
+|--------|-------|
+| 20 char limit | 50-80 char limit |
+| Generic AI output | Professional broker language |
+| Uses only MLS text | Uses MLS + Image Insights |
+| Cringy descriptions | Polished, marketable taglines |

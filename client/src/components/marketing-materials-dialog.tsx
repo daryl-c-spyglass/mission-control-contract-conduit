@@ -254,20 +254,18 @@ export function MarketingMaterialsDialog({
     return `/api/proxy-image?url=${encodeURIComponent(url)}`;
   };
 
-  // Get the MLS property description for AI generation
-  const getPropertyDescription = (): string => {
+  // Check if we have property data for AI generation
+  const hasPropertyData = (): boolean => {
     const mlsData = transaction.mlsData as any;
-    return mlsData?.description || transaction.notes || "";
+    return !!(mlsData?.description || transaction.notes || mlsData?.beds || mlsData?.baths);
   };
 
-  // Generate AI social media description from property description
+  // Generate AI social media description using full property context
   const generateAIDescription = async () => {
-    const propertyDescription = getPropertyDescription();
-    
-    if (!propertyDescription) {
+    if (!hasPropertyData()) {
       toast({
-        title: "No Property Description",
-        description: "No MLS description available to generate from.",
+        title: "No Property Data",
+        description: "No MLS data available to generate from.",
         variant: "destructive",
       });
       return;
@@ -276,35 +274,26 @@ export function MarketingMaterialsDialog({
     setIsGeneratingAI(true);
 
     try {
-      const response = await apiRequest("POST", "/api/summarize-description", {
-        description: propertyDescription,
-        maxLength: 20,
-        propertyInfo: {
-          address: transaction.propertyAddress,
-        },
+      const response = await apiRequest("POST", "/api/generate-social-tagline", {
+        transactionId: transaction.id,
       });
 
       const data = await response.json();
       
-      if (data.summary) {
-        // Clean up and truncate to 20 characters
-        let suggestion = data.summary.replace(/[.!?]+$/, '').trim();
-        if (suggestion.length > 20) {
-          suggestion = suggestion.slice(0, 20).trim();
-        }
-        setSocialDescription(suggestion);
+      if (data.tagline) {
+        setSocialDescription(data.tagline);
         setGeneratedImage(null);
         
         toast({
-          title: "Description Generated",
-          description: "AI suggested a social media description based on the property.",
+          title: "Tagline Generated",
+          description: "Professional broker-style tagline created.",
         });
       }
     } catch (error) {
       console.error("AI description error:", error);
       toast({
         title: "Generation Failed",
-        description: "Could not generate description. Please try again.",
+        description: "Could not generate tagline. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -1170,12 +1159,12 @@ Thank you for your interest!`;
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Social Media Description</Label>
+                <Label>Social Media Tagline</Label>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={generateAIDescription}
-                  disabled={isGeneratingAI || !getPropertyDescription()}
+                  disabled={isGeneratingAI || !hasPropertyData()}
                   className="h-6 px-2 text-xs gap-1"
                   data-testid="button-ai-generate-description"
                 >
@@ -1188,18 +1177,18 @@ Thank you for your interest!`;
                 </Button>
               </div>
               <Input
-                placeholder="e.g. Modern 3BR Home"
+                placeholder="e.g. Stunning 4BR with Chef's Kitchen"
                 value={socialDescription}
                 onChange={(e) => {
-                  if (e.target.value.length <= 20) {
+                  if (e.target.value.length <= 80) {
                     setSocialDescription(e.target.value);
                     setGeneratedImage(null);
                   }
                 }}
-                maxLength={20}
+                maxLength={80}
                 data-testid="input-social-description"
               />
-              <p className="text-xs text-muted-foreground">{socialDescription.length}/20 characters</p>
+              <p className="text-xs text-muted-foreground">{socialDescription.length}/80 characters</p>
             </div>
           </div>
 
