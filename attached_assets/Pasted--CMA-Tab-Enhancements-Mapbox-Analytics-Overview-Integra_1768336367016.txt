@@ -1,0 +1,908 @@
+## CMA Tab Enhancements - Mapbox, Analytics, Overview Integration
+
+Enhance the migrated CMA tab with proper tooltips, reordered views, Mapbox integration, and add CMA analytics preview to the Overview tab.
+
+---
+
+## PART 1: View Toggle Enhancements
+
+### Current State
+```
+[Grid icon] [Chart icon] [Map icon] [Share]
+```
+
+### Required Changes
+
+1. **Add Tooltips** to each view button
+2. **Reorder** to: Analytics → Grid → Map
+3. **Better Icons** with labels on hover
+
+```tsx
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { BarChart3, LayoutGrid, Map } from "lucide-react";
+
+// View toggle with tooltips
+<TooltipProvider>
+  <div className="flex items-center gap-1 border rounded-lg p-1">
+    {/* Analytics - First */}
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant={activeView === 'analytics' ? 'secondary' : 'ghost'}
+          size="sm"
+          onClick={() => setActiveView('analytics')}
+          className="px-3"
+        >
+          <BarChart3 className="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>Analytics & Statistics</p>
+      </TooltipContent>
+    </Tooltip>
+
+    {/* Grid - Second */}
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant={activeView === 'grid' ? 'secondary' : 'ghost'}
+          size="sm"
+          onClick={() => setActiveView('grid')}
+          className="px-3"
+        >
+          <LayoutGrid className="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>Property Grid</p>
+      </TooltipContent>
+    </Tooltip>
+
+    {/* Map - Third */}
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant={activeView === 'map' ? 'secondary' : 'ghost'}
+          size="sm"
+          onClick={() => setActiveView('map')}
+          className="px-3"
+        >
+          <Map className="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>Map View</p>
+      </TooltipContent>
+    </Tooltip>
+  </div>
+</TooltipProvider>
+```
+
+---
+
+## PART 2: Mapbox Integration (Replace Leaflet)
+
+### Remove Leaflet, Use Mapbox
+
+Since Mission Control already uses Mapbox, replace any Leaflet map with Mapbox for consistency.
+
+### Mapbox CMA Map Component
+
+```tsx
+// components/cma-map.tsx
+import { useEffect, useRef, useState } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+interface CMAMapProps {
+  properties: any[];
+  subjectProperty: any;
+  onPropertyClick?: (property: any) => void;
+}
+
+export function CMAMap({ properties, subjectProperty, onPropertyClick }: CMAMapProps) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const [selectedProperty, setSelectedProperty] = useState<any>(null);
+
+  useEffect(() => {
+    if (!mapContainer.current) return;
+
+    // Initialize Mapbox
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+
+    // Calculate center from subject property or properties average
+    const centerLat = subjectProperty?.map?.latitude || 
+                      subjectProperty?.latitude ||
+                      properties[0]?.map?.latitude || 
+                      30.2672; // Austin default
+    const centerLng = subjectProperty?.map?.longitude || 
+                      subjectProperty?.longitude ||
+                      properties[0]?.map?.longitude || 
+                      -97.7431;
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [centerLng, centerLat],
+      zoom: 12,
+    });
+
+    // Add navigation controls
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    // Wait for map to load
+    map.current.on('load', () => {
+      addPropertyMarkers();
+      addSubjectPropertyMarker();
+      fitMapToBounds();
+    });
+
+    return () => {
+      map.current?.remove();
+    };
+  }, []);
+
+  // Update markers when properties change
+  useEffect(() => {
+    if (map.current?.loaded()) {
+      addPropertyMarkers();
+      fitMapToBounds();
+    }
+  }, [properties]);
+
+  const addSubjectPropertyMarker = () => {
+    if (!map.current || !subjectProperty) return;
+
+    const lat = subjectProperty.map?.latitude || subjectProperty.latitude;
+    const lng = subjectProperty.map?.longitude || subjectProperty.longitude;
+
+    if (!lat || !lng) return;
+
+    // Create custom marker element for subject property
+    const el = document.createElement('div');
+    el.className = 'subject-marker';
+    el.innerHTML = `
+      <div class="relative">
+        <div class="bg-primary text-white px-3 py-1.5 rounded-lg shadow-lg font-semibold text-sm whitespace-nowrap">
+          <span class="text-xs block opacity-80">Subject</span>
+          $${(subjectProperty.listPrice || 0).toLocaleString()}
+        </div>
+        <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-primary"></div>
+      </div>
+    `;
+
+    new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+      .setLngLat([lng, lat])
+      .addTo(map.current);
+  };
+
+  const addPropertyMarkers = () => {
+    if (!map.current) return;
+
+    // Remove existing markers (except subject)
+    document.querySelectorAll('.comp-marker').forEach(el => el.remove());
+
+    properties.forEach((property, index) => {
+      const lat = property.map?.latitude || property.latitude;
+      const lng = property.map?.longitude || property.longitude;
+
+      if (!lat || !lng) return;
+
+      const price = property.soldPrice || property.closePrice || property.listPrice || 0;
+      const status = property.status || property.standardStatus || '';
+      const isSold = status.toLowerCase().includes('sold') || status.toLowerCase().includes('closed');
+
+      // Create custom marker element
+      const el = document.createElement('div');
+      el.className = 'comp-marker cursor-pointer';
+      el.innerHTML = `
+        <div class="relative group">
+          <div class="${isSold ? 'bg-red-500' : 'bg-green-500'} text-white px-2 py-1 rounded-md shadow-md font-medium text-xs whitespace-nowrap hover:scale-110 transition-transform">
+            $${(price / 1000).toFixed(0)}K
+          </div>
+          <div class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent ${isSold ? 'border-t-red-500' : 'border-t-green-500'}"></div>
+        </div>
+      `;
+
+      el.addEventListener('click', () => {
+        setSelectedProperty(property);
+        onPropertyClick?.(property);
+      });
+
+      new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([lng, lat])
+        .addTo(map.current!);
+    });
+  };
+
+  const fitMapToBounds = () => {
+    if (!map.current || properties.length === 0) return;
+
+    const coordinates: [number, number][] = [];
+
+    // Add subject property
+    if (subjectProperty?.map?.longitude && subjectProperty?.map?.latitude) {
+      coordinates.push([subjectProperty.map.longitude, subjectProperty.map.latitude]);
+    }
+
+    // Add comparable properties
+    properties.forEach(p => {
+      const lng = p.map?.longitude || p.longitude;
+      const lat = p.map?.latitude || p.latitude;
+      if (lng && lat) {
+        coordinates.push([lng, lat]);
+      }
+    });
+
+    if (coordinates.length === 0) return;
+
+    const bounds = coordinates.reduce(
+      (bounds, coord) => bounds.extend(coord as mapboxgl.LngLatLike),
+      new mapboxgl.LngLatBounds(coordinates[0], coordinates[0])
+    );
+
+    map.current.fitBounds(bounds, {
+      padding: 50,
+      maxZoom: 14,
+    });
+  };
+
+  return (
+    <div className="relative w-full h-[500px] rounded-lg overflow-hidden border">
+      <div ref={mapContainer} className="w-full h-full" />
+      
+      {/* Map Legend */}
+      <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur rounded-lg p-3 shadow-md">
+        <p className="text-xs font-medium mb-2">Legend</p>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-primary"></div>
+            <span className="text-xs">Subject Property</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            <span className="text-xs">Active Listing</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+            <span className="text-xs">Sold</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Selected Property Popup */}
+      {selectedProperty && (
+        <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-4 max-w-xs">
+          <button 
+            className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+            onClick={() => setSelectedProperty(null)}
+          >
+            ×
+          </button>
+          {selectedProperty.images?.[0] && (
+            <img 
+              src={selectedProperty.images[0]} 
+              alt="Property" 
+              className="w-full h-24 object-cover rounded mb-2"
+            />
+          )}
+          <p className="font-semibold text-sm">
+            ${(selectedProperty.soldPrice || selectedProperty.listPrice || 0).toLocaleString()}
+          </p>
+          <p className="text-xs text-muted-foreground truncate">
+            {selectedProperty.address?.streetAddress || selectedProperty.unparsedAddress}
+          </p>
+          <div className="flex gap-2 mt-1 text-xs text-muted-foreground">
+            <span>{selectedProperty.numBedrooms || selectedProperty.bedroomsTotal} bd</span>
+            <span>{selectedProperty.numBathrooms || selectedProperty.bathroomsTotalInteger} ba</span>
+            <span>{(selectedProperty.sqft || selectedProperty.livingArea)?.toLocaleString()} sqft</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### Add Repliers Polygon Support (Optional Enhancement)
+
+If you want to show neighborhood boundaries from Repliers:
+
+```tsx
+// Add polygon layer from Repliers data
+const addNeighborhoodPolygon = async () => {
+  if (!map.current || !subjectProperty?.address?.neighborhood) return;
+
+  try {
+    // Fetch polygon from Repliers
+    const response = await fetch(
+      `/api/repliers/boundaries?neighborhood=${encodeURIComponent(subjectProperty.address.neighborhood)}`
+    );
+    const polygonData = await response.json();
+
+    if (!polygonData?.geometry) return;
+
+    // Add polygon source
+    map.current.addSource('neighborhood', {
+      type: 'geojson',
+      data: polygonData.geometry,
+    });
+
+    // Add fill layer
+    map.current.addLayer({
+      id: 'neighborhood-fill',
+      type: 'fill',
+      source: 'neighborhood',
+      paint: {
+        'fill-color': '#3b82f6',
+        'fill-opacity': 0.1,
+      },
+    });
+
+    // Add outline layer
+    map.current.addLayer({
+      id: 'neighborhood-outline',
+      type: 'line',
+      source: 'neighborhood',
+      paint: {
+        'line-color': '#3b82f6',
+        'line-width': 2,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to load neighborhood polygon:', error);
+  }
+};
+```
+
+---
+
+## PART 3: CMA Analytics Component (Shared)
+
+Create a reusable analytics component that can be used in both CMA tab and Overview tab.
+
+```tsx
+// components/cma-analytics.tsx
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { 
+  DollarSign, TrendingUp, TrendingDown, Clock, 
+  Home, Ruler, Calendar, ArrowUpRight, ArrowDownRight 
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+interface CMAAnalyticsProps {
+  statistics: {
+    price: { average: number; median: number; range: { min: number; max: number } };
+    pricePerSqFt: { average: number; median: number; range: { min: number; max: number } };
+    daysOnMarket: { average: number; median: number; range: { min: number; max: number } };
+    livingArea: { average: number; median: number; range: { min: number; max: number } };
+    bedrooms: { average: number; median: number; range: { min: number; max: number } };
+    bathrooms: { average: number; median: number; range: { min: number; max: number } };
+    yearBuilt: { average: number; median: number; range: { min: number; max: number } };
+  };
+  subjectProperty?: any;
+  comparableCount: number;
+  variant?: 'full' | 'compact'; // 'compact' for Overview tab
+}
+
+export function CMAAnalytics({ 
+  statistics, 
+  subjectProperty, 
+  comparableCount,
+  variant = 'full' 
+}: CMAAnalyticsProps) {
+  
+  // Calculate how subject compares to market
+  const subjectPrice = subjectProperty?.listPrice || 0;
+  const subjectSqft = subjectProperty?.sqft || subjectProperty?.details?.sqft || 0;
+  const subjectPricePerSqft = subjectSqft > 0 ? subjectPrice / subjectSqft : 0;
+  
+  const priceVsMarket = statistics.price.average > 0 
+    ? ((subjectPrice - statistics.price.average) / statistics.price.average) * 100 
+    : 0;
+  
+  const pricePerSqftVsMarket = statistics.pricePerSqFt.average > 0
+    ? ((subjectPricePerSqft - statistics.pricePerSqFt.average) / statistics.pricePerSqFt.average) * 100
+    : 0;
+
+  if (variant === 'compact') {
+    // Compact version for Overview tab
+    return (
+      <Card>
+        <CardContent className="pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              Market Analysis
+            </h3>
+            <Badge variant="secondary">{comparableCount} comps</Badge>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <CompactStatCard
+              label="Avg Price"
+              value={`$${Math.round(statistics.price.average).toLocaleString()}`}
+              comparison={priceVsMarket}
+              subjectValue={subjectPrice > 0 ? `Your: $${subjectPrice.toLocaleString()}` : undefined}
+            />
+            <CompactStatCard
+              label="Avg $/SqFt"
+              value={`$${Math.round(statistics.pricePerSqFt.average)}`}
+              comparison={pricePerSqftVsMarket}
+              subjectValue={subjectPricePerSqft > 0 ? `Your: $${Math.round(subjectPricePerSqft)}` : undefined}
+            />
+            <CompactStatCard
+              label="Avg DOM"
+              value={`${Math.round(statistics.daysOnMarket.average)} days`}
+            />
+            <CompactStatCard
+              label="Price Range"
+              value={`$${(statistics.price.range.min / 1000).toFixed(0)}K - $${(statistics.price.range.max / 1000).toFixed(0)}K`}
+            />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Full version for CMA tab
+  return (
+    <div className="space-y-6">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          icon={DollarSign}
+          label="Average Price"
+          value={`$${Math.round(statistics.price.average).toLocaleString()}`}
+          subtitle={`Median: $${Math.round(statistics.price.median).toLocaleString()}`}
+          range={`$${statistics.price.range.min.toLocaleString()} - $${statistics.price.range.max.toLocaleString()}`}
+        />
+        <StatCard
+          icon={Ruler}
+          label="Avg Price/SqFt"
+          value={`$${Math.round(statistics.pricePerSqFt.average)}`}
+          subtitle={`Median: $${Math.round(statistics.pricePerSqFt.median)}`}
+          range={`$${Math.round(statistics.pricePerSqFt.range.min)} - $${Math.round(statistics.pricePerSqFt.range.max)}`}
+        />
+        <StatCard
+          icon={Clock}
+          label="Avg Days on Market"
+          value={Math.round(statistics.daysOnMarket.average).toString()}
+          subtitle={`Median: ${Math.round(statistics.daysOnMarket.median)}`}
+          range={`${statistics.daysOnMarket.range.min} - ${statistics.daysOnMarket.range.max} days`}
+        />
+        <StatCard
+          icon={Home}
+          label="Avg Square Feet"
+          value={Math.round(statistics.livingArea.average).toLocaleString()}
+          subtitle={`Median: ${Math.round(statistics.livingArea.median).toLocaleString()}`}
+          range={`${statistics.livingArea.range.min.toLocaleString()} - ${statistics.livingArea.range.max.toLocaleString()}`}
+        />
+      </div>
+
+      {/* Subject vs Market Comparison */}
+      {subjectProperty && (
+        <Card>
+          <CardContent className="pt-4">
+            <h4 className="font-semibold mb-4">Your Listing vs Market</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <ComparisonRow
+                label="List Price"
+                subjectValue={`$${subjectPrice.toLocaleString()}`}
+                marketValue={`$${Math.round(statistics.price.average).toLocaleString()}`}
+                percentDiff={priceVsMarket}
+              />
+              <ComparisonRow
+                label="Price/SqFt"
+                subjectValue={`$${Math.round(subjectPricePerSqft)}`}
+                marketValue={`$${Math.round(statistics.pricePerSqFt.average)}`}
+                percentDiff={pricePerSqftVsMarket}
+              />
+              <ComparisonRow
+                label="Square Feet"
+                subjectValue={subjectSqft.toLocaleString()}
+                marketValue={Math.round(statistics.livingArea.average).toLocaleString()}
+                percentDiff={statistics.livingArea.average > 0 
+                  ? ((subjectSqft - statistics.livingArea.average) / statistics.livingArea.average) * 100 
+                  : 0}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Additional Stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <MiniStatCard
+          label="Avg Bedrooms"
+          value={statistics.bedrooms.average.toFixed(1)}
+        />
+        <MiniStatCard
+          label="Avg Bathrooms"
+          value={statistics.bathrooms.average.toFixed(1)}
+        />
+        <MiniStatCard
+          label="Avg Year Built"
+          value={Math.round(statistics.yearBuilt.average).toString()}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Helper Components
+function StatCard({ icon: Icon, label, value, subtitle, range }: any) {
+  return (
+    <Card>
+      <CardContent className="pt-4">
+        <div className="flex items-center gap-2 text-muted-foreground mb-1">
+          <Icon className="h-4 w-4" />
+          <span className="text-sm">{label}</span>
+        </div>
+        <p className="text-2xl font-bold">{value}</p>
+        <p className="text-sm text-muted-foreground">{subtitle}</p>
+        <p className="text-xs text-muted-foreground mt-1">{range}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CompactStatCard({ label, value, comparison, subjectValue }: any) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-lg font-semibold">{value}</p>
+      {comparison !== undefined && comparison !== 0 && (
+        <div className={cn(
+          "flex items-center gap-1 text-xs",
+          comparison > 0 ? "text-red-500" : "text-green-500"
+        )}>
+          {comparison > 0 ? (
+            <ArrowUpRight className="h-3 w-3" />
+          ) : (
+            <ArrowDownRight className="h-3 w-3" />
+          )}
+          <span>{Math.abs(comparison).toFixed(1)}% vs market</span>
+        </div>
+      )}
+      {subjectValue && (
+        <p className="text-xs text-muted-foreground">{subjectValue}</p>
+      )}
+    </div>
+  );
+}
+
+function ComparisonRow({ label, subjectValue, marketValue, percentDiff }: any) {
+  const isAboveMarket = percentDiff > 0;
+  
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <div className="flex items-center justify-between">
+        <span className="font-medium">{subjectValue}</span>
+        <Badge 
+          variant="secondary" 
+          className={cn(
+            "text-xs",
+            isAboveMarket ? "text-red-600" : "text-green-600"
+          )}
+        >
+          {isAboveMarket ? '+' : ''}{percentDiff.toFixed(1)}%
+        </Badge>
+      </div>
+      <span className="text-xs text-muted-foreground">Market avg: {marketValue}</span>
+    </div>
+  );
+}
+
+function MiniStatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <Card>
+      <CardContent className="py-3 text-center">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-xl font-semibold">{value}</p>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+---
+
+## PART 4: Add CMA Analytics to Overview Tab
+
+Add the compact CMA analytics above Property Photos in the Overview tab.
+
+```tsx
+// In overview-tab.tsx or transaction-overview component
+
+import { CMAAnalytics } from '@/components/cma-analytics';
+
+function OverviewTab({ transaction, mlsData, comparables }: OverviewTabProps) {
+  // Calculate statistics from comparables (same logic as CMA tab)
+  const statistics = useMemo(() => {
+    return calculateStatistics(comparables || []);
+  }, [comparables]);
+
+  return (
+    <div className="space-y-6">
+      {/* Property Details Card */}
+      <PropertyDetailsCard ... />
+
+      {/* Key Dates Card */}
+      <KeyDatesCard ... />
+
+      {/* Coordinators Card */}
+      <CoordinatorsCard ... />
+
+      {/* ===== NEW: CMA Analytics Preview ===== */}
+      {comparables && comparables.length > 0 && (
+        <CMAAnalytics
+          statistics={statistics}
+          subjectProperty={mlsData}
+          comparableCount={comparables.length}
+          variant="compact"
+        />
+      )}
+
+      {/* Property Photos */}
+      <PropertyPhotosSection ... />
+    </div>
+  );
+}
+
+// Shared statistics calculation function
+function calculateStatistics(properties: any[]) {
+  const computeStats = (values: number[]) => {
+    const filtered = values.filter(v => v > 0);
+    if (filtered.length === 0) {
+      return { average: 0, median: 0, range: { min: 0, max: 0 } };
+    }
+    const sorted = [...filtered].sort((a, b) => a - b);
+    const average = sorted.reduce((a, b) => a + b, 0) / sorted.length;
+    const median = sorted.length % 2 === 0
+      ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+      : sorted[Math.floor(sorted.length / 2)];
+    return { average, median, range: { min: sorted[0], max: sorted[sorted.length - 1] } };
+  };
+
+  // Use Repliers field names
+  const prices = properties.map(p => {
+    const status = p.status || '';
+    const isSold = status.toLowerCase().includes('sold') || status.toLowerCase().includes('closed');
+    return isSold ? (p.soldPrice || p.listPrice || 0) : (p.listPrice || 0);
+  });
+
+  const sqfts = properties.map(p => p.sqft || p.details?.sqft || p.livingArea || 0);
+  
+  const pricesPerSqFt = properties
+    .filter(p => (p.sqft || p.details?.sqft || p.livingArea) > 0)
+    .map(p => {
+      const sqft = p.sqft || p.details?.sqft || p.livingArea;
+      const status = p.status || '';
+      const isSold = status.toLowerCase().includes('sold') || status.toLowerCase().includes('closed');
+      const price = isSold ? (p.soldPrice || p.listPrice || 0) : (p.listPrice || 0);
+      return price / sqft;
+    });
+
+  return {
+    price: computeStats(prices),
+    pricePerSqFt: computeStats(pricesPerSqFt),
+    daysOnMarket: computeStats(properties.map(p => p.simpleDaysOnMarket || p.daysOnMarket || 0)),
+    livingArea: computeStats(sqfts),
+    bedrooms: computeStats(properties.map(p => p.numBedrooms || p.details?.numBedrooms || p.bedroomsTotal || 0)),
+    bathrooms: computeStats(properties.map(p => p.numBathrooms || p.details?.numBathrooms || p.bathroomsTotalInteger || 0)),
+    yearBuilt: computeStats(properties.map(p => p.yearBuilt || p.details?.yearBuilt || 0)),
+  };
+}
+```
+
+---
+
+## PART 5: Repliers Field Mapping for CMA Analytics
+
+### Correct Field Mapping (Repliers → CMA)
+
+| CMA Statistic | Repliers Field | Fallback Fields |
+|---------------|----------------|-----------------|
+| **List Price** | `listPrice` | - |
+| **Sold Price** | `soldPrice` | `closePrice` |
+| **Square Feet** | `sqft` | `details.sqft`, `livingArea` |
+| **Beds** | `numBedrooms` | `details.numBedrooms`, `bedroomsTotal` |
+| **Baths** | `numBathrooms` | `details.numBathrooms`, `bathroomsTotalInteger` |
+| **Days on Market** | `simpleDaysOnMarket` | `daysOnMarket` |
+| **Year Built** | `yearBuilt` | `details.yearBuilt` |
+| **Lot Size (sqft)** | `lotSize` | `lotSizeSquareFeet` |
+| **Lot Size (acres)** | `acres` | `lotSizeAcres` |
+| **Status** | `status` | `standardStatus` |
+| **Latitude** | `map.latitude` | `latitude` |
+| **Longitude** | `map.longitude` | `longitude` |
+| **Address** | `address.streetAddress` | `unparsedAddress` |
+| **City** | `address.city` | `city` |
+| **Neighborhood** | `address.neighborhood` | `subdivisionName` |
+
+### Shared Statistics Utility
+
+Create a shared utility file to ensure both Overview and CMA tab use the same calculation:
+
+```tsx
+// lib/utils/cma-statistics.ts
+
+export interface PropertyStatistics {
+  price: StatRange;
+  pricePerSqFt: StatRange;
+  daysOnMarket: StatRange;
+  livingArea: StatRange;
+  bedrooms: StatRange;
+  bathrooms: StatRange;
+  yearBuilt: StatRange;
+}
+
+interface StatRange {
+  average: number;
+  median: number;
+  range: { min: number; max: number };
+}
+
+/**
+ * Calculate CMA statistics from Repliers property data
+ * Used by both Overview tab and CMA tab to ensure consistency
+ */
+export function calculateCMAStatistics(properties: any[]): PropertyStatistics {
+  const computeStats = (values: number[]): StatRange => {
+    const filtered = values.filter(v => v != null && v > 0);
+    if (filtered.length === 0) {
+      return { average: 0, median: 0, range: { min: 0, max: 0 } };
+    }
+    const sorted = [...filtered].sort((a, b) => a - b);
+    const sum = sorted.reduce((a, b) => a + b, 0);
+    const average = sum / sorted.length;
+    const median = sorted.length % 2 === 0
+      ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+      : sorted[Math.floor(sorted.length / 2)];
+    return {
+      average,
+      median,
+      range: { min: sorted[0], max: sorted[sorted.length - 1] }
+    };
+  };
+
+  // Helper to get property price (sold price for closed, list price for active)
+  const getPrice = (p: any): number => {
+    const status = (p.status || p.standardStatus || '').toLowerCase();
+    const isSold = status.includes('sold') || status.includes('closed');
+    if (isSold) {
+      return p.soldPrice || p.closePrice || p.listPrice || 0;
+    }
+    return p.listPrice || 0;
+  };
+
+  // Helper to get square footage
+  const getSqft = (p: any): number => {
+    return p.sqft || p.details?.sqft || p.livingArea || 0;
+  };
+
+  // Calculate all statistics
+  const prices = properties.map(getPrice);
+  
+  const pricesPerSqFt = properties
+    .filter(p => getSqft(p) > 0)
+    .map(p => getPrice(p) / getSqft(p));
+
+  return {
+    price: computeStats(prices),
+    pricePerSqFt: computeStats(pricesPerSqFt),
+    daysOnMarket: computeStats(
+      properties.map(p => p.simpleDaysOnMarket || p.daysOnMarket || 0)
+    ),
+    livingArea: computeStats(properties.map(getSqft)),
+    bedrooms: computeStats(
+      properties.map(p => p.numBedrooms || p.details?.numBedrooms || p.bedroomsTotal || 0)
+    ),
+    bathrooms: computeStats(
+      properties.map(p => p.numBathrooms || p.details?.numBathrooms || p.bathroomsTotalInteger || 0)
+    ),
+    yearBuilt: computeStats(
+      properties.map(p => p.yearBuilt || p.details?.yearBuilt || 0)
+    ),
+  };
+}
+```
+
+### Usage in Both Tabs
+
+```tsx
+// In CMA Tab
+import { calculateCMAStatistics } from '@/lib/utils/cma-statistics';
+
+const statistics = useMemo(() => {
+  return calculateCMAStatistics(comparables);
+}, [comparables]);
+
+// In Overview Tab - SAME FUNCTION
+import { calculateCMAStatistics } from '@/lib/utils/cma-statistics';
+
+const statistics = useMemo(() => {
+  return calculateCMAStatistics(comparables);
+}, [comparables]);
+```
+
+---
+
+## PART 6: Overview Tab Layout with CMA Analytics
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Overview Tab                                                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐            │
+│ │ Property Details│ │ Key Dates    [✏]│ │ Coordinators [+]│            │
+│ │ $434,990        │ │ Contract: —     │ │ No coordinators │            │
+│ │ 4 bd • 2 ba     │ │ Closing: —      │ │                 │            │
+│ └─────────────────┘ └─────────────────┘ └─────────────────┘            │
+│                                                                         │
+│ ┌─────────────────────────────────────────────────────────────────────┐ │
+│ │ 📊 Market Analysis                                    [10 comps]   │ │
+│ │                                                                     │ │
+│ │ Avg Price        Avg $/SqFt       Avg DOM          Price Range     │ │
+│ │ $425,000         $235             15 days          $299K - $549K   │ │
+│ │ ▼ 2.3% vs mkt    ▲ 1.5% vs mkt                                     │ │
+│ └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                         │
+│ ┌─────────────────────────────────────────────────────────────────────┐ │
+│ │ 📷 Property Photos                              [View all 46]      │ │
+│ │ [img][img][img][img][img][img][img][img]                           │ │
+│ └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Testing Checklist
+
+### View Toggle:
+- [ ] Tooltips appear on hover for all three buttons
+- [ ] Order is: Analytics → Grid → Map
+- [ ] Active view is highlighted
+- [ ] Switching views works correctly
+
+### Mapbox Map:
+- [ ] Map loads with Mapbox (not Leaflet)
+- [ ] Subject property marker is distinct (different color/style)
+- [ ] Comparable markers show price
+- [ ] Sold properties show red markers
+- [ ] Active listings show green markers
+- [ ] Clicking marker shows property details
+- [ ] Map fits all properties in view
+- [ ] Legend displays correctly
+
+### CMA Analytics:
+- [ ] Full version shows in CMA tab
+- [ ] Compact version shows in Overview tab
+- [ ] Statistics are identical in both tabs
+- [ ] Subject vs Market comparison is accurate
+- [ ] Percentage differences calculated correctly
+
+### Repliers Field Mapping:
+- [ ] Prices use `listPrice` for active, `soldPrice` for closed
+- [ ] Square feet uses `sqft` or `details.sqft`
+- [ ] Days on market uses `simpleDaysOnMarket`
+- [ ] Coordinates use `map.latitude` and `map.longitude`
+
+---
+
+## Files to Create/Modify
+
+**New Files:**
+- `lib/utils/cma-statistics.ts` - Shared statistics calculation
+- `components/cma-map.tsx` - Mapbox map component
+- `components/cma-analytics.tsx` - Reusable analytics component
+
+**Modify:**
+- `components/cma-tab.tsx` - Add tooltips, reorder views, use new components
+- `components/overview-tab.tsx` - Add CMA analytics preview
+- Remove any Leaflet CSS imports if no longer needed

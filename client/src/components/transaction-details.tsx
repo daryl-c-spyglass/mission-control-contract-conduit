@@ -80,7 +80,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getStatusBadgeStyle, getStatusLabel } from "@/lib/utils/status-colors";
-import { templateDesigns, getTemplatesByCategory, getSubcategoriesForCategory, getSubcategoryLabel, getCategoryLabel, type TemplateDesign, type TemplateCategory, type TemplateSubcategory } from "@/lib/templates/template-designs";
 import type { Transaction, Coordinator, Activity as ActivityType, CMAComparable, MLSData, MarketingAsset, ContractDocument } from "@shared/schema";
 
 interface TransactionDetailsProps {
@@ -449,30 +448,6 @@ function DocumentPreviewModal({ document, isOpen, onClose, onDownload }: Documen
   );
 }
 
-// Template listing data type
-interface TemplateListing {
-  mlsNumber: string;
-  listPrice: number;
-  address: string;
-  city: string;
-  state: string;
-  bedrooms: number;
-  bathrooms: number;
-  sqft: number;
-  yearBuilt: number;
-  propertyType: string;
-  description: string;
-  listDate: string;
-  status: string;
-  images: string[];
-  agent?: {
-    name: string;
-    phone: string;
-    email: string;
-    brokerage: string;
-  };
-}
-
 // Room type filter options
 const ROOM_TYPES = [
   { id: "all", label: "All", icon: Grid3X3 },
@@ -493,15 +468,6 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [graphicsDialogOpen, setGraphicsDialogOpen] = useState(false);
   const [previewAsset, setPreviewAsset] = useState<MarketingAsset | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [templateSearch, setTemplateSearch] = useState("");
-  const [templateListing, setTemplateListing] = useState<TemplateListing | null>(null);
-  const [templateCategory, setTemplateCategory] = useState<string>("posts");
-  
-  const [libraryCategory, setLibraryCategory] = useState<TemplateCategory>("social");
-  const [librarySubcategory, setLibrarySubcategory] = useState<TemplateSubcategory | "all">("all");
-  const [selectedTemplateForCreation, setSelectedTemplateForCreation] = useState<TemplateDesign | null>(null);
-  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
-  const [templateFlyerDialogOpen, setTemplateFlyerDialogOpen] = useState(false);
   const [currentPhoto, setCurrentPhoto] = useState(0);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const statusLabel = getStatusLabel(transaction.status);
@@ -751,33 +717,6 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
     ? Math.ceil((new Date(transaction.closingDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null;
 
-  const searchListingMutation = useMutation({
-    mutationFn: async (query: string) => {
-      const res = await fetch(`/api/listings/search?query=${encodeURIComponent(query)}`, {
-        credentials: "include",
-      });
-      if (!res.ok) {
-        if (res.status === 404) throw new Error("No listing found");
-        throw new Error("Failed to search listings");
-      }
-      return res.json() as Promise<TemplateListing>;
-    },
-    onSuccess: (data) => {
-      setTemplateListing(data);
-      toast({ title: "Listing found", description: data.address });
-    },
-    onError: (error: Error) => {
-      toast({ title: error.message, variant: "destructive" });
-    },
-  });
-
-  const handleTemplateSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (templateSearch.trim()) {
-      searchListingMutation.mutate(templateSearch.trim());
-    }
-  };
-
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
@@ -987,7 +926,6 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
               )}
             </TabsTrigger>
             <TabsTrigger value="cma" className="text-xs sm:text-sm" data-testid="tab-cma">CMA</TabsTrigger>
-            <TabsTrigger value="templates" className="text-xs sm:text-sm" data-testid="tab-templates">Templates</TabsTrigger>
             <TabsTrigger value="timeline" className="text-xs sm:text-sm" data-testid="tab-timeline">Timeline</TabsTrigger>
           </TabsList>
         </div>
@@ -2157,26 +2095,95 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         </TabsContent>
 
         <TabsContent value="marketing" className="space-y-6">
+          {/* Header */}
+          <div>
+            <h2 className="text-xl font-bold">Marketing</h2>
+            <p className="text-sm text-muted-foreground">
+              Create and manage marketing materials for {transaction.propertyAddress}
+            </p>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Create Graphics Card */}
+            <Card 
+              className="cursor-pointer hover:border-primary transition-colors hover-elevate"
+              onClick={() => setGraphicsDialogOpen(true)}
+              data-testid="card-create-graphics"
+            >
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-pink-500/10 rounded-lg">
+                    <ImageIcon className="h-6 w-6 text-pink-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Create Graphics</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Social media posts & stories
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Create Flyer Card */}
+            <Card 
+              className="cursor-pointer hover:border-primary transition-colors hover-elevate"
+              onClick={() => setFlyerDialogOpen(true)}
+              data-testid="card-create-flyer"
+            >
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-orange-500/10 rounded-lg">
+                    <FileImage className="h-6 w-6 text-orange-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Create Flyer</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Print-ready PDF flyer
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quick Create All Card */}
+            <Card 
+              className="cursor-pointer hover:border-primary transition-colors hover-elevate bg-gradient-to-br from-primary/5 to-primary/10"
+              onClick={() => setGraphicsDialogOpen(true)}
+              data-testid="card-quick-create"
+            >
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-primary/20 rounded-lg">
+                    <Flame className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Quick Create All</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Post + Story + Facebook
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* AI Features Info Banner */}
+          <Card className="bg-muted/50">
+            <CardContent className="py-3">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Activity className="h-4 w-4 text-yellow-500" />
+                <span>
+                  AI automatically selects the best property photos and generates professional descriptions
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* My Assets Header */}
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <h2 className="text-lg font-semibold">Marketing Assets</h2>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setGraphicsDialogOpen(true)}
-                data-testid="button-create-graphics"
-              >
-                <ImageIcon className="h-4 w-4 mr-2" />
-                Create Graphics
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => setFlyerDialogOpen(true)}
-                data-testid="button-create-flyer"
-              >
-                <FileImage className="h-4 w-4 mr-2" />
-                Create Flyer
-              </Button>
-            </div>
+            <h3 className="text-lg font-semibold">My Assets ({marketingAssets.length})</h3>
           </div>
 
           {assetsLoading ? (
@@ -2279,12 +2286,22 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
             </div>
           ) : (
             <Card>
-              <CardContent className="py-12 text-center">
-                <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <ImageIcon className="h-12 w-12 text-muted-foreground/50 mb-4" />
                 <h3 className="font-medium mb-2">No Marketing Assets Yet</h3>
-                <p className="text-sm text-muted-foreground">
-                  Use the buttons above to create social media graphics or print flyers.
+                <p className="text-sm text-muted-foreground mb-4">
+                  Use the Quick Actions above to create social media graphics or print flyers.
                 </p>
+                <div className="flex gap-2">
+                  <Button onClick={() => setGraphicsDialogOpen(true)} data-testid="button-empty-create-graphics">
+                    <ImageIcon className="h-4 w-4 mr-2" />
+                    Create Graphics
+                  </Button>
+                  <Button variant="outline" onClick={() => setFlyerDialogOpen(true)} data-testid="button-empty-create-flyer">
+                    <FileImage className="h-4 w-4 mr-2" />
+                    Create Flyer
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -2323,229 +2340,6 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           )}
         </TabsContent>
 
-        <TabsContent value="templates" className="space-y-6">
-          <div className="space-y-6">
-            {/* Header */}
-            <div>
-              <h2 className="text-xl font-bold">Template Library</h2>
-              <p className="text-sm text-muted-foreground">
-                Browse and customize professional templates for your listing
-              </p>
-            </div>
-
-            {/* Current Listing Card (auto-loaded from transaction) */}
-            {mlsData ? (
-              <Card className="bg-muted/50">
-                <CardContent className="flex items-center gap-4 py-4">
-                  {photos[0] && (
-                    <img
-                      src={`/api/proxy-image?url=${encodeURIComponent(photos[0])}`}
-                      alt="Property"
-                      className="w-20 h-16 object-cover rounded"
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold">{transaction.propertyAddress}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatPrice(mlsData.listPrice)} {mlsData.bedrooms && `• ${mlsData.bedrooms} bed`} {mlsData.bathrooms && `• ${mlsData.bathrooms} bath`}
-                    </p>
-                  </div>
-                  <Badge className={getStatusBadgeStyle(transaction.status)}>
-                    {getStatusLabel(transaction.status)}
-                  </Badge>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="bg-muted/50">
-                <CardContent className="py-4 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    No MLS data available. Fetch MLS data from the MLS Data tab first.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Category Tabs */}
-            <Tabs value={libraryCategory} onValueChange={(v) => {
-              setLibraryCategory(v as TemplateCategory);
-              setLibrarySubcategory("all");
-            }}>
-              <TabsList>
-                <TabsTrigger value="social" className="gap-2" data-testid="tab-template-social">
-                  <Smartphone className="h-4 w-4" />
-                  Social Media
-                </TabsTrigger>
-                <TabsTrigger value="print" className="gap-2" data-testid="tab-template-print">
-                  <Newspaper className="h-4 w-4" />
-                  Print Materials
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="social" className="space-y-4 mt-4">
-                {/* Sub-filters */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  {["all", ...getSubcategoriesForCategory("social")].map((sub) => (
-                    <Badge
-                      key={sub}
-                      variant={librarySubcategory === sub ? "default" : "outline"}
-                      className="cursor-pointer"
-                      onClick={() => setLibrarySubcategory(sub as TemplateSubcategory | "all")}
-                      data-testid={`badge-subcategory-${sub}`}
-                    >
-                      {sub === "all" ? "All" : getSubcategoryLabel(sub as TemplateSubcategory)}
-                    </Badge>
-                  ))}
-                </div>
-
-                {/* Template Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {getTemplatesByCategory("social")
-                    .filter(t => librarySubcategory === "all" || t.subcategory === librarySubcategory)
-                    .map((template) => (
-                      <Card
-                        key={template.id}
-                        className="overflow-hidden cursor-pointer group hover:ring-2 hover:ring-primary transition-all"
-                        onClick={() => {
-                          setSelectedTemplateForCreation(template);
-                          setTemplateDialogOpen(true);
-                        }}
-                        data-testid={`card-template-${template.id}`}
-                      >
-                        <div className={`relative bg-black ${
-                          template.subcategory === "stories" ? "aspect-[9/16]" : 
-                          template.subcategory === "facebook" ? "aspect-video" : "aspect-square"
-                        }`}>
-                          {/* Template Preview with property photo */}
-                          {photos[0] ? (
-                            <img
-                              src={`/api/proxy-image?url=${encodeURIComponent(photos[0])}`}
-                              alt={template.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-muted">
-                              <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                            </div>
-                          )}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                          <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
-                            <p className="text-xs font-semibold uppercase tracking-wider mb-1">Just Listed</p>
-                            <p className="text-sm font-medium line-clamp-1">{transaction.propertyAddress}</p>
-                            {mlsData?.listPrice && (
-                              <p className="text-xs mt-1">{formatPrice(mlsData.listPrice)}</p>
-                            )}
-                          </div>
-                          <div className="absolute top-2 right-2 bg-white/90 dark:bg-black/90 px-2 py-1 rounded text-xs font-semibold">
-                            SPYGLASS
-                          </div>
-                          {/* Hover overlay */}
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <Button size="sm" variant="secondary">
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Customize
-                            </Button>
-                          </div>
-                        </div>
-                        <CardContent className="p-3">
-                          <p className="text-sm font-medium">{template.name}</p>
-                          <p className="text-xs text-muted-foreground">{template.format.aspectRatio}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="print" className="space-y-4 mt-4">
-                {/* Sub-filters */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  {["all", ...getSubcategoriesForCategory("print")].map((sub) => (
-                    <Badge
-                      key={sub}
-                      variant={librarySubcategory === sub ? "default" : "outline"}
-                      className="cursor-pointer"
-                      onClick={() => setLibrarySubcategory(sub as TemplateSubcategory | "all")}
-                      data-testid={`badge-print-subcategory-${sub}`}
-                    >
-                      {sub === "all" ? "All" : getSubcategoryLabel(sub as TemplateSubcategory)}
-                    </Badge>
-                  ))}
-                </div>
-
-                {/* Print Template Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {getTemplatesByCategory("print")
-                    .filter(t => librarySubcategory === "all" || t.subcategory === librarySubcategory)
-                    .map((template) => (
-                      <Card
-                        key={template.id}
-                        className="overflow-hidden cursor-pointer group hover:ring-2 hover:ring-primary transition-all"
-                        onClick={() => {
-                          setSelectedTemplateForCreation(template);
-                          setTemplateFlyerDialogOpen(true);
-                        }}
-                        data-testid={`card-template-${template.id}`}
-                      >
-                        <div className="relative aspect-[8.5/11] bg-white dark:bg-card">
-                          {/* Print template preview */}
-                          <div className="h-full p-3 flex flex-col">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-[8px] font-semibold uppercase tracking-wider text-muted-foreground">Spyglass Realty</span>
-                              <Badge variant="outline" className="text-[6px] h-4 px-1">Just Listed</Badge>
-                            </div>
-                            {photos[0] ? (
-                              <div className="flex-1 rounded overflow-hidden bg-muted">
-                                <img
-                                  src={`/api/proxy-image?url=${encodeURIComponent(photos[0])}`}
-                                  alt={template.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            ) : (
-                              <div className="flex-1 rounded bg-muted flex items-center justify-center">
-                                <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                              </div>
-                            )}
-                            <div className="mt-2">
-                              <p className="text-[8px] font-semibold line-clamp-1">{transaction.propertyAddress}</p>
-                              {mlsData?.listPrice && (
-                                <p className="text-[10px] font-bold">{formatPrice(mlsData.listPrice)}</p>
-                              )}
-                            </div>
-                          </div>
-                          {/* Hover overlay */}
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <Button size="sm" variant="secondary">
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Customize
-                            </Button>
-                          </div>
-                        </div>
-                        <CardContent className="p-3">
-                          <p className="text-sm font-medium">{template.name}</p>
-                          <p className="text-xs text-muted-foreground">{template.format.aspectRatio}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
-
-          {/* Social Graphics Dialog - triggered from template library */}
-          <MarketingMaterialsDialog
-            open={templateDialogOpen}
-            onOpenChange={setTemplateDialogOpen}
-            transaction={transaction}
-            initialFormat={selectedTemplateForCreation?.dialogFormatId as 'square' | 'landscape' | 'story' | undefined}
-          />
-
-          {/* Flyer Dialog - triggered from template library */}
-          <CreateFlyerDialog
-            open={templateFlyerDialogOpen}
-            onOpenChange={setTemplateFlyerDialogOpen}
-            transaction={transaction}
-          />
-        </TabsContent>
       </Tabs>
 
       {/* Overview Property Photo Gallery Modal */}
