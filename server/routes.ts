@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import path from "path";
 import fs from "fs";
 import { storage } from "./storage";
-import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema } from "@shared/schema";
+import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema, insertCmaSchema } from "@shared/schema";
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages, watchUserMailbox } from "./gmail";
 import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel } from "./slack";
 import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess, getBestPhotosForFlyer } from "./repliers";
@@ -805,6 +805,149 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete document" });
+    }
+  });
+
+  // ============ CMAs (Comparative Market Analysis) ============
+
+  // Get all CMAs
+  app.get("/api/cmas", isAuthenticated, async (req, res) => {
+    try {
+      const allCmas = await storage.getAllCmas();
+      res.json(allCmas);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch CMAs" });
+    }
+  });
+
+  // Get CMA by ID
+  app.get("/api/cmas/:id", isAuthenticated, async (req, res) => {
+    try {
+      const cma = await storage.getCma(req.params.id);
+      if (!cma) {
+        return res.status(404).json({ message: "CMA not found" });
+      }
+      res.json(cma);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch CMA" });
+    }
+  });
+
+  // Get CMA by transaction ID
+  app.get("/api/transactions/:transactionId/cma", isAuthenticated, async (req, res) => {
+    try {
+      const cma = await storage.getCmaByTransaction(req.params.transactionId);
+      res.json(cma || null);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch CMA for transaction" });
+    }
+  });
+
+  // Get shared CMA by public link token (no auth required for public sharing)
+  app.get("/api/shared/cma/:token", async (req, res) => {
+    try {
+      const cma = await storage.getCmaByShareToken(req.params.token);
+      if (!cma) {
+        return res.status(404).json({ message: "CMA not found or link expired" });
+      }
+      // Check expiration
+      if (cma.expiresAt && new Date(cma.expiresAt) < new Date()) {
+        return res.status(410).json({ message: "This CMA link has expired" });
+      }
+      res.json(cma);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch shared CMA" });
+    }
+  });
+
+  // Create a new CMA
+  app.post("/api/cmas", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const validatedData = insertCmaSchema.parse({
+        ...req.body,
+        userId,
+      });
+      const cma = await storage.createCma(validatedData);
+      res.status(201).json(cma);
+    } catch (error: any) {
+      console.error("CMA creation error:", error);
+      res.status(400).json({ message: error.message || "Failed to create CMA" });
+    }
+  });
+
+  // Create CMA for a specific transaction
+  app.post("/api/transactions/:transactionId/cma", isAuthenticated, async (req: any, res) => {
+    try {
+      const transaction = await storage.getTransaction(req.params.transactionId);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      const userId = req.user?.claims?.sub;
+      const validatedData = insertCmaSchema.parse({
+        ...req.body,
+        transactionId: req.params.transactionId,
+        userId,
+        subjectPropertyId: transaction.mlsNumber || undefined,
+      });
+      const cma = await storage.createCma(validatedData);
+      res.status(201).json(cma);
+    } catch (error: any) {
+      console.error("Transaction CMA creation error:", error);
+      res.status(400).json({ message: error.message || "Failed to create CMA for transaction" });
+    }
+  });
+
+  // Update CMA
+  app.patch("/api/cmas/:id", isAuthenticated, async (req, res) => {
+    try {
+      const updated = await storage.updateCma(req.params.id, req.body);
+      if (!updated) {
+        return res.status(404).json({ message: "CMA not found" });
+      }
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to update CMA" });
+    }
+  });
+
+  // Generate or regenerate share link for CMA
+  app.post("/api/cmas/:id/share", isAuthenticated, async (req, res) => {
+    try {
+      const cma = await storage.getCma(req.params.id);
+      if (!cma) {
+        return res.status(404).json({ message: "CMA not found" });
+      }
+      
+      // Generate a unique token
+      const token = `cma_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+      
+      // Set expiration (default 30 days from now)
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + (req.body.expirationDays || 30));
+      
+      const updated = await storage.updateCma(req.params.id, {
+        publicLink: token,
+        expiresAt,
+      });
+      
+      res.json({ publicLink: token, expiresAt });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to generate share link" });
+    }
+  });
+
+  // Delete CMA
+  app.delete("/api/cmas/:id", isAuthenticated, async (req, res) => {
+    try {
+      const deleted = await storage.deleteCma(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "CMA not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete CMA" });
     }
   });
 
