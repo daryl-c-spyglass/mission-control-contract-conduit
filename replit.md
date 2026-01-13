@@ -45,7 +45,7 @@ Preferred communication style: Simple, everyday language.
 - **Preview Modal Zoom Controls**: Interactive zoom functionality for enlarged previews of marketing materials.
 - **Automatic MLS Synchronization**: Background service using node-cron to sync MLS data every 15 minutes for active and in-contract transactions.
 - **Shared Listing Utilities** (`shared/lib/listings.ts`):
-  - `isRentalOrLease(listing)`: Predicate for detecting rentals via type/propertyType/class fields
+  - `isRentalOrLease(listing)`: Predicate for detecting rentals via type, propertyType, transactionType, listingCategory, leaseType, details.propertySubType, and class fields
   - `getDisplayDOM(listing)`: Returns accurate Days on Market (prefers simpleDaysOnMarket over daysOnMarket)
   - `hasAccurateDOM(listing)`: Checks if simpleDaysOnMarket is available
   - `excludeRentals(listings)`: Filter helper for arrays

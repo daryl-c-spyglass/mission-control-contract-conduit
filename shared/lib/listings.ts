@@ -17,10 +17,19 @@
 export function isRentalOrLease(listing: {
   type?: string | null;
   propertyType?: string | null;
-  details?: { propertyType?: string | null } | null;
+  transactionType?: string | null;
+  listingCategory?: string | null;
+  leaseType?: string | null;
+  details?: { propertyType?: string | null; propertySubType?: string | null } | null;
   class?: string | null;
 }): boolean {
   if (!listing) return false;
+  
+  // Helper to check for rental keywords
+  const hasRentalKeyword = (str: string) => {
+    const lower = str.toLowerCase();
+    return lower.includes('lease') || lower.includes('rental') || lower.includes('rent');
+  };
   
   // Check type field (exact match)
   const type = (listing.type || '').toLowerCase().trim();
@@ -28,23 +37,33 @@ export function isRentalOrLease(listing: {
     return true;
   }
   
+  // Check transactionType (ACTRIS commercial leases often use this)
+  if (hasRentalKeyword(listing.transactionType || '')) {
+    return true;
+  }
+  
+  // Check listingCategory
+  if (hasRentalKeyword(listing.listingCategory || '')) {
+    return true;
+  }
+  
+  // Check leaseType (if present, it's definitely a lease)
+  if (listing.leaseType) {
+    return true;
+  }
+  
   // Check top-level propertyType (from normalized mlsData)
-  const topPropertyType = (listing.propertyType || '').toLowerCase();
-  if (
-    topPropertyType.includes('lease') ||
-    topPropertyType.includes('rental') ||
-    topPropertyType.includes('rent')
-  ) {
+  if (hasRentalKeyword(listing.propertyType || '')) {
     return true;
   }
   
   // Check details.propertyType (from raw Repliers data)
-  const detailsPropertyType = (listing.details?.propertyType || '').toLowerCase();
-  if (
-    detailsPropertyType.includes('lease') ||
-    detailsPropertyType.includes('rental') ||
-    detailsPropertyType.includes('rent')
-  ) {
+  if (hasRentalKeyword(listing.details?.propertyType || '')) {
+    return true;
+  }
+  
+  // Check details.propertySubType
+  if (hasRentalKeyword(listing.details?.propertySubType || '')) {
     return true;
   }
   
@@ -94,7 +113,15 @@ export function hasAccurateDOM(listing: {
  * Filter an array of listings to exclude rentals/leases.
  * Use this as a failsafe after API calls.
  */
-export function excludeRentals<T extends { type?: string | null; propertyType?: string | null; details?: { propertyType?: string | null } | null; class?: string | null }>(
+export function excludeRentals<T extends { 
+  type?: string | null; 
+  propertyType?: string | null; 
+  transactionType?: string | null;
+  listingCategory?: string | null;
+  leaseType?: string | null;
+  details?: { propertyType?: string | null; propertySubType?: string | null } | null; 
+  class?: string | null 
+}>(
   listings: T[]
 ): T[] {
   return listings.filter(listing => !isRentalOrLease(listing));
