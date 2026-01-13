@@ -1,0 +1,63 @@
+Replit task: Fix Print Flyer “Preview” so it is ALWAYS pixel-identical to the “Download Flyer” output.
+
+Problem
+- The Preview thumbnail/enlarged preview does not match the downloaded flyer (layout differences, spacing, dividers, fonts, or image scaling).
+- We need ONE single source of truth render pipeline.
+
+Non-negotiable requirement
+- Preview must be generated from the exact same HTML/CSS + same render function + same data payload used for Download Flyer.
+- If Download generates a PNG/PDF via Puppeteer, Preview MUST use that same PNG (or the same Puppeteer render call) and NEVER a separate DOM screenshot or alternate CSS/template.
+
+What to implement (do this in code, not just explanation)
+1) Single render entrypoint
+- Create ONE function (example name) renderFlyer({ data, format }): returns { pngBuffer, pdfBuffer? }.
+- Both:
+  a) Download Flyer button
+  b) Render Preview / Preview thumbnail / Click-to-enlarge preview
+  must call the SAME renderFlyer().
+
+2) Preview uses the rendered PNG from renderFlyer()
+- When user clicks “Render Preview”, call the same endpoint used for “Download PNG” but with `mode=preview`.
+- The server renders at full resolution (8.5x11 @ 300DPI -> 2550x3300) and returns PNG.
+- The UI shows that PNG inside the preview container using CSS scaling ONLY:
+  - object-fit: contain;
+  - background: neutral light;
+  - no extra padding/margins applied to the PNG itself.
+- For the small preview thumbnail, use the SAME PNG and scale it down (client-side). Do NOT re-render with a different viewport/template.
+
+3) Lock viewport + DPI so Preview equals Download
+- In Puppeteer, enforce:
+  - viewport width=2550 height=3300 deviceScaleFactor=1 (or consistent DSF used for BOTH preview and download).
+- No conditional CSS based on “preview mode”.
+- If you currently use different sizes (e.g., 1024px wide for preview), remove that.
+
+4) Disable all “preview-only” layout code
+- Remove any alternate preview template, alternate CSS, or “thumbnail layout”.
+- No separate React/HTML used for preview. Preview must reference the rendered PNG output only.
+
+5) Add verification tests (must be automated)
+- Add a test script (node) that:
+  - renders PNG for preview and download using identical inputs
+  - asserts the binary hash is identical OR pixel-diff is zero (preferred: pixelmatch).
+- If hashes differ, fail the test and print which layer/selector differs (log computed layout metrics if possible).
+
+6) Cache to make Preview fast and consistent
+- Cache rendered PNG using a deterministic key:
+  - key = hash(listingId + selectedPhotos + price + beds + baths + sqft + headline + description + agent fields)
+- If the user hasn’t changed inputs, preview should reuse the cached PNG.
+- Download should also reuse the same cached PNG/PDF to guarantee parity.
+
+Acceptance criteria (must confirm with screenshots)
+- Clicking “Render Preview” shows the exact same flyer image as the downloaded PNG (pixel-identical).
+- Downloaded flyer and preview do not differ in:
+  - dividers (Y-axis only, no X-axis lines)
+  - font weights (headline/phone not bold where specified)
+  - icon size/placement
+  - spacing, margins, or image cropping
+- Provide before/after screenshots + confirm automated test passes.
+
+Notes / context
+- We are matching the Spyglass PSD reference. The flyer is rendered via HTML/CSS to PNG/PDF using Puppeteer.
+- Preview must mirror Download ALWAYS. No exceptions.
+
+Please implement this now and tell me which files you changed and how I can verify locally.

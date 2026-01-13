@@ -85,7 +85,8 @@ Print flyers use HTML/CSS + Puppeteer for server-side rendering (replaced canvas
 - **Puppeteer Config**: Runs with --no-sandbox, --disable-setuid-sandbox for Replit compatibility
 - **Social flyers** still use client-side canvas rendering for speed
 - **Preview Rendering**: "Render Preview" button triggers server-side Puppeteer preview identical to download
-- **Template Version**: v2.2.0 with baseline alignment and sizing updates
+- **Template Version**: v2.2.1 with baseline alignment and sizing updates
+- **Parity Verification**: `scripts/verify-flyer-parity.ts` validates pixel-identical output
 
 #### Print Flyer Layout Specifications (January 2026)
 Bottom strip layout with PSD-matching baseline alignment:
