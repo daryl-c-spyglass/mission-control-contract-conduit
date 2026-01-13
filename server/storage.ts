@@ -11,15 +11,18 @@ import {
   type InsertMarketingAsset,
   type ContractDocument,
   type InsertContractDocument,
+  type Cma,
+  type InsertCma,
   transactions,
   coordinators,
   integrationSettings,
   activities,
   marketingAssets,
   contractDocuments,
+  cmas,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, isNull, and } from "drizzle-orm";
 
 export interface IStorage {
   // Transactions
@@ -58,6 +61,16 @@ export interface IStorage {
   getContractDocumentsByTransaction(transactionId: string): Promise<ContractDocument[]>;
   createContractDocument(doc: InsertContractDocument): Promise<ContractDocument>;
   deleteContractDocument(id: string): Promise<boolean>;
+
+  // CMAs
+  getCma(id: string): Promise<Cma | undefined>;
+  getCmaByTransaction(transactionId: string): Promise<Cma | undefined>;
+  getCmaByShareToken(token: string): Promise<Cma | undefined>;
+  getCmasByUser(userId: string): Promise<Cma[]>;
+  getAllCmas(): Promise<Cma[]>;
+  createCma(cma: InsertCma): Promise<Cma>;
+  updateCma(id: string, cma: Partial<Cma>): Promise<Cma | undefined>;
+  deleteCma(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -257,6 +270,54 @@ export class DatabaseStorage implements IStorage {
 
   async deleteContractDocument(id: string): Promise<boolean> {
     await db.delete(contractDocuments).where(eq(contractDocuments.id, id));
+    return true;
+  }
+
+  // CMAs
+  async getCma(id: string): Promise<Cma | undefined> {
+    const [cma] = await db.select().from(cmas).where(eq(cmas.id, id));
+    return cma;
+  }
+
+  async getCmaByTransaction(transactionId: string): Promise<Cma | undefined> {
+    const [cma] = await db
+      .select()
+      .from(cmas)
+      .where(eq(cmas.transactionId, transactionId))
+      .orderBy(desc(cmas.updatedAt))
+      .limit(1);
+    return cma;
+  }
+
+  async getCmaByShareToken(token: string): Promise<Cma | undefined> {
+    const [cma] = await db.select().from(cmas).where(eq(cmas.publicLink, token));
+    return cma;
+  }
+
+  async getCmasByUser(userId: string): Promise<Cma[]> {
+    return await db.select().from(cmas).where(eq(cmas.userId, userId));
+  }
+
+  async getAllCmas(): Promise<Cma[]> {
+    return await db.select().from(cmas).orderBy(desc(cmas.updatedAt));
+  }
+
+  async createCma(cma: InsertCma): Promise<Cma> {
+    const [newCma] = await db.insert(cmas).values(cma).returning();
+    return newCma;
+  }
+
+  async updateCma(id: string, updates: Partial<Cma>): Promise<Cma | undefined> {
+    const [updated] = await db
+      .update(cmas)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(cmas.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCma(id: string): Promise<boolean> {
+    await db.delete(cmas).where(eq(cmas.id, id));
     return true;
   }
 }

@@ -91,6 +91,23 @@ export const marketingAssets = pgTable("marketing_assets", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// CMA (Comparative Market Analysis) table
+export const cmas = pgTable("cmas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  transactionId: varchar("transaction_id"), // Link to transaction (varchar to match transactions.id)
+  userId: varchar("user_id"),
+  name: text("name").notNull(),
+  subjectPropertyId: text("subject_property_id"), // MLS number of subject property
+  comparablePropertyIds: jsonb("comparable_property_ids").$type<string[]>().notNull().default([]),
+  propertiesData: jsonb("properties_data").$type<any[]>(),
+  searchCriteria: jsonb("search_criteria"),
+  notes: text("notes"),
+  publicLink: text("public_link").unique(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Contract documents for transactions
 export const contractDocuments = pgTable("contract_documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -135,6 +152,12 @@ export const insertContractDocumentSchema = createInsertSchema(contractDocuments
   createdAt: true,
 });
 
+export const insertCmaSchema = createInsertSchema(cmas).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
@@ -153,6 +176,43 @@ export type InsertMarketingAsset = z.infer<typeof insertMarketingAssetSchema>;
 
 export type ContractDocument = typeof contractDocuments.$inferSelect;
 export type InsertContractDocument = z.infer<typeof insertContractDocumentSchema>;
+
+export type Cma = typeof cmas.$inferSelect;
+export type InsertCma = z.infer<typeof insertCmaSchema>;
+
+// CMA Statistics Types
+export interface CmaStatRange {
+  min: number;
+  max: number;
+}
+
+export interface CmaStatMetric {
+  range: CmaStatRange;
+  average: number;
+  median: number;
+}
+
+export interface PropertyStatistics {
+  price: CmaStatMetric;
+  pricePerSqFt: CmaStatMetric;
+  daysOnMarket: CmaStatMetric;
+  livingArea: CmaStatMetric;
+  lotSize: CmaStatMetric;
+  acres: CmaStatMetric;
+  bedrooms: CmaStatMetric;
+  bathrooms: CmaStatMetric;
+  yearBuilt: CmaStatMetric;
+}
+
+export interface TimelineDataPoint {
+  date: string;
+  price: number;
+  status: string;
+  propertyId: string;
+  address: string;
+  daysOnMarket: number | null;
+  cumulativeDaysOnMarket: number | null;
+}
 
 // CMA Comparable type
 export interface CMAComparable {
