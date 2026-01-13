@@ -1,0 +1,55 @@
+Goal: Lock Rechat parity permanently for Print Flyer. We are 90–95% there; remaining work is visual tuning + guaranteeing Preview == Download. Do NOT change the overall structure (header + 1 hero + 2 secondary photos + 3-column bottom block). Only tune spacing, sizing, divider geometry, and ensure single render source of truth.
+
+1) Preview must always match Download (no drift)
+- Make Preview and Download render from the exact same HTML + CSS template and the same render function.
+- Do NOT have a separate “preview layout”. Preview must be a scaled render of the same final output.
+- Implement: one renderFlyer(format, data) that outputs PNG/PDF. Preview calls the same renderFlyer but returns a scaled image (or downscaled PNG) from the same output.
+- Ensure identical font loading/embedding and identical viewport/page size for both preview and download. No conditional CSS based on preview/download. If scaling is needed, apply it via transform/scale in the preview container only OR generate the same PNG and just display it smaller.
+
+2) Divider rules (Y-axis only; no X-axis line)
+- Remove any horizontal divider line (“x-axis”) entirely from the bottom section.
+- Use ONLY vertical dividers between the 3 bottom columns.
+- Divider height must be content-bounded: it should start at the top of the bottom-content block and end at the lowest baseline among:
+  (a) stats block (sq ft row),
+  (b) description last line,
+  (c) agent phone baseline.
+- Divider must never extend into the photos above or into bottom page whitespace. No T-caps or horizontal tips.
+- Divider x-position must never overlap text (add padding so text never touches divider).
+
+3) Stats block (left column) alignment + final tweak
+- Bedrooms, bathrooms, sq ft must be one line each: [icon] [value] [label] on the same line.
+- Icons must be baseline-aligned with the text line (vertically centered to the text baseline).
+- Use the provided icon assets (Bedroom.png, Bathroom.png, sq ft.png) and size them consistently.
+- Move the entire stats block downward by +6% relative to its current position so the top row is not too high.
+- Ensure the sq ft row baseline aligns horizontally with BOTH:
+  - the agent phone number baseline (right column)
+  - the last line of the description (center column)
+
+4) Agent block sizing
+- Increase agent avatar diameter by +15% and border thickness by +10% without overlapping other elements.
+- Increase Spyglass logo in the agent block by +12%.
+- Tighten vertical spacing in agent block slightly: reduce gaps between avatar/name/title/phone by ~8–10% after scaling so the block remains compact and vertically aligned with the other columns.
+- Ensure agent name never truncates; if needed, allocate a bit more width from the center column (but keep the 3-column structure).
+
+5) Typography constraints
+- Listing headline must NOT be bold. Set headline font-weight to 400–500 (not 600+).
+- Agent phone number must NOT be bold.
+- Price badge text color must be black and not bold (weight 400).
+- Description must be left-aligned.
+
+6) White space reduction at bottom
+- Reduce bottom page padding/margin by 25%.
+- Reduce bottom block internal vertical padding by 10%.
+- If extra whitespace still exists, prefer slightly increasing: headline (+4%), description font-size (+3%), before reintroducing padding.
+
+7) QA checklist output (required)
+After changes, add a simple test routine or manual checklist steps that confirm:
+- Preview PNG is byte-for-byte derived from the same render path as Download (same template/CSS).
+- No divider overlaps logo/address, photos, or any text.
+- No horizontal divider exists in bottom section.
+- Divider height ends at content baseline (does not run to page bottom).
+- Stats block moved downward and is baseline-aligned with description + phone.
+- Avatar and Spyglass logo are visibly larger and still non-overlapping.
+- Headline/phone/price text are not bold and price is black.
+
+Make the changes in the existing codebase with minimal refactor: consolidate render paths first, then apply the visual tuning deltas above.

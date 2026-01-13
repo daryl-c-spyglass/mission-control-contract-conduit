@@ -128,7 +128,7 @@
     
     .price-badge * {
       color: #000 !important;
-      font-weight: 500 !important;  /* NOT bold */
+      font-weight: 400 !important;  /* Regular weight - NOT bold */
     }
     
     .price-label {
@@ -216,7 +216,7 @@
     /* ===== BOTTOM SECTION - Y-AXIS DIVIDERS ONLY ===== */
     .bottom-section {
       height: var(--bottomH);
-      padding: 40px var(--padX) 40px;  /* Reduced padding for tighter fit */
+      padding: 30px var(--padX) 30px;  /* -25% padding reduction (was 40px) */
       display: flex;
       align-items: flex-start;  /* Top align everything */
     }
@@ -259,14 +259,15 @@
       flex-direction: column;
       justify-content: flex-end;  /* Push stats to bottom - sqft aligns with description baseline */
       align-items: flex-start;
-      gap: 48px;
+      gap: 44px;  /* Tightened slightly (-8%) */
+      padding-top: 6%;  /* Move stats block down +6% */
     }
     
-    /* Stats sub-groups - no extra offset needed, flex-end handles alignment */
+    /* Stats sub-groups - tightened gap */
     .stats-top {
       display: flex;
       flex-direction: column;
-      gap: 48px;
+      gap: 44px;  /* Tightened slightly (-8%) */
     }
     
     .stats-bottom {
@@ -340,7 +341,7 @@
       flex-direction: column;
       justify-content: flex-end;  /* Push content to bottom - phone aligns with sqft baseline */
       align-items: flex-start;
-      gap: 16px;
+      gap: 14px;  /* Tightened by ~10% (was 16px) */
       padding-left: 10px;
     }
     
@@ -389,10 +390,10 @@
     
     /* Agent name - ONE LINE, never truncated */
     .agent-name {
-      font-size: 48px;  /* Slightly reduced to fit with larger photo */
+      font-size: 48px;
       font-weight: 700;
       line-height: 1.1;
-      margin-top: 6px;
+      margin-top: 4px;  /* Reduced from 6px for tighter spacing */
       white-space: nowrap;
       overflow: visible;
       text-overflow: clip;
