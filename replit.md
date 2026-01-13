@@ -175,7 +175,7 @@ Full Repliers data model integration per https://help.repliers.com/en/article/un
 - **Sold Information**: For closed transactions, displays soldPrice, soldDate, and list-vs-sold comparison
 - **Days on Market**: Uses simpleDaysOnMarket when available (more accurate), with tooltip explaining potential variance
 - **Status Badges**: Shows lastStatus ribbons like "Price Reduced" (Pc) and "Back on Market" (Bom)
-- **Virtual Tour**: "View Virtual Tour" button appears when virtualTourUrl is available
+- **Virtual Tour**: REMOVED for MLS/IDX/VOW compliance - field still ingested for internal debugging (hasExternalMediaLinks flag)
 - **Photo Count**: Badge in gallery header showing total photoCount from Repliers API
 - **Neighborhood**: Displays address.neighborhood in Location section
 - **Permissions**: Respects displayAddressOnInternet, displayPublic, displayInternetEntireListing flags

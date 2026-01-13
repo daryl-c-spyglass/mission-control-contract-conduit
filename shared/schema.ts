@@ -203,8 +203,9 @@ export interface MLSData {
   soldPrice?: number | null;
   soldDate?: string | null;
   
-  // Virtual tour
+  // External media links (internal use only - NOT for display per MLS/IDX/VOW compliance)
   virtualTourUrl?: string | null;
+  hasExternalMediaLinks?: boolean; // Computed flag for internal debugging
   
   // Photo count
   photoCount?: number;

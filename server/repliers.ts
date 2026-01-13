@@ -71,8 +71,9 @@ export interface MLSListingData {
   soldPrice: number | null;
   soldDate: string | null;
   
-  // Virtual tour
+  // External media links (internal use only - NOT for display per MLS/IDX/VOW compliance)
   virtualTourUrl: string | null;
+  hasExternalMediaLinks: boolean;
   
   // Photo count
   photoCount: number;
@@ -384,8 +385,9 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
       soldPrice: listing.soldPrice != null ? parseFloat(listing.soldPrice) : null,
       soldDate: listing.soldDate || listing.timestamps?.closedDate || null,
       
-      // Virtual tour
+      // External media links (internal use only - NOT for display per MLS/IDX/VOW compliance)
       virtualTourUrl: listing.details?.virtualTourUrl || listing.virtualTourUrl || null,
+      hasExternalMediaLinks: !!(listing.details?.virtualTourUrl || listing.virtualTourUrl || listing.videoUrl || listing.matterportUrl),
       
       // Photo count
       photoCount: listing.photoCount || photos.length,

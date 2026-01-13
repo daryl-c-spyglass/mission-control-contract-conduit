@@ -1550,15 +1550,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                       </div>
                     )}
                     
-                    {/* Virtual Tour Button */}
-                    {mlsData.virtualTourUrl && (
-                      <Button variant="outline" className="w-full gap-2" asChild>
-                        <a href={mlsData.virtualTourUrl} target="_blank" rel="noopener noreferrer" data-testid="link-virtual-tour">
-                          <Video className="h-4 w-4" />
-                          View Virtual Tour
-                        </a>
-                      </Button>
-                    )}
+                    {/* Virtual Tour removed for MLS/IDX/VOW compliance - field still ingested for internal use only */}
                   </CardContent>
                 </Card>
                 
