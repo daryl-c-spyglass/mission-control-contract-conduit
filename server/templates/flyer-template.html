@@ -43,9 +43,10 @@
       --sepColor: rgba(0,0,0,0.16);
       --sepW: 2px;
       
-      /* Horizontal divider styling */
-      --hDividerColor: #bfbfbf;
-      --hDividerH: 3px;
+      /* Divider styling - thicker for visibility */
+      --dividerColor: #b5b5b5;
+      --dividerW: 10px;
+      --ruleH: 4px;
     }
     
     html, body {
@@ -224,23 +225,24 @@
       font-size: 32px;
     }
     
-    /* BOTTOM SECTION - FIXED (fills remainder) */
+    /* BOTTOM SECTION - Uses divider columns so nothing overlaps text */
     .bottom-section {
       height: var(--bottomH);
       padding: 48px var(--padX) 70px;
-      display: flex;
-      align-items: flex-start;
+      display: grid;
+      /* STATS | DIV | COPY | DIV | AGENT */
+      grid-template-columns: 480px var(--dividerW) 1fr var(--dividerW) 520px;
+      column-gap: 46px;
+      align-items: start;
+      min-height: 0;
+      border-top: none !important;
     }
     
-    /* Content band - 3-column layout with vertical dividers via borders */
-    .bottom-band {
-      width: 100%;
-      display: grid;
-      grid-template-columns: 420px 1fr 480px;
-      gap: 0;
-      height: auto;
-      min-height: 400px;
-      align-items: flex-start;
+    /* Real divider columns (never overlap because they have their own column) */
+    .v-divider {
+      background: var(--dividerColor);
+      border-radius: 2px;
+      align-self: stretch;
     }
     
     /* LEFT COLUMN - Stats (anchor to top) */
@@ -249,162 +251,161 @@
       flex-direction: column;
       justify-content: flex-start;
       gap: 44px;
-      padding: 0 40px 0 0;
-      border-right: var(--hDividerH) solid var(--hDividerColor);
+      padding-right: 10px;
     }
     
     .stat-item {
       display: flex;
       align-items: center;
       gap: 18px;
-      white-space: nowrap;  /* Prevents wrapping - one line */
+      white-space: nowrap;
     }
     
     .stat-icon {
-      width: 64px;
-      height: 64px;
-      flex: 0 0 64px;
+      width: 56px;
+      height: 56px;
+      flex: 0 0 auto;
       display: flex;
       align-items: center;
       justify-content: center;
     }
     
     .stat-icon svg {
-      width: 64px;
-      height: 64px;
+      width: 56px;
+      height: 56px;
       fill: #111;
     }
     
     .stat-text {
-      font-size: 68px;
+      font-size: 52px;
       font-weight: 700;
       line-height: 1.05;
       white-space: nowrap;
     }
     
-    /* CENTER COLUMN - Copy (headline + description with horizontal rules) */
+    /* COPY COLUMN AS ITS OWN GRID (rules are rows, not overlays) */
     .copy-column {
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
-      align-items: stretch;
-      padding: 0 50px;
-      border-right: var(--hDividerH) solid var(--hDividerColor);
+      display: grid;
+      grid-template-rows:
+        auto  /* rule 1 */
+        auto  /* headline */
+        auto  /* rule 2 */
+        auto  /* rule 3 */
+        1fr   /* description */
+        auto; /* rule 4 */
+      row-gap: 18px;
+      padding: 0 10px;
+      min-height: 0;
     }
     
-    /* Horizontal rule for copy column */
-    .copy-rule {
-      height: var(--hDividerH);
-      background: var(--hDividerColor);
+    /* Horizontal rules (always separate rows) */
+    .h-rule {
+      height: var(--ruleH);
+      background: var(--dividerColor);
       width: 100%;
-      margin: 18px 0;
+      border-radius: 2px;
     }
     
     .listing-headline {
-      font-family: 'Montserrat', sans-serif !important;
+      font-family: 'League Spartan', sans-serif;
       font-size: 60px;
-      font-weight: 500 !important;  /* NOT bold */
+      font-weight: 500 !important;
       letter-spacing: 4px;
       text-transform: uppercase;
-      text-align: center;  /* CENTERED per reference */
+      text-align: center;
       line-height: 1.15;
       margin: 0;
-      white-space: pre-line;
-      width: 100%;
     }
     
     .listing-description {
-      font-size: 46px;
+      font-size: 40px;
       line-height: 1.5;
       color: #3b3b3b;
       font-weight: 400;
       margin: 0 !important;
-      max-width: none;
-      text-align: left !important;  /* LEFT-aligned only */
+      text-align: left !important;
       display: -webkit-box;
       -webkit-box-orient: vertical;
-      -webkit-line-clamp: 5;
+      -webkit-line-clamp: 6;
       overflow: hidden;
     }
     
-    /* RIGHT COLUMN - Agent (aligned within band) */
+    /* RIGHT COLUMN - Agent */
     .agent-column {
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
-      align-items: center;
+      align-items: flex-start;
       gap: 18px;
-      text-align: center;
-      padding: 0 0 0 50px;
+      padding-left: 10px;
     }
     
     /* Agent photo + logo row side by side */
     .agent-top-row {
       display: flex;
       align-items: center;
-      justify-content: center;
       gap: 22px;
     }
     
     .agent-team-logo {
-      width: 200px;
-      height: 200px;
+      width: 210px;
+      height: 210px;
       object-fit: contain;
-      border: 10px solid rgba(0,0,0,0.25);
+      border: 8px solid #b5b5b5;
       background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     
     .agent-photo {
-      width: 240px;
-      height: 240px;
+      width: 210px;
+      height: 210px;
       border-radius: 50%;
       object-fit: cover;
-      border: 7px solid #c7b28a;
+      border: 8px solid #c7b28a;
       background: #f2f2f2;
     }
     
     .agent-photo-placeholder {
-      width: 240px;
-      height: 240px;
+      width: 210px;
+      height: 210px;
       border-radius: 50%;
       background: #e0e0e0;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 7px solid #c7b28a;
+      border: 8px solid #c7b28a;
     }
     
     .agent-photo-placeholder svg {
-      width: 120px;
-      height: 120px;
+      width: 100px;
+      height: 100px;
       fill: #999;
     }
     
     .agent-name {
-      font-size: 64px;
+      font-size: 54px;
       font-weight: 700;
       line-height: 1.1;
       margin-top: 10px;
       white-space: nowrap;
       overflow: visible;
       text-overflow: clip;
-      max-width: none;
-      width: 100%;
     }
     
     .agent-title {
-      font-size: 30px;
-      letter-spacing: 5px;
+      font-size: 26px;
+      letter-spacing: 4px;
       color: var(--muted);
-      margin-top: 8px;
       text-transform: uppercase;
+      font-weight: 400;
     }
     
     .agent-phone {
-      font-size: 48px;
-      font-weight: 500 !important;  /* NOT bold */
+      font-size: 34px;
+      font-weight: 400 !important;
       letter-spacing: 1px;
-      margin-top: 14px;
     }
     
     .agent-logo {
@@ -412,6 +413,19 @@
       height: auto;
       margin-top: 24px;
       opacity: 0.95;
+    }
+    
+    /* Disable any previous pseudo element divider system */
+    .stats-column::before,
+    .stats-column::after,
+    .copy-column::before,
+    .copy-column::after,
+    .agent-column::before,
+    .agent-column::after,
+    .bottom-section::before,
+    .bottom-section::after {
+      content: none !important;
+      display: none !important;
     }
   </style>
 </head>
@@ -465,88 +479,85 @@
     </div>
   </div>
   
-  <!-- BOTTOM SECTION -->
+  <!-- BOTTOM SECTION - Grid with dedicated divider columns -->
   <div class="bottom-section">
-    <div class="bottom-band">
-      <!-- Stats Column -->
-      <div class="stats-column">
-        <div class="stat-item">
-          <span class="stat-icon">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <rect x="2" y="12" width="20" height="4" rx="1" fill="#111"/>
-              <path d="M4 12V7C4 6.45 4.45 6 5 6H10C10.55 6 11 6.45 11 7V12" stroke="#111" stroke-width="1.5" fill="none"/>
-              <path d="M13 12V7C13 6.45 13.45 6 14 6H19C19.55 6 20 6.45 20 7V12" stroke="#111" stroke-width="1.5" fill="none"/>
-              <path d="M3 16V20M21 16V20" stroke="#111" stroke-width="2"/>
-              <path d="M2 16H22" stroke="#111" stroke-width="1.5"/>
-            </svg>
-          </span>
-          <div class="stat-text">{{beds}} bedrooms</div>
-        </div>
-        <div class="stat-item">
-          <span class="stat-icon">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M4 12H20V16C20 18.2091 18.2091 20 16 20H8C5.79086 20 4 18.2091 4 16V12Z" fill="#111"/>
-              <path d="M6 12V8C6 5.79086 7.79086 4 10 4H10.5C11.8807 4 13 5.11929 13 6.5V12" stroke="#111" stroke-width="2" fill="none"/>
-              <circle cx="7" cy="7" r="1.5" fill="#111"/>
-            </svg>
-          </span>
-          <div class="stat-text">{{baths}} bathrooms</div>
-        </div>
-        <div class="stat-item stat-sqft">
-          <span class="stat-icon">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M3 21L21 3" stroke="#111" stroke-width="2"/>
-              <path d="M3 21H9M3 21V15" stroke="#111" stroke-width="2"/>
-              <path d="M21 3H15M21 3V9" stroke="#111" stroke-width="2"/>
-              <path d="M9 3H3V9" stroke="#111" stroke-width="2" fill="none"/>
-              <path d="M15 21H21V15" stroke="#111" stroke-width="2" fill="none"/>
-            </svg>
-          </span>
-          <div class="stat-text">{{sqft}} sq. ft</div>
-        </div>
+    <!-- Stats Column -->
+    <div class="stats-column">
+      <div class="stat-item">
+        <span class="stat-icon">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="12" width="20" height="4" rx="1" fill="#111"/>
+            <path d="M4 12V7C4 6.45 4.45 6 5 6H10C10.55 6 11 6.45 11 7V12" stroke="#111" stroke-width="1.5" fill="none"/>
+            <path d="M13 12V7C13 6.45 13.45 6 14 6H19C19.55 6 20 6.45 20 7V12" stroke="#111" stroke-width="1.5" fill="none"/>
+            <path d="M3 16V20M21 16V20" stroke="#111" stroke-width="2"/>
+            <path d="M2 16H22" stroke="#111" stroke-width="1.5"/>
+          </svg>
+        </span>
+        <div class="stat-text">{{beds}} bedrooms</div>
       </div>
-      
-      <!-- Copy Column (headline + description with 4 horizontal rules) -->
-      <div class="copy-column">
-        <!-- Rule 1: Before headline -->
-        <div class="copy-rule"></div>
-        
-        {{#if headline}}
-        <div class="listing-headline">{{headline}}</div>
+      <div class="stat-item">
+        <span class="stat-icon">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 12H20V16C20 18.2091 18.2091 20 16 20H8C5.79086 20 4 18.2091 4 16V12Z" fill="#111"/>
+            <path d="M6 12V8C6 5.79086 7.79086 4 10 4H10.5C11.8807 4 13 5.11929 13 6.5V12" stroke="#111" stroke-width="2" fill="none"/>
+            <circle cx="7" cy="7" r="1.5" fill="#111"/>
+          </svg>
+        </span>
+        <div class="stat-text">{{baths}} bathrooms</div>
+      </div>
+      <div class="stat-item">
+        <span class="stat-icon">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 21L21 3" stroke="#111" stroke-width="2"/>
+            <path d="M3 21H9M3 21V15" stroke="#111" stroke-width="2"/>
+            <path d="M21 3H15M21 3V9" stroke="#111" stroke-width="2"/>
+            <path d="M9 3H3V9" stroke="#111" stroke-width="2" fill="none"/>
+            <path d="M15 21H21V15" stroke="#111" stroke-width="2" fill="none"/>
+          </svg>
+        </span>
+        <div class="stat-text">{{sqft}} sq. ft</div>
+      </div>
+    </div>
+    
+    <!-- Vertical Divider 1 -->
+    <div class="v-divider" aria-hidden="true"></div>
+    
+    <!-- Copy Column (headline + description with horizontal rules as rows) -->
+    <div class="copy-column">
+      <div class="h-rule" aria-hidden="true"></div>
+      {{#if headline}}
+      <div class="listing-headline">{{headline}}</div>
+      {{else}}
+      <div class="listing-headline"></div>
+      {{/if}}
+      <div class="h-rule" aria-hidden="true"></div>
+      <div class="h-rule" aria-hidden="true"></div>
+      <div class="listing-description">{{description}}</div>
+      <div class="h-rule" aria-hidden="true"></div>
+    </div>
+    
+    <!-- Vertical Divider 2 -->
+    <div class="v-divider" aria-hidden="true"></div>
+    
+    <!-- Agent Column -->
+    <div class="agent-column">
+      <div class="agent-top-row">
+        {{#if agentPhoto}}
+        <img src="{{agentPhoto}}" class="agent-photo" alt="{{agentName}}">
+        {{else}}
+        <div class="agent-photo-placeholder">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="8" r="4"/>
+            <path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>
+          </svg>
+        </div>
         {{/if}}
-        
-        <!-- Rule 2: After headline -->
-        <div class="copy-rule"></div>
-        
-        <!-- Rule 3: Before description -->
-        <div class="copy-rule"></div>
-        
-        <div class="listing-description">{{description}}</div>
-        
-        <!-- Rule 4: After description -->
-        <div class="copy-rule"></div>
+        <img src="{{spyglassLogoUrl}}" class="agent-team-logo" alt="Spyglass Realty">
       </div>
       
-      <!-- Agent Column -->
-      <div class="agent-column">
-        <div class="agent-top-row">
-          {{#if agentPhoto}}
-          <img src="{{agentPhoto}}" class="agent-photo" alt="{{agentName}}">
-          {{else}}
-          <div class="agent-photo-placeholder">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="8" r="4"/>
-              <path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>
-            </svg>
-          </div>
-          {{/if}}
-          <img src="{{spyglassLogoUrl}}" class="agent-team-logo" alt="Spyglass Realty">
-        </div>
-        
-        <div class="agent-name">{{agentName}}</div>
-        <div class="agent-title">{{agentTitle}}</div>
-        <div class="agent-phone">{{agentPhone}}</div>
-      </div>
+      <div class="agent-name">{{agentName}}</div>
+      <div class="agent-title">{{agentTitle}}</div>
+      <div class="agent-phone">{{agentPhone}}</div>
     </div>
   </div>
   </div>

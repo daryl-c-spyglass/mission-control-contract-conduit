@@ -1,0 +1,333 @@
+REPLIT TASK — FIX DIVIDER OVERLAPS (CURRENT OUTPUT STILL WRONG)
+AUTHORITATIVE REFERENCE: Rechat flyer screenshot (provided by user)
+CURRENT BUG: dividers are drawn “through” text/content and overlapping the bottom section.
+
+NON-NEGOTIABLE OUTCOME
+1) Dividers must NEVER overlap text.
+2) Bottom section must have clean columns (Stats | Copy | Agent) with dividers as true layout boundaries.
+3) Copy-column horizontal rules must sit in their own rows (not absolute, not pseudo elements).
+4) Preview PNG must be pixel-identical to Download PDF.
+
+========================================================
+WHAT IS WRONG RIGHT NOW (BASED ON LATEST OUTPUT)
+========================================================
+- The horizontal rules in the copy column are visually crossing the headline/description area.
+- The vertical dividers are intersecting or “cutting through” the stats text and copy text.
+- This typically happens when dividers are implemented with:
+  - position:absolute; left/top; and large heights
+  - ::before/::after pseudo elements that span the container height
+  - borders applied to a parent that contains text with insufficient padding
+  - z-index layering above content
+
+WE ARE GOING TO FIX THIS BY:
+A) Making the bottom section a true 3-column grid with divider columns (not borders)
+B) Giving dividers their own dedicated grid columns so they can’t overlap text
+C) Making the copy column a grid with dedicated rows for the four horizontal rules
+
+========================================================
+AUTHORITATIVE DIAGRAM (THIS IS THE TARGET)
+========================================================
+
+BOTTOM SECTION GRID (use divider columns, not overlay)
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  STATS         │ DIV │                 COPY                  │ DIV │ AGENT    │
+│               │     │  HR  (before headline)                │     │          │
+│ icon + text   │     │  HEADLINE (centered, NOT bold)        │     │ photo+logo│
+│ icon + text   │     │  HR  (after headline)                 │     │ name 1line│
+│ icon + text   │     │  HR  (before description)             │     │ title      │
+│               │     │  DESCRIPTION (LEFT aligned)           │     │ phone NOT b│
+│               │     │  HR  (after description)              │     │          │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+IMPORTANT:
+- Vertical dividers are their own narrow columns (“DIV”), full height, behind nothing.
+- Horizontal rules in COPY are their own rows (“HR”), so they never sit behind text.
+
+========================================================
+IMPLEMENTATION — REQUIRED STRUCTURE CHANGES
+========================================================
+Update server/templates/flyer-template.html (Handlebars) in the bottom section:
+
+CURRENT (likely):
+<div class="bottom-section">
+  <div class="stats-column">...</div>
+  <div class="description-column">...</div>
+  <div class="agent-column">...</div>
+</div>
+
+REPLACE WITH THIS EXACT STRUCTURE:
+<div class="bottom-section">
+  <div class="stats-column">...</div>
+
+  <div class="v-divider v-divider-1" aria-hidden="true"></div>
+
+  <div class="copy-column">
+    <div class="h-rule rule-1" aria-hidden="true"></div>
+    <div class="listing-headline">{{headline}}</div>
+    <div class="h-rule rule-2" aria-hidden="true"></div>
+
+    <div class="h-rule rule-3" aria-hidden="true"></div>
+    <div class="listing-description">{{description}}</div>
+    <div class="h-rule rule-4" aria-hidden="true"></div>
+  </div>
+
+  <div class="v-divider v-divider-2" aria-hidden="true"></div>
+
+  <div class="agent-column">...</div>
+</div>
+
+DO NOT implement dividers using ::before/::after or absolute positioning.
+
+========================================================
+IMPLEMENTATION — REQUIRED CSS (DROP-IN REPLACEMENT)
+========================================================
+In server/templates/flyer-template.html, replace bottom layout CSS with the following
+(keep your existing :root sizing variables, but replace the bottom section blocks):
+
+:root {
+  --dividerColor: #b5b5b5;
+  --dividerW: 10px;          /* thicker */
+  --dividerWThin: 6px;       /* optional */
+  --ruleH: 4px;              /* thicker horizontal rules */
+}
+
+/* Bottom section uses divider columns so nothing overlaps text */
+.bottom-section{
+  height: var(--bottomH);
+  padding: 48px var(--padX) 70px;
+  display: grid;
+
+  /* STATS | DIV | COPY | DIV | AGENT */
+  grid-template-columns: 480px var(--dividerW) 1fr var(--dividerW) 520px;
+
+  column-gap: 46px; /* space between content and divider */
+  align-items: start;
+  min-height: 0;
+
+  /* ensure no inherited border-top adds lines */
+  border-top: none !important;
+}
+
+/* Real divider columns (never overlap because they have their own column) */
+.v-divider{
+  background: var(--dividerColor);
+  border-radius: 2px;
+  align-self: stretch; /* full height of bottom section grid */
+}
+
+/* STATS */
+.stats-column{
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+  gap: 44px;
+  padding-right: 10px; /* breathing room away from divider */
+}
+.stat-item{
+  display:flex;
+  align-items:center;
+  gap: 18px;
+  white-space: nowrap; /* one line per stat */
+}
+.stat-icon{
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+}
+.stat-text{
+  font-size: 52px;
+  font-weight: 700;
+  line-height: 1.05;
+}
+
+/* COPY COLUMN AS ITS OWN GRID (rules are rows, not overlays) */
+.copy-column{
+  display:grid;
+  grid-template-rows:
+    auto  /* rule 1 */
+    auto  /* headline */
+    auto  /* rule 2 */
+    auto  /* rule 3 */
+    1fr   /* description */
+    auto; /* rule 4 */
+  row-gap: 18px;
+  padding: 0 10px;
+  min-height: 0;
+}
+
+/* Horizontal rules (always separate rows) */
+.h-rule{
+  height: var(--ruleH);
+  background: var(--dividerColor);
+  width: 100%;
+  border-radius: 2px;
+}
+
+/* Headline (centered, NOT bold) */
+.listing-headline{
+  font-family: 'League Spartan', sans-serif;
+  text-align: center;
+  text-transform: uppercase;
+  font-weight: 500 !important; /* NOT bold */
+  letter-spacing: 4px;
+  font-size: 60px;
+  margin: 0;
+}
+
+/* Description (LEFT aligned only) */
+.listing-description{
+  text-align: left !important;
+  font-size: 40px;
+  font-weight: 400;
+  line-height: 1.5;
+  margin: 0;
+
+  /* optional clamp */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  overflow: hidden;
+}
+
+/* AGENT */
+.agent-column{
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start; /* in reference, agent block sits higher */
+  align-items:flex-start;
+  gap: 18px;
+  padding-left: 10px;
+}
+
+.agent-row{
+  display:flex;
+  align-items:center;
+  gap: 22px;
+}
+
+.agent-photo{
+  width: 210px;
+  height: 210px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 8px solid #c7b28a;
+  background:#f2f2f2;
+}
+
+.agent-logo-box{
+  width: 210px;
+  height: 210px;
+  border: 8px solid #b5b5b5;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.agent-name{
+  font-size: 54px;
+  font-weight: 700;
+  white-space: nowrap;        /* force 1 line */
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.agent-title{
+  font-size: 26px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.agent-phone{
+  font-size: 34px;
+  font-weight: 400 !important; /* NOT bold */
+}
+
+/* IMPORTANT: disable any previous pseudo element divider system */
+.stats-column::before,
+.stats-column::after,
+.copy-column::before,
+.copy-column::after,
+.agent-column::before,
+.agent-column::after,
+.bottom-section::before,
+.bottom-section::after{
+  content: none !important;
+  display: none !important;
+}
+
+========================================================
+HEADER LEFT DIVIDER (ALSO PREVENT OVERLAP INTO PHOTO)
+========================================================
+If the header-left divider is still dropping into the photo area, enforce this:
+
+.header-wrap{
+  position: relative;
+  height: calc(var(--headerH) + var(--addressH));
+  overflow: hidden;     /* CLIPS DIVIDER */
+}
+
+.header-left-divider{
+  position:absolute;
+  left: 64px;
+  top: 18px;
+  width: 10px;
+  height: calc(100% - 36px);
+  background: var(--dividerColor);
+  z-index: 1;
+}
+
+.header-content{
+  position:relative;
+  z-index: 2;
+  padding-left: 120px; /* prevents touching logo/address */
+}
+
+========================================================
+PREVIEW MUST MATCH DOWNLOAD (FIX PIPELINE IF NEEDED)
+========================================================
+In server/services/flyer-generator.ts ensure:
+- both pngPreview and pdf use the SAME page.setViewport({width:2550,height:3300, deviceScaleFactor:1})
+- setContent uses the same HTML string
+- wait for fonts and images:
+  await page.evaluate(() => document.fonts?.ready);
+  await page.evaluate(async () => {
+    const imgs = Array.from(document.images);
+    await Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(r => { img.onload=r; img.onerror=r; })));
+  });
+
+No extra scaling for preview in frontend. Preview should render from the same endpoint /api/flyer/render with outputType=pngPreview (already set) and must use the same CSS and HTML.
+
+========================================================
+QA CHECKLIST (REPLIT MUST RUN AFTER CHANGES)
+========================================================
+DIVIDERS (OVERLAP PROOF)
+- [ ] Vertical dividers are separate grid columns (not borders, not absolute, not pseudo)
+- [ ] No divider crosses text in stats column
+- [ ] No divider crosses headline/description
+- [ ] Horizontal rules are separate rows in copy-column grid (not behind text)
+
+TEXT RULES
+- [ ] Headline centered, NOT bold
+- [ ] Description left-aligned only
+- [ ] Phone number NOT bold
+
+STATS RULES
+- [ ] Each stat is single-line (icon + text)
+- [ ] No wrapping
+
+HEADER RULES
+- [ ] Left divider clipped to header (doesn’t enter photo)
+- [ ] Divider not touching logo/address
+
+RENDER CONSISTENCY
+- [ ] Preview PNG matches Download PDF pixel-for-pixel
+
+DELIVERABLE
+Commit changes to:
+- server/templates/flyer-template.html (HTML structure + CSS)
+- server/services/flyer-generator.ts only if preview/download mismatch persists
+
+END TASK
