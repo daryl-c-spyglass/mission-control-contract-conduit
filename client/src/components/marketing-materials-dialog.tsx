@@ -164,6 +164,44 @@ export function MarketingMaterialsDialog({
     return STATUS_OPTIONS.find(s => s.value === statusValue)?.label?.toUpperCase() || "JUST LISTED";
   };
 
+  const getStatusBadgeColor = (statusValue: StatusType): string => {
+    const colors: Record<StatusType, string> = {
+      'just_listed': '#f97316',
+      'for_sale': '#f97316',
+      'for_lease': '#06b6d4',
+      'under_contract': '#3b82f6',
+      'just_sold': '#ef4444',
+      'price_improvement': '#8b5cf6',
+    };
+    return colors[statusValue] || '#f97316';
+  };
+
+  const formatPrice = (price: number | undefined | null): string => {
+    if (!price) return '';
+    return `$${price.toLocaleString()}`;
+  };
+
+  const parseAddress = (fullAddress: string): { street: string; cityStateZip: string } => {
+    const parts = fullAddress.split(',').map(p => p.trim());
+    if (parts.length >= 3) {
+      return {
+        street: parts[0],
+        cityStateZip: parts.slice(1).join(', ')
+      };
+    } else if (parts.length === 2) {
+      return {
+        street: parts[0],
+        cityStateZip: parts[1]
+      };
+    }
+    return { street: fullAddress, cityStateZip: '' };
+  };
+
+  const getPropertyPrice = (): number | null => {
+    const mlsData = transaction.mlsData as any;
+    return transaction.salePrice || transaction.listPrice || mlsData?.listPrice || null;
+  };
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -277,12 +315,14 @@ export function MarketingMaterialsDialog({
     canvas.height = 675;
 
     const headerHeight = 90;
+    const price = getPropertyPrice();
+    const { street, cityStateZip } = parseAddress(transaction.propertyAddress);
 
     // Draw dark header bar
     ctx.fillStyle = "#2a2a2a";
     ctx.fillRect(0, 0, canvas.width, headerHeight);
 
-    // Load and draw Spyglass logo
+    // Load and draw Spyglass logo (left side)
     try {
       const logo = new Image();
       logo.crossOrigin = "anonymous";
@@ -293,9 +333,9 @@ export function MarketingMaterialsDialog({
       });
       
       if (logo.complete && logo.naturalWidth > 0) {
-        const logoHeight = 60;
+        const logoHeight = 50;
         const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight;
-        const logoX = (canvas.width - logoWidth) / 2;
+        const logoX = 30;
         const logoY = (headerHeight - logoHeight) / 2;
         ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
       }
@@ -303,10 +343,16 @@ export function MarketingMaterialsDialog({
       // Fallback to text if logo fails
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 18px Inter, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("SPYGLASS", canvas.width / 2, 40);
-      ctx.font = "12px Inter, sans-serif";
-      ctx.fillText("R E A L T Y", canvas.width / 2, 60);
+      ctx.textAlign = "left";
+      ctx.fillText("SPYGLASS REALTY", 30, headerHeight / 2 + 6);
+    }
+
+    // Draw price (right side of header)
+    if (price) {
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 32px Inter, sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(formatPrice(price), canvas.width - 30, headerHeight / 2 + 10);
     }
 
     // Draw property image (main area)
@@ -334,19 +380,37 @@ export function MarketingMaterialsDialog({
 
     // Draw bottom info bar with semi-transparent background
     const bottomY = canvas.height - 100;
-    ctx.fillStyle = "rgba(42, 42, 42, 0.9)";
+    ctx.fillStyle = "rgba(42, 42, 42, 0.95)";
     ctx.fillRect(0, bottomY, canvas.width, 100);
 
-    // Status badge
+    // Status badge with colored background
+    const statusLabel = getStatusLabel(status);
+    ctx.font = "bold 18px Inter, sans-serif";
+    const badgeTextWidth = ctx.measureText(statusLabel).width;
+    const badgePadding = 12;
+    const badgeHeight = 32;
+    const badgeX = 25;
+    const badgeY = bottomY + 12;
+    
+    ctx.fillStyle = getStatusBadgeColor(status);
+    ctx.beginPath();
+    ctx.roundRect(badgeX, badgeY, badgeTextWidth + badgePadding * 2, badgeHeight, 4);
+    ctx.fill();
+    
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 24px Inter, sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText(getStatusLabel(status), 30, bottomY + 40);
+    ctx.fillText(statusLabel, badgeX + badgePadding, badgeY + 22);
 
-    // Address (with optional social description)
+    // Street address
+    ctx.font = "bold 20px Inter, sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(street, 25, bottomY + 65);
+
+    // City, State ZIP
     ctx.font = "16px Inter, sans-serif";
-    const addressText = socialDescription ? `${transaction.propertyAddress}, ${socialDescription}` : transaction.propertyAddress;
-    ctx.fillText(addressText, 30, bottomY + 70);
+    ctx.fillStyle = "#cccccc";
+    const cityLine = socialDescription ? `${cityStateZip} | ${socialDescription}` : cityStateZip;
+    ctx.fillText(cityLine, 25, bottomY + 88);
 
     // Agent info on right side
     if (user?.marketingDisplayName) {
@@ -411,12 +475,14 @@ export function MarketingMaterialsDialog({
     canvas.height = 1080;
 
     const headerHeight = 100;
+    const price = getPropertyPrice();
+    const { street, cityStateZip } = parseAddress(transaction.propertyAddress);
 
     // Draw dark header bar
     ctx.fillStyle = "#2a2a2a";
     ctx.fillRect(0, 0, canvas.width, headerHeight);
 
-    // Load and draw Spyglass logo
+    // Load and draw Spyglass logo (left side)
     try {
       const logo = new Image();
       logo.crossOrigin = "anonymous";
@@ -427,9 +493,9 @@ export function MarketingMaterialsDialog({
       });
       
       if (logo.complete && logo.naturalWidth > 0) {
-        const logoHeight = 70;
+        const logoHeight = 60;
         const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight;
-        const logoX = (canvas.width - logoWidth) / 2;
+        const logoX = 30;
         const logoY = (headerHeight - logoHeight) / 2;
         ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
       }
@@ -437,15 +503,21 @@ export function MarketingMaterialsDialog({
       // Fallback to text if logo fails
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 22px Inter, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("SPYGLASS", canvas.width / 2, 45);
-      ctx.font = "14px Inter, sans-serif";
-      ctx.fillText("R E A L T Y", canvas.width / 2, 70);
+      ctx.textAlign = "left";
+      ctx.fillText("SPYGLASS REALTY", 30, headerHeight / 2 + 6);
+    }
+
+    // Draw price (right side of header)
+    if (price) {
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 36px Inter, sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(formatPrice(price), canvas.width - 30, headerHeight / 2 + 12);
     }
 
     // Draw property image
     const imageY = headerHeight;
-    const bottomBarHeight = 200;
+    const bottomBarHeight = 220;
     const imageHeight = canvas.height - headerHeight - bottomBarHeight;
     
     const imgAspect = img.width / img.height;
@@ -477,26 +549,44 @@ export function MarketingMaterialsDialog({
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, bottomY, canvas.width, bottomBarHeight);
 
-    // Status badge
-    ctx.fillStyle = "#1a1a1a";
-    ctx.font = "bold 36px Inter, sans-serif";
+    // Status badge with colored background
+    const statusLabel = getStatusLabel(status);
+    ctx.font = "bold 24px Inter, sans-serif";
+    const badgeTextWidth = ctx.measureText(statusLabel).width;
+    const badgePadding = 16;
+    const badgeHeight = 42;
+    const badgeX = 30;
+    const badgeY = bottomY + 20;
+    
+    ctx.fillStyle = getStatusBadgeColor(status);
+    ctx.beginPath();
+    ctx.roundRect(badgeX, badgeY, badgeTextWidth + badgePadding * 2, badgeHeight, 6);
+    ctx.fill();
+    
+    ctx.fillStyle = "#ffffff";
     ctx.textAlign = "left";
-    ctx.fillText(getStatusLabel(status), 30, bottomY + 55);
+    ctx.fillText(statusLabel, badgeX + badgePadding, badgeY + 30);
 
-    // Address (with optional social description)
-    ctx.font = "28px Inter, sans-serif";
-    const addressText = socialDescription ? `${transaction.propertyAddress}, ${socialDescription}` : transaction.propertyAddress;
-    ctx.fillText(addressText, 30, bottomY + 100);
+    // Street address
+    ctx.font = "bold 32px Inter, sans-serif";
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillText(street, 30, bottomY + 100);
+
+    // City, State ZIP
+    ctx.font = "24px Inter, sans-serif";
+    ctx.fillStyle = "#666666";
+    const cityLine = socialDescription ? `${cityStateZip} | ${socialDescription}` : cityStateZip;
+    ctx.fillText(cityLine, 30, bottomY + 135);
 
     // Agent info
     if (user?.marketingDisplayName) {
       ctx.font = "18px Inter, sans-serif";
-      ctx.fillStyle = "#666666";
+      ctx.fillStyle = "#888888";
       let agentText = user.marketingDisplayName;
       if (user.marketingPhone) {
         agentText += ` | ${user.marketingPhone}`;
       }
-      ctx.fillText(agentText, 30, bottomY + 140);
+      ctx.fillText(agentText, 30, bottomY + 175);
     }
 
     // Agent headshot circle
@@ -567,6 +657,9 @@ export function MarketingMaterialsDialog({
     canvas.width = 1080;
     canvas.height = 1080;
 
+    const price = getPropertyPrice();
+    const { street, cityStateZip } = parseAddress(transaction.propertyAddress);
+
     // White background
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -600,8 +693,16 @@ export function MarketingMaterialsDialog({
     ctx.fillStyle = "#1a1a1a";
     ctx.font = "bold 36px Inter, sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText(transaction.propertyAddress.toUpperCase(), 0, 0);
+    ctx.fillText(`${street}, ${cityStateZip}`.toUpperCase(), 0, 0);
     ctx.restore();
+
+    // Draw price on left panel (below logo)
+    if (price) {
+      ctx.fillStyle = "#1a1a1a";
+      ctx.font = "bold 32px Inter, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(formatPrice(price), leftPanelWidth / 2 + 10, 170);
+    }
 
     // Draw property image on right side
     const imageX = leftPanelWidth;
@@ -633,18 +734,32 @@ export function MarketingMaterialsDialog({
     ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
     ctx.restore();
 
-    // Bottom section with status and description
+    // Bottom section with status badge
     const bottomY = canvas.height - 120;
     
-    // Status badge and social description
-    ctx.fillStyle = "#1a1a1a";
-    ctx.font = "bold 32px Inter, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(getStatusLabel(status), canvas.width / 2 + 50, bottomY + 20);
+    // Status badge with colored background
+    const statusLabel = getStatusLabel(status);
+    ctx.font = "bold 24px Inter, sans-serif";
+    const badgeTextWidth = ctx.measureText(statusLabel).width;
+    const badgePadding = 16;
+    const badgeHeight = 42;
+    const badgeX = canvas.width / 2 + 50 - (badgeTextWidth + badgePadding * 2) / 2;
+    const badgeY = bottomY;
     
+    ctx.fillStyle = getStatusBadgeColor(status);
+    ctx.beginPath();
+    ctx.roundRect(badgeX, badgeY, badgeTextWidth + badgePadding * 2, badgeHeight, 6);
+    ctx.fill();
+    
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.fillText(statusLabel, canvas.width / 2 + 50, badgeY + 30);
+    
+    // Social description below badge
     if (socialDescription) {
+      ctx.fillStyle = "#666666";
       ctx.font = "24px Inter, sans-serif";
-      ctx.fillText(socialDescription, canvas.width / 2 + 50, bottomY + 55);
+      ctx.fillText(socialDescription, canvas.width / 2 + 50, bottomY + 65);
     }
 
     // Agent headshot in bottom left

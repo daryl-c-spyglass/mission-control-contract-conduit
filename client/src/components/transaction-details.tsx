@@ -1592,11 +1592,23 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 const metadata = asset.metadata as { format?: string; status?: string; dimensions?: string; headline?: string } | null;
                 const isPrintFlyer = asset.type === 'print_flyer' || metadata?.format === 'print';
                 const isSocialFlyer = asset.type === 'social_flyer' || metadata?.format === 'social';
+                const isLandscape = asset.type === 'facebook';
+                const isSquare = asset.type === 'instagram' || isSocialFlyer;
+                const isAltStyle = asset.type === 'alt_style';
+                
                 const typeLabel = isPrintFlyer ? 'Print Flyer' : 
-                                  isSocialFlyer ? 'Social 1:1' :
-                                  asset.type === "facebook" ? "Facebook 16:9" : 
-                                  asset.type === "instagram" ? "Instagram 1:1" :
-                                  asset.type === "alt_style" ? "Alt Style" : asset.type;
+                                  isLandscape ? 'Facebook 16:9' :
+                                  isSquare ? 'Instagram Post' :
+                                  isAltStyle ? 'Alt Style' : asset.type;
+                
+                const getBadgeStyle = () => {
+                  if (isPrintFlyer) return 'bg-orange-500 text-white hover:bg-orange-600';
+                  if (isLandscape) return 'bg-purple-500 text-white hover:bg-purple-600';
+                  if (isSquare) return 'bg-blue-500 text-white hover:bg-blue-600';
+                  if (isAltStyle) return 'bg-pink-500 text-white hover:bg-pink-600';
+                  return 'bg-gray-500 text-white hover:bg-gray-600';
+                };
+                
                 const statusLabel = metadata?.status;
                 const createdDate = asset.createdAt ? new Date(asset.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null;
                 
@@ -1617,7 +1629,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                     <CardContent className="p-3 space-y-2">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0 space-y-1.5">
-                          <Badge variant={isPrintFlyer ? "default" : "secondary"} className="text-xs">
+                          <Badge className={`text-xs ${getBadgeStyle()}`}>
                             {typeLabel}
                           </Badge>
                           {statusLabel && (

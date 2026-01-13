@@ -1,0 +1,174 @@
+## Improve Create Graphics & Add Format Badges
+
+Two improvements needed:
+
+### Part 1: Add Consistent Format Badges to Marketing Assets Gallery
+
+**Current State:**
+- Print Flyer: Has orange badge ✅
+- Facebook 16:9: Plain text label ❌
+
+**Required:**
+All asset types should have colored badges for visual consistency.
+
+**Badge Colors:**
+```
+Print Flyer    → Orange (#f97316) background, white text
+Social Square  → Blue (#3b82f6) background, white text  
+Social 16:9    → Purple (#8b5cf6) background, white text
+Story 9:16     → Pink (#ec4899) background, white text
+```
+
+**Implementation:**
+```tsx
+const formatBadgeStyles: Record<string, string> = {
+  'print': 'bg-orange-500 text-white',
+  'square': 'bg-blue-500 text-white',
+  'landscape': 'bg-purple-500 text-white',  // 16:9
+  'story': 'bg-pink-500 text-white',         // 9:16
+};
+
+// In the asset card:
+<Badge className={formatBadgeStyles[asset.format] || 'bg-gray-500 text-white'}>
+  {formatLabels[asset.format]}
+</Badge>
+```
+
+**Format Labels:**
+```
+print     → "Print Flyer"
+square    → "Instagram Post"
+landscape → "Facebook 16:9"
+story     → "Instagram Story"
+```
+
+---
+
+### Part 2: Enhance Create Graphics Output
+
+**Current Output:** Photo with status badge + address only
+
+**Enhanced Output (like Rechat):**
+
+```
+┌────────────────────────────────────────┐
+│ SPYGLASS REALTY              $434,990  │
+│                                        │
+│                                        │
+│         [Property Photo]               │
+│                                        │
+│                                        │
+│ ┌──────────────┐                       │
+│ │ JUST LISTED  │                       │
+│ └──────────────┘                       │
+│ 13106 New Boston                       │
+│ Austin, TX 78729                       │
+└────────────────────────────────────────┘
+```
+
+**Elements to Add:**
+
+1. **Brokerage Name** (top-left)
+   - "SPYGLASS REALTY" or logo
+   - Subtle, professional placement
+
+2. **Price** (top-right)
+   - Property price from MLS data
+   - Bold, prominent
+
+3. **Full Address** (bottom)
+   - Street address
+   - City, State ZIP
+
+4. **Status Badge** (bottom-left, above address)
+   - Colored background matching status
+   - JUST LISTED = Orange
+   - OPEN HOUSE = Green
+   - UNDER CONTRACT = Blue
+   - JUST SOLD = Red
+   - PRICE IMPROVEMENT = Purple
+
+**Update Canvas Rendering:**
+
+In `marketing-materials-dialog.tsx`, update the canvas drawing to include:
+
+```typescript
+// Draw brokerage name (top-left)
+ctx.font = 'bold 24px Arial';
+ctx.fillStyle = 'white';
+ctx.fillText('SPYGLASS REALTY', 30, 40);
+
+// Draw price (top-right)
+ctx.font = 'bold 36px Arial';
+ctx.textAlign = 'right';
+ctx.fillText(formatPrice(price), canvas.width - 30, 50);
+
+// Draw status badge with background
+const badgeColors = {
+  'Just Listed': '#f97316',
+  'Open House': '#22c55e',
+  'Under Contract': '#3b82f6',
+  'Just Sold': '#ef4444',
+  'Price Improvement': '#8b5cf6',
+  'For Sale': '#f97316',
+  'For Lease': '#06b6d4',
+};
+
+// Draw badge background
+ctx.fillStyle = badgeColors[status] || '#f97316';
+ctx.fillRect(20, canvas.height - 120, badgeWidth + 20, 40);
+
+// Draw badge text
+ctx.fillStyle = 'white';
+ctx.font = 'bold 24px Arial';
+ctx.fillText(status.toUpperCase(), 30, canvas.height - 88);
+
+// Draw address
+ctx.fillStyle = 'white';
+ctx.font = '28px Arial';
+ctx.fillText(streetAddress, 20, canvas.height - 50);
+ctx.font = '20px Arial';
+ctx.fillText(cityStateZip, 20, canvas.height - 20);
+```
+
+---
+
+### Part 3: Add Multiple Template Styles (Future Enhancement)
+
+For now, improve the single template. Later, add template options:
+- Style 1: Overlay at bottom (current)
+- Style 2: Overlay at top
+- Style 3: Side banner
+- Style 4: Minimal (just badge)
+
+---
+
+### Testing:
+
+**Badge Testing:**
+1. Go to Marketing tab with existing assets
+2. Verify Print Flyer has orange badge
+3. Verify Facebook 16:9 has purple badge
+4. Verify all badge colors match the scheme
+
+**Create Graphics Testing:**
+1. Click "Create Graphics"
+2. Select a photo and status
+3. Verify preview shows:
+   - Brokerage name (top-left)
+   - Price (top-right)
+   - Status badge (bottom-left)
+   - Full address (bottom)
+4. Generate and save
+5. Verify saved image has all elements (not just plain photo)
+
+---
+
+### Files to Modify:
+- `client/src/components/transaction-details.tsx` - Asset card badges
+- `client/src/components/marketing-materials-dialog.tsx` - Canvas rendering
+
+### DO NOT change:
+- Create Flyer functionality
+- Existing saved assets
+- Other tabs
