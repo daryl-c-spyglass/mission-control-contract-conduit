@@ -1,0 +1,745 @@
+## Improve Docs Tab UX
+
+Enhance the document management experience with better upload flow, document display, and preview capabilities.
+
+---
+
+### Issue 1: Remove Duplicate Upload Button
+
+**Current:** Two "Upload Documents" buttons (header + empty state)
+**Fix:** Keep header button, simplify empty state
+
+**Empty State (simplified):**
+```
+[Document Icon]
+No Documents Yet
+Upload contract documents, amendments, and other files for this transaction.
+(Use the "Upload Documents" button above to get started)
+```
+
+Remove the orange CTA button from empty state - header button is sufficient.
+
+---
+
+### Issue 2: Add Document Naming Before Upload
+
+**Current Flow:** Select file → Upload immediately
+**New Flow:** Select file → Name document → Upload
+
+**Upload Dialog:**
+```
+┌─────────────────────────────────────────────────┐
+│ Upload Document                              ✕  │
+├─────────────────────────────────────────────────┤
+│                                                 │
+│ Document Name *                                 │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ e.g. Sales Contract, Amendment #1           │ │
+│ └─────────────────────────────────────────────┘ │
+│                                                 │
+│ Document Type                                   │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ Contract                                  ▼ │ │
+│ └─────────────────────────────────────────────┘ │
+│   Options: Contract, Amendment, Addendum,       │
+│   Disclosure, Inspection, Appraisal, Other      │
+│                                                 │
+│ File                                            │
+│ ┌─────────────────────────────────────────────┐ │
+│ │  📄 sales-contract-13106-new-boston.pdf     │ │
+│ │     2.4 MB                                  │ │
+│ │                              [Change File]  │ │
+│ └─────────────────────────────────────────────┘ │
+│                                                 │
+│ Notes (optional)                                │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ Add any notes about this document...        │ │
+│ └─────────────────────────────────────────────┘ │
+│                                                 │
+│              [Cancel]  [Upload Document]        │
+└─────────────────────────────────────────────────┘
+```
+
+**Implementation:**
+
+```tsx
+interface DocumentUploadDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onUpload: (data: DocumentUploadData) => void;
+}
+
+interface DocumentUploadData {
+  name: string;
+  type: DocumentType;
+  file: File;
+  notes?: string;
+}
+
+type DocumentType = 
+  | 'contract'
+  | 'amendment'
+  | 'addendum'
+  | 'disclosure'
+  | 'inspection'
+  | 'appraisal'
+  | 'other';
+
+function DocumentUploadDialog({ isOpen, onClose, onUpload }: DocumentUploadDialogProps) {
+  const [name, setName] = useState('');
+  const [type, setType] = useState<DocumentType>('contract');
+  const [file, setFile] = useState<File | null>(null);
+  const [notes, setNotes] = useState('');
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      // Auto-fill name from filename if empty
+      if (!name) {
+        setName(selectedFile.name.replace(/\.[^/.]+$/, '')); // Remove extension
+      }
+    }
+  };
+
+  const handleSubmit = () => {
+    if (!name || !file) return;
+    onUpload({ name, type, file, notes });
+    onClose();
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Upload Document</DialogTitle>
+        </DialogHeader>
+        
+        {/* Document Name */}
+        <div className="space-y-2">
+          <Label htmlFor="name">Document Name *</Label>
+          <Input
+            id="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Sales Contract, Amendment #1"
+          />
+        </div>
+
+        {/* Document Type */}
+        <div className="space-y-2">
+          <Label>Document Type</Label>
+          <Select value={type} onValueChange={setType}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="contract">Contract</SelectItem>
+              <SelectItem value="amendment">Amendment</SelectItem>
+              <SelectItem value="addendum">Addendum</SelectItem>
+              <SelectItem value="disclosure">Disclosure</SelectItem>
+              <SelectItem value="inspection">Inspection Report</SelectItem>
+              <SelectItem value="appraisal">Appraisal</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* File Selection */}
+        <div className="space-y-2">
+          <Label>File</Label>
+          {file ? (
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">{file.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(file.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setFile(null)}>
+                Change
+              </Button>
+            </div>
+          ) : (
+            <div className="border-2 border-dashed rounded-lg p-6 text-center">
+              <input
+                type="file"
+                id="file-upload"
+                className="hidden"
+                onChange={handleFileSelect}
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.jpeg,.png"
+              />
+              <label htmlFor="file-upload" className="cursor-pointer">
+                <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  Click to select a file
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  PDF, DOC, DOCX, XLS, XLSX, CSV, JPG, PNG
+                </p>
+              </label>
+            </div>
+          )}
+        </div>
+
+        {/* Notes */}
+        <div className="space-y-2">
+          <Label htmlFor="notes">Notes (optional)</Label>
+          <Textarea
+            id="notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Add any notes about this document..."
+            rows={2}
+          />
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={!name || !file}>
+            Upload Document
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+---
+
+### Issue 3: Improve Document List Display
+
+**Document Card Layout:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 📄  Sales Contract                                              │
+│     Contract • Uploaded Jan 13, 2025                            │
+│     sales-contract-13106-new-boston.pdf (2.4 MB)                │
+│                                                                 │
+│     Notes: Original executed contract                           │
+│                                  [Preview] [Download] [🗑]      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Implementation:**
+
+```tsx
+interface Document {
+  id: number;
+  name: string;
+  type: DocumentType;
+  fileName: string;
+  fileSize: number;
+  fileUrl: string;
+  mimeType: string;
+  notes?: string;
+  uploadedAt: string;
+  uploadedBy?: string;
+}
+
+function DocumentCard({ doc, onPreview, onDownload, onDelete }: DocumentCardProps) {
+  const typeLabels: Record<DocumentType, string> = {
+    contract: 'Contract',
+    amendment: 'Amendment',
+    addendum: 'Addendum',
+    disclosure: 'Disclosure',
+    inspection: 'Inspection Report',
+    appraisal: 'Appraisal',
+    other: 'Other',
+  };
+
+  const typeColors: Record<DocumentType, string> = {
+    contract: 'bg-blue-100 text-blue-800',
+    amendment: 'bg-orange-100 text-orange-800',
+    addendum: 'bg-green-100 text-green-800',
+    disclosure: 'bg-purple-100 text-purple-800',
+    inspection: 'bg-yellow-100 text-yellow-800',
+    appraisal: 'bg-pink-100 text-pink-800',
+    other: 'bg-gray-100 text-gray-800',
+  };
+
+  return (
+    <div className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
+      <div className="flex items-start justify-between">
+        <div className="flex items-start gap-3">
+          <FileText className="h-10 w-10 text-muted-foreground mt-1" />
+          <div>
+            <h4 className="font-medium">{doc.name}</h4>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge className={typeColors[doc.type]} variant="secondary">
+                {typeLabels[doc.type]}
+              </Badge>
+              <span className="text-sm text-muted-foreground">
+                Uploaded {formatDate(doc.uploadedAt)}
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              {doc.fileName} ({formatFileSize(doc.fileSize)})
+            </p>
+            {doc.notes && (
+              <p className="text-sm mt-2 text-muted-foreground italic">
+                "{doc.notes}"
+              </p>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={() => onPreview(doc)}>
+            <Eye className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => onDownload(doc)}>
+            <Download className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => onDelete(doc)}>
+            <Trash className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+### Issue 4: Document Preview Modal (NEW)
+
+**Create a document preview modal that supports multiple file types:**
+
+**Preview Modal Layout:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Sales Contract                                               ✕  │
+│ Contract • sales-contract.pdf (2.4 MB)                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                                                           │  │
+│  │                                                           │  │
+│  │              [Document Preview Area]                      │  │
+│  │                                                           │  │
+│  │              PDF: Embedded viewer                         │  │
+│  │              Images: Image display                        │  │
+│  │              Excel/CSV: Table preview                     │  │
+│  │              Word: Converted preview or message           │  │
+│  │                                                           │  │
+│  │                                                           │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  [Full Screen]                              [Download] [Close]  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Implementation:**
+
+```tsx
+interface DocumentPreviewModalProps {
+  document: Document | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onDownload: (doc: Document) => void;
+}
+
+function DocumentPreviewModal({ 
+  document, 
+  isOpen, 
+  onClose, 
+  onDownload 
+}: DocumentPreviewModalProps) {
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  if (!document) return null;
+
+  const getFileExtension = (fileName: string) => {
+    return fileName.split('.').pop()?.toLowerCase() || '';
+  };
+
+  const extension = getFileExtension(document.fileName);
+  const mimeType = document.mimeType;
+
+  // Render appropriate preview based on file type
+  const renderPreview = () => {
+    // PDF Preview
+    if (extension === 'pdf' || mimeType === 'application/pdf') {
+      return (
+        <iframe
+          src={`${document.fileUrl}#toolbar=1&navpanes=0`}
+          className="w-full h-full min-h-[600px] rounded-lg"
+          title={document.name}
+        />
+      );
+    }
+
+    // Image Preview (JPG, PNG, GIF, WebP)
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension) || 
+        mimeType?.startsWith('image/')) {
+      return (
+        <div className="flex items-center justify-center h-full min-h-[400px] bg-muted rounded-lg p-4">
+          <img
+            src={document.fileUrl}
+            alt={document.name}
+            className="max-w-full max-h-[70vh] object-contain rounded"
+          />
+        </div>
+      );
+    }
+
+    // CSV Preview
+    if (extension === 'csv' || mimeType === 'text/csv') {
+      return <CSVPreview fileUrl={document.fileUrl} />;
+    }
+
+    // Excel Preview (XLSX, XLS)
+    if (['xlsx', 'xls'].includes(extension) || 
+        mimeType?.includes('spreadsheet') ||
+        mimeType?.includes('excel')) {
+      return <ExcelPreview fileUrl={document.fileUrl} />;
+    }
+
+    // Word Documents (DOC, DOCX) - Show message with download option
+    if (['doc', 'docx'].includes(extension) || 
+        mimeType?.includes('word') ||
+        mimeType?.includes('document')) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full min-h-[300px] bg-muted rounded-lg p-8 text-center">
+          <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium mb-2">Word Document</h3>
+          <p className="text-muted-foreground mb-4">
+            Word documents cannot be previewed directly in the browser.
+          </p>
+          <Button onClick={() => onDownload(document)}>
+            <Download className="h-4 w-4 mr-2" />
+            Download to View
+          </Button>
+        </div>
+      );
+    }
+
+    // Unsupported file type
+    return (
+      <div className="flex flex-col items-center justify-center h-full min-h-[300px] bg-muted rounded-lg p-8 text-center">
+        <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-medium mb-2">Preview Not Available</h3>
+        <p className="text-muted-foreground mb-4">
+          This file type cannot be previewed in the browser.
+        </p>
+        <Button onClick={() => onDownload(document)}>
+          <Download className="h-4 w-4 mr-2" />
+          Download File
+        </Button>
+      </div>
+    );
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className={isFullScreen ? "max-w-[95vw] h-[95vh]" : "max-w-4xl"}>
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle>{document.name}</DialogTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                {document.type} • {document.fileName} ({formatFileSize(document.fileSize)})
+              </p>
+            </div>
+          </div>
+        </DialogHeader>
+        
+        {/* Preview Area */}
+        <div className={isFullScreen ? "flex-1 overflow-auto" : ""}>
+          {renderPreview()}
+        </div>
+
+        <DialogFooter className="flex justify-between sm:justify-between">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsFullScreen(!isFullScreen)}
+          >
+            {isFullScreen ? (
+              <>
+                <Minimize2 className="h-4 w-4 mr-2" />
+                Exit Full Screen
+              </>
+            ) : (
+              <>
+                <Maximize2 className="h-4 w-4 mr-2" />
+                Full Screen
+              </>
+            )}
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onDownload(document)}>
+              <Download className="h-4 w-4 mr-2" />
+              Download
+            </Button>
+            <Button onClick={onClose}>Close</Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// CSV Preview Component
+function CSVPreview({ fileUrl }: { fileUrl: string }) {
+  const [data, setData] = useState<string[][]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(fileUrl)
+      .then(res => res.text())
+      .then(text => {
+        // Parse CSV - simple implementation
+        const rows = text.split('\n').map(row => 
+          row.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''))
+        );
+        setData(rows.slice(0, 100)); // Limit to first 100 rows for performance
+        setLoading(false);
+      })
+      .catch(() => {
+        setError('Failed to load CSV');
+        setLoading(false);
+      });
+  }, [fileUrl]);
+
+  if (loading) return <div className="p-4 text-center">Loading...</div>;
+  if (error) return <div className="p-4 text-center text-red-500">{error}</div>;
+
+  return (
+    <div className="overflow-auto max-h-[500px] border rounded-lg">
+      <table className="w-full text-sm">
+        <thead className="bg-muted sticky top-0">
+          <tr>
+            {data[0]?.map((header, i) => (
+              <th key={i} className="px-3 py-2 text-left font-medium border-b">
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.slice(1).map((row, i) => (
+            <tr key={i} className="hover:bg-muted/50">
+              {row.map((cell, j) => (
+                <td key={j} className="px-3 py-2 border-b">
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {data.length >= 100 && (
+        <p className="text-sm text-muted-foreground p-2 text-center">
+          Showing first 100 rows. Download to view all data.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Excel Preview Component (using SheetJS)
+function ExcelPreview({ fileUrl }: { fileUrl: string }) {
+  const [data, setData] = useState<string[][]>([]);
+  const [sheets, setSheets] = useState<string[]>([]);
+  const [activeSheet, setActiveSheet] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Need to install: npm install xlsx
+    import('xlsx').then(XLSX => {
+      fetch(fileUrl)
+        .then(res => res.arrayBuffer())
+        .then(buffer => {
+          const workbook = XLSX.read(buffer, { type: 'array' });
+          const sheetNames = workbook.SheetNames;
+          setSheets(sheetNames);
+          setActiveSheet(sheetNames[0]);
+          
+          // Get first sheet data
+          const worksheet = workbook.Sheets[sheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][];
+          setData(jsonData.slice(0, 100)); // Limit rows
+          setLoading(false);
+        })
+        .catch(() => {
+          setError('Failed to load Excel file');
+          setLoading(false);
+        });
+    });
+  }, [fileUrl]);
+
+  if (loading) return <div className="p-4 text-center">Loading spreadsheet...</div>;
+  if (error) return <div className="p-4 text-center text-red-500">{error}</div>;
+
+  return (
+    <div className="space-y-2">
+      {/* Sheet tabs */}
+      {sheets.length > 1 && (
+        <div className="flex gap-1 border-b">
+          {sheets.map(sheet => (
+            <button
+              key={sheet}
+              onClick={() => setActiveSheet(sheet)}
+              className={`px-3 py-1 text-sm rounded-t ${
+                activeSheet === sheet 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'hover:bg-muted'
+              }`}
+            >
+              {sheet}
+            </button>
+          ))}
+        </div>
+      )}
+      
+      {/* Data table */}
+      <div className="overflow-auto max-h-[500px] border rounded-lg">
+        <table className="w-full text-sm">
+          <thead className="bg-muted sticky top-0">
+            <tr>
+              {data[0]?.map((header, i) => (
+                <th key={i} className="px-3 py-2 text-left font-medium border-b">
+                  {header || `Column ${i + 1}`}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.slice(1).map((row, i) => (
+              <tr key={i} className="hover:bg-muted/50">
+                {row.map((cell, j) => (
+                  <td key={j} className="px-3 py-2 border-b">
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+```
+
+**File Type Support Summary:**
+
+| File Type | Preview Method |
+|-----------|----------------|
+| PDF (.pdf) | Embedded iframe viewer |
+| Images (.jpg, .png, .gif, .webp) | Native image display |
+| CSV (.csv) | Parsed table view |
+| Excel (.xlsx, .xls) | SheetJS parsed table view |
+| Word (.doc, .docx) | Download prompt (no browser preview) |
+| Other | Download prompt |
+
+---
+
+### Additional Dependencies
+
+Install SheetJS for Excel preview:
+```bash
+npm install xlsx
+```
+
+---
+
+### Additional UX Recommendations
+
+**1. Drag & Drop Upload**
+Allow dragging files directly onto the Docs tab area.
+
+**2. Document Count Badge on Tab**
+Show count like Marketing tab: `Docs 3`
+
+**3. Sort/Filter Options**
+```
+Contract Documents                    [Filter: All ▼] [Sort: Newest ▼]
+```
+
+**4. Bulk Actions (Future)**
+- Select multiple documents
+- Bulk download as ZIP
+- Bulk delete
+
+---
+
+### Database Schema Update (if needed)
+
+```sql
+-- Add new columns to documents table
+ALTER TABLE documents ADD COLUMN display_name VARCHAR(255);
+ALTER TABLE documents ADD COLUMN document_type VARCHAR(50) DEFAULT 'other';
+ALTER TABLE documents ADD COLUMN mime_type VARCHAR(100);
+ALTER TABLE documents ADD COLUMN notes TEXT;
+```
+
+---
+
+### Files to Modify:
+- `client/src/components/transaction-details.tsx` - Docs tab content
+- Create: `client/src/components/document-upload-dialog.tsx`
+- Create: `client/src/components/document-card.tsx`
+- Create: `client/src/components/document-preview-modal.tsx`
+- `server/routes.ts` - Update document upload endpoint to accept new fields
+
+### API Update:
+
+```typescript
+// POST /api/transactions/:id/documents
+// Request body (multipart form data):
+{
+  file: File,
+  name: string,
+  type: 'contract' | 'amendment' | ... ,
+  notes?: string
+}
+
+// Response:
+{
+  id: number,
+  name: string,
+  type: string,
+  fileName: string,
+  fileSize: number,
+  fileUrl: string,
+  mimeType: string,
+  notes: string | null,
+  uploadedAt: string
+}
+```
+
+---
+
+### Testing:
+
+**Upload Testing:**
+1. Click "Upload Documents" in header
+2. Dialog opens with name, type, file, notes fields
+3. Select a file - name auto-fills from filename
+4. Change document type
+5. Add optional notes
+6. Upload
+7. Document appears in list with all info
+
+**Preview Testing:**
+1. Upload a PDF → Click Preview → PDF viewer opens
+2. Upload an image → Click Preview → Image displays
+3. Upload a CSV → Click Preview → Table view shows
+4. Upload an Excel file → Click Preview → Spreadsheet table shows
+5. Upload a Word doc → Click Preview → Shows download prompt
+6. Test Full Screen button
+7. Test Download from preview modal
+
+**General Testing:**
+8. View, Download, Delete buttons work
+9. Empty state shows simple message (no duplicate button)
