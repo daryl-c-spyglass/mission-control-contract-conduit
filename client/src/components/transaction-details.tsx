@@ -443,29 +443,6 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
               <span className="hidden xs:inline">View</span> Emails
             </Button>
           )}
-          {onMarketingClick && (
-            <Button 
-              variant="outline" 
-              size="sm"
-              className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9" 
-              data-testid="button-marketing-materials"
-              onClick={onMarketingClick}
-            >
-              <ImageIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Marketing</span>
-              <span className="sm:hidden">Assets</span>
-            </Button>
-          )}
-          <Button 
-            variant="outline" 
-            size="sm"
-            className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9" 
-            data-testid="button-create-flyer"
-            onClick={() => setFlyerDialogOpen(true)}
-          >
-            <FileImage className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            <span className="hidden xs:inline">Create</span> Flyer
-          </Button>
         </div>
       </div>
 
@@ -658,17 +635,10 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
               return (
                 <Card>
                   <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between gap-4">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <ImageIcon className="h-4 w-4" />
-                        Property Photos
-                      </CardTitle>
-                      {onMarketingClick && (
-                        <Button variant="outline" size="sm" onClick={onMarketingClick} data-testid="button-create-marketing">
-                          Create Marketing Materials
-                        </Button>
-                      )}
-                    </div>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <ImageIcon className="h-4 w-4" />
+                      Property Photos
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
@@ -688,7 +658,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                     </div>
                     {photos.length > 8 && (
                       <p className="text-sm text-muted-foreground mt-2 text-center">
-                        +{photos.length - 8} more photos available in Marketing Materials
+                        +{photos.length - 8} more photos available in MLS Data tab
                       </p>
                     )}
                   </CardContent>
@@ -1459,16 +1429,26 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         <TabsContent value="marketing" className="space-y-6">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <h2 className="text-lg font-semibold">Marketing Assets</h2>
-            {onMarketingClick && (
+            <div className="flex items-center gap-2">
+              {onMarketingClick && (
+                <Button 
+                  variant="outline" 
+                  onClick={onMarketingClick}
+                  data-testid="button-create-graphics"
+                >
+                  <ImageIcon className="h-4 w-4 mr-2" />
+                  Create Graphics
+                </Button>
+              )}
               <Button 
                 variant="outline" 
-                onClick={onMarketingClick}
-                data-testid="button-create-marketing"
+                onClick={() => setFlyerDialogOpen(true)}
+                data-testid="button-create-flyer"
               >
-                <ImageIcon className="h-4 w-4 mr-2" />
-                Create New Graphics
+                <FileImage className="h-4 w-4 mr-2" />
+                Create Flyer
               </Button>
-            )}
+            </div>
           </div>
 
           {assetsLoading ? (
@@ -1529,14 +1509,20 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
                 <h3 className="font-medium mb-2">No Marketing Assets Yet</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Generate social media graphics and other marketing materials for this property.
+                  Create social media graphics or professional print flyers for this property.
                 </p>
-                {onMarketingClick && (
-                  <Button onClick={onMarketingClick} data-testid="button-create-first-asset">
-                    <ImageIcon className="h-4 w-4 mr-2" />
-                    Create Marketing Materials
+                <div className="flex items-center justify-center gap-3">
+                  {onMarketingClick && (
+                    <Button variant="outline" onClick={onMarketingClick} data-testid="button-create-first-graphics">
+                      <ImageIcon className="h-4 w-4 mr-2" />
+                      Create Graphics
+                    </Button>
+                  )}
+                  <Button onClick={() => setFlyerDialogOpen(true)} data-testid="button-create-first-flyer">
+                    <FileImage className="h-4 w-4 mr-2" />
+                    Create Flyer
                   </Button>
-                )}
+                </div>
               </CardContent>
             </Card>
           )}

@@ -1,0 +1,64 @@
+## Consolidate All Marketing to Marketing Tab
+
+Move all marketing creation into the Marketing tab. Remove marketing buttons from header and Overview.
+
+### Changes to make:
+
+**1. Remove "Marketing" button from header**
+- File: `client/src/components/transaction-details.tsx`
+- Remove the "Marketing" button from the header (top right)
+
+**2. Remove "Flyer" button from header**
+- File: `client/src/components/transaction-details.tsx`
+- Remove the "Flyer" button from the header (top right)
+
+**3. Remove "Create Marketing Materials" from Overview tab**
+- File: `client/src/components/transaction-details.tsx`
+- Remove the "Create Marketing Materials" button from the Property Photos card
+
+**4. Marketing tab - Add BOTH creation options**
+- Keep "Create New Graphics" button → opens MarketingMaterialsDialog (social media)
+- ADD "Create Flyer" button → opens CreateFlyerDialog (print flyer)
+- Both buttons should be in the Marketing tab header, side by side
+- Style them consistently (both as outline buttons, or primary/secondary)
+
+**5. Marketing tab - Update empty state**
+- When no assets exist, show both options:
+  - "Create Social Graphics" → opens MarketingMaterialsDialog
+  - "Create Flyer" → opens CreateFlyerDialog
+- Or a single CTA that explains both options are available
+
+### Suggested Marketing Tab Header Layout:
+```
+Marketing Assets                    [Create Graphics] [Create Flyer]
+```
+
+### Result:
+
+| Location | Before | After |
+|----------|--------|-------|
+| Header | Marketing + Flyer buttons | No marketing buttons |
+| Overview | Create Marketing Materials button | No button |
+| Marketing tab header | Create New Graphics only | Create Graphics + Create Flyer |
+| Marketing tab empty state | 1 CTA | 2 CTAs (or updated single CTA) |
+| Templates tab | Preview gallery | No change |
+
+### User Flow After Changes:
+
+- **Want any marketing materials?** → Go to Marketing tab
+  - Social media graphics → "Create Graphics" button
+  - Print flyer (8.5×11) → "Create Flyer" button
+- **Browse template designs?** → Go to Templates tab
+
+### DO NOT change:
+- CreateFlyerDialog component or functionality
+- MarketingMaterialsDialog component or functionality
+- Templates tab
+- Marketing tab asset display/gallery
+- Any API endpoints
+
+### Benefits:
+- Single destination for all marketing creation
+- Cleaner header (no marketing buttons)
+- Clear separation of concerns (Marketing tab = marketing, Overview = property info)
+- Users know exactly where to go for marketing materials
