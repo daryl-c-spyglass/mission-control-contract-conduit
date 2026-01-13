@@ -473,8 +473,10 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentPhoto, setCurrentPhoto] = useState(0);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
-  const statusLabel = getStatusLabel(transaction.status);
   const mlsData = transaction.mlsData as MLSData | null;
+  // Use MLS status as source of truth, fallback to transaction status
+  const displayStatus = mlsData?.status || transaction.status || 'Active';
+  const statusLabel = getStatusLabel(displayStatus);
   const [documentUploadOpen, setDocumentUploadOpen] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<ContractDocument | null>(null);
   
@@ -738,7 +740,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
               <h1 className="text-lg sm:text-2xl font-semibold truncate" data-testid="text-detail-address">
                 {transaction.propertyAddress}
               </h1>
-              <Badge className={`shrink-0 ${getStatusBadgeStyle(transaction.status)}`} data-testid="badge-detail-status">
+              <Badge className={`shrink-0 ${getStatusBadgeStyle(displayStatus)}`} data-testid="badge-detail-status">
                 {statusLabel}
               </Badge>
             </div>

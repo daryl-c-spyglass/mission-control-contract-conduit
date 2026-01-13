@@ -1,0 +1,304 @@
+## Fix Status Badge Inconsistency
+
+The transaction header shows "Active Listing" but the MLS Data section shows "Active Under Contract". These must always be synchronized.
+
+---
+
+## Current Problem
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ ← 13106 New Boston    [Active Listing]    ← Shows "Active"      │
+│   # ACT2572987                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ MLS Listing Data                                                │
+│                                                                 │
+│                           [Active Under Contract] ← Shows       │
+│                           13 days on market        different!   │
+│                           $434,990                              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Issue:** Two different status badges showing different statuses for the same property.
+
+---
+
+## Root Cause
+
+The header badge likely uses `transaction.status` from the database, while the MLS Data section uses `mlsData.status` from Repliers. When MLS status changes (e.g., property goes under contract), the transaction record isn't being updated.
+
+---
+
+## Solution: Single Source of Truth
+
+**The MLS status from Repliers should be the authoritative source.** The header badge should derive its status from the same MLS data.
+
+### Option 1: Always Use MLS Status (Recommended)
+
+```tsx
+// In transaction-details header component
+
+interface TransactionHeaderProps {
+  transaction: any;
+  mlsData: any;  // Pass MLS data to header
+}
+
+function TransactionHeader({ transaction, mlsData }: TransactionHeaderProps) {
+  // Use MLS status as the source of truth, fallback to transaction status
+  const status = mlsData?.status || transaction.status || 'Active';
+  
+  return (
+    <div className="flex items-center gap-3">
+      <h1 className="text-2xl font-bold">{transaction.address}</h1>
+      <StatusBadge status={status} />
+    </div>
+  );
+}
+```
+
+### Option 2: Sync Status on MLS Data Refresh
+
+When MLS data is fetched/refreshed, update the transaction status in the database:
+
+```typescript
+// server/services/mls-sync.ts
+
+async function syncMLSData(transactionId: number, mlsNumber: string) {
+  // Fetch latest from Repliers
+  const mlsData = await fetchFromRepliers(mlsNumber);
+  
+  // Get current transaction
+  const transaction = await storage.getTransaction(transactionId);
+  
+  // Check if status changed
+  if (transaction.status !== mlsData.status) {
+    // Update transaction status to match MLS
+    await storage.updateTransaction(transactionId, {
+      status: mlsData.status,
+    });
+    
+    // Log to timeline
+    await TimelineLogger.statusChanged(
+      transactionId, 
+      transaction.status, 
+      mlsData.status
+    );
+  }
+  
+  // Store MLS data
+  await storage.updateMLSData(transactionId, mlsData);
+  
+  return mlsData;
+}
+```
+
+---
+
+## Status Badge Component (Unified)
+
+Create a single status badge component that handles all MLS statuses:
+
+```tsx
+// components/status-badge.tsx
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+
+interface StatusBadgeProps {
+  status: string;
+  className?: string;
+}
+
+// Status configuration with colors
+const STATUS_CONFIG: Record<string, { label: string; variant: string; className: string }> = {
+  // Active statuses
+  'A': { label: 'Active Listing', variant: 'default', className: 'bg-green-500 hover:bg-green-600' },
+  'Active': { label: 'Active Listing', variant: 'default', className: 'bg-green-500 hover:bg-green-600' },
+  'Active Listing': { label: 'Active Listing', variant: 'default', className: 'bg-green-500 hover:bg-green-600' },
+  
+  // Under Contract statuses
+  'U': { label: 'Under Contract', variant: 'default', className: 'bg-orange-500 hover:bg-orange-600' },
+  'Under Contract': { label: 'Under Contract', variant: 'default', className: 'bg-orange-500 hover:bg-orange-600' },
+  'Active Under Contract': { label: 'Active Under Contract', variant: 'default', className: 'bg-orange-500 hover:bg-orange-600' },
+  'Pending': { label: 'Pending', variant: 'default', className: 'bg-orange-500 hover:bg-orange-600' },
+  
+  // Sold/Closed statuses
+  'S': { label: 'Sold', variant: 'default', className: 'bg-red-500 hover:bg-red-600' },
+  'Sold': { label: 'Sold', variant: 'default', className: 'bg-red-500 hover:bg-red-600' },
+  'Closed': { label: 'Closed', variant: 'default', className: 'bg-red-500 hover:bg-red-600' },
+  
+  // Coming Soon
+  'Coming Soon': { label: 'Coming Soon', variant: 'default', className: 'bg-blue-500 hover:bg-blue-600' },
+  
+  // Withdrawn/Expired/Cancelled
+  'W': { label: 'Withdrawn', variant: 'default', className: 'bg-gray-500 hover:bg-gray-600' },
+  'Withdrawn': { label: 'Withdrawn', variant: 'default', className: 'bg-gray-500 hover:bg-gray-600' },
+  'Expired': { label: 'Expired', variant: 'default', className: 'bg-gray-500 hover:bg-gray-600' },
+  'Cancelled': { label: 'Cancelled', variant: 'default', className: 'bg-gray-500 hover:bg-gray-600' },
+};
+
+export function StatusBadge({ status, className }: StatusBadgeProps) {
+  // Normalize status string
+  const normalizedStatus = status?.trim() || 'Active';
+  
+  // Get config, with fallback
+  const config = STATUS_CONFIG[normalizedStatus] || {
+    label: normalizedStatus,
+    variant: 'default',
+    className: 'bg-gray-500 hover:bg-gray-600',
+  };
+
+  return (
+    <Badge className={cn(config.className, 'text-white', className)}>
+      {config.label}
+    </Badge>
+  );
+}
+```
+
+---
+
+## Implementation
+
+### Step 1: Update Transaction Header
+
+```tsx
+// components/transaction-header.tsx or in transaction-details page
+
+function TransactionHeader({ transaction, mlsData }: Props) {
+  // MLS status takes priority over stored transaction status
+  const displayStatus = mlsData?.status || transaction.status || 'Active';
+
+  return (
+    <div className="flex items-center gap-4">
+      <Button variant="ghost" size="icon" onClick={() => navigate('/transactions')}>
+        <ArrowLeft className="h-5 w-5" />
+      </Button>
+      
+      <div>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold">{transaction.address}</h1>
+          <StatusBadge status={displayStatus} />
+        </div>
+        <p className="text-sm text-muted-foreground"># {transaction.mlsNumber}</p>
+      </div>
+    </div>
+  );
+}
+```
+
+### Step 2: Update MLS Data Section
+
+```tsx
+// In MLS Data tab - use same StatusBadge component
+
+function MLSDataSection({ mlsData }: Props) {
+  return (
+    <div className="flex items-center gap-4">
+      <StatusBadge status={mlsData?.status} />
+      <div>
+        <p className="text-sm text-muted-foreground">
+          {mlsData?.simpleDaysOnMarket || 0} days on market
+        </p>
+        <p className="text-2xl font-bold">
+          ${mlsData?.listPrice?.toLocaleString()}
+        </p>
+      </div>
+    </div>
+  );
+}
+```
+
+### Step 3: Sync on MLS Refresh
+
+```typescript
+// When "Refresh MLS Data" button is clicked or auto-sync runs
+
+async function handleRefreshMLS(transactionId: number, mlsNumber: string) {
+  const mlsData = await fetch(`/api/repliers/listing/${mlsNumber}`).then(r => r.json());
+  
+  // Update transaction status if changed
+  const currentTransaction = await storage.getTransaction(transactionId);
+  
+  if (currentTransaction.status !== mlsData.status) {
+    await storage.updateTransaction(transactionId, {
+      status: mlsData.status,
+      updatedAt: new Date(),
+    });
+    
+    // Invalidate queries to refresh UI
+    queryClient.invalidateQueries(['transaction', transactionId]);
+  }
+  
+  return mlsData;
+}
+```
+
+---
+
+## After Fix
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ ← 13106 New Boston    [Active Under Contract]  ← MATCHES!      │
+│   # ACT2572987                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ MLS Listing Data                                                │
+│                                                                 │
+│                           [Active Under Contract] ← MATCHES!    │
+│                           13 days on market                     │
+│                           $434,990                              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Status Color Guide
+
+| Status | Color | Hex |
+|--------|-------|-----|
+| Active Listing | Green | `#22c55e` |
+| Active Under Contract | Orange | `#f97316` |
+| Pending | Orange | `#f97316` |
+| Under Contract | Orange | `#f97316` |
+| Sold / Closed | Red | `#ef4444` |
+| Coming Soon | Blue | `#3b82f6` |
+| Withdrawn / Expired | Gray | `#6b7280` |
+
+---
+
+## Transaction Cards (Bonus)
+
+Also ensure the transaction list cards show the correct status:
+
+```tsx
+// In transaction card component
+
+function TransactionCard({ transaction }: Props) {
+  // If MLS data is available in the transaction object, use it
+  const status = transaction.mlsStatus || transaction.status || 'Active';
+  
+  return (
+    <Card>
+      <div className="flex items-center justify-between">
+        <h3>{transaction.address}</h3>
+        <StatusBadge status={status} />
+      </div>
+      {/* ... */}
+    </Card>
+  );
+}
+```
+
+---
+
+## Summary
+
+| Location | Source | Fix |
+|----------|--------|-----|
+| Header badge | Was: `transaction.status` | Use: `mlsData.status` |
+| MLS Data section | `mlsData.status` | Keep as-is |
+| Transaction cards | Was: `transaction.status` | Use: `mlsData.status` or sync on refresh |
+
+**Key Principle:** MLS data from Repliers is the source of truth for listing status. The UI should always reflect the current MLS status.
