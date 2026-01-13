@@ -55,12 +55,19 @@ The app follows a Modern Productivity Dashboard approach inspired by Linear, Not
 - **MLS Systems (Repliers API)**: Fetch property data including photos, pricing, and details
 - **Follow Up Boss (FUB)**: CRM integration for client data
 
+### Marketing Tab (Consolidated - January 2026)
+The Marketing tab serves as the single destination for all marketing asset creation:
+- **Create Graphics Button**: Opens MarketingMaterialsDialog for social media graphics (16:9/1:1/alt styles, canvas rendering, saves to Marketing Assets, optional Slack posting)
+- **Create Flyer Button**: Opens CreateFlyerDialog with dual tabs for Social (1:1) and Print (8.5x11) flyers, AI summarization, agent branding, Puppeteer rendering
+- **Asset Gallery**: Displays all previously created marketing assets with download/delete options
+- **Centralized UX**: Removed marketing buttons from header and Overview tab to reduce confusion
+- **Empty State**: Shows both creation options when no assets exist
+
 ### Templates Feature (ReChat-like)
-The Templates tab in transaction details provides marketing template generation:
-- Search by address or MLS number to fetch listing data from Repliers API
+The Templates tab in transaction details provides marketing template preview gallery:
+- Preview-only gallery with visual mockups
 - Template categories: Posts (1:1), Stories (9:16), Flyers, Postcards, Brochures
-- Live previews with property photos, pricing, and description overlays
-- Uses `/api/listings/search` endpoint with `searchByAddress` fallback to MLS lookup
+- No direct download/customize capability (use Marketing tab for creation)
 
 ### Create Property Flyer Dialog (January 2026)
 Enhanced flyer creation dialog with UX improvements for mobile and desktop:
