@@ -76,13 +76,6 @@ async function syncTransactionMLS(transaction: Transaction): Promise<SyncResult>
 
     await storage.updateTransaction(transaction.id, updateData as Partial<InsertTransaction>);
 
-    await storage.createActivity({
-      transactionId: transaction.id,
-      type: "mls_auto_synced",
-      description: `Auto-synced MLS data: ${mlsData.photos?.length || 0} photos, ${cmaData?.length || 0} comparables`,
-      category: "mls",
-    });
-
     result.success = true;
     result.photosCount = mlsData.photos?.length || 0;
     result.comparablesCount = cmaData?.length || 0;
