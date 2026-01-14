@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -1167,7 +1166,6 @@ Thank you for your interest!`;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <TooltipProvider delayDuration={300}>
         <DialogHeader>
           <DialogTitle>{isEditMode ? 'Edit Marketing Graphic' : 'Marketing Materials'}</DialogTitle>
           <DialogDescription>
@@ -1187,60 +1185,35 @@ Thank you for your interest!`;
         <div className="space-y-6">
           {/* Format Selector */}
           <div className="space-y-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Label className="cursor-help">Format</Label>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Select the social media platform size for your graphic</p>
-              </TooltipContent>
-            </Tooltip>
-            <div className="grid grid-cols-3 gap-2">
+            <Label>Format</Label>
+            <div className="flex flex-wrap gap-2">
               {FORMAT_OPTIONS.map((format) => (
-                <Tooltip key={format.id}>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => { setSelectedFormat(format); setGeneratedImage(null); }}
-                      className={`flex flex-col items-center p-3 rounded-lg border-2 transition-colors ${
-                        selectedFormat.id === format.id
-                          ? "border-primary bg-primary/5"
-                          : "border-muted hover:border-primary/50"
-                      }`}
-                      data-testid={`button-format-${format.id}`}
-                    >
-                      <div className={`rounded border-2 border-current mb-2 flex items-center justify-center text-muted-foreground ${
-                        format.ratio === '1:1' ? "w-10 h-10" :
-                        (format.ratio === '16:9' || format.ratio === '1.91:1') ? "w-14 h-8" :
-                        "w-6 h-10"
-                      }`}>
-                        <span className="text-[10px]">
-                          {format.ratio}
-                        </span>
-                      </div>
-                      <span className="text-sm font-medium">{format.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {format.width}×{format.height}
-                      </span>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{format.name} - {format.ratio} aspect ratio</p>
-                  </TooltipContent>
-                </Tooltip>
+                <button
+                  key={format.id}
+                  onClick={() => { setSelectedFormat(format); setGeneratedImage(null); }}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md border transition-colors ${
+                    selectedFormat.id === format.id
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-muted hover:border-primary/50"
+                  }`}
+                  data-testid={`button-format-${format.id}`}
+                >
+                  <div className={`rounded border border-current flex items-center justify-center text-xs ${
+                    format.ratio === '1:1' ? "w-5 h-5" :
+                    (format.ratio === '16:9' || format.ratio === '1.91:1') ? "w-7 h-4" :
+                    "w-4 h-6"
+                  }`}>
+                    <span className="text-[8px]">{format.ratio}</span>
+                  </div>
+                  <span className="text-sm font-medium whitespace-nowrap">{format.name}</span>
+                </button>
               ))}
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Label className="cursor-help">Status Type</Label>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Auto-detected from MLS. Change if needed for marketing purposes.</p>
-                </TooltipContent>
-              </Tooltip>
+              <Label>Status Type</Label>
               <Select value={status} onValueChange={(v) => { setStatus(v as StatusType); setGeneratedImage(null); }}>
                 <SelectTrigger data-testid="select-status-type">
                   <SelectValue />
@@ -1258,28 +1231,21 @@ Thank you for your interest!`;
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Social Media Tagline</Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={generateAIDescription}
-                      disabled={isGeneratingAI || !hasPropertyData()}
-                      className="h-6 px-2 text-xs gap-1"
-                      data-testid="button-ai-generate-description"
-                    >
-                      {isGeneratingAI ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Sparkles className="h-3 w-3" />
-                      )}
-                      AI Suggest
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Generate a catchy tagline using AI based on property features</p>
-                  </TooltipContent>
-                </Tooltip>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={generateAIDescription}
+                  disabled={isGeneratingAI || !hasPropertyData()}
+                  className="h-6 px-2 text-xs gap-1"
+                  data-testid="button-ai-generate-description"
+                >
+                  {isGeneratingAI ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3 w-3" />
+                  )}
+                  AI Suggest
+                </Button>
               </div>
               <Input
                 placeholder="e.g. Stunning 4BR with Chef's Kitchen"
@@ -1298,21 +1264,14 @@ Thank you for your interest!`;
           </div>
 
           <div className="space-y-3">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Label className="cursor-help flex items-center gap-2">
-                  Property Photo
-                  {recommendedIndices.length > 0 && (
-                    <span className="text-xs text-primary">
-                      {recommendedIndices.length} AI pick{recommendedIndices.length > 1 ? 's' : ''}
-                    </span>
-                  )}
-                </Label>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Photos marked with a star are recommended by AI for best engagement</p>
-              </TooltipContent>
-            </Tooltip>
+            <Label className="flex items-center gap-2">
+              Property Photo
+              {recommendedIndices.length > 0 && (
+                <span className="text-xs text-primary">
+                  {recommendedIndices.length} AI pick{recommendedIndices.length > 1 ? 's' : ''}
+                </span>
+              )}
+            </Label>
             
             {/* Main selected photo preview */}
             {currentImage ? (
@@ -1531,7 +1490,6 @@ Thank you for your interest!`;
             </div>
           )}
         </div>
-        </TooltipProvider>
       </DialogContent>
     </Dialog>
   );
