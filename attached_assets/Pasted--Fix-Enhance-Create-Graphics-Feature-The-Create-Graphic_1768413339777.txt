@@ -1,0 +1,632 @@
+# Fix & Enhance Create Graphics Feature
+
+The Create Graphics dialog is functional but missing several key features for parity with Create Flyer and better UX.
+
+---
+
+## Issues to Fix
+
+### 1. Photo Selection UI - Upgrade to Thumbnail Carousel
+
+**Current:** Simple arrow navigation with "Use arrows to browse" text
+**Required:** Thumbnail carousel matching Create Flyer style
+
+Replace the current photo navigation with a horizontal scrollable thumbnail strip:
+
+```tsx
+// Current (REMOVE this pattern)
+<div className="flex items-center gap-2">
+  <Button variant="outline" size="icon" onClick={prevPhoto}>
+    <ChevronLeft />
+  </Button>
+  <span>Use arrows to browse</span>
+  <Button variant="outline" size="icon" onClick={nextPhoto}>
+    <ChevronRight />
+  </Button>
+</div>
+
+// New (ADD this pattern)
+<div className="space-y-3">
+  {/* Main selected photo preview */}
+  <div className="aspect-video bg-muted rounded-lg overflow-hidden">
+    <img 
+      src={photos[selectedPhotoIndex]?.url} 
+      alt="Selected property photo"
+      className="w-full h-full object-cover"
+    />
+  </div>
+  
+  {/* Thumbnail carousel */}
+  <div className="relative">
+    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+      {photos.map((photo, index) => (
+        <button
+          key={photo.id || index}
+          onClick={() => setSelectedPhotoIndex(index)}
+          className={cn(
+            "relative flex-shrink-0 w-16 h-16 rounded-md overflow-hidden border-2 transition-all",
+            selectedPhotoIndex === index 
+              ? "border-primary ring-2 ring-primary/20" 
+              : "border-transparent hover:border-muted-foreground/30"
+          )}
+        >
+          <img 
+            src={photo.url} 
+            alt={`Photo ${index + 1}`}
+            className="w-full h-full object-cover"
+          />
+          {/* AI Recommended badge */}
+          {photo.isRecommended && (
+            <div className="absolute top-0.5 right-0.5 bg-primary rounded-full p-0.5">
+              <Sparkles className="h-2.5 w-2.5 text-primary-foreground" />
+            </div>
+          )}
+        </button>
+      ))}
+    </div>
+  </div>
+  
+  {/* Photo count indicator */}
+  <p className="text-xs text-muted-foreground text-center">
+    Photo {selectedPhotoIndex + 1} of {photos.length}
+    {photos[selectedPhotoIndex]?.isRecommended && (
+      <span className="ml-2 text-primary">★ AI Recommended</span>
+    )}
+  </p>
+</div>
+```
+
+---
+
+### 2. Repliers Image Insights Integration
+
+Add AI-powered photo recommendations using Repliers Image Insights data. The MLS photos from Repliers include metadata we can use to identify best photos.
+
+**Backend: Add photo scoring endpoint or use existing Image Insights**
+
+```typescript
+// server/routes.ts - Add or update photo recommendations endpoint
+
+app.get('/api/transactions/:id/recommended-photos', async (req, res) => {
+  const { id } = req.params;
+  const transaction = await storage.getTransaction(id);
+  
+  if (!transaction?.mlsData?.photos) {
+    return res.json({ photos: [], recommendations: [] });
+  }
+  
+  const photos = transaction.mlsData.photos;
+  
+  // Score photos based on Image Insights or heuristics
+  const scoredPhotos = photos.map((photo, index) => {
+    let score = 0;
+    const reasons = [];
+    
+    // First photo is usually the hero/front exterior
+    if (index === 0) {
+      score += 10;
+      reasons.push('Primary listing photo');
+    }
+    
+    // Check photo description/tags if available from Repliers
+    const description = (photo.description || photo.caption || '').toLowerCase();
+    
+    if (description.includes('front') || description.includes('exterior')) {
+      score += 8;
+      reasons.push('Exterior view');
+    }
+    if (description.includes('kitchen')) {
+      score += 6;
+      reasons.push('Kitchen');
+    }
+    if (description.includes('living') || description.includes('great room')) {
+      score += 5;
+      reasons.push('Living area');
+    }
+    if (description.includes('master') || description.includes('primary')) {
+      score += 4;
+      reasons.push('Primary bedroom');
+    }
+    if (description.includes('pool') || description.includes('backyard')) {
+      score += 5;
+      reasons.push('Outdoor amenity');
+    }
+    
+    // High-res photos score higher
+    if (photo.width && photo.width >= 1200) {
+      score += 2;
+    }
+    
+    return {
+      ...photo,
+      index,
+      score,
+      reasons,
+      isRecommended: score >= 6
+    };
+  });
+  
+  // Sort by score descending, but keep original order available
+  const recommendations = [...scoredPhotos]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+  
+  res.json({
+    photos: scoredPhotos,
+    recommendations: recommendations.map(p => p.index)
+  });
+});
+```
+
+**Frontend: Display recommendations in the dialog**
+
+```tsx
+// In MarketingMaterialsDialog or CreateGraphicsDialog
+
+const [recommendedIndices, setRecommendedIndices] = useState<number[]>([]);
+
+// Fetch recommendations when dialog opens
+useEffect(() => {
+  if (open && transaction?.id) {
+    fetch(`/api/transactions/${transaction.id}/recommended-photos`)
+      .then(res => res.json())
+      .then(data => {
+        setRecommendedIndices(data.recommendations || []);
+      })
+      .catch(console.error);
+  }
+}, [open, transaction?.id]);
+
+// Mark photos as recommended
+const photosWithRecommendations = photos.map((photo, index) => ({
+  ...photo,
+  isRecommended: recommendedIndices.includes(index)
+}));
+
+// Optionally sort recommended first
+const sortedPhotos = [
+  ...photosWithRecommendations.filter(p => p.isRecommended),
+  ...photosWithRecommendations.filter(p => !p.isRecommended)
+];
+```
+
+---
+
+### 3. Status Type Auto-Detection from MLS
+
+The Status Type dropdown should auto-populate based on MLS data instead of defaulting to a static value.
+
+```tsx
+// Add MLS status mapping function
+const getMlsStatusType = (mlsStatus: string): string => {
+  const status = (mlsStatus || '').toLowerCase();
+  
+  if (status.includes('active under contract') || status.includes('pending')) {
+    return 'Under Contract';
+  }
+  if (status.includes('sold') || status.includes('closed')) {
+    return 'Just Sold';
+  }
+  if (status.includes('coming soon')) {
+    return 'Coming Soon';
+  }
+  if (status.includes('active')) {
+    // Check days on market for "Just Listed" vs "For Sale"
+    const dom = transaction?.mlsData?.simpleDaysOnMarket || 0;
+    return dom <= 7 ? 'Just Listed' : 'For Sale';
+  }
+  
+  return 'For Sale'; // Default fallback
+};
+
+// Initialize status from MLS data
+const [statusType, setStatusType] = useState(() => {
+  const mlsStatus = transaction?.mlsData?.standardStatus || 
+                    transaction?.mlsData?.status || 
+                    transaction?.status;
+  return getMlsStatusType(mlsStatus);
+});
+```
+
+**Status Type options should include:**
+```tsx
+const statusOptions = [
+  { value: 'Just Listed', label: 'Just Listed' },
+  { value: 'For Sale', label: 'For Sale' },
+  { value: 'Open House', label: 'Open House' },
+  { value: 'Price Reduced', label: 'Price Reduced' },
+  { value: 'Under Contract', label: 'Under Contract' },
+  { value: 'Just Sold', label: 'Just Sold' },
+  { value: 'Coming Soon', label: 'Coming Soon' },
+];
+```
+
+---
+
+### 4. Add Tooltips to All Interactive Elements
+
+Add tooltips using the Tooltip component from shadcn/ui:
+
+```tsx
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+// Wrap the dialog content in TooltipProvider
+<TooltipProvider delayDuration={300}>
+  <DialogContent>
+    {/* Format selection with tooltips */}
+    <div className="space-y-2">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Label className="cursor-help">Format</Label>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Select the social media platform size for your graphic</p>
+        </TooltipContent>
+      </Tooltip>
+      
+      {/* Format buttons with individual tooltips */}
+      <div className="grid grid-cols-3 gap-2">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant={format === 'instagram-post' ? 'default' : 'outline'}>
+              Instagram Post
+              <span className="text-xs text-muted-foreground">1080×1080</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Square format for Instagram feed posts</p>
+          </TooltipContent>
+        </Tooltip>
+        
+        {/* Repeat for other formats... */}
+      </div>
+    </div>
+    
+    {/* Status Type with tooltip */}
+    <div className="space-y-2">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Label className="cursor-help">Status Type</Label>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Auto-detected from MLS. Change if needed for marketing purposes.</p>
+        </TooltipContent>
+      </Tooltip>
+      <Select value={statusType} onValueChange={setStatusType}>
+        {/* ... */}
+      </Select>
+    </div>
+    
+    {/* AI Suggest button with tooltip */}
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="ghost" size="sm" onClick={generateTagline}>
+          <Sparkles className="h-4 w-4 mr-1" />
+          AI Suggest
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>Generate a catchy tagline using AI based on property features</p>
+      </TooltipContent>
+    </Tooltip>
+    
+    {/* Photo section with tooltip */}
+    <div className="space-y-2">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Label className="cursor-help">
+            Property Photo
+            {recommendedIndices.length > 0 && (
+              <span className="ml-2 text-xs text-primary">
+                ★ {recommendedIndices.length} AI picks
+              </span>
+            )}
+          </Label>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Photos marked with ★ are recommended by AI for best engagement</p>
+        </TooltipContent>
+      </Tooltip>
+    </div>
+  </DialogContent>
+</TooltipProvider>
+```
+
+---
+
+### 5. Quality Parity with Flyer Generator
+
+Ensure Create Graphics uses the same high-quality Puppeteer pipeline as Create Flyer.
+
+**Update the graphics generation endpoint:**
+
+```typescript
+// server/routes.ts - Graphics generation
+
+app.post('/api/generate-graphic', async (req, res) => {
+  const { format, statusType, tagline, photoUrl, propertyData } = req.body;
+  
+  // Format dimensions mapping
+  const dimensions = {
+    'instagram-post': { width: 1080, height: 1080 },
+    'instagram-story': { width: 1080, height: 1920 },
+    'facebook-post': { width: 1200, height: 630 },
+    'x-post': { width: 1200, height: 675 },
+    'tiktok-cover': { width: 1080, height: 1920 },
+  };
+  
+  const { width, height } = dimensions[format] || dimensions['instagram-post'];
+  
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+  
+  const page = await browser.newPage();
+  
+  // KEY: Use 2x deviceScaleFactor for high quality (same as flyer)
+  await page.setViewport({
+    width,
+    height,
+    deviceScaleFactor: 2  // This is critical for quality parity
+  });
+  
+  // Generate HTML template based on format
+  const html = generateGraphicTemplate({
+    format,
+    statusType,
+    tagline,
+    photoUrl,
+    propertyData,
+    width,
+    height
+  });
+  
+  await page.setContent(html, { waitUntil: 'networkidle0' });
+  
+  // Wait for images to load
+  await page.evaluate(async () => {
+    const images = document.querySelectorAll('img');
+    await Promise.all(
+      Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      })
+    );
+  });
+  
+  const imageBuffer = await page.screenshot({
+    type: 'png',
+    fullPage: false
+  });
+  
+  await browser.close();
+  
+  // Return as base64 for preview and download
+  const base64 = imageBuffer.toString('base64');
+  
+  res.json({
+    success: true,
+    image: `data:image/png;base64,${base64}`,
+    width: width * 2,  // Actual output is 2x due to deviceScaleFactor
+    height: height * 2,
+    format
+  });
+});
+
+// Template generator function
+function generateGraphicTemplate({ format, statusType, tagline, photoUrl, propertyData, width, height }) {
+  const isVertical = height > width;
+  const price = propertyData?.listPrice || propertyData?.price;
+  const address = propertyData?.address || propertyData?.streetAddress;
+  
+  // Status badge colors
+  const statusColors = {
+    'Just Listed': { bg: '#22c55e', text: '#ffffff' },
+    'For Sale': { bg: '#f97316', text: '#ffffff' },
+    'Open House': { bg: '#3b82f6', text: '#ffffff' },
+    'Price Reduced': { bg: '#ef4444', text: '#ffffff' },
+    'Under Contract': { bg: '#eab308', text: '#000000' },
+    'Just Sold': { bg: '#a855f7', text: '#ffffff' },
+    'Coming Soon': { bg: '#6366f1', text: '#ffffff' },
+  };
+  
+  const statusColor = statusColors[statusType] || statusColors['For Sale'];
+  
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+          width: ${width}px;
+          height: ${height}px;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+          overflow: hidden;
+        }
+        
+        .container {
+          position: relative;
+          width: 100%;
+          height: 100%;
+        }
+        
+        .background-image {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        
+        .overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(
+            to bottom,
+            rgba(0,0,0,0.3) 0%,
+            rgba(0,0,0,0) 30%,
+            rgba(0,0,0,0) 50%,
+            rgba(0,0,0,0.7) 100%
+          );
+        }
+        
+        .header {
+          position: absolute;
+          top: ${isVertical ? '40px' : '24px'};
+          left: 0;
+          right: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+        }
+        
+        .logo {
+          height: ${isVertical ? '32px' : '24px'};
+          filter: brightness(0) invert(1);
+        }
+        
+        .price {
+          font-size: ${isVertical ? '36px' : '28px'};
+          font-weight: 700;
+          color: white;
+          text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        }
+        
+        .content {
+          position: absolute;
+          bottom: ${isVertical ? '80px' : '40px'};
+          left: 0;
+          right: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 12px;
+          padding: 0 24px;
+        }
+        
+        .status-badge {
+          background: ${statusColor.bg};
+          color: ${statusColor.text};
+          padding: 6px 16px;
+          border-radius: 4px;
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        
+        .address {
+          font-size: ${isVertical ? '24px' : '20px'};
+          font-weight: 600;
+          color: white;
+          text-align: center;
+          text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        }
+        
+        .tagline {
+          font-size: ${isVertical ? '14px' : '12px'};
+          color: rgba(255,255,255,0.9);
+          text-align: center;
+          max-width: 80%;
+          text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+        }
+        
+        .agent-photo {
+          width: ${isVertical ? '48px' : '36px'};
+          height: ${isVertical ? '48px' : '36px'};
+          border-radius: 50%;
+          border: 2px solid white;
+          object-fit: cover;
+          margin-top: 8px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <img class="background-image" src="${photoUrl}" alt="Property" />
+        <div class="overlay"></div>
+        
+        <div class="header">
+          <img class="logo" src="https://spyglassrealty.com/logo-white.png" alt="Spyglass Realty" />
+          <div class="price">${formatPrice(price)}</div>
+        </div>
+        
+        <div class="content">
+          <div class="status-badge">${statusType}</div>
+          <div class="address">${address}</div>
+          ${tagline ? `<div class="tagline">${tagline}</div>` : ''}
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+function formatPrice(price) {
+  if (!price) return '';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
+  }).format(price);
+}
+```
+
+---
+
+## Summary of Changes
+
+| Component | Change |
+|-----------|--------|
+| **Photo UI** | Replace arrow nav with thumbnail carousel |
+| **Photo Recommendations** | Add AI-powered photo scoring from Repliers data |
+| **Status Auto-detect** | Initialize from MLS status, not hardcoded default |
+| **Tooltips** | Add to all labels, buttons, and interactive elements |
+| **Quality** | Use Puppeteer with 2x deviceScaleFactor |
+| **Template** | Unified template function with proper formatting |
+
+---
+
+## Files to Modify
+
+1. `client/src/components/marketing-materials-dialog.tsx` (or `create-graphics-dialog.tsx`)
+   - Photo thumbnail carousel
+   - Tooltips on all elements
+   - Status auto-detection
+   - Fetch photo recommendations
+
+2. `server/routes.ts`
+   - Add `/api/transactions/:id/recommended-photos` endpoint
+   - Update `/api/generate-graphic` with 2x quality
+
+3. `client/src/components/ui/tooltip.tsx` (if not already installed)
+   - Ensure Tooltip component is available
+
+---
+
+## Testing Checklist
+
+- [ ] Photo carousel shows thumbnails that are clickable
+- [ ] AI-recommended photos show star badge
+- [ ] Status auto-populates based on MLS data
+- [ ] All labels show tooltips on hover
+- [ ] Generated graphics are high quality (2x resolution)
+- [ ] All 5 formats generate correctly (Instagram Post, Story, Facebook, X, TikTok)
+- [ ] Download works for all formats
+- [ ] Assets save to Marketing gallery after generation
