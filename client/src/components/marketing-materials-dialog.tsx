@@ -10,10 +10,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Download, Image as ImageIcon, FileText, Mail, ChevronLeft, ChevronRight, Loader2, Copy, Check, Upload, MessageSquare, Sparkles } from "lucide-react";
+import { Download, Image as ImageIcon, FileText, Mail, Loader2, Copy, Check, Upload, MessageSquare, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Transaction } from "@shared/schema";
 import spyglassLogoWhite from "@assets/White-Orange_(1)_1767129299733.png";
 import spyglassLogoBlack from "@assets/Large_Logo_1767129431992.jpeg";
@@ -87,6 +89,7 @@ export function MarketingMaterialsDialog({
   const [socialDescription, setSocialDescription] = useState("");
   const [postToSlack, setPostToSlack] = useState(true);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [recommendedIndices, setRecommendedIndices] = useState<number[]>([]);
 
   const saveAssetMutation = useMutation({
     mutationFn: async ({ type, imageData, fileName, config }: { type: string; imageData: string; fileName: string; config?: SocialGraphicConfig }) => {
@@ -185,6 +188,7 @@ export function MarketingMaterialsDialog({
       if (mlsData?.status) {
         const mlsStatus = mlsData.status.toLowerCase();
         let detectedStatus: StatusType = 'just_listed';
+        
         if (mlsStatus.includes('contract') || mlsStatus.includes('pending')) {
           detectedStatus = 'under_contract';
         } else if (mlsStatus.includes('sold') || mlsStatus.includes('closed')) {
@@ -193,11 +197,39 @@ export function MarketingMaterialsDialog({
           detectedStatus = 'for_lease';
         } else if (mlsStatus.includes('coming')) {
           detectedStatus = 'coming_soon';
+        } else if (mlsStatus.includes('active')) {
+          // Check days on market for "Just Listed" vs "For Sale"
+          const dom = mlsData?.simpleDaysOnMarket || mlsData?.daysOnMarket || 0;
+          detectedStatus = dom <= 7 ? 'just_listed' : 'for_sale';
         }
         setStatus(detectedStatus);
       }
     }
   }, [open, isEditMode, transaction.mlsData]);
+  
+  // Fetch photo recommendations when dialog opens
+  // Note: recommendations are indices into the MLS/property images array (not including uploaded photos)
+  // We need to offset them by the number of uploaded photos since uploaded photos are prepended
+  useEffect(() => {
+    if (open && transaction?.id) {
+      fetch(`/api/transactions/${transaction.id}/recommended-photos`)
+        .then(res => res.json())
+        .then(data => {
+          // Offset the server-returned indices by the number of uploaded photos
+          // since allImages = [...uploadedPhotos, ...propertyImages, ...mlsImages]
+          const serverRecommendations = data.recommendations || [];
+          const offsetRecommendations = serverRecommendations.map((idx: number) => idx + uploadedPhotos.length);
+          setRecommendedIndices(offsetRecommendations);
+        })
+        .catch(() => {
+          // Fallback: first MLS photo is recommended (after any uploads)
+          const firstMlsIndex = uploadedPhotos.length;
+          if (allImages.length > firstMlsIndex) {
+            setRecommendedIndices([firstMlsIndex]);
+          }
+        });
+    }
+  }, [open, transaction?.id, uploadedPhotos.length]);
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -1135,6 +1167,7 @@ Thank you for your interest!`;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <TooltipProvider delayDuration={300}>
         <DialogHeader>
           <DialogTitle>{isEditMode ? 'Edit Marketing Graphic' : 'Marketing Materials'}</DialogTitle>
           <DialogDescription>
@@ -1151,44 +1184,63 @@ Thank you for your interest!`;
             </p>
           </div>
         )}
-
         <div className="space-y-6">
           {/* Format Selector */}
           <div className="space-y-2">
-            <Label>Format</Label>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Label className="cursor-help">Format</Label>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Select the social media platform size for your graphic</p>
+              </TooltipContent>
+            </Tooltip>
             <div className="grid grid-cols-3 gap-2">
               {FORMAT_OPTIONS.map((format) => (
-                <button
-                  key={format.id}
-                  onClick={() => { setSelectedFormat(format); setGeneratedImage(null); }}
-                  className={`flex flex-col items-center p-3 rounded-lg border-2 transition-colors ${
-                    selectedFormat.id === format.id
-                      ? "border-primary bg-primary/5"
-                      : "border-muted hover:border-primary/50"
-                  }`}
-                  data-testid={`button-format-${format.id}`}
-                >
-                  <div className={`rounded border-2 border-current mb-2 flex items-center justify-center text-muted-foreground ${
-                    format.ratio === '1:1' ? "w-10 h-10" :
-                    (format.ratio === '16:9' || format.ratio === '1.91:1') ? "w-14 h-8" :
-                    "w-6 h-10"
-                  }`}>
-                    <span className="text-[10px]">
-                      {format.ratio}
-                    </span>
-                  </div>
-                  <span className="text-sm font-medium">{format.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {format.width}×{format.height}
-                  </span>
-                </button>
+                <Tooltip key={format.id}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => { setSelectedFormat(format); setGeneratedImage(null); }}
+                      className={`flex flex-col items-center p-3 rounded-lg border-2 transition-colors ${
+                        selectedFormat.id === format.id
+                          ? "border-primary bg-primary/5"
+                          : "border-muted hover:border-primary/50"
+                      }`}
+                      data-testid={`button-format-${format.id}`}
+                    >
+                      <div className={`rounded border-2 border-current mb-2 flex items-center justify-center text-muted-foreground ${
+                        format.ratio === '1:1' ? "w-10 h-10" :
+                        (format.ratio === '16:9' || format.ratio === '1.91:1') ? "w-14 h-8" :
+                        "w-6 h-10"
+                      }`}>
+                        <span className="text-[10px]">
+                          {format.ratio}
+                        </span>
+                      </div>
+                      <span className="text-sm font-medium">{format.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {format.width}×{format.height}
+                      </span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{format.name} - {format.ratio} aspect ratio</p>
+                  </TooltipContent>
+                </Tooltip>
               ))}
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Status Type</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Label className="cursor-help">Status Type</Label>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Auto-detected from MLS. Change if needed for marketing purposes.</p>
+                </TooltipContent>
+              </Tooltip>
               <Select value={status} onValueChange={(v) => { setStatus(v as StatusType); setGeneratedImage(null); }}>
                 <SelectTrigger data-testid="select-status-type">
                   <SelectValue />
@@ -1206,21 +1258,28 @@ Thank you for your interest!`;
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Social Media Tagline</Label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={generateAIDescription}
-                  disabled={isGeneratingAI || !hasPropertyData()}
-                  className="h-6 px-2 text-xs gap-1"
-                  data-testid="button-ai-generate-description"
-                >
-                  {isGeneratingAI ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-3 w-3" />
-                  )}
-                  AI Suggest
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={generateAIDescription}
+                      disabled={isGeneratingAI || !hasPropertyData()}
+                      className="h-6 px-2 text-xs gap-1"
+                      data-testid="button-ai-generate-description"
+                    >
+                      {isGeneratingAI ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3 w-3" />
+                      )}
+                      AI Suggest
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Generate a catchy tagline using AI based on property features</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
               <Input
                 placeholder="e.g. Stunning 4BR with Chef's Kitchen"
@@ -1238,73 +1297,123 @@ Thank you for your interest!`;
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Property Photo ({allImages.length > 0 ? `${selectedPhotoIndex + 1} of ${allImages.length}` : "None"})</Label>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={prevImage}
-                  disabled={allImages.length <= 1}
-                  data-testid="button-prev-photo"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <div className="flex-1 text-center text-sm text-muted-foreground truncate">
-                  {allImages.length === 0 ? "Upload a photo" : "Use arrows to browse"}
+          <div className="space-y-3">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Label className="cursor-help flex items-center gap-2">
+                  Property Photo
+                  {recommendedIndices.length > 0 && (
+                    <span className="text-xs text-primary">
+                      {recommendedIndices.length} AI pick{recommendedIndices.length > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </Label>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Photos marked with a star are recommended by AI for best engagement</p>
+              </TooltipContent>
+            </Tooltip>
+            
+            {/* Main selected photo preview */}
+            {currentImage ? (
+              <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
+                <img
+                  src={getProxiedUrl(currentImage)}
+                  alt="Selected property photo"
+                  className="w-full h-full object-cover"
+                  data-testid="img-selected-photo"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "";
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
+                  <div className="text-white">
+                    <p className="font-bold text-lg">{getStatusLabel(status)}</p>
+                    <p className="text-sm">{transaction.propertyAddress}</p>
+                  </div>
                 </div>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={nextImage}
-                  disabled={allImages.length <= 1}
-                  data-testid="button-next-photo"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
               </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handlePhotoUpload}
-                data-testid="input-photo-upload"
-              />
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => fileInputRef.current?.click()}
-                data-testid="button-upload-photo"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Upload Photo
-              </Button>
-            </div>
+            ) : (
+              <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
+                <p className="text-muted-foreground text-sm">No photos available. Upload one below.</p>
+              </div>
+            )}
+            
+            {/* Thumbnail carousel */}
+            {allImages.length > 0 && (
+              <div className="relative">
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                  {allImages.map((photo, index) => {
+                    const isRecommended = recommendedIndices.includes(index);
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          setSelectedPhotoIndex(index);
+                          setGeneratedImage(null);
+                        }}
+                        className={cn(
+                          "relative flex-shrink-0 w-16 h-16 rounded-md overflow-hidden border-2 transition-all",
+                          selectedPhotoIndex === index 
+                            ? "border-primary ring-2 ring-primary/20" 
+                            : "border-transparent hover:border-muted-foreground/30"
+                        )}
+                        data-testid={`button-photo-thumbnail-${index}`}
+                      >
+                        <img 
+                          src={getProxiedUrl(photo)} 
+                          alt={`Photo ${index + 1}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                        {isRecommended && (
+                          <div className="absolute top-0.5 right-0.5 bg-primary rounded-full p-0.5">
+                            <Sparkles className="h-2.5 w-2.5 text-primary-foreground" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            {/* Photo count indicator */}
+            <p className="text-xs text-muted-foreground text-center">
+              {allImages.length > 0 ? (
+                <>
+                  Photo {selectedPhotoIndex + 1} of {allImages.length}
+                  {recommendedIndices.includes(selectedPhotoIndex) && (
+                    <span className="ml-2 text-primary">AI Recommended</span>
+                  )}
+                </>
+              ) : (
+                "No photos"
+              )}
+            </p>
+            
+            {/* Upload button */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoUpload}
+              data-testid="input-photo-upload"
+            />
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => fileInputRef.current?.click()}
+              data-testid="button-upload-photo"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Photo
+            </Button>
           </div>
-
-          {currentImage && (
-            <div className="relative aspect-video bg-muted rounded-md overflow-hidden">
-              <img
-                src={getProxiedUrl(currentImage)}
-                alt="Selected property photo"
-                className="w-full h-full object-cover"
-                data-testid="img-selected-photo"
-                onError={(e) => {
-                  // Fallback to placeholder if proxy fails
-                  (e.target as HTMLImageElement).src = "";
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
-              />
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-                <div className="text-white">
-                  <p className="font-bold text-lg">{getStatusLabel(status)}</p>
-                  <p className="text-sm">{transaction.propertyAddress}</p>
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="flex items-center gap-3 p-3 rounded-md bg-muted/30 border">
             <Checkbox
@@ -1422,6 +1531,7 @@ Thank you for your interest!`;
             </div>
           )}
         </div>
+        </TooltipProvider>
       </DialogContent>
     </Dialog>
   );

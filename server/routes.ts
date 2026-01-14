@@ -693,6 +693,104 @@ export async function registerRoutes(
   });
 
   // ============ Marketing Assets ============
+  
+  // Photo recommendations endpoint for Create Graphics dialog
+  app.get("/api/transactions/:id/recommended-photos", isAuthenticated, async (req, res) => {
+    try {
+      const transaction = await storage.getTransaction(req.params.id);
+      
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      const mlsData = transaction.mlsData as any;
+      const photos = mlsData?.images || transaction.propertyImages || [];
+      
+      if (!photos.length) {
+        return res.json({ photos: [], recommendations: [] });
+      }
+      
+      // Score photos based on position and metadata/filename heuristics
+      const scoredPhotos = photos.map((photo: string | object, index: number) => {
+        let score = 0;
+        const reasons: string[] = [];
+        const url = typeof photo === 'string' ? photo : (photo as any).url || '';
+        const urlLower = url.toLowerCase();
+        const description = (typeof photo === 'object' ? (photo as any).description || (photo as any).caption || '' : '').toLowerCase();
+        
+        // First photo is usually the hero/front exterior - highest priority
+        if (index === 0) {
+          score += 15;
+          reasons.push('Primary listing photo');
+        }
+        
+        // Check photo description/tags if available
+        if (description.includes('front') || description.includes('exterior')) {
+          score += 8;
+          reasons.push('Exterior view');
+        }
+        if (description.includes('kitchen')) {
+          score += 6;
+          reasons.push('Kitchen');
+        }
+        if (description.includes('living') || description.includes('great room')) {
+          score += 5;
+          reasons.push('Living area');
+        }
+        if (description.includes('master') || description.includes('primary')) {
+          score += 4;
+          reasons.push('Primary bedroom');
+        }
+        if (description.includes('pool') || description.includes('backyard')) {
+          score += 5;
+          reasons.push('Outdoor amenity');
+        }
+        
+        // Fallback: check URL/filename for hints when no description available
+        if (!description) {
+          if (urlLower.includes('front') || urlLower.includes('exterior') || urlLower.includes('_01') || urlLower.includes('-01')) {
+            score += 6;
+            reasons.push('Likely exterior (filename hint)');
+          }
+          if (urlLower.includes('kitchen')) {
+            score += 4;
+            reasons.push('Kitchen (filename hint)');
+          }
+          if (urlLower.includes('living') || urlLower.includes('family')) {
+            score += 3;
+            reasons.push('Living area (filename hint)');
+          }
+        }
+        
+        // Top 5 photos get a bonus (they're usually curated by listing agent)
+        if (index < 5) {
+          score += (5 - index);
+        }
+        
+        return {
+          url,
+          index,
+          score,
+          reasons,
+          isRecommended: score >= 6
+        };
+      });
+      
+      // Get top 5 recommendations sorted by score
+      const recommendations = [...scoredPhotos]
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5)
+        .map(p => p.index);
+      
+      res.json({
+        photos: scoredPhotos,
+        recommendations
+      });
+    } catch (error) {
+      console.error("Error getting recommended photos:", error);
+      res.status(500).json({ message: "Failed to get photo recommendations" });
+    }
+  });
 
   app.get("/api/transactions/:id/marketing-assets", isAuthenticated, async (req, res) => {
     try {
