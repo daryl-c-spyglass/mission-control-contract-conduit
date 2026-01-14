@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getStatusBadgeStyle, getStatusLabel, getStatusColor } from "@/lib/utils/status-colors";
@@ -241,33 +242,48 @@ export function CMATab({ transaction }: CMATabProps) {
         
         <div className="flex items-center gap-2">
           <div className="flex items-center border rounded-md">
-            <Button
-              variant={viewMode === 'stats' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="rounded-r-none"
-              onClick={() => setViewMode('stats')}
-              data-testid="button-view-stats"
-            >
-              <BarChart3 className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="rounded-none border-l"
-              onClick={() => setViewMode('grid')}
-              data-testid="button-view-grid"
-            >
-              <Grid3X3 className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'map' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="rounded-l-none border-l"
-              onClick={() => setViewMode('map')}
-              data-testid="button-view-map"
-            >
-              <Map className="h-4 w-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={viewMode === 'stats' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="rounded-r-none"
+                  onClick={() => setViewMode('stats')}
+                  data-testid="button-view-stats"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Statistics View</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="rounded-none border-l"
+                  onClick={() => setViewMode('grid')}
+                  data-testid="button-view-grid"
+                >
+                  <Grid3X3 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Grid View</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={viewMode === 'map' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="rounded-l-none border-l"
+                  onClick={() => setViewMode('map')}
+                  data-testid="button-view-map"
+                >
+                  <Map className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Map View</TooltipContent>
+            </Tooltip>
           </div>
           
           <Button

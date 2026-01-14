@@ -165,177 +165,185 @@ function initCmaLayers(
   tuning: OverlayTuning,
   showPolygon: boolean = true
 ) {
-  removeAllCmaLayers(map);
+  try {
+    removeAllCmaLayers(map);
 
-  map.addSource(SOURCE_IDS.polygon, {
-    type: 'geojson',
-    data: model.polygonCollection || EMPTY_FEATURE_COLLECTION,
-  });
+    const hasComps = model.compsOnlyCollection && model.compsOnlyCollection.features.length > 0;
+    const hasSubject = model.subjectFeature !== null;
+    const hasPolygon = model.polygonCollection && model.polygonCollection.features.length > 0;
 
-  map.addSource(SOURCE_IDS.comps, {
-    type: 'geojson',
-    data: model.compsOnlyCollection || EMPTY_FEATURE_COLLECTION,
-    cluster: true,
-    clusterMaxZoom: 14,
-    clusterRadius: 50,
-    promoteId: 'id',
-  });
+    map.addSource(SOURCE_IDS.polygon, {
+      type: 'geojson',
+      data: hasPolygon ? model.polygonCollection : EMPTY_FEATURE_COLLECTION,
+    });
 
-  const subjectCollection: GeoJSON.FeatureCollection = {
-    type: 'FeatureCollection',
-    features: model.subjectFeature ? [model.subjectFeature] : [],
-  };
+    map.addSource(SOURCE_IDS.comps, {
+      type: 'geojson',
+      data: hasComps ? model.compsOnlyCollection : EMPTY_FEATURE_COLLECTION,
+      cluster: true,
+      clusterMaxZoom: 14,
+      clusterRadius: 50,
+      promoteId: 'id',
+    });
 
-  map.addSource(SOURCE_IDS.subject, {
-    type: 'geojson',
-    data: subjectCollection,
-  });
+    const subjectCollection: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: hasSubject ? [model.subjectFeature!] : [],
+    };
 
-  map.addLayer({
-    id: LAYER_IDS.polygonFill,
-    type: 'fill',
-    source: SOURCE_IDS.polygon,
-    layout: {
-      visibility: showPolygon ? 'visible' : 'none',
-    },
-    paint: {
-      'fill-color': tuning.polygonFillColor,
-      'fill-opacity': tuning.polygonFillOpacity,
-    },
-  });
+    map.addSource(SOURCE_IDS.subject, {
+      type: 'geojson',
+      data: subjectCollection,
+    });
 
-  map.addLayer({
-    id: LAYER_IDS.polygonLine,
-    type: 'line',
-    source: SOURCE_IDS.polygon,
-    layout: {
-      visibility: showPolygon ? 'visible' : 'none',
-    },
-    paint: {
-      'line-color': tuning.polygonLineColor,
-      'line-width': tuning.polygonLineWidth,
-      'line-opacity': tuning.polygonLineOpacity,
-    },
-  });
+    map.addLayer({
+      id: LAYER_IDS.polygonFill,
+      type: 'fill',
+      source: SOURCE_IDS.polygon,
+      layout: {
+        visibility: showPolygon ? 'visible' : 'none',
+      },
+      paint: {
+        'fill-color': tuning.polygonFillColor,
+        'fill-opacity': tuning.polygonFillOpacity,
+      },
+    });
 
-  map.addLayer({
-    id: LAYER_IDS.clusterCircle,
-    type: 'circle',
-    source: SOURCE_IDS.comps,
-    filter: ['has', 'point_count'],
-    paint: {
-      'circle-color': '#6366f1',
-      'circle-radius': ['step', ['get', 'point_count'], 20, 10, 30, 50, 40],
-      'circle-stroke-width': tuning.compStrokeWidth,
-      'circle-stroke-color': '#ffffff',
-    },
-  });
+    map.addLayer({
+      id: LAYER_IDS.polygonLine,
+      type: 'line',
+      source: SOURCE_IDS.polygon,
+      layout: {
+        visibility: showPolygon ? 'visible' : 'none',
+      },
+      paint: {
+        'line-color': tuning.polygonLineColor,
+        'line-width': tuning.polygonLineWidth,
+        'line-opacity': tuning.polygonLineOpacity,
+      },
+    });
 
-  map.addLayer({
-    id: LAYER_IDS.clusterCount,
-    type: 'symbol',
-    source: SOURCE_IDS.comps,
-    filter: ['has', 'point_count'],
-    layout: {
-      'text-field': '{point_count_abbreviated}',
-      'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
-      'text-size': 14,
-    },
-    paint: {
-      'text-color': '#ffffff',
-    },
-  });
+    map.addLayer({
+      id: LAYER_IDS.clusterCircle,
+      type: 'circle',
+      source: SOURCE_IDS.comps,
+      filter: ['has', 'point_count'],
+      paint: {
+        'circle-color': '#6366f1',
+        'circle-radius': ['step', ['get', 'point_count'], 20, 10, 30, 50, 40],
+        'circle-stroke-width': tuning.compStrokeWidth,
+        'circle-stroke-color': '#ffffff',
+      },
+    });
 
-  map.addLayer({
-    id: LAYER_IDS.compPoints,
-    type: 'circle',
-    source: SOURCE_IDS.comps,
-    filter: ['!', ['has', 'point_count']],
-    paint: {
-      'circle-radius': [
-        'case',
-        ['boolean', ['feature-state', 'hover'], false],
-        10,
-        8,
-      ],
-      'circle-color': [
-        'match',
-        ['get', 'status'],
-        'ACTIVE', STATUS_COLORS.ACTIVE,
-        'PENDING', STATUS_COLORS.PENDING,
-        'SOLD', STATUS_COLORS.SOLD,
-        STATUS_COLORS.UNKNOWN,
-      ],
-      'circle-stroke-width': [
-        'case',
-        ['boolean', ['feature-state', 'hover'], false],
-        tuning.compHoverStrokeWidth,
-        ['boolean', ['feature-state', 'selected'], false],
-        tuning.compHoverStrokeWidth,
-        tuning.compStrokeWidth,
-      ],
-      'circle-stroke-color': '#ffffff',
-      'circle-opacity': [
-        'case',
-        ['boolean', ['feature-state', 'hover'], false],
-        1,
-        0.9,
-      ],
-    },
-  });
+    map.addLayer({
+      id: LAYER_IDS.clusterCount,
+      type: 'symbol',
+      source: SOURCE_IDS.comps,
+      filter: ['has', 'point_count'],
+      layout: {
+        'text-field': '{point_count_abbreviated}',
+        'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
+        'text-size': 14,
+      },
+      paint: {
+        'text-color': '#ffffff',
+      },
+    });
 
-  map.addLayer({
-    id: LAYER_IDS.compLabels,
-    type: 'symbol',
-    source: SOURCE_IDS.comps,
-    filter: ['!', ['has', 'point_count']],
-    layout: {
-      'text-field': ['get', 'priceFormatted'],
-      'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
-      'text-size': 11,
-      'text-offset': [0, -1.8],
-      'text-anchor': 'bottom',
-      'text-allow-overlap': false,
-      'text-ignore-placement': false,
-    },
-    paint: {
-      'text-color': tuning.labelTextColor,
-      'text-halo-color': tuning.labelHaloColor,
-      'text-halo-width': tuning.labelHaloWidth,
-    },
-  });
+    map.addLayer({
+      id: LAYER_IDS.compPoints,
+      type: 'circle',
+      source: SOURCE_IDS.comps,
+      filter: ['!', ['has', 'point_count']],
+      paint: {
+        'circle-radius': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          10,
+          8,
+        ],
+        'circle-color': [
+          'match',
+          ['get', 'status'],
+          'ACTIVE', STATUS_COLORS.ACTIVE,
+          'PENDING', STATUS_COLORS.PENDING,
+          'SOLD', STATUS_COLORS.SOLD,
+          STATUS_COLORS.UNKNOWN,
+        ],
+        'circle-stroke-width': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          tuning.compHoverStrokeWidth,
+          ['boolean', ['feature-state', 'selected'], false],
+          tuning.compHoverStrokeWidth,
+          tuning.compStrokeWidth,
+        ],
+        'circle-stroke-color': '#ffffff',
+        'circle-opacity': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          1,
+          0.9,
+        ],
+      },
+    });
 
-  map.addLayer({
-    id: LAYER_IDS.subjectPoint,
-    type: 'circle',
-    source: SOURCE_IDS.subject,
-    paint: {
-      'circle-radius': 12,
-      'circle-color': SUBJECT_COLOR,
-      'circle-stroke-width': tuning.compStrokeWidth + 1,
-      'circle-stroke-color': '#ffffff',
-    },
-  });
+    map.addLayer({
+      id: LAYER_IDS.compLabels,
+      type: 'symbol',
+      source: SOURCE_IDS.comps,
+      filter: ['!', ['has', 'point_count']],
+      layout: {
+        'text-field': ['get', 'priceFormatted'],
+        'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
+        'text-size': 11,
+        'text-offset': [0, -1.8],
+        'text-anchor': 'bottom',
+        'text-allow-overlap': false,
+        'text-ignore-placement': false,
+      },
+      paint: {
+        'text-color': tuning.labelTextColor,
+        'text-halo-color': tuning.labelHaloColor,
+        'text-halo-width': tuning.labelHaloWidth,
+      },
+    });
 
-  map.addLayer({
-    id: LAYER_IDS.subjectLabel,
-    type: 'symbol',
-    source: SOURCE_IDS.subject,
-    layout: {
-      'text-field': ['concat', 'SUBJECT\n', ['get', 'priceFormatted']],
-      'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
-      'text-size': 12,
-      'text-offset': [0, -2.2],
-      'text-anchor': 'bottom',
-      'text-allow-overlap': true,
-      'text-ignore-placement': true,
-    },
-    paint: {
-      'text-color': tuning.subjectLabelTextColor,
-      'text-halo-color': tuning.subjectLabelHaloColor,
-      'text-halo-width': tuning.subjectLabelHaloWidth,
-    },
-  });
+    map.addLayer({
+      id: LAYER_IDS.subjectPoint,
+      type: 'circle',
+      source: SOURCE_IDS.subject,
+      paint: {
+        'circle-radius': 12,
+        'circle-color': SUBJECT_COLOR,
+        'circle-stroke-width': tuning.compStrokeWidth + 1,
+        'circle-stroke-color': '#ffffff',
+      },
+    });
+
+    map.addLayer({
+      id: LAYER_IDS.subjectLabel,
+      type: 'symbol',
+      source: SOURCE_IDS.subject,
+      layout: {
+        'text-field': ['concat', 'SUBJECT\n', ['get', 'priceFormatted']],
+        'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+        'text-size': 12,
+        'text-offset': [0, -2.2],
+        'text-anchor': 'bottom',
+        'text-allow-overlap': true,
+        'text-ignore-placement': true,
+      },
+      paint: {
+        'text-color': tuning.subjectLabelTextColor,
+        'text-halo-color': tuning.subjectLabelHaloColor,
+        'text-halo-width': tuning.subjectLabelHaloWidth,
+      },
+    });
+  } catch (err) {
+    console.warn('[CMA Map] Error initializing layers:', err);
+  }
 }
 
 function removeAllCmaLayers(map: mapboxgl.Map) {
