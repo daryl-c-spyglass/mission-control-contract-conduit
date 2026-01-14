@@ -1,0 +1,126 @@
+n the CMA tab, the map currently only renders the SUBJECT marker even though “10 comparables found”. Fix the CMA map so it always renders:
+
+Markers
+
+Always plot the SUBJECT marker.
+
+Always plot ALL comparables (e.g., 10 comps) as separate markers.
+
+Color code markers by type/status:
+
+Subject: blue
+
+Active comp: green
+
+Pending comp: orange
+
+Sold comp: red
+
+If status is unknown: gray
+
+Ensure coordinates are handled consistently as [lng, lat] (Mapbox format). Add guards for missing lat/lng and skip only those points (don’t break the whole render).
+
+Auto polygon drawing
+
+Automatically generate a polygon (“search area”) from the SUBJECT + all comparables.
+
+Use a stable algorithm that does not require external paid APIs:
+
+Preferred: convex hull of all points, then optionally buffer slightly (small padding) so points aren’t on the edge.
+
+Represent as GeoJSON Polygon.
+
+Render polygon as:
+
+Fill layer with low opacity
+
+Stroke/outline layer with visible border
+
+Polygon should update whenever subject or comparables change.
+
+Controls (must work)
+
+“Center on Subject” button:
+
+map.flyTo({ center: [subjectLng, subjectLat], zoom: <reasonableZoom> })
+
+“Fit all” button:
+
+Build LngLatBounds from SUBJECT + every comparable
+
+map.fitBounds(bounds, { padding: <reasonablePadding>, duration: <ms> })
+
+If these handlers exist but don’t work, fix lifecycle:
+
+Attach handlers only after map is initialized
+
+Ensure map.on('load') is used before adding sources/layers
+
+Ensure handlers read latest state (subject + comps) at click time.
+
+Data wiring (root cause)
+
+Investigate why comparables aren’t currently plotted:
+
+Confirm we receive a comparables array in CMA data
+
+Confirm each comparable has lat/lng
+
+Fix mapping from API response schema → point model
+
+Add temporary console logs (behind a debug flag) that print:
+
+subject coords
+
+count of comparables received
+
+count of comparables with valid coords
+
+bounds coordinates used by fitBounds
+
+Single source of truth (prevents future regressions)
+
+Create a single function used by CMA map rendering: buildCmaMapModel(subject, comparables)
+
+Returns:
+
+points[] = [{type:'subject'|'comp', status, lng, lat, id}]
+
+bounds = LngLatBounds covering all points
+
+polygonGeoJson = hull polygon from all points
+
+Both:
+
+initial render
+
+rerender after data changes
+
+and the UI controls (fit/center)
+must use this same model, not separate duplicated logic.
+
+Acceptance tests (manual)
+
+When comparables = 10, map shows 11 markers total (1 subject + 10 comps).
+
+Clicking “Fit all” shows all markers in view with padding.
+
+Clicking “Center on subject” centers on subject reliably.
+
+Polygon always appears and encloses subject + comps.
+
+No marker/polygon overlaps or disappears after rerender.
+
+Implementation notes:
+
+Keep this within our current stack (Mapbox GL JS).
+
+Avoid adding heavy dependencies; implement convex hull directly or use a lightweight utility already in repo.
+
+Make sure layers/sources are updated (setData) rather than duplicated on every render.
+
+Deliverable:
+
+Commit-ready change that fixes CMA tab map rendering and controls.
+
+Include brief notes in code comments explaining the [lng,lat] requirement and the model function usage.
