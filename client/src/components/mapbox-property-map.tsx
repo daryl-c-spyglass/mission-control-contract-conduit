@@ -37,13 +37,13 @@ function setStoredStylePreference(pref: MapStylePreference) {
   } catch {}
 }
 
-function resolveMapStyle(preference: MapStylePreference): string {
-  switch (preference) {
-    case 'satellite': return MAP_STYLES.SATELLITE;
-    case 'dark': return MAP_STYLES.DARK;
-    case 'streets':
-    default: return MAP_STYLES.STREETS;
-  }
+function resolveMapStyle(preference: MapStylePreference, isDark: boolean): string {
+  // If user explicitly chose satellite, always use it
+  if (preference === 'satellite') return MAP_STYLES.SATELLITE;
+  // If user explicitly chose dark, use it
+  if (preference === 'dark') return MAP_STYLES.DARK;
+  // For 'streets' or default: auto-sync with theme
+  return isDark ? MAP_STYLES.DARK : MAP_STYLES.STREETS;
 }
 
 interface PropertyMapProps {
@@ -91,7 +91,7 @@ export function MapboxPropertyMap({
   const [stylePreference, setStylePreference] = useState<MapStylePreference>(getStoredStylePreference);
   const { isDark } = useTheme();
 
-  const mapStyle = resolveMapStyle(stylePreference);
+  const mapStyle = resolveMapStyle(stylePreference, isDark);
 
   const selectStyle = useCallback((pref: MapStylePreference) => {
     setStylePreference(pref);
