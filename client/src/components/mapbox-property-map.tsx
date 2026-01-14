@@ -2,6 +2,49 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useTheme } from '@/hooks/use-theme';
+import { Button } from '@/components/ui/button';
+import { Map, Satellite, Moon, ChevronDown } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+const MAP_STYLES = {
+  STREETS: 'mapbox://styles/mapbox/streets-v11',
+  SATELLITE: 'mapbox://styles/mapbox/satellite-streets-v11',
+  DARK: 'mapbox://styles/mapbox/dark-v10',
+} as const;
+
+type MapStylePreference = 'streets' | 'satellite' | 'dark';
+const STORAGE_KEY = 'mlsDataMapStylePreference';
+const STYLE_CYCLE: MapStylePreference[] = ['streets', 'satellite', 'dark'];
+
+function getStoredStylePreference(): MapStylePreference {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === 'satellite' || stored === 'dark' || stored === 'streets') {
+      return stored;
+    }
+  } catch {}
+  return 'streets';
+}
+
+function setStoredStylePreference(pref: MapStylePreference) {
+  try {
+    localStorage.setItem(STORAGE_KEY, pref);
+  } catch {}
+}
+
+function resolveMapStyle(preference: MapStylePreference): string {
+  switch (preference) {
+    case 'satellite': return MAP_STYLES.SATELLITE;
+    case 'dark': return MAP_STYLES.DARK;
+    case 'streets':
+    default: return MAP_STYLES.STREETS;
+  }
+}
 
 interface PropertyMapProps {
   latitude: number;
@@ -45,11 +88,33 @@ export function MapboxPropertyMap({
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [stylePreference, setStylePreference] = useState<MapStylePreference>(getStoredStylePreference);
   const { isDark } = useTheme();
 
-  const mapStyle = isDark 
-    ? 'mapbox://styles/mapbox/dark-v11' 
-    : 'mapbox://styles/mapbox/light-v11';
+  const mapStyle = resolveMapStyle(stylePreference);
+
+  const selectStyle = useCallback((pref: MapStylePreference) => {
+    setStylePreference(pref);
+    setStoredStylePreference(pref);
+  }, []);
+
+  const getStyleIcon = (style: MapStylePreference) => {
+    switch (style) {
+      case 'satellite': return <Satellite className="h-4 w-4" />;
+      case 'dark': return <Moon className="h-4 w-4" />;
+      case 'streets':
+      default: return <Map className="h-4 w-4" />;
+    }
+  };
+
+  const getStyleLabel = (style: MapStylePreference) => {
+    switch (style) {
+      case 'satellite': return 'Satellite';
+      case 'dark': return 'Dark';
+      case 'streets':
+      default: return 'Streets';
+    }
+  };
 
   useEffect(() => {
     fetch('/api/mapbox-token')
@@ -219,12 +284,8 @@ export function MapboxPropertyMap({
 
   useEffect(() => {
     if (map.current && isLoaded) {
-      const currentStyle = map.current.getStyle();
-      const currentStyleName = currentStyle?.name || '';
-      const newStyleIsDark = mapStyle.includes('dark');
-      const currentStyleIsDark = currentStyleName.toLowerCase().includes('dark');
-      
-      if (newStyleIsDark !== currentStyleIsDark) {
+      const currentStyleUrl = (map.current as any)._styleUrl || '';
+      if (currentStyleUrl !== mapStyle) {
         map.current.setStyle(mapStyle);
       }
     }
@@ -289,11 +350,47 @@ export function MapboxPropertyMap({
           margin-top: 4px !important;
         }
       `}</style>
-      <div 
-        ref={mapContainer} 
-        className="w-full h-[300px] rounded-b-lg overflow-hidden"
-        data-testid="map-container"
-      />
+      <div className="relative w-full h-[300px]">
+        <div 
+          ref={mapContainer} 
+          className="w-full h-full rounded-b-lg overflow-hidden"
+          data-testid="map-container"
+        />
+        {isLoaded && (
+          <div className="absolute top-2 left-2 z-10">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="h-8 shadow-md gap-1 px-2"
+                  data-testid="button-toggle-map-style"
+                >
+                  {getStyleIcon(stylePreference)}
+                  <span className="text-xs">{getStyleLabel(stylePreference)}</span>
+                  <ChevronDown className="h-3 w-3 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[120px]">
+                {STYLE_CYCLE.map((style) => (
+                  <DropdownMenuItem
+                    key={style}
+                    onClick={() => selectStyle(style)}
+                    className="gap-2"
+                    data-testid={`menu-item-style-${style}`}
+                  >
+                    {getStyleIcon(style)}
+                    <span>{getStyleLabel(style)}</span>
+                    {style === stylePreference && (
+                      <span className="ml-auto text-xs text-muted-foreground">Active</span>
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+      </div>
     </>
   );
 }

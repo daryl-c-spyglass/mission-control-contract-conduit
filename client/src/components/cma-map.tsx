@@ -575,8 +575,9 @@ export function CMAMap({
       });
 
       const currentModel = modelRef.current;
-      if (currentModel) {
-        const matchingProp = currentModel.propertyByFeatureId.get(props.id);
+      const propMap = currentModel?.propertyByFeatureId;
+      if (propMap && typeof propMap.get === 'function') {
+        const matchingProp = propMap.get(props.id);
         if (matchingProp) {
           onPropertyClickRef.current?.(matchingProp);
         }
@@ -585,8 +586,9 @@ export function CMAMap({
 
     map.on('click', LAYER_IDS.subjectPoint, () => {
       const currentModel = modelRef.current;
-      if (currentModel) {
-        const subjectProp = currentModel.propertyByFeatureId.get('subject');
+      const propMap = currentModel?.propertyByFeatureId;
+      if (propMap && typeof propMap.get === 'function') {
+        const subjectProp = propMap.get('subject');
         if (subjectProp) {
           onPropertyClickRef.current?.(subjectProp);
         }
