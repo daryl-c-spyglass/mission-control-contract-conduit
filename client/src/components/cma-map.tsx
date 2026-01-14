@@ -159,6 +159,77 @@ const EMPTY_FEATURE_COLLECTION: GeoJSON.FeatureCollection = {
   features: [],
 };
 
+function addSymbolLayers(
+  map: mapboxgl.Map,
+  tuning: OverlayTuning
+) {
+  try {
+    if (!map.getLayer(LAYER_IDS.clusterCount) && map.getSource(SOURCE_IDS.comps)) {
+      map.addLayer({
+        id: LAYER_IDS.clusterCount,
+        type: 'symbol',
+        source: SOURCE_IDS.comps,
+        filter: ['has', 'point_count'],
+        layout: {
+          'text-field': ['to-string', ['get', 'point_count']],
+          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
+          'text-size': 14,
+        },
+        paint: {
+          'text-color': '#ffffff',
+        },
+      });
+    }
+
+    if (!map.getLayer(LAYER_IDS.compLabels) && map.getSource(SOURCE_IDS.comps)) {
+      map.addLayer({
+        id: LAYER_IDS.compLabels,
+        type: 'symbol',
+        source: SOURCE_IDS.comps,
+        filter: ['!', ['has', 'point_count']],
+        layout: {
+          'text-field': ['coalesce', ['get', 'priceFormatted'], ''],
+          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
+          'text-size': 11,
+          'text-offset': [0, -1.8],
+          'text-anchor': 'bottom',
+          'text-allow-overlap': false,
+          'text-ignore-placement': false,
+        },
+        paint: {
+          'text-color': tuning.labelTextColor,
+          'text-halo-color': tuning.labelHaloColor,
+          'text-halo-width': tuning.labelHaloWidth,
+        },
+      });
+    }
+
+    if (!map.getLayer(LAYER_IDS.subjectLabel) && map.getSource(SOURCE_IDS.subject)) {
+      map.addLayer({
+        id: LAYER_IDS.subjectLabel,
+        type: 'symbol',
+        source: SOURCE_IDS.subject,
+        layout: {
+          'text-field': ['concat', 'SUBJECT\n', ['coalesce', ['get', 'priceFormatted'], '']],
+          'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+          'text-size': 12,
+          'text-offset': [0, -2.2],
+          'text-anchor': 'bottom',
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        paint: {
+          'text-color': tuning.subjectLabelTextColor,
+          'text-halo-color': tuning.subjectLabelHaloColor,
+          'text-halo-width': tuning.subjectLabelHaloWidth,
+        },
+      });
+    }
+  } catch (err) {
+    console.warn('[CMA Map] Error adding symbol layers:', err);
+  }
+}
+
 function initCmaLayers(
   map: mapboxgl.Map,
   model: CmaMapModel,
@@ -237,21 +308,6 @@ function initCmaLayers(
     });
 
     map.addLayer({
-      id: LAYER_IDS.clusterCount,
-      type: 'symbol',
-      source: SOURCE_IDS.comps,
-      filter: ['has', 'point_count'],
-      layout: {
-        'text-field': '{point_count_abbreviated}',
-        'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
-        'text-size': 14,
-      },
-      paint: {
-        'text-color': '#ffffff',
-      },
-    });
-
-    map.addLayer({
       id: LAYER_IDS.compPoints,
       type: 'circle',
       source: SOURCE_IDS.comps,
@@ -290,27 +346,6 @@ function initCmaLayers(
     });
 
     map.addLayer({
-      id: LAYER_IDS.compLabels,
-      type: 'symbol',
-      source: SOURCE_IDS.comps,
-      filter: ['!', ['has', 'point_count']],
-      layout: {
-        'text-field': ['get', 'priceFormatted'],
-        'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
-        'text-size': 11,
-        'text-offset': [0, -1.8],
-        'text-anchor': 'bottom',
-        'text-allow-overlap': false,
-        'text-ignore-placement': false,
-      },
-      paint: {
-        'text-color': tuning.labelTextColor,
-        'text-halo-color': tuning.labelHaloColor,
-        'text-halo-width': tuning.labelHaloWidth,
-      },
-    });
-
-    map.addLayer({
       id: LAYER_IDS.subjectPoint,
       type: 'circle',
       source: SOURCE_IDS.subject,
@@ -322,24 +357,8 @@ function initCmaLayers(
       },
     });
 
-    map.addLayer({
-      id: LAYER_IDS.subjectLabel,
-      type: 'symbol',
-      source: SOURCE_IDS.subject,
-      layout: {
-        'text-field': ['concat', 'SUBJECT\n', ['get', 'priceFormatted']],
-        'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
-        'text-size': 12,
-        'text-offset': [0, -2.2],
-        'text-anchor': 'bottom',
-        'text-allow-overlap': true,
-        'text-ignore-placement': true,
-      },
-      paint: {
-        'text-color': tuning.subjectLabelTextColor,
-        'text-halo-color': tuning.subjectLabelHaloColor,
-        'text-halo-width': tuning.subjectLabelHaloWidth,
-      },
+    map.once('idle', () => {
+      addSymbolLayers(map, tuning);
     });
   } catch (err) {
     console.warn('[CMA Map] Error initializing layers:', err);

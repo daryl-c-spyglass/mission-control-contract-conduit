@@ -170,7 +170,7 @@ function extractPrice(property: any): number {
 }
 
 function formatPrice(price: number): string {
-  if (price <= 0) return '';
+  if (price <= 0) return 'N/A';
   if (price >= 1000000) {
     return `$${(price / 1000000).toFixed(2)}M`;
   }
