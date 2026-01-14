@@ -504,6 +504,9 @@ export function CMAMap({
   useEffect(() => {
     if (!token || !mapContainer.current || mapRef.current) return;
 
+    // Set model ref BEFORE creating map to ensure handlers have access to it
+    modelRef.current = model;
+
     mapboxgl.accessToken = token;
 
     const centerCoords = model.subjectLngLat || [-97.7431, 30.2672];
@@ -527,158 +530,157 @@ export function CMAMap({
       if (model.bounds) {
         setTimeout(() => fitAllBounds(), 100);
       }
-    });
 
-    map.on('click', LAYER_IDS.clusterCircle, (e) => {
-      if (!layersReadyRef.current) return;
-      
-      const features = map.queryRenderedFeatures(e.point, {
-        layers: [LAYER_IDS.clusterCircle],
-      });
-      if (!features.length) return;
-
-      const clusterId = features[0].properties?.cluster_id;
-      const source = map.getSource(SOURCE_IDS.comps) as mapboxgl.GeoJSONSource | undefined;
-
-      if (source && typeof source.getClusterExpansionZoom === 'function') {
-        source.getClusterExpansionZoom(clusterId, (err, zoom) => {
-          if (err) return;
-          const coords = (features[0].geometry as GeoJSON.Point).coordinates as [number, number];
-          map.easeTo({ center: coords, zoom: zoom ?? 14 });
+      // Register all event handlers INSIDE load callback to ensure layers exist
+      map.on('click', LAYER_IDS.clusterCircle, (e) => {
+        if (!layersReadyRef.current) return;
+        
+        const features = map.queryRenderedFeatures(e.point, {
+          layers: [LAYER_IDS.clusterCircle],
         });
-      }
-    });
+        if (!features.length) return;
 
-    map.on('click', LAYER_IDS.compPoints, (e) => {
-      if (!layersReadyRef.current) return;
-      
-      const features = map.queryRenderedFeatures(e.point, {
-        layers: [LAYER_IDS.compPoints],
+        const clusterId = features[0].properties?.cluster_id;
+        const source = map.getSource(SOURCE_IDS.comps) as mapboxgl.GeoJSONSource | undefined;
+
+        if (source && typeof source.getClusterExpansionZoom === 'function') {
+          source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+            if (err) return;
+            const coords = (features[0].geometry as GeoJSON.Point).coordinates as [number, number];
+            map.easeTo({ center: coords, zoom: zoom ?? 14 });
+          });
+        }
       });
-      if (!features.length) return;
 
-      const props = features[0].properties as CmaPointProperties;
+      map.on('click', LAYER_IDS.compPoints, (e) => {
+        if (!layersReadyRef.current) return;
+        
+        const features = map.queryRenderedFeatures(e.point, {
+          layers: [LAYER_IDS.compPoints],
+        });
+        if (!features.length) return;
 
-      if (selectedIdRef.current) {
+        const props = features[0].properties as CmaPointProperties;
+
+        if (selectedIdRef.current) {
+          try {
+            map.setFeatureState(
+              { source: SOURCE_IDS.comps, id: selectedIdRef.current },
+              { selected: false }
+            );
+          } catch (e) {
+            // Source may not be ready
+          }
+        }
+
+        const featureId = props.id;
+        selectedIdRef.current = featureId;
         try {
           map.setFeatureState(
-            { source: SOURCE_IDS.comps, id: selectedIdRef.current },
-            { selected: false }
+            { source: SOURCE_IDS.comps, id: featureId },
+            { selected: true }
           );
         } catch (e) {
           // Source may not be ready
         }
-      }
 
-      const featureId = props.id;
-      selectedIdRef.current = featureId;
-      try {
-        map.setFeatureState(
-          { source: SOURCE_IDS.comps, id: featureId },
-          { selected: true }
-        );
-      } catch (e) {
-        // Source may not be ready
-      }
+        const parsedPhotos = typeof props.photos === 'string' 
+          ? JSON.parse(props.photos) 
+          : props.photos;
 
-      const parsedPhotos = typeof props.photos === 'string' 
-        ? JSON.parse(props.photos) 
-        : props.photos;
+        setSelectedProperty({
+          ...props,
+          photos: parsedPhotos || [],
+        });
 
-      setSelectedProperty({
-        ...props,
-        photos: parsedPhotos || [],
-      });
-
-      const currentModel = modelRef.current;
-      const propMap = currentModel?.propertyByFeatureId;
-      if (propMap && typeof propMap.get === 'function') {
+        const currentModel = modelRef.current;
+        if (!currentModel?.propertyByFeatureId) return;
+        const propMap = currentModel.propertyByFeatureId;
         const matchingProp = propMap.get(props.id);
         if (matchingProp) {
           onPropertyClickRef.current?.(matchingProp);
         }
-      }
-    });
+      });
 
-    map.on('click', LAYER_IDS.subjectPoint, () => {
-      if (!layersReadyRef.current) return;
-      
-      const currentModel = modelRef.current;
-      const propMap = currentModel?.propertyByFeatureId;
-      if (propMap && typeof propMap.get === 'function') {
+      map.on('click', LAYER_IDS.subjectPoint, () => {
+        if (!layersReadyRef.current) return;
+        
+        const currentModel = modelRef.current;
+        if (!currentModel?.propertyByFeatureId) return;
+        const propMap = currentModel.propertyByFeatureId;
         const subjectProp = propMap.get('subject');
         if (subjectProp) {
           onPropertyClickRef.current?.(subjectProp);
         }
-      }
-    });
-
-    map.on('mousemove', LAYER_IDS.compPoints, (e) => {
-      if (!layersReadyRef.current) return;
-      
-      map.getCanvas().style.cursor = 'pointer';
-
-      const features = map.queryRenderedFeatures(e.point, {
-        layers: [LAYER_IDS.compPoints],
       });
-      if (!features.length) return;
 
-      const featureId = features[0].properties?.id as string;
+      map.on('mousemove', LAYER_IDS.compPoints, (e) => {
+        if (!layersReadyRef.current) return;
+        
+        map.getCanvas().style.cursor = 'pointer';
 
-      if (hoveredIdRef.current && hoveredIdRef.current !== featureId) {
+        const features = map.queryRenderedFeatures(e.point, {
+          layers: [LAYER_IDS.compPoints],
+        });
+        if (!features.length) return;
+
+        const featureId = features[0].properties?.id as string;
+
+        if (hoveredIdRef.current && hoveredIdRef.current !== featureId) {
+          try {
+            map.setFeatureState(
+              { source: SOURCE_IDS.comps, id: hoveredIdRef.current },
+              { hover: false }
+            );
+          } catch (e) {
+            // Source may not be ready
+          }
+        }
+
+        hoveredIdRef.current = featureId;
         try {
           map.setFeatureState(
-            { source: SOURCE_IDS.comps, id: hoveredIdRef.current },
-            { hover: false }
+            { source: SOURCE_IDS.comps, id: featureId },
+            { hover: true }
           );
         } catch (e) {
           // Source may not be ready
         }
-      }
+      });
 
-      hoveredIdRef.current = featureId;
-      try {
-        map.setFeatureState(
-          { source: SOURCE_IDS.comps, id: featureId },
-          { hover: true }
-        );
-      } catch (e) {
-        // Source may not be ready
-      }
-    });
+      map.on('mouseleave', LAYER_IDS.compPoints, () => {
+        if (!layersReadyRef.current) return;
+        
+        map.getCanvas().style.cursor = '';
 
-    map.on('mouseleave', LAYER_IDS.compPoints, () => {
-      if (!layersReadyRef.current) return;
-      
-      map.getCanvas().style.cursor = '';
-
-      if (hoveredIdRef.current) {
-        try {
-          map.setFeatureState(
-            { source: SOURCE_IDS.comps, id: hoveredIdRef.current },
-            { hover: false }
-          );
-        } catch (e) {
-          // Source may not be ready
+        if (hoveredIdRef.current) {
+          try {
+            map.setFeatureState(
+              { source: SOURCE_IDS.comps, id: hoveredIdRef.current },
+              { hover: false }
+            );
+          } catch (e) {
+            // Source may not be ready
+          }
+          hoveredIdRef.current = null;
         }
-        hoveredIdRef.current = null;
-      }
-    });
+      });
 
-    map.on('mouseenter', LAYER_IDS.clusterCircle, () => {
-      map.getCanvas().style.cursor = 'pointer';
-    });
+      map.on('mouseenter', LAYER_IDS.clusterCircle, () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
 
-    map.on('mouseleave', LAYER_IDS.clusterCircle, () => {
-      map.getCanvas().style.cursor = '';
-    });
+      map.on('mouseleave', LAYER_IDS.clusterCircle, () => {
+        map.getCanvas().style.cursor = '';
+      });
 
-    map.on('mouseenter', LAYER_IDS.subjectPoint, () => {
-      map.getCanvas().style.cursor = 'pointer';
-    });
+      map.on('mouseenter', LAYER_IDS.subjectPoint, () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
 
-    map.on('mouseleave', LAYER_IDS.subjectPoint, () => {
-      map.getCanvas().style.cursor = '';
+      map.on('mouseleave', LAYER_IDS.subjectPoint, () => {
+        map.getCanvas().style.cursor = '';
+      });
     });
 
     return () => {
