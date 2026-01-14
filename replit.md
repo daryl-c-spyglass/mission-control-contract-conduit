@@ -41,6 +41,20 @@ Preferred communication style: Simple, everyday language.
 - **Graphics Templates (Server-side)**: Alternative Handlebars templates in `server/templates/graphics/` for future server-side rendering via `/api/graphics/render` endpoint.
 - **Agent Marketing Profile**: Dedicated settings for agent branding on marketing materials, including headshot, name, title, and contact information.
 
+### Mobile/WebView Optimizations
+- **Viewport Configuration**: `viewport-fit=cover` enables full-screen content on devices with notches (iPhone X+)
+- **PWA Meta Tags**: iOS and Android home screen app support with themed status bars
+- **Safe Area Utilities**: CSS utility classes for handling notch and home indicator:
+  - `.safe-top`, `.safe-bottom`, `.safe-left`, `.safe-right` - individual padding
+  - `.safe-x`, `.safe-y`, `.safe-all` - combined padding
+  - `.mt-safe`, `.mb-safe` - margin variants
+- **Touch Optimizations**:
+  - Tap highlight disabled (`-webkit-tap-highlight-color: transparent`)
+  - Touch-action utilities: `.touch-pan-x`, `.touch-pan-y`, `.touch-manipulation`
+  - Opt-in touch targets: `.touch-target-44`, `.touch-target-48`
+- **Scroll Behavior**: `overscroll-behavior-y: contain` prevents pull-to-refresh conflicts
+- **Reduced Motion**: Respects `prefers-reduced-motion` for accessibility
+
 ### Technical Implementations
 - **AI Social Media Tagline Generation**: GPT-4o-mini powered tagline generation for social media graphics, using full property context and image insights from Repliers API.
 - **AI Description Summarization**: AI-powered summarization of MLS descriptions for flyers, with character limits and revert functionality.
