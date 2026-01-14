@@ -10,6 +10,17 @@ import type { Property } from '@shared/schema';
 // Debug flag - set to true to enable console logging
 const DEBUG_CMA_MAP = true;
 
+// Normalized status type for CMA comparables
+type NormalizedStatus = 'active' | 'pending' | 'sold' | 'unknown';
+
+// Status display labels for the UI
+const STATUS_LABELS: Record<NormalizedStatus, string> = {
+  active: 'Active Listing',
+  pending: 'Pending',
+  sold: 'Sold',
+  unknown: 'Unknown Status',
+};
+
 interface CMAMapProps {
   properties: Property[];
   subjectProperty: Property | null;
@@ -20,12 +31,17 @@ interface CMAMapProps {
 // Point model for CMA map - single source of truth
 interface CmaMapPoint {
   type: 'subject' | 'comp';
-  status: 'active' | 'pending' | 'sold' | 'unknown';
+  status: NormalizedStatus;
   lng: number;
   lat: number;
   id: string;
   property: Property;
   price: number;
+  // Additional details for tooltips
+  beds: number | null;
+  baths: number | null;
+  sqft: number | null;
+  address: string;
 }
 
 // Complete map model returned by buildCmaMapModel
@@ -173,24 +189,106 @@ function getPropertyCoordinates(property: any): [number, number] | null {
   return null;
 }
 
-// Determine property status from various possible fields
-function getPropertyStatus(property: any): 'active' | 'pending' | 'sold' | 'unknown' {
-  const status = (property?.standardStatus || property?.status || '').toString().toLowerCase();
+/**
+ * Normalize Repliers API status values to our standard enum
+ * This is the single source of truth for status normalization across the CMA map
+ * 
+ * Repliers API status values observed:
+ * - standardStatus: "Active", "Pending", "Sold", "Closed", "Coming Soon", "Withdrawn", etc.
+ * - lastStatus: "A" (Active), "U" (Under Contract), "S" (Sold), "W" (Withdrawn), "Sc" (Status Change), etc.
+ * - status: Various text values
+ * 
+ * @param rawStatus - The raw status string from Repliers API
+ * @returns Normalized status enum value
+ */
+function normalizeComparableStatus(rawStatus: string | null | undefined): NormalizedStatus {
+  if (!rawStatus) return 'unknown';
   
-  if (status.includes('closed') || status.includes('sold')) {
+  const status = rawStatus.toString().toLowerCase().trim();
+  
+  // Sold/Closed statuses
+  if (status === 's' || status === 'sold' || status === 'closed' || 
+      status.includes('sold') || status.includes('closed')) {
     return 'sold';
   }
-  if (status.includes('pending') || status.includes('contract') || status.includes('contingent')) {
+  
+  // Pending/Under Contract statuses
+  if (status === 'u' || status === 'p' || status === 'pending' || 
+      status.includes('pending') || status.includes('contract') || 
+      status.includes('contingent') || status.includes('under contract') ||
+      status.includes('backup') || status.includes('option')) {
     return 'pending';
   }
-  if (status.includes('active') || status.includes('coming')) {
+  
+  // Active/Coming Soon statuses
+  if (status === 'a' || status === 'active' || 
+      status.includes('active') || status.includes('coming') ||
+      status.includes('new') || status.includes('available')) {
     return 'active';
   }
-  // Unknown status
-  if (!status) {
+  
+  // Withdrawn/Cancelled/Expired - treat as unknown
+  if (status === 'w' || status === 'x' || status === 'e' ||
+      status.includes('withdrawn') || status.includes('cancelled') || 
+      status.includes('canceled') || status.includes('expired') ||
+      status.includes('terminate')) {
     return 'unknown';
   }
-  return 'active'; // Default to active for non-empty unrecognized statuses
+  
+  // Status change indicator - try to determine from other context
+  if (status === 'sc') {
+    return 'pending'; // Status change often means going to pending
+  }
+  
+  // If we have a status but can't categorize it, default to active
+  // (better to show something than grey "unknown")
+  if (status.length > 0) {
+    if (DEBUG_CMA_MAP) {
+      console.log('[CMA Map] Unrecognized status, defaulting to active:', rawStatus);
+    }
+    return 'active';
+  }
+  
+  return 'unknown';
+}
+
+/**
+ * Extract and normalize property status from various possible fields
+ * Checks multiple fields in priority order to find the best status indicator
+ */
+function getPropertyStatus(property: any): NormalizedStatus {
+  // Priority 1: standardStatus (RESO standard)
+  if (property?.standardStatus) {
+    return normalizeComparableStatus(property.standardStatus);
+  }
+  
+  // Priority 2: status field
+  if (property?.status) {
+    return normalizeComparableStatus(property.status);
+  }
+  
+  // Priority 3: lastStatus (Repliers specific)
+  if (property?.lastStatus) {
+    return normalizeComparableStatus(property.lastStatus);
+  }
+  
+  // Priority 4: Check rawData for nested status
+  if (property?.rawData?.standardStatus) {
+    return normalizeComparableStatus(property.rawData.standardStatus);
+  }
+  if (property?.rawData?.status) {
+    return normalizeComparableStatus(property.rawData.status);
+  }
+  if (property?.rawData?.lastStatus) {
+    return normalizeComparableStatus(property.rawData.lastStatus);
+  }
+  
+  // Priority 5: Infer from sold price/date
+  if (property?.soldPrice || property?.closePrice || property?.soldDate || property?.closedDate) {
+    return 'sold';
+  }
+  
+  return 'unknown';
 }
 
 // Get price from property, handling multiple possible field locations
@@ -200,6 +298,57 @@ function getPropertyPrice(property: any): number {
     || property?.listPrice 
     || property?.price 
     || 0;
+}
+
+// Get bedroom count from property
+function getPropertyBeds(property: any): number | null {
+  const beds = property?.bedroomsTotal 
+    || property?.numBedrooms 
+    || property?.bedrooms
+    || property?.details?.numBedrooms
+    || property?.rawData?.details?.numBedrooms;
+  return beds != null ? Number(beds) : null;
+}
+
+// Get bathroom count from property
+function getPropertyBaths(property: any): number | null {
+  const baths = property?.bathroomsTotalInteger 
+    || property?.numBathrooms 
+    || property?.bathrooms
+    || property?.details?.numBathrooms
+    || property?.rawData?.details?.numBathrooms;
+  return baths != null ? Number(baths) : null;
+}
+
+// Get square footage from property
+function getPropertySqft(property: any): number | null {
+  const sqft = property?.livingArea 
+    || property?.sqft 
+    || property?.details?.sqft
+    || property?.rawData?.details?.sqft;
+  return sqft != null ? Number(sqft) : null;
+}
+
+// Get short address from property
+function getPropertyAddress(property: any): string {
+  // Check for parsed address first
+  if (property?.address?.streetAddress) return property.address.streetAddress;
+  if (typeof property?.address === 'string') return property.address;
+  
+  // Build address from parts
+  if (property?.address?.streetNumber && property?.address?.streetName) {
+    let addr = `${property.address.streetNumber} ${property.address.streetName}`;
+    if (property.address.streetSuffix) addr += ` ${property.address.streetSuffix}`;
+    return addr;
+  }
+  
+  // Check unparsedAddress
+  if (property?.unparsedAddress) return property.unparsedAddress;
+  
+  // Raw data fallback
+  if (property?.rawData?.address?.streetAddress) return property.rawData.address.streetAddress;
+  
+  return 'Unknown Address';
 }
 
 // Build the complete CMA map model - SINGLE SOURCE OF TRUTH
@@ -226,6 +375,10 @@ function buildCmaMapModel(subjectProperty: Property | null, comparables: Propert
         id: 'subject',
         property: subjectProperty,
         price: getPropertyPrice(subjectProperty),
+        beds: getPropertyBeds(subjectProperty),
+        baths: getPropertyBaths(subjectProperty),
+        sqft: getPropertySqft(subjectProperty),
+        address: getPropertyAddress(subjectProperty),
       });
     }
   }
@@ -236,14 +389,30 @@ function buildCmaMapModel(subjectProperty: Property | null, comparables: Propert
     if (coords) {
       allCoords.push(coords);
       const propAny = property as any;
+      const status = getPropertyStatus(property);
+      
+      if (DEBUG_CMA_MAP) {
+        console.log('[CMA Map] Comparable status:', {
+          id: propAny.mlsNumber || `comp-${index}`,
+          standardStatus: propAny.standardStatus,
+          status: propAny.status,
+          lastStatus: propAny.lastStatus,
+          normalized: status,
+        });
+      }
+      
       points.push({
         type: 'comp',
-        status: getPropertyStatus(property),
+        status: status,
         lng: coords[0],
         lat: coords[1],
         id: propAny.mlsNumber || `comp-${index}`,
         property: property,
         price: getPropertyPrice(property),
+        beds: getPropertyBeds(property),
+        baths: getPropertyBaths(property),
+        sqft: getPropertySqft(property),
+        address: getPropertyAddress(property),
       });
     }
   });
@@ -257,9 +426,11 @@ function buildCmaMapModel(subjectProperty: Property | null, comparables: Propert
     );
   }
 
-  // Build polygon GeoJSON from convex hull
+  // Build polygon GeoJSON from convex hull or bounding box
   let polygonGeoJson: GeoJSON.Feature<GeoJSON.Polygon> | null = null;
+  
   if (allCoords.length >= 3) {
+    // Use convex hull for 3+ points
     const hull = calculateConvexHull(allCoords);
     if (hull.length >= 3) {
       // Close the polygon by adding first point at end
@@ -273,6 +444,43 @@ function buildCmaMapModel(subjectProperty: Property | null, comparables: Propert
         },
       };
     }
+  } else if (allCoords.length === 2 && bounds) {
+    // Use bounding box for 2 points - expand slightly for visibility
+    const padding = 0.005; // ~500m padding
+    const bboxCoords: [number, number][] = [
+      [bounds.getWest() - padding, bounds.getSouth() - padding],
+      [bounds.getEast() + padding, bounds.getSouth() - padding],
+      [bounds.getEast() + padding, bounds.getNorth() + padding],
+      [bounds.getWest() - padding, bounds.getNorth() + padding],
+      [bounds.getWest() - padding, bounds.getSouth() - padding], // Close polygon
+    ];
+    polygonGeoJson = {
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'Polygon',
+        coordinates: [bboxCoords],
+      },
+    };
+  } else if (allCoords.length === 1) {
+    // For single point, create a small square around it
+    const [lng, lat] = allCoords[0];
+    const padding = 0.003; // ~300m padding
+    const bboxCoords: [number, number][] = [
+      [lng - padding, lat - padding],
+      [lng + padding, lat - padding],
+      [lng + padding, lat + padding],
+      [lng - padding, lat + padding],
+      [lng - padding, lat - padding], // Close polygon
+    ];
+    polygonGeoJson = {
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'Polygon',
+        coordinates: [bboxCoords],
+      },
+    };
   }
 
   if (DEBUG_CMA_MAP) {
@@ -434,9 +642,18 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick, showPolyg
           </div>
         `;
       } else {
+        // Build details string for tooltip
+        const details: string[] = [];
+        if (point.beds != null) details.push(`${point.beds} bd`);
+        if (point.baths != null) details.push(`${point.baths} ba`);
+        if (point.sqft != null) details.push(`${point.sqft.toLocaleString()} sqft`);
+        const detailsStr = details.length > 0 ? details.join(' · ') : '';
+        const statusLabel = STATUS_LABELS[point.status];
+        
         el.innerHTML = `
-          <div style="position: relative;">
-            <div style="
+          <div style="position: relative;" class="marker-container">
+            <!-- Main price marker -->
+            <div class="marker-main" style="
               background-color: ${colors.bg};
               color: white;
               padding: 4px 8px;
@@ -450,6 +667,7 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick, showPolyg
             ">
               ${formatPrice(point.price)}
             </div>
+            <!-- Pointer arrow -->
             <div style="
               position: absolute;
               bottom: -4px;
@@ -461,22 +679,61 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick, showPolyg
               border-right: 4px solid transparent;
               border-top: 4px solid ${colors.bg};
             "></div>
+            <!-- Hover tooltip -->
+            <div class="marker-tooltip" style="
+              position: absolute;
+              bottom: calc(100% + 8px);
+              left: 50%;
+              transform: translateX(-50%);
+              background: ${isDark ? 'rgba(30, 30, 30, 0.95)' : 'rgba(255, 255, 255, 0.97)'};
+              color: ${isDark ? '#f5f5f5' : '#1f1f1f'};
+              padding: 8px 12px;
+              border-radius: 6px;
+              box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+              font-size: 11px;
+              white-space: nowrap;
+              display: none;
+              z-index: 200;
+              border: 1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'};
+            ">
+              <div style="font-weight: 600; margin-bottom: 4px;">${formatFullPrice(point.price)}</div>
+              <div style="
+                display: inline-block;
+                padding: 2px 6px;
+                border-radius: 3px;
+                font-size: 10px;
+                font-weight: 500;
+                background-color: ${colors.bg};
+                color: white;
+                margin-bottom: 4px;
+              ">${statusLabel}</div>
+              ${detailsStr ? `<div style="color: ${isDark ? '#aaa' : '#666'}; margin-bottom: 2px;">${detailsStr}</div>` : ''}
+              <div style="color: ${isDark ? '#888' : '#999'}; font-size: 10px; max-width: 180px; overflow: hidden; text-overflow: ellipsis;">${point.address}</div>
+            </div>
           </div>
         `;
 
         // Add hover effects for comparables
         el.addEventListener('mouseenter', () => {
-          const inner = el.querySelector('div > div') as HTMLElement;
-          if (inner) {
-            inner.style.transform = 'scale(1.1)';
-            inner.style.boxShadow = `0 4px 12px ${colors.shadow}`;
+          const main = el.querySelector('.marker-main') as HTMLElement;
+          const tooltip = el.querySelector('.marker-tooltip') as HTMLElement;
+          if (main) {
+            main.style.transform = 'scale(1.1)';
+            main.style.boxShadow = `0 4px 12px ${colors.shadow}`;
+          }
+          if (tooltip) {
+            tooltip.style.display = 'block';
           }
         });
         el.addEventListener('mouseleave', () => {
-          const inner = el.querySelector('div > div') as HTMLElement;
-          if (inner) {
-            inner.style.transform = 'scale(1)';
-            inner.style.boxShadow = `0 2px 8px ${colors.shadow}`;
+          const main = el.querySelector('.marker-main') as HTMLElement;
+          const tooltip = el.querySelector('.marker-tooltip') as HTMLElement;
+          if (main) {
+            main.style.transform = 'scale(1)';
+            main.style.boxShadow = `0 2px 8px ${colors.shadow}`;
+          }
+          if (tooltip) {
+            tooltip.style.display = 'none';
           }
         });
       }
@@ -506,8 +763,11 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick, showPolyg
       return;
     }
 
+    // Call resize() before fitting to handle responsive container changes
+    map.current.resize();
+
     if (model.points.length === 1 && model.subjectCoords) {
-      map.current.flyTo({ center: model.subjectCoords, zoom: 14, duration: 1000 });
+      map.current.flyTo({ center: model.subjectCoords, zoom: 14, duration: 600 });
       return;
     }
 
@@ -521,7 +781,7 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick, showPolyg
     map.current.fitBounds(model.bounds, {
       padding: 60,
       maxZoom: 14,
-      duration: 1000,
+      duration: 600,
     });
   }, [model]);
 
@@ -534,6 +794,9 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick, showPolyg
       return;
     }
 
+    // Call resize() before flying to handle responsive container changes
+    map.current.resize();
+
     if (DEBUG_CMA_MAP) {
       console.log('[CMA Map] centerOnSubject:', model.subjectCoords);
     }
@@ -541,7 +804,7 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick, showPolyg
     map.current.flyTo({ 
       center: model.subjectCoords, 
       zoom: 14,
-      duration: 1000 
+      duration: 600 
     });
   }, [model.subjectCoords]);
 

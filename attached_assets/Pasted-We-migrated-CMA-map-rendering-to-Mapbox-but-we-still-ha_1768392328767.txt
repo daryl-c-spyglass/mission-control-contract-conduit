@@ -1,0 +1,126 @@
+We migrated CMA map rendering to Mapbox, but we still have parity gaps. Please fix the CMA tab Mapbox implementation end-to-end with the requirements below. Do not hack around symptoms—fix the underlying data + map layers so it stays correct across all CMAs.
+
+Goal
+
+On the CMA tab, the map must always render:
+
+Subject marker
+
+All comparable markers (10+ when available)
+
+A polygon representing the auto-built search area (or coverage area) that includes subject + comps
+
+Working map controls: “Center on Subject” and “Fit all (Subject + Comps)”
+
+Comparable markers must be colored by the actual status from Repliers (not “Unknown” unless the API truly returns no status)
+
+1) Data validation (first)
+
+Find the exact CMA data object used to render the map (subject + comparables).
+
+Log/inspect the comparables array in the CMA response and confirm:
+
+Each comparable has coordinates: lat/lng (or convertible fields)
+
+Each comparable has a status field from Repliers (ex: Active, Pending, Sold, etc.)
+
+If the status is missing due to mapping/transform, fix the mapping layer so the UI receives the correct normalized status.
+
+Deliverable: A single normalizeComparableStatus() function that converts Repliers status fields into our known enum values (Active Listing, Pending, Sold, Unknown), and is used consistently by markers + legend.
+
+2) Markers: subject + comparables
+
+Ensure the map always adds:
+
+One “Subject” marker with the blue style
+
+N comparable markers with the correct color based on normalized status
+
+The current bug where only the subject appears must be resolved by ensuring the comparable markers are created and added to the map layer every render.
+
+Avoid duplicate markers on re-render (clear previous layer/source, or use stable feature IDs and update source data).
+
+Deliverable: Markers are rendered via a GeoJSON FeatureCollection source so we can update the source cleanly on each re-render.
+
+3) Polygon (auto-drawn coverage area)
+
+We need a polygon layer that is currently missing.
+
+Build a polygon automatically using all points (subject + comps). Use:
+
+Convex hull OR bounding polygon (best: convex hull; fallback: bbox polygon)
+
+Draw it as a Mapbox fill + outline layer:
+
+Fill opacity ~0.08–0.12
+
+Outline width ~2px
+
+Color should be a neutral “brand-safe” grey (not bright).
+
+Polygon must be visible above the basemap and below markers.
+
+Deliverable: A GeoJSON polygon source + fill/line layers that always render when there are 3+ points. If fewer than 3 points, draw a bounding box instead.
+
+4) Fit/Center controls must work
+
+Fix the two controls:
+
+Center on Subject: map.flyTo({ center: [subjectLng, subjectLat], zoom: <reasonable zoom> })
+
+Fit all (Subject + Comps): compute bounds using all markers (and polygon bounds if available), then call:
+
+map.fitBounds(bounds, { padding: 60, duration: 600, maxZoom: 14 })
+If map container size changes (responsive), call map.resize() before fitting.
+
+Deliverable: Both buttons work reliably after re-render and after switching tabs.
+
+5) Improve interactivity
+
+Hover state: on marker hover (or label hover), show a small tooltip with:
+
+Price (already shown) + status + beds/baths (if available) + address short form
+
+Click state: clicking a comparable should:
+
+highlight the selected comparable marker
+
+open a side panel or modal (whatever we already use in CMA UI) with full comparable details
+
+Legend must reflect the same normalized statuses and colors.
+
+6) Map style
+
+Pick a “realty broker friendly” style with good label clarity and subtle roads.
+
+Default to: mapbox://styles/mapbox/streets-v11 or a cleaner modern style if we already have one configured.
+
+Whichever style you pick, ensure polygon + markers are still clearly visible.
+
+7) Tests / checks (must do)
+
+Create a quick internal test checklist and verify on the CMA tab:
+
+Subject + 10 comps visible
+
+No comps show as “Unknown” unless status truly missing
+
+Polygon visible every time (or bbox fallback)
+
+“Center on Subject” works
+
+“Fit all” works
+
+Re-render does not duplicate markers/layers
+
+Switching tabs and coming back keeps map stable
+
+Notes
+
+Don’t hardcode statuses. Use the Repliers response and normalize it.
+
+Don’t draw polygon via DOM overlay. Use Mapbox sources/layers.
+
+Keep sources/layers named consistently (e.g., cma-subject, cma-comps, cma-polygon) so re-render cleanup is deterministic.
+
+Implement the above and push the fix.
