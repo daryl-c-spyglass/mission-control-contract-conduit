@@ -105,7 +105,7 @@ function AuthenticatedApp() {
           onCreateTransaction={() => setCreateDialogOpen(true)}
         />
         <div className="flex flex-col flex-1 min-w-0">
-          <header className="flex items-center justify-between gap-4 p-3 border-b bg-background sticky top-0 z-50">
+          <header className="flex items-center justify-between gap-4 p-3 border-b bg-background sticky top-0 z-50 safe-top">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex items-center gap-3">
               {user && (
@@ -133,7 +133,7 @@ function AuthenticatedApp() {
               <ThemeToggle />
             </div>
           </header>
-          <main className="flex-1 overflow-auto p-6">
+          <main className="flex-1 overflow-auto p-6 safe-bottom">
             <div className="max-w-7xl mx-auto">
               <Switch>
                 <Route path="/">
