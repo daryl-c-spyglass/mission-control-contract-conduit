@@ -1,0 +1,114 @@
+GOAL
+Bring the CMA Mapbox map to “broker-grade” interactivity and ensure the Preview and the Download/Export outputs use the SAME data + SAME render pipeline (no drift). Fix: polygon not visible, status colors wrong (grey/unknown), and Center/Fit controls not working.
+
+NON-NEGOTIABLES
+1) Single source of truth for CMA map data:
+   - Subject + Comparables must be transformed once into ONE canonical structure (GeoJSON FeatureCollections).
+   - Both the CMA UI map and any export/preview (if applicable) must read from the same structure.
+2) All map layers must be deterministic and added in the same order every time.
+3) Controls (“Center on Subject”, “Fit All”) must always work, even if comparables update async.
+
+STYLE / BASEMAP
+- Default CMA basemap style to a clean/light “broker” look (less visual noise than streets):
+  Prefer a Mapbox Light style if available (e.g., light-v11). If we must use streets-v11, reduce label clutter by placing our overlays above labels and using stronger marker contrast.
+- Allow easy switching via a constant:
+  const CMA_MAP_STYLE = 'mapbox://styles/mapbox/light-v11';
+  fallback: 'mapbox://styles/mapbox/streets-v11'
+
+DATA MODEL (CANONICAL)
+Build these functions in a shared module used by BOTH CMA UI + any preview/export:
+- normalizeStatus(repliersStatusRaw) -> one of: 'ACTIVE' | 'PENDING' | 'SOLD' | 'UNKNOWN'
+- buildSubjectFeature(subject) -> GeoJSON Feature w/ props: { type:'subject', status, price, ... }
+- buildComparableFeatures(comps[]) -> GeoJSON Features w/ props: { type:'comp', status, price, ... }
+- buildBounds(subjectFeature, compFeatures) -> LngLatBounds covering all points
+- buildPolygon(subjectFeature, compFeatures) -> GeoJSON polygon Feature (convex hull or buffered hull)
+  - Use turf.js:
+    - points = turf.featureCollection([subjectFeature, ...compFeatures])
+    - hull = turf.convex(points) OR turf.concave(points, {maxEdge: ...})
+    - if hull is null (too few points), fallback to turf.buffer(subjectPoint, radiusKm)
+    - optional: turf.buffer(hull, 0.3, {units:'kilometers'}) for nicer area
+
+MAP LAYERS (ORDER MATTERS)
+Create ONE function: initCmaMap(map, data) that:
+1) Adds sources:
+   - 'cma-points' (GeoJSON FeatureCollection: subject + comps)
+   - 'cma-polygon' (GeoJSON FeatureCollection: polygon)
+2) Adds layers in this order (topmost last):
+   A) Polygon fill (below points)
+   B) Polygon outline
+   C) Cluster circles (for comps only; subject excluded)
+   D) Cluster count label
+   E) Comparable points (unclustered)
+   F) Subject point (always visible, on top)
+   G) Hover/selection halo (optional, via feature-state)
+3) Uses data-driven styling:
+   - Color by status:
+     ACTIVE = #2E7D32 (green)
+     PENDING = #F9A825 (amber)
+     SOLD = #C62828 (red)
+     UNKNOWN = #757575 (grey) BUT only if normalizeStatus returns UNKNOWN
+   - Subject is always blue or highlighted (e.g., #1565C0), regardless of status
+4) Adds “price pill” labels:
+   - Use symbol layer with formatted text like “$434K” from props.price
+   - Ensure label collision/placement works and doesn’t hide subject
+
+INTERACTIVITY (REQUIRED)
+Implement:
+1) Hover:
+   - On mousemove over comp points: setFeatureState({hover:true}) for that feature id
+   - Style hover with slightly larger radius + stronger outline + higher opacity
+2) Click:
+   - On click comp: setFeatureState({selected:true}) and open popup OR update a side panel
+   - Popup must show: address (if available), price, beds/baths, sqft, DOM, status
+3) Clustering:
+   - Enable cluster on comps only. Subject must NOT be clustered.
+   - Clicking a cluster zooms in (getClusterExpansionZoom)
+4) Controls:
+   - “Center on Subject”:
+     map.flyTo({ center: subjectLngLat, zoom: DEFAULT_SUBJECT_ZOOM, essential:true })
+   - “Fit All”:
+     map.fitBounds(allBounds, { padding: {top:40,right:40,bottom:40,left:40}, duration: 600 })
+   - Ensure these work even if data loads after map init:
+     - store latest computed subjectLngLat + bounds in state
+     - disable buttons until ready OR handle null gracefully
+
+POLYGON VISIBILITY FIX
+- Ensure polygon source exists and has valid coordinates (lng,lat order).
+- Ensure polygon fill opacity is visible (e.g., 0.08–0.12) and outline width 2.
+- Ensure polygon layers are ABOVE basemap but BELOW point layers.
+- Add a debug toggle to temporarily increase opacity if needed.
+
+STATUS FROM REPLIERS (NO GREY DEFAULT)
+- Do NOT set grey unless normalizeStatus returns UNKNOWN.
+- Confirm Repliers response has a status field; if missing, map it from known fields (e.g., “status”, “lastStatus”, “listingStatus”).
+- Add a small console warning for any comp with UNKNOWN after normalization.
+
+PERFORMANCE / UX
+- Use requestAnimationFrame or throttling for hover updates.
+- Keep markers as layers (not DOM markers) for performance.
+- Maintain a legend consistent with status colors and subject highlighting.
+
+ACCEPTANCE TEST CHECKLIST (MUST RUN)
+1) Map shows: 1 subject + N comps (N = “10 comparable properties found”).
+2) Polygon is visible and encloses subject+comps (or fallback buffer if few points).
+3) Colors: comps are green/amber/red based on Repliers status; grey only if truly unknown.
+4) Hover highlights a comp; click opens details; only one selected at a time.
+5) Clusters appear when zoomed out; click cluster zooms in.
+6) “Center on Subject” and “Fit All” always work.
+7) No regressions: subject label is always readable and on top.
+8) Basemap is the chosen clean/light style (or streets-v11 fallback) and overlays are clear.
+
+DELIVERABLES
+- Commit changes with:
+  - shared data builder module
+  - map init + update functions
+  - turf-based polygon generation
+  - fixed controls and status mapping
+- Add a short README section: “CMA Map Data Flow” + “How to verify polygon/status/controls”.
+
+IMPORTANT
+Do not hack with magic pixel offsets. Fix by:
+- correct GeoJSON
+- correct layer order
+- correct feature-state + bounds calculations
+- correct normalization of Repliers status

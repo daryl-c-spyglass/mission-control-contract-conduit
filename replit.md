@@ -86,3 +86,87 @@ Preferred communication style: Simple, everyday language.
 - **Mapbox**: For interactive property maps with dynamic styling.
 - **PostgreSQL**: Primary database for application data.
 - **GPT-4o-mini**: Used for AI-powered tagline generation and description summarization.
+- **Turf.js**: For geospatial operations like convex hull polygon generation and buffering in CMA maps.
+
+## CMA Map Data Flow
+
+### Architecture
+The CMA map uses a single source of truth pattern with shared data structures for both UI rendering and any export/preview features.
+
+**Key Files:**
+- `client/src/lib/cma-map-data.ts` - Shared data builder module (canonical data structures)
+- `client/src/components/cma-map.tsx` - Mapbox GL JS map component
+
+### Data Model
+```typescript
+// Status normalization
+type NormalizedStatus = 'ACTIVE' | 'PENDING' | 'SOLD' | 'UNKNOWN';
+
+// CmaMapModel - returned by buildCmaMapModel()
+interface CmaMapModel {
+  subjectFeature: CmaPointFeature | null;     // Subject property GeoJSON
+  compFeatures: CmaPointFeature[];            // Comparable properties GeoJSON
+  allPointsCollection: FeatureCollection;     // Combined for bounds
+  compsOnlyCollection: FeatureCollection;     // For clustering (excludes subject)
+  polygonFeature: CmaPolygonFeature | null;   // Convex hull search area
+  polygonCollection: FeatureCollection;       // For map layer
+  bounds: [[number, number], [number, number]] | null;
+  subjectLngLat: [number, number] | null;
+}
+```
+
+### Status Normalization
+`normalizeStatus(rawStatus)` maps Repliers API values:
+- ACTIVE: 'a', 'active', 'coming', 'new', 'available'
+- PENDING: 'u', 'p', 'pending', 'contract', 'contingent', 'backup', 'option', 'sc', 'k' (kick-out), 'b' (backup offer), 'h' (hold), 't' (temp off market)
+- SOLD: 's', 'sold', 'closed'
+- UNKNOWN: Only when no status data available, unrecognized codes, or withdrawn/cancelled/expired listings
+
+Note: Unknown status codes now surface warnings in console and return UNKNOWN to ensure data quality issues are visible.
+
+### Layer Order (bottom to top)
+1. Polygon fill (search area)
+2. Polygon outline
+3. Cluster circles (comps only)
+4. Cluster count labels
+5. Comparable points (unclustered)
+6. Comparable price labels
+7. Subject point (always on top)
+8. Subject label
+
+### Status Colors
+- ACTIVE: #2E7D32 (green)
+- PENDING: #F9A825 (amber)
+- SOLD: #C62828 (red)
+- UNKNOWN: #757575 (grey)
+- Subject: #1565C0 (blue, always)
+
+### Polygon Generation (turf.js)
+- 3+ points: `turf.convex()` → `turf.buffer(hull, 0.3km)`
+- 2 points: `turf.lineString()` → `turf.buffer(line, 0.3km)`
+- 1 point: `turf.buffer(point, 0.5km)`
+
+### Controls
+- **Center on Subject**: `map.flyTo({ center: subjectLngLat, zoom: 14 })`
+- **Fit All**: `map.fitBounds(bounds, { padding: 60 })`
+- Both use `map.resize()` first to handle responsive containers
+
+### Interactivity
+- **Hover**: Feature-state `{hover: true}` → larger radius + stronger stroke
+- **Click Comp**: Feature-state `{selected: true}` + popup with details
+- **Click Cluster**: `getClusterExpansionZoom()` → zoom in
+- **Canonical Property Lookup**: `propertyByFeatureId` Map provides direct access to original Property objects by feature ID
+
+### Theme Toggle Handling
+- Style effect only triggers on actual mapStyle changes (not on data changes)
+- Uses refs (`modelRef`, `isDarkRef`, `showPolygonRef`) to access latest values in styledata callback
+- Selection state (selected/hovered features) is captured before style change and restored after
+
+### Verification Steps
+1. Map shows subject (blue) + N comparables with correct status colors
+2. Polygon is visible and encloses all points (or buffer fallback)
+3. Colors match status (green/amber/red), grey only if truly unknown
+4. Hover highlights comparable, click opens details popup
+5. Clusters appear when zoomed out, clicking zooms in
+6. "Center on Subject" and "Fit All" buttons always work
+7. Subject label always readable and on top
