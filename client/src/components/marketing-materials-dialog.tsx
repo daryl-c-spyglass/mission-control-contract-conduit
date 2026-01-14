@@ -33,7 +33,7 @@ interface MarketingMaterialsDialogProps {
   initialData?: SocialGraphicConfig;
   assetId?: string;
   onAssetSaved?: () => void;
-  initialFormat?: 'square' | 'landscape' | 'story';
+  initialFormat?: 'instagram-post' | 'instagram-story' | 'facebook-post' | 'x-post' | 'tiktok-cover' | 'square' | 'landscape' | 'story';
 }
 
 const STATUS_OPTIONS = [
@@ -43,14 +43,18 @@ const STATUS_OPTIONS = [
   { value: "under_contract", label: "Under Contract" },
   { value: "just_sold", label: "Just Sold" },
   { value: "price_improvement", label: "Price Improvement" },
+  { value: "open_house", label: "Open House" },
+  { value: "coming_soon", label: "Coming Soon" },
 ] as const;
 
 type StatusType = typeof STATUS_OPTIONS[number]["value"];
 
 const FORMAT_OPTIONS = [
-  { id: 'square', name: 'Instagram Post', width: 1080, height: 1080, badge: 'Instagram Post', badgeColor: '#3b82f6' },
-  { id: 'landscape', name: 'Facebook Post', width: 1200, height: 630, badge: 'Facebook 16:9', badgeColor: '#8b5cf6' },
-  { id: 'story', name: 'Instagram Story', width: 1080, height: 1920, badge: 'Instagram Story', badgeColor: '#ec4899' },
+  { id: 'instagram-post', name: 'Instagram Post', width: 1080, height: 1080, badge: 'Instagram Post', badgeColor: '#3b82f6', ratio: '1:1' },
+  { id: 'instagram-story', name: 'Instagram Story', width: 1080, height: 1920, badge: 'Instagram Story', badgeColor: '#ec4899', ratio: '9:16' },
+  { id: 'facebook-post', name: 'Facebook Post', width: 1200, height: 630, badge: 'Facebook 16:9', badgeColor: '#8b5cf6', ratio: '1.91:1' },
+  { id: 'x-post', name: 'X (Twitter) Post', width: 1200, height: 675, badge: 'X Post', badgeColor: '#000000', ratio: '16:9' },
+  { id: 'tiktok-cover', name: 'TikTok Cover', width: 1080, height: 1920, badge: 'TikTok', badgeColor: '#00f2ea', ratio: '9:16' },
 ] as const;
 
 type FormatType = typeof FORMAT_OPTIONS[number];
@@ -160,13 +164,41 @@ export function MarketingMaterialsDialog({
   // Set initial format when dialog opens with initialFormat prop
   useEffect(() => {
     if (open && initialFormat) {
-      const format = FORMAT_OPTIONS.find(f => f.id === initialFormat);
+      // Map old format IDs to new ones for backwards compatibility
+      const formatIdMap: Record<string, string> = {
+        'square': 'instagram-post',
+        'landscape': 'facebook-post',
+        'story': 'instagram-story',
+      };
+      const mappedFormatId = formatIdMap[initialFormat] || initialFormat;
+      const format = FORMAT_OPTIONS.find(f => f.id === mappedFormatId);
       if (format) {
         setSelectedFormat(format);
       }
     }
   }, [open, initialFormat]);
   
+  // Auto-detect status from MLS when dialog opens
+  useEffect(() => {
+    if (open && !isEditMode) {
+      const mlsData = transaction.mlsData as any;
+      if (mlsData?.status) {
+        const mlsStatus = mlsData.status.toLowerCase();
+        let detectedStatus: StatusType = 'just_listed';
+        if (mlsStatus.includes('contract') || mlsStatus.includes('pending')) {
+          detectedStatus = 'under_contract';
+        } else if (mlsStatus.includes('sold') || mlsStatus.includes('closed')) {
+          detectedStatus = 'just_sold';
+        } else if (mlsStatus.includes('lease')) {
+          detectedStatus = 'for_lease';
+        } else if (mlsStatus.includes('coming')) {
+          detectedStatus = 'coming_soon';
+        }
+        setStatus(detectedStatus);
+      }
+    }
+  }, [open, isEditMode, transaction.mlsData]);
+
   // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
@@ -191,6 +223,8 @@ export function MarketingMaterialsDialog({
       'under_contract': '#3b82f6',
       'just_sold': '#ef4444',
       'price_improvement': '#8b5cf6',
+      'open_house': '#3b82f6',
+      'coming_soon': '#14b8a6',
     };
     return colors[statusValue] || '#f97316';
   };
@@ -340,9 +374,9 @@ export function MarketingMaterialsDialog({
 
       // Generate graphic based on selected format
       let generatedDataUrl: string;
-      if (selectedFormat.id === 'landscape') {
+      if (selectedFormat.id === 'facebook-post' || selectedFormat.id === 'x-post') {
         generatedDataUrl = await generateLandscapeGraphic(img);
-      } else if (selectedFormat.id === 'story') {
+      } else if (selectedFormat.id === 'instagram-story' || selectedFormat.id === 'tiktok-cover') {
         generatedDataUrl = await generateStoryGraphic(img);
       } else {
         // Default to square (Instagram Post)
@@ -1135,12 +1169,12 @@ Thank you for your interest!`;
                   data-testid={`button-format-${format.id}`}
                 >
                   <div className={`rounded border-2 border-current mb-2 flex items-center justify-center text-muted-foreground ${
-                    format.id === 'square' ? "w-10 h-10" :
-                    format.id === 'landscape' ? "w-14 h-8" :
+                    format.ratio === '1:1' ? "w-10 h-10" :
+                    (format.ratio === '16:9' || format.ratio === '1.91:1') ? "w-14 h-8" :
                     "w-6 h-10"
                   }`}>
                     <span className="text-[10px]">
-                      {format.id === 'square' ? '1:1' : format.id === 'landscape' ? '16:9' : '9:16'}
+                      {format.ratio}
                     </span>
                   </div>
                   <span className="text-sm font-medium">{format.name}</span>
@@ -1316,8 +1350,8 @@ Thank you for your interest!`;
               <Card>
                 <CardContent className="pt-4">
                   <div className={`relative overflow-hidden rounded-lg mx-auto ${
-                    selectedFormat.id === 'square' ? "aspect-square max-w-md" :
-                    selectedFormat.id === 'landscape' ? "aspect-video" :
+                    selectedFormat.ratio === '1:1' ? "aspect-square max-w-md" :
+                    (selectedFormat.ratio === '16:9' || selectedFormat.ratio === '1.91:1') ? "aspect-video" :
                     "aspect-[9/16] max-h-[500px]"
                   }`}>
                     <img
@@ -1330,8 +1364,9 @@ Thank you for your interest!`;
                   <Button
                     className="w-full mt-4"
                     onClick={() => {
-                      const formatType = selectedFormat.id === 'landscape' ? 'facebook' : 
-                                        selectedFormat.id === 'story' ? 'story' : 'instagram';
+                      const formatType = selectedFormat.id.includes('facebook') ? 'facebook' : 
+                                        selectedFormat.id.includes('story') || selectedFormat.id.includes('tiktok') ? 'story' : 
+                                        selectedFormat.id.includes('x-post') ? 'x' : 'instagram';
                       downloadImage(
                         generatedImage, 
                         `${transaction.propertyAddress.replace(/[^a-z0-9]/gi, "_")}_${selectedFormat.id}.png`, 

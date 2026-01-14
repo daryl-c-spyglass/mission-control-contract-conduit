@@ -2174,82 +2174,63 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           </div>
 
           {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Create Graphics Card */}
-            <Card 
-              className="cursor-pointer hover:border-primary transition-colors hover-elevate"
-              onClick={() => setGraphicsDialogOpen(true)}
-              data-testid="card-create-graphics"
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-pink-500/10 rounded-lg">
-                    <ImageIcon className="h-6 w-6 text-pink-500" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Create Graphics</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Social media posts & stories
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Card 
+                  className="cursor-pointer hover:border-primary transition-colors hover-elevate"
+                  onClick={() => setGraphicsDialogOpen(true)}
+                  data-testid="card-create-graphics"
+                >
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-pink-500/10 rounded-lg">
+                        <ImageIcon className="h-6 w-6 text-pink-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">Create Graphics</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Social media posts & stories
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Create Instagram, Facebook, X, and TikTok graphics</p>
+              </TooltipContent>
+            </Tooltip>
 
             {/* Create Flyer Card */}
-            <Card 
-              className="cursor-pointer hover:border-primary transition-colors hover-elevate"
-              onClick={() => setFlyerDialogOpen(true)}
-              data-testid="card-create-flyer"
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-orange-500/10 rounded-lg">
-                    <FileImage className="h-6 w-6 text-orange-500" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Create Flyer</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Print-ready PDF flyer
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Quick Create All Card */}
-            <Card 
-              className="cursor-pointer hover:border-primary transition-colors hover-elevate bg-gradient-to-br from-primary/5 to-primary/10"
-              onClick={() => setGraphicsDialogOpen(true)}
-              data-testid="card-quick-create"
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-primary/20 rounded-lg">
-                    <Flame className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Quick Create All</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Post + Story + Facebook
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Card 
+                  className="cursor-pointer hover:border-primary transition-colors hover-elevate"
+                  onClick={() => setFlyerDialogOpen(true)}
+                  data-testid="card-create-flyer"
+                >
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-orange-500/10 rounded-lg">
+                        <FileImage className="h-6 w-6 text-orange-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">Create Flyer</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Print-ready PDF & PNG flyers
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Generate professional property flyers for print</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
-
-          {/* AI Features Info Banner */}
-          <Card className="bg-muted/50">
-            <CardContent className="py-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Activity className="h-4 w-4 text-yellow-500" />
-                <span>
-                  AI automatically selects the best property photos and generates professional descriptions
-                </span>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* My Assets Header */}
           <div className="flex items-center justify-between gap-4 flex-wrap">

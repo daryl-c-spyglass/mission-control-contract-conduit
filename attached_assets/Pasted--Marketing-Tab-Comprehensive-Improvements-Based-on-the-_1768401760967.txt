@@ -1,0 +1,1178 @@
+## Marketing Tab - Comprehensive Improvements
+
+Based on the sample graphics review and user feedback, here are the required improvements.
+
+---
+
+## Sample Graphics Review
+
+### Issues Identified
+
+| Graphic | Issue | Fix |
+|---------|-------|-----|
+| Instagram Post (Square) | Shows "FOR LEASE" but property is for sale | Use correct status badge from MLS |
+| Instagram Story | Description truncated: "Steps from Trails & Ea..." | Limit description or adjust font size |
+| All formats | Need quality parity with Create Flyer | Use same Puppeteer rendering pipeline |
+
+### What's Working Well ✅
+- Spyglass Realty logo placement
+- Agent headshot integration
+- Dark header/footer bars
+- Orange status badge styling
+- Price display formatting
+- Professional layout structure
+
+---
+
+## Required Changes
+
+### 1. Remove Quick Create All Button
+
+```tsx
+// DELETE this entire card from marketing-tab.tsx
+<Card onClick={handleQuickCreateAll}>
+  <CardContent>
+    <div className="flex items-center gap-4">
+      <Sparkles className="h-6 w-6" />
+      <div>
+        <h3>Quick Create All</h3>
+        <p>Post + Story + Facebook</p>
+      </div>
+    </div>
+  </CardContent>
+</Card>
+```
+
+### 2. Remove "AI automatically selects..." Text
+
+```tsx
+// DELETE this line from marketing-tab.tsx
+<p className="text-sm text-muted-foreground">
+  AI automatically selects the best property photos and generates professional descriptions
+</p>
+```
+
+### 3. Simplify to Two Buttons Only
+
+```tsx
+// Marketing tab should only have these two cards:
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  {/* Create Graphics */}
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <Card 
+        className="cursor-pointer hover:border-primary transition-colors"
+        onClick={() => setCreateGraphicsOpen(true)}
+      >
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-pink-100 rounded-lg">
+              <Image className="h-6 w-6 text-pink-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Create Graphics</h3>
+              <p className="text-sm text-muted-foreground">
+                Social media posts & stories
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </TooltipTrigger>
+    <TooltipContent>
+      <p>Create Instagram, Facebook, X, and TikTok graphics</p>
+    </TooltipContent>
+  </Tooltip>
+
+  {/* Create Flyer */}
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <Card 
+        className="cursor-pointer hover:border-primary transition-colors"
+        onClick={() => setCreateFlyerOpen(true)}
+      >
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-orange-100 rounded-lg">
+              <FileText className="h-6 w-6 text-orange-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Create Flyer</h3>
+              <p className="text-sm text-muted-foreground">
+                Print-ready PDF & PNG flyers
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </TooltipTrigger>
+    <TooltipContent>
+      <p>Generate professional property flyers for print</p>
+    </TooltipContent>
+  </Tooltip>
+</div>
+```
+
+---
+
+## Create Graphics Dialog - Enhanced
+
+### Social Media Formats (Including X/Twitter)
+
+```typescript
+// lib/social-formats.ts
+export const SOCIAL_FORMATS = [
+  { 
+    id: 'instagram-post', 
+    name: 'Instagram Post', 
+    platform: 'Instagram',
+    width: 1080, 
+    height: 1080, 
+    ratio: '1:1',
+    icon: 'Instagram',
+    description: 'Square format for feed posts'
+  },
+  { 
+    id: 'instagram-story', 
+    name: 'Instagram Story', 
+    platform: 'Instagram',
+    width: 1080, 
+    height: 1920, 
+    ratio: '9:16',
+    icon: 'Instagram',
+    description: 'Vertical format for stories & reels'
+  },
+  { 
+    id: 'facebook-post', 
+    name: 'Facebook Post', 
+    platform: 'Facebook',
+    width: 1200, 
+    height: 630, 
+    ratio: '1.91:1',
+    icon: 'Facebook',
+    description: 'Landscape format for feed posts'
+  },
+  { 
+    id: 'x-post', 
+    name: 'X (Twitter) Post', 
+    platform: 'X',
+    width: 1200, 
+    height: 675, 
+    ratio: '16:9',
+    icon: 'Twitter',
+    description: 'Landscape format for tweets'
+  },
+  { 
+    id: 'tiktok-cover', 
+    name: 'TikTok Cover', 
+    platform: 'TikTok',
+    width: 1080, 
+    height: 1920, 
+    ratio: '9:16',
+    icon: 'TikTok',
+    description: 'Vertical format for video covers'
+  },
+];
+```
+
+### Photo Selection - Match Create Flyer Style
+
+```tsx
+// components/create-graphics-dialog.tsx
+import { useState, useEffect, useMemo } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Sparkles, Download, ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+import { SOCIAL_FORMATS } from '@/lib/social-formats';
+
+interface CreateGraphicsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  transaction: any;
+  mlsData: any;
+  onSuccess?: () => void;
+}
+
+const STATUS_OPTIONS = [
+  { value: 'Just Listed', label: 'Just Listed', color: 'bg-orange-500' },
+  { value: 'Open House', label: 'Open House', color: 'bg-blue-500' },
+  { value: 'Price Reduced', label: 'Price Reduced', color: 'bg-red-500' },
+  { value: 'Under Contract', label: 'Under Contract', color: 'bg-purple-500' },
+  { value: 'Coming Soon', label: 'Coming Soon', color: 'bg-teal-500' },
+  { value: 'Just Sold', label: 'Just Sold', color: 'bg-green-500' },
+  { value: 'For Lease', label: 'For Lease', color: 'bg-amber-500' },
+];
+
+export function CreateGraphicsDialog({ 
+  open, 
+  onOpenChange, 
+  transaction, 
+  mlsData,
+  onSuccess 
+}: CreateGraphicsDialogProps) {
+  const [selectedFormat, setSelectedFormat] = useState(SOCIAL_FORMATS[0]);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [status, setStatus] = useState('Just Listed');
+  const [description, setDescription] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  // Get photos from MLS data
+  const photos = useMemo(() => mlsData?.images || [], [mlsData]);
+  const currentPhoto = photos[currentPhotoIndex];
+  const totalPhotos = photos.length;
+
+  // Auto-select best photo using Repliers Image Insights
+  useEffect(() => {
+    if (open && mlsData?.imageInsights) {
+      // Find the best exterior/front photo
+      const insights = mlsData.imageInsights;
+      const bestPhotoIndex = insights.findIndex((insight: any) => 
+        insight.category?.toLowerCase().includes('exterior') ||
+        insight.category?.toLowerCase().includes('front') ||
+        insight.isPrimary
+      );
+      
+      if (bestPhotoIndex >= 0) {
+        setCurrentPhotoIndex(bestPhotoIndex);
+      }
+    }
+  }, [open, mlsData]);
+
+  // Set default status based on MLS status
+  useEffect(() => {
+    if (open && mlsData?.status) {
+      const mlsStatus = mlsData.status.toLowerCase();
+      if (mlsStatus.includes('contract') || mlsStatus.includes('pending')) {
+        setStatus('Under Contract');
+      } else if (mlsStatus.includes('sold') || mlsStatus.includes('closed')) {
+        setStatus('Just Sold');
+      } else if (mlsStatus.includes('lease')) {
+        setStatus('For Lease');
+      } else {
+        setStatus('Just Listed');
+      }
+    }
+  }, [open, mlsData]);
+
+  // Navigate photos
+  const prevPhoto = () => {
+    setCurrentPhotoIndex((prev) => (prev === 0 ? totalPhotos - 1 : prev - 1));
+  };
+
+  const nextPhoto = () => {
+    setCurrentPhotoIndex((prev) => (prev === totalPhotos - 1 ? 0 : prev + 1));
+  };
+
+  // AI description generation
+  const handleAISuggest = async () => {
+    setIsLoadingAI(true);
+    try {
+      const response = await fetch('/api/ai/generate-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mlsDescription: mlsData?.description || mlsData?.remarks,
+          propertyDetails: {
+            beds: mlsData?.numBedrooms || mlsData?.details?.numBedrooms,
+            baths: mlsData?.numBathrooms || mlsData?.details?.numBathrooms,
+            sqft: mlsData?.sqft || mlsData?.details?.sqft,
+            address: transaction.address,
+            price: mlsData?.listPrice,
+            features: mlsData?.features,
+          },
+          maxLength: 80,
+          format: selectedFormat.id,
+        }),
+      });
+      const data = await response.json();
+      setDescription(data.description || '');
+    } catch (error) {
+      toast({ title: 'Failed to generate description', variant: 'destructive' });
+    } finally {
+      setIsLoadingAI(false);
+    }
+  };
+
+  // Generate graphic
+  const handleGenerate = async () => {
+    if (!currentPhoto) {
+      toast({ title: 'Please select a photo', variant: 'destructive' });
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/graphics/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId: transaction.id,
+          format: selectedFormat.id,
+          width: selectedFormat.width,
+          height: selectedFormat.height,
+          photoUrl: currentPhoto,
+          status,
+          description,
+          address: transaction.address,
+          price: mlsData?.listPrice,
+          beds: mlsData?.numBedrooms || mlsData?.details?.numBedrooms,
+          baths: mlsData?.numBathrooms || mlsData?.details?.numBathrooms,
+          sqft: mlsData?.sqft || mlsData?.details?.sqft,
+          agentName: transaction.agentName || 'Agent Name',
+          agentPhone: transaction.agentPhone,
+          agentLicense: transaction.agentLicense,
+          agentPhoto: transaction.agentPhoto,
+          brokerageLogo: '/spyglass-logo.png',
+          saveToAssets: true,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to generate');
+
+      const blob = await response.blob();
+      const filename = `${transaction.address.replace(/[^a-z0-9]/gi, '_')}_${selectedFormat.id}.png`;
+      
+      // Download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      toast({ title: `${selectedFormat.name} created successfully!` });
+      onSuccess?.();
+      onOpenChange(false);
+    } catch (error) {
+      toast({ title: 'Failed to generate graphic', variant: 'destructive' });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <TooltipProvider>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Create Social Media Graphic
+              <Tooltip>
+                <TooltipTrigger>
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Generate professional graphics for social media platforms</p>
+                </TooltipContent>
+              </Tooltip>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="grid grid-cols-2 gap-6">
+            {/* Left Column: Options */}
+            <div className="space-y-5">
+              
+              {/* Format Selection */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Label>Platform & Format</Label>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Select the social media platform and format</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {SOCIAL_FORMATS.map((format) => (
+                    <Tooltip key={format.id}>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => setSelectedFormat(format)}
+                          className={cn(
+                            "flex items-center gap-2 p-3 rounded-lg border-2 text-left transition-all",
+                            selectedFormat.id === format.id
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-primary/50"
+                          )}
+                        >
+                          <div className="flex-shrink-0">
+                            <PlatformIcon platform={format.platform} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{format.name}</p>
+                            <p className="text-xs text-muted-foreground">{format.ratio}</p>
+                          </div>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{format.description}</p>
+                        <p className="text-xs text-muted-foreground">{format.width} x {format.height}px</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
+              </div>
+
+              {/* Photo Selection - Create Flyer Style */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Label>Property Photo</Label>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Best photo auto-selected using Repliers Image Insights</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Badge variant="secondary" className="text-xs">
+                    {currentPhotoIndex + 1} of {totalPhotos}
+                  </Badge>
+                </div>
+                
+                {/* Photo Carousel - Same as Create Flyer */}
+                <div className="relative aspect-video rounded-lg overflow-hidden bg-muted border">
+                  {currentPhoto ? (
+                    <img 
+                      src={currentPhoto} 
+                      alt={`Photo ${currentPhotoIndex + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      No photos available
+                    </div>
+                  )}
+                  
+                  {/* Navigation arrows */}
+                  {totalPhotos > 1 && (
+                    <>
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full opacity-80 hover:opacity-100"
+                        onClick={prevPhoto}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full opacity-80 hover:opacity-100"
+                        onClick={nextPhoto}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+
+                {/* Thumbnail strip */}
+                {totalPhotos > 1 && (
+                  <div className="flex gap-1 mt-2 overflow-x-auto pb-1">
+                    {photos.slice(0, 10).map((photo: string, idx: number) => (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentPhotoIndex(idx)}
+                        className={cn(
+                          "flex-shrink-0 w-12 h-12 rounded overflow-hidden border-2 transition-all",
+                          currentPhotoIndex === idx
+                            ? "border-primary ring-1 ring-primary"
+                            : "border-transparent opacity-60 hover:opacity-100"
+                        )}
+                      >
+                        <img src={photo} alt="" className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                    {totalPhotos > 10 && (
+                      <div className="flex-shrink-0 w-12 h-12 rounded bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                        +{totalPhotos - 10}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Status Badge */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Label>Status Badge</Label>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Auto-detected from MLS status</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <div className="flex items-center gap-2">
+                          <div className={cn("w-3 h-3 rounded", opt.color)} />
+                          {opt.label}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Description */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Label>Description</Label>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Optional tagline for the graphic (max 80 characters)</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={handleAISuggest}
+                        disabled={isLoadingAI}
+                      >
+                        {isLoadingAI ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                        ) : (
+                          <Sparkles className="h-4 w-4 mr-1" />
+                        )}
+                        AI Suggest
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Generate a catchy description using AI</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Input
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  maxLength={80}
+                  placeholder="e.g. Stunning 4BR with Chef's Kitchen"
+                />
+                <p className="text-xs text-muted-foreground mt-1 text-right">
+                  {description.length}/80
+                </p>
+              </div>
+            </div>
+
+            {/* Right Column: Preview */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Label>Preview</Label>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Final output will match Create Flyer quality</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div 
+                className={cn(
+                  "bg-gray-900 rounded-lg flex items-center justify-center overflow-hidden border",
+                  selectedFormat.ratio === '1:1' && "aspect-square",
+                  selectedFormat.ratio === '9:16' && "aspect-[9/16] max-h-[450px]",
+                  (selectedFormat.ratio === '1.91:1' || selectedFormat.ratio === '16:9') && "aspect-video"
+                )}
+              >
+                {currentPhoto ? (
+                  <div className="relative w-full h-full">
+                    <img 
+                      src={currentPhoto} 
+                      alt="Preview" 
+                      className="w-full h-full object-cover"
+                    />
+                    {/* Overlay preview - simplified */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-gray-900/90 p-3">
+                      <Badge className="bg-orange-500 text-white mb-1">{status.toUpperCase()}</Badge>
+                      <p className="text-white font-semibold text-sm">{transaction.address}</p>
+                      {description && (
+                        <p className="text-gray-300 text-xs truncate">{description}</p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-sm">Select a photo</p>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground text-center">
+                {selectedFormat.name} • {selectedFormat.width} x {selectedFormat.height}px
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="mt-6">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button onClick={handleGenerate} disabled={isGenerating || !currentPhoto}>
+                  {isGenerating ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  Generate & Download
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Generate high-quality PNG and download</p>
+              </TooltipContent>
+            </Tooltip>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </TooltipProvider>
+  );
+}
+
+// Platform icon component
+function PlatformIcon({ platform }: { platform: string }) {
+  const iconClass = "h-5 w-5";
+  
+  switch (platform) {
+    case 'Instagram':
+      return (
+        <svg className={iconClass} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+        </svg>
+      );
+    case 'Facebook':
+      return (
+        <svg className={iconClass} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+        </svg>
+      );
+    case 'X':
+      return (
+        <svg className={iconClass} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+        </svg>
+      );
+    case 'TikTok':
+      return (
+        <svg className={iconClass} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+```
+
+---
+
+## Create Flyer Dialog - Simplified (Print Only)
+
+Remove social media format selection, focus only on print flyers:
+
+```tsx
+// components/create-flyer-dialog.tsx
+import { useState, useEffect, useMemo } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Download, ChevronLeft, ChevronRight, Info, FileImage, FileText } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+
+interface CreateFlyerDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  transaction: any;
+  mlsData: any;
+  onSuccess?: () => void;
+}
+
+const STATUS_OPTIONS = [
+  { value: 'Just Listed', label: 'Just Listed' },
+  { value: 'Open House', label: 'Open House' },
+  { value: 'Price Reduced', label: 'Price Reduced' },
+  { value: 'Under Contract', label: 'Under Contract' },
+  { value: 'Coming Soon', label: 'Coming Soon' },
+  { value: 'Just Sold', label: 'Just Sold' },
+  { value: 'For Lease', label: 'For Lease' },
+];
+
+const OUTPUT_FORMATS = [
+  { value: 'pdf', label: 'PDF', icon: FileText, description: 'Print-ready PDF document' },
+  { value: 'png', label: 'PNG', icon: FileImage, description: 'High-resolution image' },
+];
+
+export function CreateFlyerDialog({ 
+  open, 
+  onOpenChange, 
+  transaction, 
+  mlsData,
+  onSuccess 
+}: CreateFlyerDialogProps) {
+  const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
+  const [status, setStatus] = useState('Just Listed');
+  const [description, setDescription] = useState('');
+  const [outputFormat, setOutputFormat] = useState('pdf');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const { toast } = useToast();
+
+  const photos = useMemo(() => mlsData?.images || [], [mlsData]);
+
+  // Auto-select first 3 photos
+  useEffect(() => {
+    if (open && photos.length > 0) {
+      setSelectedPhotos(photos.slice(0, 3));
+      setDescription(mlsData?.description || mlsData?.remarks || '');
+    }
+  }, [open, photos, mlsData]);
+
+  // Set default status
+  useEffect(() => {
+    if (open && mlsData?.status) {
+      const mlsStatus = mlsData.status.toLowerCase();
+      if (mlsStatus.includes('contract') || mlsStatus.includes('pending')) {
+        setStatus('Under Contract');
+      } else if (mlsStatus.includes('sold') || mlsStatus.includes('closed')) {
+        setStatus('Just Sold');
+      } else {
+        setStatus('Just Listed');
+      }
+    }
+  }, [open, mlsData]);
+
+  const togglePhotoSelection = (photo: string) => {
+    if (selectedPhotos.includes(photo)) {
+      setSelectedPhotos(selectedPhotos.filter(p => p !== photo));
+    } else if (selectedPhotos.length < 3) {
+      setSelectedPhotos([...selectedPhotos, photo]);
+    } else {
+      toast({ title: 'Maximum 3 photos allowed', variant: 'destructive' });
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (selectedPhotos.length === 0) {
+      toast({ title: 'Please select at least one photo', variant: 'destructive' });
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/flyer/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId: transaction.id,
+          photos: selectedPhotos,
+          status,
+          description,
+          outputFormat,
+          address: transaction.address,
+          price: mlsData?.listPrice,
+          beds: mlsData?.numBedrooms || mlsData?.details?.numBedrooms,
+          baths: mlsData?.numBathrooms || mlsData?.details?.numBathrooms,
+          sqft: mlsData?.sqft || mlsData?.details?.sqft,
+          yearBuilt: mlsData?.yearBuilt || mlsData?.details?.yearBuilt,
+          agentName: transaction.agentName,
+          agentPhone: transaction.agentPhone,
+          agentPhoto: transaction.agentPhoto,
+          brokerageLogo: '/spyglass-logo.png',
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to generate flyer');
+
+      const blob = await response.blob();
+      const ext = outputFormat === 'pdf' ? 'pdf' : 'png';
+      const filename = `${transaction.address.replace(/[^a-z0-9]/gi, '_')}_flyer.${ext}`;
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      toast({ title: `Flyer created successfully!` });
+      onSuccess?.();
+      onOpenChange(false);
+    } catch (error) {
+      toast({ title: 'Failed to generate flyer', variant: 'destructive' });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <TooltipProvider>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Create Property Flyer
+              <Tooltip>
+                <TooltipTrigger>
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Generate print-ready property flyers (8.5" x 11")</p>
+                </TooltipContent>
+              </Tooltip>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* Photo Selection */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Label>Property Photos</Label>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Select up to 3 photos for the flyer</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Badge variant="secondary">
+                  {selectedPhotos.length}/3 selected
+                </Badge>
+              </div>
+              
+              <div className="grid grid-cols-6 gap-2 max-h-48 overflow-y-auto">
+                {photos.map((photo: string, idx: number) => (
+                  <Tooltip key={idx}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => togglePhotoSelection(photo)}
+                        className={cn(
+                          "aspect-square rounded-lg overflow-hidden border-2 transition-all relative",
+                          selectedPhotos.includes(photo)
+                            ? "border-primary ring-2 ring-primary/20"
+                            : "border-transparent hover:border-primary/50"
+                        )}
+                      >
+                        <img src={photo} alt="" className="w-full h-full object-cover" />
+                        {selectedPhotos.includes(photo) && (
+                          <div className="absolute top-1 right-1 w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center text-xs font-bold">
+                            {selectedPhotos.indexOf(photo) + 1}
+                          </div>
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Click to {selectedPhotos.includes(photo) ? 'deselect' : 'select'}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+            </div>
+
+            {/* Status & Output Format Row */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Label>Status</Label>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Listing status badge for the flyer</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Label>Output Format</Label>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>PDF for printing, PNG for digital sharing</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="flex gap-2">
+                  {OUTPUT_FORMATS.map((format) => (
+                    <Tooltip key={format.value}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={outputFormat === format.value ? 'default' : 'outline'}
+                          className="flex-1"
+                          onClick={() => setOutputFormat(format.value)}
+                        >
+                          <format.icon className="h-4 w-4 mr-2" />
+                          {format.label}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{format.description}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Label>Property Description</Label>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Auto-populated from MLS, editable</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                maxLength={500}
+                placeholder="Property description..."
+              />
+              <p className="text-xs text-muted-foreground mt-1 text-right">
+                {description.length}/500
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="mt-6">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button onClick={handleGenerate} disabled={isGenerating || selectedPhotos.length === 0}>
+                  {isGenerating ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  Generate Flyer
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Generate and download {outputFormat.toUpperCase()} flyer</p>
+              </TooltipContent>
+            </Tooltip>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </TooltipProvider>
+  );
+}
+```
+
+---
+
+## Graphics Quality - Use Same Puppeteer Pipeline
+
+Ensure graphics use the same high-quality rendering as flyers:
+
+```typescript
+// server/routes/graphics.ts
+import puppeteer from 'puppeteer';
+import Handlebars from 'handlebars';
+import fs from 'fs';
+import path from 'path';
+
+app.post('/api/graphics/render', async (req, res) => {
+  const {
+    format,
+    width,
+    height,
+    photoUrl,
+    status,
+    description,
+    address,
+    price,
+    beds,
+    baths,
+    sqft,
+    agentName,
+    agentPhone,
+    agentLicense,
+    agentPhoto,
+    brokerageLogo,
+    transactionId,
+    saveToAssets,
+  } = req.body;
+
+  try {
+    // Convert photo to base64 for reliable rendering
+    const photoBase64 = await fetchImageAsBase64(photoUrl);
+    const logoBase64 = await fetchImageAsBase64(brokerageLogo);
+    const agentPhotoBase64 = agentPhoto ? await fetchImageAsBase64(agentPhoto) : null;
+
+    // Select template based on format
+    const templateName = getTemplateName(format);
+    const templatePath = path.join(__dirname, `../templates/graphics/${templateName}.hbs`);
+    const templateSource = fs.readFileSync(templatePath, 'utf-8');
+    const template = Handlebars.compile(templateSource);
+
+    // Render HTML
+    const html = template({
+      photoBase64,
+      logoBase64,
+      agentPhotoBase64,
+      status: status.toUpperCase(),
+      description,
+      address,
+      price: formatPrice(price),
+      beds,
+      baths,
+      sqft: sqft?.toLocaleString(),
+      agentName,
+      agentPhone,
+      agentLicense,
+      width,
+      height,
+    });
+
+    // Launch Puppeteer with same settings as flyer
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+
+    const page = await browser.newPage();
+    
+    // Set viewport to exact dimensions
+    await page.setViewport({
+      width,
+      height,
+      deviceScaleFactor: 2, // 2x for high quality (same as flyer)
+    });
+
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+
+    // High-quality PNG screenshot
+    const imageBuffer = await page.screenshot({
+      type: 'png',
+      fullPage: false,
+      omitBackground: false,
+    });
+
+    await browser.close();
+
+    // Save to assets if requested
+    if (saveToAssets && transactionId) {
+      await saveMarketingAsset(transactionId, format, imageBuffer);
+    }
+
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `attachment; filename="${address}_${format}.png"`);
+    res.send(imageBuffer);
+
+  } catch (error) {
+    console.error('Graphics render error:', error);
+    res.status(500).json({ error: 'Failed to generate graphic' });
+  }
+});
+
+function getTemplateName(format: string): string {
+  switch (format) {
+    case 'instagram-post': return 'square';
+    case 'instagram-story': return 'story';
+    case 'tiktok-cover': return 'story';
+    case 'facebook-post': return 'landscape';
+    case 'x-post': return 'landscape';
+    default: return 'square';
+  }
+}
+```
+
+---
+
+## Summary of Changes
+
+| Change | Action |
+|--------|--------|
+| Remove Quick Create All | Delete button and handler |
+| Remove AI text | Delete "AI automatically selects..." paragraph |
+| Add X (Twitter) | Add to SOCIAL_FORMATS array |
+| Photo selection style | Match Create Flyer carousel style |
+| Auto-select photos | Use Repliers Image Insights |
+| Create Flyer simplify | Remove social media formats, PNG + PDF only |
+| Add tooltips | Add to all labels and buttons |
+| Quality parity | Use same Puppeteer pipeline with 2x deviceScaleFactor |
+| Fix status badge | Auto-detect from MLS status |
+
+---
+
+## Final Marketing Tab Layout
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Marketing                                                       │
+│ Create and manage marketing materials for 13106 New Boston      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────────────┐  ┌─────────────────────────┐      │
+│  │ 🎨 Create Graphics      │  │ 📄 Create Flyer         │      │
+│  │    Social media posts   │  │    Print-ready PDF/PNG  │      │
+│  │    & stories            │  │    flyers               │      │
+│  └─────────────────────────┘  └─────────────────────────┘      │
+│                                                                 │
+│ My Assets (6)                                    [Filter: All]  │
+│ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐                    │
+│ │ Story  │ │ Post   │ │ FB     │ │ Flyer  │                    │
+│ └────────┘ └────────┘ └────────┘ └────────┘                    │
+└─────────────────────────────────────────────────────────────────┘
+```
