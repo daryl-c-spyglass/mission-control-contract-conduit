@@ -16,7 +16,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ createDialogOpen, setCreateDialogOpen }: DashboardProps) {
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [initialTab, setInitialTab] = useState<string>("overview");
@@ -29,9 +29,29 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen }: Das
     queryKey: ["/api/coordinators"],
   });
 
+  // Fetch the full transaction details when selected (this triggers CMA coordinate enrichment)
+  // staleTime: 0 ensures fresh data is fetched, not from cache
+  // queryFn uses context.queryKey to avoid stale closure issues
+  const { data: selectedTransaction, isLoading: selectedLoading, error: selectedError } = useQuery<Transaction>({
+    queryKey: ["/api/transactions", selectedTransactionId] as const,
+    queryFn: async ({ queryKey }) => {
+      const id = queryKey[1];
+      if (!id) throw new Error("No transaction ID provided");
+      console.log("[DEBUG] Fetching individual transaction:", id);
+      const res = await fetch(`/api/transactions/${id}`, { credentials: "include" });
+      if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+      return res.json();
+    },
+    enabled: !!selectedTransactionId,
+    staleTime: 0,
+  });
+  
+  // Debug log for individual transaction query
+  console.log("[DEBUG] Individual transaction query - id:", selectedTransactionId, "loading:", selectedLoading, "error:", selectedError, "data:", !!selectedTransaction);
+
   const { data: activities = [] } = useQuery<Activity[]>({
-    queryKey: ["/api/transactions", selectedTransaction?.id, "activities"],
-    enabled: !!selectedTransaction,
+    queryKey: ["/api/transactions", selectedTransactionId, "activities"],
+    enabled: !!selectedTransactionId,
   });
 
   const filteredTransactions = transactions.filter((t) => {
@@ -49,14 +69,14 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen }: Das
     return matchesSearch && matchesStatus;
   });
 
-  if (selectedTransaction) {
+  if (selectedTransactionId && selectedTransaction) {
     return (
       <TransactionDetails
         transaction={selectedTransaction}
         coordinators={coordinators}
         activities={activities}
         onBack={() => {
-          setSelectedTransaction(null);
+          setSelectedTransactionId(null);
           setInitialTab("overview");
         }}
         initialTab={initialTab}
@@ -117,18 +137,18 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen }: Das
               key={transaction.id}
               transaction={transaction}
               coordinators={coordinators}
-              onClick={() => setSelectedTransaction(transaction)}
+              onClick={() => setSelectedTransactionId(transaction.id)}
               onMarketingClick={() => {
                 setInitialTab("marketing");
-                setSelectedTransaction(transaction);
+                setSelectedTransactionId(transaction.id);
               }}
               onMLSClick={() => {
                 setInitialTab("mls");
-                setSelectedTransaction(transaction);
+                setSelectedTransactionId(transaction.id);
               }}
               onDocsClick={() => {
                 setInitialTab("docs");
-                setSelectedTransaction(transaction);
+                setSelectedTransactionId(transaction.id);
               }}
             />
           ))}

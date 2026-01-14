@@ -87,22 +87,89 @@ function calculateConvexHull(points: [number, number][]): [number, number][] {
   return lower.concat(upper);
 }
 
+// Parse WKT POINT string to extract coordinates
+// Format: "POINT (-97.71673184 30.28215462)"
+function parseWktPoint(wkt: string | null | undefined): [number, number] | null {
+  if (!wkt || typeof wkt !== 'string') return null;
+  const match = wkt.match(/POINT\s*\(\s*(-?[\d.]+)\s+(-?[\d.]+)\s*\)/i);
+  if (match) {
+    const lng = parseFloat(match[1]);
+    const lat = parseFloat(match[2]);
+    if (!isNaN(lng) && !isNaN(lat)) {
+      return [lng, lat];
+    }
+  }
+  return null;
+}
+
 // Extract coordinates from a property, handling multiple possible field locations
 // Returns [lng, lat] (Mapbox format) or null if not found
+// Handles all known Repliers API coordinate formats:
+// - map.latitude/longitude (standard)
+// - coordinates.latitude/longitude (normalized)
+// - geo.lat/lon (Repliers comparable format)
+// - rawData.map.latitude/longitude (raw data)
+// - rawData.map.point (WKT format like "POINT (-97.71 30.28)")
+// - rawData.geo.lat/lon (raw geo data)
 function getPropertyCoordinates(property: any): [number, number] | null {
-  // Check multiple possible locations for coordinates
-  const lat = property?.map?.latitude 
-    || property?.coordinates?.latitude 
-    || property?.latitude
-    || property?.rawData?.map?.latitude;
-  const lng = property?.map?.longitude 
-    || property?.coordinates?.longitude 
-    || property?.longitude
-    || property?.rawData?.map?.longitude;
+  // Check multiple possible locations for coordinates (prioritized by reliability)
   
-  if (lat != null && lng != null && !isNaN(Number(lat)) && !isNaN(Number(lng))) {
-    return [Number(lng), Number(lat)]; // Mapbox uses [lng, lat]
+  // 1. Standard map object
+  const mapLat = property?.map?.latitude;
+  const mapLng = property?.map?.longitude;
+  if (mapLat != null && mapLng != null && !isNaN(Number(mapLat)) && !isNaN(Number(mapLng))) {
+    return [Number(mapLng), Number(mapLat)];
   }
+  
+  // 2. Normalized coordinates object
+  const coordLat = property?.coordinates?.latitude;
+  const coordLng = property?.coordinates?.longitude;
+  if (coordLat != null && coordLng != null && !isNaN(Number(coordLat)) && !isNaN(Number(coordLng))) {
+    return [Number(coordLng), Number(coordLat)];
+  }
+  
+  // 3. Repliers geo object (used in comparables)
+  const geoLat = property?.geo?.lat;
+  const geoLon = property?.geo?.lon || property?.geo?.lng;
+  if (geoLat != null && geoLon != null && !isNaN(Number(geoLat)) && !isNaN(Number(geoLon))) {
+    return [Number(geoLon), Number(geoLat)];
+  }
+  
+  // 4. Direct latitude/longitude on property
+  const directLat = property?.latitude;
+  const directLng = property?.longitude;
+  if (directLat != null && directLng != null && !isNaN(Number(directLat)) && !isNaN(Number(directLng))) {
+    return [Number(directLng), Number(directLat)];
+  }
+  
+  // 5. rawData.map object
+  const rawMapLat = property?.rawData?.map?.latitude;
+  const rawMapLng = property?.rawData?.map?.longitude;
+  if (rawMapLat != null && rawMapLng != null && !isNaN(Number(rawMapLat)) && !isNaN(Number(rawMapLng))) {
+    return [Number(rawMapLng), Number(rawMapLat)];
+  }
+  
+  // 6. rawData.map.point (WKT format)
+  const rawMapPoint = property?.rawData?.map?.point;
+  const wktCoords = parseWktPoint(rawMapPoint);
+  if (wktCoords) {
+    return wktCoords;
+  }
+  
+  // 7. rawData.geo object
+  const rawGeoLat = property?.rawData?.geo?.lat;
+  const rawGeoLon = property?.rawData?.geo?.lon || property?.rawData?.geo?.lng;
+  if (rawGeoLat != null && rawGeoLon != null && !isNaN(Number(rawGeoLat)) && !isNaN(Number(rawGeoLon))) {
+    return [Number(rawGeoLon), Number(rawGeoLat)];
+  }
+  
+  // 8. For comparables: check address object for lat/lng
+  const addrLat = property?.address?.latitude;
+  const addrLng = property?.address?.longitude;
+  if (addrLat != null && addrLng != null && !isNaN(Number(addrLat)) && !isNaN(Number(addrLng))) {
+    return [Number(addrLng), Number(addrLat)];
+  }
+  
   return null;
 }
 

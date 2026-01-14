@@ -8,7 +8,7 @@ import { TransactionDetails } from "@/components/transaction-details";
 import type { Transaction, Coordinator, Activity } from "@shared/schema";
 
 export default function Archive() {
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [initialTab, setInitialTab] = useState<string>("overview");
 
@@ -20,9 +20,26 @@ export default function Archive() {
     queryKey: ["/api/coordinators"],
   });
 
+  // Fetch the full transaction details when selected (this triggers CMA coordinate enrichment)
+  // staleTime: 0 ensures fresh data is fetched, not from cache
+  // queryFn uses context.queryKey to avoid stale closure issues
+  const { data: selectedTransaction } = useQuery<Transaction>({
+    queryKey: ["/api/transactions", selectedTransactionId] as const,
+    queryFn: async ({ queryKey }) => {
+      const id = queryKey[1];
+      if (!id) throw new Error("No transaction ID provided");
+      console.log("[DEBUG] Archive: Fetching individual transaction:", id);
+      const res = await fetch(`/api/transactions/${id}`, { credentials: "include" });
+      if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+      return res.json();
+    },
+    enabled: !!selectedTransactionId,
+    staleTime: 0,
+  });
+
   const { data: activities = [] } = useQuery<Activity[]>({
-    queryKey: ["/api/transactions", selectedTransaction?.id, "activities"],
-    enabled: !!selectedTransaction,
+    queryKey: ["/api/transactions", selectedTransactionId, "activities"],
+    enabled: !!selectedTransactionId,
   });
 
   const archivedTransactions = transactions.filter(
@@ -34,14 +51,14 @@ export default function Archive() {
       t.mlsNumber?.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  if (selectedTransaction) {
+  if (selectedTransactionId && selectedTransaction) {
     return (
       <TransactionDetails
         transaction={selectedTransaction}
         coordinators={coordinators}
         activities={activities}
         onBack={() => {
-          setSelectedTransaction(null);
+          setSelectedTransactionId(null);
           setInitialTab("overview");
         }}
         initialTab={initialTab}
@@ -89,18 +106,18 @@ export default function Archive() {
               key={transaction.id}
               transaction={transaction}
               coordinators={coordinators}
-              onClick={() => setSelectedTransaction(transaction)}
+              onClick={() => setSelectedTransactionId(transaction.id)}
               onMarketingClick={() => {
                 setInitialTab("marketing");
-                setSelectedTransaction(transaction);
+                setSelectedTransactionId(transaction.id);
               }}
               onMLSClick={() => {
                 setInitialTab("mls");
-                setSelectedTransaction(transaction);
+                setSelectedTransactionId(transaction.id);
               }}
               onDocsClick={() => {
                 setInitialTab("docs");
-                setSelectedTransaction(transaction);
+                setSelectedTransactionId(transaction.id);
               }}
             />
           ))}
