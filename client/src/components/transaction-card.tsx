@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import type { Transaction, Coordinator } from "@shared/schema";
+import type { Transaction, Coordinator, MLSData } from "@shared/schema";
 import { getStatusBadgeStyle, getStatusLabel, getDaysRemainingStyle } from "@/lib/utils/status-colors";
 
 interface TransactionCardProps {
@@ -33,7 +33,10 @@ function formatDate(dateString: string | null): string {
 }
 
 export function TransactionCard({ transaction, coordinators, onClick, onMarketingClick, onMLSClick, onDocsClick }: TransactionCardProps) {
-  const statusLabel = getStatusLabel(transaction.status);
+  // Use MLS status as source of truth, fallback to transaction status
+  const mlsData = transaction.mlsData as MLSData | null;
+  const displayStatus = mlsData?.status || transaction.status;
+  const statusLabel = getStatusLabel(displayStatus);
   const daysRemaining = getDaysRemaining(transaction.closingDate);
   
   const transactionCoordinators = coordinators.filter(
@@ -60,7 +63,7 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
             </div>
           )}
         </div>
-        <Badge className={getStatusBadgeStyle(transaction.status)} data-testid={`badge-status-${transaction.id}`}>
+        <Badge className={getStatusBadgeStyle(displayStatus)} data-testid={`badge-status-${transaction.id}`}>
           {statusLabel}
         </Badge>
       </CardHeader>
@@ -87,7 +90,7 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
           </div>
         </div>
 
-        {daysRemaining !== null && transaction.status !== "closed" && transaction.status !== "cancelled" && (
+        {daysRemaining !== null && !displayStatus.toLowerCase().includes('closed') && !displayStatus.toLowerCase().includes('sold') && !displayStatus.toLowerCase().includes('cancel') && (
           <div className={`text-sm ${getDaysRemainingStyle(daysRemaining)}`}>
             {daysRemaining > 0 ? `${daysRemaining} days remaining` : daysRemaining === 0 ? "Closing today" : `${Math.abs(daysRemaining)} days overdue`}
           </div>
