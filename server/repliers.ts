@@ -581,9 +581,18 @@ export async function fetchSimilarListings(mlsNumber: string, radius: number = 5
   }
 }
 
-// Fetch coordinates for a single MLS listing (used for backfilling CMA data)
+// Fetch listing details for a single MLS listing (used for backfilling CMA data)
+// Returns coordinates AND status data when available
 // Tries with boardId first, then without if 404 occurs
-export async function fetchListingCoordinates(mlsNumber: string): Promise<{ latitude: number; longitude: number } | null> {
+export interface ListingEnrichment {
+  latitude: number;
+  longitude: number;
+  status?: string;
+  soldPrice?: number;
+  soldDate?: string;
+}
+
+export async function fetchListingCoordinates(mlsNumber: string): Promise<ListingEnrichment | null> {
   try {
     const formattedMLS = mlsNumber.startsWith("ACT") ? mlsNumber : `ACT${mlsNumber}`;
     
@@ -605,9 +614,17 @@ export async function fetchListingCoordinates(mlsNumber: string): Promise<{ lati
     const lng = data?.map?.longitude || data?.address?.longitude || data?.longitude;
     
     if (lat && lng) {
+      // Extract status information while we have the listing data
+      const status = data?.standardStatus || data?.status || data?.lastStatus || '';
+      const soldPrice = data?.soldPrice || data?.closePrice;
+      const soldDate = data?.soldDate || data?.closedDate || data?.timestamps?.closedDate;
+      
       return {
         latitude: parseFloat(lat),
         longitude: parseFloat(lng),
+        status: status,
+        soldPrice: soldPrice ? parseFloat(soldPrice) : undefined,
+        soldDate: soldDate || undefined,
       };
     }
     console.log(`[CMA] No coordinates found for ${mlsNumber}`);
@@ -618,55 +635,80 @@ export async function fetchListingCoordinates(mlsNumber: string): Promise<{ lati
   }
 }
 
-// Enrich CMA comparables with coordinates by fetching from Repliers API
+// Enrich CMA comparables with coordinates and status by fetching from Repliers API
 export async function enrichCMAWithCoordinates(comparables: CMAComparable[]): Promise<CMAComparable[]> {
-  // Count comparables in different states
-  const withCoords = comparables.filter(c => c.map).length;
-  const withMlsNoCoords = comparables.filter(c => !c.map && c.mlsNumber);
-  const noMls = comparables.filter(c => !c.map && !c.mlsNumber).length;
+  // Determine which comparables need enrichment (missing coordinates OR status)
+  const needsEnrichment = comparables.filter(c => {
+    const hasCoords = c.map && c.map.latitude && c.map.longitude;
+    const hasStatus = c.status && c.status.trim().length > 0;
+    return c.mlsNumber && (!hasCoords || !hasStatus);
+  });
+  const noMls = comparables.filter(c => !c.mlsNumber).length;
   
-  if (withMlsNoCoords.length === 0) {
+  if (needsEnrichment.length === 0) {
     if (noMls > 0) {
-      console.log(`[CMA] ${noMls} comparables lack MLS numbers and cannot be enriched with coordinates`);
+      console.log(`[CMA] ${noMls} comparables lack MLS numbers and cannot be enriched`);
     }
     return comparables;
   }
   
-  console.log(`[CMA] Enriching ${withMlsNoCoords.length} comparables (${withCoords} already have coords, ${noMls} lack MLS numbers)`);
+  console.log(`[CMA] Enriching ${needsEnrichment.length} comparables with coordinates/status (${noMls} lack MLS numbers)`);
   
-  // Fetch coordinates for all missing entries in parallel (with limit)
+  // Fetch listing data for all entries needing enrichment in parallel (with limit)
   const pLimit = (await import('p-limit')).default;
   const limit = pLimit(3); // Max 3 concurrent requests
   
-  const coordinateResults = await Promise.all(
-    withMlsNoCoords.map(comp => 
+  const enrichmentResults = await Promise.all(
+    needsEnrichment.map(comp => 
       limit(async () => {
-        const coords = await fetchListingCoordinates(comp.mlsNumber);
-        return { mlsNumber: comp.mlsNumber, coords };
+        const enrichment = await fetchListingCoordinates(comp.mlsNumber);
+        return { mlsNumber: comp.mlsNumber, enrichment };
       })
     )
   );
   
-  // Build a map of MLS number to coordinates
-  const coordsMap = new Map<string, { latitude: number; longitude: number }>();
+  // Build a map of MLS number to enrichment data
+  const enrichmentMap = new Map<string, ListingEnrichment>();
   let successCount = 0;
-  for (const result of coordinateResults) {
-    if (result.coords) {
-      coordsMap.set(result.mlsNumber, result.coords);
+  for (const result of enrichmentResults) {
+    if (result.enrichment) {
+      enrichmentMap.set(result.mlsNumber, result.enrichment);
       successCount++;
     }
   }
   
-  console.log(`[CMA] Enriched ${successCount}/${withMlsNoCoords.length} comparables with coordinates`);
+  console.log(`[CMA] Enriched ${successCount}/${needsEnrichment.length} comparables with coordinates/status`);
   
-  // Merge coordinates back into comparables
+  // Merge enrichment data back into comparables
   return comparables.map(comp => {
-    if (comp.map) return comp; // Already has coordinates
-    const coords = coordsMap.get(comp.mlsNumber);
-    if (coords) {
-      return { ...comp, map: coords };
+    const enrichment = enrichmentMap.get(comp.mlsNumber || '');
+    if (!enrichment) return comp;
+    
+    const enrichedComp = { ...comp };
+    
+    // Merge coordinates if missing
+    if (!comp.map || !comp.map.latitude) {
+      enrichedComp.map = {
+        latitude: enrichment.latitude,
+        longitude: enrichment.longitude,
+      };
     }
-    return comp;
+    
+    // Merge status if missing or empty
+    if (!comp.status || comp.status.trim().length === 0) {
+      if (enrichment.status) {
+        enrichedComp.status = enrichment.status;
+      }
+      // Also add soldPrice/soldDate if available (helps with status inference)
+      if (enrichment.soldPrice) {
+        (enrichedComp as any).soldPrice = enrichment.soldPrice;
+      }
+      if (enrichment.soldDate) {
+        (enrichedComp as any).soldDate = enrichment.soldDate;
+      }
+    }
+    
+    return enrichedComp;
   });
 }
 

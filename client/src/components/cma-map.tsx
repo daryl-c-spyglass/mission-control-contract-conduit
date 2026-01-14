@@ -255,37 +255,52 @@ function normalizeComparableStatus(rawStatus: string | null | undefined): Normal
 /**
  * Extract and normalize property status from various possible fields
  * Checks multiple fields in priority order to find the best status indicator
+ * 
+ * Note: CMA comparables from Repliers API often have empty status fields.
+ * We check for truthy, non-empty strings at each priority level.
  */
 function getPropertyStatus(property: any): NormalizedStatus {
+  // Helper to check if a value is a non-empty string
+  const isValidStatus = (s: any) => typeof s === 'string' && s.trim().length > 0;
+  
   // Priority 1: standardStatus (RESO standard)
-  if (property?.standardStatus) {
+  if (isValidStatus(property?.standardStatus)) {
     return normalizeComparableStatus(property.standardStatus);
   }
   
-  // Priority 2: status field
-  if (property?.status) {
+  // Priority 2: status field (check for non-empty)
+  if (isValidStatus(property?.status)) {
     return normalizeComparableStatus(property.status);
   }
   
   // Priority 3: lastStatus (Repliers specific)
-  if (property?.lastStatus) {
+  if (isValidStatus(property?.lastStatus)) {
     return normalizeComparableStatus(property.lastStatus);
   }
   
-  // Priority 4: Check rawData for nested status
-  if (property?.rawData?.standardStatus) {
+  // Priority 4: Check rawData for nested status fields
+  if (isValidStatus(property?.rawData?.standardStatus)) {
     return normalizeComparableStatus(property.rawData.standardStatus);
   }
-  if (property?.rawData?.status) {
+  if (isValidStatus(property?.rawData?.status)) {
     return normalizeComparableStatus(property.rawData.status);
   }
-  if (property?.rawData?.lastStatus) {
+  if (isValidStatus(property?.rawData?.lastStatus)) {
     return normalizeComparableStatus(property.rawData.lastStatus);
   }
   
   // Priority 5: Infer from sold price/date
   if (property?.soldPrice || property?.closePrice || property?.soldDate || property?.closedDate) {
     return 'sold';
+  }
+  
+  // Priority 6: If it has a listPrice but no soldPrice, likely active
+  // CMA comparables with price but no status are typically active listings
+  if (property?.price && !property?.soldPrice && !property?.closePrice) {
+    if (DEBUG_CMA_MAP) {
+      console.log('[CMA Map] No status, but has listPrice - treating as active');
+    }
+    return 'active';
   }
   
   return 'unknown';
@@ -394,9 +409,10 @@ function buildCmaMapModel(subjectProperty: Property | null, comparables: Propert
       if (DEBUG_CMA_MAP) {
         console.log('[CMA Map] Comparable status:', {
           id: propAny.mlsNumber || `comp-${index}`,
-          standardStatus: propAny.standardStatus,
-          status: propAny.status,
-          lastStatus: propAny.lastStatus,
+          standardStatus: propAny.standardStatus || propAny.rawData?.standardStatus,
+          status: propAny.status || propAny.rawData?.status,
+          lastStatus: propAny.lastStatus || propAny.rawData?.lastStatus,
+          soldPrice: propAny.soldPrice || propAny.closePrice,
           normalized: status,
         });
       }
@@ -609,6 +625,7 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick, showPolyg
       const el = document.createElement('div');
       el.className = point.type === 'subject' ? 'subject-marker' : 'comp-marker';
       el.style.cursor = 'pointer';
+      el.style.overflow = 'visible';
 
       if (point.type === 'subject') {
         el.innerHTML = `
@@ -651,7 +668,7 @@ export function CMAMap({ properties, subjectProperty, onPropertyClick, showPolyg
         const statusLabel = STATUS_LABELS[point.status];
         
         el.innerHTML = `
-          <div style="position: relative;" class="marker-container">
+          <div style="position: relative; overflow: visible;" class="marker-container">
             <!-- Main price marker -->
             <div class="marker-main" style="
               background-color: ${colors.bg};
