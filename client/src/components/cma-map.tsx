@@ -386,6 +386,7 @@ export function CMAMap({
   const onPropertyClickRef = useRef(onPropertyClick);
   const modelRef = useRef<CmaMapModel | null>(null);
   const isDarkRef = useRef<boolean>(false);
+  const layersReadyRef = useRef<boolean>(false);
 
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -520,6 +521,7 @@ export function CMAMap({
 
     map.on('load', () => {
       initCmaLayers(map, model, overlayTuning, showPolygon);
+      layersReadyRef.current = true;
       setMapReady(true);
 
       if (model.bounds) {
@@ -528,22 +530,28 @@ export function CMAMap({
     });
 
     map.on('click', LAYER_IDS.clusterCircle, (e) => {
+      if (!layersReadyRef.current) return;
+      
       const features = map.queryRenderedFeatures(e.point, {
         layers: [LAYER_IDS.clusterCircle],
       });
       if (!features.length) return;
 
       const clusterId = features[0].properties?.cluster_id;
-      const source = map.getSource(SOURCE_IDS.comps) as mapboxgl.GeoJSONSource;
+      const source = map.getSource(SOURCE_IDS.comps) as mapboxgl.GeoJSONSource | undefined;
 
-      source.getClusterExpansionZoom(clusterId, (err, zoom) => {
-        if (err) return;
-        const coords = (features[0].geometry as GeoJSON.Point).coordinates as [number, number];
-        map.easeTo({ center: coords, zoom: zoom ?? 14 });
-      });
+      if (source && typeof source.getClusterExpansionZoom === 'function') {
+        source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+          if (err) return;
+          const coords = (features[0].geometry as GeoJSON.Point).coordinates as [number, number];
+          map.easeTo({ center: coords, zoom: zoom ?? 14 });
+        });
+      }
     });
 
     map.on('click', LAYER_IDS.compPoints, (e) => {
+      if (!layersReadyRef.current) return;
+      
       const features = map.queryRenderedFeatures(e.point, {
         layers: [LAYER_IDS.compPoints],
       });
@@ -552,18 +560,26 @@ export function CMAMap({
       const props = features[0].properties as CmaPointProperties;
 
       if (selectedIdRef.current) {
-        map.setFeatureState(
-          { source: SOURCE_IDS.comps, id: selectedIdRef.current },
-          { selected: false }
-        );
+        try {
+          map.setFeatureState(
+            { source: SOURCE_IDS.comps, id: selectedIdRef.current },
+            { selected: false }
+          );
+        } catch (e) {
+          // Source may not be ready
+        }
       }
 
       const featureId = props.id;
       selectedIdRef.current = featureId;
-      map.setFeatureState(
-        { source: SOURCE_IDS.comps, id: featureId },
-        { selected: true }
-      );
+      try {
+        map.setFeatureState(
+          { source: SOURCE_IDS.comps, id: featureId },
+          { selected: true }
+        );
+      } catch (e) {
+        // Source may not be ready
+      }
 
       const parsedPhotos = typeof props.photos === 'string' 
         ? JSON.parse(props.photos) 
@@ -585,6 +601,8 @@ export function CMAMap({
     });
 
     map.on('click', LAYER_IDS.subjectPoint, () => {
+      if (!layersReadyRef.current) return;
+      
       const currentModel = modelRef.current;
       const propMap = currentModel?.propertyByFeatureId;
       if (propMap && typeof propMap.get === 'function') {
@@ -596,6 +614,8 @@ export function CMAMap({
     });
 
     map.on('mousemove', LAYER_IDS.compPoints, (e) => {
+      if (!layersReadyRef.current) return;
+      
       map.getCanvas().style.cursor = 'pointer';
 
       const features = map.queryRenderedFeatures(e.point, {
@@ -606,27 +626,41 @@ export function CMAMap({
       const featureId = features[0].properties?.id as string;
 
       if (hoveredIdRef.current && hoveredIdRef.current !== featureId) {
-        map.setFeatureState(
-          { source: SOURCE_IDS.comps, id: hoveredIdRef.current },
-          { hover: false }
-        );
+        try {
+          map.setFeatureState(
+            { source: SOURCE_IDS.comps, id: hoveredIdRef.current },
+            { hover: false }
+          );
+        } catch (e) {
+          // Source may not be ready
+        }
       }
 
       hoveredIdRef.current = featureId;
-      map.setFeatureState(
-        { source: SOURCE_IDS.comps, id: featureId },
-        { hover: true }
-      );
+      try {
+        map.setFeatureState(
+          { source: SOURCE_IDS.comps, id: featureId },
+          { hover: true }
+        );
+      } catch (e) {
+        // Source may not be ready
+      }
     });
 
     map.on('mouseleave', LAYER_IDS.compPoints, () => {
+      if (!layersReadyRef.current) return;
+      
       map.getCanvas().style.cursor = '';
 
       if (hoveredIdRef.current) {
-        map.setFeatureState(
-          { source: SOURCE_IDS.comps, id: hoveredIdRef.current },
-          { hover: false }
-        );
+        try {
+          map.setFeatureState(
+            { source: SOURCE_IDS.comps, id: hoveredIdRef.current },
+            { hover: false }
+          );
+        } catch (e) {
+          // Source may not be ready
+        }
         hoveredIdRef.current = null;
       }
     });
@@ -672,6 +706,9 @@ export function CMAMap({
     const previousSelectedId = selectedIdRef.current;
     const previousHoveredId = hoveredIdRef.current;
 
+    // Mark layers as not ready before style change to prevent race conditions
+    layersReadyRef.current = false;
+
     map.setStyle(mapStyle);
 
     map.once('styledata', () => {
@@ -680,6 +717,7 @@ export function CMAMap({
       if (currentModel) {
         initCmaLayers(map, currentModel, currentTuning, showPolygonRef.current);
 
+        // Restore selection state after layers are reinitialized
         if (previousSelectedId) {
           try {
             map.setFeatureState(
@@ -687,6 +725,7 @@ export function CMAMap({
               { selected: true }
             );
           } catch (e) {
+            // Source may not be ready
           }
         }
 
@@ -697,8 +736,12 @@ export function CMAMap({
               { hover: true }
             );
           } catch (e) {
+            // Source may not be ready
           }
         }
+
+        // Mark layers as ready after initialization is complete
+        layersReadyRef.current = true;
       }
     });
   }, [mapStyle, mapReady]);
@@ -728,13 +771,17 @@ export function CMAMap({
 
   const closePropertyPopup = useCallback(() => {
     const map = mapRef.current;
-    if (map && selectedIdRef.current) {
-      map.setFeatureState(
-        { source: SOURCE_IDS.comps, id: selectedIdRef.current },
-        { selected: false }
-      );
-      selectedIdRef.current = null;
+    if (map && selectedIdRef.current && layersReadyRef.current) {
+      try {
+        map.setFeatureState(
+          { source: SOURCE_IDS.comps, id: selectedIdRef.current },
+          { selected: false }
+        );
+      } catch (e) {
+        // Source may not be ready
+      }
     }
+    selectedIdRef.current = null;
     setSelectedProperty(null);
   }, []);
 
