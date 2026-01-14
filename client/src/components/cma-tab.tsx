@@ -15,6 +15,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getStatusBadgeStyle, getStatusLabel, getStatusColor } from "@/lib/utils/status-colors";
 import { CMAMap } from "@/components/cma-map";
 import type { Transaction, CMAComparable, Cma, PropertyStatistics, CmaStatMetric, Property } from "@shared/schema";
+import { useLocation } from "wouter";
 import { 
   Activity, 
   Share2, 
@@ -37,7 +38,9 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  Hash
+  Hash,
+  Plus,
+  Search
 } from "lucide-react";
 
 interface CMATabProps {
@@ -147,6 +150,7 @@ function StatCard({
 
 export function CMATab({ transaction }: CMATabProps) {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [viewMode, setViewMode] = useState<'grid' | 'stats' | 'map'>('stats');
   const [selectedProperty, setSelectedProperty] = useState<CMAComparable | null>(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -213,17 +217,91 @@ export function CMATab({ transaction }: CMATabProps) {
   const currentPhotos = selectedProperty?.photos || 
     (selectedProperty?.imageUrl ? [selectedProperty.imageUrl] : []);
   
+  const handleCreateCMA = () => {
+    const mlsData = transaction.mlsData as any;
+    if (mlsData) {
+      const normalizedSubject = {
+        id: mlsData.mlsNumber || mlsData.id || '',
+        mlsNumber: mlsData.mlsNumber || '',
+        address: mlsData.address?.unparsedAddress || mlsData.address?.streetAddress || transaction.propertyAddress || '',
+        city: mlsData.city || '',
+        state: mlsData.stateOrProvince || mlsData.state || 'TX',
+        postalCode: mlsData.postalCode || '',
+        listPrice: mlsData.listPrice ? Number(mlsData.listPrice) : null,
+        bedrooms: mlsData.bedrooms ? Number(mlsData.bedrooms) : null,
+        bathrooms: mlsData.bathrooms ? Number(mlsData.bathrooms) : null,
+        livingArea: mlsData.livingArea ? Number(mlsData.livingArea) : null,
+        lotSizeAcres: mlsData.lotSizeAcres ? Number(mlsData.lotSizeAcres) : null,
+        yearBuilt: mlsData.yearBuilt ? Number(mlsData.yearBuilt) : null,
+        subdivisionName: mlsData.subdivisionName || '',
+        standardStatus: mlsData.standardStatus || '',
+        latitude: mlsData.latitude ? Number(mlsData.latitude) : null,
+        longitude: mlsData.longitude ? Number(mlsData.longitude) : null,
+        photos: mlsData.photos || [],
+      };
+      sessionStorage.setItem('cmaSubjectProperty', JSON.stringify(normalizedSubject));
+      sessionStorage.setItem('cmaTransactionId', String(transaction.id));
+    }
+    setLocation('/cmas/new?fromTransaction=true');
+  };
+
   if (!cmaData || cmaData.length === 0) {
+    const mlsData = transaction.mlsData as any;
+    const hasMLSData = !!mlsData && !!mlsData.listPrice;
+    
     return (
       <div className="space-y-6">
         <h2 className="text-lg font-semibold">Comparative Market Analysis</h2>
         <Card>
-          <CardContent className="py-12 text-center">
-            <Activity className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-            <h3 className="font-medium mb-2">No CMA Data Available</h3>
-            <p className="text-sm text-muted-foreground">
-              Comparative market analysis will appear here once MLS data is fetched.
-            </p>
+          <CardContent className="py-12">
+            <div className="max-w-md mx-auto text-center">
+              <Search className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+              <h3 className="font-medium mb-2">Create a CMA for this Property</h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                {hasMLSData 
+                  ? "Use this property's details to find comparable listings and create a professional market analysis."
+                  : "Once MLS data is available, you can create a comparative market analysis for this property."
+                }
+              </p>
+              
+              {hasMLSData && (
+                <div className="bg-muted/50 rounded-lg p-4 mb-6 text-left">
+                  <p className="text-sm font-medium mb-2">Subject Property</p>
+                  <p className="text-sm">{transaction.propertyAddress}</p>
+                  <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
+                    {mlsData.bedrooms && (
+                      <span className="flex items-center gap-1">
+                        <Bed className="h-3 w-3" /> {mlsData.bedrooms} beds
+                      </span>
+                    )}
+                    {mlsData.bathrooms && (
+                      <span className="flex items-center gap-1">
+                        <Bath className="h-3 w-3" /> {mlsData.bathrooms} baths
+                      </span>
+                    )}
+                    {mlsData.livingArea && (
+                      <span className="flex items-center gap-1">
+                        <Square className="h-3 w-3" /> {mlsData.livingArea.toLocaleString()} sqft
+                      </span>
+                    )}
+                    {mlsData.listPrice && (
+                      <span className="flex items-center gap-1">
+                        <DollarSign className="h-3 w-3" /> {formatPrice(mlsData.listPrice)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              <Button 
+                onClick={handleCreateCMA}
+                disabled={!hasMLSData}
+                data-testid="button-create-cma"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create CMA
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -15,13 +15,16 @@ export default function CMANew() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  // Parse URL search params for "modify" mode or "fromProperties" mode
+  // Parse URL search params for "modify" mode, "fromProperties" mode, or "fromTransaction" mode
   const params = new URLSearchParams(search);
   const fromCmaId = params.get('from');
   const fromProperties = params.get('fromProperties') === 'true';
+  const fromTransaction = params.get('fromTransaction') === 'true';
   
   // Get pre-selected properties from Properties page (via sessionStorage)
   const [preSelectedProperties, setPreSelectedProperties] = useState<Property[]>([]);
+  const [transactionSubject, setTransactionSubject] = useState<Property | null>(null);
+  const [transactionId, setTransactionId] = useState<number | null>(null);
   
   useEffect(() => {
     if (fromProperties) {
@@ -38,6 +41,27 @@ export default function CMANew() {
       }
     }
   }, [fromProperties]);
+  
+  // Get subject property from transaction (via sessionStorage)
+  useEffect(() => {
+    if (fromTransaction) {
+      const storedSubject = sessionStorage.getItem('cmaSubjectProperty');
+      const storedTransactionId = sessionStorage.getItem('cmaTransactionId');
+      if (storedSubject) {
+        try {
+          const subject = JSON.parse(storedSubject);
+          setTransactionSubject(subject);
+          sessionStorage.removeItem('cmaSubjectProperty');
+        } catch (e) {
+          console.error('Failed to parse subject property:', e);
+        }
+      }
+      if (storedTransactionId) {
+        setTransactionId(parseInt(storedTransactionId, 10));
+        sessionStorage.removeItem('cmaTransactionId');
+      }
+    }
+  }, [fromTransaction]);
   
   // Fetch original CMA data if modifying
   const { data: originalCma } = useQuery({
@@ -187,25 +211,64 @@ export default function CMANew() {
     };
   }, [fromProperties, preSelectedProperties]);
   
-  // Use properties initial data if available, otherwise use CMA modify data
-  const finalInitialData = propertiesInitialData || initialData;
+  // Build initial data from transaction subject property
+  const transactionInitialData = useMemo(() => {
+    if (!fromTransaction || !transactionSubject) return undefined;
+    
+    const subject = transactionSubject as any;
+    const address = subject.address || '';
+    
+    return {
+      name: `CMA - ${address}`,
+      searchCriteria: {
+        city: subject.city || '',
+        subdivision: subject.subdivisionName || '',
+        statuses: ['active', 'closed'],
+        minBeds: subject.bedrooms ? String(Math.max(1, subject.bedrooms - 1)) : '',
+        maxPrice: subject.listPrice ? String(Math.round(subject.listPrice * 1.2)) : '',
+        minSqft: subject.livingArea ? String(Math.round(subject.livingArea * 0.8)) : '',
+        maxSqft: subject.livingArea ? String(Math.round(subject.livingArea * 1.2)) : '',
+        minLotAcres: '',
+        maxLotAcres: '',
+        minYearBuilt: '',
+        maxYearBuilt: '',
+        stories: '',
+        soldDays: '180',
+      },
+      comparables: [],
+      subjectProperty: transactionSubject,
+      transactionId: transactionId,
+    };
+  }, [fromTransaction, transactionSubject, transactionId]);
+  
+  // Use transaction initial data, properties initial data, or CMA modify data
+  const finalInitialData = transactionInitialData || propertiesInitialData || initialData;
   
   // Determine the title and description
-  const pageTitle = fromProperties ? 'Quick CMA' : (fromCmaId ? 'Modify CMA' : 'Create New CMA');
-  const pageDescription = fromProperties 
-    ? `Create a CMA with ${preSelectedProperties.length} pre-selected properties`
-    : (fromCmaId 
-        ? 'Modify your search criteria and comparables to create an updated CMA'
-        : 'Build a comprehensive comparative market analysis for your clients'
+  const pageTitle = fromTransaction 
+    ? 'Create CMA' 
+    : (fromProperties ? 'Quick CMA' : (fromCmaId ? 'Modify CMA' : 'Create New CMA'));
+  const pageDescription = fromTransaction
+    ? 'Search for comparable properties to build a market analysis for this listing'
+    : (fromProperties 
+        ? `Create a CMA with ${preSelectedProperties.length} pre-selected properties`
+        : (fromCmaId 
+            ? 'Modify your search criteria and comparables to create an updated CMA'
+            : 'Build a comprehensive comparative market analysis for your clients'
+          )
       );
+  
+  // Determine back link - for transaction, link to dashboard (transaction details shown in sidebar)
+  const backLink = fromTransaction ? '/' : (fromProperties ? '/properties' : '/cmas');
+  const backLabel = fromTransaction ? 'Back to Dashboard' : (fromProperties ? 'Back to Properties' : 'Back to CMAs');
 
   return (
     <div className="space-y-6">
       <div>
-        <Link href={fromProperties ? "/properties" : "/cmas"}>
+        <Link href={backLink}>
           <Button variant="ghost" size="sm" className="mb-4" data-testid="button-back-to-cmas">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            {fromProperties ? 'Back to Properties' : 'Back to CMAs'}
+            {backLabel}
           </Button>
         </Link>
         <h1 className="text-3xl font-bold" data-testid="text-new-cma-title">
