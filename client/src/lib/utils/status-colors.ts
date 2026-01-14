@@ -58,22 +58,25 @@ export const getDaysRemainingStyle = (days: number): string => {
 };
 
 export const getStatusLabel = (status: string): string => {
+  // If the status contains spaces and capital letters, it's likely an MLS status - preserve it exactly
+  if (status.includes(' ') && /[A-Z]/.test(status)) {
+    return status;
+  }
+  
   const statusLower = status.toLowerCase();
   
-  // IMPORTANT: Check compound statuses BEFORE simple ones
-  // "Active Under Contract" should return "Under Contract", not "Active Listing"
-  if (statusLower.includes('under contract') || statusLower.includes('under_contract')) return 'Under Contract';
-  if (statusLower.includes('in contract') || statusLower.includes('in_contract')) return 'In Contract';
-  if (statusLower.includes('pending inspection') || statusLower.includes('pending_inspection')) return 'Pending Inspection';
-  if (statusLower.includes('clear to close') || statusLower.includes('clear_to_close')) return 'Clear to Close';
-  if (statusLower.includes('coming soon')) return 'Coming Soon';
-  if (statusLower.includes('pending')) return 'Pending';
-  if (statusLower.includes('closed') || statusLower.includes('sold')) return 'Closed';
-  if (statusLower.includes('withdrawn')) return 'Withdrawn';
-  if (statusLower.includes('cancel')) return 'Cancelled';
-  if (statusLower.includes('expired')) return 'Expired';
-  // Check "active" LAST since compound statuses like "Active Under Contract" should match above
-  if (statusLower.includes('active') || statusLower === 'for sale') return 'Active Listing';
+  // Only normalize internal status codes (snake_case or lowercase)
+  if (statusLower === 'in_contract' || statusLower === 'in contract') return 'In Contract';
+  if (statusLower === 'pending_inspection' || statusLower === 'pending inspection') return 'Pending Inspection';
+  if (statusLower === 'clear_to_close' || statusLower === 'clear to close') return 'Clear to Close';
+  if (statusLower === 'coming_soon' || statusLower === 'coming soon') return 'Coming Soon';
+  if (statusLower === 'pending') return 'Pending';
+  if (statusLower === 'closed' || statusLower === 'sold') return 'Closed';
+  if (statusLower === 'withdrawn') return 'Withdrawn';
+  if (statusLower === 'cancelled' || statusLower === 'canceled') return 'Cancelled';
+  if (statusLower === 'expired') return 'Expired';
+  if (statusLower === 'active' || statusLower === 'for sale') return 'Active Listing';
   
+  // Default: capitalize first letter and replace underscores
   return status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ');
 };
