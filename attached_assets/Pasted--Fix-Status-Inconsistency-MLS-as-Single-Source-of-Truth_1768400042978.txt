@@ -1,0 +1,468 @@
+## Fix Status Inconsistency - MLS as Single Source of Truth
+
+The header shows "Active Listing" but MLS Data shows "Active Under Contract". The MLS status from Repliers is the real-time, authoritative source and should be used everywhere.
+
+---
+
+## Current Problem
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ ← 13106 New Boston    [Active Listing]      ← WRONG (stale)    │
+│   # ACT2572987                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ MLS Listing Data                                                │
+│                                                                 │
+│                        [Active Under Contract] ← CORRECT (live) │
+│                        14 days on market                        │
+│                        $434,990                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Root Cause:** Header uses `transaction.status` (stored in database at creation time), while MLS Data uses `mlsData.status` (live from Repliers).
+
+---
+
+## Solution: MLS Status = Single Source of Truth
+
+### Principle
+
+The MLS status from Repliers is ALWAYS the authoritative source because:
+1. It reflects real-time listing status in the MLS system
+2. Status changes (Active → Under Contract → Sold) happen in MLS first
+3. Agents expect to see the current MLS status
+
+### Implementation Strategy
+
+1. **Display:** Always show `mlsData.status` in the UI (header, cards, everywhere)
+2. **Sync:** Update `transaction.status` in database whenever MLS data is fetched
+3. **Fallback:** Only use stored `transaction.status` if MLS data isn't loaded yet
+
+---
+
+## Implementation
+
+### 1. Create Status Utility
+
+```typescript
+// lib/utils/status.ts
+
+export interface StatusConfig {
+  label: string;
+  color: string;      // Tailwind bg color class
+  textColor: string;  // Text color for contrast
+  priority: number;   // For sorting (lower = more urgent)
+}
+
+// Comprehensive status mapping from Repliers
+export const STATUS_MAP: Record<string, StatusConfig> = {
+  // Active statuses
+  'A': { label: 'Active', color: 'bg-green-500', textColor: 'text-white', priority: 1 },
+  'Active': { label: 'Active', color: 'bg-green-500', textColor: 'text-white', priority: 1 },
+  'Active Listing': { label: 'Active', color: 'bg-green-500', textColor: 'text-white', priority: 1 },
+  
+  // Under Contract / Pending statuses (ORANGE - not green!)
+  'U': { label: 'Under Contract', color: 'bg-orange-500', textColor: 'text-white', priority: 2 },
+  'Under Contract': { label: 'Under Contract', color: 'bg-orange-500', textColor: 'text-white', priority: 2 },
+  'Active Under Contract': { label: 'Under Contract', color: 'bg-orange-500', textColor: 'text-white', priority: 2 },
+  'Pending': { label: 'Pending', color: 'bg-orange-500', textColor: 'text-white', priority: 2 },
+  'P': { label: 'Pending', color: 'bg-orange-500', textColor: 'text-white', priority: 2 },
+  
+  // Sold / Closed statuses
+  'S': { label: 'Sold', color: 'bg-red-500', textColor: 'text-white', priority: 3 },
+  'Sold': { label: 'Sold', color: 'bg-red-500', textColor: 'text-white', priority: 3 },
+  'Closed': { label: 'Closed', color: 'bg-red-500', textColor: 'text-white', priority: 3 },
+  'C': { label: 'Closed', color: 'bg-red-500', textColor: 'text-white', priority: 3 },
+  
+  // Coming Soon
+  'Coming Soon': { label: 'Coming Soon', color: 'bg-blue-500', textColor: 'text-white', priority: 0 },
+  'CS': { label: 'Coming Soon', color: 'bg-blue-500', textColor: 'text-white', priority: 0 },
+  
+  // Withdrawn / Expired / Cancelled
+  'W': { label: 'Withdrawn', color: 'bg-gray-500', textColor: 'text-white', priority: 4 },
+  'Withdrawn': { label: 'Withdrawn', color: 'bg-gray-500', textColor: 'text-white', priority: 4 },
+  'X': { label: 'Expired', color: 'bg-gray-500', textColor: 'text-white', priority: 4 },
+  'Expired': { label: 'Expired', color: 'bg-gray-500', textColor: 'text-white', priority: 4 },
+  'Cancelled': { label: 'Cancelled', color: 'bg-gray-500', textColor: 'text-white', priority: 4 },
+};
+
+// Default for unknown statuses
+const DEFAULT_STATUS: StatusConfig = {
+  label: 'Unknown',
+  color: 'bg-gray-400',
+  textColor: 'text-white',
+  priority: 99,
+};
+
+/**
+ * Get normalized status configuration
+ * @param rawStatus - Status string from Repliers or database
+ */
+export function getStatusConfig(rawStatus: string | null | undefined): StatusConfig {
+  if (!rawStatus) return DEFAULT_STATUS;
+  
+  const trimmed = rawStatus.trim();
+  
+  // Direct match
+  if (STATUS_MAP[trimmed]) {
+    return STATUS_MAP[trimmed];
+  }
+  
+  // Case-insensitive match
+  const lowerStatus = trimmed.toLowerCase();
+  for (const [key, config] of Object.entries(STATUS_MAP)) {
+    if (key.toLowerCase() === lowerStatus) {
+      return config;
+    }
+  }
+  
+  // Partial match for compound statuses
+  if (lowerStatus.includes('under contract')) {
+    return STATUS_MAP['Under Contract'];
+  }
+  if (lowerStatus.includes('pending')) {
+    return STATUS_MAP['Pending'];
+  }
+  if (lowerStatus.includes('sold') || lowerStatus.includes('closed')) {
+    return STATUS_MAP['Sold'];
+  }
+  if (lowerStatus.includes('active')) {
+    return STATUS_MAP['Active'];
+  }
+  
+  // Return default with original label
+  return { ...DEFAULT_STATUS, label: trimmed };
+}
+
+/**
+ * Get the authoritative status from MLS data or transaction
+ * MLS data takes priority over stored transaction status
+ */
+export function getAuthoritativeStatus(
+  mlsData: any | null | undefined,
+  transaction: any | null | undefined
+): string {
+  // Priority 1: MLS data status (real-time from Repliers)
+  if (mlsData?.status) {
+    return mlsData.status;
+  }
+  
+  // Priority 2: MLS standardStatus field
+  if (mlsData?.standardStatus) {
+    return mlsData.standardStatus;
+  }
+  
+  // Fallback: Transaction status from database
+  if (transaction?.status) {
+    return transaction.status;
+  }
+  
+  return 'Active'; // Default
+}
+```
+
+### 2. Create Unified Status Badge Component
+
+```tsx
+// components/ui/status-badge.tsx
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { getStatusConfig } from '@/lib/utils/status';
+
+interface StatusBadgeProps {
+  status: string | null | undefined;
+  className?: string;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+export function StatusBadge({ status, className, size = 'md' }: StatusBadgeProps) {
+  const config = getStatusConfig(status);
+  
+  const sizeClasses = {
+    sm: 'text-xs px-2 py-0.5',
+    md: 'text-sm px-2.5 py-0.5',
+    lg: 'text-base px-3 py-1',
+  };
+  
+  return (
+    <Badge 
+      className={cn(
+        config.color, 
+        config.textColor,
+        sizeClasses[size],
+        'font-medium',
+        className
+      )}
+    >
+      {config.label}
+    </Badge>
+  );
+}
+```
+
+### 3. Update Transaction Header
+
+```tsx
+// components/transaction-header.tsx (or wherever the header is)
+import { StatusBadge } from '@/components/ui/status-badge';
+import { getAuthoritativeStatus } from '@/lib/utils/status';
+
+interface TransactionHeaderProps {
+  transaction: any;
+  mlsData?: any;
+}
+
+export function TransactionHeader({ transaction, mlsData }: TransactionHeaderProps) {
+  // Get the authoritative status (MLS takes priority)
+  const status = getAuthoritativeStatus(mlsData, transaction);
+  
+  return (
+    <div className="flex items-center gap-4">
+      <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+        <ArrowLeft className="h-5 w-5" />
+      </Button>
+      
+      <div>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold">{transaction.address}</h1>
+          <StatusBadge status={status} />
+        </div>
+        <p className="text-sm text-muted-foreground">
+          # {transaction.mlsNumber}
+        </p>
+      </div>
+    </div>
+  );
+}
+```
+
+### 4. Update Transaction Detail Page to Pass MLS Data to Header
+
+```tsx
+// pages/transaction/[id].tsx or components/transaction-details.tsx
+
+export function TransactionDetails({ transactionId }: Props) {
+  const { data: transaction } = useQuery({
+    queryKey: ['transaction', transactionId],
+    queryFn: () => fetchTransaction(transactionId),
+  });
+
+  const { data: mlsData } = useQuery({
+    queryKey: ['mls-data', transaction?.mlsNumber],
+    queryFn: () => fetchMLSData(transaction?.mlsNumber),
+    enabled: !!transaction?.mlsNumber,
+  });
+
+  return (
+    <div>
+      {/* Pass BOTH transaction AND mlsData to header */}
+      <TransactionHeader 
+        transaction={transaction} 
+        mlsData={mlsData}  // <-- This is the key fix!
+      />
+      
+      <Tabs>
+        <TabsContent value="overview">
+          <OverviewTab transaction={transaction} mlsData={mlsData} />
+        </TabsContent>
+        <TabsContent value="mls-data">
+          <MLSDataTab mlsData={mlsData} />
+        </TabsContent>
+        {/* ... other tabs */}
+      </Tabs>
+    </div>
+  );
+}
+```
+
+### 5. Update MLS Data Tab to Use Same Badge
+
+```tsx
+// components/mls-data-tab.tsx
+import { StatusBadge } from '@/components/ui/status-badge';
+
+export function MLSDataTab({ mlsData }: Props) {
+  return (
+    <div>
+      {/* Property info section */}
+      <div className="flex items-center gap-4">
+        <StatusBadge status={mlsData?.status} size="md" />
+        <div>
+          <p className="text-sm text-muted-foreground">
+            {mlsData?.simpleDaysOnMarket || 0} days on market
+          </p>
+          <p className="text-2xl font-bold">
+            ${mlsData?.listPrice?.toLocaleString()}
+          </p>
+        </div>
+      </div>
+      {/* ... rest of MLS data */}
+    </div>
+  );
+}
+```
+
+### 6. Update Transaction Card (List View)
+
+```tsx
+// components/transaction-card.tsx
+import { StatusBadge } from '@/components/ui/status-badge';
+import { getAuthoritativeStatus } from '@/lib/utils/status';
+
+interface TransactionCardProps {
+  transaction: any;
+}
+
+export function TransactionCard({ transaction }: TransactionCardProps) {
+  // Use mlsStatus if available, otherwise fall back to status
+  const status = transaction.mlsStatus || transaction.status;
+  
+  return (
+    <Card className="hover:shadow-md transition-shadow">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-semibold truncate">{transaction.address}</h3>
+          <StatusBadge status={status} size="sm" />
+        </div>
+        {/* ... rest of card */}
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+### 7. Sync Status on MLS Data Fetch (Backend)
+
+```typescript
+// server/services/mls-sync.ts
+import { TimelineLogger } from './timeline';
+
+export async function syncMLSData(transactionId: number, mlsNumber: string) {
+  // Fetch latest from Repliers
+  const mlsData = await fetchFromRepliers(mlsNumber);
+  
+  // Get current transaction
+  const transaction = await storage.getTransaction(transactionId);
+  
+  if (!transaction) return mlsData;
+  
+  // Check if status changed
+  const newStatus = mlsData.status || mlsData.standardStatus;
+  const oldStatus = transaction.status;
+  
+  if (newStatus && newStatus !== oldStatus) {
+    // Update transaction status in database
+    await storage.updateTransaction(transactionId, {
+      status: newStatus,
+      mlsStatus: newStatus, // Store MLS status separately too
+      updatedAt: new Date(),
+    });
+    
+    // Log status change to timeline
+    await TimelineLogger.statusChanged(transactionId, oldStatus, newStatus);
+    
+    console.log(`Transaction ${transactionId} status updated: ${oldStatus} → ${newStatus}`);
+  }
+  
+  // Also update other MLS fields that might have changed
+  await storage.updateTransaction(transactionId, {
+    listPrice: mlsData.listPrice,
+    soldPrice: mlsData.soldPrice || mlsData.closePrice,
+    // ... other fields
+  });
+  
+  return mlsData;
+}
+```
+
+### 8. Add mlsStatus Column to Schema (if not exists)
+
+```typescript
+// shared/schema.ts
+export const transactions = pgTable('transactions', {
+  id: serial('id').primaryKey(),
+  address: varchar('address', { length: 255 }).notNull(),
+  mlsNumber: varchar('mls_number', { length: 50 }),
+  status: varchar('status', { length: 50 }).default('Active'),
+  mlsStatus: varchar('mls_status', { length: 50 }), // <-- Add this column
+  listPrice: integer('list_price'),
+  soldPrice: integer('sold_price'),
+  // ... other columns
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+```
+
+Run migration:
+```bash
+npx drizzle-kit generate
+npx drizzle-kit push
+```
+
+---
+
+## Status Color Reference
+
+| Status | Color | Use Case |
+|--------|-------|----------|
+| Active | 🟢 Green | Listing is available |
+| Coming Soon | 🔵 Blue | Pre-market |
+| Under Contract | 🟠 Orange | Accepted offer, not closed |
+| Pending | 🟠 Orange | Same as Under Contract |
+| Sold / Closed | 🔴 Red | Transaction completed |
+| Withdrawn / Expired | ⚫ Gray | No longer available |
+
+---
+
+## After Fix
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ ← 13106 New Boston    [Under Contract]      ← MATCHES! (orange) │
+│   # ACT2572987                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ MLS Listing Data                                                │
+│                                                                 │
+│                        [Under Contract]     ← MATCHES! (orange) │
+│                        14 days on market                        │
+│                        $434,990                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Checklist
+
+### Files to Create:
+- [ ] `lib/utils/status.ts` - Status mapping and utilities
+- [ ] `components/ui/status-badge.tsx` - Unified badge component
+
+### Files to Update:
+- [ ] `components/transaction-header.tsx` - Use StatusBadge with mlsData
+- [ ] `components/transaction-details.tsx` - Pass mlsData to header
+- [ ] `components/mls-data-tab.tsx` - Use StatusBadge
+- [ ] `components/transaction-card.tsx` - Use StatusBadge
+- [ ] `server/services/mls-sync.ts` - Sync status on fetch
+- [ ] `shared/schema.ts` - Add mlsStatus column (optional)
+
+### Behavior Verification:
+- [ ] Header badge matches MLS Data badge
+- [ ] "Active Under Contract" shows as orange (not green)
+- [ ] Status syncs when MLS data is refreshed
+- [ ] Transaction cards show correct status
+- [ ] Timeline logs status changes
+
+---
+
+## Summary
+
+| Location | Before | After |
+|----------|--------|-------|
+| Header | `transaction.status` (stale) | `mlsData.status` (live) |
+| MLS Data Tab | `mlsData.status` | `mlsData.status` (same) |
+| Transaction Cards | `transaction.status` | `mlsData.status` or synced |
+| Database | Static | Synced on MLS fetch |
+
+**Key Principle:** MLS data from Repliers is the single source of truth. Always display `mlsData.status` when available, and sync it to the database to keep everything consistent.

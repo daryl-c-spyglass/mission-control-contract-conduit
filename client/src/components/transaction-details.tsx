@@ -1515,7 +1515,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Status</span>
-                            <span>{mlsData.status || 'Unknown'}</span>
+                            <span>{getStatusLabel(mlsData.status || 'Unknown')}</span>
                           </div>
                         </>
                       )}
@@ -1666,7 +1666,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                     {/* Status Badges Row */}
                     <div className="flex items-center flex-wrap gap-2">
                       <Badge className={getStatusBadgeStyle(mlsData.status || 'Unknown')}>
-                        {mlsData.status || 'Unknown'}
+                        {getStatusLabel(mlsData.status || 'Unknown')}
                       </Badge>
                       {/* lastStatus ribbons */}
                       {mlsData.lastStatus === 'Pc' && (
