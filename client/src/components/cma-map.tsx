@@ -4,7 +4,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { useTheme } from '@/hooks/use-theme';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Locate, Maximize2 } from 'lucide-react';
+import { X, Locate, Maximize2, Map, Satellite } from 'lucide-react';
 import type { Property } from '@shared/schema';
 import {
   buildCmaMapModel,
@@ -17,8 +17,116 @@ import {
   type NormalizedStatus,
 } from '@/lib/cma-map-data';
 
-const CMA_MAP_STYLE_LIGHT = 'mapbox://styles/mapbox/light-v11';
-const CMA_MAP_STYLE_DARK = 'mapbox://styles/mapbox/dark-v11';
+const MAPBOX_STYLES = {
+  STREETS: 'mapbox://styles/mapbox/streets-v11',
+  SATELLITE: 'mapbox://styles/mapbox/satellite-streets-v11',
+  DARK: 'mapbox://styles/mapbox/dark-v10',
+} as const;
+
+type BasemapPreference = 'streets' | 'satellite';
+type ResolvedStyle = typeof MAPBOX_STYLES[keyof typeof MAPBOX_STYLES];
+
+const STORAGE_KEY = 'cmaMapStylePreference';
+
+function getStoredBasemapPreference(): BasemapPreference {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === 'satellite') return 'satellite';
+    return 'streets';
+  } catch {
+    return 'streets';
+  }
+}
+
+function setStoredBasemapPreference(pref: BasemapPreference): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, pref);
+  } catch {
+  }
+}
+
+function resolveMapStyle(isDark: boolean, preference: BasemapPreference): ResolvedStyle {
+  if (preference === 'satellite') {
+    return MAPBOX_STYLES.SATELLITE;
+  }
+  return isDark ? MAPBOX_STYLES.DARK : MAPBOX_STYLES.STREETS;
+}
+
+function getStyleType(style: ResolvedStyle): 'streets' | 'satellite' | 'dark' {
+  if (style === MAPBOX_STYLES.SATELLITE) return 'satellite';
+  if (style === MAPBOX_STYLES.DARK) return 'dark';
+  return 'streets';
+}
+
+interface OverlayTuning {
+  polygonFillOpacity: number;
+  polygonLineWidth: number;
+  polygonLineOpacity: number;
+  compStrokeWidth: number;
+  compHoverStrokeWidth: number;
+  labelHaloWidth: number;
+  subjectLabelHaloWidth: number;
+  labelTextColor: string;
+  labelHaloColor: string;
+  subjectLabelTextColor: string;
+  subjectLabelHaloColor: string;
+  polygonFillColor: string;
+  polygonLineColor: string;
+}
+
+function getOverlayTuning(styleType: 'streets' | 'satellite' | 'dark'): OverlayTuning {
+  switch (styleType) {
+    case 'satellite':
+      return {
+        polygonFillOpacity: 0.16,
+        polygonLineWidth: 3,
+        polygonLineOpacity: 0.85,
+        compStrokeWidth: 2.5,
+        compHoverStrokeWidth: 3.5,
+        labelHaloWidth: 2,
+        subjectLabelHaloWidth: 2.5,
+        labelTextColor: '#ffffff',
+        labelHaloColor: 'rgba(0,0,0,0.85)',
+        subjectLabelTextColor: '#ffffff',
+        subjectLabelHaloColor: 'rgba(0,0,0,0.9)',
+        polygonFillColor: '#60a5fa',
+        polygonLineColor: '#93c5fd',
+      };
+    case 'dark':
+      return {
+        polygonFillOpacity: 0.14,
+        polygonLineWidth: 2,
+        polygonLineOpacity: 0.75,
+        compStrokeWidth: 2,
+        compHoverStrokeWidth: 3,
+        labelHaloWidth: 1.8,
+        subjectLabelHaloWidth: 2.2,
+        labelTextColor: '#f5f5f5',
+        labelHaloColor: 'rgba(0,0,0,0.8)',
+        subjectLabelTextColor: '#f5f5f5',
+        subjectLabelHaloColor: 'rgba(0,0,0,0.9)',
+        polygonFillColor: '#60a5fa',
+        polygonLineColor: '#60a5fa',
+      };
+    default:
+      return {
+        polygonFillOpacity: 0.10,
+        polygonLineWidth: 2,
+        polygonLineOpacity: 0.7,
+        compStrokeWidth: 2,
+        compHoverStrokeWidth: 3,
+        labelHaloWidth: 1.5,
+        subjectLabelHaloWidth: 2,
+        labelTextColor: '#1f2937',
+        labelHaloColor: 'rgba(255,255,255,0.9)',
+        subjectLabelTextColor: '#1e3a8a',
+        subjectLabelHaloColor: 'rgba(255,255,255,0.95)',
+        polygonFillColor: '#3b82f6',
+        polygonLineColor: '#2563eb',
+      };
+  }
+}
+
 const DEFAULT_SUBJECT_ZOOM = 14;
 const DEFAULT_FIT_PADDING = { top: 60, right: 60, bottom: 60, left: 60 };
 
@@ -51,7 +159,12 @@ const EMPTY_FEATURE_COLLECTION: GeoJSON.FeatureCollection = {
   features: [],
 };
 
-function initCmaLayers(map: mapboxgl.Map, model: CmaMapModel, isDark: boolean, showPolygon: boolean = true) {
+function initCmaLayers(
+  map: mapboxgl.Map,
+  model: CmaMapModel,
+  tuning: OverlayTuning,
+  showPolygon: boolean = true
+) {
   removeAllCmaLayers(map);
 
   map.addSource(SOURCE_IDS.polygon, {
@@ -86,8 +199,8 @@ function initCmaLayers(map: mapboxgl.Map, model: CmaMapModel, isDark: boolean, s
       visibility: showPolygon ? 'visible' : 'none',
     },
     paint: {
-      'fill-color': isDark ? '#60a5fa' : '#3b82f6',
-      'fill-opacity': 0.1,
+      'fill-color': tuning.polygonFillColor,
+      'fill-opacity': tuning.polygonFillOpacity,
     },
   });
 
@@ -99,9 +212,9 @@ function initCmaLayers(map: mapboxgl.Map, model: CmaMapModel, isDark: boolean, s
       visibility: showPolygon ? 'visible' : 'none',
     },
     paint: {
-      'line-color': isDark ? '#60a5fa' : '#2563eb',
-      'line-width': 2,
-      'line-opacity': 0.7,
+      'line-color': tuning.polygonLineColor,
+      'line-width': tuning.polygonLineWidth,
+      'line-opacity': tuning.polygonLineOpacity,
     },
   });
 
@@ -113,7 +226,7 @@ function initCmaLayers(map: mapboxgl.Map, model: CmaMapModel, isDark: boolean, s
     paint: {
       'circle-color': '#6366f1',
       'circle-radius': ['step', ['get', 'point_count'], 20, 10, 30, 50, 40],
-      'circle-stroke-width': 2,
+      'circle-stroke-width': tuning.compStrokeWidth,
       'circle-stroke-color': '#ffffff',
     },
   });
@@ -156,10 +269,10 @@ function initCmaLayers(map: mapboxgl.Map, model: CmaMapModel, isDark: boolean, s
       'circle-stroke-width': [
         'case',
         ['boolean', ['feature-state', 'hover'], false],
-        3,
+        tuning.compHoverStrokeWidth,
         ['boolean', ['feature-state', 'selected'], false],
-        3,
-        2,
+        tuning.compHoverStrokeWidth,
+        tuning.compStrokeWidth,
       ],
       'circle-stroke-color': '#ffffff',
       'circle-opacity': [
@@ -186,9 +299,9 @@ function initCmaLayers(map: mapboxgl.Map, model: CmaMapModel, isDark: boolean, s
       'text-ignore-placement': false,
     },
     paint: {
-      'text-color': isDark ? '#f5f5f5' : '#1f2937',
-      'text-halo-color': isDark ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)',
-      'text-halo-width': 1.5,
+      'text-color': tuning.labelTextColor,
+      'text-halo-color': tuning.labelHaloColor,
+      'text-halo-width': tuning.labelHaloWidth,
     },
   });
 
@@ -199,7 +312,7 @@ function initCmaLayers(map: mapboxgl.Map, model: CmaMapModel, isDark: boolean, s
     paint: {
       'circle-radius': 12,
       'circle-color': SUBJECT_COLOR,
-      'circle-stroke-width': 3,
+      'circle-stroke-width': tuning.compStrokeWidth + 1,
       'circle-stroke-color': '#ffffff',
     },
   });
@@ -218,9 +331,9 @@ function initCmaLayers(map: mapboxgl.Map, model: CmaMapModel, isDark: boolean, s
       'text-ignore-placement': true,
     },
     paint: {
-      'text-color': isDark ? '#f5f5f5' : '#1e3a8a',
-      'text-halo-color': isDark ? 'rgba(0,0,0,0.9)' : 'rgba(255,255,255,0.95)',
-      'text-halo-width': 2,
+      'text-color': tuning.subjectLabelTextColor,
+      'text-halo-color': tuning.subjectLabelHaloColor,
+      'text-halo-width': tuning.subjectLabelHaloWidth,
     },
   });
 }
@@ -296,7 +409,18 @@ export function CMAMap({
   }, [onPropertyClick]);
 
   const { isDark } = useTheme();
-  const mapStyle = isDark ? CMA_MAP_STYLE_DARK : CMA_MAP_STYLE_LIGHT;
+  const [basemapPreference, setBasemapPreference] = useState<BasemapPreference>(getStoredBasemapPreference);
+  const basemapPreferenceRef = useRef<BasemapPreference>(basemapPreference);
+
+  const mapStyle = useMemo(() => resolveMapStyle(isDark, basemapPreference), [isDark, basemapPreference]);
+  const styleType = useMemo(() => getStyleType(mapStyle), [mapStyle]);
+  const overlayTuning = useMemo(() => getOverlayTuning(styleType), [styleType]);
+  const overlayTuningRef = useRef<OverlayTuning>(overlayTuning);
+
+  const handleBasemapChange = useCallback((pref: BasemapPreference) => {
+    setBasemapPreference(pref);
+    setStoredBasemapPreference(pref);
+  }, []);
 
   const model = useMemo(() => {
     return buildCmaMapModel(subjectProperty, properties);
@@ -309,6 +433,14 @@ export function CMAMap({
   useEffect(() => {
     isDarkRef.current = isDark;
   }, [isDark]);
+
+  useEffect(() => {
+    basemapPreferenceRef.current = basemapPreference;
+  }, [basemapPreference]);
+
+  useEffect(() => {
+    overlayTuningRef.current = overlayTuning;
+  }, [overlayTuning]);
 
   useEffect(() => {
     fetch('/api/mapbox-token')
@@ -387,7 +519,7 @@ export function CMAMap({
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
     map.on('load', () => {
-      initCmaLayers(map, model, isDark, showPolygon);
+      initCmaLayers(map, model, overlayTuning, showPolygon);
       setMapReady(true);
 
       if (model.bounds) {
@@ -542,8 +674,9 @@ export function CMAMap({
 
     map.once('styledata', () => {
       const currentModel = modelRef.current;
+      const currentTuning = overlayTuningRef.current;
       if (currentModel) {
-        initCmaLayers(map, currentModel, isDarkRef.current, showPolygonRef.current);
+        initCmaLayers(map, currentModel, currentTuning, showPolygonRef.current);
 
         if (previousSelectedId) {
           try {
@@ -652,6 +785,28 @@ export function CMAMap({
         >
           <Maximize2 className="h-4 w-4" />
         </Button>
+        <div className="flex flex-col bg-background/90 backdrop-blur rounded-md shadow-md border overflow-hidden">
+          <Button
+            size="icon"
+            variant={basemapPreference === 'streets' ? 'default' : 'ghost'}
+            className="h-8 w-8 rounded-none"
+            onClick={() => handleBasemapChange('streets')}
+            title={isDark ? 'Dark map' : 'Street map'}
+            data-testid="button-basemap-streets"
+          >
+            <Map className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant={basemapPreference === 'satellite' ? 'default' : 'ghost'}
+            className="h-8 w-8 rounded-none"
+            onClick={() => handleBasemapChange('satellite')}
+            title="Satellite map"
+            data-testid="button-basemap-satellite"
+          >
+            <Satellite className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <div className="absolute top-4 left-1/2 -translate-x-1/2">

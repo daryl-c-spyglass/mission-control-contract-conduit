@@ -1,0 +1,91 @@
+GOAL
+Add a basemap style switcher to the CMA Map:
+- Default: Streets (mapbox://styles/mapbox/streets-v11)
+- Optional: Satellite Streets (mapbox://styles/mapbox/satellite-streets-v11) for real estate context
+- Dark Mode: mapbox://styles/mapbox/dark-v10 (auto when app is in dark theme)
+The switch MUST NOT break: subject + comps markers, clustering, polygon drawing, hover/click interactivity, and Center/Fit controls. Polygon + markers must remain visually dominant across styles.
+
+IMPORTANT: KEEP DATA + RENDERING PARITY
+Use ONE shared “canonical CMA Geo builder” for:
+- CMA UI preview map
+- Any download/export rendering (if we render map elsewhere)
+No duplicate logic. Style can change; data + layers + bounds logic must be identical.
+
+STYLES
+Define a style resolver:
+- STREETS = 'mapbox://styles/mapbox/streets-v11'
+- SATELLITE = 'mapbox://styles/mapbox/satellite-streets-v11'
+- DARK = 'mapbox://styles/mapbox/dark-v10'
+
+Rules:
+1) If app theme is dark => use DARK regardless of Streets/Satellite toggle, unless user explicitly chooses Satellite (Satellite should remain available, but default in dark is DARK).
+2) If theme is light => allow user to pick Streets or Satellite.
+3) Persist user selection in localStorage (e.g., 'cmaMapStylePreference').
+
+UI CONTROL
+Add a small segmented control (or dropdown) on the CMA map header:
+- “Streets”
+- “Satellite”
+If theme is dark, show “Dark” as active basemap (and optionally allow toggling to Satellite if we want).
+Do not clutter the map; keep control near existing map actions (Center on Subject / Fit All).
+
+HOW TO CHANGE STYLE WITHOUT BREAKING LAYERS
+When style changes in Mapbox GL JS, custom sources/layers are lost. Implement:
+- setMapStyleAndRestoreOverlays(nextStyle)
+  1) save current camera (center, zoom, bearing, pitch)
+  2) map.setStyle(nextStyle)
+  3) on 'style.load' => re-add sources + layers (polygon + points + clusters + labels) via initCmaOverlays()
+  4) restore camera
+  5) re-apply feature-state selection/hover if needed
+This must be deterministic and idempotent.
+
+OVERLAY VISIBILITY ACROSS STYLES (CRITICAL)
+Because Satellite is visually “busy”, tune overlays dynamically by basemap:
+- Streets/Light:
+  - polygon fill opacity: 0.10
+  - polygon outline width: 2
+- Satellite:
+  - polygon fill opacity: 0.14–0.18 (slightly stronger)
+  - polygon outline width: 2.5–3
+  - marker outlines slightly thicker (+10–15%)
+  - price label halo slightly thicker (+15–20%) so text stays readable over imagery
+- Dark:
+  - polygon fill opacity: 0.12–0.16
+  - ensure label text color/halo contrasts properly (white text with dark halo or vice versa, whichever current design uses)
+
+DO NOT CHANGE LAYER ORDER (REQUIRED)
+After style load, add overlays in the same order every time:
+1) polygon fill
+2) polygon outline
+3) comp clusters
+4) cluster count
+5) comp points
+6) subject point (always top)
+7) price pill labels
+8) hover/selected halo (feature-state)
+
+STATUS COLORS (FROM REPLIERS)
+Ensure comparable status comes from Repliers mapping (ACTIVE/PENDING/SOLD/UNKNOWN).
+Never default comps to UNKNOWN/grey unless truly unknown.
+
+CONTROLS MUST STILL WORK
+- Center on Subject => flyTo(subjectLngLat, DEFAULT_SUBJECT_ZOOM)
+- Fit All => fitBounds(allBounds, padding 40)
+These must work after style switches and after async data loads.
+Disable buttons until subjectLngLat + bounds are ready OR queue actions.
+
+ACCEPTANCE TESTS
+1) Switching Streets <-> Satellite does not remove markers, clusters, polygon, or labels.
+2) Switching into dark theme automatically applies DARK style (overlays still present).
+3) Polygon is clearly visible on Satellite and Dark.
+4) Subject + comps always visible; subject remains on top.
+5) Hover/click interactivity works after any style switch.
+6) Center/Fit controls work after any style switch.
+7) Persisted preference loads correctly on refresh.
+
+DELIVERABLES
+- style resolver + localStorage preference
+- UI style toggle control
+- setStyle + restore overlays mechanism
+- per-style overlay tuning (polygon + marker/label halo)
+- README note: “Changing styles re-adds overlays on style.load”

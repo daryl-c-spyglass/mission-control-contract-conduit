@@ -157,9 +157,32 @@ Note: Unknown status codes now surface warnings in console and return UNKNOWN to
 - **Click Cluster**: `getClusterExpansionZoom()` → zoom in
 - **Canonical Property Lookup**: `propertyByFeatureId` Map provides direct access to original Property objects by feature ID
 
+### Basemap Style Switcher
+**Styles Available:**
+- `STREETS` = 'mapbox://styles/mapbox/streets-v11' (default in light mode)
+- `SATELLITE` = 'mapbox://styles/mapbox/satellite-streets-v11' (user preference)
+- `DARK` = 'mapbox://styles/mapbox/dark-v10' (auto in dark mode, unless satellite selected)
+
+**Style Resolution Logic:**
+- If user preference is `satellite` → always use SATELLITE
+- Otherwise: dark theme → DARK, light theme → STREETS
+- Preference persisted in localStorage (`cmaMapStylePreference`)
+
+**Per-Style Overlay Tuning:**
+- Streets: polygon fill 0.10, line width 2, standard halos
+- Satellite: polygon fill 0.16, line width 3, thicker halos (2.0-2.5), white text over dark halo
+- Dark: polygon fill 0.14, line width 2, slightly thicker halos (1.8-2.2)
+
+**Changing Styles Without Breaking Layers:**
+When style changes, custom sources/layers are lost. Solution:
+1. Capture camera + feature-state (selected/hovered)
+2. `map.setStyle(nextStyle)`
+3. On 'styledata' → re-add sources + layers via `initCmaLayers()`
+4. Restore feature-state selection/hover
+
 ### Theme Toggle Handling
 - Style effect only triggers on actual mapStyle changes (not on data changes)
-- Uses refs (`modelRef`, `isDarkRef`, `showPolygonRef`) to access latest values in styledata callback
+- Uses refs (`modelRef`, `isDarkRef`, `showPolygonRef`, `overlayTuningRef`) to access latest values in styledata callback
 - Selection state (selected/hovered features) is captured before style change and restored after
 
 ### Verification Steps
