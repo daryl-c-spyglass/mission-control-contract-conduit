@@ -46,15 +46,11 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import type { Transaction, MLSData } from "@shared/schema";
 
-import spyglassLogoWhite from "@assets/White-Orange_(1)_1767129299733.png";
 import spyglassLogoBlack from "@assets/SpyglassRealty_Logo_Black_(1)_1767985123384.png";
-
-type FlyerFormat = "social" | "print";
 
 // Single source of truth for character limits
 const DESCRIPTION_LIMITS = {
-  social: 200,
-  print: 150,  // Increased from 115 to allow more description content
+  print: 150,  // Character limit for print flyer description
 } as const;
 
 const STATUS_OPTIONS = [
@@ -126,99 +122,6 @@ interface PreviewProps {
   agentPhone?: string;
   agentPhotoUrl?: string;
   listingHeadline?: string;
-}
-
-function SocialMediaPreview({
-  photoUrls,
-  status,
-  price,
-  address,
-  bedrooms,
-  bathrooms,
-  sqft,
-  description,
-}: PreviewProps) {
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageError, setImageError] = useState(false);
-  const mainPhotoUrl = photoUrls[0] || null;
-
-  useEffect(() => {
-    setImageLoaded(false);
-    setImageError(false);
-  }, [mainPhotoUrl]);
-
-  const statusLabel = STATUS_OPTIONS.find(s => s.value === status)?.label || "Just Listed";
-  const truncatedDesc = truncateDescription(description || "", DESCRIPTION_LIMITS.social);
-
-  const specs = [];
-  if (bedrooms) specs.push(`${bedrooms} bed`);
-  if (bathrooms) specs.push(`${bathrooms} bath`);
-  if (sqft) specs.push(`${parseInt(sqft).toLocaleString()} sqft`);
-
-  return (
-    <div className="relative w-full aspect-square bg-[#1a1a2e] rounded-lg overflow-hidden shadow-lg border border-border">
-      {/* Photo takes top 50% for 1:1 square format */}
-      <div className="relative h-[50%] bg-muted">
-        {mainPhotoUrl ? (
-          <>
-            {!imageLoaded && !imageError && (
-              <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            )}
-            {imageError && (
-              <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                <p className="text-xs text-muted-foreground">Failed to load</p>
-              </div>
-            )}
-            <img
-              src={mainPhotoUrl}
-              alt="Property"
-              className={`w-full h-full object-cover transition-opacity ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-              onLoad={() => setImageLoaded(true)}
-              onError={() => setImageError(true)}
-            />
-            <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-[#1a1a2e] to-transparent" />
-          </>
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <p className="text-xs text-muted-foreground">Select a photo</p>
-          </div>
-        )}
-      </div>
-
-      {/* Content area for 1:1 square format - compact spacing */}
-      <div className="p-2 space-y-1">
-        <p className="text-[8px] font-bold text-amber-500 uppercase tracking-wide">
-          {statusLabel}
-        </p>
-        <p className="text-[10px] font-bold text-white">
-          {price || "$0"}
-        </p>
-        <p className="text-[8px] text-white leading-tight">
-          {address.toUpperCase()}
-        </p>
-        {specs.length > 0 && (
-          <p className="text-[7px] text-gray-400">
-            {specs.join("  |  ")}
-          </p>
-        )}
-        {truncatedDesc && (
-          <p className="text-[6px] text-gray-300 leading-relaxed line-clamp-3">
-            {truncatedDesc}
-          </p>
-        )}
-      </div>
-
-      <div className="absolute bottom-1 right-1">
-        <img
-          src={spyglassLogoWhite}
-          alt="Logo"
-          className="h-3 w-auto opacity-90"
-        />
-      </div>
-    </div>
-  );
 }
 
 function PrintFlyerPreview({
@@ -407,7 +310,7 @@ export interface FlyerAssetConfig {
   agentTitle?: string;
   agentPhone?: string;
   agentPhotoUrl?: string;
-  format: 'social' | 'print';
+  format: 'print';
   price?: string;
   bedrooms?: string;
   bathrooms?: string;
@@ -441,7 +344,8 @@ export function CreateFlyerDialog({
 }: CreateFlyerDialogProps) {
   const isEditMode = Boolean(assetId && initialData);
   const { toast } = useToast();
-  const [format, setFormat] = useState<FlyerFormat>("social");
+  // Format is always "print" - social media graphics are handled by MarketingMaterialsDialog
+  const format = "print" as const;
   const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -476,28 +380,22 @@ export function CreateFlyerDialog({
   }, []);
 
   const mlsData = transaction.mlsData as MLSData | null;
-  const maxPhotos = format === "social" ? 1 : 3;
-  const maxDescriptionLength = DESCRIPTION_LIMITS[format];
+  const maxPhotos = 3; // Print flyer uses up to 3 photos
+  const maxDescriptionLength = DESCRIPTION_LIMITS.print;
 
-  const resetPhotoSelection = useCallback((newFormat: FlyerFormat) => {
-    const limit = newFormat === "social" ? 1 : 3;
+  const resetPhotoSelection = useCallback(() => {
     if (mlsPhotos.length > 0) {
-      setSelectedPhotos(mlsPhotos.slice(0, limit));
+      setSelectedPhotos(mlsPhotos.slice(0, 3));
     } else {
       setSelectedPhotos([]);
     }
     setUploadedPhotos([]);
-    // Clear photo insights when switching to social (not needed there)
-    if (newFormat === "social") {
-      setPhotoInsights({});
-    }
   }, [mlsPhotos]);
 
   useEffect(() => {
     if (open) {
       // If editing, restore saved state from initialData
       if (isEditMode && initialData) {
-        setFormat(initialData.format);
         setSelectedPhotos(initialData.photoUrls || []);
         if (initialData.agentPhotoUrl) {
           setLocalAgentPhoto(initialData.agentPhotoUrl);
@@ -516,7 +414,7 @@ export function CreateFlyerDialog({
           listingHeadline: initialData.headline || "",
         });
       } else {
-        resetPhotoSelection(format);
+        resetPhotoSelection();
         if (mlsPhotos.length === 0) {
           setShowUploadSection(true);
         }
@@ -537,7 +435,6 @@ export function CreateFlyerDialog({
       setSelectedPhotos([]);
       setUploadedPhotos([]);
       setShowUploadSection(false);
-      setFormat("social");
       setLocalAgentPhoto(null);
       setZoomLevel(100);
       // Clear rendered preview when dialog closes
@@ -547,14 +444,6 @@ export function CreateFlyerDialog({
       }
     }
   }, [open]);
-
-  // Clear rendered preview when format changes
-  useEffect(() => {
-    if (renderedPreviewUrl) {
-      URL.revokeObjectURL(renderedPreviewUrl);
-      setRenderedPreviewUrl(null);
-    }
-  }, [format]);
 
   useEffect(() => {
     if (!previewEnlarged) {
@@ -654,7 +543,7 @@ export function CreateFlyerDialog({
     } finally {
       setIsSummarizing(false);
     }
-  }, [form, transaction.propertyAddress, toast, originalDescription, format]);
+  }, [form, transaction.propertyAddress, toast, originalDescription]);
 
   const handleRevertToPrevious = useCallback(() => {
     if (previousDescription !== null) {
@@ -746,16 +635,6 @@ export function CreateFlyerDialog({
     });
   }, [form, toast]);
 
-  const handleFormatChange = (newFormat: FlyerFormat) => {
-    setFormat(newFormat);
-    resetPhotoSelection(newFormat);
-    // Clear rendered preview when switching formats
-    if (renderedPreviewUrl) {
-      URL.revokeObjectURL(renderedPreviewUrl);
-      setRenderedPreviewUrl(null);
-    }
-  };
-
   const togglePhotoSelection = (photoUrl: string) => {
     setSelectedPhotos((prev) => {
       if (prev.includes(photoUrl)) {
@@ -764,7 +643,7 @@ export function CreateFlyerDialog({
       if (prev.length >= maxPhotos) {
         toast({
           title: "Maximum photos selected",
-          description: `You can select ${maxPhotos === 1 ? "1 photo" : `up to ${maxPhotos} photos`} for ${format === "social" ? "social media" : "print flyer"}`,
+          description: `You can select up to ${maxPhotos} photos for the print flyer`,
         });
         return prev;
       }
@@ -949,8 +828,6 @@ export function CreateFlyerDialog({
 
   // Render pixel-identical preview using Puppeteer (same as download)
   const renderActualPreview = useCallback(async () => {
-    if (format !== "print") return;
-    
     const photosToUse = getPhotosForFlyer();
     if (photosToUse.length === 0) {
       toast({
@@ -1027,145 +904,7 @@ export function CreateFlyerDialog({
     } finally {
       setIsRenderingPreview(false);
     }
-  }, [format, form, toast, transaction.propertyAddress, mlsData, localAgentPhoto, agentPhotoUrl, renderedPreviewUrl, getPhotosForFlyer]);
-
-  const generateSocialFlyer = async (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, data: FormValues, photosToUse: string[]) => {
-    // 1:1 square format for social media
-    canvas.width = 1080;
-    canvas.height = 1080;
-
-    ctx.fillStyle = "#1a1a2e";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    const mainPhoto = document.createElement('img');
-    mainPhoto.crossOrigin = "anonymous";
-    await new Promise<void>((resolve, reject) => {
-      mainPhoto.onload = () => resolve();
-      mainPhoto.onerror = () => reject(new Error("Failed to load photo"));
-      mainPhoto.src = photosToUse[0];
-    });
-
-    // For 1:1 square format, photo takes top portion
-    const photoHeight = 540;
-    ctx.drawImage(mainPhoto, 0, 0, canvas.width, photoHeight);
-
-    // Gradient overlay at bottom of photo
-    const gradient = ctx.createLinearGradient(0, photoHeight - 150, 0, photoHeight);
-    gradient.addColorStop(0, "rgba(26, 26, 46, 0)");
-    gradient.addColorStop(1, "rgba(26, 26, 46, 1)");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, photoHeight - 150, canvas.width, 150);
-
-    // Status label
-    const statusLabel = STATUS_OPTIONS.find(s => s.value === data.status)?.label || "Just Listed";
-    ctx.fillStyle = "#d97706";
-    ctx.font = "bold 36px Inter, sans-serif";
-    ctx.fillText(statusLabel.toUpperCase(), 40, photoHeight + 50);
-
-    // Price
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 32px Inter, sans-serif";
-    ctx.fillText(data.price, 40, photoHeight + 95);
-
-    // Address - full address on single line for square format
-    const address = transaction.propertyAddress;
-    ctx.font = "24px Inter, sans-serif";
-    ctx.fillStyle = "#ffffff";
-    let addressY = photoHeight + 140;
-    ctx.fillText(address.toUpperCase(), 40, addressY);
-    addressY += 35;
-
-    // Property specs
-    if (data.bedrooms || data.bathrooms || data.sqft) {
-      ctx.font = "22px Inter, sans-serif";
-      ctx.fillStyle = "#a0a0a0";
-      let specs = [];
-      if (data.bedrooms) specs.push(`${data.bedrooms} bed`);
-      if (data.bathrooms) specs.push(`${data.bathrooms} bath`);
-      if (data.sqft) specs.push(`${parseInt(data.sqft).toLocaleString()} sq ft`);
-      ctx.fillText(specs.join("  |  "), 40, addressY + 20);
-    }
-
-    // Description (compact for square format)
-    if (data.description) {
-      const truncatedDesc = truncateDescription(data.description, DESCRIPTION_LIMITS.social);
-      ctx.font = "20px Inter, sans-serif";
-      ctx.fillStyle = "#cccccc";
-      const maxWidth = canvas.width - 80;
-      const words = truncatedDesc.split(" ");
-      let line = "";
-      let descY = addressY + 70;
-      const lineHeight = 28;
-      let lineCount = 0;
-      
-      words.forEach((word) => {
-        if (lineCount >= 4) return; // Max 4 lines for square format
-        const testLine = line + word + " ";
-        const metrics = ctx.measureText(testLine);
-        if (metrics.width > maxWidth && line !== "") {
-          ctx.fillText(line.trim(), 40, descY);
-          line = word + " ";
-          descY += lineHeight;
-          lineCount++;
-        } else {
-          line = testLine;
-        }
-      });
-      if (line.trim() && lineCount < 4) {
-        ctx.fillText(line.trim(), 40, descY);
-      }
-    }
-
-    // Logo (bottom right)
-    const logo = document.createElement('img');
-    logo.crossOrigin = "anonymous";
-    await new Promise<void>((resolve) => {
-      logo.onload = () => resolve();
-      logo.onerror = () => resolve();
-      logo.src = spyglassLogoWhite;
-    });
-    
-    const logoHeight = 50;
-    const logoWidth = (logo.width / logo.height) * logoHeight || 150;
-    ctx.drawImage(logo, canvas.width - logoWidth - 40, canvas.height - logoHeight - 40, logoWidth, logoHeight);
-
-    // Agent info (bottom left, compact)
-    if (agentName) {
-      ctx.font = "bold 22px Inter, sans-serif";
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(agentName, 40, canvas.height - 70);
-      
-      if (agentPhone) {
-        ctx.font = "18px Inter, sans-serif";
-        ctx.fillStyle = "#a0a0a0";
-        ctx.fillText(agentPhone, 40, canvas.height - 45);
-      }
-    }
-
-    // Agent photo (smaller for square format)
-    if (agentPhotoUrl) {
-      const agentPhoto = document.createElement('img');
-      agentPhoto.crossOrigin = "anonymous";
-      await new Promise<void>((resolve) => {
-        agentPhoto.onload = () => resolve();
-        agentPhoto.onerror = () => resolve();
-        agentPhoto.src = agentPhotoUrl;
-      });
-      
-      if (agentPhoto.complete && agentPhoto.naturalWidth > 0) {
-        const size = 60;
-        const x = canvas.width - logoWidth - 40 - size - 20;
-        const y = canvas.height - size - 40;
-        
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(x + size/2, y + size/2, size/2, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.drawImage(agentPhoto, x, y, size, size);
-        ctx.restore();
-      }
-    }
-  };
+  }, [form, toast, transaction.propertyAddress, mlsData, localAgentPhoto, agentPhotoUrl, renderedPreviewUrl, getPhotosForFlyer]);
 
   const generatePrintFlyer = async (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, data: FormValues, photosToUse: string[]) => {
     canvas.width = 2550;
@@ -1586,201 +1325,131 @@ export function CreateFlyerDialog({
       return;
     }
 
-    if (format === "print") {
-      if (!data.agentName?.trim()) {
-        toast({
-          title: "Agent name required",
-          description: "Please fill in your name for the print flyer",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (!data.agentPhone?.trim()) {
-        toast({
-          title: "Agent phone required",
-          description: "Please fill in your phone number for the print flyer",
-          variant: "destructive",
-        });
-        return;
-      }
+    if (!data.agentName?.trim()) {
+      toast({
+        title: "Agent name required",
+        description: "Please fill in your name for the print flyer",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!data.agentPhone?.trim()) {
+      toast({
+        title: "Agent phone required",
+        description: "Please fill in your phone number for the print flyer",
+        variant: "destructive",
+      });
+      return;
     }
 
     setIsGenerating(true);
 
     try {
-      if (format === "social") {
-        // Social media flyer uses canvas (client-side)
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        if (!ctx) throw new Error("Could not create canvas context");
-        
-        await generateSocialFlyer(ctx, canvas, data, photosToUse);
-        
-        const dataUrl = canvas.toDataURL("image/png");
-        const addressSlug = transaction.propertyAddress.split(",")[0].replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, "");
-        const fileName = `${addressSlug}_social.png`;
-        
-        // Download the file
-        const link = document.createElement("a");
-        link.download = fileName;
-        link.href = dataUrl;
-        link.click();
-
-        // Save to marketing assets
-        try {
-          const statusLabel = STATUS_OPTIONS.find(s => s.value === data.status)?.label || data.status;
-          const config: FlyerAssetConfig = {
-            status: data.status,
-            description: data.description,
-            photoUrls: photosToUse,
-            format: 'social',
-            price: data.price,
-            bedrooms: data.bedrooms,
-            bathrooms: data.bathrooms,
-            sqft: data.sqft,
-          };
-          
-          if (isEditMode && assetId) {
-            await apiRequest("PATCH", `/api/transactions/${transaction.id}/marketing-assets/${assetId}`, {
-              imageData: dataUrl,
-              fileName,
-              metadata: {
-                format: 'social',
-                status: statusLabel,
-                dimensions: '1:1',
-                config,
-              }
-            });
-          } else {
-            await apiRequest("POST", `/api/transactions/${transaction.id}/marketing-assets`, {
-              type: 'social_flyer',
-              imageData: dataUrl,
-              fileName,
-              metadata: {
-                format: 'social',
-                status: statusLabel,
-                dimensions: '1:1',
-                config,
-              }
-            });
-          }
-          onAssetSaved?.();
-        } catch (saveError) {
-          console.error("Failed to save marketing asset:", saveError);
-          // Don't show error - the download still worked
-        }
-
-        toast({
-          title: "Graphic created",
-          description: "Your social media graphic has been downloaded and saved to Marketing Assets",
-        });
-      } else {
-        // Print flyer uses unified /api/flyer/render endpoint (same as preview for pixel-identical output)
-        const response = await fetch('/api/flyer/render', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            status: data.status,
-            price: data.price,
-            address: transaction.propertyAddress,
-            photos: photosToUse,
-            beds: mlsData?.bedrooms || 0,
-            baths: mlsData?.bathrooms || 0,
-            sqft: mlsData?.sqft || 0,
-            headline: data.listingHeadline,
-            description: data.description,
-            agentName: data.agentName,
-            agentTitle: data.agentTitle,
-            agentPhone: data.agentPhone,
-            agentPhoto: effectiveAgentPhoto,
-            outputType: 'pdf' // PDF for high-quality printable flyer download
-          }),
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || 'Failed to generate flyer');
-        }
-        
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const addressSlug = transaction.propertyAddress.split(",")[0].replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, "");
-        const fileName = `${addressSlug}_flyer.pdf`;
-        
-        // Download the file
-        const link = document.createElement("a");
-        link.download = fileName;
-        link.href = url;
-        link.click();
-        
-        // Save to marketing assets
-        try {
-          // Convert blob to base64 for storage
-          const reader = new FileReader();
-          const base64Promise = new Promise<string>((resolve) => {
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-          });
-          const imageData = await base64Promise;
-          
-          const statusLabel = STATUS_OPTIONS.find(s => s.value === data.status)?.label || data.status;
-          const config: FlyerAssetConfig = {
-            status: data.status,
-            description: data.description,
-            headline: data.listingHeadline,
-            photoUrls: photosToUse,
-            agentName: data.agentName,
-            agentTitle: data.agentTitle,
-            agentPhone: data.agentPhone,
-            agentPhotoUrl: effectiveAgentPhoto || undefined,
-            format: 'print',
-            price: data.price,
-            bedrooms: data.bedrooms,
-            bathrooms: data.bathrooms,
-            sqft: data.sqft,
-          };
-          
-          if (isEditMode && assetId) {
-            await apiRequest("PATCH", `/api/transactions/${transaction.id}/marketing-assets/${assetId}`, {
-              imageData,
-              fileName,
-              metadata: {
-                format: 'print',
-                status: statusLabel,
-                dimensions: '8.5x11',
-                headline: data.listingHeadline,
-                config,
-              }
-            });
-          } else {
-            await apiRequest("POST", `/api/transactions/${transaction.id}/marketing-assets`, {
-              type: 'print_flyer',
-              imageData,
-              fileName,
-              metadata: {
-                format: 'print',
-                status: statusLabel,
-                dimensions: '8.5x11',
-                headline: data.listingHeadline,
-                config,
-              }
-            });
-          }
-          onAssetSaved?.();
-        } catch (saveError) {
-          console.error("Failed to save marketing asset:", saveError);
-          // Don't show error - the download still worked
-        }
-        
-        window.URL.revokeObjectURL(url);
-
-        toast({
-          title: "Flyer created",
-          description: "Your print flyer has been downloaded and saved to Marketing Assets",
-        });
+      // Print flyer uses unified /api/flyer/render endpoint (PNG output)
+      const response = await fetch('/api/flyer/render', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: data.status,
+          price: data.price,
+          address: transaction.propertyAddress,
+          photos: photosToUse,
+          beds: mlsData?.bedrooms || 0,
+          baths: mlsData?.bathrooms || 0,
+          sqft: mlsData?.sqft || 0,
+          headline: data.listingHeadline,
+          description: data.description,
+          agentName: data.agentName,
+          agentTitle: data.agentTitle,
+          agentPhone: data.agentPhone,
+          agentPhoto: effectiveAgentPhoto,
+          outputType: 'pngPreview' // PNG for print-ready download
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to generate flyer');
       }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const addressSlug = transaction.propertyAddress.split(",")[0].replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, "");
+      const fileName = `${addressSlug}_flyer.png`;
+      
+      // Download the file
+      const link = document.createElement("a");
+      link.download = fileName;
+      link.href = url;
+      link.click();
+      
+      // Save to marketing assets
+      try {
+        // Convert blob to base64 for storage
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+        const imageData = await base64Promise;
+        
+        const statusLabel = STATUS_OPTIONS.find(s => s.value === data.status)?.label || data.status;
+        const config: FlyerAssetConfig = {
+          status: data.status,
+          description: data.description,
+          headline: data.listingHeadline,
+          photoUrls: photosToUse,
+          agentName: data.agentName,
+          agentTitle: data.agentTitle,
+          agentPhone: data.agentPhone,
+          agentPhotoUrl: effectiveAgentPhoto || undefined,
+          format: 'print',
+          price: data.price,
+          bedrooms: data.bedrooms,
+          bathrooms: data.bathrooms,
+          sqft: data.sqft,
+        };
+        
+        if (isEditMode && assetId) {
+          await apiRequest("PATCH", `/api/transactions/${transaction.id}/marketing-assets/${assetId}`, {
+            imageData,
+            fileName,
+            metadata: {
+              format: 'print',
+              status: statusLabel,
+              dimensions: '8.5x11',
+              headline: data.listingHeadline,
+              config,
+            }
+          });
+        } else {
+          await apiRequest("POST", `/api/transactions/${transaction.id}/marketing-assets`, {
+            type: 'print_flyer',
+            imageData,
+            fileName,
+            metadata: {
+              format: 'print',
+              status: statusLabel,
+              dimensions: '8.5x11',
+              headline: data.listingHeadline,
+              config,
+            }
+          });
+        }
+        onAssetSaved?.();
+      } catch (saveError) {
+        console.error("Failed to save marketing asset:", saveError);
+        // Don't show error - the download still worked
+      }
+      
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Flyer downloaded",
+        description: "Your print-ready PNG flyer has been saved.",
+      });
     } catch (error) {
       console.error("Flyer generation error:", error);
       toast({
@@ -1803,7 +1472,7 @@ export function CreateFlyerDialog({
         <DialogHeader className="pb-2 sm:pb-4">
           <DialogTitle className="text-lg sm:text-xl">{isEditMode ? 'Edit Property Flyer' : 'Create Property Flyer'}</DialogTitle>
           <DialogDescription className="text-xs sm:text-sm">
-            {isEditMode ? 'Update your flyer with new details or photos.' : 'Choose a format, select photos, and customize details.'}
+            {isEditMode ? 'Update your flyer with new details or photos.' : 'Select photos and customize details for your print flyer.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -1811,53 +1480,11 @@ export function CreateFlyerDialog({
           <form onSubmit={form.handleSubmit(generateFlyer)} className="flex-1 flex flex-col min-h-0">
             <div className="flex-1 flex flex-col lg:flex-row gap-4 sm:gap-6 overflow-y-auto pr-1 sm:pr-2 min-h-0">
               <div className="flex-1 space-y-3 sm:space-y-4 min-w-0">
-                <div className="space-y-2">
-                  <FormLabel className="text-sm">Format</FormLabel>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleFormatChange("social")}
-                      className={`flex flex-col items-center gap-1 sm:gap-1.5 p-2.5 sm:p-3 rounded-lg border-2 transition-all active:scale-[0.98] ${
-                        format === "social"
-                          ? "border-primary bg-primary/5"
-                          : "border-muted hover:border-muted-foreground/50"
-                      }`}
-                      data-testid="button-format-social"
-                    >
-                      <Image className={`h-5 w-5 ${format === "social" ? "text-primary" : "text-muted-foreground"}`} />
-                      <span className={`text-xs sm:text-sm font-medium ${format === "social" ? "text-primary" : ""}`}>
-                        Social Media
-                      </span>
-                      <span className="text-[9px] sm:text-[10px] text-muted-foreground text-center leading-tight">
-                        Instagram/Facebook
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleFormatChange("print")}
-                      className={`flex flex-col items-center gap-1 sm:gap-1.5 p-2.5 sm:p-3 rounded-lg border-2 transition-all active:scale-[0.98] ${
-                        format === "print"
-                          ? "border-primary bg-primary/5"
-                          : "border-muted hover:border-muted-foreground/50"
-                      }`}
-                      data-testid="button-format-print"
-                    >
-                      <FileText className={`h-5 w-5 ${format === "print" ? "text-primary" : "text-muted-foreground"}`} />
-                      <span className={`text-xs sm:text-sm font-medium ${format === "print" ? "text-primary" : ""}`}>
-                        Print Flyer
-                      </span>
-                      <span className="text-[9px] sm:text-[10px] text-muted-foreground text-center leading-tight">
-                        8.5×11 Print
-                      </span>
-                    </button>
-                  </div>
-                </div>
-
                 {mlsPhotos.length > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <FormLabel className="text-sm">
-                        Select {format === "social" ? "1 photo" : "up to 3 photos"}
+                        Select up to 3 photos
                       </FormLabel>
                       <div className="flex items-center gap-2">
                         {(mlsData?.mlsNumber || transaction.mlsNumber) && (
@@ -1885,17 +1512,11 @@ export function CreateFlyerDialog({
                               <div className="text-xs text-muted-foreground mb-2">
                                 Using AI Image Insights to select:
                               </div>
-                              {format === "social" ? (
-                                <ul className="text-xs space-y-0.5">
-                                  <li>• Best Exterior/Front photo</li>
-                                </ul>
-                              ) : (
-                                <ul className="text-xs space-y-0.5">
-                                  <li>• Photo 1: Best Exterior/Front</li>
-                                  <li>• Photo 2: Best Kitchen</li>
-                                  <li>• Photo 3: Best Living Room</li>
-                                </ul>
-                              )}
+                              <ul className="text-xs space-y-0.5">
+                                <li>• Photo 1: Best Exterior/Front</li>
+                                <li>• Photo 2: Best Kitchen</li>
+                                <li>• Photo 3: Best Living Room</li>
+                              </ul>
                               <div className="text-[10px] text-muted-foreground mt-2">
                                 Based on room classification & quality scores
                               </div>
@@ -2334,11 +1955,9 @@ export function CreateFlyerDialog({
                   }}
                 />
 
-                {format === "print" && (
-                  <>
-                    <div className="border-t pt-3 mt-2">
-                      <FormLabel className="text-sm font-medium text-muted-foreground">Agent Information</FormLabel>
-                    </div>
+                <div className="border-t pt-3 mt-2">
+                  <FormLabel className="text-sm font-medium text-muted-foreground">Agent Information</FormLabel>
+                </div>
 
                     <FormField
                       control={form.control}
@@ -2563,8 +2182,6 @@ export function CreateFlyerDialog({
                         </div>
                       </div>
                     </div>
-                  </>
-                )}
               </div>
 
               <div className="w-full lg:w-48 flex-shrink-0 order-first lg:order-last">
@@ -2572,30 +2189,7 @@ export function CreateFlyerDialog({
                   <p className="text-xs font-medium text-muted-foreground mb-2 text-center">
                     Preview
                   </p>
-                  {format === "social" ? (
-                    /* Social media uses client-side React preview */
-                    <div 
-                      className="flex justify-center lg:block cursor-pointer relative group"
-                      onClick={() => setPreviewEnlarged(true)}
-                      data-testid="button-enlarge-preview"
-                    >
-                      <SocialMediaPreview
-                        photoUrls={previewPhotoUrls}
-                        status={watchedValues.status || "just_listed"}
-                        price={watchedValues.price || "$0"}
-                        address={transaction.propertyAddress}
-                        bedrooms={watchedValues.bedrooms}
-                        bathrooms={watchedValues.bathrooms}
-                        sqft={watchedValues.sqft}
-                        description={watchedValues.description}
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
-                        <div className="bg-white/90 rounded-full p-2">
-                          <Maximize2 className="h-4 w-4 text-gray-700" />
-                        </div>
-                      </div>
-                    </div>
-                  ) : renderedPreviewUrl ? (
+                  {renderedPreviewUrl ? (
                     /* Print flyer: Show ONLY Puppeteer-rendered PNG (same as download) */
                     <div 
                       className="flex justify-center lg:block cursor-pointer relative group"
@@ -2625,43 +2219,34 @@ export function CreateFlyerDialog({
                       </p>
                     </div>
                   )}
-                  {format === "social" && (
+                  <Button
+                    type="button"
+                    variant={renderedPreviewUrl ? "outline" : "default"}
+                    size="sm"
+                    className="w-full mt-2 h-7 text-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      renderActualPreview();
+                    }}
+                    disabled={isRenderingPreview || !hasPhotosSelected}
+                    data-testid="button-render-preview"
+                  >
+                    {isRenderingPreview ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Rendering...
+                      </>
+                    ) : (
+                      <>
+                        <Image className="h-3 w-3 mr-1" />
+                        {renderedPreviewUrl ? "Re-render" : "Render Preview"}
+                      </>
+                    )}
+                  </Button>
+                  {renderedPreviewUrl && (
                     <p className="text-[10px] text-muted-foreground text-center mt-1">
-                      Click to enlarge
+                      Click preview to enlarge
                     </p>
-                  )}
-                  {format === "print" && (
-                    <>
-                      <Button
-                        type="button"
-                        variant={renderedPreviewUrl ? "outline" : "default"}
-                        size="sm"
-                        className="w-full mt-2 h-7 text-xs"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          renderActualPreview();
-                        }}
-                        disabled={isRenderingPreview || !hasPhotosSelected}
-                        data-testid="button-render-preview"
-                      >
-                        {isRenderingPreview ? (
-                          <>
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            Rendering...
-                          </>
-                        ) : (
-                          <>
-                            <Image className="h-3 w-3 mr-1" />
-                            {renderedPreviewUrl ? "Re-render" : "Render Preview"}
-                          </>
-                        )}
-                      </Button>
-                      {renderedPreviewUrl && (
-                        <p className="text-[10px] text-muted-foreground text-center mt-1">
-                          Click preview to enlarge
-                        </p>
-                      )}
-                    </>
                   )}
                 </div>
               </div>
@@ -2688,7 +2273,7 @@ export function CreateFlyerDialog({
                 ) : (
                   <Download className="h-4 w-4 mr-2" />
                 )}
-                {format === "social" ? "Download Graphic" : "Download Flyer"}
+                Download Flyer
               </Button>
             </div>
           </form>
@@ -2700,7 +2285,7 @@ export function CreateFlyerDialog({
         <Dialog open={previewEnlarged} onOpenChange={setPreviewEnlarged}>
           <DialogContent className="w-[95vw] max-w-[min(95vw,1000px)] max-h-[90vh] p-2 sm:p-3 flex flex-col">
             <DialogHeader className="pb-1 px-2">
-              <DialogTitle className="text-base">Preview - {format === "social" ? "Social Media" : "Print Flyer"}</DialogTitle>
+              <DialogTitle className="text-base">Preview - Print Flyer</DialogTitle>
               <DialogDescription className="text-xs">
                 Full-size preview of your flyer
               </DialogDescription>
@@ -2752,19 +2337,8 @@ export function CreateFlyerDialog({
                   style={{ transform: `scale(${zoomLevel / 100})` }}
                 >
                   {/* Preview container - simple image display only */}
-                  <div className={format === "social" ? "w-72 sm:w-80" : "w-[340px] sm:w-[400px]"}>
-                    {format === "social" ? (
-                      <SocialMediaPreview
-                        photoUrls={previewPhotoUrls}
-                        status={watchedValues.status || "just_listed"}
-                        price={watchedValues.price || "$0"}
-                        address={transaction.propertyAddress}
-                        bedrooms={watchedValues.bedrooms}
-                        bathrooms={watchedValues.bathrooms}
-                        sqft={watchedValues.sqft}
-                        description={watchedValues.description}
-                      />
-                    ) : renderedPreviewUrl ? (
+                  <div className="w-[340px] sm:w-[400px]">
+                    {renderedPreviewUrl ? (
                       /* Print flyer: Show ONLY Puppeteer-rendered PNG (pixel-identical to download) */
                       <img 
                         src={renderedPreviewUrl} 

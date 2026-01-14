@@ -1,0 +1,331 @@
+# Remove Social Media Format from Create Flyer & Make PNG-Only
+
+The Create Property Flyer dialog currently has two format options and outputs both PDF and PNG. Update it to:
+1. Remove the Social Media format option (Create Graphics handles that)
+2. Output PNG only (remove PDF download)
+
+---
+
+## Changes Required
+
+### 1. Remove Format Selection UI
+
+In the Create Property Flyer dialog component, remove the format toggle between "Social Media" and "Print Flyer":
+
+**Before:**
+```tsx
+<div className="space-y-2">
+  <Label>Format</Label>
+  <div className="grid grid-cols-2 gap-4">
+    <Button 
+      variant={format === 'social' ? 'default' : 'outline'}
+      onClick={() => setFormat('social')}
+    >
+      <ImageIcon className="h-4 w-4 mr-2" />
+      Social Media
+      <span className="text-xs text-muted-foreground">Instagram/Facebook</span>
+    </Button>
+    <Button
+      variant={format === 'print' ? 'default' : 'outline'}
+      onClick={() => setFormat('print')}
+    >
+      <FileText className="h-4 w-4 mr-2" />
+      Print Flyer
+      <span className="text-xs text-muted-foreground">8.5×11 Print</span>
+    </Button>
+  </div>
+</div>
+```
+
+**After:**
+```tsx
+// Remove the format selection entirely
+// The dialog is now ONLY for print flyers (PNG)
+// No format state needed - it's always print PNG
+```
+
+---
+
+### 2. Update Dialog Title & Description
+
+**Before:**
+```tsx
+<DialogTitle>Create Property Flyer</DialogTitle>
+<p>Choose a format, select photos, and customize details.</p>
+```
+
+**After:**
+```tsx
+<DialogTitle>Create Print Flyer</DialogTitle>
+<p>Create a print-ready 8.5×11 PNG flyer for {propertyAddress}</p>
+```
+
+---
+
+### 3. Remove Format State Variable
+
+```tsx
+// REMOVE this line:
+const [format, setFormat] = useState<'social' | 'print'>('social');
+
+// The component now only generates print PNG flyers
+// No format switching needed
+```
+
+---
+
+### 4. Update Backend - PNG Only (Remove PDF)
+
+**Before (server/routes.ts):**
+```typescript
+app.post('/api/generate-flyer', async (req, res) => {
+  // ... generation code ...
+  
+  // Generate PDF
+  const pdfBuffer = await page.pdf({
+    width: '8.5in',
+    height: '11in',
+    printBackground: true,
+  });
+
+  // Generate PNG
+  const pngBuffer = await page.screenshot({
+    type: 'png',
+    fullPage: true
+  });
+
+  await browser.close();
+
+  // Return both formats
+  res.json({
+    success: true,
+    pdf: `data:application/pdf;base64,${pdfBuffer.toString('base64')}`,
+    png: `data:image/png;base64,${pngBuffer.toString('base64')}`,
+  });
+});
+```
+
+**After (server/routes.ts):**
+```typescript
+app.post('/api/generate-flyer', async (req, res) => {
+  // ... generation code ...
+  
+  // Generate PNG ONLY (no PDF)
+  const pngBuffer = await page.screenshot({
+    type: 'png',
+    fullPage: true
+  });
+
+  await browser.close();
+
+  // Return PNG only
+  res.json({
+    success: true,
+    image: `data:image/png;base64,${pngBuffer.toString('base64')}`,
+    format: 'png',
+    dimensions: {
+      width: 2550,
+      height: 3300,
+      dpi: 300
+    }
+  });
+});
+```
+
+---
+
+### 5. Update Frontend Download Handler
+
+**Before:**
+```tsx
+const handleGenerate = async () => {
+  setIsGenerating(true);
+  try {
+    const response = await fetch('/api/generate-flyer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      // Download PDF
+      const pdfLink = document.createElement('a');
+      pdfLink.href = data.pdf;
+      pdfLink.download = `${address}-flyer.pdf`;
+      pdfLink.click();
+      
+      // Also download PNG
+      const pngLink = document.createElement('a');
+      pngLink.href = data.png;
+      pngLink.download = `${address}-flyer.png`;
+      pngLink.click();
+    }
+  } finally {
+    setIsGenerating(false);
+  }
+};
+```
+
+**After:**
+```tsx
+const handleGenerate = async () => {
+  setIsGenerating(true);
+  try {
+    const response = await fetch('/api/generate-flyer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      // Download PNG only
+      const link = document.createElement('a');
+      link.href = data.image;
+      link.download = `${address}-flyer.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Close dialog after download
+      onOpenChange(false);
+      
+      toast({
+        title: 'Flyer downloaded!',
+        description: 'Your print-ready PNG flyer has been saved.',
+      });
+    }
+  } catch (error) {
+    console.error('Flyer generation failed:', error);
+    toast({
+      title: 'Generation failed',
+      description: 'Please try again.',
+      variant: 'destructive',
+    });
+  } finally {
+    setIsGenerating(false);
+  }
+};
+```
+
+---
+
+### 6. Update Button Text
+
+**Before:**
+```tsx
+<Button onClick={handleGenerate}>
+  <Download className="h-4 w-4 mr-2" />
+  Download Graphic
+</Button>
+```
+
+**After:**
+```tsx
+<Button onClick={handleGenerate} disabled={isGenerating}>
+  {isGenerating ? (
+    <>
+      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+      Generating...
+    </>
+  ) : (
+    <>
+      <Download className="h-4 w-4 mr-2" />
+      Download PNG
+    </>
+  )}
+</Button>
+```
+
+---
+
+### 7. Update Any UI Text Referencing PDF
+
+Search for and update any text that mentions PDF:
+
+**Before:**
+```tsx
+// Various places in the UI
+"Print-ready PDF & PNG Flyers"
+"Download PDF"
+"PDF/PNG"
+```
+
+**After:**
+```tsx
+// Updated text
+"Print-ready PNG Flyer"
+"Download PNG"
+"PNG"
+```
+
+---
+
+### 8. Update Marketing Tab Description (if applicable)
+
+**Before:**
+```tsx
+<Button>
+  <FileText className="h-4 w-4 mr-2" />
+  Create Flyer
+</Button>
+<span className="text-xs text-muted-foreground">Print-ready PDF/PNG</span>
+```
+
+**After:**
+```tsx
+<Button>
+  <FileText className="h-4 w-4 mr-2" />
+  Create Flyer
+</Button>
+<span className="text-xs text-muted-foreground">8.5×11 Print PNG</span>
+```
+
+---
+
+## Summary of All Changes
+
+| Component | Before | After |
+|-----------|--------|-------|
+| Format toggle | Social Media / Print | Removed (Print only) |
+| Dialog title | "Create Property Flyer" | "Create Print Flyer" |
+| Output format | PDF + PNG | PNG only |
+| Button text | "Download Graphic" | "Download PNG" |
+| Description | "Print-ready PDF & PNG" | "Print-ready PNG Flyer" |
+| Backend response | `{ pdf, png }` | `{ image }` |
+
+---
+
+## Clear Feature Separation (Final)
+
+| Button | Purpose | Output |
+|--------|---------|--------|
+| **Create Graphics** | Social media posts | PNG (various sizes) |
+| **Create Print Flyer** | Physical prints | PNG (8.5×11 at 300dpi / 2550×3300px) |
+
+---
+
+## Files to Update
+
+| File | Changes |
+|------|---------|
+| `client/src/components/create-flyer-dialog.tsx` | Remove format toggle, update UI text, PNG-only download |
+| `server/routes.ts` | Remove PDF generation, return PNG only |
+| Any marketing tab components | Update description text |
+
+---
+
+## Testing Checklist
+
+- [ ] Create Print Flyer dialog opens without format selection
+- [ ] Title says "Create Print Flyer"
+- [ ] No Social Media / Print toggle visible
+- [ ] Preview shows 8.5×11 aspect ratio
+- [ ] Generate button says "Download PNG"
+- [ ] Only PNG file downloads (no PDF)
+- [ ] Downloaded PNG is 2550×3300px (300dpi print quality)
+- [ ] No references to "PDF" anywhere in the flyer UI
+- [ ] Create Graphics still works for all social formats
