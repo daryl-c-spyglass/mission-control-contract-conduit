@@ -142,7 +142,7 @@ export async function generateGraphic(data: GraphicsData, format: GraphicsFormat
     throw new Error('Failed to load property photo');
   }
   
-  const templatePath = path.join(import.meta.dirname, `../templates/graphics/${format}.hbs`);
+  const templatePath = path.resolve(process.cwd(), `server/templates/graphics/${format}.hbs`);
   
   if (!fs.existsSync(templatePath)) {
     throw new Error(`Template not found: ${format}.hbs`);

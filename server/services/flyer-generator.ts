@@ -137,11 +137,11 @@ const FLYER_HEIGHT = 3300;
 // Template version for cache invalidation
 const TEMPLATE_VERSION = 'v2.4.2';
 
-// Icon paths for stat icons
+// Icon paths for stat icons - use process.cwd() for CJS compatibility
 const ICON_PATHS = {
-  bedroom: path.join(import.meta.dirname, '../public/icons/bedroom.png'),
-  bathroom: path.join(import.meta.dirname, '../public/icons/bathroom.png'),
-  sqft: path.join(import.meta.dirname, '../public/icons/sqft.png')
+  bedroom: path.resolve(process.cwd(), 'server/public/icons/bedroom.png'),
+  bathroom: path.resolve(process.cwd(), 'server/public/icons/bathroom.png'),
+  sqft: path.resolve(process.cwd(), 'server/public/icons/sqft.png')
 };
 
 export type OutputType = 'pngPreview' | 'pdf';
@@ -233,7 +233,7 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     sqftIcon: sqftIconB64
   };
   
-  const templatePath = path.join(import.meta.dirname, '../templates/flyer-template.html');
+  const templatePath = path.resolve(process.cwd(), 'server/templates/flyer-template.html');
   const templateHtml = fs.readFileSync(templatePath, 'utf-8');
   
   const template = Handlebars.compile(templateHtml);
