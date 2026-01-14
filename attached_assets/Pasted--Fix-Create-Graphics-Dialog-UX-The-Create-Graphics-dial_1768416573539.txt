@@ -1,0 +1,583 @@
+# Fix Create Graphics Dialog UX
+
+The Create Graphics dialog has a messy layout where the photo preview dominates the entire dialog. Update it to match the clean two-column layout used in Create Property Flyer.
+
+---
+
+## Current Issues (Create Graphics)
+
+- ❌ Photo preview takes up entire dialog height
+- ❌ No live preview of the final graphic
+- ❌ Thumbnail carousel at bottom gets lost
+- ❌ Poor visual hierarchy
+- ❌ Status/address overlay on photo is confusing (is this the output?)
+
+## Target UX (Create Property Flyer)
+
+- ✅ Two-column layout: Form inputs (left) + Live preview (right)
+- ✅ Compact photo selection grid with numbered selection indicator
+- ✅ Auto-Select button for AI photo recommendation
+- ✅ Live preview showing exactly what will be generated
+- ✅ "Click to enlarge" option on preview
+- ✅ Clean form fields with proper spacing
+- ✅ Character count on text inputs
+
+---
+
+## New Layout Structure
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Marketing Materials                                              [X]    │
+│ Generate professional marketing graphics for 13106 New Boston           │
+├────────────────────────────────────┬────────────────────────────────────┤
+│                                    │                                    │
+│ Format                             │ Preview                            │
+│ ┌──────┐ ┌──────┐ ┌──────┐        │ ┌────────────────────────────────┐ │
+│ │ IG   │ │IG    │ │ FB   │ ...    │ │                                │ │
+│ │ Post │ │Story │ │ Post │        │ │     [Live Preview of           │ │
+│ └──────┘ └──────┘ └──────┘        │ │      Generated Graphic]        │ │
+│                                    │ │                                │ │
+│ Select Photo        [Auto-Select]  │ │    ┌─────────────────────┐    │ │
+│ ┌────┬────┬────┬────┬────┐        │ │    │    JUST LISTED      │    │ │
+│ │ 1  │    │    │    │    │        │ │    │    $434,990         │    │ │
+│ │[✓] │    │    │    │    │        │ │    │  13106 NEW BOSTON   │    │ │
+│ └────┴────┴────┴────┴────┘        │ │    └─────────────────────┘    │ │
+│                                    │ │                                │ │
+│ Status Type                        │ │                                │ │
+│ ┌────────────────────────────┐    │ └────────────────────────────────┘ │
+│ │ Under Contract          ▼  │    │         Click to enlarge           │
+│ └────────────────────────────┘    │                                    │
+│                                    │                                    │
+│ Social Media Tagline    [AI ✨]    │                                    │
+│ ┌────────────────────────────┐    │                                    │
+│ │ Turnkey 4BR in NW Austin   │    │                                    │
+│ └────────────────────────────┘    │                                    │
+│                        45/80 chars │                                    │
+│                                    │                                    │
+│           [Cancel]  [Generate & Download]                               │
+└────────────────────────────────────┴────────────────────────────────────┘
+```
+
+---
+
+## Updated Component Code
+
+Replace the current Marketing Materials / Create Graphics dialog with this structure:
+
+```tsx
+// client/src/components/marketing-materials-dialog.tsx
+
+import { useState, useEffect, useMemo } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+import { Sparkles, Download, Wand2, Check } from 'lucide-react';
+
+interface MarketingMaterialsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  transaction: any;
+}
+
+const FORMAT_OPTIONS = [
+  { id: 'instagram-post', label: 'Instagram Post', dimensions: '1080×1080', ratio: '1:1' },
+  { id: 'instagram-story', label: 'Instagram Story', dimensions: '1080×1920', ratio: '9:16' },
+  { id: 'facebook-post', label: 'Facebook Post', dimensions: '1200×630', ratio: '1.91:1' },
+  { id: 'x-post', label: 'X (Twitter) Post', dimensions: '1200×675', ratio: '16:9' },
+  { id: 'tiktok-cover', label: 'TikTok Cover', dimensions: '1080×1920', ratio: '9:16' },
+];
+
+const STATUS_OPTIONS = [
+  'Just Listed',
+  'For Sale',
+  'For Lease',
+  'Under Contract',
+  'Just Sold',
+  'Price Improvement',
+  'Open House',
+  'Coming Soon',
+];
+
+export function MarketingMaterialsDialog({
+  open,
+  onOpenChange,
+  transaction,
+}: MarketingMaterialsDialogProps) {
+  // Form state
+  const [selectedFormat, setSelectedFormat] = useState('instagram-post');
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const [statusType, setStatusType] = useState('Just Listed');
+  const [tagline, setTagline] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+
+  // Get photos from transaction MLS data
+  const photos = useMemo(() => {
+    return transaction?.mlsData?.photos || [];
+  }, [transaction]);
+
+  // Auto-detect status from MLS data
+  useEffect(() => {
+    if (transaction?.mlsData?.standardStatus) {
+      const mlsStatus = transaction.mlsData.standardStatus.toLowerCase();
+      if (mlsStatus.includes('active under contract') || mlsStatus.includes('pending')) {
+        setStatusType('Under Contract');
+      } else if (mlsStatus.includes('sold') || mlsStatus.includes('closed')) {
+        setStatusType('Just Sold');
+      } else if (mlsStatus.includes('active')) {
+        const dom = transaction.mlsData.simpleDaysOnMarket || 0;
+        setStatusType(dom <= 7 ? 'Just Listed' : 'For Sale');
+      }
+    }
+  }, [transaction]);
+
+  // Generate preview when inputs change
+  useEffect(() => {
+    if (!open || photos.length === 0) return;
+    
+    const debounceTimer = setTimeout(() => {
+      generatePreview();
+    }, 500);
+
+    return () => clearTimeout(debounceTimer);
+  }, [selectedFormat, selectedPhotoIndex, statusType, tagline, open]);
+
+  const generatePreview = async () => {
+    if (photos.length === 0) return;
+    
+    setIsLoadingPreview(true);
+    try {
+      const response = await fetch('/api/generate-graphic-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          format: selectedFormat,
+          photoUrl: photos[selectedPhotoIndex]?.url,
+          statusType,
+          tagline,
+          propertyData: {
+            price: transaction?.mlsData?.listPrice || transaction?.price,
+            address: transaction?.mlsData?.address?.streetAddress || transaction?.address,
+          },
+        }),
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        setPreviewUrl(data.preview);
+      }
+    } catch (error) {
+      console.error('Preview generation failed:', error);
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
+  const handleAutoSelect = async () => {
+    // Select the first photo (usually the hero/front exterior)
+    // In the future, this could use Repliers Image Insights
+    setSelectedPhotoIndex(0);
+  };
+
+  const handleAISuggest = async () => {
+    try {
+      const response = await fetch('/api/generate-tagline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address: transaction?.mlsData?.address?.streetAddress || transaction?.address,
+          beds: transaction?.mlsData?.beds,
+          baths: transaction?.mlsData?.baths,
+          sqft: transaction?.mlsData?.sqft,
+          description: transaction?.mlsData?.description,
+        }),
+      });
+      
+      const data = await response.json();
+      if (data.tagline) {
+        setTagline(data.tagline);
+      }
+    } catch (error) {
+      console.error('Tagline generation failed:', error);
+    }
+  };
+
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/generate-graphic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId: transaction?.id,
+          format: selectedFormat,
+          photoUrl: photos[selectedPhotoIndex]?.url,
+          statusType,
+          tagline,
+          propertyData: {
+            price: transaction?.mlsData?.listPrice || transaction?.price,
+            address: transaction?.mlsData?.address?.streetAddress || transaction?.address,
+            city: transaction?.mlsData?.address?.city,
+            state: transaction?.mlsData?.address?.state,
+          },
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success && data.image) {
+        // Trigger download
+        const link = document.createElement('a');
+        link.href = data.image;
+        link.download = `${transaction?.address || 'property'}-${selectedFormat}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Close dialog
+        onOpenChange(false);
+      }
+    } catch (error) {
+      console.error('Generation failed:', error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const selectedFormatInfo = FORMAT_OPTIONS.find(f => f.id === selectedFormat);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+        <DialogHeader>
+          <DialogTitle>Marketing Materials</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Generate professional marketing graphics for {transaction?.address || 'this property'}
+          </p>
+        </DialogHeader>
+
+        <div className="grid grid-cols-2 gap-6 mt-4">
+          {/* LEFT COLUMN - Form Inputs */}
+          <div className="space-y-5 overflow-y-auto max-h-[60vh] pr-2">
+            {/* Format Selection */}
+            <div className="space-y-2">
+              <Label>Format</Label>
+              <div className="flex flex-wrap gap-2">
+                {FORMAT_OPTIONS.map((format) => (
+                  <Button
+                    key={format.id}
+                    variant={selectedFormat === format.id ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedFormat(format.id)}
+                    className="text-xs"
+                  >
+                    <span className="text-[10px] text-muted-foreground mr-1.5 opacity-70">
+                      {format.ratio}
+                    </span>
+                    {format.label.replace(' Post', '').replace(' Story', ' Story').replace(' Cover', '')}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {selectedFormatInfo?.dimensions}
+              </p>
+            </div>
+
+            {/* Photo Selection */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Select Photo</Label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAutoSelect}
+                  className="h-7 text-xs"
+                >
+                  <Wand2 className="h-3 w-3 mr-1" />
+                  Auto-Select
+                </Button>
+              </div>
+              
+              {/* Photo Grid */}
+              <div className="grid grid-cols-5 gap-2 max-h-32 overflow-y-auto p-1">
+                {photos.slice(0, 20).map((photo: any, index: number) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedPhotoIndex(index)}
+                    className={cn(
+                      "relative aspect-square rounded-md overflow-hidden border-2 transition-all",
+                      selectedPhotoIndex === index
+                        ? "border-primary ring-2 ring-primary/20"
+                        : "border-transparent hover:border-muted-foreground/30"
+                    )}
+                  >
+                    <img
+                      src={photo.url}
+                      alt={`Photo ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    {selectedPhotoIndex === index && (
+                      <div className="absolute top-1 left-1 bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium">
+                        <Check className="h-3 w-3" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {photos.length} photos available • Photo {selectedPhotoIndex + 1} selected
+              </p>
+            </div>
+
+            {/* Status Type */}
+            <div className="space-y-2">
+              <Label>Status Type</Label>
+              <Select value={statusType} onValueChange={setStatusType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {status}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Social Media Tagline */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Social Media Tagline</Label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleAISuggest}
+                  className="h-7 text-xs"
+                >
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  AI Suggest
+                </Button>
+              </div>
+              <Input
+                value={tagline}
+                onChange={(e) => setTagline(e.target.value)}
+                placeholder="e.g., Turnkey 4BR in sought-after NW Austin"
+                maxLength={80}
+              />
+              <p className="text-xs text-muted-foreground text-right">
+                {tagline.length}/80 characters
+              </p>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN - Live Preview */}
+          <div className="space-y-2">
+            <Label>Preview</Label>
+            <div 
+              className={cn(
+                "relative bg-muted rounded-lg overflow-hidden flex items-center justify-center",
+                selectedFormat.includes('story') || selectedFormat.includes('tiktok')
+                  ? "aspect-[9/16] max-h-[50vh]"
+                  : selectedFormat === 'instagram-post'
+                  ? "aspect-square max-h-[50vh]"
+                  : "aspect-video max-h-[50vh]"
+              )}
+            >
+              {isLoadingPreview ? (
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  <span className="text-sm">Generating preview...</span>
+                </div>
+              ) : previewUrl ? (
+                <img
+                  src={previewUrl}
+                  alt="Preview"
+                  className="w-full h-full object-contain"
+                />
+              ) : photos[selectedPhotoIndex] ? (
+                // Fallback: Show selected photo with overlay
+                <div className="relative w-full h-full">
+                  <img
+                    src={photos[selectedPhotoIndex]?.url}
+                    alt="Selected"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30" />
+                  <div className="absolute top-4 left-0 right-0 text-center">
+                    <span className="text-white text-xs font-semibold">SPYGLASS REALTY</span>
+                    <p className="text-white text-lg font-bold mt-1">
+                      ${(transaction?.mlsData?.listPrice || 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="absolute bottom-4 left-0 right-0 text-center">
+                    <span className="bg-primary text-primary-foreground px-3 py-1 rounded text-xs font-semibold uppercase">
+                      {statusType}
+                    </span>
+                    <p className="text-white text-sm font-medium mt-2">
+                      {transaction?.address}
+                    </p>
+                    {tagline && (
+                      <p className="text-white/80 text-xs mt-1">{tagline}</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <span className="text-muted-foreground text-sm">No photo selected</span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground text-center">
+              Click to enlarge
+            </p>
+          </div>
+        </div>
+
+        {/* Footer Buttons */}
+        <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleGenerate} disabled={isGenerating || photos.length === 0}>
+            {isGenerating ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Generating...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                Download Graphic
+              </>
+            )}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+---
+
+## Key UX Improvements
+
+| Before | After |
+|--------|-------|
+| Photo dominates entire dialog | Two-column layout with live preview |
+| Thumbnails at bottom, hard to see | 5-column photo grid, easy to browse |
+| No visual feedback on selection | Checkmark badge on selected photo |
+| No live preview | Real-time preview updates as you change options |
+| Confusing overlay on main photo | Clean preview that matches final output |
+| No Auto-Select | Auto-Select button for AI recommendation |
+| Tagline field gets lost | Clear tagline input with AI Suggest button |
+| No character count | 45/80 character counter |
+
+---
+
+## Optional: Add Preview Generation Endpoint
+
+For real-time preview (lightweight, faster than full generation):
+
+```typescript
+// server/routes.ts
+
+app.post('/api/generate-graphic-preview', async (req, res) => {
+  const { format, photoUrl, statusType, tagline, propertyData } = req.body;
+  
+  // Generate a lower-resolution preview (faster)
+  const dimensions = {
+    'instagram-post': { width: 400, height: 400 },
+    'instagram-story': { width: 225, height: 400 },
+    'facebook-post': { width: 400, height: 210 },
+    'x-post': { width: 400, height: 225 },
+    'tiktok-cover': { width: 225, height: 400 },
+  };
+  
+  const { width, height } = dimensions[format] || dimensions['instagram-post'];
+  
+  // Use same template but at preview resolution
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+  
+  const page = await browser.newPage();
+  await page.setViewport({ width, height, deviceScaleFactor: 1 });
+  
+  // Generate preview HTML (same template, smaller size)
+  const html = generateGraphicTemplate({
+    format,
+    statusType,
+    tagline,
+    photoUrl,
+    propertyData,
+    width,
+    height,
+    isPreview: true
+  });
+  
+  await page.setContent(html, { waitUntil: 'networkidle0' });
+  
+  const imageBuffer = await page.screenshot({ type: 'png' });
+  await browser.close();
+  
+  res.json({
+    success: true,
+    preview: `data:image/png;base64,${imageBuffer.toString('base64')}`
+  });
+});
+```
+
+---
+
+## Summary of Changes
+
+1. **Layout**: Two-column grid (form left, preview right)
+2. **Photo Selection**: Compact 5-column grid with checkmark indicator
+3. **Auto-Select**: Button to auto-pick best photo
+4. **Live Preview**: Real-time preview that updates as you change options
+5. **Format Buttons**: Horizontal button group instead of dropdown
+6. **Character Count**: Shows 45/80 on tagline input
+7. **Clean Spacing**: Proper visual hierarchy and spacing
+
+---
+
+## Files to Update
+
+| File | Action |
+|------|--------|
+| `client/src/components/marketing-materials-dialog.tsx` | REPLACE with new component |
+| `server/routes.ts` | ADD `/api/generate-graphic-preview` endpoint (optional) |
+
+---
+
+## Testing Checklist
+
+- [ ] Dialog opens with two-column layout
+- [ ] Photo grid shows 5 columns of thumbnails
+- [ ] Selected photo has checkmark badge
+- [ ] Auto-Select button selects first photo
+- [ ] Format buttons switch correctly
+- [ ] Live preview updates when changing options
+- [ ] AI Suggest generates tagline
+- [ ] Character count updates as you type
+- [ ] Download button generates and downloads graphic
+- [ ] Preview aspect ratio matches selected format
