@@ -640,12 +640,18 @@ export function CreateFlyerDialog({
 
     setIsGeneratingHeadline(true);
     try {
+      // Get current status and city for status-aware headline generation
+      const currentStatus = form.getValues("status");
+      const city = (mlsData as any)?.address?.city || (mlsData as any)?.city || "Austin";
+      
       const response = await apiRequest("POST", "/api/generate-headline", {
         description: originalDescription,
         address: transaction.propertyAddress,
         beds: form.getValues("bedrooms"),
         baths: form.getValues("bathrooms"),
         sqft: form.getValues("sqft"),
+        status: currentStatus,
+        city: city,
       });
 
       const data = await response.json();

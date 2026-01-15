@@ -1,0 +1,252 @@
+# AI Headline Generation - Align with Selected Status
+
+The "AI Generate" button for Listing Headline should generate contextually relevant headlines based on the Status selected by the agent.
+
+---
+
+## Current Behavior
+- AI generates generic headlines regardless of status
+- Headline might say "MOVE-IN READY" when status is "Just Sold"
+
+## Expected Behavior
+- AI considers the selected Status when generating headlines
+- Headlines match the marketing intent of the status
+
+---
+
+## Status-Based Headline Examples
+
+| Status | Example Headlines |
+|--------|-------------------|
+| **For Sale** | "YOUR DREAM HOME AWAITS", "MOVE-IN READY IN NW AUSTIN", "STUNNING HOME IN SOUGHT-AFTER NEIGHBORHOOD" |
+| **Just Listed** | "NEW TO MARKET IN NW AUSTIN", "JUST LISTED - DON'T MISS OUT", "FRESHLY LISTED GEM" |
+| **Under Contract** | "UNDER CONTRACT IN JUST 3 DAYS", "PENDING - BUT WE HAVE MORE", "ANOTHER SUCCESS STORY" |
+| **Just Sold** | "JUST SOLD OVER ASKING", "ANOTHER ONE SOLD IN NW AUSTIN", "SOLD! CONGRATS TO OUR BUYERS" |
+| **For Lease** | "AVAILABLE FOR LEASE", "RENTAL OPPORTUNITY IN NW AUSTIN", "LEASE THIS STUNNING HOME" |
+| **Open House** | "OPEN HOUSE THIS WEEKEND", "COME SEE US SATURDAY", "DON'T MISS OUR OPEN HOUSE" |
+
+---
+
+## Implementation
+
+### Update the AI Generate Headline Function
+
+```typescript
+// In create-flyer-dialog.tsx
+
+const generateHeadline = async () => {
+  setIsGeneratingHeadline(true);
+  
+  try {
+    const response = await fetch('/api/generate-headline', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: status,  // Pass the selected status
+        address: transaction?.address,
+        city: transaction?.mlsData?.address?.city || 'Austin',
+        beds: beds,
+        baths: baths,
+        sqft: sqft,
+        description: description,
+        propertyType: transaction?.mlsData?.propertyType || 'home',
+      }),
+    });
+    
+    const data = await response.json();
+    if (data.headline) {
+      setHeadline(data.headline);
+    }
+  } catch (error) {
+    console.error('Headline generation failed:', error);
+  } finally {
+    setIsGeneratingHeadline(false);
+  }
+};
+```
+
+### Update the Backend Endpoint
+
+```typescript
+// In server/routes.ts
+
+app.post('/api/generate-headline', async (req, res) => {
+  const { status, address, city, beds, baths, sqft, description, propertyType } = req.body;
+  
+  // Status-specific prompts
+  const statusPrompts: Record<string, string> = {
+    'For Sale': `Generate a compelling headline for a ${propertyType} for sale. Focus on features, lifestyle, or location appeal. Examples: "YOUR DREAM HOME AWAITS", "STUNNING ${beds}BR IN ${city.toUpperCase()}"`,
+    
+    'Just Listed': `Generate an exciting headline for a newly listed ${propertyType}. Emphasize newness and urgency. Examples: "JUST LISTED IN ${city.toUpperCase()}", "NEW TO MARKET - DON'T MISS OUT", "FRESHLY LISTED GEM"`,
+    
+    'Under Contract': `Generate a headline for a ${propertyType} that's under contract. Can highlight success or invite buyers to see similar properties. Examples: "UNDER CONTRACT IN 3 DAYS", "PENDING - MORE COMING SOON", "ANOTHER SUCCESS IN ${city.toUpperCase()}"`,
+    
+    'Just Sold': `Generate a celebratory headline for a ${propertyType} that just sold. Emphasize success, speed of sale, or congratulations. Examples: "JUST SOLD!", "SOLD OVER ASKING", "ANOTHER ONE SOLD IN ${city.toUpperCase()}", "CONGRATS TO THE NEW OWNERS"`,
+    
+    'For Lease': `Generate a headline for a ${propertyType} available for lease/rent. Focus on rental appeal. Examples: "AVAILABLE FOR LEASE", "RENTAL OPPORTUNITY", "LEASE THIS STUNNING ${beds}BR"`,
+    
+    'Open House': `Generate an inviting headline for an open house. Create urgency to attend. Examples: "OPEN HOUSE THIS WEEKEND", "COME SEE US SATURDAY", "DON'T MISS THIS OPEN HOUSE", "YOUR INVITATION TO TOUR"`,
+  };
+  
+  const statusPrompt = statusPrompts[status] || statusPrompts['For Sale'];
+  
+  // Full prompt for AI
+  const prompt = `${statusPrompt}
+
+Property Details:
+- Location: ${city}
+- Bedrooms: ${beds}
+- Bathrooms: ${baths}
+- Square Feet: ${sqft}
+- Key Features: ${description?.substring(0, 200)}
+
+Generate a single short, punchy headline (max 40 characters, all caps). No quotes, no punctuation except hyphens. Just the headline text.`;
+
+  try {
+    // If using OpenAI
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 50,
+      temperature: 0.8,
+    });
+    
+    let headline = completion.choices[0]?.message?.content?.trim() || '';
+    
+    // Clean up the headline
+    headline = headline
+      .toUpperCase()
+      .replace(/['"]/g, '')  // Remove quotes
+      .replace(/\.$/g, '')   // Remove trailing period
+      .substring(0, 40);     // Enforce max length
+    
+    res.json({ success: true, headline });
+    
+  } catch (error) {
+    // Fallback headlines if AI fails
+    const fallbackHeadlines: Record<string, string[]> = {
+      'For Sale': ['YOUR DREAM HOME AWAITS', 'MOVE-IN READY', `STUNNING ${beds}BR HOME`],
+      'Just Listed': ['JUST LISTED', 'NEW TO MARKET', 'FRESHLY LISTED'],
+      'Under Contract': ['UNDER CONTRACT', 'PENDING SALE', 'GOING FAST'],
+      'Just Sold': ['JUST SOLD', 'SOLD', 'ANOTHER ONE SOLD'],
+      'For Lease': ['FOR LEASE', 'AVAILABLE NOW', 'RENTAL OPPORTUNITY'],
+      'Open House': ['OPEN HOUSE', 'COME SEE US', 'TOUR THIS HOME'],
+    };
+    
+    const options = fallbackHeadlines[status] || fallbackHeadlines['For Sale'];
+    const randomHeadline = options[Math.floor(Math.random() * options.length)];
+    
+    res.json({ success: true, headline: randomHeadline });
+  }
+});
+```
+
+---
+
+## Alternative: Client-Side Fallback (No AI)
+
+If you don't want to use AI for headlines, create smart fallbacks based on status:
+
+```typescript
+// In create-flyer-dialog.tsx
+
+const generateHeadline = () => {
+  const city = transaction?.mlsData?.address?.city || 'AUSTIN';
+  
+  const headlinesByStatus: Record<string, string[]> = {
+    'For Sale': [
+      `STUNNING HOME IN ${city.toUpperCase()}`,
+      `YOUR DREAM HOME AWAITS YOU`,
+      `MOVE-IN READY IN ${city.toUpperCase()}`,
+      `${beds}BR GEM IN ${city.toUpperCase()}`,
+      `DON'T MISS THIS ONE`,
+    ],
+    'Just Listed': [
+      `JUST LISTED IN ${city.toUpperCase()}`,
+      `NEW TO MARKET`,
+      `FRESHLY LISTED - ACT FAST`,
+      `BRAND NEW LISTING`,
+      `HOT NEW LISTING`,
+    ],
+    'Under Contract': [
+      `UNDER CONTRACT`,
+      `PENDING IN ${city.toUpperCase()}`,
+      `UNDER CONTRACT IN DAYS`,
+      `GOING, GOING... PENDING`,
+      `ANOTHER SUCCESS STORY`,
+    ],
+    'Just Sold': [
+      `JUST SOLD IN ${city.toUpperCase()}`,
+      `SOLD!`,
+      `ANOTHER ONE SOLD`,
+      `SOLD OVER ASKING`,
+      `CONGRATS TO THE BUYERS`,
+    ],
+    'For Lease': [
+      `FOR LEASE IN ${city.toUpperCase()}`,
+      `AVAILABLE FOR RENT`,
+      `LEASE THIS ${beds}BR HOME`,
+      `RENTAL OPPORTUNITY`,
+      `NOW LEASING`,
+    ],
+    'Open House': [
+      `OPEN HOUSE THIS WEEKEND`,
+      `COME TOUR THIS HOME`,
+      `YOU'RE INVITED - OPEN HOUSE`,
+      `OPEN HOUSE SAT & SUN`,
+      `SEE IT IN PERSON`,
+    ],
+  };
+  
+  const options = headlinesByStatus[status] || headlinesByStatus['For Sale'];
+  const randomIndex = Math.floor(Math.random() * options.length);
+  setHeadline(options[randomIndex]);
+};
+```
+
+---
+
+## UI Enhancement: Show Status Context
+
+Optionally, show a hint below the headline field:
+
+```tsx
+<div className="space-y-2">
+  <div className="flex items-center justify-between">
+    <Label>Listing Headline (optional)</Label>
+    <div className="flex gap-2">
+      <Button variant="outline" size="sm" onClick={generateHeadline}>
+        <Sparkles className="h-3 w-3 mr-1" />
+        AI Generate
+      </Button>
+      <Button variant="ghost" size="sm" onClick={() => setHeadline('')}>
+        <Undo className="h-3 w-3 mr-1" />
+        Revert
+      </Button>
+    </div>
+  </div>
+  <Input
+    value={headline}
+    onChange={(e) => setHeadline(e.target.value.toUpperCase())}
+    placeholder={`e.g., ${status === 'Just Sold' ? 'SOLD OVER ASKING' : 'YOUR DREAM HOME AWAITS'}`}
+    maxLength={40}
+  />
+  <div className="flex justify-between text-xs text-muted-foreground">
+    <span>Optional headline - appears above description</span>
+    <span>{headline.length}/40</span>
+  </div>
+</div>
+```
+
+---
+
+## Testing Checklist
+
+- [ ] Select "For Sale" → AI generates sale-focused headline
+- [ ] Select "Just Listed" → AI generates "new to market" style headline
+- [ ] Select "Under Contract" → AI generates pending/success headline
+- [ ] Select "Just Sold" → AI generates celebratory/sold headline
+- [ ] Select "For Lease" → AI generates rental-focused headline
+- [ ] Select "Open House" → AI generates open house invitation headline
+- [ ] Headline placeholder text changes based on status
+- [ ] Generated headlines are all caps and under 40 characters

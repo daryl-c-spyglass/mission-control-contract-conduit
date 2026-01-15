@@ -2151,7 +2151,7 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
   // ============ AI Headline Generation ============
   app.post("/api/generate-headline", isAuthenticated, async (req, res) => {
     try {
-      const { description, address, beds, baths, sqft, neighborhood } = req.body;
+      const { description, address, beds, baths, sqft, neighborhood, status, city } = req.body;
       
       if (!description || description.trim().length === 0) {
         return res.status(400).json({ error: "Description is required" });
@@ -2162,25 +2162,51 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
       });
 
+      // Status-specific prompts for contextually relevant headlines
+      const statusPrompts: Record<string, string> = {
+        'for_sale': `Generate a compelling headline for a home FOR SALE. Focus on features, lifestyle, or location appeal.
+Examples: "YOUR DREAM HOME AWAITS", "STUNNING ${beds || 3}BR IN ${(city || 'AUSTIN').toUpperCase()}", "MOVE-IN READY GEM"`,
+        
+        'just_listed': `Generate an exciting headline for a NEWLY LISTED property. Emphasize newness and urgency.
+Examples: "JUST LISTED IN ${(city || 'AUSTIN').toUpperCase()}", "NEW TO MARKET - DON'T MISS OUT", "FRESHLY LISTED GEM"`,
+        
+        'under_contract': `Generate a headline for a property UNDER CONTRACT. Highlight success or invite buyers to see similar properties.
+Examples: "UNDER CONTRACT IN 3 DAYS", "PENDING - MORE COMING SOON", "ANOTHER SUCCESS IN ${(city || 'AUSTIN').toUpperCase()}"`,
+        
+        'just_sold': `Generate a CELEBRATORY headline for a property that JUST SOLD. Emphasize success, speed of sale, or congratulations.
+Examples: "JUST SOLD!", "SOLD OVER ASKING", "ANOTHER ONE SOLD IN ${(city || 'AUSTIN').toUpperCase()}", "CONGRATS TO THE NEW OWNERS"`,
+        
+        'for_lease': `Generate a headline for a property available FOR LEASE/RENT. Focus on rental appeal.
+Examples: "AVAILABLE FOR LEASE", "RENTAL OPPORTUNITY", "LEASE THIS STUNNING ${beds || 3}BR"`,
+        
+        'open_house': `Generate an INVITING headline for an OPEN HOUSE. Create urgency to attend.
+Examples: "OPEN HOUSE THIS WEEKEND", "COME SEE US SATURDAY", "YOUR INVITATION TO TOUR"`,
+        
+        'price_improvement': `Generate a headline for a PRICE REDUCED property. Emphasize the new value opportunity.
+Examples: "NEW PRICE - DON'T MISS OUT", "REDUCED AND READY", "BETTER VALUE THAN EVER"`,
+        
+        'listed': `Generate a compelling headline for a property listing. Focus on features or location.
+Examples: "YOUR DREAM HOME AWAITS", "STUNNING HOME IN ${(city || 'AUSTIN').toUpperCase()}", "PRIME LOCATION"`
+      };
+      
+      const statusPrompt = statusPrompts[status] || statusPrompts['for_sale'];
+
       const prompt = `You are a real estate marketing expert. Generate a catchy, compelling headline for a property listing flyer.
+
+STATUS CONTEXT:
+${statusPrompt}
 
 Requirements:
 - Maximum 39 characters (strict limit)
 - ALL UPPERCASE
 - Professional real estate broker style
-- Focus on: location appeal, property highlights, or urgency
+- Match the tone to the status (celebratory for sold, urgent for just listed, inviting for open house)
 - No exclamation marks
 - Should grab attention and create interest
 
-Examples of good headlines:
-- "A PRIME OPPORTUNITY IN NORTH EAST AUSTIN"
-- "STUNNING HILL COUNTRY RETREAT"
-- "MODERN LUXURY IN DOWNTOWN"
-- "YOUR DREAM HOME AWAITS"
-- "MOVE-IN READY IN TARRYTOWN"
-
 Property details:
 Address: ${address || "N/A"}
+City: ${city || "Austin"}
 Beds: ${beds || "N/A"} | Baths: ${baths || "N/A"} | Sqft: ${sqft || "N/A"}
 ${neighborhood ? `Neighborhood: ${neighborhood}` : ""}
 
@@ -2191,7 +2217,7 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
-          { role: "system", content: "You are a real estate marketing expert. Return only the headline text, no quotes or explanation." },
+          { role: "system", content: "You are a real estate marketing expert. Return only the headline text, no quotes or explanation. Match the tone to the property status." },
           { role: "user", content: prompt }
         ],
         max_tokens: 60,
