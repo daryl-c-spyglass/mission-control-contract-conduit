@@ -1654,8 +1654,7 @@ export async function registerRoutes(
       }
 
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.OPENAI_API_KEY,
       });
 
       const prompt = `You are a real estate copywriter. Write a compelling property description summary.
@@ -1770,8 +1769,7 @@ Return only the summary text, nothing else.`;
         : "";
 
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.OPENAI_API_KEY,
       });
 
       const prompt = `You are a professional real estate broker writing a short, punchy social media tagline for a property listing.
@@ -2158,8 +2156,7 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
       }
 
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.OPENAI_API_KEY,
       });
 
       // Status-specific prompts for contextually relevant headlines
