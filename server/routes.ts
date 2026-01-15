@@ -1012,6 +1012,11 @@ export async function registerRoutes(
   });
 
   app.post("/api/transactions/:id/documents", isAuthenticated, async (req: any, res) => {
+    console.log('[DOC UPLOAD] ========== DOCUMENT UPLOAD DEBUG ==========');
+    console.log('[DOC UPLOAD] Route hit for transaction:', req.params.id);
+    console.log('[DOC UPLOAD] Content-Type:', req.get('Content-Type'));
+    console.log('[DOC UPLOAD] Body keys:', Object.keys(req.body || {}));
+    
     try {
       const transaction = await storage.getTransaction(req.params.id);
       if (!transaction) {
