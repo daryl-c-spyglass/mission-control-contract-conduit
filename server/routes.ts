@@ -491,6 +491,108 @@ export async function registerRoutes(
     }
   });
 
+  // Connect Slack channel to an existing transaction
+  app.post("/api/transactions/:id/connect-slack", isAuthenticated, async (req: any, res) => {
+    try {
+      const transaction = await storage.getTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      // Check if already connected
+      if (transaction.slackChannelId) {
+        return res.status(400).json({ 
+          message: "Transaction already has a Slack channel connected",
+          slackChannelId: transaction.slackChannelId,
+          slackChannelName: transaction.slackChannelName
+        });
+      }
+
+      if (!process.env.SLACK_BOT_TOKEN) {
+        return res.status(400).json({ message: "Slack is not configured" });
+      }
+
+      // Get the current user's info for channel naming
+      const userId = req.user?.claims?.sub;
+      let agentName = "";
+      
+      if (userId) {
+        const creator = await authStorage.getUser(userId);
+        if (creator) {
+          agentName = `${creator.firstName || ""} ${creator.lastName || ""}`.trim();
+        }
+      }
+
+      // Generate channel name and create channel
+      const channelName = generateSlackChannelName(
+        transaction.propertyAddress,
+        transaction.transactionType,
+        agentName
+      );
+      
+      console.log(`[Slack] Creating channel for existing transaction: ${channelName}`);
+      const slackResult = await createSlackChannel(channelName);
+      
+      // Update transaction with Slack channel info
+      await storage.updateTransaction(transaction.id, {
+        slackChannelId: slackResult.channelId,
+        slackChannelName: slackResult.channelName,
+      });
+
+      // Log activity
+      await storage.createActivity({
+        transactionId: transaction.id,
+        type: "channel_created",
+        description: `Slack channel #${slackResult.channelName} connected`,
+        category: "team",
+      });
+
+      // Invite relevant users to the channel
+      const slackUserIdsToInvite: string[] = [];
+      
+      // Add the creating user's Slack ID
+      if (userId) {
+        const creator = await authStorage.getUser(userId);
+        if (creator?.slackUserId) {
+          slackUserIdsToInvite.push(creator.slackUserId);
+        }
+      }
+      
+      // Add coordinators' Slack IDs
+      if (transaction.coordinatorIds && transaction.coordinatorIds.length > 0) {
+        const coordsWithSlack = await Promise.all(
+          transaction.coordinatorIds.map(id => storage.getCoordinator(id))
+        );
+        coordsWithSlack
+          .filter(c => c?.slackUserId)
+          .forEach(c => slackUserIdsToInvite.push(c!.slackUserId!));
+      }
+      
+      // Invite all users to the channel
+      if (slackUserIdsToInvite.length > 0) {
+        await inviteUsersToChannel(slackResult.channelId, slackUserIdsToInvite);
+      }
+
+      // Post a welcome message
+      await postToChannel(
+        slackResult.channelId,
+        `:house: *Slack channel connected for ${transaction.propertyAddress}*\n\nThis channel has been connected to an existing transaction in Mission Control.`
+      );
+
+      // Return updated transaction
+      const updatedTransaction = await storage.getTransaction(transaction.id);
+      res.json({
+        success: true,
+        slackChannelId: slackResult.channelId,
+        slackChannelName: slackResult.channelName,
+        transaction: updatedTransaction
+      });
+    } catch (error: any) {
+      console.error("Connect Slack error:", error);
+      res.status(500).json({ message: error.message || "Failed to connect Slack channel" });
+    }
+  });
+
   app.post("/api/transactions/:id/refresh-mls", isAuthenticated, async (req, res) => {
     console.log("=== REFRESH MLS REQUEST ===", req.params.id);
     try {

@@ -818,6 +818,28 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
     },
   });
 
+  const connectSlackMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/transactions/${transaction.id}/connect-slack`);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ 
+        title: "Slack channel connected", 
+        description: `Channel #${data.slackChannelName} has been created and linked.` 
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", transaction.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to connect Slack", 
+        description: error.message || "Please try again.",
+        variant: "destructive" 
+      });
+    },
+  });
+
   const handleSaveDates = async () => {
     await updateTransactionMutation.mutateAsync({
       contractDate: editContractDate || null,
@@ -888,7 +910,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         </div>
 
         <div className="flex items-center gap-2 flex-wrap pl-10 sm:pl-0">
-          {transaction.slackChannelId && (
+          {transaction.slackChannelId ? (
             <Button 
               variant="outline" 
               size="sm"
@@ -898,6 +920,22 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
             >
               <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span className="hidden xs:inline">Open</span> Slack
+            </Button>
+          ) : (
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9" 
+              data-testid="button-connect-slack"
+              onClick={() => connectSlackMutation.mutate()}
+              disabled={connectSlackMutation.isPending}
+            >
+              {connectSlackMutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+              ) : (
+                <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              )}
+              <span className="hidden xs:inline">Connect</span> Slack
             </Button>
           )}
           {transaction.gmailLabelId && (
