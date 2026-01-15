@@ -5,7 +5,7 @@ import fs from "fs";
 import { storage } from "./storage";
 import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema, insertCmaSchema } from "@shared/schema";
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages, watchUserMailbox } from "./gmail";
-import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel } from "./slack";
+import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel, postDocumentUploadNotification } from "./slack";
 import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess, getBestPhotosForFlyer } from "./repliers";
 import { isRentalOrLease } from "../shared/lib/listings";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
@@ -932,12 +932,50 @@ export async function registerRoutes(
         category: "documents",
       });
 
-      // Optionally notify Slack about the upload
+      // Format file size for display
+      const formatFileSize = (bytes: number) => {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+      };
+
+      // Get document type label
+      const docTypeLabels: Record<string, string> = {
+        contract: 'Contract',
+        amendment: 'Amendment',
+        addendum: 'Addendum',
+        disclosure: 'Disclosure',
+        inspection: 'Inspection Report',
+        appraisal: 'Appraisal',
+        title: 'Title Document',
+        insurance: 'Insurance',
+        closing: 'Closing Document',
+        other: 'Other',
+      };
+      const docTypeLabel = docTypeLabels[documentType || 'other'] || 'Other';
+
+      // Get file extension
+      const fileExt = fileName.split('.').pop()?.toLowerCase() || 'unknown';
+
+      // Send enhanced Slack notification with Block Kit formatting
       if (transaction.slackChannelId) {
-        await postToChannel(
-          transaction.slackChannelId,
-          `A new contract document has been uploaded: *${docLabel}*`
-        );
+        try {
+          await postDocumentUploadNotification(
+            transaction.slackChannelId,
+            {
+              documentName: docLabel,
+              documentType: docTypeLabel,
+              fileFormat: fileExt,
+              fileSize: formatFileSize(fileSize),
+              notes: notes || undefined,
+              propertyAddress: transaction.propertyAddress,
+              uploadedBy: req.user?.claims?.email || 'Unknown User',
+            }
+          );
+        } catch (slackError) {
+          console.error("Failed to send Slack notification:", slackError);
+          // Don't fail the request if Slack notification fails
+        }
       }
 
       res.status(201).json(doc);

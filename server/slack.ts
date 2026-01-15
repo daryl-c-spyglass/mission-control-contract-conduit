@@ -76,6 +76,104 @@ export async function postToChannel(channelId: string, text: string): Promise<vo
   });
 }
 
+interface DocumentUploadNotification {
+  documentName: string;
+  documentType: string;
+  fileFormat: string;
+  fileSize: string;
+  notes?: string;
+  propertyAddress: string;
+  uploadedBy: string;
+}
+
+/**
+ * Send a detailed Block Kit notification about a document upload
+ */
+export async function postDocumentUploadNotification(
+  channelId: string,
+  doc: DocumentUploadNotification
+): Promise<void> {
+  const timestamp = new Date().toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+
+  const blocks: any[] = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: "New Document Uploaded",
+        emoji: true
+      }
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*Document Name:*\n${doc.documentName}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*Document Type:*\n${doc.documentType}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*File Format:*\n${doc.fileFormat.toUpperCase()}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*File Size:*\n${doc.fileSize}`
+        }
+      ]
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*Property:*\n${doc.propertyAddress}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*Uploaded By:*\n${doc.uploadedBy}`
+        }
+      ]
+    },
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: `Uploaded on ${timestamp}`
+        }
+      ]
+    }
+  ];
+
+  // Add notes section if notes exist
+  if (doc.notes && doc.notes.trim()) {
+    blocks.splice(3, 0, {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Notes:*\n${doc.notes}`
+      }
+    });
+  }
+
+  await slackRequest("chat.postMessage", {
+    channel: channelId,
+    text: `New document uploaded: ${doc.documentName}`,
+    blocks,
+  });
+}
+
 export async function lookupUserByEmail(email: string): Promise<string | null> {
   try {
     const data = await slackRequest("users.lookupByEmail", { email });

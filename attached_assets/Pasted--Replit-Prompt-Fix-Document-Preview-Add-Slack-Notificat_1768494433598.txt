@@ -1,0 +1,496 @@
+## Replit Prompt: Fix Document Preview & Add Slack Notifications
+
+---
+
+**Task: Fix Document Preview in Documents Tab + Send Slack Notifications on Upload**
+
+The document preview feature in the Documents tab needs to be fixed (showing blank screen), AND we need to add automatic Slack notifications when documents are uploaded.
+
+---
+
+### Part 1: Fix Blank Document Preview
+
+**Problem:** When a user clicks to preview a document in the Documents tab, the preview area displays blank/empty instead of showing the document content.
+
+**Requirements:**
+
+1. **Diagnose the Issue**
+   - Check browser console for errors when preview is clicked
+   - Verify the document URL is being passed correctly to the preview component
+   - Check if it's a CORS issue with document fetching
+   - Verify file types being handled (PDF, DOCX, images, etc.)
+
+2. **Implement Proper Preview Handler**
+
+   ```typescript
+   const DocumentPreview = ({ document }) => {
+     const [loading, setLoading] = useState(true);
+     const [error, setError] = useState(null);
+     
+     const getPreviewComponent = () => {
+       const fileType = document.type || document.name?.split('.').pop()?.toLowerCase();
+       
+       switch (fileType) {
+         case 'pdf':
+           return (
+             <iframe
+               src={document.url}
+               style={{ width: '100%', height: '600px', border: 'none' }}
+               onLoad={() => setLoading(false)}
+               onError={() => setError('Failed to load PDF')}
+               title="PDF Preview"
+             />
+           );
+           
+         case 'jpg':
+         case 'jpeg':
+         case 'png':
+         case 'gif':
+           return (
+             <img
+               src={document.url}
+               alt={document.name}
+               style={{ maxWidth: '100%', height: 'auto' }}
+               onLoad={() => setLoading(false)}
+               onError={() => setError('Failed to load image')}
+             />
+           );
+           
+         case 'docx':
+         case 'doc':
+           return (
+             <iframe
+               src={`https://docs.google.com/viewer?url=${encodeURIComponent(document.url)}&embedded=true`}
+               style={{ width: '100%', height: '600px', border: 'none' }}
+               onLoad={() => setLoading(false)}
+               title="Document Preview"
+             />
+           );
+           
+         default:
+           return (
+             <div className="unsupported-preview">
+               <p>Preview not available for this file type</p>
+               <a href={document.url} download>Download to view</a>
+             </div>
+           );
+       }
+     };
+     
+     return (
+       <div className="document-preview-container">
+         {loading && <div className="loading-spinner">Loading preview...</div>}
+         {error && <div className="error-message">{error}</div>}
+         {getPreviewComponent()}
+       </div>
+     );
+   };
+   ```
+
+3. **Preview Container Styling**
+   ```css
+   .document-preview-container {
+     width: 100%;
+     min-height: 500px;
+     background: #f5f5f5;
+     border-radius: 8px;
+     overflow: hidden;
+   }
+   
+   .document-preview-container iframe,
+   .document-preview-container img {
+     width: 100%;
+     height: 100%;
+     min-height: 500px;
+   }
+   ```
+
+---
+
+### Part 2: Slack Notification on Document Upload (NEW FEATURE)
+
+**Requirement:** When a document is uploaded to a transaction, automatically send a notification to the connected Slack channel with document details.
+
+**Notification Should Include:**
+- ✅ Document Name
+- ✅ Document Type (e.g., Contract, Amendment, Disclosure, etc.)
+- ✅ File Format (PDF, DOCX, JPG, etc.)
+- ✅ Notes (if any were added during upload)
+- ✅ Transaction/Property Address for context
+- ✅ Timestamp
+- ✅ Who uploaded the document
+
+**1. Create Slack Notification Service**
+
+```typescript
+// services/slackNotifications.ts
+
+interface DocumentUploadNotification {
+  documentName: string;
+  documentType: string;
+  fileFormat: string;
+  notes?: string;
+  propertyAddress: string;
+  uploadedBy: string;
+  transactionId: string;
+  documentUrl?: string;
+}
+
+export async function sendDocumentUploadNotification(
+  slackChannelId: string,
+  document: DocumentUploadNotification
+): Promise<boolean> {
+  try {
+    const fileExtension = document.fileFormat.toUpperCase();
+    const timestamp = new Date().toLocaleString();
+    
+    // Build the Slack message blocks
+    const message = {
+      channel: slackChannelId,
+      text: `📄 New Document Uploaded: ${document.documentName}`,
+      blocks: [
+        {
+          type: "header",
+          text: {
+            type: "plain_text",
+            text: "📄 New Document Uploaded",
+            emoji: true
+          }
+        },
+        {
+          type: "section",
+          fields: [
+            {
+              type: "mrkdwn",
+              text: `*Document Name:*\n${document.documentName}`
+            },
+            {
+              type: "mrkdwn",
+              text: `*Document Type:*\n${document.documentType}`
+            },
+            {
+              type: "mrkdwn",
+              text: `*File Format:*\n${fileExtension}`
+            },
+            {
+              type: "mrkdwn",
+              text: `*Property:*\n${document.propertyAddress}`
+            }
+          ]
+        },
+        {
+          type: "section",
+          fields: [
+            {
+              type: "mrkdwn",
+              text: `*Uploaded By:*\n${document.uploadedBy}`
+            },
+            {
+              type: "mrkdwn",
+              text: `*Time:*\n${timestamp}`
+            }
+          ]
+        }
+      ]
+    };
+    
+    // Add notes section if notes exist
+    if (document.notes && document.notes.trim()) {
+      message.blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `*Notes:*\n${document.notes}`
+        }
+      });
+    }
+    
+    // Add divider
+    message.blocks.push({ type: "divider" });
+    
+    // Add link to document if available
+    if (document.documentUrl) {
+      message.blocks.push({
+        type: "actions",
+        elements: [
+          {
+            type: "button",
+            text: {
+              type: "plain_text",
+              text: "View Document",
+              emoji: true
+            },
+            url: document.documentUrl,
+            action_id: "view_document"
+          }
+        ]
+      });
+    }
+    
+    // Send to Slack API
+    const response = await fetch('/api/slack/send-message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(message)
+    });
+    
+    return response.ok;
+  } catch (error) {
+    console.error('Failed to send Slack notification:', error);
+    return false;
+  }
+}
+```
+
+**2. Update Document Upload Handler**
+
+```typescript
+// In your document upload component/handler
+
+import { sendDocumentUploadNotification } from '@/services/slackNotifications';
+
+const handleDocumentUpload = async (files: File[], uploadData: UploadFormData) => {
+  try {
+    // 1. Upload the document(s) to storage
+    const uploadedDocs = await uploadDocumentsToStorage(files, transactionId);
+    
+    // 2. Save document metadata to database
+    for (const doc of uploadedDocs) {
+      const savedDoc = await saveDocumentMetadata({
+        transactionId,
+        name: doc.name,
+        type: uploadData.documentType,
+        url: doc.url,
+        notes: uploadData.notes,
+        uploadedBy: currentUser.name,
+        uploadedAt: new Date()
+      });
+      
+      // 3. Send Slack notification if channel is connected
+      if (transaction.slackChannelId) {
+        const fileFormat = doc.name.split('.').pop() || 'unknown';
+        
+        await sendDocumentUploadNotification(transaction.slackChannelId, {
+          documentName: doc.name,
+          documentType: uploadData.documentType || 'General Document',
+          fileFormat: fileFormat,
+          notes: uploadData.notes,
+          propertyAddress: transaction.propertyAddress,
+          uploadedBy: currentUser.name,
+          transactionId: transactionId,
+          documentUrl: doc.url
+        });
+      }
+    }
+    
+    // 4. Log to activity timeline
+    await logActivity({
+      transactionId,
+      type: 'document_upload',
+      description: `Document uploaded: ${files.map(f => f.name).join(', ')}`,
+      user: currentUser.name
+    });
+    
+    toast.success('Document(s) uploaded successfully');
+    
+  } catch (error) {
+    console.error('Document upload failed:', error);
+    toast.error('Failed to upload document');
+  }
+};
+```
+
+**3. Update Document Upload Form to Include Document Type**
+
+```typescript
+// DocumentUploadModal.tsx
+
+interface DocumentUploadFormData {
+  files: File[];
+  documentType: string;
+  notes: string;
+}
+
+const DOCUMENT_TYPES = [
+  'Contract',
+  'Amendment',
+  'Addendum',
+  'Disclosure',
+  'Inspection Report',
+  'Appraisal',
+  'Title Document',
+  'Insurance',
+  'Closing Document',
+  'Other'
+];
+
+const DocumentUploadModal = ({ isOpen, onClose, transactionId }) => {
+  const [formData, setFormData] = useState<DocumentUploadFormData>({
+    files: [],
+    documentType: '',
+    notes: ''
+  });
+  
+  return (
+    <Modal isOpen={isOpen} onClose={onClose}>
+      <div className="upload-modal">
+        <h2>Upload Documents</h2>
+        
+        {/* File Drop Zone */}
+        <FileDropZone
+          onFilesSelected={(files) => setFormData(prev => ({ ...prev, files }))}
+          acceptedTypes={['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png']}
+        />
+        
+        {/* Document Type Selector */}
+        <div className="form-field">
+          <label>Document Type</label>
+          <select
+            value={formData.documentType}
+            onChange={(e) => setFormData(prev => ({ ...prev, documentType: e.target.value }))}
+          >
+            <option value="">Select document type...</option>
+            {DOCUMENT_TYPES.map(type => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
+        </div>
+        
+        {/* Notes Field */}
+        <div className="form-field">
+          <label>Notes (optional)</label>
+          <textarea
+            value={formData.notes}
+            onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+            placeholder="Add any notes about this document..."
+            rows={3}
+          />
+        </div>
+        
+        {/* Upload Button */}
+        <button
+          onClick={() => handleDocumentUpload(formData.files, formData)}
+          disabled={formData.files.length === 0}
+        >
+          Upload Document{formData.files.length > 1 ? 's' : ''}
+        </button>
+      </div>
+    </Modal>
+  );
+};
+```
+
+**4. Backend API Route for Slack Messages**
+
+```typescript
+// api/slack/send-message.ts (or routes/slack.ts)
+
+import { WebClient } from '@slack/web-api';
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { channel, text, blocks } = body;
+    
+    // Get Slack token from environment or database
+    const slackToken = process.env.SLACK_BOT_TOKEN;
+    
+    if (!slackToken) {
+      return Response.json({ error: 'Slack not configured' }, { status: 500 });
+    }
+    
+    const slack = new WebClient(slackToken);
+    
+    const result = await slack.chat.postMessage({
+      channel,
+      text,
+      blocks
+    });
+    
+    return Response.json({ success: true, ts: result.ts });
+    
+  } catch (error) {
+    console.error('Slack API error:', error);
+    return Response.json({ error: 'Failed to send message' }, { status: 500 });
+  }
+}
+```
+
+---
+
+### Files to Check/Modify
+
+**For Preview Fix:**
+- `client/src/components/DocumentsTab.tsx`
+- `client/src/components/DocumentPreview.tsx`
+- Document upload/storage API endpoints
+- CSS files for preview container
+
+**For Slack Notifications:**
+- `client/src/services/slackNotifications.ts` (create new)
+- `client/src/components/DocumentUploadModal.tsx`
+- `server/routes/slack.ts` or `api/slack/send-message.ts`
+- Transaction model (ensure slackChannelId is stored)
+
+---
+
+### Example Slack Message Output
+
+When a document is uploaded, the Slack channel will receive a message like:
+
+```
+📄 New Document Uploaded
+───────────────────────────
+Document Name:    Purchase_Agreement_13106_New_Boston.pdf
+Document Type:    Contract
+File Format:      PDF
+Property:         13106 New Boston
+
+Uploaded By:      Randi
+Time:             Jan 16, 2026, 2:30 PM
+
+Notes:
+Signed purchase agreement from buyers. Earnest money due by Jan 20.
+
+───────────────────────────
+[View Document]
+```
+
+---
+
+### Acceptance Criteria
+
+**Document Preview:**
+- [ ] PDF documents display correctly in preview
+- [ ] Image files (JPG, PNG) display correctly in preview
+- [ ] DOCX/DOC files show preview (or graceful fallback with download option)
+- [ ] Loading state shown while document loads
+- [ ] Error message displayed if preview fails
+- [ ] Works in both Replit (dev) and Render (production)
+
+**Slack Notifications:**
+- [ ] Notification sent to connected Slack channel when document uploaded
+- [ ] Document name displays correctly
+- [ ] Document type displays correctly (Contract, Amendment, etc.)
+- [ ] File format displays correctly (PDF, DOCX, JPG, etc.)
+- [ ] Notes included in notification (if provided during upload)
+- [ ] Property address included for context
+- [ ] Uploader name and timestamp included
+- [ ] "View Document" button links to document (if URL available)
+- [ ] Graceful handling if Slack channel not connected (no error, just skip notification)
+- [ ] Activity logged to transaction timeline
+
+---
+
+### Debugging Steps
+
+1. Open browser DevTools → Console tab
+2. Upload a test document
+3. Check console for any error messages
+4. Check Network tab to verify Slack API call is made
+5. Verify the Slack channel receives the notification
+6. Test preview by clicking on uploaded document
+
+---
+
+Copy this into Replit to implement both features!

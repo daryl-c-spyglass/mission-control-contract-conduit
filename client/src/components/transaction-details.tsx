@@ -65,6 +65,7 @@ import {
   Plus,
   Minus,
   ZoomIn,
+  AlertCircle,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -339,6 +340,28 @@ interface DocumentPreviewModalProps {
 }
 
 function DocumentPreviewModal({ document, isOpen, onClose, onDownload }: DocumentPreviewModalProps) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const extension = document ? document.fileName.split('.').pop()?.toLowerCase() || '' : '';
+  const mimeType = document?.fileType;
+  const isPdf = extension === 'pdf' || mimeType === 'application/pdf';
+  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension) || mimeType?.startsWith('image/');
+  const isPreviewable = isPdf || isImage;
+
+  // Reset loading/error state when document changes
+  // Only set loading to true for previewable content
+  useEffect(() => {
+    if (document) {
+      const ext = document.fileName.split('.').pop()?.toLowerCase() || '';
+      const mime = document.fileType;
+      const pdf = ext === 'pdf' || mime === 'application/pdf';
+      const img = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext) || mime?.startsWith('image/');
+      setLoading(pdf || img);
+      setError(null);
+    }
+  }, [document?.id]);
+
   if (!document) return null;
 
   const formatFileSize = (bytes: number) => {
@@ -349,32 +372,90 @@ function DocumentPreviewModal({ document, isOpen, onClose, onDownload }: Documen
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const getFileExtension = (fileName: string) => {
-    return fileName.split('.').pop()?.toLowerCase() || '';
+
+  const handleLoad = () => {
+    setLoading(false);
+    setError(null);
   };
 
-  const extension = getFileExtension(document.fileName);
-  const mimeType = document.fileType;
+  const handleError = () => {
+    setLoading(false);
+    setError('Failed to load document. Try downloading instead.');
+  };
 
   const renderPreview = () => {
-    if (extension === 'pdf' || mimeType === 'application/pdf') {
+    if (isPdf) {
       return (
-        <iframe
-          src={`${document.fileData}#toolbar=1&navpanes=0`}
-          className="w-full h-full min-h-[500px] rounded-lg"
-          title={document.name || document.fileName}
-        />
+        <div className="relative w-full h-full min-h-[500px]">
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-lg z-10">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Loading PDF...</p>
+              </div>
+            </div>
+          )}
+          {error ? (
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px] bg-muted rounded-lg p-8 text-center">
+              <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+              <h3 className="text-lg font-medium mb-2">Preview Failed</h3>
+              <p className="text-muted-foreground mb-4">{error}</p>
+              <Button onClick={() => onDownload(document)}>
+                <Download className="h-4 w-4 mr-2" />
+                Download to View
+              </Button>
+            </div>
+          ) : (
+            <object
+              data={document.fileData}
+              type="application/pdf"
+              className="w-full h-full min-h-[500px] rounded-lg"
+              onLoad={handleLoad}
+              onError={handleError}
+            >
+              <iframe
+                src={document.fileData}
+                className="w-full h-full min-h-[500px] rounded-lg"
+                title={document.name || document.fileName}
+                onLoad={handleLoad}
+                onError={handleError}
+              />
+            </object>
+          )}
+        </div>
       );
     }
 
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension) || mimeType?.startsWith('image/')) {
+    if (isImage) {
       return (
-        <div className="flex items-center justify-center h-full min-h-[400px] bg-muted rounded-lg p-4">
-          <img
-            src={document.fileData}
-            alt={document.name || document.fileName}
-            className="max-w-full max-h-[60vh] object-contain rounded"
-          />
+        <div className="relative flex items-center justify-center h-full min-h-[400px] bg-muted rounded-lg p-4">
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-lg z-10">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Loading image...</p>
+              </div>
+            </div>
+          )}
+          {error ? (
+            <div className="flex flex-col items-center justify-center p-8 text-center">
+              <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+              <h3 className="text-lg font-medium mb-2">Image Failed to Load</h3>
+              <p className="text-muted-foreground mb-4">{error}</p>
+              <Button onClick={() => onDownload(document)}>
+                <Download className="h-4 w-4 mr-2" />
+                Download to View
+              </Button>
+            </div>
+          ) : (
+            <img
+              src={document.fileData}
+              alt={document.name || document.fileName}
+              className="max-w-full max-h-[60vh] object-contain rounded"
+              onLoad={handleLoad}
+              onError={handleError}
+            />
+          )}
         </div>
       );
     }
@@ -627,13 +708,12 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
     const savedConfig = metadata?.config;
     
     const isPrintFlyer = asset.type === 'print_flyer' || metadata?.format === 'print';
-    const isSocialFlyer = asset.type === 'social_flyer' || metadata?.format === 'social';
     
-    if (isPrintFlyer || isSocialFlyer) {
+    if (isPrintFlyer) {
       // Flyer type - open CreateFlyerDialog in edit mode
       // Use saved config or fall back to defaults from MLS data
       const config: FlyerAssetConfig = savedConfig ? (savedConfig as FlyerAssetConfig) : {
-        format: isPrintFlyer ? 'print' : 'social',
+        format: 'print' as const,
         status: metadata?.status || 'Just Listed',
         description: mlsData?.description || '',
         headline: '',
