@@ -1,0 +1,252 @@
+# Conditional Open House Fields in Create Flyer Dialog
+
+The Open House Day and Open House Details fields should only be visible when the user selects "Open House" as the Status. Otherwise, these fields should be hidden.
+
+---
+
+## Current Behavior
+- Open House Day and Open House Details are always visible
+- Fields show even when status is "For Sale", "Just Listed", etc.
+
+## Expected Behavior
+- When Status = "Open House" → Show Open House Day & Open House Details fields
+- When Status = anything else → Hide Open House Day & Open House Details fields
+
+---
+
+## Implementation
+
+### Update the Create Flyer Dialog Component
+
+```tsx
+// In create-flyer-dialog.tsx (or create-property-flyer-dialog.tsx)
+
+// State
+const [status, setStatus] = useState('For Sale');
+const [openHouseDay, setOpenHouseDay] = useState('');
+const [openHouseDetails, setOpenHouseDetails] = useState('');
+
+// Check if Open House is selected
+const isOpenHouse = status === 'Open House';
+
+// In the JSX - Conditionally render Open House fields:
+
+{/* Status Field */}
+<div className="space-y-2">
+  <Label>Status</Label>
+  <Select value={status} onValueChange={setStatus}>
+    <SelectTrigger>
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="For Sale">For Sale</SelectItem>
+      <SelectItem value="Just Listed">Just Listed</SelectItem>
+      <SelectItem value="Under Contract">Under Contract</SelectItem>
+      <SelectItem value="Just Sold">Just Sold</SelectItem>
+      <SelectItem value="For Lease">For Lease</SelectItem>
+      <SelectItem value="Open House">Open House</SelectItem>
+    </SelectContent>
+  </Select>
+</div>
+
+{/* Open House Fields - Only show when status is "Open House" */}
+{isOpenHouse && (
+  <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-2">
+      <Label>Open House Day</Label>
+      <Select value={openHouseDay} onValueChange={setOpenHouseDay}>
+        <SelectTrigger>
+          <SelectValue placeholder="Select day" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="Saturday">Saturday</SelectItem>
+          <SelectItem value="Sunday">Sunday</SelectItem>
+          <SelectItem value="Sat & Sun">Sat & Sun</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+    <div className="space-y-2">
+      <Label>Open House Details</Label>
+      <Input
+        value={openHouseDetails}
+        onChange={(e) => setOpenHouseDetails(e.target.value)}
+        placeholder="e.g., May 17th, 11AM - 3PM"
+      />
+    </div>
+  </div>
+)}
+```
+
+---
+
+## Alternative: Smooth Animation
+
+For a nicer UX with animation, you can use a height transition:
+
+```tsx
+import { motion, AnimatePresence } from 'framer-motion';
+
+// Or if not using framer-motion, use CSS transitions:
+
+{/* With CSS transition */}
+<div className={cn(
+  "grid grid-cols-2 gap-4 overflow-hidden transition-all duration-200",
+  isOpenHouse ? "max-h-24 opacity-100 mt-4" : "max-h-0 opacity-0 mt-0"
+)}>
+  {/* Open House Day */}
+  <div className="space-y-2">
+    <Label>Open House Day</Label>
+    <Select value={openHouseDay} onValueChange={setOpenHouseDay}>
+      <SelectTrigger>
+        <SelectValue placeholder="Select day" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="Saturday">Saturday</SelectItem>
+        <SelectItem value="Sunday">Sunday</SelectItem>
+        <SelectItem value="Sat & Sun">Sat & Sun</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+  
+  {/* Open House Details */}
+  <div className="space-y-2">
+    <Label>Open House Details</Label>
+    <Input
+      value={openHouseDetails}
+      onChange={(e) => setOpenHouseDetails(e.target.value)}
+      placeholder="e.g., May 17th, 11AM - 3PM"
+    />
+  </div>
+</div>
+```
+
+---
+
+## Clear Open House Fields When Status Changes
+
+When user switches away from "Open House", clear the Open House fields:
+
+```tsx
+// Watch for status changes and clear Open House fields
+useEffect(() => {
+  if (status !== 'Open House') {
+    setOpenHouseDay('');
+    setOpenHouseDetails('');
+  }
+}, [status]);
+```
+
+---
+
+## Update Payload - Only Include Open House Data When Relevant
+
+```tsx
+const handleGenerate = async () => {
+  const payload = {
+    // ... other fields
+    status,
+    // Only include Open House data if status is "Open House"
+    openHouseDay: status === 'Open House' ? openHouseDay : null,
+    openHouseDetails: status === 'Open House' ? openHouseDetails : null,
+  };
+  
+  // ... rest of generation
+};
+```
+
+---
+
+## Complete Example
+
+```tsx
+export function CreateFlyerDialog({ open, onOpenChange, transaction }) {
+  const [status, setStatus] = useState('For Sale');
+  const [openHouseDay, setOpenHouseDay] = useState('');
+  const [openHouseDetails, setOpenHouseDetails] = useState('');
+  
+  const isOpenHouse = status === 'Open House';
+  
+  // Clear Open House fields when status changes away from Open House
+  useEffect(() => {
+    if (!isOpenHouse) {
+      setOpenHouseDay('');
+      setOpenHouseDetails('');
+    }
+  }, [isOpenHouse]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        {/* ... other fields ... */}
+        
+        {/* Price and Status Row */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Price</Label>
+            <Input value={price} onChange={(e) => setPrice(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="For Sale">For Sale</SelectItem>
+                <SelectItem value="Just Listed">Just Listed</SelectItem>
+                <SelectItem value="Under Contract">Under Contract</SelectItem>
+                <SelectItem value="Just Sold">Just Sold</SelectItem>
+                <SelectItem value="For Lease">For Lease</SelectItem>
+                <SelectItem value="Open House">Open House</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        
+        {/* Open House Fields - Conditional */}
+        {isOpenHouse && (
+          <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="space-y-2">
+              <Label>Open House Day</Label>
+              <Select value={openHouseDay} onValueChange={setOpenHouseDay}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select day" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Saturday">Saturday</SelectItem>
+                  <SelectItem value="Sunday">Sunday</SelectItem>
+                  <SelectItem value="Sat & Sun">Sat & Sun</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Open House Details</Label>
+              <Input
+                value={openHouseDetails}
+                onChange={(e) => setOpenHouseDetails(e.target.value)}
+                placeholder="e.g., May 17th, 11AM - 3PM"
+              />
+            </div>
+          </div>
+        )}
+        
+        {/* ... rest of form ... */}
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+---
+
+## Testing Checklist
+
+- [ ] Open House Day field hidden when status is "For Sale"
+- [ ] Open House Day field hidden when status is "Just Listed"
+- [ ] Open House Day field hidden when status is "Under Contract"
+- [ ] Open House Day field hidden when status is "Just Sold"
+- [ ] Open House Day field hidden when status is "For Lease"
+- [ ] Open House Day field VISIBLE when status is "Open House"
+- [ ] Open House Details field follows same visibility rules
+- [ ] Fields clear when switching away from "Open House"
+- [ ] Generated flyer only shows Open House info when status is "Open House"

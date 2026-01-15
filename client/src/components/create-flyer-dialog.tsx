@@ -541,6 +541,14 @@ export function CreateFlyerDialog({
   const watchedValues = useWatch({ control: form.control });
   const currentDescriptionLength = watchedValues.description?.length || 0;
 
+  // Clear Open House fields when status changes away from "open_house"
+  useEffect(() => {
+    if (watchedValues.status !== 'open_house') {
+      form.setValue('openHouseDay', '');
+      form.setValue('openHouseDate', '');
+    }
+  }, [watchedValues.status, form]);
+
   const handleSummarize = useCallback(async () => {
     // Always use the FULL original MLS description as source
     if (!originalDescription || originalDescription.trim().length === 0) {
@@ -1837,50 +1845,53 @@ export function CreateFlyerDialog({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <FormField
-                    control={form.control}
-                    name="openHouseDay"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Open House Day</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                {/* Open House Fields - Only show when status is "open_house" */}
+                {watchedValues.status === 'open_house' && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <FormField
+                      control={form.control}
+                      name="openHouseDay"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">Open House Day</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="h-8" data-testid="select-open-house-day">
+                                <SelectValue placeholder="Select day" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {OPEN_HOUSE_DAY_OPTIONS.filter(opt => opt.value !== '').map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="openHouseDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">Open House Details</FormLabel>
                           <FormControl>
-                            <SelectTrigger className="h-8" data-testid="select-open-house-day">
-                              <SelectValue placeholder="None" />
-                            </SelectTrigger>
+                            <Input
+                              placeholder="e.g., May 17th, 11AM - 3PM"
+                              className="h-8"
+                              data-testid="input-open-house-date"
+                              {...field}
+                            />
                           </FormControl>
-                          <SelectContent>
-                            {OPEN_HOUSE_DAY_OPTIONS.map((option) => (
-                              <SelectItem key={option.value || "none"} value={option.value || "none"}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="openHouseDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Open House Details</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="e.g., May 17th, 11AM - 3PM"
-                            className="h-8"
-                            data-testid="input-open-house-date"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
 
                 <div className="grid grid-cols-3 gap-2">
                   <FormField
