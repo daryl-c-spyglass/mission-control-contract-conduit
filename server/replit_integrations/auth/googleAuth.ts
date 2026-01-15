@@ -140,12 +140,19 @@ export async function setupAuth(app: Express) {
             <head><title>Authentication Complete</title></head>
             <body>
               <script>
-                if (window.opener) {
-                  window.opener.postMessage({ type: 'AUTH_SUCCESS' }, '*');
-                  window.close();
-                } else {
-                  window.location.href = '/';
-                }
+                (function() {
+                  if (window.opener) {
+                    // Post message to opener (the iframe that opened this popup)
+                    window.opener.postMessage({ type: 'AUTH_SUCCESS' }, '*');
+                    // Small delay to ensure message is received before closing
+                    setTimeout(function() {
+                      window.close();
+                    }, 100);
+                  } else {
+                    // Fallback: redirect this window if no opener
+                    window.location.href = '/';
+                  }
+                })();
               </script>
               <p>Authentication successful. This window will close automatically.</p>
             </body>
