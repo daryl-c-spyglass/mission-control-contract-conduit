@@ -56,6 +56,30 @@ const FORMAT_OPTIONS = [
   { id: 'tiktok-cover', name: 'TikTok', fullName: 'TikTok Cover', width: 1080, height: 1920, ratio: '9:16' },
 ] as const;
 
+// Generate 15-minute interval time options (9 AM to 7 PM)
+const generateTimeOptions = () => {
+  const times: { value: string; label: string }[] = [];
+  for (let hour = 9; hour <= 19; hour++) {
+    for (const minute of [0, 15, 30, 45]) {
+      // Skip times after 7:00 PM
+      if (hour === 19 && minute > 0) continue;
+      
+      const hour24 = hour.toString().padStart(2, '0');
+      const minuteStr = minute.toString().padStart(2, '0');
+      const value = `${hour24}:${minuteStr}`;
+      
+      const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const label = `${hour12}:${minuteStr} ${ampm}`;
+      
+      times.push({ value, label });
+    }
+  }
+  return times;
+};
+
+const OPEN_HOUSE_TIME_OPTIONS = generateTimeOptions();
+
 type FormatType = typeof FORMAT_OPTIONS[number];
 
 export function MarketingMaterialsDialog({ 
@@ -229,12 +253,13 @@ export function MarketingMaterialsDialog({
     }
   }, [open]);
 
-  // Format time from 24h to 12h AM/PM
+  // Format time from 24h to 12h AM/PM (e.g., "13:00" -> "1:00 PM", "13:30" -> "1:30 PM")
   const formatTime12h = (time24: string): string => {
     const [hours, minutes] = time24.split(':').map(Number);
     const period = hours >= 12 ? 'PM' : 'AM';
     const hour12 = hours % 12 || 12;
-    return `${hour12}${minutes > 0 ? `:${minutes.toString().padStart(2, '0')}` : ''} ${period}`;
+    const minuteStr = minutes.toString().padStart(2, '0');
+    return `${hour12}:${minuteStr} ${period}`;
   };
   
   // Format date to short form (e.g., "SAT JAN 18")
@@ -1100,9 +1125,9 @@ export function MarketingMaterialsDialog({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'].map((time) => (
-                          <SelectItem key={time} value={time}>
-                            {formatTime12h(time)}
+                        {OPEN_HOUSE_TIME_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1115,9 +1140,9 @@ export function MarketingMaterialsDialog({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {['12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00'].map((time) => (
-                          <SelectItem key={time} value={time}>
-                            {formatTime12h(time)}
+                        {OPEN_HOUSE_TIME_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
                           </SelectItem>
                         ))}
                       </SelectContent>

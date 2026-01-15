@@ -62,19 +62,29 @@ const STATUS_OPTIONS = [
   { value: "open_house", label: "Open House" },
 ];
 
-const OPEN_HOUSE_TIME_OPTIONS = [
-  { value: "09:00", label: "9 AM" },
-  { value: "10:00", label: "10 AM" },
-  { value: "11:00", label: "11 AM" },
-  { value: "12:00", label: "12 PM" },
-  { value: "13:00", label: "1 PM" },
-  { value: "14:00", label: "2 PM" },
-  { value: "15:00", label: "3 PM" },
-  { value: "16:00", label: "4 PM" },
-  { value: "17:00", label: "5 PM" },
-  { value: "18:00", label: "6 PM" },
-  { value: "19:00", label: "7 PM" },
-];
+// Generate 15-minute interval time options (9 AM to 7 PM)
+const generateTimeOptions = () => {
+  const times: { value: string; label: string }[] = [];
+  for (let hour = 9; hour <= 19; hour++) {
+    for (const minute of [0, 15, 30, 45]) {
+      // Skip times after 7:00 PM
+      if (hour === 19 && minute > 0) continue;
+      
+      const hour24 = hour.toString().padStart(2, '0');
+      const minuteStr = minute.toString().padStart(2, '0');
+      const value = `${hour24}:${minuteStr}`;
+      
+      const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const label = `${hour12}:${minuteStr} ${ampm}`;
+      
+      times.push({ value, label });
+    }
+  }
+  return times;
+};
+
+const OPEN_HOUSE_TIME_OPTIONS = generateTimeOptions();
 
 const formSchema = z.object({
   price: z.string().min(1, "Price is required"),
@@ -92,12 +102,13 @@ const formSchema = z.object({
   openHouseTimeEnd: z.string().optional(),
 });
 
-// Format time from 24h to 12h AM/PM (e.g., "13:00" -> "1PM")
+// Format time from 24h to 12h AM/PM (e.g., "13:00" -> "1:00PM", "13:30" -> "1:30PM")
 function formatTime12h(time24: string): string {
   const [hours, minutes] = time24.split(':').map(Number);
   const period = hours >= 12 ? 'PM' : 'AM';
   const hour12 = hours % 12 || 12;
-  return `${hour12}${minutes > 0 ? `:${minutes.toString().padStart(2, '0')}` : ''}${period}`;
+  const minuteStr = minutes.toString().padStart(2, '0');
+  return `${hour12}:${minuteStr}${period}`;
 }
 
 // Format date to short form (e.g., "SAT JAN 18")
