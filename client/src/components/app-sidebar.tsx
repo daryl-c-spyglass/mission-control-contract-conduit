@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Transaction } from "@shared/schema";
 
 interface AppSidebarProps {
@@ -43,6 +43,29 @@ export function AppSidebar({ transactions, onCreateTransaction }: AppSidebarProp
   const navItems = user?.isAdmin === "true"
     ? [...baseNavItems, ...adminNavItems]
     : baseNavItems;
+
+  // User display info with fallback chain
+  // Name: Marketing Profile → Google OAuth (first+last) → email username
+  const googleName = user?.firstName && user?.lastName 
+    ? `${user.firstName} ${user.lastName}`.trim() 
+    : user?.firstName || user?.lastName || null;
+  const emailUsername = user?.email?.split('@')[0] || '';
+  const displayName = user?.marketingDisplayName || googleName || emailUsername || 'Agent';
+  
+  // Email: logged-in user's email
+  const displayEmail = user?.email || '';
+  
+  // Photo: Marketing Profile → Google OAuth → null (shows initials)
+  const displayPhoto = user?.marketingHeadshotUrl || user?.profileImageUrl || null;
+  
+  // Get initials for avatar fallback
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(' ').filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
 
   return (
     <Sidebar>
@@ -107,13 +130,18 @@ export function AppSidebar({ transactions, onCreateTransaction }: AppSidebarProp
       </SidebarContent>
 
       <SidebarFooter className="p-4">
-        <div className="flex items-center gap-3 rounded-md p-2 hover-elevate">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="text-xs">AG</AvatarFallback>
+        <div className="flex items-center gap-3 rounded-md p-2 hover-elevate" data-testid="sidebar-user-profile">
+          <Avatar className="h-9 w-9 flex-shrink-0">
+            {displayPhoto ? (
+              <AvatarImage src={displayPhoto} alt={displayName} className="object-cover" />
+            ) : null}
+            <AvatarFallback className="text-xs bg-primary text-primary-foreground font-semibold">
+              {getInitials(displayName)}
+            </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">Agent User</p>
-            <p className="text-xs text-muted-foreground truncate">agent@realty.com</p>
+            <p className="text-sm font-medium truncate" data-testid="text-user-name">{displayName}</p>
+            <p className="text-xs text-muted-foreground truncate" data-testid="text-user-email">{displayEmail}</p>
           </div>
         </div>
       </SidebarFooter>

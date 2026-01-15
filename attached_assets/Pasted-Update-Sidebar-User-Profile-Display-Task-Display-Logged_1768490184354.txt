@@ -1,0 +1,150 @@
+Update Sidebar User Profile Display
+
+Task: Display Logged-In User's Info in Sidebar
+The lower left corner of the sidebar currently shows hardcoded "Agent User" and "agent@realty.com". Update this to dynamically show the actual logged-in user's information.
+Requirements
+
+Display User's Actual Information:
+
+Profile Photo: From Agent Marketing Profile (Settings) or Google profile photo as fallback
+Display Name: From Agent Marketing Profile, or Google name, or email username as fallback
+Email: From logged-in user's authentication email
+
+
+Data Priority (fallback chain):
+For Name:
+
+   1. Agent Marketing Profile → Display Name (if set)
+   2. Google OAuth name (from login)
+   3. Email username (part before @)
+For Photo:
+   1. Agent Marketing Profile → Photo (if uploaded)
+   2. Google OAuth profile picture
+   3. Default avatar/initials
+For Email:
+   1. Logged-in user's email (from auth session)
+
+Implementation
+
+tsx   // In Sidebar component
+   const { user } = useAuth(); // Get logged-in user from auth context
+   const { marketingProfile } = useMarketingProfile(); // Get Agent Marketing Profile
+   
+   const displayName = marketingProfile?.displayName || user?.name || user?.email?.split('@')[0] || 'Agent';
+   const displayEmail = user?.email || '';
+   const displayPhoto = marketingProfile?.photo || user?.profilePicture || null;
+   
+   // In the sidebar footer
+   <div className="sidebar-user-profile">
+     <div className="user-avatar">
+       {displayPhoto ? (
+         <img src={displayPhoto} alt={displayName} className="avatar-image" />
+       ) : (
+         <div className="avatar-initials">
+           {displayName.charAt(0).toUpperCase()}
+         </div>
+       )}
+     </div>
+     <div className="user-info">
+       <span className="user-name">{displayName}</span>
+       <span className="user-email">{displayEmail}</span>
+     </div>
+   </div>
+
+Styling
+
+css   .sidebar-user-profile {
+     display: flex;
+     align-items: center;
+     gap: 12px;
+     padding: 16px;
+     border-top: 1px solid rgba(255, 255, 255, 0.1);
+   }
+
+   .user-avatar {
+     width: 40px;
+     height: 40px;
+     border-radius: 50%;
+     overflow: hidden;
+     flex-shrink: 0;
+   }
+
+   .avatar-image {
+     width: 100%;
+     height: 100%;
+     object-fit: cover;
+   }
+
+   .avatar-initials {
+     width: 100%;
+     height: 100%;
+     background: #F97316;
+     color: white;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     font-weight: 600;
+     font-size: 16px;
+   }
+
+   .user-info {
+     display: flex;
+     flex-direction: column;
+     overflow: hidden;
+   }
+
+   .user-name {
+     font-weight: 500;
+     color: white;
+     white-space: nowrap;
+     overflow: hidden;
+     text-overflow: ellipsis;
+   }
+
+   .user-email {
+     font-size: 12px;
+     color: rgba(255, 255, 255, 0.6);
+     white-space: nowrap;
+     overflow: hidden;
+     text-overflow: ellipsis;
+   }
+```
+
+5. **Real-time Updates**
+   
+   When the user updates their Agent Marketing Profile in Settings:
+   - The sidebar should reflect the changes immediately (or after save)
+   - Use React context or state management to sync the data
+
+### Visual Example
+
+**Before (hardcoded):**
+```
+┌──────────────────────┐
+│ 👤 Agent User        │
+│    agent@realty.com  │
+└──────────────────────┘
+```
+
+**After (dynamic):**
+```
+┌──────────────────────┐
+│ 🖼️ Daryl Camingao    │
+│    daryl@spyglass... │
+└──────────────────────┘
+Files to Update
+
+Sidebar component (likely client/src/components/Sidebar.tsx or Layout.tsx)
+May need to fetch/subscribe to Agent Marketing Profile data
+
+Acceptance Criteria
+
+ Sidebar shows logged-in user's email address
+ Sidebar shows user's display name from Marketing Profile (if set)
+ Sidebar shows profile photo from Marketing Profile (if uploaded)
+ Falls back to Google profile photo if no Marketing Profile photo
+ Falls back to initials avatar if no photo available
+ Updates when user changes their Marketing Profile in Settings
+ Long names/emails truncate with ellipsis
+ Works in both Replit (dev) and Render (production)
+
