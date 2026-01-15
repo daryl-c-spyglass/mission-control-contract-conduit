@@ -207,3 +207,48 @@ When style changes, custom sources/layers are lost. Solution:
 5. Clusters appear when zoomed out, clicking zooms in
 6. "Center on Subject" and "Fit All" buttons always work
 7. Subject label always readable and on top
+
+## Deployment
+
+### Environment Setup
+- **Replit**: Development environment
+- **GitHub**: Version control (auto-synced from Replit)
+- **Render**: Production hosting (auto-deploys from GitHub main branch)
+
+### Production URL
+- https://mission-control-contract-conduit.onrender.com
+
+### Render Configuration
+
+#### Puppeteer/Chromium Setup
+The flyer generation features require Chromium. On Render, this is configured via:
+
+1. **apt.txt** (in project root) - Lists required system dependencies:
+   - chromium, fonts-liberation, libatk-bridge2.0-0, libnss3, etc.
+
+2. **Environment Variable**:
+   - `CHROMIUM_PATH=/usr/bin/chromium` (set in Render dashboard)
+
+3. **Build Command** (in Render dashboard):
+   ```
+   apt-get update && xargs apt-get install -y < apt.txt && npm install && npm run build
+   ```
+
+#### Required Environment Variables on Render
+- `DATABASE_URL` - PostgreSQL connection string
+- `OPENAI_API_KEY` - OpenAI API key for AI features
+- `GOOGLE_CLIENT_ID` - Google OAuth client ID
+- `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
+- `GOOGLE_SERVICE_ACCOUNT_JSON` - Google service account credentials
+- `MAPBOX_TOKEN` - Mapbox access token
+- `REPLIERS_API_KEY` - Repliers MLS API key
+- `FUB_API_KEY` - Follow Up Boss API key
+- `CHROMIUM_PATH=/usr/bin/chromium` - Path to Chromium binary
+
+### Puppeteer Configuration
+The `server/services/flyer-generator.ts` automatically detects Chromium:
+1. Checks `CHROMIUM_PATH` environment variable first
+2. Falls back to `which chromium` or `which chromium-browser`
+3. Falls back to Nix store path (for Replit)
+
+Launch options include `--no-sandbox` and `--disable-setuid-sandbox` for containerized environments.
