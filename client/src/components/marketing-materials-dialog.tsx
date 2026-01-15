@@ -84,6 +84,11 @@ export function MarketingMaterialsDialog({
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [recommendedIndices, setRecommendedIndices] = useState<number[]>([]);
   const [showEnlargedPreview, setShowEnlargedPreview] = useState(false);
+  
+  // Open House specific fields
+  const [openHouseDate, setOpenHouseDate] = useState<string>("");
+  const [openHouseTimeStart, setOpenHouseTimeStart] = useState<string>("13:00");
+  const [openHouseTimeEnd, setOpenHouseTimeEnd] = useState<string>("16:00");
 
   const saveAssetMutation = useMutation({
     mutationFn: async ({ type, imageData, fileName, config }: { type: string; imageData: string; fileName: string; config?: SocialGraphicConfig }) => {
@@ -224,7 +229,30 @@ export function MarketingMaterialsDialog({
     }
   }, [open]);
 
+  // Format time from 24h to 12h AM/PM
+  const formatTime12h = (time24: string): string => {
+    const [hours, minutes] = time24.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hour12 = hours % 12 || 12;
+    return `${hour12}${minutes > 0 ? `:${minutes.toString().padStart(2, '0')}` : ''} ${period}`;
+  };
+  
+  // Format date to short form (e.g., "SAT JAN 18")
+  const formatDateShort = (dateStr: string): string => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr + 'T12:00:00');
+    const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    return `${days[date.getDay()]} ${months[date.getMonth()]} ${date.getDate()}`;
+  };
+
   const getStatusLabel = (statusValue: StatusType) => {
+    if (statusValue === 'open_house' && openHouseDate) {
+      const dateShort = formatDateShort(openHouseDate);
+      const timeStart = formatTime12h(openHouseTimeStart);
+      const timeEnd = formatTime12h(openHouseTimeEnd);
+      return `OPEN HOUSE | ${dateShort} | ${timeStart.replace(' ', '')}-${timeEnd.replace(' ', '')}`;
+    }
     return STATUS_OPTIONS.find(s => s.value === statusValue)?.label?.toUpperCase() || "JUST LISTED";
   };
 
@@ -236,7 +264,7 @@ export function MarketingMaterialsDialog({
       'under_contract': '#3b82f6',
       'just_sold': '#ef4444',
       'price_improvement': '#8b5cf6',
-      'open_house': '#3b82f6',
+      'open_house': '#f97316', // Primary orange to stand out
       'coming_soon': '#14b8a6',
     };
     return colors[statusValue] || '#f97316';
@@ -1052,6 +1080,58 @@ export function MarketingMaterialsDialog({
               </Select>
             </div>
 
+            {/* Open House Date/Time Fields - shown only when Open House is selected */}
+            {status === 'open_house' && (
+              <div className="space-y-3 p-3 rounded-md bg-orange-500/10 border border-orange-500/20">
+                <div className="space-y-2">
+                  <Label>Open House Date</Label>
+                  <Input
+                    type="date"
+                    value={openHouseDate}
+                    onChange={(e) => { setOpenHouseDate(e.target.value); setGeneratedImage(null); }}
+                    data-testid="input-open-house-date"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Start Time</Label>
+                    <Select value={openHouseTimeStart} onValueChange={(v) => { setOpenHouseTimeStart(v); setGeneratedImage(null); }}>
+                      <SelectTrigger data-testid="select-open-house-start">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'].map((time) => (
+                          <SelectItem key={time} value={time}>
+                            {formatTime12h(time)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>End Time</Label>
+                    <Select value={openHouseTimeEnd} onValueChange={(v) => { setOpenHouseTimeEnd(v); setGeneratedImage(null); }}>
+                      <SelectTrigger data-testid="select-open-house-end">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00'].map((time) => (
+                          <SelectItem key={time} value={time}>
+                            {formatTime12h(time)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {openHouseDate && (
+                  <p className="text-xs text-orange-600 font-medium">
+                    Preview: {formatDateShort(openHouseDate)} | {formatTime12h(openHouseTimeStart).replace(' ', '')}-{formatTime12h(openHouseTimeEnd).replace(' ', '')}
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Social Media Tagline */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -1073,7 +1153,9 @@ export function MarketingMaterialsDialog({
                 </Button>
               </div>
               <Input
-                placeholder="e.g. Stunning 4BR with Chef's Kitchen"
+                placeholder={status === 'open_house' 
+                  ? "e.g. Join us this Saturday for an Open House!" 
+                  : "e.g. Stunning 4BR with Chef's Kitchen"}
                 value={socialDescription}
                 onChange={(e) => {
                   if (e.target.value.length <= 80) {

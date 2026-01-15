@@ -1,0 +1,72 @@
+Add Open House to Marketing Graphics Status Type
+
+Task: Add "Open House" Option to Create Marketing Graphics
+In the Marketing tab → Create Graphics modal, add "Open House" as a new status type option alongside the existing options (Just Listed, Price Reduced, Under Contract, Sold, etc.).
+Requirements
+
+Add "Open House" to Status Type dropdown
+Location: Marketing Graphics modal/dialog (likely in client/src/components/ - look for the Create Graphics or Marketing Materials component)
+Add to the status options array:
+
+typescript   const statusOptions = [
+     { value: 'just_listed', label: 'Just Listed' },
+     { value: 'open_house', label: 'Open House' },  // Add this
+     { value: 'price_reduced', label: 'Price Reduced' },
+     { value: 'under_contract', label: 'Under Contract' },
+     { value: 'sold', label: 'Sold' },
+     // ... other existing options
+   ];
+
+Add Open House specific fields (when "Open House" is selected, show additional inputs):
+
+typescript   // Show these fields only when status === 'open_house'
+   - Open House Date (date picker)
+   - Open House Time Start (time picker) 
+   - Open House Time End (time picker)
+   // Example: "Saturday, January 18 | 1:00 PM - 4:00 PM"
+```
+
+3. **Update graphic template for Open House**
+   
+   When generating Open House graphics, display:
+   - "OPEN HOUSE" as the status banner
+   - Date and time prominently shown
+   - Example format: "OPEN HOUSE | SAT JAN 18 | 1-4 PM"
+
+4. **Social Media Description placeholder update**
+   
+   When Open House is selected, update the placeholder text:
+```
+   e.g. "Join us this Saturday for an Open House!"
+```
+
+### UI Example
+```
+┌─────────────────────────────────────────────────┐
+│ Status Type                                      │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ Open House                              ▼   │ │
+│ └─────────────────────────────────────────────┘ │
+│                                                  │
+│ Open House Date                                  │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ Saturday, January 18, 2026              📅  │ │
+│ └─────────────────────────────────────────────┘ │
+│                                                  │
+│ Time                                             │
+│ ┌───────────────┐    ┌───────────────┐         │
+│ │ 1:00 PM   ▼   │ to │ 4:00 PM   ▼   │         │
+│ └───────────────┘    └───────────────┘         │
+└─────────────────────────────────────────────────┘
+Acceptance Criteria
+
+ "Open House" appears in Status Type dropdown
+ Selecting "Open House" shows date/time picker fields
+ Generated graphics display Open House date and time
+ Date formats nicely (e.g., "SAT JAN 18" not "2026-01-18")
+ Time formats in 12-hour format with AM/PM
+ Works in both Replit (dev) and Render (production)
+
+Brand Colors
+
+Open House banner color: Use primary orange (#F97316) or a distinct color to stand out
