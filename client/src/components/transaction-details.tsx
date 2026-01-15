@@ -342,6 +342,7 @@ interface DocumentPreviewModalProps {
 function DocumentPreviewModal({ document, isOpen, onClose, onDownload }: DocumentPreviewModalProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   
   const extension = document ? document.fileName.split('.').pop()?.toLowerCase() || '' : '';
   const mimeType = document?.fileType;
@@ -349,18 +350,65 @@ function DocumentPreviewModal({ document, isOpen, onClose, onDownload }: Documen
   const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension) || mimeType?.startsWith('image/');
   const isPreviewable = isPdf || isImage;
 
-  // Reset loading/error state when document changes
-  // Only set loading to true for previewable content
+  // Convert base64 data URL to blob URL for reliable rendering
   useEffect(() => {
-    if (document) {
-      const ext = document.fileName.split('.').pop()?.toLowerCase() || '';
-      const mime = document.fileType;
-      const pdf = ext === 'pdf' || mime === 'application/pdf';
-      const img = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext) || mime?.startsWith('image/');
-      setLoading(pdf || img);
-      setError(null);
+    if (!document?.fileData || !isPreviewable) {
+      setBlobUrl(null);
+      setLoading(false);
+      return;
     }
-  }, [document?.id]);
+    
+    try {
+      // Parse the data URL: data:mime;base64,data
+      const matches = document.fileData.match(/^data:([^;]+);base64,(.+)$/);
+      if (!matches) {
+        // Not a data URL, use as-is (might be a regular URL)
+        setBlobUrl(document.fileData);
+        setLoading(true);
+        return;
+      }
+      
+      const mime = matches[1];
+      const base64Data = matches[2];
+      
+      // Decode base64 to binary
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      // Create blob and URL
+      const blob = new Blob([bytes], { type: mime });
+      const url = URL.createObjectURL(blob);
+      setBlobUrl(url);
+      setLoading(true);
+      setError(null);
+      
+      // Cleanup function to revoke blob URL
+      return () => {
+        URL.revokeObjectURL(url);
+      };
+    } catch (e) {
+      console.error('Failed to create blob URL:', e);
+      setError('Failed to load document preview.');
+      setLoading(false);
+    }
+  }, [document?.id, document?.fileData, isPreviewable]);
+
+  // Timeout fallback: if loading doesn't clear after 10 seconds, show error
+  useEffect(() => {
+    if (!loading || !isPreviewable) return;
+    
+    const timeout = setTimeout(() => {
+      if (loading) {
+        setLoading(false);
+        // Don't set error - just let the content show (it may have loaded but onLoad didn't fire)
+      }
+    }, 10000);
+    
+    return () => clearTimeout(timeout);
+  }, [loading, isPreviewable, document?.id]);
 
   if (!document) return null;
 
@@ -405,22 +453,19 @@ function DocumentPreviewModal({ document, isOpen, onClose, onDownload }: Documen
                 Download to View
               </Button>
             </div>
-          ) : (
-            <object
-              data={document.fileData}
-              type="application/pdf"
-              className="w-full h-full min-h-[500px] rounded-lg"
+          ) : blobUrl ? (
+            <iframe
+              src={blobUrl}
+              className="w-full h-full min-h-[500px] rounded-lg border-0"
+              title={document.name || document.fileName}
               onLoad={handleLoad}
               onError={handleError}
-            >
-              <iframe
-                src={document.fileData}
-                className="w-full h-full min-h-[500px] rounded-lg"
-                title={document.name || document.fileName}
-                onLoad={handleLoad}
-                onError={handleError}
-              />
-            </object>
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px] bg-muted rounded-lg p-8 text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
+              <p className="text-sm text-muted-foreground">Preparing document...</p>
+            </div>
           )}
         </div>
       );
@@ -447,14 +492,19 @@ function DocumentPreviewModal({ document, isOpen, onClose, onDownload }: Documen
                 Download to View
               </Button>
             </div>
-          ) : (
+          ) : blobUrl ? (
             <img
-              src={document.fileData}
+              src={blobUrl}
               alt={document.name || document.fileName}
               className="max-w-full max-h-[60vh] object-contain rounded"
               onLoad={handleLoad}
               onError={handleError}
             />
+          ) : (
+            <div className="flex flex-col items-center justify-center p-8 text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
+              <p className="text-sm text-muted-foreground">Preparing image...</p>
+            </div>
           )}
         </div>
       );
