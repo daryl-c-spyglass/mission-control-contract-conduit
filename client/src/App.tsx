@@ -16,7 +16,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Building2, LogOut, Loader2 } from "lucide-react";
 import Dashboard from "@/pages/dashboard";
 import Archive from "@/pages/archive";
-import GraphicsSettings from "@/pages/graphics-settings";
 import Settings from "@/pages/settings";
 import Admin from "@/pages/admin";
 import SharedCMAPage from "@/pages/shared-cma";
@@ -195,7 +194,6 @@ function AuthenticatedApp() {
                   />
                 </Route>
                 <Route path="/archive" component={Archive} />
-                <Route path="/graphics" component={GraphicsSettings} />
                 <Route path="/settings" component={Settings} />
                 <Route path="/admin" component={Admin} />
                 <Route path="/cmas" component={CMAs} />

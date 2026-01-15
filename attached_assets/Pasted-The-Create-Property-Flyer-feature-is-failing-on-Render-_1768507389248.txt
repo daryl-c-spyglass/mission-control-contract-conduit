@@ -1,0 +1,117 @@
+The "Create Property Flyer" feature is failing on Render with error: "Preview failed - Could not render preview. Please try again."
+
+This is the flyer generator that uses Puppeteer + Handlebars.
+
+---
+
+## DEBUG STEPS
+
+1. Check the server logs on Render for the actual error:
+   - What error is being thrown when "Render Preview" is clicked?
+   - Is it a Puppeteer/Chromium issue?
+   - Is it a memory/timeout issue?
+
+2. Find the flyer generation code:
+```bash
+grep -r "renderPreview\|createFlyer\|puppeteer" --include="*.ts" --include="*.tsx"
+grep -r "Preview failed" --include="*.ts" --include="*.tsx"
+```
+
+3. Common Puppeteer issues on Render:
+
+   A. Missing Chromium dependencies - Render needs buildpacks:
+render.yaml or Build settings
+Add Puppeteer buildpack or install dependencies
+
+   B. Puppeteer launch args for server environment:
+```typescript
+   const browser = await puppeteer.launch({
+     headless: 'new',
+     args: [
+       '--no-sandbox',
+       '--disable-setuid-sandbox',
+       '--disable-dev-shm-usage',
+       '--disable-gpu',
+       '--single-process',
+       '--no-zygote'
+     ]
+   });
+```
+
+   C. Memory limits - flyer generation may need more RAM
+
+4. Add detailed error logging:
+```typescript
+async function renderFlyerPreview(data) {
+  console.log('========== FLYER PREVIEW DEBUG ==========');
+  console.log('Starting flyer preview generation...');
+  console.log('Data received:', JSON.stringify(data, null, 2));
+  
+  try {
+    console.log('Launching Puppeteer...');
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    });
+    console.log('Browser launched successfully');
+    
+    const page = await browser.newPage();
+    console.log('Page created');
+    
+    // ... rest of generation
+    
+    console.log('Flyer generated successfully');
+    return result;
+    
+  } catch (error) {
+    console.error('========== FLYER ERROR ==========');
+    console.error('Error type:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    throw error;
+  }
+}
+```
+
+5. Check if this works locally in Replit but fails only on Render
+   - If works locally: Render environment issue
+   - If fails both: Code issue
+
+---
+
+## POSSIBLE FIXES
+
+1. Puppeteer Render Configuration:
+```typescript
+const puppeteerConfig = {
+  headless: 'new',
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox', 
+    '--disable-dev-shm-usage',
+    '--disable-accelerated-2d-canvas',
+    '--no-first-run',
+    '--no-zygote',
+    '--single-process',
+    '--disable-gpu'
+  ]
+};
+```
+
+2. Add Puppeteer buildpack to Render:
+   - Go to Render Dashboard > Your Service > Settings
+   - Add environment variable: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+   - Use @sparticuz/chromium for serverless environments
+
+3. Increase timeout:
+```typescript
+await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
+```
+
+---
+
+Show me:
+1. The current Puppeteer configuration
+2. The error from Render logs
+3. Whether it works in Replit dev environment
