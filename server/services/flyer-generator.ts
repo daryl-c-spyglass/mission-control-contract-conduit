@@ -86,28 +86,55 @@ async function imageToBase64(imageUrl: string): Promise<string> {
 }
 
 function findChromiumPath(): string {
-  // Try environment variable first
-  if (process.env.CHROMIUM_PATH && fs.existsSync(process.env.CHROMIUM_PATH)) {
-    return process.env.CHROMIUM_PATH;
+  console.log('[FlyerGenerator] Searching for Chromium...');
+  
+  // Try environment variable first (set on Render: CHROMIUM_PATH=/usr/bin/chromium)
+  if (process.env.CHROMIUM_PATH) {
+    console.log('[FlyerGenerator] CHROMIUM_PATH env var:', process.env.CHROMIUM_PATH);
+    if (fs.existsSync(process.env.CHROMIUM_PATH)) {
+      console.log('[FlyerGenerator] Found Chromium at CHROMIUM_PATH');
+      return process.env.CHROMIUM_PATH;
+    } else {
+      console.log('[FlyerGenerator] CHROMIUM_PATH does not exist on filesystem');
+    }
+  }
+  
+  // Common paths to check on various systems (Render, Ubuntu, Debian, etc.)
+  const commonPaths = [
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/snap/bin/chromium'
+  ];
+  
+  for (const p of commonPaths) {
+    if (fs.existsSync(p)) {
+      console.log('[FlyerGenerator] Found Chromium at:', p);
+      return p;
+    }
   }
   
   // Try to find chromium using which
   try {
-    const chromiumPath = execSync('which chromium 2>/dev/null || which chromium-browser 2>/dev/null', { encoding: 'utf-8' }).trim();
+    const chromiumPath = execSync('which chromium 2>/dev/null || which chromium-browser 2>/dev/null || which google-chrome 2>/dev/null', { encoding: 'utf-8' }).trim();
     if (chromiumPath && fs.existsSync(chromiumPath)) {
+      console.log('[FlyerGenerator] Found Chromium via which:', chromiumPath);
       return chromiumPath;
     }
   } catch (e) {
-    // Ignore error
+    console.log('[FlyerGenerator] which command failed');
   }
   
-  // Fallback to common Nix store path
+  // Fallback to common Nix store path (Replit)
   const nixPath = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
   if (fs.existsSync(nixPath)) {
+    console.log('[FlyerGenerator] Found Chromium at Nix path');
     return nixPath;
   }
   
-  // Let Puppeteer try to find its own
+  // Let Puppeteer try to find its own bundled browser
+  console.log('[FlyerGenerator] No Chromium found, will use Puppeteer default');
   return '';
 }
 
@@ -272,7 +299,17 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
       '--no-zygote',
       '--single-process',
       '--disable-extensions',
-      '--font-render-hinting=medium'
+      '--font-render-hinting=medium',
+      '--disable-accelerated-2d-canvas',
+      '--disable-software-rasterizer',
+      '--disable-background-networking',
+      '--disable-default-apps',
+      '--disable-sync',
+      '--disable-translate',
+      '--hide-scrollbars',
+      '--metrics-recording-only',
+      '--mute-audio',
+      '--safebrowsing-disable-auto-update'
     ]
   };
   
@@ -280,7 +317,24 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     launchOptions.executablePath = chromiumPath;
   }
   
-  const browser = await puppeteer.launch(launchOptions);
+  console.log('[FlyerGenerator] Launching Puppeteer with options:', JSON.stringify({
+    headless: launchOptions.headless,
+    executablePath: launchOptions.executablePath || 'default',
+    argsCount: launchOptions.args.length
+  }));
+  
+  let browser;
+  try {
+    browser = await puppeteer.launch(launchOptions);
+    console.log('[FlyerGenerator] Browser launched successfully');
+  } catch (launchError: any) {
+    console.error('[FlyerGenerator] ===== BROWSER LAUNCH ERROR =====');
+    console.error('[FlyerGenerator] Error:', launchError.message);
+    console.error('[FlyerGenerator] Stack:', launchError.stack);
+    console.error('[FlyerGenerator] CHROMIUM_PATH env:', process.env.CHROMIUM_PATH);
+    console.error('[FlyerGenerator] Attempted executablePath:', launchOptions.executablePath || 'default');
+    throw new Error(`Failed to launch browser: ${launchError.message}`);
+  }
   
   try {
     const page = await browser.newPage();
@@ -297,11 +351,13 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     // 2. Emulate 'print' media type for BOTH outputs to ensure identical CSS behavior
     await page.emulateMediaType(RENDER_CONFIG.mediaType);
     
-    // 3. Load HTML content
+    // 3. Load HTML content with generous timeout for slower environments
+    console.log('[FlyerGenerator] Loading HTML content...');
     await page.setContent(html, { 
       waitUntil: 'networkidle0',
-      timeout: 30000
+      timeout: 60000  // 60 seconds for Render's slower cold starts
     });
+    console.log('[FlyerGenerator] HTML content loaded');
     
     // 4. Wait for fonts to be fully loaded
     await page.evaluate(() => document.fonts && document.fonts.ready);
