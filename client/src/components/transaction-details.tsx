@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { MapboxPropertyMap } from "./mapbox-property-map";
 import { CMAAnalytics } from "./cma-analytics";
 import { calculateStatistics } from "./cma-tab";
@@ -61,6 +62,9 @@ import {
   Video,
   Info,
   RotateCcw,
+  Plus,
+  Minus,
+  ZoomIn,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -833,12 +837,20 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         }}
       />
 
-      {/* Asset Preview Modal */}
+      {/* Asset Preview Modal with Zoom */}
       <Dialog open={Boolean(previewAsset)} onOpenChange={(open) => !open && setPreviewAsset(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent 
+          className="w-[98vw] max-w-[98vw] h-[95vh] max-h-[95vh] p-0 bg-black/95 border-none flex flex-col [&>button]:bg-white/10 [&>button]:text-white [&>button]:hover:bg-white/20 [&>button]:active:bg-white/30 [&>button]:rounded-full [&>button]:opacity-100 [&>button]:p-1.5 sm:[&>button]:p-2 [&>button]:hover:opacity-100"
+          onKeyDown={(e) => {
+            // Keyboard shortcuts for zoom
+            if (e.key === 'Escape') {
+              setPreviewAsset(null);
+            }
+          }}
+        >
           <VisuallyHidden>
             <DialogTitle>Asset Preview</DialogTitle>
-            <DialogDescription>Preview marketing asset</DialogDescription>
+            <DialogDescription>Preview marketing asset with zoom controls</DialogDescription>
           </VisuallyHidden>
           {previewAsset && (() => {
             const metadata = previewAsset.metadata as { format?: string; status?: string; config?: FlyerAssetConfig | SocialGraphicConfig } | null;
@@ -848,77 +860,158 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                               isSocialFlyer ? 'Social 1:1' :
                               previewAsset.type === "facebook" ? "Facebook 16:9" : 
                               previewAsset.type === "instagram" ? "Instagram 1:1" :
+                              previewAsset.type === "story" ? "Story 9:16" :
                               previewAsset.type === "alt_style" ? "Alt Style" : previewAsset.type;
             const createdDate = previewAsset.createdAt ? new Date(previewAsset.createdAt).toLocaleDateString('en-US', { 
-              month: 'long', 
-              day: 'numeric',
-              year: 'numeric'
+              month: 'short', 
+              day: 'numeric'
             }) : null;
             
             return (
-              <div className="space-y-4">
-                {/* Large Image Preview */}
-                <div className="flex justify-center bg-muted rounded-lg p-4">
-                  <img 
-                    src={previewAsset.imageData} 
-                    alt={previewAsset.fileName}
-                    className="max-h-[60vh] object-contain rounded-md"
-                    data-testid="img-asset-preview-large"
-                  />
-                </div>
-                
-                {/* Asset Info */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <Badge variant={isPrintFlyer ? "default" : "secondary"}>
-                      {typeLabel}
-                    </Badge>
-                    {createdDate && (
-                      <p className="text-sm text-muted-foreground">
-                        Created {createdDate}
-                      </p>
-                    )}
+              <TransformWrapper
+                initialScale={1}
+                minScale={0.5}
+                maxScale={4}
+                centerOnInit={true}
+                wheel={{ step: 0.1 }}
+                doubleClick={{ mode: "reset" }}
+              >
+                {({ zoomIn, zoomOut, resetTransform, instance }) => (
+                  <div className="flex flex-col h-full">
+                    {/* Zoom Controls Header */}
+                    <div className="flex items-center justify-between px-4 py-3 bg-black/50 backdrop-blur-sm">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setPreviewAsset(null)}
+                        className="text-white hover:bg-white/20"
+                        data-testid="button-preview-close"
+                      >
+                        <X className="h-5 w-5" />
+                      </Button>
+                      
+                      {/* Zoom Controls */}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => zoomOut()}
+                          className="text-white hover:bg-white/20"
+                          data-testid="button-zoom-out"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <span className="text-white text-sm min-w-[50px] text-center">
+                          {Math.round(instance.transformState.scale * 100)}%
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => zoomIn()}
+                          className="text-white hover:bg-white/20"
+                          data-testid="button-zoom-in"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => resetTransform()}
+                          className="text-white hover:bg-white/20 ml-2"
+                          data-testid="button-zoom-reset"
+                        >
+                          <RotateCcw className="h-4 w-4 mr-1" />
+                          Reset
+                        </Button>
+                      </div>
+                      
+                      <div className="w-10" />
+                    </div>
+                    
+                    {/* Zoomable Image Area */}
+                    <div className="flex-1 overflow-hidden flex items-center justify-center">
+                      <TransformComponent
+                        wrapperStyle={{
+                          width: '100%',
+                          height: '100%',
+                        }}
+                        contentStyle={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <img 
+                          src={previewAsset.imageData} 
+                          alt={previewAsset.fileName}
+                          className="max-w-full max-h-full object-contain"
+                          style={{ maxHeight: 'calc(95vh - 140px)' }}
+                          data-testid="img-asset-preview-large"
+                        />
+                      </TransformComponent>
+                    </div>
+                    
+                    {/* Footer with Asset Info and Actions */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 py-3 bg-black/50 backdrop-blur-sm">
+                      <div className="flex items-center gap-3">
+                        <Badge 
+                          className={isPrintFlyer ? "bg-orange-500 text-white" : "bg-white/20 text-white"}
+                        >
+                          {typeLabel}
+                        </Badge>
+                        {createdDate && (
+                          <span className="text-sm text-white/70">{createdDate}</span>
+                        )}
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            handleEditAsset(previewAsset);
+                            setPreviewAsset(null);
+                          }}
+                          className="text-white hover:bg-white/20"
+                          data-testid="button-preview-edit"
+                        >
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
+                        <Button 
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            downloadAsset(previewAsset);
+                          }}
+                          className="text-white hover:bg-white/20"
+                          data-testid="button-preview-download"
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Download
+                        </Button>
+                        <Button 
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            deleteAssetMutation.mutate(previewAsset.id);
+                            setPreviewAsset(null);
+                          }}
+                          disabled={deleteAssetMutation.isPending}
+                          className="text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                          data-testid="button-preview-delete"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 flex-wrap">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => {
-                        handleEditAsset(previewAsset);
-                        setPreviewAsset(null);
-                      }}
-                      data-testid="button-preview-edit"
-                    >
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => {
-                        downloadAsset(previewAsset);
-                        setPreviewAsset(null);
-                      }}
-                      data-testid="button-preview-download"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download
-                    </Button>
-                    <Button 
-                      variant="destructive" 
-                      onClick={() => {
-                        deleteAssetMutation.mutate(previewAsset.id);
-                        setPreviewAsset(null);
-                      }}
-                      disabled={deleteAssetMutation.isPending}
-                      data-testid="button-preview-delete"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              </div>
+                )}
+              </TransformWrapper>
             );
           })()}
         </DialogContent>

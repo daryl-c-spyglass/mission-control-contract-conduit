@@ -1,0 +1,169 @@
+dd Zoom/Lightbox Feature to Marketing Assets
+
+Task: Add Zoom In/Out Feature for Marketing Assets
+In the Marketing tab → My Assets section, add a lightbox/zoom feature so agents can click on any asset to view it larger with zoom controls.
+Requirements
+
+Click to Open Lightbox
+When an agent clicks on an asset thumbnail in "My Assets", open a fullscreen/modal lightbox view.
+Lightbox Features:
+
+Zoom In button (+) - increase zoom level
+Zoom Out button (-) - decrease zoom level
+Reset Zoom button - return to fit-to-screen
+Mouse wheel zoom - scroll to zoom in/out
+Pan/drag - when zoomed in, drag to move around the image
+Close button (X) - close lightbox and return to gallery
+Keyboard support:
+
++ or = to zoom in
+- to zoom out
+Escape to close
+Arrow keys to pan when zoomed
+
+
+
+
+UI Design
+
+┌─────────────────────────────────────────────────────────────┐
+│ ✕                                           − 100% +  Reset │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│                                                             │
+│                    ┌─────────────────┐                      │
+│                    │                 │                      │
+│                    │   [Asset Image] │                      │
+│                    │                 │                      │
+│                    └─────────────────┘                      │
+│                                                             │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│  Story 9:16  │  Jan 15  │  📥 Download                      │
+└─────────────────────────────────────────────────────────────┘
+
+Implementation Options
+Option A: Use a library (Recommended)
+
+bash   npm install react-zoom-pan-pinch
+tsx   import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+
+   const AssetLightbox = ({ asset, onClose }) => {
+     return (
+       <div className="lightbox-overlay">
+         <button className="close-btn" onClick={onClose}>✕</button>
+         
+         <TransformWrapper
+           initialScale={1}
+           minScale={0.5}
+           maxScale={4}
+         >
+           {({ zoomIn, zoomOut, resetTransform }) => (
+             <>
+               <div className="zoom-controls">
+                 <button onClick={() => zoomOut()}>−</button>
+                 <button onClick={() => resetTransform()}>Reset</button>
+                 <button onClick={() => zoomIn()}>+</button>
+               </div>
+               <TransformComponent>
+                 <img src={asset.url} alt={asset.name} />
+               </TransformComponent>
+             </>
+           )}
+         </TransformWrapper>
+         
+         <div className="asset-info">
+           <span className="asset-type">{asset.type}</span>
+           <span className="asset-date">{asset.date}</span>
+         </div>
+       </div>
+     );
+   };
+Option B: Custom implementation (No library)
+tsx   const [scale, setScale] = useState(1);
+   const [position, setPosition] = useState({ x: 0, y: 0 });
+   
+   const handleZoomIn = () => setScale(prev => Math.min(prev + 0.25, 4));
+   const handleZoomOut = () => setScale(prev => Math.max(prev - 0.25, 0.5));
+   const handleReset = () => { setScale(1); setPosition({ x: 0, y: 0 }); };
+
+Styling
+
+css   .lightbox-overlay {
+     position: fixed;
+     top: 0;
+     left: 0;
+     right: 0;
+     bottom: 0;
+     background: rgba(0, 0, 0, 0.9);
+     z-index: 1000;
+     display: flex;
+     flex-direction: column;
+   }
+
+   .zoom-controls {
+     position: absolute;
+     top: 16px;
+     right: 60px;
+     display: flex;
+     gap: 8px;
+     z-index: 1001;
+   }
+
+   .zoom-controls button {
+     background: rgba(255, 255, 255, 0.2);
+     border: none;
+     color: white;
+     padding: 8px 16px;
+     border-radius: 4px;
+     cursor: pointer;
+   }
+
+   .zoom-controls button:hover {
+     background: rgba(255, 255, 255, 0.3);
+   }
+
+   .close-btn {
+     position: absolute;
+     top: 16px;
+     left: 16px;
+     background: transparent;
+     border: none;
+     color: white;
+     font-size: 24px;
+     cursor: pointer;
+   }
+
+Add click handler to asset cards
+
+tsx   // In the My Assets grid
+   <div 
+     className="asset-card"
+     onClick={() => setSelectedAsset(asset)}
+     style={{ cursor: 'pointer' }}
+   >
+     <img src={asset.thumbnail} alt={asset.name} />
+     {/* existing asset info */}
+   </div>
+
+   {/* Render lightbox when asset is selected */}
+   {selectedAsset && (
+     <AssetLightbox 
+       asset={selectedAsset} 
+       onClose={() => setSelectedAsset(null)} 
+     />
+   )}
+Acceptance Criteria
+
+ Clicking an asset thumbnail opens fullscreen lightbox
+ Zoom in button increases image size
+ Zoom out button decreases image size
+ Reset button returns to default view
+ Mouse wheel zooms in/out
+ Can drag/pan image when zoomed in
+ Press Escape or click X to close
+ Works for both Story (9:16) and Print Flyer assets
+ Dark overlay background for better viewing
+ Asset type badge and date visible in lightbox
+ Download button accessible from lightbox view
+ Works on both desktop and mobile (touch pinch-to-zoom)
