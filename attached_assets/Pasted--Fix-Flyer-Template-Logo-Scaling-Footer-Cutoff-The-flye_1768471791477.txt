@@ -1,0 +1,601 @@
+# Fix Flyer Template - Logo Scaling & Footer Cutoff
+
+The flyer still has two critical issues:
+1. Logo is zoomed in/cropped incorrectly
+2. Footer section is still getting cut off (QR code, agent name, phone number not visible)
+
+Plus minor issues:
+3. Agent photo showing placeholder instead of actual photo
+4. Redundant "JUST LISTED" badge (already have "LISTED AT" in price tag)
+
+---
+
+## Issue 1: Logo Zoomed In / Cropped
+
+The Spyglass logo in the upper left is appearing zoomed in, showing only a portion of the logo instead of the full image.
+
+**Likely Causes:**
+- `object-fit: cover` on the logo image causing crop
+- Container too small for the logo
+- Logo image URL pointing to a cropped version
+
+**Fix - Update Logo CSS:**
+
+```css
+/* Before (causing zoom/crop) */
+.logo-image {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;  /* This crops the image */
+}
+
+/* After (show full logo) */
+.logo-image {
+    width: auto;
+    height: 60px;
+    max-width: 80px;
+    object-fit: contain;  /* This preserves aspect ratio */
+}
+```
+
+**Or if using the SVG logo from Caleb's template:**
+
+```handlebars
+<div class="logo-container">
+    {{#if logoUrl}}
+    <img src="{{logoUrl}}" alt="Spyglass Realty" class="logo-image" />
+    {{else}}
+    <!-- Use SVG fallback - Caleb's original -->
+    <svg width="60" height="60" viewBox="0 0 60 60" class="logo-svg">
+        <circle cx="30" cy="30" r="28" fill="none" stroke="#2c2c2c" stroke-width="2"/>
+        <circle cx="30" cy="30" r="22" fill="none" stroke="#2c2c2c" stroke-width="2"/>
+        <path d="M 15 35 Q 30 25, 45 35" fill="none" stroke="#2c2c2c" stroke-width="2"/>
+        <path d="M 15 25 Q 30 35, 45 25" fill="none" stroke="#2c2c2c" stroke-width="2"/>
+    </svg>
+    {{/if}}
+    <div>
+        <div class="logo-text">SPYGLASS</div>
+        <div class="logo-subtext">REALTY</div>
+    </div>
+</div>
+```
+
+**CSS for logo container:**
+
+```css
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.logo-image {
+    height: 60px;
+    width: auto;
+    object-fit: contain;  /* KEY: contain, not cover */
+}
+
+.logo-svg {
+    width: 60px;
+    height: 60px;
+    flex-shrink: 0;
+}
+
+.logo-text {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #2c2c2c;
+}
+
+.logo-subtext {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    color: #2c2c2c;
+}
+```
+
+---
+
+## Issue 2: Footer Still Cut Off
+
+The footer is still being clipped. The page height calculation or screenshot is not capturing the full 11 inches.
+
+**Root Cause Analysis:**
+
+At 300 DPI:
+- 8.5 inches × 300 = 2550px width
+- 11 inches × 300 = 3300px height
+
+**Fix 1: Verify Puppeteer Viewport**
+
+```typescript
+// Make sure viewport is set BEFORE setting content
+await page.setViewport({
+    width: 2550,
+    height: 3300,
+    deviceScaleFactor: 1
+});
+
+// Then set content
+await page.setContent(html, { waitUntil: 'networkidle0' });
+```
+
+**Fix 2: Update CSS Page Dimensions**
+
+The template CSS must use pixel values, not inches (Puppeteer renders pixels):
+
+```css
+/* WRONG - inches don't work reliably in Puppeteer */
+.page {
+    width: 8.5in;
+    height: 11in;
+}
+
+/* RIGHT - use pixels at 300dpi */
+.page {
+    width: 2550px;
+    height: 3300px;
+    margin: 0;
+    padding: 0;
+    position: relative;
+    background: white;
+    overflow: hidden;
+}
+
+/* Also ensure body has no margin */
+body {
+    margin: 0;
+    padding: 0;
+}
+```
+
+**Fix 3: Use Clip Instead of fullPage**
+
+```typescript
+// Instead of fullPage which can be unreliable:
+const pngBuffer = await page.screenshot({
+    type: 'png',
+    clip: {
+        x: 0,
+        y: 0,
+        width: 2550,
+        height: 3300
+    }
+});
+```
+
+**Fix 4: Scale Internal Elements Proportionally**
+
+If the page is 2550×3300px, all the internal measurements from Caleb's template (which was 8.5in × 11in for screen) need to be scaled by 3× for 300dpi:
+
+| Element | Caleb's Original | At 300 DPI |
+|---------|------------------|------------|
+| Top bar padding | 20px 40px | 60px 120px |
+| Logo size | 60px | 180px |
+| Main image height | 380px | 1140px |
+| Secondary image height | 300px | 900px |
+| Footer padding | 40px | 120px |
+| Font sizes | 14-28px | 42-84px |
+
+**Complete Scaled CSS:**
+
+```css
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Montserrat', 'Arial', sans-serif;
+    background: white;
+    margin: 0;
+    padding: 0;
+}
+
+.page {
+    width: 2550px;
+    height: 3300px;
+    position: relative;
+    background: white;
+    overflow: hidden;
+}
+
+.top-bar {
+    background: white;
+    padding: 60px 120px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 3px solid #ddd;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 45px;
+}
+
+.logo-image,
+.logo-svg {
+    width: 180px;
+    height: 180px;
+    object-fit: contain;
+}
+
+.logo-text {
+    font-size: 84px;
+    font-weight: 800;
+    letter-spacing: 6px;
+    color: #2c2c2c;
+}
+
+.logo-subtext {
+    font-size: 48px;
+    font-weight: 600;
+    letter-spacing: 9px;
+    color: #2c2c2c;
+}
+
+.price-tag {
+    background: #8B7355;
+    color: white;
+    padding: 45px 90px;
+    clip-path: polygon(10% 0%, 100% 0%, 100% 100%, 0% 100%);
+    text-align: right;
+}
+
+.price-tag-label {
+    font-size: 30px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+}
+
+.price-tag-amount {
+    font-size: 60px;
+    font-weight: 700;
+}
+
+.address-bar {
+    padding: 45px 120px;
+    font-size: 54px;
+    font-weight: 600;
+    letter-spacing: 9px;
+    color: #2c2c2c;
+    text-transform: uppercase;
+    border-bottom: 3px solid #ddd;
+}
+
+.main-image-container {
+    width: calc(100% - 240px);
+    margin: 60px 120px;
+    height: 1140px;
+    border-radius: 9px;
+    overflow: hidden;
+    position: relative;
+}
+
+.main-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* REMOVE the status badge overlay - it's redundant */
+.status-badge {
+    display: none;  /* Remove this entirely */
+}
+
+.bottom-images {
+    display: flex;
+    gap: 30px;
+    padding: 0 120px;
+    margin-bottom: 60px;
+}
+
+.secondary-image-container {
+    flex: 1;
+    height: 750px;
+    border-radius: 9px;
+    overflow: hidden;
+}
+
+.secondary-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.footer-section {
+    display: flex;
+    padding: 30px 120px 60px;
+    gap: 60px;
+    align-items: flex-start;
+    height: auto;
+    min-height: 450px;
+}
+
+.property-details {
+    flex: 0 0 450px;
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    gap: 36px;
+    margin-bottom: 45px;
+}
+
+.detail-item:last-child {
+    margin-bottom: 0;
+}
+
+.icon {
+    width: 90px;
+    height: 90px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.detail-text {
+    font-size: 48px;
+    font-weight: 700;
+    color: #2c2c2c;
+}
+
+.footer-description {
+    flex: 1;
+    padding-top: 0;
+}
+
+.footer-open-house {
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    color: #2c2c2c;
+}
+
+.footer-open-house-date {
+    font-size: 42px;
+    font-weight: 600;
+    margin-bottom: 36px;
+    color: #2c2c2c;
+}
+
+.footer-headline {
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    color: #2c2c2c;
+}
+
+.footer-text {
+    font-size: 36px;
+    line-height: 1.6;
+    color: #444;
+}
+
+.footer-agent {
+    flex: 0 0 420px;
+    text-align: center;
+}
+
+.agent-photo {
+    width: 270px;
+    height: 270px;
+    border-radius: 50%;
+    margin: 0 auto 30px;
+    border: 9px solid white;
+    box-shadow: 0 6px 30px rgba(0,0,0,0.1);
+    overflow: hidden;
+    background: #ddd;
+}
+
+.agent-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.qr-code {
+    width: 180px;
+    height: 180px;
+    margin: 0 auto 30px;
+    border: 6px solid #2c2c2c;
+    background: white;
+}
+
+.qr-code img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.footer-agent-name {
+    font-size: 51px;
+    font-weight: 700;
+    color: #2c2c2c;
+    margin-bottom: 12px;
+}
+
+.footer-agent-title {
+    font-size: 30px;
+    font-weight: 600;
+    color: #666;
+    letter-spacing: 3px;
+    margin-bottom: 9px;
+}
+
+.footer-agent-phone {
+    font-size: 36px;
+    color: #2c2c2c;
+    font-weight: 600;
+}
+```
+
+---
+
+## Issue 3: Agent Photo Placeholder
+
+The agent photo is showing a gray placeholder. Ensure the agent photo URL is being passed correctly:
+
+```typescript
+// In the data preparation:
+const templateData = {
+    // ...other fields
+    agentPhoto: settings?.agentHeadshot || settings?.profilePhoto || null,
+};
+```
+
+```handlebars
+{{#if agentPhoto}}
+<div class="agent-photo">
+    <img src="{{agentPhoto}}" alt="{{agentName}}" />
+</div>
+{{else}}
+<div class="agent-photo">
+    <!-- Placeholder silhouette -->
+    <svg viewBox="0 0 100 100" fill="#999">
+        <circle cx="50" cy="35" r="20"/>
+        <path d="M 15 95 Q 15 60, 50 60 Q 85 60, 85 95 Z"/>
+    </svg>
+</div>
+{{/if}}
+```
+
+---
+
+## Issue 4: Remove Redundant "JUST LISTED" Badge
+
+The price tag already shows "LISTED AT" so the blue "JUST LISTED" badge on the hero image is redundant. Remove it:
+
+```handlebars
+<!-- REMOVE THIS entirely -->
+{{!-- 
+<div class="status-badge">{{status}}</div>
+--}}
+```
+
+Or if you want to keep the badge, remove the label from price tag and just show the price:
+
+```handlebars
+<div class="price-tag">
+    {{#if showPriceLabel}}
+    <div class="price-tag-label">{{priceLabel}}</div>
+    {{/if}}
+    <div class="price-tag-amount">{{price}}</div>
+</div>
+```
+
+---
+
+## Complete Puppeteer Generation Code
+
+```typescript
+app.post('/api/generate-flyer', async (req, res) => {
+  try {
+    const { /* ...all your fields */ } = req.body;
+    
+    // Load and compile template
+    const templatePath = path.join(__dirname, 'templates', 'flyer-template.hbs');
+    const templateSource = fs.readFileSync(templatePath, 'utf-8');
+    const template = Handlebars.compile(templateSource);
+    
+    // Prepare data
+    const templateData = {
+      // ... all your template data
+    };
+    
+    // Generate HTML
+    const html = template(templateData);
+    
+    // Launch browser
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    });
+    
+    const page = await browser.newPage();
+    
+    // SET VIEWPORT FIRST - 8.5x11 at 300dpi
+    await page.setViewport({
+      width: 2550,
+      height: 3300,
+      deviceScaleFactor: 1
+    });
+    
+    // Set content
+    await page.setContent(html, { 
+      waitUntil: 'networkidle0',
+      timeout: 30000 
+    });
+    
+    // Wait for images to load
+    await page.evaluate(async () => {
+      const images = document.querySelectorAll('img');
+      await Promise.all(
+        Array.from(images).map(img => {
+          if (img.complete) return Promise.resolve();
+          return new Promise(resolve => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+        })
+      );
+    });
+    
+    // Small delay for fonts
+    await new Promise(r => setTimeout(r, 500));
+    
+    // Screenshot with exact clip dimensions
+    const pngBuffer = await page.screenshot({
+      type: 'png',
+      clip: {
+        x: 0,
+        y: 0,
+        width: 2550,
+        height: 3300
+      }
+    });
+    
+    await browser.close();
+    
+    res.json({
+      success: true,
+      image: `data:image/png;base64,${pngBuffer.toString('base64')}`,
+      dimensions: { width: 2550, height: 3300, dpi: 300 }
+    });
+    
+  } catch (error) {
+    console.error('Flyer generation error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+```
+
+---
+
+## Testing Checklist
+
+- [ ] Logo displays full image (not cropped/zoomed)
+- [ ] Logo is properly sized (~180px at 300dpi)
+- [ ] Footer section fully visible
+- [ ] QR code visible
+- [ ] Agent name visible
+- [ ] Agent phone number visible
+- [ ] Agent photo loads (not placeholder)
+- [ ] No redundant status badge on hero image
+- [ ] Total image size is 2550×3300px
+- [ ] All text is readable and properly sized
