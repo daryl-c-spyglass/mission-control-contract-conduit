@@ -118,6 +118,36 @@ function truncateDescription(text: string, maxLength: number): string {
   return truncated.trim();
 }
 
+// Auto-format agent name: capitalize first letter of each word
+function formatAgentName(name: string): string {
+  if (!name) return name;
+  return name
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+// Auto-format phone number to US format: (XXX) XXX-XXXX
+function formatPhoneNumber(phone: string): string {
+  if (!phone) return phone;
+  
+  // Remove all non-digits
+  const digits = phone.replace(/\D/g, '');
+  
+  // Remove leading 1 if present (country code)
+  const cleaned = digits.startsWith('1') && digits.length === 11 
+    ? digits.slice(1) 
+    : digits;
+  
+  // Format as (XXX) XXX-XXXX
+  if (cleaned.length === 10) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  }
+  
+  return phone; // Return original if not 10 digits
+}
+
 interface PreviewProps {
   photoUrls: string[];
   status: string;
@@ -2203,6 +2233,13 @@ export function CreateFlyerDialog({
                                 className="h-8"
                                 data-testid="input-agent-name"
                                 {...field}
+                                onBlur={(e) => {
+                                  field.onBlur();
+                                  const formatted = formatAgentName(e.target.value);
+                                  if (formatted !== e.target.value) {
+                                    field.onChange(formatted);
+                                  }
+                                }}
                               />
                             </FormControl>
                             <FormMessage />
@@ -2242,6 +2279,13 @@ export function CreateFlyerDialog({
                               className="h-8"
                               data-testid="input-agent-phone"
                               {...field}
+                              onBlur={(e) => {
+                                field.onBlur();
+                                const formatted = formatPhoneNumber(e.target.value);
+                                if (formatted !== e.target.value) {
+                                  field.onChange(formatted);
+                                }
+                              }}
                             />
                           </FormControl>
                           <FormMessage />
