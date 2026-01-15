@@ -884,6 +884,9 @@ export function CreateFlyerDialog({
           agentTitle: data.agentTitle,
           agentPhone: data.agentPhone,
           agentPhoto: effectiveAgentPhoto,
+          openHouseDay: data.openHouseDay && data.openHouseDay !== 'none' ? data.openHouseDay.toUpperCase() : '',
+          openHouseDate: data.openHouseDate || '',
+          mlsNumber: transaction.mlsNumber || '',
           outputType: 'pngPreview'
         }),
       });
@@ -1377,6 +1380,9 @@ export function CreateFlyerDialog({
           agentTitle: data.agentTitle,
           agentPhone: data.agentPhone,
           agentPhoto: effectiveAgentPhoto,
+          openHouseDay: data.openHouseDay && data.openHouseDay !== 'none' ? data.openHouseDay.toUpperCase() : '',
+          openHouseDate: data.openHouseDate || '',
+          mlsNumber: transaction.mlsNumber || '',
           outputType: 'pngPreview' // PNG for print-ready download
         }),
       });

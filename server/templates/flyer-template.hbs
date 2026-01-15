@@ -311,7 +311,7 @@
             position: absolute;
             top: 420px;
             right: 150px;
-            background: {{statusColor}};
+            background: #8B7355;
             color: white;
             padding: 24px 60px;
             font-size: 36px;
@@ -321,6 +321,12 @@
             border-radius: 6px;
             box-shadow: 0 6px 20px rgba(0,0,0,0.3);
         }
+        
+        .status-badge.status-green { background: #2E7D32; }
+        .status-badge.status-blue { background: #1565C0; }
+        .status-badge.status-orange { background: #E65100; }
+        .status-badge.status-red { background: #C62828; }
+        .status-badge.status-purple { background: #6A1B9A; }
         
         @media print {
             .page {
@@ -332,7 +338,7 @@
 <body>
     <div class="page">
         {{#if statusBadge}}
-        <div class="status-badge">{{statusBadge}}</div>
+        <div class="status-badge {{statusColorClass}}">{{statusBadge}}</div>
         {{/if}}
         
         <!-- Top Bar -->
@@ -477,10 +483,16 @@
                 <div class="qr-code">
                     <img src="{{qrCodeUrl}}" alt="Scan for more info" />
                 </div>
+                {{else if listingUrl}}
+                <div class="qr-code">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={{listingUrl}}" alt="QR Code" />
+                </div>
                 {{/if}}
                 <div class="agent-name">{{agentName}}</div>
                 <div class="agent-title">{{agentTitle}}</div>
+                {{#if agentPhone}}
                 <div class="agent-phone">{{agentPhone}}</div>
+                {{/if}}
                 {{#if agentEmail}}
                 <div class="agent-email">{{agentEmail}}</div>
                 {{/if}}

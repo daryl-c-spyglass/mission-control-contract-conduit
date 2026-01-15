@@ -133,8 +133,9 @@ export interface FlyerData {
   agentEmail?: string;
   agentPhoto?: string;
   qrCodeUrl?: string;
+  listingUrl?: string;
   statusBadge?: string;
-  statusColor?: string;
+  statusColorClass?: string;
 }
 
 // 8.5x11 at 300 DPI

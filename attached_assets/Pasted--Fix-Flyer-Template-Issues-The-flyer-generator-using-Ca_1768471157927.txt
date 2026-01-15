@@ -1,0 +1,366 @@
+# Fix Flyer Template Issues
+
+The flyer generator using Caleb's template has several issues that need to be fixed:
+
+1. White box artifact appearing on hero image
+2. Missing QR code in agent section
+3. Missing agent phone number
+4. Footer section getting cut off
+5. Open House section replaced with tagline (should show both or be configurable)
+
+---
+
+## Issue 1: White Box Artifact on Hero Image
+
+There's a white rectangle appearing in the upper-right area of the hero image. This is likely caused by:
+- An empty/unstyled element in the template
+- A status badge placeholder that's rendering without content
+- An overlay element with white background
+
+**Fix:** Find and remove or properly hide the element causing this.
+
+```typescript
+// Check the template for any of these patterns and fix:
+
+// If there's a status badge that might be empty:
+{{#if status}}
+<div class="status-badge">{{status}}</div>
+{{/if}}
+
+// Make sure empty elements don't render:
+// WRONG - renders empty white box
+<div class="some-overlay"></div>
+
+// RIGHT - only render if needed
+{{#if showOverlay}}
+<div class="some-overlay">{{overlayContent}}</div>
+{{/if}}
+```
+
+Also check CSS for any elements with white backgrounds that shouldn't be there:
+
+```css
+/* Look for and remove/fix any rules like: */
+.some-element {
+  background: white;  /* This might be causing the white box */
+  /* ... */
+}
+```
+
+---
+
+## Issue 2: Missing QR Code
+
+Caleb's template includes a QR code section that's not rendering. Add it back:
+
+**In the Handlebars template, ensure this is in the agent section:**
+
+```handlebars
+<div class="footer-agent">
+    <!-- Agent Photo -->
+    {{#if agentPhoto}}
+    <div class="agent-photo">
+        <img src="{{agentPhoto}}" alt="{{agentName}}" />
+    </div>
+    {{/if}}
+    
+    <!-- QR Code - ADD THIS BACK -->
+    {{#if qrCodeUrl}}
+    <div class="qr-code">
+        <img src="{{qrCodeUrl}}" alt="Scan for more info" />
+    </div>
+    {{else}}
+    <!-- Generate QR code dynamically if URL not provided -->
+    <div class="qr-code">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{listingUrl}}" alt="QR Code" />
+    </div>
+    {{/if}}
+    
+    <div class="footer-agent-name">{{agentName}}</div>
+    <div class="footer-agent-title">{{agentTitle}}</div>
+    <div class="footer-agent-phone">{{agentPhone}}</div>
+</div>
+```
+
+**CSS for QR code (from Caleb's template):**
+
+```css
+.qr-code {
+    width: 100px;
+    height: 100px;
+    background: #ddd;
+    margin: 0 auto 15px;
+    border: 2px solid #2c2c2c;
+}
+
+.qr-code img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+```
+
+---
+
+## Issue 3: Missing Agent Phone Number
+
+The agent phone number is not displaying. Ensure the template includes it:
+
+**Template:**
+```handlebars
+<div class="footer-agent-name">{{agentName}}</div>
+<div class="footer-agent-title">{{agentTitle}}</div>
+<div class="footer-agent-phone">{{agentPhone}}</div>  <!-- Make sure this exists -->
+```
+
+**CSS:**
+```css
+.footer-agent-phone {
+    font-size: 14px;
+    color: #2c2c2c;
+    font-weight: 600;
+}
+```
+
+**Backend - Ensure phone is passed to template:**
+```typescript
+const templateData = {
+  // ... other fields
+  agentName: agentName || 'Agent Name',
+  agentTitle: agentTitle || 'REALTOR®',
+  agentPhone: agentPhone || '',  // Make sure this is included!
+};
+```
+
+---
+
+## Issue 4: Footer Getting Cut Off
+
+The footer section is being cut off at the bottom. This is a viewport/page height issue.
+
+**Fix 1: Ensure page dimensions are correct**
+
+```typescript
+// In the Puppeteer generation code:
+await page.setViewport({
+  width: 2550,   // 8.5in at 300dpi
+  height: 3300,  // 11in at 300dpi
+  deviceScaleFactor: 1
+});
+```
+
+**Fix 2: Check CSS page height**
+
+```css
+.page {
+    width: 2550px;   /* 8.5in at 300dpi */
+    height: 3300px;  /* 11in at 300dpi */
+    margin: 0 auto;
+    position: relative;
+    background: white;
+    overflow: hidden;  /* Prevent overflow */
+}
+```
+
+**Fix 3: Adjust footer padding if needed**
+
+The current template has:
+```css
+.footer-section {
+    padding: 0 40px 40px;  /* 40px bottom padding */
+}
+```
+
+At 300dpi scale, this should be:
+```css
+.footer-section {
+    display: flex;
+    padding: 0 120px 60px;  /* Scaled for 300dpi */
+    gap: 90px;
+    align-items: flex-start;
+}
+```
+
+**Fix 4: Ensure screenshot captures full page**
+
+```typescript
+const pngBuffer = await page.screenshot({
+  type: 'png',
+  fullPage: true,  // Capture entire page
+  clip: {          // Or use specific dimensions
+    x: 0,
+    y: 0,
+    width: 2550,
+    height: 3300
+  }
+});
+```
+
+---
+
+## Issue 5: Open House vs Tagline/Headline
+
+Caleb's template has "OPEN HOUSE SATURDAY" with date, but your output shows a tagline headline instead. Make this configurable:
+
+**Template with conditional Open House:**
+
+```handlebars
+<div class="footer-description">
+    {{#if openHouseDay}}
+    <!-- Show Open House info if provided -->
+    <div class="footer-open-house">OPEN HOUSE {{openHouseDay}}</div>
+    <div class="footer-open-house-date">{{openHouseDate}}</div>
+    {{else}}
+    <!-- Show headline/tagline if no Open House -->
+    <div class="footer-headline">{{headline}}</div>
+    {{/if}}
+    
+    <div class="footer-text">{{description}}</div>
+</div>
+```
+
+**CSS for headline (alternative to Open House):**
+
+```css
+.footer-headline {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 15px;
+    color: #2c2c2c;
+}
+```
+
+---
+
+## Complete Fixed Template
+
+Here's the corrected footer section of the template:
+
+```handlebars
+<div class="footer-section">
+    <!-- Property Details (Left) -->
+    <div class="property-details">
+        <div class="detail-item">
+            <div class="icon">
+                <svg width="40" height="40" viewBox="0 0 40 40">
+                    <rect x="5" y="15" width="30" height="18" fill="none" stroke="#2c2c2c" stroke-width="2" rx="2"/>
+                    <rect x="10" y="10" width="6" height="8" fill="none" stroke="#2c2c2c" stroke-width="2"/>
+                    <rect x="24" y="10" width="6" height="8" fill="none" stroke="#2c2c2c" stroke-width="2"/>
+                </svg>
+            </div>
+            <div class="detail-text">{{bedrooms}} bedrooms</div>
+        </div>
+        <div class="detail-item">
+            <div class="icon">
+                <svg width="40" height="40" viewBox="0 0 40 40">
+                    <path d="M 10 25 L 10 15 Q 10 10, 15 10 L 25 10 Q 30 10, 30 15 L 30 25" fill="none" stroke="#2c2c2c" stroke-width="2"/>
+                    <circle cx="13" cy="17" r="2" fill="#2c2c2c"/>
+                    <rect x="5" y="25" width="30" height="8" fill="none" stroke="#2c2c2c" stroke-width="2" rx="2"/>
+                </svg>
+            </div>
+            <div class="detail-text">{{bathrooms}} bathrooms</div>
+        </div>
+        <div class="detail-item">
+            <div class="icon">
+                <svg width="40" height="40" viewBox="0 0 40 40">
+                    <rect x="8" y="8" width="24" height="24" fill="none" stroke="#2c2c2c" stroke-width="2"/>
+                    <path d="M 8 8 L 32 32 M 32 8 L 8 32" stroke="#2c2c2c" stroke-width="1"/>
+                </svg>
+            </div>
+            <div class="detail-text">{{sqft}} sq. ft</div>
+        </div>
+    </div>
+    
+    <!-- Description (Middle) -->
+    <div class="footer-description">
+        {{#if openHouseDay}}
+        <div class="footer-open-house">OPEN HOUSE {{openHouseDay}}</div>
+        <div class="footer-open-house-date">{{openHouseDate}}</div>
+        {{else if headline}}
+        <div class="footer-headline">{{headline}}</div>
+        {{/if}}
+        <div class="footer-text">{{description}}</div>
+    </div>
+    
+    <!-- Agent Info (Right) -->
+    <div class="footer-agent">
+        {{#if agentPhoto}}
+        <div class="agent-photo">
+            <img src="{{agentPhoto}}" alt="{{agentName}}" />
+        </div>
+        {{/if}}
+        
+        {{#if qrCodeUrl}}
+        <div class="qr-code">
+            <img src="{{qrCodeUrl}}" alt="Scan for details" />
+        </div>
+        {{else if listingUrl}}
+        <div class="qr-code">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{listingUrl}}" alt="QR Code" />
+        </div>
+        {{/if}}
+        
+        <div class="footer-agent-name">{{agentName}}</div>
+        <div class="footer-agent-title">{{agentTitle}}</div>
+        {{#if agentPhone}}
+        <div class="footer-agent-phone">{{agentPhone}}</div>
+        {{/if}}
+    </div>
+</div>
+```
+
+---
+
+## Backend Data to Pass
+
+Make sure all these fields are passed to the template:
+
+```typescript
+const templateData = {
+  // Property
+  address: fullAddress,
+  price: formattedPrice,
+  priceLabel: getPriceLabel(status),
+  bedrooms: bedrooms,
+  bathrooms: bathrooms,
+  sqft: formattedSqft,
+  
+  // Images
+  mainImage: photos[0],
+  secondaryImage1: photos[1],
+  secondaryImage2: photos[2],
+  
+  // Description
+  headline: headline || tagline,  // "MOVE-IN READY IN NW AUSTIN"
+  description: truncatedDescription,
+  
+  // Open House (optional)
+  openHouseDay: openHouseDay,      // "SATURDAY"
+  openHouseDate: openHouseDate,    // "MAY 17TH, 11AM - 3PM"
+  
+  // Agent
+  agentName: agentName,
+  agentTitle: agentTitle || 'REALTOR®',
+  agentPhone: agentPhone,          // "(512) 555-1234"
+  agentPhoto: agentPhoto,
+  
+  // QR Code
+  qrCodeUrl: qrCodeUrl,
+  listingUrl: `https://spyglassrealty.com/listing/${mlsNumber}`,
+};
+```
+
+---
+
+## Testing Checklist
+
+- [ ] No white box artifact on hero image
+- [ ] QR code displays in agent section
+- [ ] Agent phone number displays below REALTOR® title
+- [ ] Footer section is not cut off
+- [ ] All three columns in footer are visible
+- [ ] Open House info shows when provided
+- [ ] Headline shows when no Open House
+- [ ] Full 8.5×11 (2550×3300px) output

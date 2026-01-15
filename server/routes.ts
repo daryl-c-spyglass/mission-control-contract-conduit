@@ -1861,7 +1861,10 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
         agentName,
         agentTitle,
         agentPhone,
-        agentPhoto
+        agentPhoto,
+        openHouseDay,
+        openHouseDate,
+        mlsNumber
       } = req.body;
       
       // Validate required fields
@@ -1880,13 +1883,23 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
       
       const statusLabels: Record<string, string> = {
         'just_listed': 'JUST LISTED',
-        'for_sale': 'LISTED AT',
+        'for_sale': '',
         'open_house': 'OPEN HOUSE',
         'price_improvement': 'PRICE REDUCED',
         'under_contract': 'UNDER CONTRACT',
         'just_sold': 'JUST SOLD',
         'for_lease': 'FOR LEASE',
-        'listed': 'LISTED AT'
+        'listed': ''
+      };
+      
+      const getStatusColorClass = (s: string): string => {
+        const sl = (s || '').toLowerCase();
+        if (sl.includes('sold')) return 'status-red';
+        if (sl.includes('contract') || sl.includes('pending')) return 'status-orange';
+        if (sl.includes('reduced')) return 'status-purple';
+        if (sl.includes('open')) return 'status-green';
+        if (sl === 'just_listed') return 'status-blue';
+        return '';
       };
       
       const getPriceLabel = (s: string) => {
@@ -1901,6 +1914,9 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
       const cleanPrice = String(price || '0').replace(/[$,]/g, '');
       const numericPrice = parseFloat(cleanPrice) || 0;
       
+      // Generate listing URL for QR code
+      const listingUrl = mlsNumber ? `https://spyglassrealty.com/listing/${mlsNumber}` : undefined;
+      
       const flyerData: FlyerData = {
         priceLabel: getPriceLabel(status),
         price: `$${numericPrice.toLocaleString()}`,
@@ -1913,11 +1929,15 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
         sqft: Number(sqft || 0).toLocaleString(),
         headline: headline?.toUpperCase() || '',
         description: description || '',
+        openHouseDay: openHouseDay || '',
+        openHouseDate: openHouseDate || '',
         agentName: agentName,
         agentTitle: agentTitle || 'REALTOR®',
         agentPhone: agentPhone,
         agentPhoto: agentPhoto,
-        statusBadge: statusLabels[status] || undefined
+        listingUrl: listingUrl,
+        statusBadge: statusLabels[status] || undefined,
+        statusColorClass: getStatusColorClass(status)
       };
       
       // Support both PNG preview and PDF download
@@ -1963,6 +1983,9 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
         agentTitle,
         agentPhone,
         agentPhoto,
+        openHouseDay,
+        openHouseDate,
+        mlsNumber,
         outputType = 'pngPreview'
       } = req.body;
       
@@ -1982,13 +2005,23 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
       
       const statusLabels: Record<string, string> = {
         'just_listed': 'JUST LISTED',
-        'for_sale': 'LISTED AT',
+        'for_sale': '',
         'open_house': 'OPEN HOUSE',
         'price_improvement': 'PRICE REDUCED',
         'under_contract': 'UNDER CONTRACT',
         'just_sold': 'JUST SOLD',
         'for_lease': 'FOR LEASE',
-        'listed': 'LISTED AT'
+        'listed': ''
+      };
+      
+      const getStatusColorClass = (s: string): string => {
+        const sl = (s || '').toLowerCase();
+        if (sl.includes('sold')) return 'status-red';
+        if (sl.includes('contract') || sl.includes('pending')) return 'status-orange';
+        if (sl.includes('reduced')) return 'status-purple';
+        if (sl.includes('open')) return 'status-green';
+        if (sl === 'just_listed') return 'status-blue';
+        return '';
       };
       
       const getPriceLabel = (s: string) => {
@@ -2002,6 +2035,9 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
       const cleanPrice = String(price || '0').replace(/[$,]/g, '');
       const numericPrice = parseFloat(cleanPrice) || 0;
       
+      // Generate listing URL for QR code
+      const listingUrl = mlsNumber ? `https://spyglassrealty.com/listing/${mlsNumber}` : undefined;
+      
       const flyerData: FlyerData = {
         priceLabel: getPriceLabel(status),
         price: `$${numericPrice.toLocaleString()}`,
@@ -2014,11 +2050,15 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
         sqft: Number(sqft || 0).toLocaleString(),
         headline: headline?.toUpperCase() || '',
         description: description || '',
+        openHouseDay: openHouseDay || '',
+        openHouseDate: openHouseDate || '',
         agentName: agentName,
         agentTitle: agentTitle || 'REALTOR®',
         agentPhone: agentPhone,
         agentPhoto: agentPhoto,
-        statusBadge: statusLabels[status] || undefined
+        listingUrl: listingUrl,
+        statusBadge: statusLabels[status] || undefined,
+        statusColorClass: getStatusColorClass(status)
       };
       
       const validOutputType: OutputType = outputType === 'pdf' ? 'pdf' : 'pngPreview';
