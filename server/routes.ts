@@ -1012,10 +1012,10 @@ export async function registerRoutes(
   });
 
   app.post("/api/transactions/:id/documents", isAuthenticated, async (req: any, res) => {
-    console.log('[DOC UPLOAD] ========== DOCUMENT UPLOAD DEBUG ==========');
-    console.log('[DOC UPLOAD] Route hit for transaction:', req.params.id);
-    console.log('[DOC UPLOAD] Content-Type:', req.get('Content-Type'));
-    console.log('[DOC UPLOAD] Body keys:', Object.keys(req.body || {}));
+    process.stderr.write(`\n[DOC UPLOAD] ========== DOCUMENT UPLOAD DEBUG ==========\n`);
+    process.stderr.write(`[DOC UPLOAD] Route hit for transaction: ${req.params.id}\n`);
+    process.stderr.write(`[DOC UPLOAD] Content-Type: ${req.get('Content-Type')}\n`);
+    process.stderr.write(`[DOC UPLOAD] Body keys: ${Object.keys(req.body || {}).join(', ')}\n`);
     
     try {
       const transaction = await storage.getTransaction(req.params.id);
@@ -1075,29 +1075,29 @@ export async function registerRoutes(
       const fileExt = fileName.split('.').pop()?.toLowerCase() || 'unknown';
 
       // Check notification settings and send Slack notification with file
-      console.log('[DOC UPLOAD] Starting Slack notification flow...');
-      console.log('[DOC UPLOAD] Transaction slackChannelId:', transaction.slackChannelId);
+      process.stderr.write(`[DOC UPLOAD] Starting Slack notification flow...\n`);
+      process.stderr.write(`[DOC UPLOAD] Transaction slackChannelId: ${transaction.slackChannelId}\n`);
       
       if (transaction.slackChannelId) {
         const userId = req.user?.claims?.sub;
         let shouldNotify = true; // Default to enabled
         
-        console.log('[DOC UPLOAD] User ID:', userId);
+        process.stderr.write(`[DOC UPLOAD] User ID: ${userId}\n`);
         
         if (userId) {
           try {
             const settings = await storage.getNotificationSettings(userId, transaction.id);
             shouldNotify = settings?.documentUploads ?? true;
-            console.log('[DOC UPLOAD] Notification settings:', settings);
-            console.log('[DOC UPLOAD] shouldNotify:', shouldNotify);
+            process.stderr.write(`[DOC UPLOAD] Notification settings: ${JSON.stringify(settings)}\n`);
+            process.stderr.write(`[DOC UPLOAD] shouldNotify: ${shouldNotify}\n`);
           } catch (e) {
-            console.log('[DOC UPLOAD] Error getting settings, defaulting to enabled:', e);
+            process.stderr.write(`[DOC UPLOAD] Error getting settings, defaulting to enabled: ${e}\n`);
             shouldNotify = true; // Default to enabled if can't get settings
           }
         }
         
         if (shouldNotify) {
-          console.log('[DOC UPLOAD] Preparing to send file to Slack...');
+          process.stderr.write(`[DOC UPLOAD] Preparing to send file to Slack...\n`);
           try {
             // Build the notification message to include with file upload
             const timestamp = new Date().toLocaleString('en-US', {
@@ -1126,10 +1126,10 @@ export async function registerRoutes(
             ].filter(Boolean).join('\n');
 
             // Upload the actual file to Slack with the notification as initial comment
-            console.log('[DOC UPLOAD] Calling uploadFileToChannel with:');
-            console.log('[DOC UPLOAD]   - channelId:', transaction.slackChannelId);
-            console.log('[DOC UPLOAD]   - fileName:', fileName);
-            console.log('[DOC UPLOAD]   - fileData length:', fileData?.length || 'undefined');
+            process.stderr.write(`[DOC UPLOAD] Calling uploadFileToChannel with:\n`);
+            process.stderr.write(`[DOC UPLOAD]   - channelId: ${transaction.slackChannelId}\n`);
+            process.stderr.write(`[DOC UPLOAD]   - fileName: ${fileName}\n`);
+            process.stderr.write(`[DOC UPLOAD]   - fileData length: ${fileData?.length || 'undefined'}\n`);
             
             const result = await uploadFileToChannel(
               transaction.slackChannelId,
@@ -1138,16 +1138,16 @@ export async function registerRoutes(
               docLabel,
               initialComment
             );
-            console.log('[DOC UPLOAD] uploadFileToChannel result:', result);
+            process.stderr.write(`[DOC UPLOAD] uploadFileToChannel result: ${JSON.stringify(result)}\n`);
           } catch (slackError) {
-            console.error("[DOC UPLOAD] Failed to send document to Slack:", slackError);
+            process.stderr.write(`[DOC UPLOAD] Failed to send document to Slack: ${slackError}\n`);
             // Don't fail the request if Slack notification fails
           }
         } else {
-          console.log('[DOC UPLOAD] shouldNotify is false, skipping Slack notification');
+          process.stderr.write(`[DOC UPLOAD] shouldNotify is false, skipping Slack notification\n`);
         }
       } else {
-        console.log('[DOC UPLOAD] No slackChannelId on transaction, skipping Slack notification');
+        process.stderr.write(`[DOC UPLOAD] No slackChannelId on transaction, skipping Slack notification\n`);
       }
 
       res.status(201).json(doc);
