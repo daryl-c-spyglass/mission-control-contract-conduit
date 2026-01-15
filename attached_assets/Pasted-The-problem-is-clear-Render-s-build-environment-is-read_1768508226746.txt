@@ -1,0 +1,97 @@
+The problem is clear: Render's build environment is read-only - you can't use apt-get directly in the build command.
+
+Project: CONTRACT CONDUIT (Replit)
+Prompt to paste into Contract Conduit Replit:
+The Render build is failing because apt-get doesn't work on Render's read-only file system.
+
+ERROR: "E: List directory /var/lib/apt/lists/partial is missing. - Acquire (30: Read-only file system)"
+
+We need to use a different approach for Puppeteer/Chromium on Render.
+
+---
+
+## SOLUTION: Use @sparticuz/chromium
+
+This package bundles Chromium for serverless/container environments where you can't install system packages.
+
+### Step 1: Install the package
+
+npm install @sparticuz/chromium puppeteer-core
+
+### Step 2: Update the flyer generator to use it
+```typescript
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
+
+async function launchBrowser() {
+  // Check if we're on Render/production
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER;
+  
+  if (isProduction) {
+    // Use @sparticuz/chromium on Render
+    console.log('[FlyerGenerator] Using @sparticuz/chromium for production');
+    
+    const browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+    });
+    
+    return browser;
+  } else {
+    // Use regular puppeteer locally (Replit/development)
+    console.log('[FlyerGenerator] Using local Puppeteer for development');
+    
+    const puppeteerFull = await import('puppeteer');
+    const browser = await puppeteerFull.default.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    return browser;
+  }
+}
+```
+
+### Step 3: Update package.json
+
+Make sure both packages are in dependencies:
+```json
+{
+  "dependencies": {
+    "puppeteer-core": "^21.0.0",
+    "@sparticuz/chromium": "^119.0.0",
+    "puppeteer": "^21.0.0"  // Keep for local dev
+  }
+}
+```
+
+### Step 4: Update Render Build Command
+
+Change the build command in Render Dashboard to just:
+npm install && npm run build
+
+Remove the apt-get part since we no longer need it.
+
+### Step 5: Add Environment Variable in Render
+
+Add to Render Dashboard > Environment:
+
+| Key | Value |
+|-----|-------|
+| RENDER | true |
+
+This helps detect we're on Render production.
+
+---
+
+## SUMMARY
+
+The fix:
+1. Install @sparticuz/chromium (bundles Chromium, no apt-get needed)
+2. Update flyer generator to use it in production
+3. Simplify Render build command to just `npm install && npm run build`
+4. Redeploy to Render
+
+This is the standard solution for Puppeteer on Render/Vercel/serverless environments.

@@ -221,18 +221,14 @@ When style changes, custom sources/layers are lost. Solution:
 ### Render Configuration
 
 #### Puppeteer/Chromium Setup
-The flyer generation features require Chromium. On Render, this is configured via:
+The flyer generation uses `@sparticuz/chromium` for production environments (Render) which bundles its own Chromium binary, eliminating the need for apt-get/system packages.
 
-1. **apt.txt** (in project root) - Lists required system dependencies:
-   - chromium, fonts-liberation, libatk-bridge2.0-0, libnss3, etc.
+**Build Command** (in Render dashboard):
+```
+npm install && npm run build
+```
 
-2. **Environment Variable**:
-   - `CHROMIUM_PATH=/usr/bin/chromium` (set in Render dashboard)
-
-3. **Build Command** (in Render dashboard):
-   ```
-   apt-get update && xargs apt-get install -y < apt.txt && npm install && npm run build
-   ```
+**No apt.txt or CHROMIUM_PATH required** - The `@sparticuz/chromium` package handles Chromium installation automatically.
 
 #### Required Environment Variables on Render
 - `DATABASE_URL` - PostgreSQL connection string
@@ -243,12 +239,11 @@ The flyer generation features require Chromium. On Render, this is configured vi
 - `MAPBOX_TOKEN` - Mapbox access token
 - `REPLIERS_API_KEY` - Repliers MLS API key
 - `FUB_API_KEY` - Follow Up Boss API key
-- `CHROMIUM_PATH=/usr/bin/chromium` - Path to Chromium binary
+- `RENDER=true` - (Optional) Helps detect production environment
 
 ### Puppeteer Configuration
-The `server/services/flyer-generator.ts` automatically detects Chromium:
-1. Checks `CHROMIUM_PATH` environment variable first
-2. Falls back to `which chromium` or `which chromium-browser`
-3. Falls back to Nix store path (for Replit)
+The `server/services/flyer-generator.ts` uses environment-aware browser launching:
+- **Production (Render)**: Uses `@sparticuz/chromium` + `puppeteer-core` (bundled Chromium)
+- **Development (Replit)**: Uses local `puppeteer` with system Chromium from Nix
 
-Launch options include `--no-sandbox` and `--disable-setuid-sandbox` for containerized environments.
+Environment detection: `process.env.NODE_ENV === 'production' || process.env.RENDER`

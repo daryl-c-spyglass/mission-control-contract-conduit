@@ -1,9 +1,98 @@
-import puppeteer from 'puppeteer';
+import puppeteerCore from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 import fs from 'fs';
 import path from 'path';
 import Handlebars from 'handlebars';
 import { execSync } from 'child_process';
 import crypto from 'crypto';
+
+// 8.5x11 at 300 DPI - moved to top for use in launchBrowser
+const FLYER_WIDTH = 2550;
+const FLYER_HEIGHT = 3300;
+
+// Detect if we're in production (Render) or development (Replit)
+const isProduction = process.env.NODE_ENV === 'production' || !!process.env.RENDER;
+
+// Launch browser with appropriate configuration for environment
+async function launchBrowser(): Promise<any> {
+  if (isProduction) {
+    // Use @sparticuz/chromium on Render (bundles its own Chromium)
+    console.log('[FlyerGenerator] Using @sparticuz/chromium for production');
+    console.log('[FlyerGenerator] NODE_ENV:', process.env.NODE_ENV);
+    console.log('[FlyerGenerator] RENDER:', process.env.RENDER);
+    
+    try {
+      const execPath = await chromium.executablePath();
+      console.log('[FlyerGenerator] Chromium executable path:', execPath);
+      
+      const browser = await puppeteerCore.launch({
+        args: chromium.args,
+        defaultViewport: { width: FLYER_WIDTH, height: FLYER_HEIGHT },
+        executablePath: execPath,
+        headless: true,
+      });
+      
+      console.log('[FlyerGenerator] @sparticuz/chromium browser launched successfully');
+      return browser;
+    } catch (err: any) {
+      console.error('[FlyerGenerator] @sparticuz/chromium launch failed:', err.message);
+      console.error('[FlyerGenerator] Stack:', err.stack);
+      throw err;
+    }
+  } else {
+    // Development mode - use local Puppeteer with system Chromium
+    console.log('[FlyerGenerator] Using local Puppeteer for development');
+    
+    const chromiumPath = findChromiumPath();
+    console.log('[FlyerGenerator] Using Chromium at:', chromiumPath || 'Puppeteer bundled');
+    
+    const launchOptions: any = {
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-extensions',
+        '--font-render-hinting=medium',
+        '--disable-accelerated-2d-canvas',
+        '--disable-software-rasterizer',
+        '--disable-background-networking',
+        '--disable-default-apps',
+        '--disable-sync',
+        '--disable-translate',
+        '--hide-scrollbars',
+        '--metrics-recording-only',
+        '--mute-audio',
+        '--safebrowsing-disable-auto-update'
+      ]
+    };
+    
+    if (chromiumPath) {
+      launchOptions.executablePath = chromiumPath;
+    }
+    
+    // Try puppeteer-core first with explicit path, fallback to dynamic import of full puppeteer
+    try {
+      if (chromiumPath) {
+        const browser = await puppeteerCore.launch(launchOptions);
+        console.log('[FlyerGenerator] Browser launched with puppeteer-core');
+        return browser;
+      }
+    } catch (err) {
+      console.log('[FlyerGenerator] puppeteer-core failed, trying full puppeteer...');
+    }
+    
+    // Fallback to full puppeteer package (has bundled Chromium)
+    const puppeteerFull = await import('puppeteer');
+    const browser = await puppeteerFull.default.launch(launchOptions);
+    console.log('[FlyerGenerator] Browser launched with full puppeteer');
+    return browser;
+  }
+}
 
 // Helper function to convert image URL to base64
 async function imageToBase64(imageUrl: string): Promise<string> {
@@ -165,10 +254,6 @@ export interface FlyerData {
   statusColorClass?: string;
 }
 
-// 8.5x11 at 300 DPI
-const FLYER_WIDTH = 2550;
-const FLYER_HEIGHT = 3300;
-
 // Template version for cache invalidation
 const TEMPLATE_VERSION = 'v3.0.0';
 
@@ -284,55 +369,17 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
   const template = Handlebars.compile(templateHtml);
   const html = template(dataWithBase64);
   
-  // Find system-installed Chromium
-  const chromiumPath = findChromiumPath();
-  console.log('[FlyerGenerator] Using Chromium at:', chromiumPath || 'Puppeteer default');
-  
-  const launchOptions: any = {
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--no-first-run',
-      '--no-zygote',
-      '--single-process',
-      '--disable-extensions',
-      '--font-render-hinting=medium',
-      '--disable-accelerated-2d-canvas',
-      '--disable-software-rasterizer',
-      '--disable-background-networking',
-      '--disable-default-apps',
-      '--disable-sync',
-      '--disable-translate',
-      '--hide-scrollbars',
-      '--metrics-recording-only',
-      '--mute-audio',
-      '--safebrowsing-disable-auto-update'
-    ]
-  };
-  
-  if (chromiumPath) {
-    launchOptions.executablePath = chromiumPath;
-  }
-  
-  console.log('[FlyerGenerator] Launching Puppeteer with options:', JSON.stringify({
-    headless: launchOptions.headless,
-    executablePath: launchOptions.executablePath || 'default',
-    argsCount: launchOptions.args.length
-  }));
-  
+  // Launch browser using environment-aware function
+  console.log('[FlyerGenerator] Launching browser...');
   let browser;
   try {
-    browser = await puppeteer.launch(launchOptions);
+    browser = await launchBrowser();
     console.log('[FlyerGenerator] Browser launched successfully');
   } catch (launchError: any) {
     console.error('[FlyerGenerator] ===== BROWSER LAUNCH ERROR =====');
     console.error('[FlyerGenerator] Error:', launchError.message);
     console.error('[FlyerGenerator] Stack:', launchError.stack);
-    console.error('[FlyerGenerator] CHROMIUM_PATH env:', process.env.CHROMIUM_PATH);
-    console.error('[FlyerGenerator] Attempted executablePath:', launchOptions.executablePath || 'default');
+    console.error('[FlyerGenerator] isProduction:', isProduction);
     throw new Error(`Failed to launch browser: ${launchError.message}`);
   }
   
