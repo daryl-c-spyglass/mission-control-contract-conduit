@@ -112,22 +112,29 @@ function findChromiumPath(): string {
 }
 
 export interface FlyerData {
-  spyglassLogoUrl: string;
-  statusLabel: string;
+  logoUrl?: string;
+  priceLabel: string;
   price: string;
-  address: string;
-  mainPhoto?: string;
-  photo2?: string;
-  photo3?: string;
-  beds: string;
-  baths: string;
+  fullAddress: string;
+  mainImage?: string;
+  secondaryImage1?: string;
+  secondaryImage2?: string;
+  bedrooms: string;
+  bathrooms: string;
   sqft: string;
+  lotSize?: string;
   headline?: string;
   description: string;
+  openHouseDay?: string;
+  openHouseDate?: string;
   agentName: string;
   agentTitle: string;
   agentPhone: string;
+  agentEmail?: string;
   agentPhoto?: string;
+  qrCodeUrl?: string;
+  statusBadge?: string;
+  statusColor?: string;
 }
 
 // 8.5x11 at 300 DPI
@@ -135,7 +142,7 @@ const FLYER_WIDTH = 2550;
 const FLYER_HEIGHT = 3300;
 
 // Template version for cache invalidation
-const TEMPLATE_VERSION = 'v2.4.2';
+const TEMPLATE_VERSION = 'v3.0.0';
 
 // Icon paths for stat icons - use process.cwd() for CJS compatibility
 const ICON_PATHS = {
@@ -158,23 +165,27 @@ const RENDER_CONFIG = {
 function generateRenderHash(data: FlyerData, outputSettings: typeof RENDER_CONFIG): string {
   const hashInput = JSON.stringify({
     templateVersion: TEMPLATE_VERSION,
-    // Only include layout-affecting data (not image content which is huge)
-    address: data.address,
+    fullAddress: data.fullAddress,
     price: data.price,
-    statusLabel: data.statusLabel,
-    beds: data.beds,
-    baths: data.baths,
+    priceLabel: data.priceLabel,
+    bedrooms: data.bedrooms,
+    bathrooms: data.bathrooms,
     sqft: data.sqft,
+    lotSize: data.lotSize || '',
     headline: data.headline || '',
     description: data.description,
+    openHouseDay: data.openHouseDay || '',
+    openHouseDate: data.openHouseDate || '',
     agentName: data.agentName,
     agentTitle: data.agentTitle,
     agentPhone: data.agentPhone,
-    hasMainPhoto: !!data.mainPhoto,
-    hasPhoto2: !!data.photo2,
-    hasPhoto3: !!data.photo3,
+    agentEmail: data.agentEmail || '',
+    statusBadge: data.statusBadge || '',
+    hasMainImage: !!data.mainImage,
+    hasSecondaryImage1: !!data.secondaryImage1,
+    hasSecondaryImage2: !!data.secondaryImage2,
     hasAgentPhoto: !!data.agentPhoto,
-    // Output settings
+    hasQrCode: !!data.qrCodeUrl,
     renderWidth: outputSettings.width,
     renderHeight: outputSettings.height,
     deviceScaleFactor: outputSettings.deviceScaleFactor,
@@ -197,13 +208,17 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
   console.log(`[FlyerGenerator] Media type: ${RENDER_CONFIG.mediaType}`);
   console.log(`[FlyerGenerator] Converting images to base64...`);
   
+  // Default logo path
+  const logoPath = data.logoUrl || path.join(process.cwd(), 'public', 'assets', 'SpyglassRealty_Logo_Black.png');
+  
   // Convert all images to base64 in parallel (including stat icons)
-  const [logoB64, mainPhotoB64, photo2B64, photo3B64, agentPhotoB64, bedroomIconB64, bathroomIconB64, sqftIconB64] = await Promise.all([
-    imageToBase64(data.spyglassLogoUrl),
-    data.mainPhoto ? imageToBase64(data.mainPhoto) : Promise.resolve(''),
-    data.photo2 ? imageToBase64(data.photo2) : Promise.resolve(''),
-    data.photo3 ? imageToBase64(data.photo3) : Promise.resolve(''),
+  const [logoB64, mainImageB64, secondaryImage1B64, secondaryImage2B64, agentPhotoB64, qrCodeB64, bedroomIconB64, bathroomIconB64, sqftIconB64] = await Promise.all([
+    imageToBase64(logoPath),
+    data.mainImage ? imageToBase64(data.mainImage) : Promise.resolve(''),
+    data.secondaryImage1 ? imageToBase64(data.secondaryImage1) : Promise.resolve(''),
+    data.secondaryImage2 ? imageToBase64(data.secondaryImage2) : Promise.resolve(''),
     data.agentPhoto ? imageToBase64(data.agentPhoto) : Promise.resolve(''),
+    data.qrCodeUrl ? imageToBase64(data.qrCodeUrl) : Promise.resolve(''),
     imageToBase64(ICON_PATHS.bedroom),
     imageToBase64(ICON_PATHS.bathroom),
     imageToBase64(ICON_PATHS.sqft)
@@ -211,29 +226,31 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
   
   console.log('[FlyerGenerator] Images converted:', {
     logo: logoB64 ? 'OK' : 'FAILED',
-    mainPhoto: mainPhotoB64 ? 'OK' : 'EMPTY',
-    photo2: photo2B64 ? 'OK' : 'EMPTY',
-    photo3: photo3B64 ? 'OK' : 'EMPTY',
+    mainImage: mainImageB64 ? 'OK' : 'EMPTY',
+    secondaryImage1: secondaryImage1B64 ? 'OK' : 'EMPTY',
+    secondaryImage2: secondaryImage2B64 ? 'OK' : 'EMPTY',
     agentPhoto: agentPhotoB64 ? 'OK' : 'EMPTY',
+    qrCode: qrCodeB64 ? 'OK' : 'EMPTY',
     bedroomIcon: bedroomIconB64 ? 'OK' : 'FAILED',
     bathroomIcon: bathroomIconB64 ? 'OK' : 'FAILED',
     sqftIcon: sqftIconB64 ? 'OK' : 'FAILED'
   });
   
-  // Create data with base64 images
+  // Create data with base64 images for template
   const dataWithBase64 = {
     ...data,
-    spyglassLogoUrl: logoB64,
-    mainPhoto: mainPhotoB64,
-    photo2: photo2B64,
-    photo3: photo3B64,
+    logoUrl: logoB64,
+    mainImage: mainImageB64,
+    secondaryImage1: secondaryImage1B64,
+    secondaryImage2: secondaryImage2B64,
     agentPhoto: agentPhotoB64,
+    qrCodeUrl: qrCodeB64,
     bedroomIcon: bedroomIconB64,
     bathroomIcon: bathroomIconB64,
     sqftIcon: sqftIconB64
   };
   
-  const templatePath = path.resolve(process.cwd(), 'server/templates/flyer-template.html');
+  const templatePath = path.resolve(process.cwd(), 'server/templates/flyer-template.hbs');
   const templateHtml = fs.readFileSync(templatePath, 'utf-8');
   
   const template = Handlebars.compile(templateHtml);

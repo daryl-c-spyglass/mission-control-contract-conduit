@@ -1,0 +1,830 @@
+# Update Flyer Generator with New Template Design
+
+Caleb provided a new HTML/CSS template for the property flyer. Update the flyer generator to use this cleaner design while maintaining the existing Puppeteer pipeline.
+
+---
+
+## Template Specifications
+
+| Element | Specification |
+|---------|---------------|
+| Page Size | 8.5" × 11" (2550 × 3300px at 300dpi) |
+| Font | Montserrat (with Arial fallback) |
+| Logo | Spyglass SVG + text |
+| Images | 1 hero (large) + 2 secondary (side by side) |
+| Layout | Top bar → Address → Images → Footer |
+
+---
+
+## Update the Handlebars Template
+
+Replace the existing flyer template with Caleb's design. Create or update the template file:
+
+**File: `server/templates/flyer-template.hbs`**
+
+```handlebars
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{address}} - Property Flyer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Montserrat', 'Arial', sans-serif;
+            background: white;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        
+        .page {
+            width: 2550px;
+            height: 3300px;
+            margin: 0 auto;
+            position: relative;
+            background: white;
+        }
+        
+        /* Top Bar */
+        .top-bar {
+            background: white;
+            padding: 60px 120px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #ddd;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 45px;
+        }
+        
+        .logo-svg {
+            width: 180px;
+            height: 180px;
+        }
+        
+        .logo-text {
+            font-size: 84px;
+            font-weight: 800;
+            letter-spacing: 6px;
+            color: #2c2c2c;
+        }
+        
+        .logo-subtext {
+            font-size: 48px;
+            font-weight: 600;
+            letter-spacing: 9px;
+            color: #2c2c2c;
+        }
+        
+        .price-tag {
+            background: #8B7355;
+            color: white;
+            padding: 45px 90px;
+            clip-path: polygon(10% 0%, 100% 0%, 100% 100%, 0% 100%);
+            text-align: right;
+        }
+        
+        .price-tag-label {
+            font-size: 30px;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+        }
+        
+        .price-tag-amount {
+            font-size: 60px;
+            font-weight: 700;
+        }
+        
+        /* Address Bar */
+        .address-bar {
+            padding: 45px 120px;
+            font-size: 54px;
+            font-weight: 600;
+            letter-spacing: 9px;
+            color: #2c2c2c;
+            text-transform: uppercase;
+            border-bottom: 3px solid #ddd;
+        }
+        
+        /* Main Image */
+        .main-image-container {
+            width: calc(100% - 240px);
+            margin: 60px 120px;
+            height: 1140px;
+            border-radius: 9px;
+            overflow: hidden;
+        }
+        
+        .main-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        /* Bottom Images */
+        .bottom-images {
+            display: flex;
+            gap: 60px;
+            padding: 0 120px 60px;
+        }
+        
+        .secondary-image-container {
+            flex: 1;
+            height: 900px;
+            border-radius: 9px;
+            overflow: hidden;
+        }
+        
+        .secondary-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        /* Footer Section */
+        .footer-section {
+            display: flex;
+            padding: 60px 120px;
+            gap: 90px;
+            align-items: flex-start;
+        }
+        
+        /* Property Details */
+        .property-details {
+            flex: 0 0 600px;
+        }
+        
+        .detail-item {
+            display: flex;
+            align-items: center;
+            gap: 45px;
+            margin-bottom: 75px;
+        }
+        
+        .detail-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .icon {
+            width: 120px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .icon svg {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .detail-text {
+            font-size: 54px;
+            font-weight: 700;
+            color: #2c2c2c;
+        }
+        
+        /* Description Section */
+        .description-section {
+            flex: 1;
+            padding-top: 30px;
+        }
+        
+        .open-house-label {
+            font-size: 42px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+            color: #2c2c2c;
+        }
+        
+        .open-house-date {
+            font-size: 48px;
+            font-weight: 600;
+            margin-bottom: 60px;
+            color: #2c2c2c;
+        }
+        
+        .description-text {
+            font-size: 42px;
+            line-height: 1.7;
+            color: #444;
+        }
+        
+        /* Agent Section */
+        .agent-section {
+            flex: 0 0 660px;
+            text-align: center;
+        }
+        
+        .agent-photo {
+            width: 360px;
+            height: 360px;
+            border-radius: 50%;
+            margin: 0 auto 45px;
+            border: 12px solid white;
+            box-shadow: 0 6px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .agent-photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .qr-code {
+            width: 300px;
+            height: 300px;
+            margin: 0 auto 45px;
+            border: 6px solid #2c2c2c;
+        }
+        
+        .qr-code img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        .agent-name {
+            font-size: 66px;
+            font-weight: 700;
+            color: #2c2c2c;
+            margin-bottom: 15px;
+        }
+        
+        .agent-title {
+            font-size: 36px;
+            font-weight: 600;
+            color: #666;
+            letter-spacing: 3px;
+            margin-bottom: 9px;
+        }
+        
+        .agent-phone {
+            font-size: 42px;
+            color: #2c2c2c;
+            font-weight: 600;
+        }
+        
+        .agent-email {
+            font-size: 36px;
+            color: #666;
+            margin-top: 6px;
+        }
+
+        /* Status Badge - Optional overlay on main image */
+        .status-badge {
+            position: absolute;
+            top: 420px;
+            right: 150px;
+            background: {{statusColor}};
+            color: white;
+            padding: 24px 60px;
+            font-size: 36px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            border-radius: 6px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        
+        @media print {
+            .page {
+                page-break-after: always;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        {{#if status}}
+        <div class="status-badge">{{status}}</div>
+        {{/if}}
+        
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="logo-container">
+                {{#if logoUrl}}
+                <img src="{{logoUrl}}" alt="Spyglass Realty" class="logo-svg" />
+                {{else}}
+                <svg class="logo-svg" viewBox="0 0 180 180">
+                    <circle cx="90" cy="90" r="84" fill="none" stroke="#2c2c2c" stroke-width="6"/>
+                    <circle cx="90" cy="90" r="66" fill="none" stroke="#2c2c2c" stroke-width="6"/>
+                    <path d="M 45 105 Q 90 75, 135 105" fill="none" stroke="#2c2c2c" stroke-width="6"/>
+                    <path d="M 45 75 Q 90 105, 135 75" fill="none" stroke="#2c2c2c" stroke-width="6"/>
+                </svg>
+                {{/if}}
+                <div>
+                    <div class="logo-text">SPYGLASS</div>
+                    <div class="logo-subtext">REALTY</div>
+                </div>
+            </div>
+            <div class="price-tag">
+                <div class="price-tag-label">{{priceLabel}}</div>
+                <div class="price-tag-amount">{{price}}</div>
+            </div>
+        </div>
+        
+        <!-- Address Bar -->
+        <div class="address-bar">{{fullAddress}}</div>
+        
+        <!-- Main Image -->
+        <div class="main-image-container">
+            <img src="{{mainImage}}" alt="Property Main View" class="main-image" />
+        </div>
+        
+        <!-- Bottom Images -->
+        <div class="bottom-images">
+            <div class="secondary-image-container">
+                <img src="{{secondaryImage1}}" alt="Property View 2" class="secondary-image" />
+            </div>
+            <div class="secondary-image-container">
+                <img src="{{secondaryImage2}}" alt="Property View 3" class="secondary-image" />
+            </div>
+        </div>
+        
+        <!-- Footer Section -->
+        <div class="footer-section">
+            <!-- Property Details -->
+            <div class="property-details">
+                <div class="detail-item">
+                    <div class="icon">
+                        <svg viewBox="0 0 120 120">
+                            <rect x="15" y="45" width="90" height="54" fill="none" stroke="#2c2c2c" stroke-width="6" rx="6"/>
+                            <rect x="30" y="30" width="18" height="24" fill="none" stroke="#2c2c2c" stroke-width="6"/>
+                            <rect x="72" y="30" width="18" height="24" fill="none" stroke="#2c2c2c" stroke-width="6"/>
+                        </svg>
+                    </div>
+                    <div class="detail-text">{{bedrooms}} bedrooms</div>
+                </div>
+                <div class="detail-item">
+                    <div class="icon">
+                        <svg viewBox="0 0 120 120">
+                            <path d="M 30 75 L 30 45 Q 30 30, 45 30 L 75 30 Q 90 30, 90 45 L 90 75" fill="none" stroke="#2c2c2c" stroke-width="6"/>
+                            <circle cx="39" cy="51" r="6" fill="#2c2c2c"/>
+                            <rect x="15" y="75" width="90" height="24" fill="none" stroke="#2c2c2c" stroke-width="6" rx="6"/>
+                        </svg>
+                    </div>
+                    <div class="detail-text">{{bathrooms}} bathrooms</div>
+                </div>
+                <div class="detail-item">
+                    <div class="icon">
+                        <svg viewBox="0 0 120 120">
+                            <rect x="24" y="24" width="72" height="72" fill="none" stroke="#2c2c2c" stroke-width="6"/>
+                            <path d="M 24 24 L 96 96 M 96 24 L 24 96" stroke="#2c2c2c" stroke-width="3"/>
+                        </svg>
+                    </div>
+                    <div class="detail-text">{{sqft}} sq. ft</div>
+                </div>
+                {{#if lotSize}}
+                <div class="detail-item">
+                    <div class="icon">
+                        <svg viewBox="0 0 120 120">
+                            <path d="M 20 100 L 20 40 L 60 20 L 100 40 L 100 100 Z" fill="none" stroke="#2c2c2c" stroke-width="6"/>
+                            <path d="M 40 100 L 40 60 L 60 50 L 80 60 L 80 100" fill="none" stroke="#2c2c2c" stroke-width="4"/>
+                        </svg>
+                    </div>
+                    <div class="detail-text">{{lotSize}}</div>
+                </div>
+                {{/if}}
+            </div>
+            
+            <!-- Description Section -->
+            <div class="description-section">
+                {{#if openHouseDate}}
+                <div class="open-house-label">Open House {{openHouseDay}}</div>
+                <div class="open-house-date">{{openHouseDate}}</div>
+                {{/if}}
+                <div class="description-text">{{description}}</div>
+            </div>
+            
+            <!-- Agent Section -->
+            <div class="agent-section">
+                {{#if agentPhoto}}
+                <div class="agent-photo">
+                    <img src="{{agentPhoto}}" alt="{{agentName}}" />
+                </div>
+                {{/if}}
+                {{#if qrCodeUrl}}
+                <div class="qr-code">
+                    <img src="{{qrCodeUrl}}" alt="Scan for more info" />
+                </div>
+                {{/if}}
+                <div class="agent-name">{{agentName}}</div>
+                <div class="agent-title">{{agentTitle}}</div>
+                <div class="agent-phone">{{agentPhone}}</div>
+                {{#if agentEmail}}
+                <div class="agent-email">{{agentEmail}}</div>
+                {{/if}}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+```
+
+---
+
+## Update the Flyer Generation Route
+
+Update the server route to use the new template with proper data mapping:
+
+**File: `server/routes.ts`** (update the flyer generation endpoint)
+
+```typescript
+import Handlebars from 'handlebars';
+import puppeteer from 'puppeteer';
+import fs from 'fs';
+import path from 'path';
+
+// Register Handlebars helpers
+Handlebars.registerHelper('formatPrice', (price: number) => {
+  if (!price) return '';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
+  }).format(price);
+});
+
+Handlebars.registerHelper('formatNumber', (num: number) => {
+  if (!num) return '';
+  return new Intl.NumberFormat('en-US').format(num);
+});
+
+// Flyer generation endpoint
+app.post('/api/generate-flyer', async (req, res) => {
+  try {
+    const { 
+      transactionId,
+      photos,        // Array of photo URLs [main, secondary1, secondary2]
+      price,
+      status,        // "Just Listed", "For Sale", "Open House", etc.
+      bedrooms,
+      bathrooms,
+      sqft,
+      lotSize,
+      description,
+      address,
+      city,
+      state,
+      zip,
+      openHouseDay,  // "Saturday", "Sunday", etc.
+      openHouseDate, // "May 17th, 11AM - 3PM"
+      agentName,
+      agentTitle,
+      agentPhone,
+      agentEmail,
+      agentPhoto,
+      qrCodeUrl,
+      logoUrl
+    } = req.body;
+
+    // Format full address
+    const fullAddress = `${address} ${city}, ${state} ${zip}`.toUpperCase();
+
+    // Determine price label based on status
+    const getPriceLabel = (status: string) => {
+      const s = (status || '').toLowerCase();
+      if (s.includes('sold')) return 'SOLD FOR';
+      if (s.includes('contract') || s.includes('pending')) return 'PENDING AT';
+      if (s.includes('reduced')) return 'NOW ONLY';
+      return 'LISTED AT';
+    };
+
+    // Determine status badge color
+    const getStatusColor = (status: string) => {
+      const s = (status || '').toLowerCase();
+      if (s.includes('just listed')) return '#22c55e';  // Green
+      if (s.includes('sold')) return '#a855f7';         // Purple
+      if (s.includes('contract') || s.includes('pending')) return '#eab308';  // Yellow
+      if (s.includes('reduced')) return '#ef4444';      // Red
+      if (s.includes('open house')) return '#3b82f6';   // Blue
+      return '#f97316';  // Orange (default for "For Sale")
+    };
+
+    // Load and compile template
+    const templatePath = path.join(__dirname, 'templates', 'flyer-template.hbs');
+    const templateSource = fs.readFileSync(templatePath, 'utf-8');
+    const template = Handlebars.compile(templateSource);
+
+    // Prepare template data
+    const templateData = {
+      mainImage: photos?.[0] || '',
+      secondaryImage1: photos?.[1] || photos?.[0] || '',
+      secondaryImage2: photos?.[2] || photos?.[0] || '',
+      price: new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 0
+      }).format(price || 0),
+      priceLabel: getPriceLabel(status),
+      status: status || null,  // null = no badge shown
+      statusColor: getStatusColor(status),
+      fullAddress,
+      bedrooms: bedrooms || 0,
+      bathrooms: bathrooms || 0,
+      sqft: new Intl.NumberFormat('en-US').format(sqft || 0),
+      lotSize: lotSize || null,
+      description: truncateDescription(description, 300),
+      openHouseDay: openHouseDay || null,
+      openHouseDate: openHouseDate || null,
+      agentName: agentName || 'Agent Name',
+      agentTitle: agentTitle || 'REALTOR®',
+      agentPhone: agentPhone || '',
+      agentEmail: agentEmail || null,
+      agentPhoto: agentPhoto || null,
+      qrCodeUrl: qrCodeUrl || null,
+      logoUrl: logoUrl || null
+    };
+
+    // Generate HTML
+    const html = template(templateData);
+
+    // Launch Puppeteer
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    });
+
+    const page = await browser.newPage();
+
+    // Set viewport to exact flyer dimensions (8.5" x 11" at 300dpi)
+    await page.setViewport({
+      width: 2550,
+      height: 3300,
+      deviceScaleFactor: 1  // Already at print resolution
+    });
+
+    // Set content and wait for images
+    await page.setContent(html, { 
+      waitUntil: 'networkidle0',
+      timeout: 30000
+    });
+
+    // Wait for all images to load
+    await page.evaluate(async () => {
+      const images = document.querySelectorAll('img');
+      await Promise.all(
+        Array.from(images).map(img => {
+          if (img.complete) return Promise.resolve();
+          return new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+        })
+      );
+    });
+
+    // Add slight delay for fonts to render
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Generate PDF
+    const pdfBuffer = await page.pdf({
+      width: '8.5in',
+      height: '11in',
+      printBackground: true,
+      preferCSSPageSize: true
+    });
+
+    // Generate PNG for preview
+    const pngBuffer = await page.screenshot({
+      type: 'png',
+      fullPage: true
+    });
+
+    await browser.close();
+
+    // Return both formats
+    res.json({
+      success: true,
+      pdf: `data:application/pdf;base64,${pdfBuffer.toString('base64')}`,
+      png: `data:image/png;base64,${pngBuffer.toString('base64')}`,
+      dimensions: {
+        width: 2550,
+        height: 3300,
+        dpi: 300
+      }
+    });
+
+  } catch (error) {
+    console.error('Flyer generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to generate flyer'
+    });
+  }
+});
+
+// Helper function to truncate description
+function truncateDescription(text: string, maxLength: number): string {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  
+  // Find the last space before maxLength
+  const truncated = text.substring(0, maxLength);
+  const lastSpace = truncated.lastIndexOf(' ');
+  
+  return truncated.substring(0, lastSpace) + '...';
+}
+```
+
+---
+
+## Update the Frontend Dialog
+
+Update `CreateFlyerDialog` to work with the new template fields:
+
+**File: `client/src/components/create-flyer-dialog.tsx`** (key updates)
+
+```tsx
+// Add Open House fields to the form
+const [openHouseDay, setOpenHouseDay] = useState<string>('');
+const [openHouseDate, setOpenHouseDate] = useState<string>('');
+
+// In the form JSX, add Open House section:
+<div className="space-y-2">
+  <Label>Open House (Optional)</Label>
+  <div className="grid grid-cols-2 gap-4">
+    <Select value={openHouseDay} onValueChange={setOpenHouseDay}>
+      <SelectTrigger>
+        <SelectValue placeholder="Select day" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="">None</SelectItem>
+        <SelectItem value="Saturday">Saturday</SelectItem>
+        <SelectItem value="Sunday">Sunday</SelectItem>
+        <SelectItem value="Sat & Sun">Sat & Sun</SelectItem>
+      </SelectContent>
+    </Select>
+    <Input
+      placeholder="e.g., May 17th, 11AM - 3PM"
+      value={openHouseDate}
+      onChange={(e) => setOpenHouseDate(e.target.value)}
+    />
+  </div>
+</div>
+
+// Update the generate request payload:
+const payload = {
+  transactionId: transaction.id,
+  photos: selectedPhotos,  // [main, secondary1, secondary2]
+  price: transaction.mlsData?.listPrice || transaction.price,
+  status: statusType,
+  bedrooms: transaction.mlsData?.beds || transaction.beds,
+  bathrooms: transaction.mlsData?.baths || transaction.baths,
+  sqft: transaction.mlsData?.sqft || transaction.sqft,
+  lotSize: transaction.mlsData?.lotSize || null,
+  description: description,
+  address: transaction.mlsData?.address?.streetAddress || transaction.address,
+  city: transaction.mlsData?.address?.city || transaction.city,
+  state: transaction.mlsData?.address?.state || 'TX',
+  zip: transaction.mlsData?.address?.zip || transaction.zip,
+  openHouseDay: openHouseDay || null,
+  openHouseDate: openHouseDate || null,
+  agentName: settings?.agentName || 'Agent Name',
+  agentTitle: settings?.agentTitle || 'REALTOR®',
+  agentPhone: settings?.agentPhone || '',
+  agentEmail: settings?.agentEmail || null,
+  agentPhoto: settings?.agentHeadshot || null,
+  qrCodeUrl: generateQRCodeUrl(transaction),  // You may need to implement this
+  logoUrl: null  // Uses default SVG if null
+};
+```
+
+---
+
+## Photo Selection for 3-Image Layout
+
+The new template requires 3 photos. Update photo selection UI:
+
+```tsx
+// State for 3 photos
+const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
+
+// Photo selection UI with 3 slots
+<div className="space-y-4">
+  <Label>Select 3 Photos</Label>
+  
+  <div className="grid grid-cols-3 gap-4">
+    {[0, 1, 2].map((slot) => (
+      <div key={slot} className="space-y-2">
+        <span className="text-xs text-muted-foreground">
+          {slot === 0 ? 'Main (Hero)' : `Secondary ${slot}`}
+        </span>
+        <div 
+          className={cn(
+            "aspect-video border-2 rounded-lg overflow-hidden cursor-pointer",
+            selectedPhotos[slot] ? "border-primary" : "border-dashed border-muted-foreground/30"
+          )}
+          onClick={() => openPhotoSelector(slot)}
+        >
+          {selectedPhotos[slot] ? (
+            <img 
+              src={selectedPhotos[slot]} 
+              alt={`Photo ${slot + 1}`}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <Plus className="h-6 w-6" />
+            </div>
+          )}
+        </div>
+      </div>
+    ))}
+  </div>
+  
+  {/* Thumbnail gallery to select from */}
+  <div className="border rounded-lg p-4 max-h-48 overflow-y-auto">
+    <div className="grid grid-cols-6 gap-2">
+      {photos.map((photo, index) => (
+        <button
+          key={index}
+          onClick={() => selectPhoto(photo.url)}
+          className={cn(
+            "aspect-square rounded overflow-hidden border-2 transition-all",
+            selectedPhotos.includes(photo.url) 
+              ? "border-primary ring-2 ring-primary/20" 
+              : "border-transparent hover:border-muted-foreground/30"
+          )}
+        >
+          <img 
+            src={photo.url} 
+            alt={`Option ${index + 1}`}
+            className="w-full h-full object-cover"
+          />
+        </button>
+      ))}
+    </div>
+  </div>
+</div>
+```
+
+---
+
+## Files to Create/Update
+
+| File | Action |
+|------|--------|
+| `server/templates/flyer-template.hbs` | CREATE - New Handlebars template |
+| `server/routes.ts` | UPDATE - Flyer generation endpoint |
+| `client/src/components/create-flyer-dialog.tsx` | UPDATE - Form fields and photo selection |
+
+---
+
+## Template Data Fields Reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mainImage` | string | URL for hero image |
+| `secondaryImage1` | string | URL for left bottom image |
+| `secondaryImage2` | string | URL for right bottom image |
+| `price` | string | Formatted price (e.g., "$649,000") |
+| `priceLabel` | string | "LISTED AT", "SOLD FOR", etc. |
+| `status` | string | Badge text (null to hide) |
+| `statusColor` | string | Hex color for badge |
+| `fullAddress` | string | Full uppercase address |
+| `bedrooms` | number | Bedroom count |
+| `bathrooms` | number | Bathroom count (can be decimal) |
+| `sqft` | string | Formatted square footage |
+| `lotSize` | string | Lot size (optional) |
+| `description` | string | Property description (truncated) |
+| `openHouseDay` | string | "Saturday", "Sunday", etc. |
+| `openHouseDate` | string | "May 17th, 11AM - 3PM" |
+| `agentName` | string | Agent full name |
+| `agentTitle` | string | "REALTOR®" |
+| `agentPhone` | string | Phone number |
+| `agentEmail` | string | Email (optional) |
+| `agentPhoto` | string | Agent headshot URL |
+| `qrCodeUrl` | string | QR code image URL |
+| `logoUrl` | string | Custom logo (uses SVG if null) |
+
+---
+
+## Testing Checklist
+
+- [ ] Flyer generates at 2550×3300px (8.5"×11" at 300dpi)
+- [ ] All 3 photos display correctly
+- [ ] Price tag shows correct label based on status
+- [ ] Address displays in uppercase
+- [ ] Property details (beds, baths, sqft) show with icons
+- [ ] Open House section appears only when data provided
+- [ ] Description truncates properly at ~300 chars
+- [ ] Agent section shows photo, QR code, and contact info
+- [ ] PDF download works
+- [ ] PNG preview matches PDF
+- [ ] Fonts render correctly (Montserrat)

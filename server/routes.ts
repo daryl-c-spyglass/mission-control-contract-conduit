@@ -1879,40 +1879,45 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
       }
       
       const statusLabels: Record<string, string> = {
-        'just_listed': 'JUST LISTED AT',
-        'for_sale': 'FOR SALE AT',
+        'just_listed': 'JUST LISTED',
+        'for_sale': 'LISTED AT',
         'open_house': 'OPEN HOUSE',
-        'price_improvement': 'PRICE REDUCED TO',
+        'price_improvement': 'PRICE REDUCED',
         'under_contract': 'UNDER CONTRACT',
-        'just_sold': 'JUST SOLD FOR',
+        'just_sold': 'JUST SOLD',
+        'for_lease': 'FOR LEASE',
         'listed': 'LISTED AT'
       };
       
-      // Use absolute file path for logo (will be converted to base64)
-      const logoPath = path.join(process.cwd(), 'public', 'assets', 'SpyglassRealty_Logo_Black.png');
-      console.log('Logo path:', logoPath, 'exists:', fs.existsSync(logoPath));
+      const getPriceLabel = (s: string) => {
+        const sl = (s || '').toLowerCase();
+        if (sl.includes('sold')) return 'SOLD FOR';
+        if (sl.includes('contract') || sl.includes('pending')) return 'PENDING AT';
+        if (sl.includes('reduced')) return 'NOW ONLY';
+        return 'LISTED AT';
+      };
       
       // Clean price - remove $ and commas, then parse
       const cleanPrice = String(price || '0').replace(/[$,]/g, '');
       const numericPrice = parseFloat(cleanPrice) || 0;
       
       const flyerData: FlyerData = {
-        spyglassLogoUrl: logoPath,
-        statusLabel: statusLabels[status] || 'LISTED AT',
+        priceLabel: getPriceLabel(status),
         price: `$${numericPrice.toLocaleString()}`,
-        address: formatAddressForFlyer(address),
-        mainPhoto: photos[0],
-        photo2: photos[1],
-        photo3: photos[2],
-        beds: String(beds || 0),
-        baths: String(baths || 0),
+        fullAddress: formatAddressForFlyer(address),
+        mainImage: photos[0],
+        secondaryImage1: photos[1],
+        secondaryImage2: photos[2],
+        bedrooms: String(beds || 0),
+        bathrooms: String(baths || 0),
         sqft: Number(sqft || 0).toLocaleString(),
         headline: headline?.toUpperCase() || '',
         description: description || '',
         agentName: agentName,
         agentTitle: agentTitle || 'REALTOR®',
         agentPhone: agentPhone,
-        agentPhoto: agentPhoto
+        agentPhoto: agentPhoto,
+        statusBadge: statusLabels[status] || undefined
       };
       
       // Support both PNG preview and PDF download
@@ -1976,37 +1981,44 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
       }
       
       const statusLabels: Record<string, string> = {
-        'just_listed': 'JUST LISTED AT',
-        'for_sale': 'FOR SALE AT',
+        'just_listed': 'JUST LISTED',
+        'for_sale': 'LISTED AT',
         'open_house': 'OPEN HOUSE',
-        'price_improvement': 'PRICE REDUCED TO',
+        'price_improvement': 'PRICE REDUCED',
         'under_contract': 'UNDER CONTRACT',
-        'just_sold': 'JUST SOLD FOR',
+        'just_sold': 'JUST SOLD',
+        'for_lease': 'FOR LEASE',
         'listed': 'LISTED AT'
       };
       
-      const logoPath = path.join(process.cwd(), 'public', 'assets', 'SpyglassRealty_Logo_Black.png');
+      const getPriceLabel = (s: string) => {
+        const sl = (s || '').toLowerCase();
+        if (sl.includes('sold')) return 'SOLD FOR';
+        if (sl.includes('contract') || sl.includes('pending')) return 'PENDING AT';
+        if (sl.includes('reduced')) return 'NOW ONLY';
+        return 'LISTED AT';
+      };
       
       const cleanPrice = String(price || '0').replace(/[$,]/g, '');
       const numericPrice = parseFloat(cleanPrice) || 0;
       
       const flyerData: FlyerData = {
-        spyglassLogoUrl: logoPath,
-        statusLabel: statusLabels[status] || 'LISTED AT',
+        priceLabel: getPriceLabel(status),
         price: `$${numericPrice.toLocaleString()}`,
-        address: formatAddressForFlyer(address),
-        mainPhoto: photos[0],
-        photo2: photos[1],
-        photo3: photos[2],
-        beds: String(beds || 0),
-        baths: String(baths || 0),
+        fullAddress: formatAddressForFlyer(address),
+        mainImage: photos[0],
+        secondaryImage1: photos[1],
+        secondaryImage2: photos[2],
+        bedrooms: String(beds || 0),
+        bathrooms: String(baths || 0),
         sqft: Number(sqft || 0).toLocaleString(),
         headline: headline?.toUpperCase() || '',
         description: description || '',
         agentName: agentName,
         agentTitle: agentTitle || 'REALTOR®',
         agentPhone: agentPhone,
-        agentPhoto: agentPhoto
+        agentPhoto: agentPhoto,
+        statusBadge: statusLabels[status] || undefined
       };
       
       const validOutputType: OutputType = outputType === 'pdf' ? 'pdf' : 'pngPreview';

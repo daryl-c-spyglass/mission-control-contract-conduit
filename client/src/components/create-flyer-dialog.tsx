@@ -59,11 +59,19 @@ const STATUS_OPTIONS = [
   { value: "under_contract", label: "Under Contract" },
   { value: "just_sold", label: "Just Sold" },
   { value: "for_lease", label: "For Lease" },
+  { value: "open_house", label: "Open House" },
+];
+
+const OPEN_HOUSE_DAY_OPTIONS = [
+  { value: "", label: "None" },
+  { value: "Saturday", label: "Saturday" },
+  { value: "Sunday", label: "Sunday" },
+  { value: "Sat & Sun", label: "Sat & Sun" },
 ];
 
 const formSchema = z.object({
   price: z.string().min(1, "Price is required"),
-  status: z.enum(["for_sale", "just_listed", "under_contract", "just_sold", "for_lease"]),
+  status: z.enum(["for_sale", "just_listed", "under_contract", "just_sold", "for_lease", "open_house"]),
   bedrooms: z.string().optional(),
   bathrooms: z.string().optional(),
   sqft: z.string().optional(),
@@ -72,6 +80,8 @@ const formSchema = z.object({
   agentTitle: z.string().optional(),
   agentPhone: z.string().optional(),
   listingHeadline: z.string().max(39, "Max 39 characters").optional(),
+  openHouseDay: z.string().optional(),
+  openHouseDate: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -486,6 +496,8 @@ export function CreateFlyerDialog({
       agentTitle: "REALTOR®",
       agentPhone: agentPhone || "",
       listingHeadline: "",
+      openHouseDay: "",
+      openHouseDate: "",
     },
   });
 
@@ -1776,6 +1788,51 @@ export function CreateFlyerDialog({
                             ))}
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <FormField
+                    control={form.control}
+                    name="openHouseDay"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Open House Day</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-8" data-testid="select-open-house-day">
+                              <SelectValue placeholder="None" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {OPEN_HOUSE_DAY_OPTIONS.map((option) => (
+                              <SelectItem key={option.value || "none"} value={option.value || "none"}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="openHouseDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Open House Details</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., May 17th, 11AM - 3PM"
+                            className="h-8"
+                            data-testid="input-open-house-date"
+                            {...field}
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
