@@ -414,6 +414,7 @@ export function CMAMap({
   const modelRef = useRef<CmaMapModel | null>(null);
   const isDarkRef = useRef<boolean>(false);
   const layersReadyRef = useRef<boolean>(false);
+  const initialFitDoneRef = useRef<boolean>(false);
 
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -554,9 +555,37 @@ export function CMAMap({
       layersReadyRef.current = true;
       setMapReady(true);
 
-      if (model.bounds) {
-        setTimeout(() => fitAllBounds(), 100);
-      }
+      // Force resize and fit bounds on initial load
+      // Use multiple attempts to ensure container has dimensions
+      const attemptFit = (attempt = 0) => {
+        map.resize();
+        if (model.bounds) {
+          if (model.compFeatures.length === 0 && model.subjectLngLat) {
+            map.jumpTo({
+              center: model.subjectLngLat,
+              zoom: DEFAULT_SUBJECT_ZOOM,
+            });
+          } else {
+            map.fitBounds(model.bounds, {
+              padding: DEFAULT_FIT_PADDING,
+              maxZoom: 15,
+              duration: 0, // No animation on initial load for instant display
+            });
+          }
+          initialFitDoneRef.current = true;
+        } else if (attempt < 3) {
+          // Retry if bounds not ready
+          setTimeout(() => attemptFit(attempt + 1), 100);
+        }
+      };
+      
+      // Immediate attempt + delayed attempts for tab visibility issues
+      attemptFit();
+      setTimeout(() => {
+        if (!initialFitDoneRef.current && model.bounds) {
+          attemptFit();
+        }
+      }, 200);
 
       // Register all event handlers INSIDE load callback to ensure layers exist
       map.on('click', LAYER_IDS.clusterCircle, (e) => {
@@ -716,6 +745,50 @@ export function CMAMap({
       mapRef.current = null;
     };
   }, [token]);
+
+  // ResizeObserver to handle tab visibility and container resize
+  useEffect(() => {
+    const container = mapContainer.current;
+    const map = mapRef.current;
+    if (!container || !map || !mapReady) return;
+
+    let lastWidth = container.clientWidth;
+    let lastHeight = container.clientHeight;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        // Only trigger if dimensions actually changed from 0 or significantly
+        if (width > 0 && height > 0 && (lastWidth === 0 || lastHeight === 0 || 
+            Math.abs(width - lastWidth) > 10 || Math.abs(height - lastHeight) > 10)) {
+          lastWidth = width;
+          lastHeight = height;
+          
+          // Trigger resize and refit bounds
+          requestAnimationFrame(() => {
+            if (mapRef.current) {
+              mapRef.current.resize();
+              // Refit bounds if not done yet or after significant resize
+              const currentModel = modelRef.current;
+              if (currentModel?.bounds) {
+                mapRef.current.fitBounds(currentModel.bounds, {
+                  padding: DEFAULT_FIT_PADDING,
+                  maxZoom: 15,
+                  duration: 300,
+                });
+              }
+            }
+          });
+        }
+      }
+    });
+
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
