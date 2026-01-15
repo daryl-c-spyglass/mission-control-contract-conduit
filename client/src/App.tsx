@@ -29,6 +29,56 @@ import type { Transaction } from "@shared/schema";
 function LandingPage() {
   const urlParams = new URLSearchParams(window.location.search);
   const error = urlParams.get("error");
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  
+  // Check if we're embedded in an iframe
+  const isInIframe = window.self !== window.top;
+  
+  const handleGoogleSignIn = () => {
+    if (isInIframe) {
+      // Use popup auth when embedded in iframe to avoid Google blocking redirects
+      setIsSigningIn(true);
+      
+      const width = 500;
+      const height = 600;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      const popup = window.open(
+        '/api/auth/google/popup',
+        'googleAuth',
+        `width=${width},height=${height},left=${left},top=${top},popup=true`
+      );
+      
+      // Listen for auth success message from popup
+      const handleMessage = (event: MessageEvent) => {
+        // Security: Only accept messages from our own origin to prevent spoofing
+        if (event.origin !== window.location.origin) {
+          return;
+        }
+        if (event.data?.type === 'AUTH_SUCCESS') {
+          window.removeEventListener('message', handleMessage);
+          setIsSigningIn(false);
+          // Refresh the page to load authenticated state
+          window.location.reload();
+        }
+      };
+      
+      window.addEventListener('message', handleMessage);
+      
+      // Check if popup was closed without completing auth
+      const checkPopup = setInterval(() => {
+        if (popup?.closed) {
+          clearInterval(checkPopup);
+          window.removeEventListener('message', handleMessage);
+          setIsSigningIn(false);
+        }
+      }, 500);
+    } else {
+      // Direct redirect when not in iframe
+      window.location.href = "/api/auth/google";
+    }
+  };
   
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background">
@@ -51,9 +101,11 @@ function LandingPage() {
           <Button
             className="w-full"
             size="lg"
-            onClick={() => window.location.href = "/api/auth/google"}
+            onClick={handleGoogleSignIn}
+            disabled={isSigningIn}
             data-testid="button-login"
           >
+            {isSigningIn && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Sign in with Google
           </Button>
           <p className="text-xs text-center text-muted-foreground">

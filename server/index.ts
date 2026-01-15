@@ -24,6 +24,34 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// Allow iframe embedding from trusted domains
+// Only set frame-ancestors, preserve any other CSP directives
+app.use((req, res, next) => {
+  // Set frame-ancestors via dedicated header (doesn't conflict with other CSP)
+  const frameAncestors = "'self' https://*.replit.dev https://*.replit.app https://*.onrender.com";
+  
+  // Override the res.setHeader to merge CSP if another middleware sets it
+  const originalSetHeader = res.setHeader.bind(res);
+  res.setHeader = function(name: string, value: any) {
+    if (name.toLowerCase() === 'content-security-policy') {
+      // Append frame-ancestors if not already present
+      const valueStr = String(value);
+      if (!valueStr.includes('frame-ancestors')) {
+        value = `${valueStr}; frame-ancestors ${frameAncestors}`;
+      }
+    }
+    return originalSetHeader(name, value);
+  };
+  
+  // Remove X-Frame-Options if set elsewhere (conflicts with CSP frame-ancestors)
+  res.removeHeader('X-Frame-Options');
+  
+  // Set initial frame-ancestors CSP
+  originalSetHeader('Content-Security-Policy', `frame-ancestors ${frameAncestors}`);
+  
+  next();
+});
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",

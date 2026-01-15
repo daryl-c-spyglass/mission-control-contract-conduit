@@ -15,6 +15,11 @@ export function getSession() {
     tableName: "sessions",
   });
   const isProduction = process.env.NODE_ENV === "production";
+  // Replit dev environment uses HTTPS via their proxy
+  const isSecure = isProduction || process.env.REPL_ID;
+  
+  // Use 'none' sameSite for cross-origin iframe embedding support when secure
+  // This allows the session cookie to be sent when embedded in an iframe
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
@@ -22,8 +27,8 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? "strict" : "lax",
+      secure: isSecure ? true : false,
+      sameSite: isSecure ? "none" : "lax", // 'none' requires secure:true
       maxAge: sessionTtl,
     },
   });
@@ -116,9 +121,56 @@ export async function setupAuth(app: Express) {
       failureRedirect: "/?error=unauthorized_domain",
     }),
     (req, res) => {
-      res.redirect("/");
+      // Check if this is a popup auth flow
+      // Check both state parameter (reliable) and session flag (backup)
+      const session = req.session as any;
+      const stateParam = req.query.state as string | undefined;
+      const isPopupFromState = stateParam === 'popup=true';
+      const isPopup = isPopupFromState || session?.authPopup;
+      
+      if (isPopup) {
+        // Clear the popup flag
+        if (session) {
+          delete session.authPopup;
+        }
+        // Return HTML that posts a message to the parent window and closes
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+            <head><title>Authentication Complete</title></head>
+            <body>
+              <script>
+                if (window.opener) {
+                  window.opener.postMessage({ type: 'AUTH_SUCCESS' }, '*');
+                  window.close();
+                } else {
+                  window.location.href = '/';
+                }
+              </script>
+              <p>Authentication successful. This window will close automatically.</p>
+            </body>
+          </html>
+        `);
+      } else {
+        res.redirect("/");
+      }
     }
   );
+  
+  // Popup-specific Google auth route
+  // Uses state parameter to reliably identify popup flow (works even if cookies blocked)
+  app.get("/api/auth/google/popup", (req, res, next) => {
+    // Store popup flag in session as backup
+    if (req.session) {
+      (req.session as any).authPopup = true;
+    }
+    // Also pass popup=true in OAuth state for reliable detection
+    passport.authenticate("google", {
+      scope: ["profile", "email"],
+      prompt: "select_account",
+      state: "popup=true", // Passed through OAuth flow and returned in callback
+    })(req, res, next);
+  });
 
   app.get("/api/logout", (req, res) => {
     req.logout(() => {

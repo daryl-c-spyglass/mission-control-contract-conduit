@@ -1,0 +1,81 @@
+## Fix Google Auth for Iframe Embedding
+
+The app currently auto-redirects to Google OAuth on page load, which gets blocked when embedded in an iframe (403 error).
+
+### Changes Needed:
+
+1. **Stop auto-redirecting to Google** - Show a login page instead
+2. **Use popup authentication** - Change `signInWithRedirect` to `signInWithPopup`
+3. **Add iframe headers** - Allow embedding from Mission Control
+
+### Step 1: Find and fix the auto-redirect
+
+Search for code that redirects unauthenticated users to Google automatically:
+```bash
+grep -r "signInWithRedirect" --include="*.tsx" --include="*.ts"
+grep -r "redirect" --include="*.tsx" --include="*.ts" | grep -i auth
+```
+
+### Step 2: Change redirect to popup
+```typescript
+// BEFORE (causes 403 in iframe):
+import { signInWithRedirect } from 'firebase/auth';
+signInWithRedirect(auth, provider);
+
+// AFTER (works in iframe):
+import { signInWithPopup } from 'firebase/auth';
+await signInWithPopup(auth, provider);
+```
+
+### Step 3: Show login page instead of auto-redirect
+
+Instead of:
+```typescript
+if (!user) {
+  signInWithRedirect(auth, provider); // Auto-redirect - BAD
+}
+```
+
+Do this:
+```typescript
+if (!user) {
+  return <LoginPage />; // Show login UI with button - GOOD
+}
+```
+
+### Step 4: Create LoginPage with popup sign-in button
+```typescript
+const LoginPage = () => {
+  const handleGoogleSignIn = async () => {
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider); // Popup works in iframe!
+  };
+
+  return (
+    <div className="login-container">
+      <h1>Contract Conduit</h1>
+      <button onClick={handleGoogleSignIn}>
+        Sign in with Google
+      </button>
+    </div>
+  );
+};
+```
+
+### Step 5: Add server headers for iframe embedding
+```typescript
+// In server/index.ts or middleware
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "frame-ancestors 'self' https://*.replit.dev https://*.replit.app https://*.onrender.com"
+  );
+  res.removeHeader('X-Frame-Options');
+  next();
+});
+```
+
+### Expected Result:
+- Direct access: Shows login page with "Sign in with Google" button
+- Click button: Opens popup for Google sign-in
+- Inside iframe: Same behavior, no 403 error
