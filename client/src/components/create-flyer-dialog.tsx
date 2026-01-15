@@ -393,6 +393,43 @@ export function CreateFlyerDialog({
   const maxPhotos = 3; // Print flyer uses up to 3 photos
   const maxDescriptionLength = DESCRIPTION_LIMITS.print;
 
+  // Build full address from MLS data (street, city, state, zip)
+  const getFullAddress = useCallback((): string => {
+    const mls = mlsData as any;
+    
+    // Get street address
+    const street = mls?.address?.streetAddress || 
+                   mls?.streetAddress ||
+                   transaction.propertyAddress?.split(',')[0]?.trim() || 
+                   '';
+    
+    // Get city
+    const city = mls?.address?.city || 
+                 mls?.city || 
+                 '';
+    
+    // Get state
+    const state = mls?.address?.state || 
+                  mls?.address?.stateOrProvince ||
+                  mls?.state || 
+                  'TX';
+    
+    // Get zip
+    const zip = mls?.address?.zip || 
+                mls?.address?.postalCode ||
+                mls?.zip || 
+                mls?.postalCode ||
+                '';
+    
+    // Build: "Street, City, ST ZIP"
+    let fullAddress = street;
+    if (city) fullAddress += `, ${city}`;
+    if (state) fullAddress += `, ${state}`;
+    if (zip) fullAddress += ` ${zip}`;
+    
+    return fullAddress.toUpperCase();
+  }, [mlsData, transaction.propertyAddress]);
+
   const resetPhotoSelection = useCallback(() => {
     if (mlsPhotos.length > 0) {
       setSelectedPhotos(mlsPhotos.slice(0, 3));
@@ -873,7 +910,7 @@ export function CreateFlyerDialog({
         body: JSON.stringify({
           status: data.status,
           price: data.price,
-          address: transaction.propertyAddress,
+          address: getFullAddress(),
           photos: photosToUse,
           beds: mlsData?.bedrooms || 0,
           baths: mlsData?.bathrooms || 0,
@@ -919,7 +956,7 @@ export function CreateFlyerDialog({
     } finally {
       setIsRenderingPreview(false);
     }
-  }, [form, toast, transaction.propertyAddress, mlsData, localAgentPhoto, agentPhotoUrl, renderedPreviewUrl, getPhotosForFlyer]);
+  }, [form, toast, getFullAddress, mlsData, localAgentPhoto, agentPhotoUrl, renderedPreviewUrl, getPhotosForFlyer]);
 
   const generatePrintFlyer = async (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, data: FormValues, photosToUse: string[]) => {
     canvas.width = 2550;
@@ -1369,7 +1406,7 @@ export function CreateFlyerDialog({
         body: JSON.stringify({
           status: data.status,
           price: data.price,
-          address: transaction.propertyAddress,
+          address: getFullAddress(),
           photos: photosToUse,
           beds: mlsData?.bedrooms || 0,
           baths: mlsData?.bathrooms || 0,

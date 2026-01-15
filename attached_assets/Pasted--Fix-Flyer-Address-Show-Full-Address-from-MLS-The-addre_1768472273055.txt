@@ -1,0 +1,231 @@
+# Fix Flyer Address - Show Full Address from MLS
+
+The address bar currently only shows the street address (e.g., "13106 NEW BOSTON"). It should show the complete address including city, state, and zip code like Caleb's original template.
+
+**Current:** `13106 NEW BOSTON`
+**Should be:** `13106 NEW BOSTON, AUSTIN, TX 78727`
+
+---
+
+## Fix: Build Full Address from Repliers MLS Data
+
+### Update the Backend Data Preparation
+
+When preparing template data, construct the full address from MLS fields:
+
+```typescript
+// In the flyer generation endpoint (server/routes.ts)
+
+app.post('/api/generate-flyer', async (req, res) => {
+  const { transactionId, ...otherFields } = req.body;
+  
+  // Get transaction with MLS data
+  const transaction = await storage.getTransaction(transactionId);
+  const mlsData = transaction?.mlsData;
+  
+  // Build full address from MLS data
+  const buildFullAddress = (mls: any, fallback: any) => {
+    // Try to get address components from MLS data
+    const streetAddress = mls?.address?.streetAddress || 
+                          mls?.streetAddress || 
+                          fallback?.address || 
+                          '';
+    
+    const city = mls?.address?.city || 
+                 mls?.city || 
+                 fallback?.city || 
+                 '';
+    
+    const state = mls?.address?.state || 
+                  mls?.state || 
+                  fallback?.state || 
+                  'TX';
+    
+    const zip = mls?.address?.zip || 
+                mls?.address?.postalCode || 
+                mls?.zip || 
+                mls?.postalCode ||
+                fallback?.zip || 
+                '';
+    
+    // Combine into full address
+    let fullAddress = streetAddress;
+    
+    if (city) {
+      fullAddress += `, ${city}`;
+    }
+    
+    if (state) {
+      fullAddress += `, ${state}`;
+    }
+    
+    if (zip) {
+      fullAddress += ` ${zip}`;
+    }
+    
+    return fullAddress.toUpperCase();
+  };
+  
+  const fullAddress = buildFullAddress(mlsData, transaction);
+  
+  // Pass to template
+  const templateData = {
+    // ... other fields
+    fullAddress: fullAddress,  // "13106 NEW BOSTON, AUSTIN, TX 78727"
+    // ... rest of fields
+  };
+  
+  // ... rest of generation code
+});
+```
+
+---
+
+### Repliers MLS Data Structure Reference
+
+The address data from Repliers typically comes in these formats:
+
+```typescript
+// Format 1: Nested address object
+mlsData.address = {
+  streetAddress: "13106 New Boston",
+  city: "Austin",
+  state: "TX",
+  zip: "78727",
+  // or postalCode: "78727"
+}
+
+// Format 2: Flat fields
+mlsData.streetAddress = "13106 New Boston"
+mlsData.city = "Austin"
+mlsData.state = "TX"
+mlsData.zip = "78727"
+
+// Format 3: Combined field
+mlsData.fullAddress = "13106 New Boston, Austin, TX 78727"
+```
+
+**Handle all formats:**
+
+```typescript
+const getFullAddress = (mlsData: any): string => {
+  // If MLS already has a full address string, use it
+  if (mlsData?.fullAddress) {
+    return mlsData.fullAddress.toUpperCase();
+  }
+  
+  // Otherwise build from components
+  const parts = [];
+  
+  // Street address
+  const street = mlsData?.address?.streetAddress || 
+                 mlsData?.streetAddress || 
+                 mlsData?.address?.street ||
+                 '';
+  if (street) parts.push(street);
+  
+  // City
+  const city = mlsData?.address?.city || mlsData?.city || '';
+  if (city) parts.push(city);
+  
+  // State
+  const state = mlsData?.address?.state || 
+                mlsData?.address?.stateOrProvince ||
+                mlsData?.state || 
+                'TX';
+  
+  // Zip
+  const zip = mlsData?.address?.zip || 
+              mlsData?.address?.postalCode ||
+              mlsData?.zip || 
+              mlsData?.postalCode ||
+              '';
+  
+  // Build: "Street, City, ST ZIP"
+  let address = parts.join(', ');
+  if (state) address += `, ${state}`;
+  if (zip) address += ` ${zip}`;
+  
+  return address.toUpperCase();
+};
+```
+
+---
+
+### Update the Template
+
+The template should already have the address bar - just ensure it uses `fullAddress`:
+
+```handlebars
+<div class="address-bar">{{fullAddress}}</div>
+```
+
+**CSS (already in place):**
+```css
+.address-bar {
+    padding: 45px 120px;
+    font-size: 54px;
+    font-weight: 600;
+    letter-spacing: 9px;
+    color: #2c2c2c;
+    text-transform: uppercase;
+    border-bottom: 3px solid #ddd;
+}
+```
+
+---
+
+### Frontend - Pass Full Address or Let Backend Build It
+
+**Option A: Let backend build it (Recommended)**
+
+The backend has access to MLS data, so it should construct the full address:
+
+```typescript
+// Frontend just sends transactionId
+const payload = {
+  transactionId: transaction.id,
+  // ... other fields
+  // Don't send address - let backend get from MLS
+};
+```
+
+**Option B: Frontend builds and sends it**
+
+If frontend already has MLS data loaded:
+
+```typescript
+const buildFullAddress = () => {
+  const mls = transaction?.mlsData;
+  const street = mls?.address?.streetAddress || transaction?.address || '';
+  const city = mls?.address?.city || transaction?.city || '';
+  const state = mls?.address?.state || transaction?.state || 'TX';
+  const zip = mls?.address?.zip || mls?.address?.postalCode || transaction?.zip || '';
+  
+  return `${street}, ${city}, ${state} ${zip}`.toUpperCase();
+};
+
+const payload = {
+  // ... other fields
+  fullAddress: buildFullAddress(),
+};
+```
+
+---
+
+## Example Output
+
+| Before | After |
+|--------|-------|
+| 13106 NEW BOSTON | 13106 NEW BOSTON, AUSTIN, TX 78727 |
+| 142 N STEEL CREEK | 142 N STEEL CREEK CREST HWY, CENTER POINT, TX 78010 |
+
+---
+
+## Testing Checklist
+
+- [ ] Address bar shows full address with city, state, zip
+- [ ] Address is all uppercase
+- [ ] Handles missing city/state/zip gracefully (doesn't show "undefined")
+- [ ] Works with different MLS data formats from Repliers
+- [ ] Spacing and formatting looks correct (comma after street, comma after city, space before zip)
