@@ -3,9 +3,9 @@ import { createServer, type Server } from "http";
 import path from "path";
 import fs from "fs";
 import { storage } from "./storage";
-import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema, insertCmaSchema } from "@shared/schema";
+import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema, insertCmaSchema, insertNotificationSettingsSchema } from "@shared/schema";
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages, watchUserMailbox } from "./gmail";
-import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel, postDocumentUploadNotification, postMLSListingNotification } from "./slack";
+import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel, postDocumentUploadNotification, postMLSListingNotification, sendMarketingNotification } from "./slack";
 import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess, getBestPhotosForFlyer } from "./repliers";
 import { isRentalOrLease } from "../shared/lib/listings";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
@@ -925,21 +925,37 @@ export async function registerRoutes(
         category: "marketing",
       });
 
-      // Upload to Slack if requested and channel exists
-      if (postToSlack && transaction.slackChannelId) {
-        const typeLabel = type === "facebook" ? "Facebook (16:9)" : 
-                          type === "instagram" ? "Instagram (1:1)" :
-                          type === "story" ? "Story (9:16)" :
-                          type === "alt_style" ? "Alternative Style" :
-                          type === "flyer" ? "Property Flyer" : type;
+      const userId = (req as any).user?.claims?.sub;
+      const createdBy = (req as any).user?.claims?.email || userId || 'Unknown';
+
+      // Check notification settings and send to Slack
+      if (transaction.slackChannelId) {
+        let shouldNotify = postToSlack; // If explicitly requested, honor that
         
-        await uploadFileToChannel(
-          transaction.slackChannelId,
-          imageData,
-          fileName,
-          `${typeLabel} - ${transaction.propertyAddress}`,
-          `New marketing material generated for ${transaction.propertyAddress}`
-        );
+        // If not explicitly requested, check user's notification settings
+        if (postToSlack === undefined && userId) {
+          try {
+            const settings = await storage.getNotificationSettings(userId, transaction.id);
+            shouldNotify = settings?.marketingAssets ?? true; // Default to true
+          } catch (e) {
+            shouldNotify = true; // Default to enabled if can't get settings
+          }
+        }
+        
+        if (shouldNotify) {
+          try {
+            await sendMarketingNotification(
+              transaction.slackChannelId,
+              transaction.propertyAddress,
+              type,
+              createdBy,
+              imageData,
+              fileName
+            );
+          } catch (slackError) {
+            console.error("Failed to send marketing notification to Slack:", slackError);
+          }
+        }
       }
 
       res.status(201).json(asset);
@@ -1053,46 +1069,60 @@ export async function registerRoutes(
       // Get file extension
       const fileExt = fileName.split('.').pop()?.toLowerCase() || 'unknown';
 
-      // Send Slack notification AND upload the actual file
+      // Check notification settings and send Slack notification with file
       if (transaction.slackChannelId) {
-        try {
-          // Build the notification message to include with file upload
-          const timestamp = new Date().toLocaleString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-          });
-          
-          const uploaderName = req.user?.claims?.email || 'Unknown User';
-          const notesText = notes ? `\n*Notes:* ${notes}` : '';
-          
-          const initialComment = [
-            `*New Document Uploaded*`,
-            ``,
-            `*Document:* ${docLabel}`,
-            `*Type:* ${docTypeLabel}`,
-            `*Format:* ${fileExt.toUpperCase()}`,
-            `*Size:* ${formatFileSize(fileSize)}`,
-            `*Property:* ${transaction.propertyAddress}`,
-            `*Uploaded by:* ${uploaderName}`,
-            `*Time:* ${timestamp}`,
-            notesText,
-          ].filter(Boolean).join('\n');
+        const userId = req.user?.claims?.sub;
+        let shouldNotify = true; // Default to enabled
+        
+        if (userId) {
+          try {
+            const settings = await storage.getNotificationSettings(userId, transaction.id);
+            shouldNotify = settings?.documentUploads ?? true;
+          } catch (e) {
+            shouldNotify = true; // Default to enabled if can't get settings
+          }
+        }
+        
+        if (shouldNotify) {
+          try {
+            // Build the notification message to include with file upload
+            const timestamp = new Date().toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            });
+            
+            const uploaderName = req.user?.claims?.email || 'Unknown User';
+            const notesText = notes ? `\n*Notes:* ${notes}` : '';
+            
+            const initialComment = [
+              `*New Document Uploaded*`,
+              ``,
+              `*Document:* ${docLabel}`,
+              `*Type:* ${docTypeLabel}`,
+              `*Format:* ${fileExt.toUpperCase()}`,
+              `*Size:* ${formatFileSize(fileSize)}`,
+              `*Property:* ${transaction.propertyAddress}`,
+              `*Uploaded by:* ${uploaderName}`,
+              `*Time:* ${timestamp}`,
+              notesText,
+            ].filter(Boolean).join('\n');
 
-          // Upload the actual file to Slack with the notification as initial comment
-          await uploadFileToChannel(
-            transaction.slackChannelId,
-            fileData,
-            fileName,
-            docLabel,
-            initialComment
-          );
-        } catch (slackError) {
-          console.error("Failed to send document to Slack:", slackError);
-          // Don't fail the request if Slack notification fails
+            // Upload the actual file to Slack with the notification as initial comment
+            await uploadFileToChannel(
+              transaction.slackChannelId,
+              fileData,
+              fileName,
+              docLabel,
+              initialComment
+            );
+          } catch (slackError) {
+            console.error("Failed to send document to Slack:", slackError);
+            // Don't fail the request if Slack notification fails
+          }
         }
       }
 
@@ -2401,6 +2431,94 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
     } catch (error: any) {
       console.error("Error generating headline:", error);
       res.status(500).json({ error: "Failed to generate headline" });
+    }
+  });
+
+  // ============ Notification Settings ============
+
+  // Get notification settings for the current user
+  app.get("/api/notification-settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { transactionId } = req.query;
+      const settings = await storage.getNotificationSettings(userId, transactionId as string | undefined);
+      
+      // Return default settings if none exist
+      if (!settings) {
+        res.json({
+          userId,
+          transactionId: transactionId || null,
+          documentUploads: true,
+          closingReminders: true,
+          marketingAssets: true,
+          reminder30Days: true,
+          reminder14Days: true,
+          reminder7Days: true,
+          reminder3Days: true,
+          reminder1Day: true,
+          reminderDayOf: true,
+        });
+        return;
+      }
+
+      res.json(settings);
+    } catch (error) {
+      console.error("Error getting notification settings:", error);
+      res.status(500).json({ message: "Failed to get notification settings" });
+    }
+  });
+
+  // Update notification settings for the current user
+  app.put("/api/notification-settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      // Validate request body using Zod schema
+      const validationResult = insertNotificationSettingsSchema.safeParse({
+        userId,
+        transactionId: req.body.transactionId || null,
+        documentUploads: req.body.documentUploads ?? true,
+        closingReminders: req.body.closingReminders ?? true,
+        marketingAssets: req.body.marketingAssets ?? true,
+        reminder30Days: req.body.reminder30Days ?? true,
+        reminder14Days: req.body.reminder14Days ?? true,
+        reminder7Days: req.body.reminder7Days ?? true,
+        reminder3Days: req.body.reminder3Days ?? true,
+        reminder1Day: req.body.reminder1Day ?? true,
+        reminderDayOf: req.body.reminderDayOf ?? true,
+      });
+
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid notification settings", 
+          errors: validationResult.error.errors 
+        });
+      }
+
+      const settings = await storage.upsertNotificationSettings(validationResult.data);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error updating notification settings:", error);
+      res.status(500).json({ message: "Failed to update notification settings" });
+    }
+  });
+
+  // Force trigger closing reminders check (for testing)
+  app.post("/api/notification-settings/check-reminders", isAuthenticated, async (req: any, res) => {
+    try {
+      const { forceReminderCheck } = await import("./services/closing-reminders");
+      await forceReminderCheck();
+      res.json({ message: "Reminder check triggered" });
+    } catch (error) {
+      console.error("Error triggering reminder check:", error);
+      res.status(500).json({ message: "Failed to trigger reminder check" });
     }
   });
 

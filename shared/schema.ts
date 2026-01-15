@@ -124,6 +124,29 @@ export const contractDocuments = pgTable("contract_documents", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Notification settings per user/transaction
+export const notificationSettings = pgTable("notification_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  transactionId: varchar("transaction_id"), // null = global settings for user
+  
+  // Toggle each notification type
+  documentUploads: boolean("document_uploads").default(true),
+  closingReminders: boolean("closing_reminders").default(true),
+  marketingAssets: boolean("marketing_assets").default(true),
+  
+  // Reminder intervals (which ones to receive)
+  reminder30Days: boolean("reminder_30_days").default(true),
+  reminder14Days: boolean("reminder_14_days").default(true),
+  reminder7Days: boolean("reminder_7_days").default(true),
+  reminder3Days: boolean("reminder_3_days").default(true),
+  reminder1Day: boolean("reminder_1_day").default(true),
+  reminderDayOf: boolean("reminder_day_of").default(true),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
   id: true,
@@ -159,6 +182,12 @@ export const insertCmaSchema = createInsertSchema(cmas).omit({
   updatedAt: true,
 });
 
+export const insertNotificationSettingsSchema = createInsertSchema(notificationSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
@@ -180,6 +209,9 @@ export type InsertContractDocument = z.infer<typeof insertContractDocumentSchema
 
 export type Cma = typeof cmas.$inferSelect;
 export type InsertCma = z.infer<typeof insertCmaSchema>;
+
+export type NotificationSetting = typeof notificationSettings.$inferSelect;
+export type InsertNotificationSetting = z.infer<typeof insertNotificationSettingsSchema>;
 
 // CMA Statistics Types
 export interface CmaStatRange {

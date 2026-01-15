@@ -1,0 +1,266 @@
+mplement a comprehensive Slack notification system for transactions. When a transaction is created (like "1005 Jewell, Austin, TX 78704"), a Slack channel is auto-created. That channel should receive notifications for various events.
+
+---
+
+## FEATURE 1: DOCUMENT UPLOAD NOTIFICATIONS
+
+When a document is uploaded to the Docs tab, send to Slack:
+
+- 📎 The actual file (attached)
+- Document name
+- Document type (Contract, Amendment, etc.)
+- File format (PDF, DOCX, etc.)
+- Notes (if any)
+- Who uploaded it
+- Timestamp
+
+Example Slack message:
+📄 New Document Uploaded
+Document: market-review-austin-2025-12-18.pdf
+Type: Other
+Size: 4.7 MB
+Notes: "Test-document"
+Uploaded by: Daryl Camingao
+Time: Jan 16, 2026, 3:45 PM
+[file attached]
+
+Find the document upload handler and add Slack notification:
+grep -r "upload" --include="*.ts" --include="*.tsx" | grep -i document
+
+---
+
+## FEATURE 2: CLOSING DATE REMINDERS
+
+Send automated reminders to Slack channel based on Expected Closing date:
+
+- 30 days remaining
+- 14 days remaining
+- 7 days remaining
+- 3 days remaining
+- 1 day remaining
+- Day of closing
+
+Example Slack message:
+⏰ Closing Reminder
+📍 1005 Jewell, Austin, TX 78704
+📅 Expected Closing: Jan 31, 2026
+⚠️ 16 days remaining
+Action items to review before closing...
+
+Implementation:
+- Create a scheduled job (cron) that runs daily
+- Check all active transactions with closing dates
+- Send reminders at configured intervals
+- Use node-cron or similar:
+```typescript
+import cron from 'node-cron';
+
+// Run daily at 9 AM
+cron.schedule('0 9 * * *', async () => {
+  await sendClosingDateReminders();
+});
+
+async function sendClosingDateReminders() {
+  const transactions = await db.transaction.findMany({
+    where: {
+      status: 'active',
+      expectedClosingDate: { not: null },
+      slackChannelId: { not: null }
+    }
+  });
+
+  for (const transaction of transactions) {
+    const daysRemaining = getDaysUntil(transaction.expectedClosingDate);
+    
+    if ([30, 14, 7, 3, 1, 0].includes(daysRemaining)) {
+      await sendSlackReminder(transaction, daysRemaining);
+    }
+  }
+}
+```
+
+---
+
+## FEATURE 3: MARKETING NOTIFICATIONS
+
+When marketing materials are created/generated, notify Slack:
+
+- Social media graphics generated
+- Flyers created
+- Any marketing assets
+
+Example Slack message:
+🎨 Marketing Materials Created
+📍 1005 Jewell, Austin, TX 78704
+Type: Property Flyer
+Created by: Daryl Camingao
+[flyer image/PDF attached]
+
+Find marketing generation code:
+grep -r "marketing" --include="*.ts" --include="*.tsx" | grep -i generate
+grep -r "flyer" --include="*.ts" --include="*.tsx"
+
+---
+
+## FEATURE 4: USER NOTIFICATION SETTINGS
+
+Add a Settings page/section where users can toggle notifications on/off:
+
+### Database Schema Addition:
+```typescript
+// Add to user or transaction settings
+model NotificationSettings {
+  id                    String   @id @default(uuid())
+  userId                String
+  transactionId         String?  // null = global settings
+  
+  // Toggle each notification type
+  documentUploads       Boolean  @default(true)
+  closingReminders      Boolean  @default(true)
+  marketingAssets       Boolean  @default(true)
+  
+  // Reminder intervals (which ones to receive)
+  reminder30Days        Boolean  @default(true)
+  reminder14Days        Boolean  @default(true)
+  reminder7Days         Boolean  @default(true)
+  reminder3Days         Boolean  @default(true)
+  reminder1Day          Boolean  @default(true)
+  reminderDayOf         Boolean  @default(true)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+```
+
+### Settings UI:
+```typescript
+// In Settings page or Transaction Settings
+
+function NotificationSettings({ transactionId }) {
+  const [settings, setSettings] = useState({
+    documentUploads: true,
+    closingReminders: true,
+    marketingAssets: true,
+    reminder30Days: true,
+    reminder14Days: true,
+    reminder7Days: true,
+    reminder3Days: true,
+    reminder1Day: true,
+    reminderDayOf: true,
+  });
+
+  return (
+    <div className="notification-settings">
+      <h3>Slack Notifications</h3>
+      
+      <div className="setting-group">
+        <h4>Notification Types</h4>
+        <ToggleSwitch
+          label="Document Uploads"
+          description="Receive notification when documents are uploaded"
+          checked={settings.documentUploads}
+          onChange={(v) => updateSetting('documentUploads', v)}
+        />
+        <ToggleSwitch
+          label="Closing Date Reminders"
+          description="Receive reminders as closing date approaches"
+          checked={settings.closingReminders}
+          onChange={(v) => updateSetting('closingReminders', v)}
+        />
+        <ToggleSwitch
+          label="Marketing Assets"
+          description="Receive notification when marketing materials are created"
+          checked={settings.marketingAssets}
+          onChange={(v) => updateSetting('marketingAssets', v)}
+        />
+      </div>
+
+      {settings.closingReminders && (
+        <div className="setting-group">
+          <h4>Reminder Schedule</h4>
+          <ToggleSwitch label="30 days before" checked={settings.reminder30Days} onChange={(v) => updateSetting('reminder30Days', v)} />
+          <ToggleSwitch label="14 days before" checked={settings.reminder14Days} onChange={(v) => updateSetting('reminder14Days', v)} />
+          <ToggleSwitch label="7 days before" checked={settings.reminder7Days} onChange={(v) => updateSetting('reminder7Days', v)} />
+          <ToggleSwitch label="3 days before" checked={settings.reminder3Days} onChange={(v) => updateSetting('reminder3Days', v)} />
+          <ToggleSwitch label="1 day before" checked={settings.reminder1Day} onChange={(v) => updateSetting('reminder1Day', v)} />
+          <ToggleSwitch label="Day of closing" checked={settings.reminderDayOf} onChange={(v) => updateSetting('reminderDayOf', v)} />
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## IMPLEMENTATION CHECKLIST
+
+### Document Uploads:
+- [ ] Find document upload handler
+- [ ] After saving document, check if transaction has slackChannelId
+- [ ] Check user's notification settings (documentUploads = true)
+- [ ] Send file + details to Slack channel using files.uploadV2
+
+### Closing Reminders:
+- [ ] Create scheduled job (cron) for daily reminder checks
+- [ ] Query transactions with upcoming closing dates
+- [ ] Check notification settings for each interval
+- [ ] Send reminder to Slack channel
+
+### Marketing Assets:
+- [ ] Find marketing/flyer generation code
+- [ ] After generating, check notification settings
+- [ ] Send asset + details to Slack channel
+
+### Settings:
+- [ ] Add NotificationSettings model to database
+- [ ] Create Settings UI with toggles
+- [ ] Create API endpoints to save/load settings
+- [ ] Check settings before sending any notification
+
+---
+
+## SLACK SERVICE UPDATE
+
+Create a central notification service:
+```typescript
+// services/slackNotifications.ts
+
+export async function sendDocumentNotification(transaction, document, uploadedBy) {
+  // Check settings first
+  const settings = await getNotificationSettings(transaction.userId, transaction.id);
+  if (!settings.documentUploads) return;
+  
+  if (!transaction.slackChannelId) return;
+  
+  // Send to Slack...
+}
+
+export async function sendClosingReminder(transaction, daysRemaining) {
+  const settings = await getNotificationSettings(transaction.userId, transaction.id);
+  if (!settings.closingReminders) return;
+  
+  const reminderKey = `reminder${daysRemaining === 0 ? 'DayOf' : daysRemaining + 'Days'}`;
+  if (!settings[reminderKey]) return;
+  
+  if (!transaction.slackChannelId) return;
+  
+  // Send to Slack...
+}
+
+export async function sendMarketingNotification(transaction, asset, createdBy) {
+  const settings = await getNotificationSettings(transaction.userId, transaction.id);
+  if (!settings.marketingAssets) return;
+  
+  if (!transaction.slackChannelId) return;
+  
+  // Send to Slack...
+}
+```
+
+---
+
+Start with Feature 1 (Document Uploads) first, then add the others incrementally.
+
+Summary of Features:
+FeatureTriggerSlack Message ContainsDocument UploadUser uploads to Docs tabFile + name + type + notes + uploaderClosing RemindersDaily cron at 30/14/7/3/1/0 daysProperty + date + days remainingMarketing AssetsUser generates flyer/graphicsAsset + type + creatorSettingsUser toggles in SettingsN/A - controls above features

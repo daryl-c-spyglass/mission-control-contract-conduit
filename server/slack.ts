@@ -532,3 +532,208 @@ export async function uploadFileToChannel(
     return null;
   }
 }
+
+/**
+ * Send a closing date reminder to a Slack channel
+ */
+export async function sendClosingReminder(
+  channelId: string,
+  propertyAddress: string,
+  closingDate: string,
+  daysRemaining: number
+): Promise<void> {
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!token) {
+    console.error("[Slack] No Slack token available for closing reminder");
+    return;
+  }
+
+  // Format the closing date for display
+  const formattedDate = new Date(closingDate).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  // Determine urgency emoji and text
+  let urgencyEmoji = "";
+  let urgencyText = "";
+  if (daysRemaining === 0) {
+    urgencyEmoji = "";
+    urgencyText = "TODAY is closing day!";
+  } else if (daysRemaining === 1) {
+    urgencyEmoji = "";
+    urgencyText = "1 day remaining - Final preparations!";
+  } else if (daysRemaining <= 3) {
+    urgencyEmoji = "";
+    urgencyText = `${daysRemaining} days remaining`;
+  } else if (daysRemaining <= 7) {
+    urgencyEmoji = "";
+    urgencyText = `${daysRemaining} days remaining`;
+  } else {
+    urgencyEmoji = "";
+    urgencyText = `${daysRemaining} days remaining`;
+  }
+
+  const blocks = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: `${urgencyEmoji} Closing Reminder`,
+        emoji: true
+      }
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*Property:*\n${propertyAddress}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*Expected Closing:*\n${formattedDate}`
+        }
+      ]
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*${urgencyText}*`
+      }
+    },
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: "Review action items and ensure all documents are in order before closing."
+        }
+      ]
+    }
+  ];
+
+  try {
+    const response = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        channel: channelId,
+        blocks,
+        text: `Closing Reminder: ${propertyAddress} - ${urgencyText}`,
+      }),
+    });
+
+    const data = await response.json();
+    if (!data.ok) {
+      console.error("[Slack] Failed to send closing reminder:", data.error);
+    } else {
+      console.log(`[Slack] Closing reminder sent for ${propertyAddress}: ${daysRemaining} days remaining`);
+    }
+  } catch (error) {
+    console.error("[Slack] Failed to send closing reminder:", error);
+  }
+}
+
+/**
+ * Send a marketing asset notification to a Slack channel (auto-notification)
+ */
+export async function sendMarketingNotification(
+  channelId: string,
+  propertyAddress: string,
+  assetType: string,
+  createdBy: string,
+  imageData?: string,
+  fileName?: string
+): Promise<void> {
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!token) {
+    console.error("[Slack] No Slack token available for marketing notification");
+    return;
+  }
+
+  const typeLabels: Record<string, string> = {
+    facebook: 'Facebook Post (16:9)',
+    instagram: 'Instagram Post (1:1)',
+    story: 'Instagram Story (9:16)',
+    alt_style: 'Alternative Style',
+    flyer: 'Property Flyer',
+  };
+  const typeLabel = typeLabels[assetType] || assetType;
+
+  const timestamp = new Date().toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+
+  // If we have image data, upload the file with the notification
+  if (imageData && fileName) {
+    const initialComment = [
+      `*Marketing Materials Created*`,
+      ``,
+      `*Property:* ${propertyAddress}`,
+      `*Type:* ${typeLabel}`,
+      `*Created by:* ${createdBy}`,
+      `*Time:* ${timestamp}`,
+    ].join('\n');
+
+    await uploadFileToChannel(channelId, imageData, fileName, `${typeLabel} - ${propertyAddress}`, initialComment);
+  } else {
+    // Just send a text message without attachment
+    const blocks = [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: "Marketing Materials Created",
+          emoji: true
+        }
+      },
+      {
+        type: "section",
+        fields: [
+          { type: "mrkdwn", text: `*Property:*\n${propertyAddress}` },
+          { type: "mrkdwn", text: `*Type:*\n${typeLabel}` }
+        ]
+      },
+      {
+        type: "section",
+        fields: [
+          { type: "mrkdwn", text: `*Created by:*\n${createdBy}` },
+          { type: "mrkdwn", text: `*Time:*\n${timestamp}` }
+        ]
+      }
+    ];
+
+    try {
+      const response = await fetch("https://slack.com/api/chat.postMessage", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          channel: channelId,
+          blocks,
+          text: `Marketing asset created: ${typeLabel} for ${propertyAddress}`,
+        }),
+      });
+
+      const data = await response.json();
+      if (!data.ok) {
+        console.error("[Slack] Failed to send marketing notification:", data.error);
+      }
+    } catch (error) {
+      console.error("[Slack] Failed to send marketing notification:", error);
+    }
+  }
+}

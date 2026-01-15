@@ -13,6 +13,8 @@ import {
   type InsertContractDocument,
   type Cma,
   type InsertCma,
+  type NotificationSetting,
+  type InsertNotificationSetting,
   transactions,
   coordinators,
   integrationSettings,
@@ -20,6 +22,7 @@ import {
   marketingAssets,
   contractDocuments,
   cmas,
+  notificationSettings,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, isNull, and } from "drizzle-orm";
@@ -71,6 +74,12 @@ export interface IStorage {
   createCma(cma: InsertCma): Promise<Cma>;
   updateCma(id: string, cma: Partial<Cma>): Promise<Cma | undefined>;
   deleteCma(id: string): Promise<boolean>;
+
+  // Notification Settings
+  getNotificationSettings(userId: string, transactionId?: string | null): Promise<NotificationSetting | undefined>;
+  getGlobalNotificationSettings(userId: string): Promise<NotificationSetting | undefined>;
+  upsertNotificationSettings(settings: InsertNotificationSetting): Promise<NotificationSetting>;
+  getTransactionsWithClosingReminders(): Promise<Transaction[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -319,6 +328,81 @@ export class DatabaseStorage implements IStorage {
   async deleteCma(id: string): Promise<boolean> {
     await db.delete(cmas).where(eq(cmas.id, id));
     return true;
+  }
+
+  // Notification Settings
+  async getNotificationSettings(userId: string, transactionId?: string | null): Promise<NotificationSetting | undefined> {
+    // First try to get transaction-specific settings if transactionId is provided
+    if (transactionId) {
+      const [setting] = await db
+        .select()
+        .from(notificationSettings)
+        .where(
+          and(
+            eq(notificationSettings.userId, userId),
+            eq(notificationSettings.transactionId, transactionId)
+          )
+        );
+      if (setting) return setting;
+    }
+    // Fall back to global settings
+    return this.getGlobalNotificationSettings(userId);
+  }
+
+  async getGlobalNotificationSettings(userId: string): Promise<NotificationSetting | undefined> {
+    const [setting] = await db
+      .select()
+      .from(notificationSettings)
+      .where(
+        and(
+          eq(notificationSettings.userId, userId),
+          isNull(notificationSettings.transactionId)
+        )
+      );
+    return setting;
+  }
+
+  async upsertNotificationSettings(settings: InsertNotificationSetting): Promise<NotificationSetting> {
+    // Check if settings exist for this user/transaction combo
+    const existing = settings.transactionId 
+      ? await db.select().from(notificationSettings).where(
+          and(
+            eq(notificationSettings.userId, settings.userId),
+            eq(notificationSettings.transactionId, settings.transactionId)
+          )
+        )
+      : await db.select().from(notificationSettings).where(
+          and(
+            eq(notificationSettings.userId, settings.userId),
+            isNull(notificationSettings.transactionId)
+          )
+        );
+
+    if (existing.length > 0) {
+      const [updated] = await db
+        .update(notificationSettings)
+        .set({ ...settings, updatedAt: new Date() })
+        .where(eq(notificationSettings.id, existing[0].id))
+        .returning();
+      return updated;
+    }
+
+    const [created] = await db
+      .insert(notificationSettings)
+      .values(settings)
+      .returning();
+    return created;
+  }
+
+  async getTransactionsWithClosingReminders(): Promise<Transaction[]> {
+    // Get all transactions that have a closing date and a Slack channel
+    const results = await db.select().from(transactions);
+    return results.filter(t => 
+      t.closingDate && 
+      t.slackChannelId && 
+      t.status !== 'closed' && 
+      t.status !== 'cancelled'
+    );
   }
 }
 
