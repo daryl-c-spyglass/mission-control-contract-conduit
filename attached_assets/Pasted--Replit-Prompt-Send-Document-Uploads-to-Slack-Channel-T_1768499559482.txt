@@ -1,0 +1,425 @@
+## Replit Prompt: Send Document Uploads to Slack Channel
+
+---
+
+**Task: When a Document is Uploaded in Contract Conduit, Send it to Slack**
+
+When a user uploads a document to a transaction, automatically send a notification to the connected Slack channel that includes:
+- ✅ The actual file (attached to the message)
+- ✅ Document Name
+- ✅ Document Type (Contract, Amendment, Disclosure, etc.)
+- ✅ File Format (PDF, DOCX, JPG, etc.)
+- ✅ Notes (if any were provided)
+- ✅ Property Address
+- ✅ Who uploaded it
+- ✅ Timestamp
+
+---
+
+### Step 1: Find the Document Upload Handler
+
+```bash
+# Search for document upload code
+grep -r "upload" --include="*.tsx" --include="*.ts" | grep -i document
+grep -r "handleUpload" --include="*.tsx" --include="*.ts"
+grep -r "multer\|formidable\|busboy" --include="*.ts"
+```
+
+---
+
+### Step 2: Create Slack File Upload Service
+
+```typescript
+// services/slackService.ts
+
+import { WebClient } from '@slack/web-api';
+
+const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
+
+interface DocumentUploadPayload {
+  channelId: string;
+  file: Buffer | string;  // File buffer or file path
+  fileName: string;
+  documentType: string;
+  fileFormat: string;
+  notes?: string;
+  propertyAddress: string;
+  uploadedBy: string;
+  transactionId: string;
+}
+
+export async function sendDocumentToSlack(payload: DocumentUploadPayload) {
+  const {
+    channelId,
+    file,
+    fileName,
+    documentType,
+    fileFormat,
+    notes,
+    propertyAddress,
+    uploadedBy,
+  } = payload;
+
+  try {
+    // Format the message
+    const timestamp = new Date().toLocaleString('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    });
+
+    const messageText = [
+      `📄 *New Document Uploaded*`,
+      ``,
+      `*Document:* ${fileName}`,
+      `*Type:* ${documentType}`,
+      `*Format:* ${fileFormat.toUpperCase()}`,
+      `*Property:* ${propertyAddress}`,
+      `*Uploaded by:* ${uploadedBy}`,
+      `*Time:* ${timestamp}`,
+      notes ? `*Notes:* ${notes}` : null,
+    ].filter(Boolean).join('\n');
+
+    // Upload file to Slack with message
+    const result = await slack.files.uploadV2({
+      channel_id: channelId,
+      file: file,
+      filename: fileName,
+      initial_comment: messageText,
+    });
+
+    console.log('Document sent to Slack:', result);
+    return { success: true, result };
+
+  } catch (error) {
+    console.error('Failed to send document to Slack:', error);
+    return { success: false, error };
+  }
+}
+```
+
+---
+
+### Step 3: Update Document Upload API Route
+
+```typescript
+// api/documents/upload.ts or routes/documents.ts
+
+import { sendDocumentToSlack } from '@/services/slackService';
+import multer from 'multer';
+import { db } from '@/lib/db';
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+export async function POST(req: Request) {
+  // Parse the multipart form data
+  const formData = await req.formData();
+  
+  const file = formData.get('file') as File;
+  const transactionId = formData.get('transactionId') as string;
+  const documentType = formData.get('documentType') as string;
+  const notes = formData.get('notes') as string;
+  
+  if (!file || !transactionId) {
+    return Response.json({ error: 'Missing required fields' }, { status: 400 });
+  }
+
+  try {
+    // Get file details
+    const fileName = file.name;
+    const fileFormat = fileName.split('.').pop() || 'unknown';
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+    // Save document to storage/database
+    const savedDocument = await saveDocumentToStorage(fileBuffer, fileName, transactionId);
+
+    // Get transaction details for Slack message
+    const transaction = await db.transaction.findUnique({
+      where: { id: transactionId },
+      include: { property: true }
+    });
+
+    // Get current user
+    const currentUser = await getCurrentUser(req);
+
+    // Send to Slack if channel is connected
+    if (transaction?.slackChannelId) {
+      await sendDocumentToSlack({
+        channelId: transaction.slackChannelId,
+        file: fileBuffer,
+        fileName: fileName,
+        documentType: documentType || 'General Document',
+        fileFormat: fileFormat,
+        notes: notes || undefined,
+        propertyAddress: transaction.property?.address || transaction.address || 'Unknown',
+        uploadedBy: currentUser?.name || currentUser?.email || 'Unknown',
+        transactionId: transactionId,
+      });
+    }
+
+    return Response.json({ 
+      success: true, 
+      document: savedDocument 
+    });
+
+  } catch (error) {
+    console.error('Document upload error:', error);
+    return Response.json({ error: 'Upload failed' }, { status: 500 });
+  }
+}
+```
+
+---
+
+### Step 4: Alternative - Using Slack Incoming Webhook with File URL
+
+If you store files in cloud storage (S3, Cloudinary, etc.) and have a public URL:
+
+```typescript
+// services/slackWebhook.ts
+
+interface DocumentNotification {
+  webhookUrl: string;
+  documentName: string;
+  documentType: string;
+  fileFormat: string;
+  documentUrl: string;  // Public URL to the file
+  notes?: string;
+  propertyAddress: string;
+  uploadedBy: string;
+}
+
+export async function notifySlackDocumentUpload(payload: DocumentNotification) {
+  const {
+    webhookUrl,
+    documentName,
+    documentType,
+    fileFormat,
+    documentUrl,
+    notes,
+    propertyAddress,
+    uploadedBy,
+  } = payload;
+
+  const timestamp = new Date().toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+
+  const message = {
+    blocks: [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: "📄 New Document Uploaded",
+          emoji: true
+        }
+      },
+      {
+        type: "section",
+        fields: [
+          { type: "mrkdwn", text: `*Document:*\n${documentName}` },
+          { type: "mrkdwn", text: `*Type:*\n${documentType}` },
+          { type: "mrkdwn", text: `*Format:*\n${fileFormat.toUpperCase()}` },
+          { type: "mrkdwn", text: `*Property:*\n${propertyAddress}` },
+        ]
+      },
+      {
+        type: "section",
+        fields: [
+          { type: "mrkdwn", text: `*Uploaded by:*\n${uploadedBy}` },
+          { type: "mrkdwn", text: `*Time:*\n${timestamp}` },
+        ]
+      },
+      ...(notes ? [{
+        type: "section",
+        text: { type: "mrkdwn", text: `*Notes:*\n${notes}` }
+      }] : []),
+      {
+        type: "actions",
+        elements: [
+          {
+            type: "button",
+            text: { type: "plain_text", text: "📥 Download Document", emoji: true },
+            url: documentUrl,
+            action_id: "download_document"
+          }
+        ]
+      }
+    ]
+  };
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(message),
+    });
+
+    return response.ok;
+  } catch (error) {
+    console.error('Slack webhook error:', error);
+    return false;
+  }
+}
+```
+
+---
+
+### Step 5: Frontend - Pass Document Type and Notes
+
+Make sure your upload form sends document type and notes:
+
+```typescript
+// components/DocumentUpload.tsx
+
+const DOCUMENT_TYPES = [
+  'Contract',
+  'Amendment', 
+  'Addendum',
+  'Disclosure',
+  'Inspection Report',
+  'Appraisal',
+  'Title Document',
+  'Insurance',
+  'Closing Document',
+  'Other'
+];
+
+function DocumentUploadForm({ transactionId, onSuccess }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [documentType, setDocumentType] = useState('');
+  const [notes, setNotes] = useState('');
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async () => {
+    if (!file) return;
+    
+    setUploading(true);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('transactionId', transactionId);
+    formData.append('documentType', documentType);
+    formData.append('notes', notes);
+
+    try {
+      const response = await fetch('/api/documents/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        onSuccess?.();
+        // Reset form
+        setFile(null);
+        setDocumentType('');
+        setNotes('');
+      }
+    } catch (error) {
+      console.error('Upload failed:', error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="upload-form">
+      {/* File Input */}
+      <input
+        type="file"
+        onChange={(e) => setFile(e.target.files?.[0] || null)}
+        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+      />
+
+      {/* Document Type */}
+      <select
+        value={documentType}
+        onChange={(e) => setDocumentType(e.target.value)}
+      >
+        <option value="">Select document type...</option>
+        {DOCUMENT_TYPES.map(type => (
+          <option key={type} value={type}>{type}</option>
+        ))}
+      </select>
+
+      {/* Notes */}
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder="Add notes (optional)..."
+      />
+
+      {/* Upload Button */}
+      <button onClick={handleUpload} disabled={!file || uploading}>
+        {uploading ? 'Uploading...' : 'Upload Document'}
+      </button>
+    </div>
+  );
+}
+```
+
+---
+
+### Step 6: Ensure Slack Bot Has File Upload Permissions
+
+Your Slack app needs the `files:write` scope. In your Slack App settings:
+
+1. Go to **OAuth & Permissions**
+2. Add these scopes:
+   - `files:write` - Upload files
+   - `chat:write` - Send messages
+   - `channels:read` - Access channel info (if needed)
+
+3. Reinstall the app to your workspace
+
+---
+
+### Environment Variables Needed
+
+```env
+SLACK_BOT_TOKEN=xoxb-your-bot-token
+# Or if using webhooks:
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx/xxx/xxx
+```
+
+---
+
+### Expected Slack Message
+
+When a document is uploaded, the Slack channel should receive:
+
+```
+📄 New Document Uploaded
+
+Document: Purchase_Agreement_242_Seven_Seas.pdf
+Type: Contract
+Format: PDF
+Property: 242 Seven Seas, Kyle, TX 78640
+
+Uploaded by: Daryl Camingao
+Time: Jan 16, 2026, 3:45 PM
+
+Notes: Signed contract with all amendments included.
+
+[📥 Download Document]
+
+📎 Purchase_Agreement_242_Seven_Seas.pdf (attached)
+```
+
+---
+
+### Checklist
+
+- [ ] Slack bot token configured with `files:write` scope
+- [ ] Document upload handler calls Slack service
+- [ ] File buffer/URL passed to Slack upload
+- [ ] Document type selector in upload form
+- [ ] Notes field in upload form
+- [ ] Property address retrieved from transaction
+- [ ] Uploader name retrieved from session/auth
+- [ ] Error handling if Slack fails (don't block upload)
+
+---
+
+Copy this into **Contract Conduit** Replit to implement Slack document notifications!

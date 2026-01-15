@@ -957,23 +957,45 @@ export async function registerRoutes(
       // Get file extension
       const fileExt = fileName.split('.').pop()?.toLowerCase() || 'unknown';
 
-      // Send enhanced Slack notification with Block Kit formatting
+      // Send Slack notification AND upload the actual file
       if (transaction.slackChannelId) {
         try {
-          await postDocumentUploadNotification(
+          // Build the notification message to include with file upload
+          const timestamp = new Date().toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+          });
+          
+          const uploaderName = req.user?.claims?.email || 'Unknown User';
+          const notesText = notes ? `\n*Notes:* ${notes}` : '';
+          
+          const initialComment = [
+            `*New Document Uploaded*`,
+            ``,
+            `*Document:* ${docLabel}`,
+            `*Type:* ${docTypeLabel}`,
+            `*Format:* ${fileExt.toUpperCase()}`,
+            `*Size:* ${formatFileSize(fileSize)}`,
+            `*Property:* ${transaction.propertyAddress}`,
+            `*Uploaded by:* ${uploaderName}`,
+            `*Time:* ${timestamp}`,
+            notesText,
+          ].filter(Boolean).join('\n');
+
+          // Upload the actual file to Slack with the notification as initial comment
+          await uploadFileToChannel(
             transaction.slackChannelId,
-            {
-              documentName: docLabel,
-              documentType: docTypeLabel,
-              fileFormat: fileExt,
-              fileSize: formatFileSize(fileSize),
-              notes: notes || undefined,
-              propertyAddress: transaction.propertyAddress,
-              uploadedBy: req.user?.claims?.email || 'Unknown User',
-            }
+            fileData,
+            fileName,
+            docLabel,
+            initialComment
           );
         } catch (slackError) {
-          console.error("Failed to send Slack notification:", slackError);
+          console.error("Failed to send document to Slack:", slackError);
           // Don't fail the request if Slack notification fails
         }
       }
