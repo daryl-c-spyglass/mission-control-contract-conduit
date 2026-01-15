@@ -125,8 +125,8 @@ export interface FlyerData {
   lotSize?: string;
   headline?: string;
   description: string;
-  openHouseDay?: string;
   openHouseDate?: string;
+  openHouseTime?: string;
   agentName: string;
   agentTitle: string;
   agentPhone: string;
@@ -175,8 +175,8 @@ function generateRenderHash(data: FlyerData, outputSettings: typeof RENDER_CONFI
     lotSize: data.lotSize || '',
     headline: data.headline || '',
     description: data.description,
-    openHouseDay: data.openHouseDay || '',
     openHouseDate: data.openHouseDate || '',
+    openHouseTime: data.openHouseTime || '',
     agentName: data.agentName,
     agentTitle: data.agentTitle,
     agentPhone: data.agentPhone,

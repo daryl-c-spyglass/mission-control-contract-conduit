@@ -1,0 +1,109 @@
+ Add Open House to Create Property Flyer
+
+Task: Add "Open House" Option to Create Property Flyer
+Add the same "Open House" status type feature from Marketing Graphics to the Create Property Flyer modal, with date and time fields that display on the generated flyer.
+Requirements
+
+Add "Open House" to Status dropdown in Create Property Flyer
+Location: Create Property Flyer modal (likely FlyerModal.tsx or similar component)
+Add to the status options:
+
+typescript   const statusOptions = [
+     { value: 'just_listed', label: 'Just Listed' },
+     { value: 'open_house', label: 'Open House' },  // Add this
+     { value: 'price_reduced', label: 'Price Reduced' },
+     { value: 'under_contract', label: 'Under Contract' },
+     { value: 'sold', label: 'Sold' },
+     // ... other existing options
+   ];
+
+Show Open House fields when selected (same as Marketing Graphics):
+
+typescript   // Conditionally show when status === 'open_house'
+   - Open House Date (date picker)
+   - Start Time (dropdown: 9 AM, 10 AM, 11 AM, 12 PM, 1 PM, 2 PM, 3 PM, 4 PM, 5 PM)
+   - End Time (dropdown: same options)
+Use the same UI styling as the Marketing Graphics Open House fields (see attached screenshot).
+
+Update Flyer Template to display Open House info
+When Open House is selected, the generated flyer should show:
+
+"OPEN HOUSE" as the status banner (instead of "Just Listed")
+Date and time prominently displayed below the banner or near the top
+Format: OPEN HOUSE | SAT, JAN 18 | 1 PM - 4 PM
+
+
+Update the flyer Handlebars template (likely in server/templates/ or similar):
+
+handlebars   {{#if isOpenHouse}}
+     <div class="open-house-banner">OPEN HOUSE</div>
+     <div class="open-house-details">
+       {{openHouseDate}} | {{openHouseStartTime}} - {{openHouseEndTime}}
+     </div>
+   {{else}}
+     <div class="status-banner">{{status}}</div>
+   {{/if}}
+
+Pass Open House data to flyer generator API
+Update the flyer render endpoint to accept:
+
+typescript   {
+     // existing fields...
+     status: 'open_house',
+     openHouseDate: '2026-01-18',      // ISO date
+     openHouseStartTime: '1 PM',
+     openHouseEndTime: '4 PM',
+   }
+```
+
+### UI Layout (match Marketing Graphics style)
+```
+┌─────────────────────────────────────────────────┐
+│ Price                    Status                  │
+│ ┌──────────────┐        ┌──────────────────────┐│
+│ │ $407,490     │        │ Open House        ▼  ││
+│ └──────────────┘        └──────────────────────┘│
+│                                                  │
+│ ┌───────────────────────────────────────────┐   │
+│ │ Open House Date                           │   │
+│ │ ┌───────────────────────────────────┐     │   │
+│ │ │ dd/mm/yyyy                    📅  │     │   │
+│ │ └───────────────────────────────────┘     │   │
+│ │                                           │   │
+│ │ Start Time           End Time             │   │
+│ │ ┌─────────────┐     ┌─────────────┐       │   │
+│ │ │ 1 PM     ▼  │     │ 4 PM     ▼  │       │   │
+│ │ └─────────────┘     └─────────────┘       │   │
+│ └───────────────────────────────────────────┘   │
+│                                                  │
+│ Beds                Baths              Sq Ft    │
+└─────────────────────────────────────────────────┘
+```
+
+### Flyer Output Example
+
+When Open House is selected, the printed flyer should display:
+```
+┌─────────────────────────────────────────────────┐
+│                 [Property Photo]                │
+│                                                  │
+│            ══════════════════════               │
+│               🏠 OPEN HOUSE                     │
+│            SAT, JAN 18 | 1 PM - 4 PM           │
+│            ══════════════════════               │
+│                                                  │
+│              242 Seven Seas                     │
+│            Kyle, TX 78640                       │
+│               $407,490                          │
+│                                                  │
+│         5 Beds | 4 Baths | 3,223 sqft          │
+└─────────────────────────────────────────────────┘
+Acceptance Criteria
+
+ "Open House" appears in Create Property Flyer Status dropdown
+ Selecting "Open House" reveals date and time picker fields
+ UI matches the Marketing Graphics Open House styling (attached screenshot)
+ Flyer preview shows Open House date and time
+ Downloaded flyer PDF/PNG includes Open House information
+ Date formats as readable text (e.g., "SAT, JAN 18" not "2026-01-18")
+ Works in both Replit (dev) and Render (production)

@@ -62,11 +62,18 @@ const STATUS_OPTIONS = [
   { value: "open_house", label: "Open House" },
 ];
 
-const OPEN_HOUSE_DAY_OPTIONS = [
-  { value: "", label: "None" },
-  { value: "Saturday", label: "Saturday" },
-  { value: "Sunday", label: "Sunday" },
-  { value: "Sat & Sun", label: "Sat & Sun" },
+const OPEN_HOUSE_TIME_OPTIONS = [
+  { value: "09:00", label: "9 AM" },
+  { value: "10:00", label: "10 AM" },
+  { value: "11:00", label: "11 AM" },
+  { value: "12:00", label: "12 PM" },
+  { value: "13:00", label: "1 PM" },
+  { value: "14:00", label: "2 PM" },
+  { value: "15:00", label: "3 PM" },
+  { value: "16:00", label: "4 PM" },
+  { value: "17:00", label: "5 PM" },
+  { value: "18:00", label: "6 PM" },
+  { value: "19:00", label: "7 PM" },
 ];
 
 const formSchema = z.object({
@@ -80,9 +87,27 @@ const formSchema = z.object({
   agentTitle: z.string().optional(),
   agentPhone: z.string().optional(),
   listingHeadline: z.string().max(39, "Max 39 characters").optional(),
-  openHouseDay: z.string().optional(),
   openHouseDate: z.string().optional(),
+  openHouseTimeStart: z.string().optional(),
+  openHouseTimeEnd: z.string().optional(),
 });
+
+// Format time from 24h to 12h AM/PM (e.g., "13:00" -> "1PM")
+function formatTime12h(time24: string): string {
+  const [hours, minutes] = time24.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hour12 = hours % 12 || 12;
+  return `${hour12}${minutes > 0 ? `:${minutes.toString().padStart(2, '0')}` : ''}${period}`;
+}
+
+// Format date to short form (e.g., "SAT JAN 18")
+function formatDateShort(dateStr: string): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr + 'T12:00:00');
+  const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  return `${days[date.getDay()]} ${months[date.getMonth()]} ${date.getDate()}`;
+}
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -563,8 +588,9 @@ export function CreateFlyerDialog({
       agentTitle: "REALTOR®",
       agentPhone: agentPhone || "",
       listingHeadline: "",
-      openHouseDay: "",
       openHouseDate: "",
+      openHouseTimeStart: "13:00",
+      openHouseTimeEnd: "16:00",
     },
   });
 
@@ -574,8 +600,9 @@ export function CreateFlyerDialog({
   // Clear Open House fields when status changes away from "open_house"
   useEffect(() => {
     if (watchedValues.status !== 'open_house') {
-      form.setValue('openHouseDay', '');
       form.setValue('openHouseDate', '');
+      form.setValue('openHouseTimeStart', '13:00');
+      form.setValue('openHouseTimeEnd', '16:00');
     }
   }, [watchedValues.status, form]);
 
@@ -965,8 +992,10 @@ export function CreateFlyerDialog({
           agentTitle: data.agentTitle,
           agentPhone: data.agentPhone,
           agentPhoto: effectiveAgentPhoto,
-          openHouseDay: data.openHouseDay && data.openHouseDay !== 'none' ? data.openHouseDay.toUpperCase() : '',
-          openHouseDate: data.openHouseDate || '',
+          openHouseDate: data.openHouseDate ? formatDateShort(data.openHouseDate) : '',
+          openHouseTime: data.openHouseDate && data.openHouseTimeStart && data.openHouseTimeEnd 
+            ? `${formatTime12h(data.openHouseTimeStart)}-${formatTime12h(data.openHouseTimeEnd)}` 
+            : '',
           mlsNumber: transaction.mlsNumber || '',
           outputType: 'pngPreview'
         }),
@@ -1461,8 +1490,10 @@ export function CreateFlyerDialog({
           agentTitle: data.agentTitle,
           agentPhone: data.agentPhone,
           agentPhoto: effectiveAgentPhoto,
-          openHouseDay: data.openHouseDay && data.openHouseDay !== 'none' ? data.openHouseDay.toUpperCase() : '',
-          openHouseDate: data.openHouseDate || '',
+          openHouseDate: data.openHouseDate ? formatDateShort(data.openHouseDate) : '',
+          openHouseTime: data.openHouseDate && data.openHouseTimeStart && data.openHouseTimeEnd 
+            ? `${formatTime12h(data.openHouseTimeStart)}-${formatTime12h(data.openHouseTimeEnd)}` 
+            : '',
           mlsNumber: transaction.mlsNumber || '',
           outputType: 'pngPreview' // PNG for print-ready download
         }),
@@ -1883,40 +1914,16 @@ export function CreateFlyerDialog({
 
                 {/* Open House Fields - Only show when status is "open_house" */}
                 {watchedValues.status === 'open_house' && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <FormField
-                      control={form.control}
-                      name="openHouseDay"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm">Open House Day</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="h-8" data-testid="select-open-house-day">
-                                <SelectValue placeholder="Select day" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {OPEN_HOUSE_DAY_OPTIONS.filter(opt => opt.value !== '').map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  <div className="space-y-3 p-3 rounded-md bg-orange-500/10 border border-orange-500/20">
                     <FormField
                       control={form.control}
                       name="openHouseDate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-sm">Open House Details</FormLabel>
+                          <FormLabel className="text-sm">Open House Date</FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="e.g., May 17th, 11AM - 3PM"
+                              type="date"
                               className="h-8"
                               data-testid="input-open-house-date"
                               {...field}
@@ -1926,6 +1933,61 @@ export function CreateFlyerDialog({
                         </FormItem>
                       )}
                     />
+                    <div className="grid grid-cols-2 gap-2">
+                      <FormField
+                        control={form.control}
+                        name="openHouseTimeStart"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">Start Time</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger className="h-8" data-testid="select-open-house-start">
+                                  <SelectValue placeholder="Start" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {OPEN_HOUSE_TIME_OPTIONS.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="openHouseTimeEnd"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">End Time</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger className="h-8" data-testid="select-open-house-end">
+                                  <SelectValue placeholder="End" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {OPEN_HOUSE_TIME_OPTIONS.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    {watchedValues.openHouseDate && (
+                      <p className="text-xs text-orange-600 font-medium">
+                        Preview: {formatDateShort(watchedValues.openHouseDate)} | {formatTime12h(watchedValues.openHouseTimeStart || '13:00')}-{formatTime12h(watchedValues.openHouseTimeEnd || '16:00')}
+                      </p>
+                    )}
                   </div>
                 )}
 

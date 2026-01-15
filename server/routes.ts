@@ -1860,8 +1860,8 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
         agentTitle,
         agentPhone,
         agentPhoto,
-        openHouseDay,
         openHouseDate,
+        openHouseTime,
         mlsNumber
       } = req.body;
       
@@ -1927,8 +1927,8 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
         sqft: Number(sqft || 0).toLocaleString(),
         headline: headline?.toUpperCase() || '',
         description: description || '',
-        openHouseDay: openHouseDay || '',
         openHouseDate: openHouseDate || '',
+        openHouseTime: openHouseTime || '',
         agentName: agentName,
         agentTitle: agentTitle || 'REALTOR®',
         agentPhone: agentPhone,
@@ -1981,8 +1981,8 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
         agentTitle,
         agentPhone,
         agentPhoto,
-        openHouseDay,
         openHouseDate,
+        openHouseTime,
         mlsNumber,
         outputType = 'pngPreview'
       } = req.body;
@@ -2048,8 +2048,8 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
         sqft: Number(sqft || 0).toLocaleString(),
         headline: headline?.toUpperCase() || '',
         description: description || '',
-        openHouseDay: openHouseDay || '',
         openHouseDate: openHouseDate || '',
+        openHouseTime: openHouseTime || '',
         agentName: agentName,
         agentTitle: agentTitle || 'REALTOR®',
         agentPhone: agentPhone,

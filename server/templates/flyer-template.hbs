@@ -196,20 +196,25 @@
             padding-top: 30px;
         }
         
-        .open-house-label {
+        .open-house-banner {
+            background: #F97316;
+            color: white;
             font-size: 36px;
             font-weight: 700;
             letter-spacing: 3px;
             text-transform: uppercase;
-            margin-bottom: 12px;
-            color: #2c2c2c;
+            padding: 18px 36px;
+            margin-bottom: 24px;
+            border-radius: 9px;
+            display: inline-block;
         }
         
-        .open-house-date {
-            font-size: 42px;
+        .open-house-details {
+            font-size: 36px;
             font-weight: 600;
             margin-bottom: 36px;
             color: #2c2c2c;
+            letter-spacing: 2px;
         }
 
         .listing-headline {
@@ -443,8 +448,8 @@
             <!-- Description Section -->
             <div class="description-section">
                 {{#if openHouseDate}}
-                <div class="open-house-label">Open House {{openHouseDay}}</div>
-                <div class="open-house-date">{{openHouseDate}}</div>
+                <div class="open-house-banner">Open House</div>
+                <div class="open-house-details">{{openHouseDate}}{{#if openHouseTime}} | {{openHouseTime}}{{/if}}</div>
                 {{/if}}
                 {{#if headline}}
                 <div class="listing-headline">{{headline}}</div>
