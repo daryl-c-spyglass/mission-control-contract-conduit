@@ -2219,7 +2219,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                       <div>
                         <h3 className="font-semibold">Create Flyer</h3>
                         <p className="text-sm text-muted-foreground">
-                          Print-ready PDF & PNG flyers
+                          PNG flyer (8.5" × 11")
                         </p>
                       </div>
                     </div>
