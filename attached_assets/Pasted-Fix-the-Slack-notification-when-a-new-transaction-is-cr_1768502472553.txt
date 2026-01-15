@@ -1,0 +1,145 @@
+Fix the Slack notification when a new transaction is created. Three issues to address:
+
+---
+
+## 1. DESCRIPTION - USE AI SUMMARIZATION
+
+Instead of truncating the description mid-sentence, use OpenAI to create a smart summary.
+
+Create a utility function:
+
+// utils/summarize.ts or services/openai.ts
+
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export async function summarizeDescription(description: string, maxLength: number = 200): Promise<string> {
+  // If already short enough, return as-is
+  if (!description || description.length <= maxLength) {
+    return description;
+  }
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',  // Fast and cheap
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a real estate assistant. Summarize property descriptions concisely while keeping the most important selling points. Keep it under 200 characters. Do not use quotes around the summary.'
+        },
+        {
+          role: 'user',
+          content: `Summarize this property description:\n\n${description}`
+        }
+      ],
+      max_tokens: 100,
+      temperature: 0.5,
+    });
+
+    return response.choices[0]?.message?.content?.trim() || description.substring(0, maxLength) + '...';
+  } catch (error) {
+    console.error('Failed to summarize description:', error);
+    // Fallback to simple truncation if AI fails
+    return description.substring(0, maxLength) + '...';
+  }
+}
+
+Then in the Slack notification code, use it:
+
+// Before sending to Slack:
+const summarizedDescription = await summarizeDescription(listing.description);
+
+// Use summarizedDescription in the Slack message instead of the full description
+
+---
+
+## 2. BROKEN IMAGE - FIX PROPERTY PHOTO
+
+The property image URL isn't displaying in Slack (shows broken image icon).
+
+Instead of posting the URL as plain text, use Slack Block Kit image block:
+
+// In the Slack message blocks:
+{
+  type: "image",
+  image_url: propertyImageUrl,  // e.g., "https://cdn.repliers.io/unlock-mls/IMG-ACT2451173_0.jpg"
+  alt_text: `Photo of ${propertyAddress}`
+}
+
+Or if Block Kit image doesn't work with Repliers CDN, download and re-upload:
+
+// Download image and upload to Slack
+import fetch from 'node-fetch';
+
+async function uploadImageToSlack(imageUrl: string, channelId: string, filename: string) {
+  try {
+    // Fetch image from Repliers CDN
+    const imageResponse = await fetch(imageUrl);
+    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+    
+    // Upload to Slack
+    const result = await slack.files.uploadV2({
+      channel_id: channelId,
+      file: imageBuffer,
+      filename: filename,
+    });
+    
+    return result;
+  } catch (error) {
+    console.error('Failed to upload image to Slack:', error);
+    return null;
+  }
+}
+
+---
+
+## 3. FIND AND UPDATE THE CODE
+
+Search for the Slack notification code:
+
+grep -r "MLS Listing Data" --include="*.ts" --include="*.tsx"
+grep -r "slack" --include="*.ts" --include="*.tsx" | grep -i transaction
+grep -r "slackChannel" --include="*.ts" --include="*.tsx"
+
+Update the transaction creation Slack notification to:
+1. Call summarizeDescription() for the property description
+2. Use proper image blocks or file upload for the property photo
+
+---
+
+## EXPECTED RESULT
+
+Before (current - broken):
+Property Type: Residential
+Welcome to 154 Pettigrew Path in Buda, where thoughtful design meets an exceptional location. Upon entry, you're greeted by a bright foyer and a dedicated office o study with French doors. Whether you're working from home or carving out time for your hobbies, this space offers a quiet, comfortable r...
+[broken image]
+
+After (fixed):
+Property Type: Residential
+Spacious 4BR/4BA in Buda with home office, French doors, and thoughtful design. Ideal for remote work. Built 2014, 3,431 sqft.
+[actual property photo displayed]
+
+---
+
+## ENVIRONMENT VARIABLE NEEDED
+
+Make sure OPENAI_API_KEY is set in your environment/secrets:
+
+OPENAI_API_KEY=sk-your-openai-api-key
+
+---
+
+## CHECKLIST
+
+- [ ] Create summarizeDescription() utility function
+- [ ] Add OpenAI package if not installed: npm install openai
+- [ ] Update Slack notification to use AI summary for descriptions > 200 chars
+- [ ] Fix image to use Block Kit image block or files.uploadV2
+- [ ] Test with a new transaction
+- [ ] Verify Slack shows summary + working image
+
+Summary of Changes:
+IssueBeforeAfterDescriptionCut off mid-word "...comfortable r..."AI-generated summary highlighting key featuresImageBroken/not loadingProperly displayed via Block Kit or file upload

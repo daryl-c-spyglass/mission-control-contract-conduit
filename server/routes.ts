@@ -5,7 +5,7 @@ import fs from "fs";
 import { storage } from "./storage";
 import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema, insertCmaSchema } from "@shared/schema";
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages, watchUserMailbox } from "./gmail";
-import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel, postDocumentUploadNotification } from "./slack";
+import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel, postDocumentUploadNotification, postMLSListingNotification } from "./slack";
 import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess, getBestPhotosForFlyer } from "./repliers";
 import { isRentalOrLease } from "../shared/lib/listings";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
@@ -423,28 +423,22 @@ export async function registerRoutes(
             
             if (currentTransaction?.slackChannelId && isActiveListing) {
               try {
-                const priceFormatted = mlsData.listPrice 
-                  ? `$${mlsData.listPrice.toLocaleString()}` 
-                  : "Price not listed";
-                
-                const listingMessage = [
-                  `:house: *MLS Listing Data*`,
-                  `*Address:* ${mlsData.address}${mlsData.city ? `, ${mlsData.city}` : ""}${mlsData.state ? `, ${mlsData.state}` : ""}`,
-                  `*MLS #:* ${mlsData.mlsNumber}`,
-                  `*Status:* ${mlsData.status}`,
-                  `*List Price:* ${priceFormatted}`,
-                  `*Beds:* ${mlsData.bedrooms || "N/A"} | *Baths:* ${mlsData.bathrooms || "N/A"} | *Sqft:* ${mlsData.sqft ? mlsData.sqft.toLocaleString() : "N/A"}`,
-                  mlsData.yearBuilt ? `*Year Built:* ${mlsData.yearBuilt}` : "",
-                  mlsData.propertyType ? `*Property Type:* ${mlsData.propertyType}` : "",
-                  mlsData.description ? `\n${mlsData.description.substring(0, 300)}${mlsData.description.length > 300 ? "..." : ""}` : "",
-                ].filter(Boolean).join("\n");
-                
-                await postToChannel(currentTransaction.slackChannelId, listingMessage);
-                
-                // Post first listing image if available
-                if (mlsData.images && mlsData.images.length > 0) {
-                  await postToChannel(currentTransaction.slackChannelId, mlsData.images[0]);
-                }
+                // Use the new Block Kit function with AI summary and proper image handling
+                await postMLSListingNotification(currentTransaction.slackChannelId, {
+                  address: mlsData.address,
+                  city: mlsData.city,
+                  state: mlsData.state,
+                  mlsNumber: mlsData.mlsNumber,
+                  status: mlsData.status,
+                  listPrice: mlsData.listPrice,
+                  bedrooms: typeof mlsData.bedrooms === 'number' ? mlsData.bedrooms : (mlsData.bedrooms ? parseInt(String(mlsData.bedrooms)) : undefined),
+                  bathrooms: typeof mlsData.bathrooms === 'number' ? mlsData.bathrooms : (mlsData.bathrooms ? parseInt(String(mlsData.bathrooms)) : undefined),
+                  sqft: typeof mlsData.sqft === 'number' ? mlsData.sqft : (mlsData.sqft ? parseInt(String(mlsData.sqft)) : undefined),
+                  yearBuilt: mlsData.yearBuilt ? String(mlsData.yearBuilt) : undefined,
+                  propertyType: mlsData.propertyType,
+                  description: mlsData.description,
+                  imageUrl: mlsData.images?.[0] || undefined,
+                });
               } catch (slackPostError) {
                 console.error("Error posting MLS data to Slack:", slackPostError);
               }

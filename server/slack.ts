@@ -1,6 +1,45 @@
 // Real Slack API integration using SLACK_BOT_TOKEN
+import OpenAI from "openai";
 
 const SLACK_API_BASE = "https://slack.com/api";
+
+/**
+ * Summarize a property description using AI for Slack notifications
+ */
+export async function summarizeDescription(description: string, maxLength: number = 200): Promise<string> {
+  // If already short enough, return as-is
+  if (!description || description.length <= maxLength) {
+    return description;
+  }
+
+  try {
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a real estate assistant. Summarize property descriptions concisely while keeping the most important selling points. Keep it under 200 characters. Do not use quotes around the summary.'
+        },
+        {
+          role: 'user',
+          content: `Summarize this property description:\n\n${description}`
+        }
+      ],
+      max_tokens: 100,
+      temperature: 0.5,
+    });
+
+    return response.choices[0]?.message?.content?.trim() || description.substring(0, maxLength) + '...';
+  } catch (error) {
+    console.error('Failed to summarize description:', error);
+    // Fallback to simple truncation if AI fails
+    return description.substring(0, maxLength) + '...';
+  }
+}
 
 async function slackRequest(method: string, body: Record<string, any>): Promise<any> {
   const token = process.env.SLACK_BOT_TOKEN;
@@ -180,6 +219,228 @@ export async function lookupUserByEmail(email: string): Promise<string | null> {
     return data.user?.id || null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Upload an image from a URL to a Slack channel
+ */
+export async function uploadImageFromUrl(
+  channelId: string,
+  imageUrl: string,
+  filename: string,
+  altText?: string
+): Promise<{ fileId: string } | null> {
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!token) {
+    console.log("Slack not configured, skipping image upload");
+    return null;
+  }
+
+  try {
+    console.log(`[Slack] Downloading image from: ${imageUrl}`);
+    
+    // Download the image
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      console.error(`[Slack] Failed to download image: ${imageResponse.status}`);
+      return null;
+    }
+    
+    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+    console.log(`[Slack] Downloaded image: ${imageBuffer.length} bytes`);
+
+    // Step 1: Get upload URL
+    const getUploadUrlResponse = await fetch("https://slack.com/api/files.getUploadURLExternal", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        filename: filename,
+        length: imageBuffer.length.toString(),
+      }),
+    });
+
+    const uploadUrlData = await getUploadUrlResponse.json();
+    if (!uploadUrlData.ok) {
+      console.error("[Slack] Failed to get upload URL:", uploadUrlData.error);
+      return null;
+    }
+
+    const { upload_url, file_id } = uploadUrlData;
+
+    // Step 2: Upload file
+    const uploadResponse = await fetch(upload_url, {
+      method: "POST",
+      body: imageBuffer,
+    });
+
+    if (!uploadResponse.ok) {
+      console.error("[Slack] Failed to upload image:", uploadResponse.status);
+      return null;
+    }
+
+    // Step 3: Complete upload
+    const completeResponse = await fetch("https://slack.com/api/files.completeUploadExternal", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        files: [{ id: file_id, title: altText || filename }],
+        channel_id: channelId,
+      }),
+    });
+
+    const completeData = await completeResponse.json();
+    if (!completeData.ok) {
+      console.error("[Slack] Failed to complete image upload:", completeData.error);
+      return null;
+    }
+
+    console.log(`[Slack] Property image uploaded successfully: ${file_id}`);
+    return { fileId: file_id };
+  } catch (error) {
+    console.error("[Slack] Failed to upload image from URL:", error);
+    return null;
+  }
+}
+
+interface MLSListingData {
+  address: string;
+  city?: string;
+  state?: string;
+  mlsNumber: string;
+  status: string;
+  listPrice?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  sqft?: number;
+  yearBuilt?: string;
+  propertyType?: string;
+  description?: string;
+  imageUrl?: string;
+}
+
+/**
+ * Post MLS listing data to Slack with Block Kit formatting and proper image handling
+ */
+export async function postMLSListingNotification(
+  channelId: string,
+  listing: MLSListingData
+): Promise<void> {
+  const priceFormatted = listing.listPrice 
+    ? `$${listing.listPrice.toLocaleString()}` 
+    : "Price not listed";
+
+  // Build address line
+  const fullAddress = [listing.address, listing.city, listing.state]
+    .filter(Boolean)
+    .join(", ");
+
+  // Summarize description using AI
+  let summaryDescription = "";
+  if (listing.description) {
+    summaryDescription = await summarizeDescription(listing.description, 200);
+  }
+
+  // Build the Block Kit message
+  const blocks: any[] = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: ":house: MLS Listing Data",
+        emoji: true
+      }
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*Address:*\n${fullAddress}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*MLS #:*\n${listing.mlsNumber}`
+        }
+      ]
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*Status:*\n${listing.status}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*List Price:*\n${priceFormatted}`
+        }
+      ]
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*Beds:* ${listing.bedrooms || "N/A"} | *Baths:* ${listing.bathrooms || "N/A"} | *Sqft:* ${listing.sqft ? listing.sqft.toLocaleString() : "N/A"}`
+        },
+        {
+          type: "mrkdwn",
+          text: listing.yearBuilt ? `*Year Built:* ${listing.yearBuilt}` : ""
+        }
+      ]
+    }
+  ];
+
+  // Add property type if available
+  if (listing.propertyType) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Property Type:* ${listing.propertyType}`
+      }
+    });
+  }
+
+  // Add AI-summarized description
+  if (summaryDescription) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: summaryDescription
+      }
+    });
+  }
+
+  // Post the text blocks first
+  await slackRequest("chat.postMessage", {
+    channel: channelId,
+    text: `MLS Listing: ${fullAddress}`,
+    blocks,
+  });
+
+  // Upload property image separately for reliable display
+  if (listing.imageUrl) {
+    try {
+      await uploadImageFromUrl(
+        channelId,
+        listing.imageUrl,
+        `property-${listing.mlsNumber}.jpg`,
+        `Photo of ${fullAddress}`
+      );
+    } catch (imageError) {
+      console.error("[Slack] Failed to upload property image:", imageError);
+      // Fallback: try posting image URL directly
+      await postToChannel(channelId, listing.imageUrl);
+    }
   }
 }
 
