@@ -241,6 +241,14 @@ function AppContent() {
 }
 
 function App() {
+  // Auto-use dark theme when embedded in iframe (Mission Control)
+  useEffect(() => {
+    if (window.self !== window.top) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
