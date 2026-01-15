@@ -1,0 +1,325 @@
+The document upload Slack notifications are still not working. I need this fixed properly.
+
+REQUIREMENTS:
+1. When a document is uploaded to the Docs tab → Send the actual file + details to the transaction's Slack channel
+2. When marketing materials are created (graphics/flyers) → Send to Slack channel
+3. This should be ON by default for all transactions
+4. Users can turn it OFF in Contract Conduit Settings (per transaction or globally)
+
+---
+
+## STEP 1: DEBUG CURRENT ISSUE
+
+First, find out why documents aren't being sent to Slack:
+```bash
+# Find document upload code
+grep -r "uploadDocument\|documentUpload\|handleUpload" --include="*.ts" --include="*.tsx"
+
+# Find where Slack messages are sent
+grep -r "slack" --include="*.ts" --include="*.tsx" | grep -i "send\|post\|upload"
+
+# Check if there's a Slack service
+ls -la **/slack*.ts **/slack*.tsx 2>/dev/null
+```
+
+Show me:
+1. The document upload handler code
+2. Is there ANY code that sends to Slack after document upload?
+3. What happens after a document is saved - is Slack notification called?
+
+---
+
+## STEP 2: IMPLEMENT DOCUMENT UPLOAD TO SLACK
+
+After a document is uploaded and saved, send to Slack:
+```typescript
+// In the document upload handler (API route or service)
+
+import { WebClient } from '@slack/web-api';
+
+const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
+
+async function handleDocumentUpload(req, res) {
+  // ... existing upload logic ...
+  
+  // After document is saved to database/storage:
+  const savedDocument = await saveDocument(file, transactionId, metadata);
+  
+  // Get transaction to find Slack channel
+  const transaction = await db.transaction.findUnique({
+    where: { id: transactionId },
+    include: { notificationSettings: true }
+  });
+  
+  // Check if Slack notifications are enabled (default: ON)
+  const notificationsEnabled = transaction.notificationSettings?.documentUploads ?? true;
+  
+  if (transaction.slackChannelId && notificationsEnabled) {
+    await sendDocumentToSlack({
+      channelId: transaction.slackChannelId,
+      file: fileBuffer,  // The actual file
+      fileName: file.name,
+      documentType: metadata.documentType || 'Document',
+      fileSize: file.size,
+      notes: metadata.notes,
+      propertyAddress: transaction.address,
+      uploadedBy: currentUser.name,
+    });
+  }
+  
+  return res.json({ success: true, document: savedDocument });
+}
+
+async function sendDocumentToSlack({ channelId, file, fileName, documentType, fileSize, notes, propertyAddress, uploadedBy }) {
+  try {
+    const timestamp = new Date().toLocaleString('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    });
+    
+    const fileSizeFormatted = (fileSize / (1024 * 1024)).toFixed(2) + ' MB';
+    
+    const message = [
+      `📄 *New Document Uploaded*`,
+      ``,
+      `*Document:* ${fileName}`,
+      `*Type:* ${documentType}`,
+      `*Size:* ${fileSizeFormatted}`,
+      `*Property:* ${propertyAddress}`,
+      `*Uploaded by:* ${uploadedBy}`,
+      `*Time:* ${timestamp}`,
+      notes ? `*Notes:* ${notes}` : null,
+    ].filter(Boolean).join('\n');
+
+    // Upload file with message
+    await slack.files.uploadV2({
+      channel_id: channelId,
+      file: file,
+      filename: fileName,
+      initial_comment: message,
+    });
+
+    console.log('✅ Document sent to Slack:', fileName);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send document to Slack:', error);
+    return false;
+  }
+}
+```
+
+---
+
+## STEP 3: IMPLEMENT MARKETING MATERIALS TO SLACK
+
+When flyers or graphics are generated, send to Slack:
+```typescript
+// In the marketing/flyer generation handler
+
+async function handleMarketingGeneration(req, res) {
+  // ... existing generation logic ...
+  
+  const generatedAsset = await generateFlyer(transactionId, options);
+  
+  // Get transaction
+  const transaction = await db.transaction.findUnique({
+    where: { id: transactionId },
+    include: { notificationSettings: true }
+  });
+  
+  // Check if marketing notifications are enabled (default: ON)
+  const notificationsEnabled = transaction.notificationSettings?.marketingAssets ?? true;
+  
+  if (transaction.slackChannelId && notificationsEnabled) {
+    await sendMarketingToSlack({
+      channelId: transaction.slackChannelId,
+      file: generatedAsset.buffer,  // The flyer/graphic file
+      fileName: generatedAsset.fileName,
+      assetType: options.type || 'Marketing Material',
+      propertyAddress: transaction.address,
+      createdBy: currentUser.name,
+    });
+  }
+  
+  return res.json({ success: true, asset: generatedAsset });
+}
+
+async function sendMarketingToSlack({ channelId, file, fileName, assetType, propertyAddress, createdBy }) {
+  try {
+    const timestamp = new Date().toLocaleString('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    });
+    
+    const message = [
+      `🎨 *Marketing Material Created*`,
+      ``,
+      `*Type:* ${assetType}`,
+      `*Property:* ${propertyAddress}`,
+      `*Created by:* ${createdBy}`,
+      `*Time:* ${timestamp}`,
+    ].join('\n');
+
+    await slack.files.uploadV2({
+      channel_id: channelId,
+      file: file,
+      filename: fileName,
+      initial_comment: message,
+    });
+
+    console.log('✅ Marketing material sent to Slack:', fileName);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send marketing to Slack:', error);
+    return false;
+  }
+}
+```
+
+---
+
+## STEP 4: ADD NOTIFICATION SETTINGS (Toggle On/Off)
+
+Add to database schema:
+```prisma
+model Transaction {
+  // ... existing fields ...
+  
+  // Notification settings (embedded or separate table)
+  slackDocumentUploads    Boolean @default(true)
+  slackMarketingAssets    Boolean @default(true)
+  slackClosingReminders   Boolean @default(true)
+}
+
+// OR as a separate settings table:
+model NotificationSettings {
+  id                  String   @id @default(uuid())
+  transactionId       String   @unique
+  transaction         Transaction @relation(fields: [transactionId], references: [id])
+  
+  documentUploads     Boolean  @default(true)
+  marketingAssets     Boolean  @default(true)
+  closingReminders    Boolean  @default(true)
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+```
+
+---
+
+## STEP 5: ADD SETTINGS UI
+
+In the transaction Settings tab or a Slack settings section:
+```typescript
+// components/SlackNotificationSettings.tsx
+
+function SlackNotificationSettings({ transactionId }) {
+  const [settings, setSettings] = useState({
+    documentUploads: true,
+    marketingAssets: true,
+    closingReminders: true,
+  });
+
+  const handleToggle = async (key: string, value: boolean) => {
+    setSettings(prev => ({ ...prev, [key]: value }));
+    
+    await fetch(`/api/transactions/${transactionId}/notification-settings`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: value }),
+    });
+  };
+
+  return (
+    <div className="slack-settings">
+      <h3>📢 Slack Notifications</h3>
+      <p className="description">Choose what gets sent to the Slack channel for this transaction.</p>
+      
+      <div className="setting-item">
+        <div>
+          <label>Document Uploads</label>
+          <span className="hint">Send uploaded documents to Slack</span>
+        </div>
+        <ToggleSwitch 
+          checked={settings.documentUploads} 
+          onChange={(v) => handleToggle('documentUploads', v)} 
+        />
+      </div>
+      
+      <div className="setting-item">
+        <div>
+          <label>Marketing Materials</label>
+          <span className="hint">Send generated flyers and graphics to Slack</span>
+        </div>
+        <ToggleSwitch 
+          checked={settings.marketingAssets} 
+          onChange={(v) => handleToggle('marketingAssets', v)} 
+        />
+      </div>
+      
+      <div className="setting-item">
+        <div>
+          <label>Closing Reminders</label>
+          <span className="hint">Send closing date reminders to Slack</span>
+        </div>
+        <ToggleSwitch 
+          checked={settings.closingReminders} 
+          onChange={(v) => handleToggle('closingReminders', v)} 
+        />
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## STEP 6: VERIFY SLACK BOT PERMISSIONS
+
+Make sure your Slack app has these scopes:
+- `files:write` - Upload files
+- `chat:write` - Send messages
+- `channels:read` - Read channel info
+
+Check in Slack App settings → OAuth & Permissions
+
+---
+
+## EXPECTED BEHAVIOR
+
+| Action | Slack Result (Default ON) |
+|--------|--------------------------|
+| Upload document to Docs tab | File + details sent to Slack channel |
+| Generate flyer | Flyer image sent to Slack channel |
+| Generate social graphic | Graphic sent to Slack channel |
+| User turns OFF in settings | No notifications sent |
+
+---
+
+## CHECKLIST
+
+- [ ] Find current document upload handler
+- [ ] Add Slack notification after document save
+- [ ] Find marketing generation handler  
+- [ ] Add Slack notification after marketing generation
+- [ ] Add notification settings to database schema
+- [ ] Create Settings UI with toggles
+- [ ] Verify Slack bot has `files:write` scope
+- [ ] Test document upload → check Slack channel
+- [ ] Test flyer generation → check Slack channel
+- [ ] Test toggle OFF → verify no notifications
+
+---
+
+## DEBUG: If still not working
+
+Add console logs to trace the issue:
+```typescript
+console.log('📤 Document uploaded:', fileName);
+console.log('🔍 Transaction slackChannelId:', transaction.slackChannelId);
+console.log('⚙️ Notifications enabled:', notificationsEnabled);
+console.log('🚀 Attempting Slack upload...');
+```
+
+Check the server logs after uploading a document to see where it fails.

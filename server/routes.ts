@@ -1070,20 +1070,29 @@ export async function registerRoutes(
       const fileExt = fileName.split('.').pop()?.toLowerCase() || 'unknown';
 
       // Check notification settings and send Slack notification with file
+      console.log('[DOC UPLOAD] Starting Slack notification flow...');
+      console.log('[DOC UPLOAD] Transaction slackChannelId:', transaction.slackChannelId);
+      
       if (transaction.slackChannelId) {
         const userId = req.user?.claims?.sub;
         let shouldNotify = true; // Default to enabled
+        
+        console.log('[DOC UPLOAD] User ID:', userId);
         
         if (userId) {
           try {
             const settings = await storage.getNotificationSettings(userId, transaction.id);
             shouldNotify = settings?.documentUploads ?? true;
+            console.log('[DOC UPLOAD] Notification settings:', settings);
+            console.log('[DOC UPLOAD] shouldNotify:', shouldNotify);
           } catch (e) {
+            console.log('[DOC UPLOAD] Error getting settings, defaulting to enabled:', e);
             shouldNotify = true; // Default to enabled if can't get settings
           }
         }
         
         if (shouldNotify) {
+          console.log('[DOC UPLOAD] Preparing to send file to Slack...');
           try {
             // Build the notification message to include with file upload
             const timestamp = new Date().toLocaleString('en-US', {
@@ -1112,18 +1121,28 @@ export async function registerRoutes(
             ].filter(Boolean).join('\n');
 
             // Upload the actual file to Slack with the notification as initial comment
-            await uploadFileToChannel(
+            console.log('[DOC UPLOAD] Calling uploadFileToChannel with:');
+            console.log('[DOC UPLOAD]   - channelId:', transaction.slackChannelId);
+            console.log('[DOC UPLOAD]   - fileName:', fileName);
+            console.log('[DOC UPLOAD]   - fileData length:', fileData?.length || 'undefined');
+            
+            const result = await uploadFileToChannel(
               transaction.slackChannelId,
               fileData,
               fileName,
               docLabel,
               initialComment
             );
+            console.log('[DOC UPLOAD] uploadFileToChannel result:', result);
           } catch (slackError) {
-            console.error("Failed to send document to Slack:", slackError);
+            console.error("[DOC UPLOAD] Failed to send document to Slack:", slackError);
             // Don't fail the request if Slack notification fails
           }
+        } else {
+          console.log('[DOC UPLOAD] shouldNotify is false, skipping Slack notification');
         }
+      } else {
+        console.log('[DOC UPLOAD] No slackChannelId on transaction, skipping Slack notification');
       }
 
       res.status(201).json(doc);
