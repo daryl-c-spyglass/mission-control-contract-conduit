@@ -197,6 +197,8 @@ export async function uploadFileToChannel(
   }
 
   try {
+    console.log(`[Slack] Starting file upload: ${fileName} to channel ${channelId}`);
+    
     // Convert base64 to buffer if it's a data URL
     let fileBuffer: Buffer;
     if (fileData.startsWith("data:")) {
@@ -205,33 +207,67 @@ export async function uploadFileToChannel(
     } else {
       fileBuffer = Buffer.from(fileData, "base64");
     }
+    
+    console.log(`[Slack] File buffer size: ${fileBuffer.length} bytes`);
 
-    // Use FormData for file upload
-    const formData = new FormData();
-    formData.append("file", new Blob([fileBuffer]), fileName);
-    formData.append("channels", channelId);
-    formData.append("title", title);
-    if (initialComment) {
-      formData.append("initial_comment", initialComment);
-    }
-
-    const response = await fetch("https://slack.com/api/files.upload", {
+    // Step 1: Get upload URL using files.getUploadURLExternal
+    const getUploadUrlResponse = await fetch("https://slack.com/api/files.getUploadURLExternal", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: formData,
+      body: new URLSearchParams({
+        filename: fileName,
+        length: fileBuffer.length.toString(),
+      }),
     });
 
-    const data = await response.json();
-    if (!data.ok) {
-      console.error("Slack file upload error:", data.error);
+    const uploadUrlData = await getUploadUrlResponse.json();
+    if (!uploadUrlData.ok) {
+      console.error("[Slack] Failed to get upload URL:", uploadUrlData.error);
       return null;
     }
 
-    return { fileId: data.file?.id || "" };
+    const { upload_url, file_id } = uploadUrlData;
+    console.log(`[Slack] Got upload URL for file_id: ${file_id}`);
+
+    // Step 2: Upload file to the URL
+    const uploadResponse = await fetch(upload_url, {
+      method: "POST",
+      body: fileBuffer,
+    });
+
+    if (!uploadResponse.ok) {
+      console.error("[Slack] Failed to upload file to URL:", uploadResponse.status);
+      return null;
+    }
+    console.log(`[Slack] File uploaded successfully`);
+
+    // Step 3: Complete the upload with files.completeUploadExternal
+    const completeResponse = await fetch("https://slack.com/api/files.completeUploadExternal", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        files: [{ id: file_id, title: title }],
+        channel_id: channelId,
+        initial_comment: initialComment || undefined,
+      }),
+    });
+
+    const completeData = await completeResponse.json();
+    if (!completeData.ok) {
+      console.error("[Slack] Failed to complete upload:", completeData.error);
+      return null;
+    }
+
+    console.log(`[Slack] File upload completed successfully: ${file_id}`);
+    return { fileId: file_id };
   } catch (error) {
-    console.error("Failed to upload file to Slack:", error);
+    console.error("[Slack] Failed to upload file:", error);
     return null;
   }
 }
