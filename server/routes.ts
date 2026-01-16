@@ -988,12 +988,62 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/transactions/:transactionId/marketing-assets/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/transactions/:transactionId/marketing-assets/:id", isAuthenticated, async (req: any, res) => {
     try {
+      // Get the asset before deleting to have details for notification
+      const asset = await storage.getMarketingAsset(req.params.id);
+      if (!asset) {
+        return res.status(404).json({ message: "Marketing asset not found" });
+      }
+
       const deleted = await storage.deleteMarketingAsset(req.params.id);
       if (!deleted) {
         return res.status(404).json({ message: "Marketing asset not found" });
       }
+
+      // Get asset type label
+      const assetTypeLabels: Record<string, string> = {
+        'instagram-post': 'Instagram Post',
+        'instagram-story': 'Instagram Story', 
+        'facebook-post': 'Facebook Post',
+        'flyer': 'Property Flyer',
+      };
+      const assetTypeLabel = assetTypeLabels[asset.type] || asset.type;
+
+      // Log activity
+      await storage.createActivity({
+        transactionId: req.params.transactionId,
+        type: "marketing_deleted",
+        description: `Marketing asset deleted: ${assetTypeLabel}`,
+        category: "marketing",
+      });
+
+      // Send Slack notification
+      const transaction = await storage.getTransaction(req.params.transactionId);
+      if (transaction?.slackChannelId) {
+        const userId = req.user?.claims?.sub;
+        let shouldNotify = true;
+
+        if (userId) {
+          try {
+            const settings = await storage.getNotificationSettings(userId, transaction.id);
+            shouldNotify = settings?.marketingAssets ?? true;
+          } catch (e) {
+            shouldNotify = true;
+          }
+        }
+
+        if (shouldNotify) {
+          try {
+            const address = transaction.propertyAddress || 'Unknown Property';
+            const message = `:wastebasket: *Marketing Asset Deleted*\n• Type: ${assetTypeLabel}\n• Property: ${address}`;
+            await postToChannel(transaction.slackChannelId, message);
+          } catch (slackError) {
+            console.error("Failed to send Slack notification for marketing deletion:", slackError);
+          }
+        }
+      }
+
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete marketing asset" });
@@ -1157,12 +1207,70 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/transactions/:transactionId/documents/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/transactions/:transactionId/documents/:id", isAuthenticated, async (req: any, res) => {
     try {
+      // Get the document before deleting to have details for notification
+      const document = await storage.getContractDocument(req.params.id);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
       const deleted = await storage.deleteContractDocument(req.params.id);
       if (!deleted) {
         return res.status(404).json({ message: "Document not found" });
       }
+
+      const docLabel = document.name || document.fileName;
+
+      // Get document type label
+      const docTypeLabels: Record<string, string> = {
+        contract: 'Contract',
+        amendment: 'Amendment',
+        addendum: 'Addendum',
+        disclosure: 'Disclosure',
+        inspection: 'Inspection Report',
+        appraisal: 'Appraisal',
+        title: 'Title Document',
+        insurance: 'Insurance',
+        closing: 'Closing Document',
+        other: 'Other',
+      };
+      const docTypeLabel = docTypeLabels[document.documentType || 'other'] || 'Other';
+
+      // Log activity
+      await storage.createActivity({
+        transactionId: req.params.transactionId,
+        type: "document_deleted",
+        description: `Contract document deleted: ${docLabel}`,
+        category: "documents",
+      });
+
+      // Send Slack notification
+      const transaction = await storage.getTransaction(req.params.transactionId);
+      if (transaction?.slackChannelId) {
+        const userId = req.user?.claims?.sub;
+        let shouldNotify = true;
+
+        if (userId) {
+          try {
+            const settings = await storage.getNotificationSettings(userId, transaction.id);
+            shouldNotify = settings?.documentUploads ?? true;
+          } catch (e) {
+            shouldNotify = true;
+          }
+        }
+
+        if (shouldNotify) {
+          try {
+            const address = transaction.propertyAddress || 'Unknown Property';
+            const message = `:wastebasket: *Document Deleted*\n• Name: ${docLabel}\n• Type: ${docTypeLabel}\n• Property: ${address}`;
+            await postToChannel(transaction.slackChannelId, message);
+          } catch (slackError) {
+            console.error("Failed to send Slack notification for document deletion:", slackError);
+          }
+        }
+      }
+
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete document" });

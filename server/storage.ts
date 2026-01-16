@@ -62,6 +62,7 @@ export interface IStorage {
 
   // Contract Documents
   getContractDocumentsByTransaction(transactionId: string): Promise<ContractDocument[]>;
+  getContractDocument(id: string): Promise<ContractDocument | undefined>;
   createContractDocument(doc: InsertContractDocument): Promise<ContractDocument>;
   deleteContractDocument(id: string): Promise<boolean>;
 
@@ -267,6 +268,11 @@ export class DatabaseStorage implements IStorage {
       .from(contractDocuments)
       .where(eq(contractDocuments.transactionId, transactionId))
       .orderBy(desc(contractDocuments.createdAt));
+  }
+
+  async getContractDocument(id: string): Promise<ContractDocument | undefined> {
+    const [doc] = await db.select().from(contractDocuments).where(eq(contractDocuments.id, id));
+    return doc;
   }
 
   async createContractDocument(doc: InsertContractDocument): Promise<ContractDocument> {
