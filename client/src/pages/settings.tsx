@@ -478,7 +478,7 @@ export default function Settings() {
         <CardContent>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              When you create a transaction, Mission Control automatically creates a Gmail filter for that property address. 
+              When you create a transaction, Contract Conduit automatically creates a Gmail filter for that property address. 
               Any emails containing the address will be labeled and forwarded to the Slack channel.
             </p>
             <div className="flex items-center gap-2">

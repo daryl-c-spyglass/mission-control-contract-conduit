@@ -86,7 +86,7 @@ function LandingPage() {
           <div className="mx-auto mb-4 p-3 rounded-lg bg-primary/10 w-fit">
             <Building2 className="h-10 w-10 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Mission Control</CardTitle>
+          <CardTitle className="text-2xl">Contract Conduit</CardTitle>
           <CardDescription>
             Real estate transaction management for your brokerage. Track deals from contract to close.
           </CardDescription>
@@ -239,7 +239,7 @@ function AppContent() {
 }
 
 function App() {
-  // Auto-use dark theme when embedded in iframe (Mission Control)
+  // Auto-use dark theme when embedded in iframe
   useEffect(() => {
     if (window.self !== window.top) {
       document.documentElement.classList.add('dark');

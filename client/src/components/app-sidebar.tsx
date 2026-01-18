@@ -74,7 +74,7 @@ export function AppSidebar({ transactions, onCreateTransaction }: AppSidebarProp
             <Building2 className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold">Mission Control</h1>
+            <h1 className="text-lg font-semibold">Contract Conduit</h1>
             <p className="text-xs text-muted-foreground">Transaction Management</p>
           </div>
         </div>

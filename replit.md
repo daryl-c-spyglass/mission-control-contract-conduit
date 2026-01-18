@@ -1,8 +1,8 @@
-# Mission Control - Real Estate Transaction Management
+# Contract Conduit - Real Estate Transaction Management
 
 ## Overview
 
-Mission Control is a real estate transaction management application designed to empower agents and coordinators with a centralized platform for tracking property deals from contract to close. It offers tools for managing active transactions, coordinating team members, and integrating with essential external services. The project aims to streamline the real estate workflow, enhance collaboration, and provide a comprehensive solution for managing complex property transactions, ultimately increasing efficiency and closing rates for real estate professionals.
+Contract Conduit is a real estate transaction management application designed to empower agents and coordinators with a centralized platform for tracking property deals from contract to close. It offers tools for managing active transactions, coordinating team members, and integrating with essential external services. The project aims to streamline the real estate workflow, enhance collaboration, and provide a comprehensive solution for managing complex property transactions, ultimately increasing efficiency and closing rates for real estate professionals.
 
 ## User Preferences
 
