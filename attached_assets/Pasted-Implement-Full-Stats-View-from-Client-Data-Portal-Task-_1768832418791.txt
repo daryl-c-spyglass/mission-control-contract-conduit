@@ -1,0 +1,543 @@
+Implement Full Stats View from Client Data Portal
+Task
+Replace the current Stats view in the CMA tab with the comprehensive Stats view from Client Data Portal. Reference the attached screenshots showing the complete layout from top to bottom.
+
+Current State (Screenshot 1 - Contract Conduit)
+Simple 6-card layout with:
+
+Avg Price, Price/SqFt, Days on Market, Avg SqFt, Avg Beds, Avg Baths
+Each showing value, range, and median
+
+Desired State (Screenshots 2-6 - Client Data Portal)
+Full Stats view with these sections in order:
+
+Summary Cards (3 cards)
+Statistics Summary Table
+Price Comparison Bar Chart
+CMA Market Review
+Days on Market / % of List Price Section
+Average Price/Sq. Ft. Scatter Plot
+
+
+Implementation
+1. Summary Cards Section (Screenshot 2)
+Three horizontal cards at the top:
+typescriptconst SummaryCards = ({ stats }) => {
+  return (
+    <div className="grid grid-cols-3 gap-4 p-4">
+      {/* Average Price Card */}
+      <div className="border rounded-lg p-4 bg-white">
+        <div className="text-sm text-gray-500">Average Price</div>
+        <div className="text-3xl font-bold text-primary">
+          ${Math.round(stats.avgPrice).toLocaleString()}
+        </div>
+        <div className="text-sm text-gray-400 mt-1">
+          Range: ${stats.minPrice.toLocaleString()} - ${stats.maxPrice.toLocaleString()}
+        </div>
+      </div>
+
+      {/* Price Per Sqft Card */}
+      <div className="border rounded-lg p-4 bg-white">
+        <div className="text-sm text-gray-500">Price Per Sqft</div>
+        <div className="text-3xl font-bold">
+          ${stats.avgPricePerSqft}<span className="text-lg text-gray-500">/sqft</span>
+        </div>
+        <div className="text-sm text-gray-400 mt-1">
+          Range: ${Math.round(stats.minPricePerSqft)} - ${Math.round(stats.maxPricePerSqft)}
+        </div>
+      </div>
+
+      {/* Avg Living Area Card */}
+      <div className="border rounded-lg p-4 bg-white">
+        <div className="text-sm text-gray-500">Avg Living Area</div>
+        <div className="text-3xl font-bold">
+          {stats.avgSqft.toLocaleString()}<span className="text-lg text-gray-500"> sqft</span>
+        </div>
+        <div className="text-sm text-gray-400 mt-1">
+          {stats.avgBeds.toFixed(1)} beds / {stats.avgBaths.toFixed(1)} baths avg
+        </div>
+      </div>
+    </div>
+  );
+};
+2. Statistics Summary Table (Screenshot 3)
+typescriptconst StatisticsSummaryTable = ({ stats, propertyCount }) => {
+  return (
+    <div className="border rounded-lg bg-white mx-4 mb-4">
+      <div className="p-4 border-b">
+        <h3 className="text-lg font-semibold">
+          Statistics Summary ({propertyCount} Properties)
+        </h3>
+      </div>
+      <table className="w-full">
+        <thead className="text-sm text-gray-500">
+          <tr className="border-b">
+            <th className="text-left p-4 font-medium">Metric</th>
+            <th className="text-left p-4 font-medium">Range</th>
+            <th className="text-left p-4 font-medium">Average</th>
+            <th className="text-left p-4 font-medium">Median</th>
+          </tr>
+        </thead>
+        <tbody className="text-sm">
+          <tr className="border-b">
+            <td className="p-4">Price</td>
+            <td className="p-4">${stats.minPrice.toLocaleString()} - ${stats.maxPrice.toLocaleString()}</td>
+            <td className="p-4 font-semibold">${Math.round(stats.avgPrice).toLocaleString()}</td>
+            <td className="p-4">${stats.medianPrice.toLocaleString()}</td>
+          </tr>
+          <tr className="border-b">
+            <td className="p-4">Price/SqFt</td>
+            <td className="p-4">${Math.round(stats.minPricePerSqft)} - ${Math.round(stats.maxPricePerSqft)}</td>
+            <td className="p-4 font-semibold">${stats.avgPricePerSqft}</td>
+            <td className="p-4">${stats.medianPricePerSqft}</td>
+          </tr>
+          <tr className="border-b">
+            <td className="p-4">Living Area</td>
+            <td className="p-4">{stats.minSqft.toLocaleString()} - {stats.maxSqft.toLocaleString()} sqft</td>
+            <td className="p-4 font-semibold">{Math.round(stats.avgSqft).toLocaleString()} sqft</td>
+            <td className="p-4">{stats.medianSqft.toLocaleString()} sqft</td>
+          </tr>
+          <tr>
+            <td className="p-4">Year Built</td>
+            <td className="p-4">{stats.minYearBuilt} - {stats.maxYearBuilt}</td>
+            <td className="p-4 font-semibold">{Math.round(stats.avgYearBuilt)}</td>
+            <td className="p-4">{stats.medianYearBuilt}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+};
+3. Price Comparison Bar Chart (Screenshot 4)
+typescriptimport { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart3 } from 'lucide-react';
+
+const PriceComparisonChart = ({ comparables }) => {
+  const chartData = comparables.map(comp => ({
+    name: comp.address.split(' ').slice(0, 3).join(' '), // Truncate address
+    price: comp.soldPrice || comp.listPrice,
+    fullAddress: comp.address,
+  }));
+
+  const formatYAxis = (value: number) => {
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+    return `$${(value / 1000).toFixed(0)}K`;
+  };
+
+  return (
+    <div className="border rounded-lg bg-white mx-4 mb-4 p-4">
+      <div className="flex items-center gap-2 mb-4">
+        <BarChart3 className="w-5 h-5 text-gray-500" />
+        <h3 className="text-lg font-semibold">Price Comparison</h3>
+      </div>
+      <div className="h-[300px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData}>
+            <XAxis 
+              dataKey="name" 
+              angle={-45} 
+              textAnchor="end" 
+              height={80}
+              tick={{ fontSize: 11 }}
+            />
+            <YAxis tickFormatter={formatYAxis} />
+            <Tooltip 
+              formatter={(value: number) => [`$${value.toLocaleString()}`, 'Price']}
+              labelFormatter={(label, payload) => payload?.[0]?.payload?.fullAddress || label}
+            />
+            <Bar dataKey="price" fill="#F37216" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+};
+4. CMA Market Review Section (Screenshot 4)
+typescriptimport { FileText } from 'lucide-react';
+
+const CMAMarketReview = ({ stats, comparables }) => {
+  // Count properties by status
+  const statusCounts = comparables.reduce((acc, comp) => {
+    const status = normalizeStatus(comp.status);
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const statusSummary = Object.entries(statusCounts)
+    .map(([status, count]) => `${count} ${formatStatusLabel(status)}`)
+    .join(', ');
+
+  return (
+    <div className="border rounded-lg bg-white mx-4 mb-4 p-4">
+      <div className="flex items-center gap-2 mb-4">
+        <FileText className="w-5 h-5 text-gray-500" />
+        <h3 className="text-lg font-semibold">CMA Market Review</h3>
+      </div>
+
+      <div className="grid grid-cols-2 gap-6">
+        {/* Market Overview */}
+        <div>
+          <div className="font-semibold mb-2">Market Overview</div>
+          <p className="text-sm text-gray-600">
+            Based on {comparables.length} comparable properties, the average price is{' '}
+            <span className="font-semibold">${Math.round(stats.avgPrice).toLocaleString()}</span>{' '}
+            with a median of <span className="font-semibold">${stats.medianPrice.toLocaleString()}</span>.{' '}
+            Prices range from ${stats.minPrice.toLocaleString()} to ${stats.maxPrice.toLocaleString()}.
+          </p>
+        </div>
+
+        {/* Price Per Square Foot */}
+        <div>
+          <div className="font-semibold mb-2">Price Per Square Foot</div>
+          <p className="text-sm text-gray-600">
+            Average price per square foot is{' '}
+            <span className="font-semibold">${stats.avgPricePerSqft.toFixed(2)}</span>{' '}
+            across comparable properties. This ranges from ${stats.minPricePerSqft.toFixed(2)} to ${stats.maxPricePerSqft.toFixed(2)}/sqft.
+          </p>
+        </div>
+
+        {/* Days on Market */}
+        <div>
+          <div className="font-semibold mb-2">Days on Market</div>
+          <p className="text-sm text-gray-600">
+            Average: <span className="font-semibold">{stats.avgDom} days</span>
+          </p>
+        </div>
+
+        {/* Property Size */}
+        <div>
+          <div className="font-semibold mb-2">Property Size</div>
+          <p className="text-sm text-gray-600">
+            Avg: <span className="font-semibold">{Math.round(stats.avgSqft).toLocaleString()} sqft</span>
+          </p>
+        </div>
+
+        {/* Bed/Bath */}
+        <div>
+          <div className="font-semibold mb-2">Bed/Bath</div>
+          <p className="text-sm text-gray-600">
+            Avg: <span className="font-semibold">{stats.avgBeds.toFixed(1)} beds / {stats.avgBaths.toFixed(1)} baths</span>
+          </p>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="mt-4 pt-4 border-t text-sm text-gray-500 italic">
+        This analysis is based on {statusSummary} properties in your selection.
+      </div>
+    </div>
+  );
+};
+5. Days on Market / % of List Price Section (Screenshot 5)
+typescriptimport { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+
+const DaysOnMarketSection = ({ comparables }) => {
+  // Filter to only closed properties
+  const closedProperties = comparables.filter(c => 
+    normalizeStatus(c.status) === 'closed' && c.soldPrice && c.listPrice
+  );
+
+  if (closedProperties.length === 0) {
+    return null; // Don't show section if no closed properties
+  }
+
+  // Calculate averages
+  const avgDom = Math.round(
+    closedProperties.reduce((sum, c) => sum + (c.dom || 0), 0) / closedProperties.length
+  );
+  const avgListPricePercent = (
+    closedProperties.reduce((sum, c) => sum + (c.soldPrice / c.listPrice) * 100, 0) / 
+    closedProperties.length
+  ).toFixed(2);
+
+  // Prepare chart data
+  const chartData = closedProperties.map(comp => ({
+    dom: comp.dom || 0,
+    price: comp.soldPrice,
+    percent: ((comp.soldPrice / comp.listPrice) * 100).toFixed(2),
+    address: comp.address,
+  }));
+
+  // Get color based on % of list price
+  const getColor = (percent: number) => {
+    if (percent >= 100) return '#22c55e'; // Green
+    if (percent >= 95) return '#eab308'; // Yellow
+    return '#ef4444'; // Red
+  };
+
+  return (
+    <div className="border rounded-lg bg-white mx-4 mb-4 p-4">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-2">
+        <div className="text-2xl font-bold">
+          {avgDom} <span className="text-sm font-normal text-gray-500">DAYS ON MARKET</span>
+        </div>
+        <div className="text-2xl font-bold text-primary">
+          {avgListPricePercent}% <span className="text-sm font-normal text-gray-500">OF LIST PRICE</span>
+        </div>
+      </div>
+
+      {/* Description */}
+      <p className="text-sm text-gray-600 mb-4">
+        Sold homes were on the market for an average of <span className="font-semibold">{avgDom} days</span> before they accepted an offer. 
+        These homes sold for an average of <span className="font-semibold">{avgListPricePercent}%</span> of list price.
+      </p>
+
+      <div className="flex gap-6">
+        {/* Property List */}
+        <div className="w-1/3">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="bg-red-500 text-white text-xs px-2 py-1 rounded">
+              {closedProperties.length}
+            </span>
+            <span className="font-semibold">Closed</span>
+          </div>
+          <div className="space-y-3">
+            {closedProperties.map(comp => {
+              const percent = ((comp.soldPrice / comp.listPrice) * 100).toFixed(2);
+              return (
+                <div key={comp.mlsId} className="flex items-center gap-3">
+                  <img 
+                    src={comp.photos?.[0] || '/placeholder-house.jpg'} 
+                    alt={comp.address}
+                    className="w-12 h-12 object-cover rounded"
+                  />
+                  <div>
+                    <div className="font-medium text-sm">{comp.address}</div>
+                    <div className="text-xs text-gray-500">
+                      {comp.dom} Days • {percent}%
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Scatter Chart */}
+        <div className="w-2/3 h-[250px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+              <XAxis 
+                dataKey="dom" 
+                name="Days" 
+                type="number"
+                tick={{ fontSize: 11 }}
+              />
+              <YAxis 
+                dataKey="price" 
+                name="Price"
+                tickFormatter={(v) => `$${(v / 1000000).toFixed(2)}M`}
+                tick={{ fontSize: 11 }}
+              />
+              <Tooltip 
+                formatter={(value: number, name: string) => {
+                  if (name === 'Price') return [`$${value.toLocaleString()}`, 'Price'];
+                  return [value, name];
+                }}
+              />
+              <Scatter data={chartData}>
+                {chartData.map((entry, index) => (
+                  <Cell key={index} fill={getColor(parseFloat(entry.percent))} />
+                ))}
+              </Scatter>
+            </ScatterChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex justify-center gap-6 mt-4 pt-4 border-t">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-green-500" />
+          <span className="text-sm text-gray-600">≥100% of list</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-yellow-500" />
+          <span className="text-sm text-gray-600">95-99% of list</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-red-500" />
+          <span className="text-sm text-gray-600">&lt;95% of list</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+6. Average Price/Sq. Ft. Scatter Plot Section (Screenshot 6)
+typescriptconst AveragePricePerSqftSection = ({ comparables, subjectProperty }) => {
+  // Filter closed properties for comparison
+  const closedProperties = comparables.filter(c => normalizeStatus(c.status) === 'closed');
+  
+  // Calculate average price per sqft
+  const allProperties = subjectProperty ? [subjectProperty, ...closedProperties] : closedProperties;
+  const avgPsf = Math.round(
+    allProperties.reduce((sum, c) => sum + ((c.soldPrice || c.listPrice) / c.sqft), 0) / 
+    allProperties.length
+  );
+
+  // Prepare chart data
+  const chartData = [
+    ...(subjectProperty ? [{
+      sqft: subjectProperty.sqft,
+      price: subjectProperty.listPrice,
+      isSubject: true,
+      address: subjectProperty.address,
+      psf: Math.round(subjectProperty.listPrice / subjectProperty.sqft),
+    }] : []),
+    ...closedProperties.map(comp => ({
+      sqft: comp.sqft,
+      price: comp.soldPrice,
+      isSubject: false,
+      address: comp.address,
+      psf: Math.round(comp.soldPrice / comp.sqft),
+    })),
+  ];
+
+  return (
+    <div className="border rounded-lg bg-white mx-4 mb-4 p-4">
+      {/* Header */}
+      <div className="font-bold text-lg mb-1">AVERAGE PRICE/SQ. FT.</div>
+      <div className="text-sm text-gray-500 mb-4">
+        {subjectProperty ? '1 Subject, ' : ''}{closedProperties.length} Closed
+      </div>
+
+      <div className="flex gap-6">
+        {/* Property List */}
+        <div className="w-1/4">
+          {subjectProperty && (
+            <div className="flex items-center gap-3 mb-3 pb-3 border-b">
+              <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center">
+                <Home className="w-5 h-5 text-gray-500" />
+              </div>
+              <div>
+                <div className="text-sm">
+                  <span className="font-semibold">Subject:</span> {subjectProperty.address.substring(0, 15)}...
+                </div>
+                <div className="text-primary text-sm font-semibold">
+                  ${Math.round(subjectProperty.listPrice / subjectProperty.sqft)} / sq. ft.
+                </div>
+              </div>
+            </div>
+          )}
+          {closedProperties.map(comp => (
+            <div key={comp.mlsId} className="flex items-center gap-3 mb-3">
+              <img 
+                src={comp.photos?.[0] || '/placeholder-house.jpg'} 
+                alt={comp.address}
+                className="w-10 h-10 object-cover rounded"
+              />
+              <div>
+                <div className="text-sm font-medium">{comp.address.substring(0, 15)}...</div>
+                <div className="text-primary text-sm font-semibold">
+                  ${Math.round(comp.soldPrice / comp.sqft)} / sq. ft.
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Main Content */}
+        <div className="w-3/4">
+          {/* Average Display */}
+          <div className="mb-4">
+            <span className="text-4xl font-bold text-primary">${avgPsf}</span>
+            <span className="text-lg text-gray-500"> / Sq. Ft.</span>
+          </div>
+          <p className="text-sm text-gray-600 mb-4">
+            Comparable homes sold for an average of <span className="text-primary font-semibold">${avgPsf}</span>/sq. ft. 
+            Many factors such as location, use of space, condition, quality, and amenities 
+            determine the market value per square foot, so reviewing each comp carefully is important.
+          </p>
+
+          {/* Scatter Chart */}
+          <div className="h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 60 }}>
+                <XAxis 
+                  dataKey="sqft" 
+                  name="Square feet"
+                  type="number"
+                  tick={{ fontSize: 11 }}
+                  label={{ value: 'Square feet', position: 'bottom', offset: 0 }}
+                />
+                <YAxis 
+                  dataKey="price" 
+                  name="Price"
+                  tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`}
+                  tick={{ fontSize: 11 }}
+                />
+                <Tooltip 
+                  formatter={(value: number, name: string) => {
+                    if (name === 'Price') return [`$${value.toLocaleString()}`, 'Price'];
+                    if (name === 'Square feet') return [value.toLocaleString(), 'Sq Ft'];
+                    return [value, name];
+                  }}
+                />
+                <Scatter data={chartData}>
+                  {chartData.map((entry, index) => (
+                    <Cell 
+                      key={index} 
+                      fill={entry.isSubject ? '#3b82f6' : '#ef4444'} 
+                      r={entry.isSubject ? 8 : 6}
+                    />
+                  ))}
+                </Scatter>
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Legend */}
+          <div className="flex items-center gap-2 mt-2">
+            <input type="checkbox" checked readOnly className="accent-blue-500" />
+            <div className="w-3 h-3 rounded-full bg-blue-500" />
+            <span className="text-sm text-gray-600">Subject Property</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+7. Complete Stats View Component
+typescriptconst StatsView = ({ comparables, subjectProperty, stats }) => {
+  return (
+    <div className="bg-gray-50 pb-4">
+      {/* 1. Summary Cards */}
+      <SummaryCards stats={stats} />
+
+      {/* 2. Statistics Summary Table */}
+      <StatisticsSummaryTable stats={stats} propertyCount={comparables.length} />
+
+      {/* 3. Price Comparison Bar Chart */}
+      <PriceComparisonChart comparables={comparables} />
+
+      {/* 4. CMA Market Review */}
+      <CMAMarketReview stats={stats} comparables={comparables} />
+
+      {/* 5. Days on Market / % of List Price */}
+      <DaysOnMarketSection comparables={comparables} />
+
+      {/* 6. Average Price/Sq. Ft. Scatter Plot */}
+      <AveragePricePerSqftSection 
+        comparables={comparables} 
+        subjectProperty={subjectProperty} 
+      />
+    </div>
+  );
+};
+
+Dependencies
+bashnpm install recharts
+
+Acceptance Criteria
+
+ Summary Cards: 3 cards (Avg Price in orange, Price/Sqft, Avg Living Area)
+ Statistics Summary Table: 4 rows (Price, Price/SqFt, Living Area, Year Built) with Range, Average, Median columns
+ Price Comparison Chart: Orange bar chart with property addresses on x-axis
+ CMA Market Review: 2-column layout with narrative text, footer with status counts
+ Days on Market Section: Only shows if closed properties exist, includes scatter chart with color-coded dots (green/yellow/red)
+ Average Price/Sq. Ft.: Scatter plot (sqft vs price), blue dot for subject, red dots for closed
+ All charts use Recharts library
+ Primary orange color (#F37216) used consistently
+ Responsive layout
+ No status filters or sub-view toggles in Stats view (pure analytics display)

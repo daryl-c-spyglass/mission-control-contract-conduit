@@ -371,6 +371,8 @@ export interface TimelineDataPoint {
 export interface CMAComparable {
   address: string;
   price: number;
+  listPrice?: number;
+  closePrice?: number;
   bedrooms: number;
   bathrooms: number;
   sqft: number | string;
@@ -381,6 +383,8 @@ export interface CMAComparable {
   mlsNumber?: string;
   status?: string;
   listDate?: string;
+  closeDate?: string;
+  yearBuilt?: number;
   map?: {
     latitude: number;
     longitude: number;

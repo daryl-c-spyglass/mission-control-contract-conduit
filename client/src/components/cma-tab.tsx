@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getStatusBadgeStyle, getStatusLabel, getStatusColor } from "@/lib/utils/status-colors";
 import { CMAMap } from "@/components/cma-map";
+import { CMAStatsView } from "@/components/cma-stats-view";
 import type { Transaction, CMAComparable, Cma, PropertyStatistics, CmaStatMetric, Property } from "@shared/schema";
 import { useLocation } from "wouter";
 import { 
@@ -563,46 +564,13 @@ export function CMATab({ transaction }: CMATabProps) {
           />
         )}
         
-        {/* STATS VIEW - No sub-views */}
+        {/* STATS VIEW - Full comprehensive stats with charts */}
         {mainView === 'stats' && statistics && (
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-            <StatCard 
-              title="Avg Price" 
-              metric={statistics.price} 
-              format="currency"
-              icon={DollarSign}
-            />
-            <StatCard 
-              title="Price/SqFt" 
-              metric={statistics.pricePerSqFt} 
-              format="currency"
-              icon={TrendingUp}
-            />
-            <StatCard 
-              title="Days on Market" 
-              metric={statistics.daysOnMarket} 
-              format="number"
-              icon={Clock}
-            />
-            <StatCard 
-              title="Avg SqFt" 
-              metric={statistics.livingArea} 
-              format="number"
-              icon={Square}
-            />
-            <StatCard 
-              title="Avg Beds" 
-              metric={statistics.bedrooms} 
-              format="decimal"
-              icon={Bed}
-            />
-            <StatCard 
-              title="Avg Baths" 
-              metric={statistics.bathrooms} 
-              format="decimal"
-              icon={Bath}
-            />
-          </div>
+          <CMAStatsView
+            comparables={filteredComparables}
+            subjectProperty={transaction.mlsData}
+            statistics={statistics}
+          />
         )}
         
         {/* COMPARE and LIST VIEWS - With sub-views */}
