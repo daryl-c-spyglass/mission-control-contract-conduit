@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
   ScatterChart, Scatter, Cell, CartesianGrid
 } from 'recharts';
-import { BarChart3, FileText, Home, TrendingUp } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight, FileText, Home, TrendingUp, X } from "lucide-react";
 import type { CMAComparable, PropertyStatistics } from "@shared/schema";
 import { PropertyDetailModal } from "./cma/PropertyDetailModal";
 
@@ -496,59 +497,151 @@ function DaysOnMarketSection({ comparables }: { comparables: CMAComparable[] }) 
   );
 }
 
+interface PropertyData {
+  mlsNumber: string;
+  address: string;
+  city?: string;
+  zip?: string;
+  price: number;
+  pricePerSqft: number;
+  beds: number;
+  baths: number;
+  sqft: number;
+  lotSize?: string;
+  garageSpaces?: number;
+  origPrice?: number;
+  listPrice: number;
+  soldPrice?: number;
+  soldPricePercent?: number;
+  status: string;
+  photos: string[];
+  isSubject: boolean;
+}
+
 function AveragePricePerSqftSection({ comparables, subjectProperty }: { comparables: CMAComparable[]; subjectProperty: any }) {
+  const [selectedProperty, setSelectedProperty] = useState<PropertyData | null>(null);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [showSubjectOnChart, setShowSubjectOnChart] = useState(true);
+
   const closedProperties = useMemo(() => {
     return comparables.filter(c => normalizeStatus(c.status) === 'closed');
   }, [comparables]);
 
-  const chartData = useMemo(() => {
-    const data: Array<{
-      sqft: number;
-      price: number;
-      isSubject: boolean;
-      address: string;
-      psf: number;
-    }> = [];
+  const parseSqft = (value: string | number | undefined): number => {
+    if (value === undefined || value === null) return 0;
+    if (typeof value === 'number') return value;
+    const cleaned = String(value).replace(/[^0-9.]/g, '');
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const allProperties = useMemo(() => {
+    const props: PropertyData[] = [];
     
     if (subjectProperty) {
-      const sqft = subjectProperty.livingArea || subjectProperty.sqft || 0;
+      const sqft = parseSqft(subjectProperty.livingArea || subjectProperty.sqft);
       const price = subjectProperty.listPrice || 0;
       if (sqft > 0 && price > 0) {
-        data.push({
-          sqft,
+        props.push({
+          mlsNumber: subjectProperty.mlsNumber || 'subject',
+          address: subjectProperty.address?.unparsedAddress || subjectProperty.address || 'Subject Property',
+          city: subjectProperty.address?.city || subjectProperty.city,
+          zip: subjectProperty.address?.postalCode || subjectProperty.zip,
           price,
+          pricePerSqft: Math.round(price / sqft),
+          beds: subjectProperty.bedroomsTotal || subjectProperty.bedrooms || 0,
+          baths: subjectProperty.bathroomsTotalInteger || subjectProperty.bathrooms || 0,
+          sqft,
+          lotSize: subjectProperty.lotSizeArea || undefined,
+          garageSpaces: subjectProperty.garageSpaces,
+          listPrice: price,
+          status: subjectProperty.standardStatus || subjectProperty.status || 'Active',
+          photos: subjectProperty.photos || [],
           isSubject: true,
-          address: subjectProperty.address?.unparsedAddress || subjectProperty.address || 'Subject',
-          psf: Math.round(price / sqft),
         });
       }
     }
     
     closedProperties.forEach(comp => {
-      const sqftValue = typeof comp.sqft === 'number' ? comp.sqft : parseFloat(String(comp.sqft)) || 0;
+      const sqftValue = parseSqft(comp.sqft);
       const price = comp.closePrice || comp.price || 0;
+      const listPrice = comp.listPrice || price;
       if (sqftValue > 0 && price > 0) {
-        data.push({
-          sqft: sqftValue,
-          price,
-          isSubject: false,
+        props.push({
+          mlsNumber: comp.mlsNumber || `comp-${comp.address}`,
           address: comp.address || 'Unknown',
-          psf: Math.round(price / sqftValue),
+          price,
+          pricePerSqft: Math.round(price / sqftValue),
+          beds: comp.bedrooms || 0,
+          baths: comp.bathrooms || 0,
+          sqft: sqftValue,
+          origPrice: listPrice,
+          listPrice,
+          soldPrice: comp.closePrice,
+          soldPricePercent: comp.closePrice && listPrice ? (comp.closePrice / listPrice) * 100 : undefined,
+          status: comp.status || 'Closed',
+          photos: comp.photos || (comp.imageUrl ? [comp.imageUrl] : []),
+          isSubject: false,
         });
       }
     });
     
-    return data;
+    return props;
   }, [closedProperties, subjectProperty]);
 
+  const chartData = useMemo(() => {
+    return allProperties
+      .filter(p => showSubjectOnChart || !p.isSubject)
+      .map(p => ({
+        x: p.sqft,
+        y: p.price,
+        property: p,
+      }));
+  }, [allProperties, showSubjectOnChart]);
+
   const avgPsf = useMemo(() => {
-    if (chartData.length === 0) return 0;
-    return Math.round(chartData.reduce((sum, c) => sum + c.psf, 0) / chartData.length);
-  }, [chartData]);
+    const compsOnly = allProperties.filter(p => !p.isSubject);
+    if (compsOnly.length === 0) return 0;
+    return Math.round(compsOnly.reduce((sum, c) => sum + c.pricePerSqft, 0) / compsOnly.length);
+  }, [allProperties]);
 
-  if (chartData.length === 0) return null;
+  const handlePropertySelect = (property: PropertyData) => {
+    setSelectedProperty(property);
+    setCurrentPhotoIndex(0);
+  };
 
-  const hasSubject = chartData.some(d => d.isSubject);
+  const handleCloseDetail = () => {
+    setSelectedProperty(null);
+  };
+
+  const safePhotoIndex = selectedProperty?.photos?.length 
+    ? Math.min(currentPhotoIndex, selectedProperty.photos.length - 1) 
+    : 0;
+
+  const nextPhoto = () => {
+    if (selectedProperty?.photos?.length) {
+      setCurrentPhotoIndex((prev) => (prev + 1) % selectedProperty.photos.length);
+    }
+  };
+
+  const prevPhoto = () => {
+    if (selectedProperty?.photos?.length) {
+      setCurrentPhotoIndex((prev) => (prev - 1 + selectedProperty.photos.length) % selectedProperty.photos.length);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    const normalized = status?.toLowerCase();
+    if (normalized === 'closed' || normalized === 'sold') return 'bg-zinc-700 dark:bg-zinc-600';
+    if (normalized === 'active') return 'bg-green-500';
+    if (normalized === 'pending') return 'bg-gray-500';
+    if (normalized?.includes('under contract')) return 'bg-orange-500';
+    return 'bg-zinc-700 dark:bg-zinc-600';
+  };
+
+  if (allProperties.length === 0) return null;
+
+  const hasSubject = allProperties.some(d => d.isSubject);
 
   return (
     <Card className="mx-4 mb-4">
@@ -558,86 +651,148 @@ function AveragePricePerSqftSection({ comparables, subjectProperty }: { comparab
           {hasSubject ? '1 Subject, ' : ''}{closedProperties.length} Closed
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-6">
-          <div className="lg:w-1/4">
-            <div className="space-y-3 max-h-[300px] overflow-y-auto">
-              {chartData.slice(0, 6).map((item, idx) => (
-                <div key={idx} className={`flex items-center gap-3 ${item.isSubject ? 'pb-3 border-b' : ''}`}>
-                  <div className={`w-10 h-10 rounded flex items-center justify-center ${item.isSubject ? 'bg-blue-100 dark:bg-blue-900' : 'bg-muted'}`}>
-                    <Home className={`w-5 h-5 ${item.isSubject ? 'text-blue-500' : 'text-muted-foreground'}`} />
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* LEFT PANEL - Property List */}
+          <div className="lg:w-56 flex-shrink-0 space-y-2 max-h-[400px] overflow-y-auto">
+            {allProperties.map((property) => (
+              <div
+                key={property.mlsNumber}
+                onClick={() => handlePropertySelect(property)}
+                data-testid={`psf-property-${property.mlsNumber}`}
+                className={`
+                  flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all
+                  ${selectedProperty?.mlsNumber === property.mlsNumber
+                    ? 'ring-2 ring-primary bg-muted'
+                    : 'hover:bg-muted/50'
+                  }
+                `}
+              >
+                <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0 bg-muted">
+                  {property.isSubject ? (
+                    <div className="w-full h-full flex items-center justify-center bg-blue-500">
+                      <Home className="h-6 w-6 text-white" />
+                    </div>
+                  ) : property.photos?.[0] ? (
+                    <img
+                      src={property.photos[0]}
+                      alt={property.address}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Home className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1">
+                    {property.isSubject && (
+                      <span className="text-xs text-green-500 font-medium">Subject:</span>
+                    )}
+                    <span className="text-sm font-medium truncate">
+                      {property.address?.split(',')[0]?.substring(0, 14)}
+                      {(property.address?.split(',')[0]?.length || 0) > 14 ? '...' : ''}
+                    </span>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm truncate">
-                      {item.isSubject && <span className="font-semibold">Subject: </span>}
-                      {item.address.substring(0, 20)}{item.address.length > 20 ? '...' : ''}
-                    </div>
-                    <div className="text-primary text-sm font-semibold">
-                      ${item.psf} / sq. ft.
-                    </div>
+                  <div className="text-primary text-sm font-semibold">
+                    ${property.pricePerSqft} / sq. ft.
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
 
-          <div className="lg:w-3/4">
+          {/* CENTER PANEL - Chart */}
+          <div className="flex-1 min-w-0">
             <div className="mb-4">
-              <span className="text-4xl font-bold text-primary">${avgPsf}</span>
-              <span className="text-lg text-muted-foreground"> / Sq. Ft.</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold text-primary">${avgPsf}</span>
+                <span className="text-lg text-muted-foreground">/ Sq. Ft.</span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                Comparable homes sold for an average of{' '}
+                <span className="text-primary font-semibold">${avgPsf}</span>/sq. ft.
+                Many factors such as location, use of space, condition, quality,
+                and amenities determine the market value per square foot.
+              </p>
             </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              Comparable homes sold for an average of <span className="text-primary font-semibold">${avgPsf}</span>/sq. ft. 
-              Many factors such as location, use of space, condition, quality, and amenities 
-              determine the market value per square foot, so reviewing each comp carefully is important.
-            </p>
 
             <div className="h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
                 <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 60 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis 
-                    dataKey="sqft" 
-                    name="Square feet"
+                  <XAxis
                     type="number"
+                    dataKey="x"
+                    name="Square feet"
                     tick={{ fontSize: 11 }}
+                    tickFormatter={(value) => value.toLocaleString()}
                     label={{ value: 'Square feet', position: 'bottom', offset: 0, fontSize: 11 }}
-                    tickFormatter={(v) => v.toLocaleString()}
                     className="fill-foreground"
                   />
-                  <YAxis 
-                    dataKey="price" 
+                  <YAxis
+                    type="number"
+                    dataKey="y"
                     name="Price"
-                    tickFormatter={(v) => v >= 1000000 ? `$${(v / 1000000).toFixed(1)}M` : `$${(v / 1000).toFixed(0)}K`}
                     tick={{ fontSize: 11 }}
+                    tickFormatter={(v) => v >= 1000000 ? `$${(v / 1000000).toFixed(1)}M` : `$${(v / 1000).toFixed(0)}K`}
                     className="fill-foreground"
                   />
-                  <Tooltip 
-                    formatter={(value: number, name: string) => {
-                      if (name === 'Price') return [formatPrice(value), 'Price'];
-                      if (name === 'Square feet') return [value.toLocaleString(), 'Sq Ft'];
-                      return [value, name];
+                  <Tooltip
+                    content={({ payload }) => {
+                      if (payload && payload.length > 0) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-popover border rounded p-2 text-sm shadow-lg">
+                            <div className="font-medium">{data.property?.address}</div>
+                            <div className="text-muted-foreground">
+                              {formatPrice(data.y)} • {data.x?.toLocaleString()} sqft
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
                     }}
-                    contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
                   />
-                  <Scatter data={chartData}>
-                    {chartData.map((entry, index) => (
-                      <Cell 
-                        key={index} 
-                        fill={entry.isSubject ? '#3b82f6' : '#ef4444'} 
-                        r={entry.isSubject ? 10 : 6}
-                      />
-                    ))}
+                  <Scatter 
+                    data={chartData}
+                    onClick={(data: any) => {
+                      if (data?.payload?.property) handlePropertySelect(data.payload.property);
+                    }}
+                  >
+                    {chartData.map((entry, index) => {
+                      const isSelected = selectedProperty?.mlsNumber === entry.property?.mlsNumber;
+                      return (
+                        <Cell
+                          key={index}
+                          fill={entry.property?.isSubject ? '#3b82f6' : '#ef4444'}
+                          stroke={isSelected ? '#f97316' : entry.property?.isSubject ? '#1d4ed8' : '#dc2626'}
+                          strokeWidth={isSelected ? 3 : 2}
+                          r={entry.property?.isSubject ? 12 : 8}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      );
+                    })}
                   </Scatter>
                 </ScatterChart>
               </ResponsiveContainer>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 mt-2">
+            <div className="flex flex-wrap items-center gap-4 mt-3">
               {hasSubject && (
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showSubjectOnChart}
+                    onChange={(e) => setShowSubjectOnChart(e.target.checked)}
+                    className="w-4 h-4 rounded border-blue-500 text-blue-500 focus:ring-blue-500"
+                  />
+                  <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
+                    <Home className="h-2.5 w-2.5 text-white" />
+                  </div>
                   <span className="text-sm text-muted-foreground">Subject Property</span>
-                </div>
+                </label>
               )}
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-red-500" />
@@ -645,6 +800,123 @@ function AveragePricePerSqftSection({ comparables, subjectProperty }: { comparab
               </div>
             </div>
           </div>
+
+          {/* RIGHT PANEL - Property Detail */}
+          {selectedProperty && (
+            <div className="lg:w-64 flex-shrink-0 bg-muted rounded-lg overflow-hidden">
+              <div className="relative">
+                <Badge
+                  className={`absolute top-3 left-3 z-10 ${getStatusColor(selectedProperty.status)} text-white border-0`}
+                >
+                  {selectedProperty.status}
+                </Badge>
+                <button
+                  onClick={handleCloseDetail}
+                  data-testid="button-close-psf-detail"
+                  className="absolute top-3 right-3 z-10 text-zinc-400 hover:text-white bg-black/40 rounded-full p-1"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+
+                <div className="relative h-40 bg-zinc-700">
+                  {selectedProperty.photos?.length > 0 ? (
+                    <img
+                      src={selectedProperty.photos[safePhotoIndex]}
+                      alt={selectedProperty.address}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Home className="w-12 h-12 text-zinc-500" />
+                    </div>
+                  )}
+
+                  {selectedProperty.photos?.length > 1 && (
+                    <>
+                      <button
+                        onClick={prevPhoto}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 rounded-full p-1"
+                      >
+                        <ChevronLeft className="h-4 w-4 text-white" />
+                      </button>
+                      <button
+                        onClick={nextPhoto}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 rounded-full p-1"
+                      >
+                        <ChevronRight className="h-4 w-4 text-white" />
+                      </button>
+                      <div className="absolute bottom-2 right-2 bg-black/60 px-2 py-0.5 rounded text-white text-xs">
+                        {safePhotoIndex + 1} / {selectedProperty.photos.length}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-4">
+                <div className="mb-3">
+                  <div className="font-medium text-sm">{selectedProperty.address}</div>
+                  {(selectedProperty.city || selectedProperty.zip) && (
+                    <div className="text-muted-foreground text-xs">
+                      {[selectedProperty.city, selectedProperty.zip].filter(Boolean).join(', ')}
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-xl font-bold text-primary mb-3">
+                  {formatPrice(selectedProperty.soldPrice || selectedProperty.price)}
+                </div>
+
+                <div className="space-y-1.5 text-xs border-t pt-3">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Beds</span>
+                    <span>{selectedProperty.beds || '—'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Baths</span>
+                    <span>{selectedProperty.baths || '—'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Sq. Ft.</span>
+                    <span>{selectedProperty.sqft?.toLocaleString() || '—'}</span>
+                  </div>
+                  {selectedProperty.lotSize && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Lot Size</span>
+                      <span>{selectedProperty.lotSize}</span>
+                    </div>
+                  )}
+                </div>
+
+                {!selectedProperty.isSubject && (
+                  <div className="space-y-1.5 text-xs border-t pt-3 mt-3">
+                    <div className="font-medium text-sm mb-2">Listing Details</div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">List Price</span>
+                      <span>{formatPrice(selectedProperty.listPrice)}</span>
+                    </div>
+                    {selectedProperty.soldPrice && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          Sold Price
+                          {selectedProperty.soldPricePercent && (
+                            <span className="text-muted-foreground/70 ml-1">
+                              ({selectedProperty.soldPricePercent.toFixed(1)}%)
+                            </span>
+                          )}
+                        </span>
+                        <span>{formatPrice(selectedProperty.soldPrice)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Price per Sq. Ft.</span>
+                      <span>${selectedProperty.pricePerSqft}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

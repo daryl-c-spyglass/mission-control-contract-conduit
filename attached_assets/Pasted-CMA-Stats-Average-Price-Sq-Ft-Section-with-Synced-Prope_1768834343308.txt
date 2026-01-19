@@ -1,0 +1,554 @@
+CMA Stats - Average Price/Sq. Ft. Section with Synced Property Details
+Overview
+Create a 3-column layout for the "Average Price/Sq. Ft." section where clicking a property in the left list syncs the detail panel on the right, matching the Client Data Portal behavior.
+Layout Structure
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  AVERAGE PRICE/SQ. FT.                                                      │
+│  1 Subject, 2 Closed                                                        │
+├──────────────┬────────────────────────────────┬─────────────────────────────┤
+│ LEFT PANEL   │      CENTER PANEL              │      RIGHT PANEL            │
+│              │                                │                             │
+│ [Property    │  $262 / Sq. Ft.               │  ┌─────────────────────────┐ │
+│  List with   │  Comparable homes sold...     │  │ Closed            ×    │ │
+│  Thumbnails] │                                │  │ ┌─────────────────────┐│ │
+│              │  ┌────────────────────────┐   │  │ │     PHOTO          ││ │
+│ ○ Subject    │  │                        │   │  │ │     1 / 35         ││ │
+│   194 Dais.. │  │    SCATTER PLOT        │   │  │ └─────────────────────┘│ │
+│   $265/sqft  │  │    (Price vs SqFt)     │   │  │ 125 Stoney Point RD    │ │
+│              │  │                        │   │  │ Austin, 78737          │ │
+│ ● 125 Ston.. │  │       ●  ○             │   │  │ $959,900               │ │
+│   $289/sqft  │  │    ●                   │   │  │                        │ │
+│   [SELECTED] │  └────────────────────────┘   │  │ Beds           4       │ │
+│              │                                │  │ Baths          4       │ │
+│ ○ 433 Ston.. │  ☑ Subject Property           │  │ Sq. Ft.     3,325      │ │
+│   $236/sqft  │                                │  │ ...                    │ │
+│              │                                │  └─────────────────────────┘ │
+└──────────────┴────────────────────────────────┴─────────────────────────────┘
+Implementation
+1. Create the Average Price Per SqFt Section Component
+typescript// client/src/components/cma/AveragePriceSqftSection.tsx
+
+import { useState } from "react";
+import { Home, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  ScatterChart,
+  Scatter,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
+
+interface Property {
+  mlsNumber: string;
+  address: string;
+  city: string;
+  zip: string;
+  price: number;
+  pricePerSqft: number;
+  beds: number;
+  baths: number;
+  sqft: number;
+  lotSize?: string;
+  garageSpaces?: number;
+  origPrice?: number;
+  listPrice: number;
+  soldPrice?: number;
+  soldPricePercent?: number;
+  status: string;
+  photos: string[];
+  isSubject?: boolean;
+}
+
+interface AveragePriceSqftSectionProps {
+  subjectProperty: Property;
+  comparables: Property[];
+  averagePricePerSqft: number;
+}
+
+export function AveragePriceSqftSection({
+  subjectProperty,
+  comparables,
+  averagePricePerSqft,
+}: AveragePriceSqftSectionProps) {
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [showSubjectOnChart, setShowSubjectOnChart] = useState(true);
+
+  // Combine subject and comparables for the list
+  const allProperties = [
+    { ...subjectProperty, isSubject: true },
+    ...comparables.map(c => ({ ...c, isSubject: false })),
+  ];
+
+  // Prepare data for scatter chart
+  const chartData = allProperties
+    .filter(p => showSubjectOnChart || !p.isSubject)
+    .map(p => ({
+      x: p.sqft,
+      y: p.price,
+      property: p,
+    }));
+
+  const closedCount = comparables.filter(
+    c => c.status?.toLowerCase() === 'closed'
+  ).length;
+
+  const handlePropertySelect = (property: Property) => {
+    setSelectedProperty(property);
+    setCurrentPhotoIndex(0); // Reset photo index when selecting new property
+  };
+
+  const handleCloseDetail = () => {
+    setSelectedProperty(null);
+  };
+
+  const nextPhoto = () => {
+    if (selectedProperty?.photos?.length) {
+      setCurrentPhotoIndex(
+        (prev) => (prev + 1) % selectedProperty.photos.length
+      );
+    }
+  };
+
+  const prevPhoto = () => {
+    if (selectedProperty?.photos?.length) {
+      setCurrentPhotoIndex(
+        (prev) =>
+          (prev - 1 + selectedProperty.photos.length) %
+          selectedProperty.photos.length
+      );
+    }
+  };
+
+  const formatPrice = (price: number) => {
+    if (price >= 1000000) {
+      return `$${(price / 1000000).toFixed(2)}M`;
+    }
+    return `$${(price / 1000).toFixed(0)}K`;
+  };
+
+  const formatFullPrice = (price: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(price);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'closed':
+      case 'sold':
+        return 'bg-zinc-700 text-white';
+      case 'active':
+        return 'bg-green-500 text-white';
+      case 'pending':
+        return 'bg-gray-500 text-white';
+      case 'active under contract':
+        return 'bg-orange-500 text-white';
+      default:
+        return 'bg-zinc-700 text-white';
+    }
+  };
+
+  // Custom dot component for scatter chart
+  const renderDot = (props: any) => {
+    const { cx, cy, payload } = props;
+    const isSubject = payload.property?.isSubject;
+    const isSelected = selectedProperty?.mlsNumber === payload.property?.mlsNumber;
+
+    if (isSubject) {
+      // Subject property - blue circle with home icon
+      return (
+        <g>
+          <circle
+            cx={cx}
+            cy={cy}
+            r={isSelected ? 16 : 14}
+            fill="#3b82f6"
+            stroke={isSelected ? "#f97316" : "#1d4ed8"}
+            strokeWidth={isSelected ? 3 : 2}
+            style={{ cursor: 'pointer' }}
+            onClick={() => handlePropertySelect(payload.property)}
+          />
+          <Home
+            x={cx - 6}
+            y={cy - 6}
+            width={12}
+            height={12}
+            color="white"
+          />
+        </g>
+      );
+    }
+
+    // Comparable property - red dot
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={isSelected ? 10 : 8}
+        fill="#ef4444"
+        stroke={isSelected ? "#f97316" : "#dc2626"}
+        strokeWidth={isSelected ? 3 : 2}
+        style={{ cursor: 'pointer' }}
+        onClick={() => handlePropertySelect(payload.property)}
+      />
+    );
+  };
+
+  return (
+    <div className="bg-zinc-900 rounded-lg p-6">
+      {/* Header */}
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold text-white">AVERAGE PRICE/SQ. FT.</h3>
+        <p className="text-zinc-400 text-sm">
+          1 Subject, {closedCount} Closed
+        </p>
+      </div>
+
+      {/* 3-Column Layout */}
+      <div className="flex gap-4">
+        {/* LEFT PANEL - Property List */}
+        <div className="w-56 flex-shrink-0 space-y-2">
+          {allProperties.map((property) => (
+            <div
+              key={property.mlsNumber}
+              onClick={() => handlePropertySelect(property)}
+              className={`
+                flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all
+                ${selectedProperty?.mlsNumber === property.mlsNumber
+                  ? 'border-2 border-orange-500 bg-zinc-800'
+                  : 'border-2 border-transparent hover:bg-zinc-800'
+                }
+              `}
+            >
+              {/* Thumbnail or Home Icon */}
+              <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0 bg-zinc-700">
+                {property.isSubject ? (
+                  <div className="w-full h-full flex items-center justify-center bg-blue-500">
+                    <Home className="h-6 w-6 text-white" />
+                  </div>
+                ) : (
+                  <img
+                    src={property.photos?.[0] || '/placeholder-property.jpg'}
+                    alt={property.address}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/placeholder-property.jpg';
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Property Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1">
+                  {property.isSubject && (
+                    <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs px-1">
+                      Subject:
+                    </Badge>
+                  )}
+                  <span className="text-white text-sm font-medium truncate">
+                    {property.address?.split(',')[0]?.substring(0, 12)}...
+                  </span>
+                </div>
+                <div className="text-orange-500 text-sm font-medium">
+                  ${property.pricePerSqft?.toFixed(0)} / sq. ft.
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* CENTER PANEL - Chart */}
+        <div className="flex-1 min-w-0">
+          {/* Average Price Header */}
+          <div className="mb-4">
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-bold text-orange-500">
+                ${averagePricePerSqft}
+              </span>
+              <span className="text-zinc-400 text-lg">/ Sq. Ft.</span>
+            </div>
+            <p className="text-zinc-400 text-sm mt-2">
+              Comparable homes sold for an average of{' '}
+              <span className="text-orange-500">${averagePricePerSqft}</span>/sq. ft.
+              Many factors such as location, use of space, condition, quality,
+              and amenities determine the market value per square foot, so
+              reviewing each comp carefully is important.
+            </p>
+          </div>
+
+          {/* Scatter Chart */}
+          <div className="h-64 mb-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis
+                  type="number"
+                  dataKey="x"
+                  name="Square feet"
+                  tick={{ fill: '#9ca3af', fontSize: 12 }}
+                  tickFormatter={(value) => value.toLocaleString()}
+                  label={{
+                    value: 'Square feet',
+                    position: 'bottom',
+                    fill: '#9ca3af',
+                    fontSize: 12,
+                  }}
+                />
+                <YAxis
+                  type="number"
+                  dataKey="y"
+                  name="Price"
+                  tick={{ fill: '#9ca3af', fontSize: 12 }}
+                  tickFormatter={formatPrice}
+                />
+                <Tooltip
+                  content={({ payload }) => {
+                    if (payload && payload.length > 0) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-zinc-800 border border-zinc-700 rounded p-2 text-sm">
+                          <div className="text-white font-medium">
+                            {data.property?.address}
+                          </div>
+                          <div className="text-zinc-400">
+                            {formatFullPrice(data.y)} • {data.x?.toLocaleString()} sqft
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Scatter
+                  data={chartData}
+                  shape={renderDot}
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Subject Property Checkbox */}
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="showSubject"
+              checked={showSubjectOnChart}
+              onCheckedChange={(checked) => setShowSubjectOnChart(checked as boolean)}
+              className="border-blue-500 data-[state=checked]:bg-blue-500"
+            />
+            <div className="flex items-center gap-1">
+              <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
+                <Home className="h-2.5 w-2.5 text-white" />
+              </div>
+              <label htmlFor="showSubject" className="text-zinc-400 text-sm cursor-pointer">
+                Subject Property
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT PANEL - Property Detail */}
+        {selectedProperty && (
+          <div className="w-64 flex-shrink-0 bg-zinc-800 rounded-lg overflow-hidden">
+            {/* Status Badge & Close Button */}
+            <div className="relative">
+              <Badge
+                className={`absolute top-3 left-3 z-10 ${getStatusColor(
+                  selectedProperty.status
+                )} border-0`}
+              >
+                {selectedProperty.status}
+              </Badge>
+              <button
+                onClick={handleCloseDetail}
+                className="absolute top-3 right-3 z-10 text-zinc-400 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              {/* Photo Carousel */}
+              <div className="relative h-40 bg-zinc-700">
+                <img
+                  src={
+                    selectedProperty.photos?.[currentPhotoIndex] ||
+                    '/placeholder-property.jpg'
+                  }
+                  alt={selectedProperty.address}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/placeholder-property.jpg';
+                  }}
+                />
+
+                {/* Photo Navigation */}
+                {selectedProperty.photos?.length > 1 && (
+                  <>
+                    <button
+                      onClick={prevPhoto}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 rounded-full p-1"
+                    >
+                      <ChevronLeft className="h-4 w-4 text-white" />
+                    </button>
+                    <button
+                      onClick={nextPhoto}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 rounded-full p-1"
+                    >
+                      <ChevronRight className="h-4 w-4 text-white" />
+                    </button>
+
+                    {/* Photo Counter */}
+                    <div className="absolute bottom-2 right-2 bg-black/60 px-2 py-0.5 rounded text-white text-xs">
+                      {currentPhotoIndex + 1} / {selectedProperty.photos.length}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Property Details */}
+            <div className="p-4">
+              {/* Address */}
+              <div className="mb-3">
+                <div className="text-white font-medium">
+                  {selectedProperty.address}
+                </div>
+                <div className="text-zinc-400 text-sm">
+                  {selectedProperty.city}, {selectedProperty.zip}
+                </div>
+              </div>
+
+              {/* Price */}
+              <div className="text-2xl font-bold text-orange-500 mb-4">
+                {formatFullPrice(selectedProperty.soldPrice || selectedProperty.price)}
+              </div>
+
+              {/* Property Specs */}
+              <div className="space-y-2 text-sm border-t border-zinc-700 pt-3">
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Beds</span>
+                  <span className="text-white">{selectedProperty.beds}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Baths</span>
+                  <span className="text-white">{selectedProperty.baths}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Sq. Ft.</span>
+                  <span className="text-white">
+                    {selectedProperty.sqft?.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Lot Size</span>
+                  <span className="text-white">
+                    {selectedProperty.lotSize || '—'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Garage Spaces</span>
+                  <span className="text-white">
+                    {selectedProperty.garageSpaces || '—'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Listing Details */}
+              <div className="space-y-2 text-sm border-t border-zinc-700 pt-3 mt-3">
+                <div className="text-white font-medium mb-2">Listing Details</div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Orig. Price</span>
+                  <span className="text-white">
+                    {formatFullPrice(selectedProperty.origPrice || selectedProperty.listPrice)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">List Price</span>
+                  <span className="text-white">
+                    {formatFullPrice(selectedProperty.listPrice)}
+                  </span>
+                </div>
+                {selectedProperty.soldPrice && (
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">
+                      Sold Price{' '}
+                      {selectedProperty.soldPricePercent && (
+                        <span className="text-zinc-500">
+                          ({selectedProperty.soldPricePercent.toFixed(1)}%)
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-white">
+                      {formatFullPrice(selectedProperty.soldPrice)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Price per Sq. Ft.</span>
+                  <span className="text-white">
+                    ${selectedProperty.pricePerSqft?.toFixed(0)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+2. Usage in CMA Stats View
+typescript// In your CMAStatsView.tsx or wherever Stats tab content lives
+
+import { AveragePriceSqftSection } from "./cma/AveragePriceSqftSection";
+
+// Inside the component:
+<AveragePriceSqftSection
+  subjectProperty={{
+    mlsNumber: transaction.mlsNumber,
+    address: transaction.address,
+    city: transaction.city || "Austin",
+    zip: transaction.zip,
+    price: transaction.listPrice,
+    pricePerSqft: transaction.listPrice / transaction.sqft,
+    beds: transaction.beds,
+    baths: transaction.baths,
+    sqft: transaction.sqft,
+    lotSize: transaction.lotSize,
+    garageSpaces: transaction.garageSpaces,
+    listPrice: transaction.listPrice,
+    status: transaction.status,
+    photos: transaction.photos || [],
+  }}
+  comparables={cmaComparables.map(comp => ({
+    mlsNumber: comp.mlsNumber,
+    address: comp.address || comp.streetAddress,
+    city: comp.city || "Austin",
+    zip: comp.zip || comp.postalCode,
+    price: comp.closePrice || comp.listPrice,
+    pricePerSqft: (comp.closePrice || comp.listPrice) / comp.sqft,
+    beds: comp.beds || comp.bedrooms,
+    baths: comp.baths || comp.bathrooms,
+    sqft: comp.sqft || comp.livingArea,
+    lotSize: comp.lotSize,
+    garageSpaces: comp.garageSpaces,
+    origPrice: comp.originalPrice,
+    listPrice: comp.listPrice,
+    soldPrice: comp.closePrice,
+    soldPricePercent: comp.closePrice ? (comp.closePrice / comp.listPrice) * 100 : undefined,
+    status: comp.status || "Closed",
+    photos: comp.photos || [],
+  }))}
+  averagePricePerSqft={calculateAveragePricePerSqft(cmaComparables)}
+/>
+
+Key Behaviors
+InteractionResultClick property in left listOrange border highlights it, right panel shows detailsClick scatter plot dotSame as clicking in list - syncs selectionClick X on right panelCloses detail panel, deselects propertyToggle "Subject Property" checkboxShows/hides subject on scatter chartNavigate photos with arrowsCycles through property photos in right panel
