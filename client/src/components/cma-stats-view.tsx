@@ -518,6 +518,24 @@ interface PropertyData {
   isSubject: boolean;
 }
 
+const getStatusBadgeColor = (status: string, isSubject?: boolean): string => {
+  if (isSubject) return 'bg-blue-500 text-white';
+  
+  switch (status?.toLowerCase()) {
+    case 'closed':
+    case 'sold':
+      return 'bg-red-500 text-white';
+    case 'active':
+      return 'bg-green-500 text-white';
+    case 'active under contract':
+      return 'bg-orange-500 text-white';
+    case 'pending':
+      return 'bg-gray-500 text-white';
+    default:
+      return 'bg-gray-500 text-white';
+  }
+};
+
 function AveragePricePerSqftSection({ comparables, subjectProperty }: { comparables: CMAComparable[]; subjectProperty: any }) {
   const [selectedProperty, setSelectedProperty] = useState<PropertyData | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
@@ -807,19 +825,9 @@ function AveragePricePerSqftSection({ comparables, subjectProperty }: { comparab
               {/* Status Badge Row - SEPARATE from photo */}
               <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-200 dark:border-zinc-700">
                 <Badge
-                  className={`
-                    ${selectedProperty.status?.toLowerCase() === 'closed' || selectedProperty.status?.toLowerCase() === 'sold'
-                      ? 'bg-zinc-800 text-white' 
-                      : selectedProperty.status?.toLowerCase() === 'active'
-                      ? 'bg-green-500 text-white'
-                      : selectedProperty.status?.toLowerCase() === 'pending' || selectedProperty.status?.toLowerCase() === 'under contract'
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-zinc-500 text-white'
-                    } 
-                    border-0 text-xs font-medium
-                  `}
+                  className={`${getStatusBadgeColor(selectedProperty.status, selectedProperty.isSubject)} border-0 text-xs font-medium`}
                 >
-                  {selectedProperty.status}
+                  {selectedProperty.isSubject ? 'Subject' : selectedProperty.status}
                 </Badge>
                 <button
                   onClick={handleCloseDetail}

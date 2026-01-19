@@ -1,0 +1,58 @@
+Status Color Fix
+Your Color System:
+StatusColorTailwind ClassClosedRedbg-red-500ActiveGreenbg-green-500Active Under ContractOrangebg-orange-500Subject PropertyBluebg-blue-500PendingGraybg-gray-500
+
+Update the Badge Color Logic
+Replace the status badge section in the right panel:
+typescript{/* Status Badge Row - SEPARATE from photo */}
+<div className="flex items-center justify-between px-3 py-2 border-b border-zinc-200">
+  <Badge
+    className={`
+      ${selectedProperty.isSubject
+        ? 'bg-blue-500 text-white'
+        : selectedProperty.status?.toLowerCase() === 'closed' || selectedProperty.status?.toLowerCase() === 'sold'
+        ? 'bg-red-500 text-white'
+        : selectedProperty.status?.toLowerCase() === 'active'
+        ? 'bg-green-500 text-white'
+        : selectedProperty.status?.toLowerCase() === 'active under contract'
+        ? 'bg-orange-500 text-white'
+        : selectedProperty.status?.toLowerCase() === 'pending'
+        ? 'bg-gray-500 text-white'
+        : 'bg-gray-500 text-white'
+      } 
+      border-0 text-xs font-medium
+    `}
+  >
+    {selectedProperty.isSubject ? 'Subject' : selectedProperty.status}
+  </Badge>
+  <button
+    onClick={handleCloseDetail}
+    className="text-zinc-400 hover:text-zinc-600"
+  >
+    <X className="h-4 w-4" />
+  </button>
+</div>
+
+Or Create a Reusable Helper Function
+Add this helper function at the top of your component (or in a shared utils file):
+typescriptconst getStatusBadgeColor = (status: string, isSubject?: boolean): string => {
+  if (isSubject) return 'bg-blue-500 text-white';
+  
+  switch (status?.toLowerCase()) {
+    case 'closed':
+    case 'sold':
+      return 'bg-red-500 text-white';
+    case 'active':
+      return 'bg-green-500 text-white';
+    case 'active under contract':
+      return 'bg-orange-500 text-white';
+    case 'pending':
+      return 'bg-gray-500 text-white';
+    default:
+      return 'bg-gray-500 text-white';
+  }
+};
+Then use it:
+typescript<Badge className={`${getStatusBadgeColor(selectedProperty.status, selectedProperty.isSubject)} border-0 text-xs font-medium`}>
+  {selectedProperty.isSubject ? 'Subject' : selectedProperty.status}
+</Badge>
