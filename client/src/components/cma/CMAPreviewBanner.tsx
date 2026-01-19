@@ -4,7 +4,7 @@ import {
   Save, 
   ExternalLink, 
   Mail, 
-  Edit, 
+  SlidersHorizontal,
   FileText,
   Loader2
 } from 'lucide-react';
@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { CMAEmailShareDialog } from './CMAEmailShareDialog';
 import { CMANotesDialog } from './CMANotesDialog';
+import { CMAFiltersPanel } from './CMAFiltersPanel';
 
 interface CMAPreviewBannerProps {
   cmaId?: string | null;
@@ -22,8 +23,16 @@ interface CMAPreviewBannerProps {
   notes?: string | null;
   cmaData?: any[];
   mlsNumber?: string | null;
+  currentFilters?: any;
+  subjectProperty?: {
+    listPrice?: number;
+    sqft?: number;
+    yearBuilt?: number;
+    beds?: number;
+    baths?: number;
+  };
   onSave?: () => void;
-  onModifySearch?: () => void;
+  onFiltersApplied?: () => void;
   onNotesUpdate?: () => void;
   isSaving?: boolean;
 }
@@ -36,14 +45,17 @@ export function CMAPreviewBanner({
   notes,
   cmaData,
   mlsNumber,
+  currentFilters,
+  subjectProperty,
   onSave,
-  onModifySearch,
+  onFiltersApplied,
   onNotesUpdate,
   isSaving,
 }: CMAPreviewBannerProps) {
   const { toast } = useToast();
   const [emailShareDialogOpen, setEmailShareDialogOpen] = useState(false);
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+  const [filtersPanelOpen, setFiltersPanelOpen] = useState(false);
   const [localShareUrl, setLocalShareUrl] = useState<string | null>(null);
 
   const generateShareMutation = useMutation({
@@ -155,15 +167,15 @@ export function CMAPreviewBanner({
             Share CMA
           </Button>
           
-          {onModifySearch && (
+          {mlsNumber && transactionId && (
             <Button 
               size="sm" 
               variant="outline" 
-              onClick={onModifySearch}
-              data-testid="button-modify-search"
+              onClick={() => setFiltersPanelOpen(true)}
+              data-testid="button-adjust-filters"
             >
-              <Edit className="w-4 h-4 mr-2" />
-              Modify Search
+              <SlidersHorizontal className="w-4 h-4 mr-2" />
+              Adjust Filters
             </Button>
           )}
           
@@ -202,6 +214,21 @@ export function CMAPreviewBanner({
         mlsNumber={mlsNumber}
         onSuccess={onNotesUpdate}
       />
+
+      {mlsNumber && transactionId && (
+        <CMAFiltersPanel
+          open={filtersPanelOpen}
+          onOpenChange={setFiltersPanelOpen}
+          transactionId={transactionId}
+          mlsNumber={mlsNumber}
+          currentFilters={currentFilters}
+          subjectProperty={subjectProperty}
+          onFiltersApplied={() => {
+            onFiltersApplied?.();
+            onNotesUpdate?.();
+          }}
+        />
+      )}
     </>
   );
 }

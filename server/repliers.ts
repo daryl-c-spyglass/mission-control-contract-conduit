@@ -1057,6 +1057,172 @@ export async function checkImageInsights(mlsNumber: string): Promise<{
   }
 }
 
+export interface CMASearchFilters {
+  radius: number; // miles
+  minPrice?: number;
+  maxPrice?: number;
+  minSqft?: number;
+  maxSqft?: number;
+  minYearBuilt?: number;
+  maxYearBuilt?: number;
+  minBeds?: number;  // Minimum bedrooms (CMA searches use "at least X beds")
+  minBaths?: number; // Minimum bathrooms (CMA searches use "at least X baths")
+  statuses: string[]; // e.g., ['Active', 'Closed', 'Pending']
+  soldWithinMonths?: number;
+  maxResults: number;
+}
+
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 3959; // Earth's radius in miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+function mapStatusToRepliers(statuses: string[]): string[] {
+  const statusMap: Record<string, string> = {
+    'Active': 'A',
+    'Closed': 'S',
+    'Pending': 'P',
+    'Active Under Contract': 'U',
+  };
+  return statuses.map(s => statusMap[s] || s);
+}
+
+export async function searchNearbyComparables(
+  subjectLat: number,
+  subjectLng: number,
+  subjectMlsNumber: string,
+  filters: CMASearchFilters
+): Promise<CMAComparable[]> {
+  try {
+    const apiKey = process.env.REPLIERS_API_KEY;
+    if (!apiKey) {
+      throw new Error("REPLIERS_API_KEY not configured");
+    }
+
+    const queryParams: Record<string, string> = {
+      type: "Sale",
+      resultsPerPage: filters.maxResults.toString(),
+      map: `${subjectLat},${subjectLng}`,
+      mapRadius: filters.radius.toString(),
+    };
+
+    // Price filters
+    if (filters.minPrice) queryParams.minPrice = filters.minPrice.toString();
+    if (filters.maxPrice) queryParams.maxPrice = filters.maxPrice.toString();
+
+    // Size filters
+    if (filters.minSqft) queryParams.minSqft = filters.minSqft.toString();
+    if (filters.maxSqft) queryParams.maxSqft = filters.maxSqft.toString();
+
+    // Year built filters
+    if (filters.minYearBuilt) queryParams.minYearBuilt = filters.minYearBuilt.toString();
+    if (filters.maxYearBuilt) queryParams.maxYearBuilt = filters.maxYearBuilt.toString();
+
+    // Beds/baths filters
+    if (filters.minBeds) queryParams.minBedrooms = filters.minBeds.toString();
+    if (filters.minBaths) queryParams.minBathrooms = filters.minBaths.toString();
+
+    // Status filter
+    if (filters.statuses && filters.statuses.length > 0) {
+      const repliersStatuses = mapStatusToRepliers(filters.statuses);
+      queryParams.status = repliersStatuses.join(',');
+    }
+
+    // Sold within filter (for closed/sold properties)
+    if (filters.soldWithinMonths) {
+      const closeDateMin = new Date();
+      closeDateMin.setMonth(closeDateMin.getMonth() - filters.soldWithinMonths);
+      queryParams.lastStatus = 'Sold';
+      queryParams.soldDateFrom = closeDateMin.toISOString().split('T')[0];
+    }
+
+    console.log("[CMA Refresh] Searching with params:", queryParams);
+
+    const url = new URL(`${REPLIERS_API_BASE}/listings`);
+    Object.entries(queryParams).forEach(([key, value]) => {
+      url.searchParams.append(key, value);
+    });
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "REPLIERS-API-KEY": apiKey,
+        "Accept": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[CMA Refresh] Repliers API error:", response.status, errorText);
+      throw new Error(`Repliers API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.listings || !Array.isArray(data.listings)) {
+      console.log("[CMA Refresh] No listings found");
+      return [];
+    }
+
+    // Filter out rentals and the subject property
+    const filteredListings = data.listings.filter((listing: any) => {
+      if (isRentalOrLease(listing)) return false;
+      if (listing.mlsNumber === subjectMlsNumber) return false;
+      return true;
+    });
+
+    console.log(`[CMA Refresh] Found ${filteredListings.length} comparables (excluded subject & rentals)`);
+
+    // Map to CMAComparable format (matching existing interface)
+    const comparables: CMAComparable[] = filteredListings.map((listing: any) => {
+      const listingLat = listing.map?.latitude || listing.address?.latitude;
+      const listingLng = listing.map?.longitude || listing.address?.longitude;
+      
+      let distance = 0;
+      if (listingLat && listingLng) {
+        distance = calculateDistance(subjectLat, subjectLng, parseFloat(listingLat), parseFloat(listingLng));
+      }
+
+      const photos = normalizeImageUrls(listing.images || listing.media || listing.photos);
+      const sqft = listing.details?.sqft || listing.sqft || 0;
+      const dom = listing.daysOnMarket ? parseInt(listing.daysOnMarket) : 0;
+
+      return {
+        mlsNumber: listing.mlsNumber,
+        address: listing.address?.full || listing.address?.streetAddress || '',
+        price: parseFloat(listing.listPrice) || 0,
+        bedrooms: parseInt(listing.details?.numBedrooms || listing.numBedrooms || '0'),
+        bathrooms: parseInt(listing.details?.numBathrooms || listing.numBathrooms || '0'),
+        sqft: typeof sqft === 'string' ? parseInt(sqft) || 0 : sqft,
+        daysOnMarket: dom,
+        distance,
+        status: listing.standardStatus || listing.status || '',
+        listDate: listing.listDate || listing.timestamps?.listDate || undefined,
+        photos: photos.slice(0, 10),
+        imageUrl: photos[0],
+        map: (listingLat && listingLng) ? {
+          latitude: parseFloat(listingLat),
+          longitude: parseFloat(listingLng),
+        } : undefined,
+      };
+    });
+
+    // Sort by distance (closest first)
+    comparables.sort((a, b) => (a.distance || 999) - (b.distance || 999));
+
+    return comparables.slice(0, filters.maxResults);
+  } catch (error) {
+    console.error("[CMA Refresh] Error searching nearby comparables:", error);
+    throw error;
+  }
+}
+
 export async function searchListings(params: {
   city?: string;
   minPrice?: number;

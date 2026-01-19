@@ -1,0 +1,838 @@
+Replace "Modify Search" with "Adjust Filters" Panel
+OVERVIEW
+Replace the "Modify Search" button with an "Adjust Filters" button that opens a slide-out panel. This panel lets users refine CMA comparable search criteria (radius, price, sqft, year built, status) and re-fetch comparables from Repliers without leaving the CMA tab.
+
+WHAT TO BUILD
+
+Rename button: "Modify Search" → "Adjust Filters"
+Create filter panel: Sheet/drawer component with filter options
+Add API endpoint: Re-fetch comparables with custom parameters
+Update CMA display: Refresh comparables after applying filters
+
+
+TASK 1: Create CMA Filters Panel Component
+Create client/src/components/cma/CMAFiltersPanel.tsx:
+typescriptimport { useState, useEffect } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { SlidersHorizontal, RotateCcw, Loader2 } from 'lucide-react';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+
+interface CMAFilters {
+  radius: number;
+  minPrice?: number;
+  maxPrice?: number;
+  minSqft?: number;
+  maxSqft?: number;
+  minYearBuilt?: number;
+  maxYearBuilt?: number;
+  minBeds?: number;
+  maxBeds?: number;
+  minBaths?: number;
+  maxBaths?: number;
+  statuses: string[];
+  maxResults: number;
+  soldWithinMonths?: number;
+}
+
+interface CMAFiltersPanelProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  transactionId: number;
+  mlsNumber: string;
+  currentFilters?: Partial<CMAFilters>;
+  subjectProperty?: {
+    listPrice?: number;
+    sqft?: number;
+    yearBuilt?: number;
+    beds?: number;
+    baths?: number;
+  };
+  onFiltersApplied: () => void;
+}
+
+const DEFAULT_FILTERS: CMAFilters = {
+  radius: 2,
+  statuses: ['Closed', 'Active', 'Active Under Contract', 'Pending'],
+  maxResults: 10,
+  soldWithinMonths: 6,
+};
+
+const RADIUS_OPTIONS = [
+  { value: 0.5, label: '0.5 mi' },
+  { value: 1, label: '1 mi' },
+  { value: 2, label: '2 mi' },
+  { value: 5, label: '5 mi' },
+  { value: 10, label: '10 mi' },
+];
+
+const STATUS_OPTIONS = [
+  { value: 'Closed', label: 'Closed' },
+  { value: 'Active', label: 'Active' },
+  { value: 'Active Under Contract', label: 'Active Under Contract' },
+  { value: 'Pending', label: 'Pending' },
+];
+
+export function CMAFiltersPanel({
+  open,
+  onOpenChange,
+  transactionId,
+  mlsNumber,
+  currentFilters,
+  subjectProperty,
+  onFiltersApplied,
+}: CMAFiltersPanelProps) {
+  const { toast } = useToast();
+  
+  // Initialize filters with defaults or current values
+  const [filters, setFilters] = useState<CMAFilters>(() => ({
+    ...DEFAULT_FILTERS,
+    ...currentFilters,
+  }));
+
+  // Reset to defaults when panel opens
+  useEffect(() => {
+    if (open && currentFilters) {
+      setFilters({ ...DEFAULT_FILTERS, ...currentFilters });
+    }
+  }, [open, currentFilters]);
+
+  // Mutation to apply filters and re-fetch comparables
+  const applyFiltersMutation = useMutation({
+    mutationFn: async (newFilters: CMAFilters) => {
+      const response = await fetch(`/api/transactions/${transactionId}/cma/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mlsNumber,
+          filters: newFilters,
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to refresh comparables');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Comparables updated',
+        description: `Found ${data.comparablesCount} comparable properties.`,
+      });
+      onFiltersApplied();
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to update',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleApplyFilters = () => {
+    applyFiltersMutation.mutate(filters);
+  };
+
+  const handleResetToDefaults = () => {
+    // Calculate smart defaults based on subject property
+    const smartDefaults: CMAFilters = {
+      ...DEFAULT_FILTERS,
+    };
+    
+    if (subjectProperty?.listPrice) {
+      // +/- 20% of list price
+      smartDefaults.minPrice = Math.round(subjectProperty.listPrice * 0.8);
+      smartDefaults.maxPrice = Math.round(subjectProperty.listPrice * 1.2);
+    }
+    
+    if (subjectProperty?.sqft) {
+      // +/- 25% of sqft
+      smartDefaults.minSqft = Math.round(subjectProperty.sqft * 0.75);
+      smartDefaults.maxSqft = Math.round(subjectProperty.sqft * 1.25);
+    }
+    
+    if (subjectProperty?.yearBuilt) {
+      // +/- 10 years
+      smartDefaults.minYearBuilt = subjectProperty.yearBuilt - 10;
+      smartDefaults.maxYearBuilt = new Date().getFullYear();
+    }
+    
+    setFilters(smartDefaults);
+  };
+
+  const handleStatusChange = (status: string, checked: boolean) => {
+    setFilters(prev => ({
+      ...prev,
+      statuses: checked
+        ? [...prev.statuses, status]
+        : prev.statuses.filter(s => s !== status),
+    }));
+  };
+
+  const formatCurrency = (value: number | undefined) => {
+    if (!value) return '';
+    return value.toString();
+  };
+
+  const parseCurrency = (value: string) => {
+    const parsed = parseInt(value.replace(/[^0-9]/g, ''));
+    return isNaN(parsed) ? undefined : parsed;
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-[400px] sm:w-[450px] overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <SlidersHorizontal className="h-5 w-5" />
+            Adjust CMA Filters
+          </SheetTitle>
+          <SheetDescription>
+            Refine search criteria to find better comparable properties. Changes will re-fetch comparables from MLS.
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="py-6 space-y-6">
+          {/* Search Radius */}
+          <div className="space-y-3">
+            <Label className="text-base font-medium">Search Radius</Label>
+            <RadioGroup
+              value={filters.radius.toString()}
+              onValueChange={(value) => setFilters(prev => ({ ...prev, radius: parseFloat(value) }))}
+              className="flex flex-wrap gap-2"
+            >
+              {RADIUS_OPTIONS.map((option) => (
+                <div key={option.value} className="flex items-center">
+                  <RadioGroupItem
+                    value={option.value.toString()}
+                    id={`radius-${option.value}`}
+                    className="peer sr-only"
+                  />
+                  <Label
+                    htmlFor={`radius-${option.value}`}
+                    className="px-3 py-2 rounded-md border cursor-pointer peer-data-[state=checked]:bg-orange-500 peer-data-[state=checked]:text-white peer-data-[state=checked]:border-orange-500 hover:bg-muted transition-colors"
+                  >
+                    {option.label}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+          </div>
+
+          {/* Sold Within */}
+          <div className="space-y-3">
+            <Label className="text-base font-medium">Sold Within</Label>
+            <Select
+              value={filters.soldWithinMonths?.toString() || '6'}
+              onValueChange={(value) => setFilters(prev => ({ ...prev, soldWithinMonths: parseInt(value) }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select timeframe" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="3">Last 3 months</SelectItem>
+                <SelectItem value="6">Last 6 months</SelectItem>
+                <SelectItem value="9">Last 9 months</SelectItem>
+                <SelectItem value="12">Last 12 months</SelectItem>
+                <SelectItem value="24">Last 24 months</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Price Range */}
+          <div className="space-y-3">
+            <Label className="text-base font-medium">Price Range</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="minPrice" className="text-sm text-muted-foreground">Min Price</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                  <Input
+                    id="minPrice"
+                    type="text"
+                    placeholder="No min"
+                    className="pl-7"
+                    value={formatCurrency(filters.minPrice)}
+                    onChange={(e) => setFilters(prev => ({ ...prev, minPrice: parseCurrency(e.target.value) }))}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="maxPrice" className="text-sm text-muted-foreground">Max Price</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                  <Input
+                    id="maxPrice"
+                    type="text"
+                    placeholder="No max"
+                    className="pl-7"
+                    value={formatCurrency(filters.maxPrice)}
+                    onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: parseCurrency(e.target.value) }))}
+                  />
+                </div>
+              </div>
+            </div>
+            {subjectProperty?.listPrice && (
+              <p className="text-xs text-muted-foreground">
+                Subject property: ${subjectProperty.listPrice.toLocaleString()}
+              </p>
+            )}
+          </div>
+
+          {/* Square Footage */}
+          <div className="space-y-3">
+            <Label className="text-base font-medium">Square Footage</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="minSqft" className="text-sm text-muted-foreground">Min Sq Ft</Label>
+                <Input
+                  id="minSqft"
+                  type="number"
+                  placeholder="No min"
+                  value={filters.minSqft || ''}
+                  onChange={(e) => setFilters(prev => ({ ...prev, minSqft: e.target.value ? parseInt(e.target.value) : undefined }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="maxSqft" className="text-sm text-muted-foreground">Max Sq Ft</Label>
+                <Input
+                  id="maxSqft"
+                  type="number"
+                  placeholder="No max"
+                  value={filters.maxSqft || ''}
+                  onChange={(e) => setFilters(prev => ({ ...prev, maxSqft: e.target.value ? parseInt(e.target.value) : undefined }))}
+                />
+              </div>
+            </div>
+            {subjectProperty?.sqft && (
+              <p className="text-xs text-muted-foreground">
+                Subject property: {subjectProperty.sqft.toLocaleString()} sq ft
+              </p>
+            )}
+          </div>
+
+          {/* Year Built */}
+          <div className="space-y-3">
+            <Label className="text-base font-medium">Year Built</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="minYearBuilt" className="text-sm text-muted-foreground">Min Year</Label>
+                <Input
+                  id="minYearBuilt"
+                  type="number"
+                  placeholder="e.g., 2000"
+                  value={filters.minYearBuilt || ''}
+                  onChange={(e) => setFilters(prev => ({ ...prev, minYearBuilt: e.target.value ? parseInt(e.target.value) : undefined }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="maxYearBuilt" className="text-sm text-muted-foreground">Max Year</Label>
+                <Input
+                  id="maxYearBuilt"
+                  type="number"
+                  placeholder="e.g., 2024"
+                  value={filters.maxYearBuilt || ''}
+                  onChange={(e) => setFilters(prev => ({ ...prev, maxYearBuilt: e.target.value ? parseInt(e.target.value) : undefined }))}
+                />
+              </div>
+            </div>
+            {subjectProperty?.yearBuilt && (
+              <p className="text-xs text-muted-foreground">
+                Subject property: Built {subjectProperty.yearBuilt}
+              </p>
+            )}
+          </div>
+
+          {/* Beds & Baths */}
+          <div className="space-y-3">
+            <Label className="text-base font-medium">Beds & Baths</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="minBeds" className="text-sm text-muted-foreground">Min Beds</Label>
+                <Select
+                  value={filters.minBeds?.toString() || ''}
+                  onValueChange={(value) => setFilters(prev => ({ ...prev, minBeds: value ? parseInt(value) : undefined }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Any" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Any</SelectItem>
+                    {[1, 2, 3, 4, 5, 6].map(num => (
+                      <SelectItem key={num} value={num.toString()}>{num}+</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="minBaths" className="text-sm text-muted-foreground">Min Baths</Label>
+                <Select
+                  value={filters.minBaths?.toString() || ''}
+                  onValueChange={(value) => setFilters(prev => ({ ...prev, minBaths: value ? parseInt(value) : undefined }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Any" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Any</SelectItem>
+                    {[1, 2, 3, 4, 5].map(num => (
+                      <SelectItem key={num} value={num.toString()}>{num}+</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {(subjectProperty?.beds || subjectProperty?.baths) && (
+              <p className="text-xs text-muted-foreground">
+                Subject property: {subjectProperty.beds} beds, {subjectProperty.baths} baths
+              </p>
+            )}
+          </div>
+
+          {/* Property Status */}
+          <div className="space-y-3">
+            <Label className="text-base font-medium">Property Status</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {STATUS_OPTIONS.map((status) => (
+                <div key={status.value} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`status-${status.value}`}
+                    checked={filters.statuses.includes(status.value)}
+                    onCheckedChange={(checked) => handleStatusChange(status.value, checked as boolean)}
+                  />
+                  <Label
+                    htmlFor={`status-${status.value}`}
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    {status.label}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Max Results */}
+          <div className="space-y-3">
+            <Label className="text-base font-medium">Maximum Results</Label>
+            <Select
+              value={filters.maxResults.toString()}
+              onValueChange={(value) => setFilters(prev => ({ ...prev, maxResults: parseInt(value) }))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5 comparables</SelectItem>
+                <SelectItem value="10">10 comparables</SelectItem>
+                <SelectItem value="15">15 comparables</SelectItem>
+                <SelectItem value="20">20 comparables</SelectItem>
+                <SelectItem value="25">25 comparables</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <SheetFooter className="flex-col sm:flex-row gap-2 pt-4 border-t">
+          <Button
+            variant="outline"
+            onClick={handleResetToDefaults}
+            className="w-full sm:w-auto"
+          >
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Smart Defaults
+          </Button>
+          <Button
+            onClick={handleApplyFilters}
+            disabled={applyFiltersMutation.isPending || filters.statuses.length === 0}
+            className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600"
+          >
+            {applyFiltersMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Searching...
+              </>
+            ) : (
+              'Apply Filters'
+            )}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+TASK 2: Update CMA Preview Banner
+Update client/src/components/cma/CMAPreviewBanner.tsx to use the new filters panel:
+typescriptimport { useState } from 'react';
+import { 
+  Save, 
+  ExternalLink, 
+  Mail, 
+  SlidersHorizontal,  // Changed from Edit
+  FileText,
+  Loader2
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { CMAEmailShareDialog } from './CMAEmailShareDialog';
+import { CMANotesDialog } from './CMANotesDialog';
+import { CMAFiltersPanel } from './CMAFiltersPanel';  // Add this import
+
+interface CMAPreviewBannerProps {
+  transactionId: number;
+  propertyAddress: string;
+  mlsNumber: string;  // Add this
+  publicLink?: string | null;
+  notes?: string | null;
+  currentFilters?: any;  // Add this
+  subjectProperty?: {    // Add this
+    listPrice?: number;
+    sqft?: number;
+    yearBuilt?: number;
+    beds?: number;
+    baths?: number;
+  };
+  onSave?: () => void;
+  onFiltersApplied?: () => void;  // Add this (replaces onModifySearch)
+  onNotesUpdate?: () => void;
+  isSaving?: boolean;
+}
+
+export function CMAPreviewBanner({
+  transactionId,
+  propertyAddress,
+  mlsNumber,
+  publicLink,
+  notes,
+  currentFilters,
+  subjectProperty,
+  onSave,
+  onFiltersApplied,
+  onNotesUpdate,
+  isSaving,
+}: CMAPreviewBannerProps) {
+  const { toast } = useToast();
+  const [emailShareDialogOpen, setEmailShareDialogOpen] = useState(false);
+  const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+  const [filtersPanelOpen, setFiltersPanelOpen] = useState(false);  // Add this
+
+  // Copy live URL to clipboard
+  const handleCopyLiveUrl = async () => {
+    if (!publicLink) {
+      toast({
+        title: 'No share link',
+        description: 'Generate a share link first using "Produce URL".',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    const shareUrl = `${window.location.origin}/share/cma/${publicLink}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast({
+        title: 'URL copied',
+        description: shareUrl,
+      });
+    } catch (error) {
+      toast({
+        title: 'Copy failed',
+        description: 'Unable to copy to clipboard.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  return (
+    <>
+      <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-400 dark:border-yellow-600 rounded-md p-4 flex items-center justify-between gap-4 flex-wrap print:hidden">
+        <p className="text-sm text-yellow-800 dark:text-yellow-200">
+          You are seeing a preview of the CMA report.
+        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          {onSave && (
+            <Button size="sm" onClick={onSave} disabled={isSaving}>
+              {isSaving ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
+              {isSaving ? 'Saving...' : 'Save'}
+            </Button>
+          )}
+          
+          <Button size="sm" variant="outline" onClick={handleCopyLiveUrl}>
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Copy Live URL
+          </Button>
+          
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={() => setEmailShareDialogOpen(true)}
+          >
+            <Mail className="w-4 h-4 mr-2" />
+            Share CMA
+          </Button>
+          
+          {/* Changed from "Modify Search" to "Adjust Filters" */}
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={() => setFiltersPanelOpen(true)}
+          >
+            <SlidersHorizontal className="w-4 h-4 mr-2" />
+            Adjust Filters
+          </Button>
+          
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={() => setNotesDialogOpen(true)}
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Notes
+          </Button>
+        </div>
+      </div>
+
+      <CMAEmailShareDialog
+        open={emailShareDialogOpen}
+        onOpenChange={setEmailShareDialogOpen}
+        transactionId={transactionId}
+        propertyAddress={propertyAddress}
+        publicLink={publicLink}
+      />
+
+      <CMANotesDialog
+        open={notesDialogOpen}
+        onOpenChange={setNotesDialogOpen}
+        transactionId={transactionId}
+        initialNotes={notes || ''}
+        onSuccess={onNotesUpdate}
+      />
+
+      {/* Add Filters Panel */}
+      <CMAFiltersPanel
+        open={filtersPanelOpen}
+        onOpenChange={setFiltersPanelOpen}
+        transactionId={transactionId}
+        mlsNumber={mlsNumber}
+        currentFilters={currentFilters}
+        subjectProperty={subjectProperty}
+        onFiltersApplied={() => {
+          onFiltersApplied?.();
+        }}
+      />
+    </>
+  );
+}
+
+TASK 3: Create API Endpoint to Refresh Comparables
+Add to server/routes.ts:
+typescript// POST /api/transactions/:id/cma/refresh - Re-fetch comparables with custom filters
+app.post('/api/transactions/:id/cma/refresh', async (req, res) => {
+  const { id } = req.params;
+  const { mlsNumber, filters } = req.body;
+
+  try {
+    // Get transaction
+    const transaction = await db.query.transactions.findFirst({
+      where: eq(transactions.id, parseInt(id)),
+    });
+
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    // Build Repliers API query parameters
+    const repliersParams: Record<string, any> = {
+      listings: mlsNumber,
+      resultsPerPage: filters.maxResults || 10,
+      status: filters.statuses?.join(',') || 'Closed,Active,Active Under Contract,Pending',
+    };
+
+    // Add radius (convert miles to meters for Repliers API if needed)
+    if (filters.radius) {
+      repliersParams.radius = filters.radius;
+      repliersParams.radiusUnit = 'mi';
+    }
+
+    // Add price filters
+    if (filters.minPrice) {
+      repliersParams.minPrice = filters.minPrice;
+    }
+    if (filters.maxPrice) {
+      repliersParams.maxPrice = filters.maxPrice;
+    }
+
+    // Add sqft filters
+    if (filters.minSqft) {
+      repliersParams.minSqft = filters.minSqft;
+    }
+    if (filters.maxSqft) {
+      repliersParams.maxSqft = filters.maxSqft;
+    }
+
+    // Add year built filters
+    if (filters.minYearBuilt) {
+      repliersParams.minYearBuilt = filters.minYearBuilt;
+    }
+    if (filters.maxYearBuilt) {
+      repliersParams.maxYearBuilt = filters.maxYearBuilt;
+    }
+
+    // Add beds/baths filters
+    if (filters.minBeds) {
+      repliersParams.minBeds = filters.minBeds;
+    }
+    if (filters.minBaths) {
+      repliersParams.minBaths = filters.minBaths;
+    }
+
+    // Add sold within timeframe (for closed status)
+    if (filters.soldWithinMonths) {
+      const soldAfterDate = new Date();
+      soldAfterDate.setMonth(soldAfterDate.getMonth() - filters.soldWithinMonths);
+      repliersParams.soldAfter = soldAfterDate.toISOString().split('T')[0];
+    }
+
+    // Call Repliers API for comparables
+    const repliersApiKey = process.env.REPLIERS_API_KEY;
+    if (!repliersApiKey) {
+      return res.status(500).json({ error: 'Repliers API key not configured' });
+    }
+
+    // Build query string
+    const queryString = new URLSearchParams(repliersParams).toString();
+    const repliersUrl = `https://api.repliers.io/listings/comparables?${queryString}`;
+
+    console.log('[CMA Refresh] Fetching from Repliers:', repliersUrl);
+
+    const repliersResponse = await fetch(repliersUrl, {
+      headers: {
+        'Authorization': `Bearer ${repliersApiKey}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!repliersResponse.ok) {
+      const errorText = await repliersResponse.text();
+      console.error('[CMA Refresh] Repliers error:', errorText);
+      return res.status(500).json({ error: 'Failed to fetch comparables from MLS' });
+    }
+
+    const repliersData = await repliersResponse.json();
+    const comparables = repliersData.listings || repliersData.comparables || [];
+
+    console.log('[CMA Refresh] Found', comparables.length, 'comparables');
+
+    // Update transaction with new comparables and filter settings
+    await db.update(transactions)
+      .set({
+        cmaComparables: JSON.stringify(comparables),
+        cmaFilters: JSON.stringify(filters),
+        cmaUpdatedAt: new Date(),
+      })
+      .where(eq(transactions.id, parseInt(id)));
+
+    res.json({
+      success: true,
+      comparablesCount: comparables.length,
+      comparables,
+      filters,
+    });
+
+  } catch (error) {
+    console.error('[CMA Refresh] Error:', error);
+    res.status(500).json({ error: 'Failed to refresh comparables' });
+  }
+});
+
+TASK 4: Add Database Fields for CMA Filters
+Add to your schema:
+typescript// In shared/schema.ts - add to transactions table
+cmaFilters: text('cma_filters'),  // JSON string of filter settings
+cmaUpdatedAt: timestamp('cma_updated_at'),
+Then run: npm run db:push
+
+TASK 5: Update CMA Tab to Pass Required Props
+In your CMA tab component, update the CMAPreviewBanner usage:
+typescript<CMAPreviewBanner
+  transactionId={transaction.id}
+  propertyAddress={transaction.address}
+  mlsNumber={transaction.mlsNumber}  // Add this
+  publicLink={transaction.cmaPublicLink}
+  notes={transaction.cmaNotes}
+  currentFilters={transaction.cmaFilters ? JSON.parse(transaction.cmaFilters) : undefined}  // Add this
+  subjectProperty={{  // Add this
+    listPrice: transaction.listPrice || mlsData?.listPrice,
+    sqft: transaction.sqft || mlsData?.livingArea,
+    yearBuilt: transaction.yearBuilt || mlsData?.yearBuilt,
+    beds: transaction.beds || mlsData?.bedrooms,
+    baths: transaction.baths || mlsData?.bathrooms,
+  }}
+  onFiltersApplied={() => {  // Changed from onModifySearch
+    refetch();  // Refresh transaction data to get new comparables
+  }}
+  onNotesUpdate={() => refetch()}
+/>
+```
+
+---
+
+### FILES TO CREATE/UPDATE
+```
+client/src/components/cma/
+├── CMAFiltersPanel.tsx      [CREATE]
+└── CMAPreviewBanner.tsx     [UPDATE]
+
+server/
+└── routes.ts                [UPDATE - add /cma/refresh endpoint]
+
+shared/
+└── schema.ts                [UPDATE - add cmaFilters, cmaUpdatedAt fields]
+
+ACCEPTANCE CRITERIA
+
+ "Modify Search" button renamed to "Adjust Filters"
+ Clicking "Adjust Filters" opens slide-out panel
+ Panel shows: Radius, Sold Within, Price, Sqft, Year Built, Beds/Baths, Status, Max Results
+ Subject property values shown as reference
+ "Smart Defaults" button calculates reasonable ranges based on subject property
+ "Apply Filters" calls Repliers API with new parameters
+ CMA tab refreshes with new comparables after applying
+ Filter settings saved to transaction for persistence
+
+
+UI APPEARANCE
+The filter panel should match Contract Conduit's dark theme with:
+
+Orange accent buttons (bg-orange-500)
+Radio buttons for radius selection
+Checkboxes for status selection
+Input fields for price/sqft/year ranges
+Loading spinner while fetching

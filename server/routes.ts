@@ -6,7 +6,7 @@ import { storage } from "./storage";
 import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema, insertCmaSchema, insertNotificationSettingsSchema } from "@shared/schema";
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages, watchUserMailbox } from "./gmail";
 import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel, postDocumentUploadNotification, postMLSListingNotification, sendMarketingNotification } from "./slack";
-import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess, getBestPhotosForFlyer } from "./repliers";
+import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess, getBestPhotosForFlyer, searchNearbyComparables, type CMASearchFilters } from "./repliers";
 import { isRentalOrLease } from "../shared/lib/listings";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
@@ -1365,6 +1365,83 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Transaction CMA creation error:", error);
       res.status(400).json({ message: error.message || "Failed to create CMA for transaction" });
+    }
+  });
+
+  // Refresh CMA comparables with new filters
+  app.post("/api/transactions/:transactionId/cma/refresh", isAuthenticated, async (req: any, res) => {
+    try {
+      const transaction = await storage.getTransaction(req.params.transactionId);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      const { mlsNumber, filters } = req.body;
+      if (!mlsNumber) {
+        return res.status(400).json({ message: "MLS number is required" });
+      }
+
+      // Get subject property coordinates
+      const subjectListing = await fetchMLSListing(mlsNumber);
+      if (!subjectListing) {
+        return res.status(404).json({ message: "Subject property not found in MLS" });
+      }
+
+      const coords = subjectListing.mlsData.coordinates;
+      if (!coords?.latitude || !coords?.longitude) {
+        return res.status(400).json({ message: "Subject property has no coordinates - cannot search nearby" });
+      }
+
+      // Build search filters with defaults
+      const searchFilters: CMASearchFilters = {
+        radius: filters?.radius || 2,
+        minPrice: filters?.minPrice,
+        maxPrice: filters?.maxPrice,
+        minSqft: filters?.minSqft,
+        maxSqft: filters?.maxSqft,
+        minYearBuilt: filters?.minYearBuilt,
+        maxYearBuilt: filters?.maxYearBuilt,
+        minBeds: filters?.minBeds,
+        minBaths: filters?.minBaths,
+        statuses: filters?.statuses || ['Closed', 'Active', 'Active Under Contract', 'Pending'],
+        soldWithinMonths: filters?.soldWithinMonths || 6,
+        maxResults: filters?.maxResults || 10,
+      };
+
+      console.log(`[CMA Refresh] Searching for comparables near ${mlsNumber} with filters:`, searchFilters);
+
+      // Search for nearby comparables
+      const comparables = await searchNearbyComparables(
+        coords.latitude,
+        coords.longitude,
+        mlsNumber,
+        searchFilters
+      );
+
+      console.log(`[CMA Refresh] Found ${comparables.length} comparables`);
+
+      // Update transaction with new CMA data
+      await storage.updateTransaction(req.params.transactionId, {
+        cmaData: comparables,
+      });
+
+      // Also update any existing CMA record for this transaction
+      const existingCma = await storage.getCmaByTransaction(req.params.transactionId);
+      if (existingCma) {
+        await storage.updateCma(existingCma.id, {
+          propertiesData: comparables,
+        });
+      }
+
+      res.json({
+        success: true,
+        comparablesCount: comparables.length,
+        comparables,
+        appliedFilters: searchFilters,
+      });
+    } catch (error: any) {
+      console.error("[CMA Refresh] Error:", error);
+      res.status(500).json({ message: error.message || "Failed to refresh CMA comparables" });
     }
   });
 

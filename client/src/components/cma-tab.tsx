@@ -441,13 +441,26 @@ export function CMATab({ transaction }: CMATabProps) {
           notes={savedCma?.notes}
           cmaData={cmaData || []}
           mlsNumber={transaction.mlsNumber}
+          subjectProperty={(() => {
+            const mlsData = transaction.mlsData as any;
+            return {
+              listPrice: mlsData?.listPrice || undefined,
+              sqft: mlsData?.livingArea || mlsData?.sqft || mlsData?.details?.sqft || undefined,
+              yearBuilt: mlsData?.yearBuilt || mlsData?.details?.yearBuilt || undefined,
+              beds: mlsData?.bedrooms || mlsData?.details?.numBedrooms || undefined,
+              baths: mlsData?.bathrooms || mlsData?.details?.numBathrooms || undefined,
+            };
+          })()}
           onSave={() => {
             toast({
               title: 'CMA Saved',
               description: 'Your CMA has been saved successfully.',
             });
           }}
-          onModifySearch={savedCma ? () => setLocation(`/cmas/new?from=${savedCma.id}`) : undefined}
+          onFiltersApplied={() => {
+            queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id] });
+            queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
+          }}
           onNotesUpdate={() => {
             queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
           }}
