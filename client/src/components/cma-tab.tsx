@@ -44,7 +44,9 @@ import {
   Table2,
   LayoutGrid,
   List,
-  Menu
+  Menu,
+  ArrowUpRight,
+  ArrowDownRight
 } from "lucide-react";
 
 const STATUS_FILTERS = [
@@ -424,52 +426,89 @@ export function CMATab({ transaction }: CMATabProps) {
       )}
       
       {/* Stats Summary Row - Only for Compare and List views */}
-      {(mainView === 'compare' || mainView === 'list') && statistics && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 bg-zinc-900 dark:bg-zinc-950 p-4 text-white">
-          <div>
-            <div className="text-xs text-zinc-400 uppercase tracking-wide">Low Price</div>
-            <div className="text-lg sm:text-xl font-bold">{formatPrice(statistics.price.range.min)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-zinc-400 uppercase tracking-wide">High Price</div>
-            <div className="text-lg sm:text-xl font-bold">{formatPrice(statistics.price.range.max)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg Price</div>
-            <div className="text-lg sm:text-xl font-bold">{formatPrice(Math.round(statistics.price.average))}</div>
-            <div className="text-xs text-zinc-400 mt-1">
-              Range: {formatPrice(statistics.price.range.min)} - {formatPrice(statistics.price.range.max)}
+      {(mainView === 'compare' || mainView === 'list') && statistics && (() => {
+        const mlsData = transaction.mlsData as any;
+        const subjectPrice = mlsData?.listPrice || 0;
+        const subjectSqft = mlsData?.livingArea || mlsData?.sqft || mlsData?.details?.sqft || 0;
+        const subjectPricePerSqft = subjectSqft > 0 ? subjectPrice / subjectSqft : 0;
+        
+        const priceVsMarket = statistics.price.average > 0 && subjectPrice > 0
+          ? ((subjectPrice - statistics.price.average) / statistics.price.average) * 100
+          : null;
+        
+        const psfVsMarket = statistics.pricePerSqFt.average > 0 && subjectPricePerSqft > 0
+          ? ((subjectPricePerSqft - statistics.pricePerSqFt.average) / statistics.pricePerSqFt.average) * 100
+          : null;
+        
+        return (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 bg-zinc-900 dark:bg-zinc-950 p-4 text-white">
+            {/* LOW PRICE - No sub-values */}
+            <div>
+              <div className="text-xs text-zinc-400 uppercase tracking-wide">Low Price</div>
+              <div className="text-lg sm:text-xl font-bold">{formatPrice(statistics.price.range.min)}</div>
             </div>
-            <div className="text-xs text-zinc-400">
-              Median: {formatPrice(Math.round(statistics.price.median))}
+            {/* HIGH PRICE - No sub-values */}
+            <div>
+              <div className="text-xs text-zinc-400 uppercase tracking-wide">High Price</div>
+              <div className="text-lg sm:text-xl font-bold">{formatPrice(statistics.price.range.max)}</div>
+            </div>
+            {/* AVG PRICE - VS Market only (Range/Median shown in other columns) */}
+            <div>
+              <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg Price</div>
+              <div className="text-lg sm:text-xl font-bold">{formatPrice(Math.round(statistics.price.average))}</div>
+              {priceVsMarket !== null && (
+                <div className="mt-1">
+                  <div className={`text-xs flex items-center gap-1 ${priceVsMarket > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                    {priceVsMarket > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                    {Math.abs(priceVsMarket).toFixed(1)}% vs market
+                  </div>
+                  <div className="text-xs text-zinc-400">
+                    Your: {formatPrice(subjectPrice)}
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* MEDIAN - No sub-values */}
+            <div>
+              <div className="text-xs text-zinc-400 uppercase tracking-wide">Median</div>
+              <div className="text-lg sm:text-xl font-bold">{formatPrice(Math.round(statistics.price.median))}</div>
+            </div>
+            {/* AVG $/SQFT - Range, Median, VS Market (unique data) */}
+            <div>
+              <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg $/SqFt</div>
+              <div className="text-lg sm:text-xl font-bold">${Math.round(statistics.pricePerSqFt.average)}</div>
+              <div className="text-xs text-zinc-400 mt-1">
+                Range: ${Math.round(statistics.pricePerSqFt.range.min)} - ${Math.round(statistics.pricePerSqFt.range.max)}
+              </div>
+              <div className="text-xs text-zinc-400">
+                Median: ${Math.round(statistics.pricePerSqFt.median)}
+              </div>
+              {psfVsMarket !== null && (
+                <div className="mt-1">
+                  <div className={`text-xs flex items-center gap-1 ${psfVsMarket > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                    {psfVsMarket > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                    {Math.abs(psfVsMarket).toFixed(1)}% vs market
+                  </div>
+                  <div className="text-xs text-zinc-400">
+                    Your: ${Math.round(subjectPricePerSqft)}
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* AVG DOM - Range, Median (unique data, no vs market) */}
+            <div>
+              <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg DOM</div>
+              <div className="text-lg sm:text-xl font-bold">{Math.round(statistics.daysOnMarket.average)} Days</div>
+              <div className="text-xs text-zinc-400 mt-1">
+                Range: {statistics.daysOnMarket.range.min} - {statistics.daysOnMarket.range.max}
+              </div>
+              <div className="text-xs text-zinc-400">
+                Median: {Math.round(statistics.daysOnMarket.median)}
+              </div>
             </div>
           </div>
-          <div>
-            <div className="text-xs text-zinc-400 uppercase tracking-wide">Median</div>
-            <div className="text-lg sm:text-xl font-bold">{formatPrice(Math.round(statistics.price.median))}</div>
-          </div>
-          <div>
-            <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg $/SqFt</div>
-            <div className="text-lg sm:text-xl font-bold">${Math.round(statistics.pricePerSqFt.average)}</div>
-            <div className="text-xs text-zinc-400 mt-1">
-              Range: ${Math.round(statistics.pricePerSqFt.range.min)} - ${Math.round(statistics.pricePerSqFt.range.max)}
-            </div>
-            <div className="text-xs text-zinc-400">
-              Median: ${Math.round(statistics.pricePerSqFt.median)}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg DOM</div>
-            <div className="text-lg sm:text-xl font-bold">{Math.round(statistics.daysOnMarket.average)} Days</div>
-            <div className="text-xs text-zinc-400 mt-1">
-              Range: {statistics.daysOnMarket.range.min} - {statistics.daysOnMarket.range.max}
-            </div>
-            <div className="text-xs text-zinc-400">
-              Median: {Math.round(statistics.daysOnMarket.median)}
-            </div>
-          </div>
-        </div>
-      )}
+        );
+      })()}
       
       {/* Sub-View Toggle - Only for Compare and List views */}
       {(mainView === 'compare' || mainView === 'list') && (

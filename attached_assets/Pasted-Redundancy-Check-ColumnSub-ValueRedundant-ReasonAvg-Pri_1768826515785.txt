@@ -1,0 +1,167 @@
+Redundancy Check:
+ColumnSub-ValueRedundant?ReasonAvg Price → RangeYESLow Price & High Price already have dedicated columnsAvg Price → MedianYESMEDIAN already has dedicated columnAvg $/Sqft → RangeNONo dedicated Min/Max $/Sqft columns existAvg $/Sqft → MedianNONo dedicated Median $/Sqft column existsAvg DOM → RangeNONo dedicated Min/Max DOM columns existAvg DOM → MedianNONo dedicated Median DOM column exists
+
+Updated Replit Prompt: Add "VS Market" Indicator and Clean Up Redundancy
+Task
+
+Remove redundant sub-values from Avg Price column (Range and Median are already shown in other columns)
+Keep Range and Median under Avg $/Sqft (unique data - no dedicated columns)
+Keep Range and Median under Avg DOM (unique data - no dedicated columns)
+Add "vs market" indicator to Avg Price and Avg $/Sqft columns
+
+Current Redundancy Issue
+LOW PRICE    HIGH PRICE    AVG PRICE              MEDIAN         AVG $/SQFT           AVG DOM
+$749,000     $2,199,000    $1,353,780             $1,299,000     $394                 0 Days
+     ↑            ↑       Range: $749K-$2.2M  ←REDUNDANT         Range: $227-$674     Range: 0-0
+     |            |       Median: $1,299,000 ←REDUNDANT          Median: $367         Median: 0
+     |            |              ↑                    ↑
+     +------------+──────────────+────────────────────+
+        Already shown in these columns!
+Desired State (Clean)
+LOW PRICE    HIGH PRICE    AVG PRICE              MEDIAN         AVG $/SQFT           AVG DOM
+$749,000     $2,199,000    $1,353,780             $1,299,000     $394                 0 Days
+                          ↗ 37.0% vs market                      Range: $227-$674     Range: 0-0
+                          Your: $1,850,000                       Median: $367         Median: 0
+                                                                 ↗ 78.3% vs market
+                                                                 Your: $717
+Updated Component
+typescriptimport { ArrowUpRight, ArrowDownRight } from 'lucide-react';
+
+const StatsSummaryRow = ({ comparables, subjectProperty }) => {
+  const stats = useMemo(() => {
+    const prices = comparables.map(c => c.soldPrice || c.listPrice).filter(Boolean);
+    const pricesPerSqft = comparables
+      .filter(c => c.sqft > 0)
+      .map(c => (c.soldPrice || c.listPrice) / c.sqft);
+    const doms = comparables.map(c => c.dom).filter(d => d !== null && d !== undefined);
+    
+    const getMedian = (arr: number[]) => {
+      if (arr.length === 0) return 0;
+      const sorted = [...arr].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    };
+    
+    return {
+      lowPrice: prices.length > 0 ? Math.min(...prices) : 0,
+      highPrice: prices.length > 0 ? Math.max(...prices) : 0,
+      avgPrice: prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0,
+      medianPrice: getMedian(prices),
+      
+      avgPricePerSqft: pricesPerSqft.length > 0 
+        ? Math.round(pricesPerSqft.reduce((a, b) => a + b, 0) / pricesPerSqft.length) 
+        : 0,
+      minPricePerSqft: pricesPerSqft.length > 0 ? Math.min(...pricesPerSqft) : 0,
+      maxPricePerSqft: pricesPerSqft.length > 0 ? Math.max(...pricesPerSqft) : 0,
+      medianPricePerSqft: Math.round(getMedian(pricesPerSqft)),
+      
+      avgDom: doms.length > 0 ? Math.round(doms.reduce((a, b) => a + b, 0) / doms.length) : 0,
+      minDom: doms.length > 0 ? Math.min(...doms) : 0,
+      maxDom: doms.length > 0 ? Math.max(...doms) : 0,
+      medianDom: Math.round(getMedian(doms)),
+    };
+  }, [comparables]);
+
+  // Calculate vs market percentages
+  const subjectPrice = subjectProperty?.listPrice || subjectProperty?.soldPrice || 0;
+  const subjectPricePerSqft = subjectProperty?.sqft > 0 
+    ? subjectPrice / subjectProperty.sqft 
+    : 0;
+
+  const calculateVsMarket = (subjectValue: number, marketAverage: number) => {
+    if (!marketAverage || marketAverage === 0 || !subjectValue) return null;
+    return ((subjectValue - marketAverage) / marketAverage) * 100;
+  };
+
+  const priceVsMarket = calculateVsMarket(subjectPrice, stats.avgPrice);
+  const psfVsMarket = calculateVsMarket(subjectPricePerSqft, stats.avgPricePerSqft);
+
+  return (
+    <div className="grid grid-cols-6 gap-4 bg-zinc-900 p-4 text-white">
+      {/* LOW PRICE - No sub-values */}
+      <div>
+        <div className="text-xs text-zinc-400 uppercase tracking-wide">Low Price</div>
+        <div className="text-xl font-bold">${stats.lowPrice.toLocaleString()}</div>
+      </div>
+      
+      {/* HIGH PRICE - No sub-values */}
+      <div>
+        <div className="text-xs text-zinc-400 uppercase tracking-wide">High Price</div>
+        <div className="text-xl font-bold">${stats.highPrice.toLocaleString()}</div>
+      </div>
+      
+      {/* AVG PRICE - VS Market only (Range/Median shown in other columns) */}
+      <div>
+        <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg Price</div>
+        <div className="text-xl font-bold">${Math.round(stats.avgPrice).toLocaleString()}</div>
+        {priceVsMarket !== null && (
+          <div className="mt-1">
+            <div className={`text-xs flex items-center gap-1 ${priceVsMarket > 0 ? 'text-red-400' : 'text-green-400'}`}>
+              {priceVsMarket > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+              {Math.abs(priceVsMarket).toFixed(1)}% vs market
+            </div>
+            <div className="text-xs text-zinc-400">
+              Your: ${subjectPrice.toLocaleString()}
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* MEDIAN - No sub-values */}
+      <div>
+        <div className="text-xs text-zinc-400 uppercase tracking-wide">Median</div>
+        <div className="text-xl font-bold">${stats.medianPrice.toLocaleString()}</div>
+      </div>
+      
+      {/* AVG $/SQFT - Range, Median, VS Market (unique data) */}
+      <div>
+        <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg $/Sqft</div>
+        <div className="text-xl font-bold">${stats.avgPricePerSqft}</div>
+        <div className="text-xs text-zinc-400 mt-1">
+          Range: ${Math.round(stats.minPricePerSqft)} - ${Math.round(stats.maxPricePerSqft)}
+        </div>
+        <div className="text-xs text-zinc-400">
+          Median: ${stats.medianPricePerSqft}
+        </div>
+        {psfVsMarket !== null && (
+          <div className="mt-1">
+            <div className={`text-xs flex items-center gap-1 ${psfVsMarket > 0 ? 'text-red-400' : 'text-green-400'}`}>
+              {psfVsMarket > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+              {Math.abs(psfVsMarket).toFixed(1)}% vs market
+            </div>
+            <div className="text-xs text-zinc-400">
+              Your: ${Math.round(subjectPricePerSqft)}
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* AVG DOM - Range, Median (unique data, no vs market) */}
+      <div>
+        <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg DOM</div>
+        <div className="text-xl font-bold">{stats.avgDom} Days</div>
+        <div className="text-xs text-zinc-400 mt-1">
+          Range: {stats.minDom} - {stats.maxDom}
+        </div>
+        <div className="text-xs text-zinc-400">
+          Median: {stats.medianDom}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+Final Data Display Summary
+ColumnMain ValueSub-ValuesVS MarketReasonLow Price$749,000NoneNoStandalone valueHigh Price$2,199,000NoneNoStandalone valueAvg Price$1,353,780NoneYesRange = Low/High columns, Median = MEDIAN columnMedian$1,299,000NoneNoStandalone valueAvg $/Sqft$394Range + MedianYesNo dedicated columns for theseAvg DOM0 DaysRange + MedianNoNo dedicated columns for these
+
+Acceptance Criteria
+
+ Avg Price: Remove Range sub-value (redundant with Low/High Price)
+ Avg Price: Remove Median sub-value (redundant with MEDIAN column)
+ Avg Price: Add "vs market" indicator with arrow and "Your:" value
+ Avg $/Sqft: Keep Range and Median (not redundant)
+ Avg $/Sqft: Add "vs market" indicator with arrow and "Your:" value
+ Avg DOM: Keep Range and Median (not redundant)
+ Red arrow when subject is ABOVE market average
+ Green arrow when subject is BELOW market average
+ Gracefully handle missing subject property (hide vs market indicators)
