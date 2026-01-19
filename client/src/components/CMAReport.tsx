@@ -57,7 +57,7 @@ export function CMAReport({
   onAddNotes,
   onPrint
 }: CMAReportProps) {
-  const [activeTab, setActiveTab] = useState("stats");
+  const [activeTab, setActiveTab] = useState("compare");
   const [activeListingTab, setActiveListingTab] = useState("all");
   
   // Property exclusion state for Include All/Exclude All functionality
@@ -704,37 +704,17 @@ export function CMAReport({
                     size="sm"
                     className={cn(
                       "text-white hover:bg-white/10",
-                      activeTab === "stats" && "bg-white/20 text-primary"
-                    )}
-                    onClick={() => setActiveTab("stats")}
-                    data-testid="tab-stats"
-                  >
-                    <BarChart3 className="w-4 h-4 mr-1.5" />
-                    Analytics
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Analytics & Statistics</p>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "text-white hover:bg-white/10",
                       activeTab === "compare" && "bg-white/20 text-primary"
                     )}
                     onClick={() => setActiveTab("compare")}
                     data-testid="tab-compare"
                   >
                     <LayoutGrid className="w-4 h-4 mr-1.5" />
-                    Grid
+                    Compare
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Property Grid</p>
+                  <p>Compare Properties</p>
                 </TooltipContent>
               </Tooltip>
               <Tooltip>
@@ -755,6 +735,26 @@ export function CMAReport({
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>Map View</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "text-white hover:bg-white/10",
+                      activeTab === "stats" && "bg-white/20 text-primary"
+                    )}
+                    onClick={() => setActiveTab("stats")}
+                    data-testid="tab-stats"
+                  >
+                    <BarChart3 className="w-4 h-4 mr-1.5" />
+                    Stats
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Statistics & Analytics</p>
                 </TooltipContent>
               </Tooltip>
               <Tooltip>

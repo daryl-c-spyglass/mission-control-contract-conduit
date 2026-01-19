@@ -1,0 +1,405 @@
+ Replace CMA Feature with Client Data Portal Version
+Overview
+Task: Replace the existing CMA implementation in Contract Conduit with the full-featured CMA system from Client Data Portal. Use the attached CMA_FEATURE_REFERENCE.md as the specification and the attached screenshots as visual reference to replicate the exact UI/UX.
+Important: This is a REPLACEMENT, not an addition. Remove/replace the existing CMA components. The goal is to exactly mimic the Client Data Portal CMA feature.
+
+Visual Reference Screenshots
+Screenshot 1: CMA List Page
+
+Grid layout of CMA cards (3 columns)
+Header: "CMAs" with count "84 Comparative Market Analyses"
+Sort dropdown: "Newest to Oldest" (top right)
+Orange "Create New CMA" button with + icon
+Each card shows:
+
+CMA name (bold)
+Document icon (top right of card)
+Created date
+Modified date (if different from created)
+Comparable count (e.g., "6 comparable properties")
+
+
+White cards with subtle shadow/border
+
+Screenshot 2: CMA Detail - Compare View
+
+Back link: "Back to CMAs"
+Title: "Highpointe" with "Shared" badge
+Action buttons row: Copy Email, Produce URL, Print, Presentation, Share
+Yellow preview banner with: Save (orange), Copy Live URL, Share CMA, Modify Search, Notes
+Dark header bar: "7 COMPARABLE HOMES" with view tabs (Compare, Map, Stats, List)
+Compare tab (active - orange highlight)
+Status filter tabs: All, Closed, Active Under Contract, Pending, Active
+Stats row (dark background): Low Price, High Price, Avg Price, Median, Avg $/Sqft, Avg DOM
+Data table with columns: Address, Status, Price, Sold Date, $/Sq.Ft, DOM, Beds, Baths, Sq. Ft., Lot Size, Garage Spaces
+Status colors: Green dot = Active, Red text = Closed, Orange text = Active Under Contract
+
+Screenshot 3: CMA Detail - Map View
+
+Same header structure as Compare view
+Map tab active (orange highlight)
+Streets/Satellite toggle in top-left (Streets active - orange background)
+Mapbox map with color-coded price markers
+Legend in bottom-left corner:
+
+Blue = Subject Property
+Green = Active
+Orange = Under Contract
+Red = Closed
+Gray = Pending
+
+
+Price bubbles on map showing amounts (e.g., $715K, $869K)
+Zoom controls on right side
+
+Screenshot 4: CMA Detail - Stats View
+
+Stats tab active (orange highlight)
+Top summary cards: Average Price ($908,257), Price Per Sqft ($273/sqft), Avg Living Area (3,323 sqft)
+Statistics Summary table: Metric, Range, Average, Median
+Price Comparison bar chart (orange bars)
+CMA Market Review section with 4 data points
+"17 Days on Market | 99.31% of List Price" section with property cards
+Average Price/Sq. Ft. scatter plot chart
+
+Screenshot 5: CMA Detail - List View
+
+List tab active (orange highlight)
+Horizontal scrollable property cards
+Left/right scroll arrows
+Each card shows:
+
+Property photo (or house icon placeholder for Subject)
+"Subject" badge (blue) on subject property
+Status badge (color-coded: Active=green, Closed=red, Active Under Contract=orange)
+Address and city
+Price (orange)
+Property details: Beds, Baths, Sq. Ft. (Living Area), Lot Size, Garage Spaces
+Comparison percentages vs subject (e.g., "-10.8%" in red, "+4.6%" in green)
+Listing Details section: Orig. Price, List Price, Sold Price
+
+
+Scroll progress bar at bottom
+
+
+Pre-Migration Steps
+1. Identify existing CMA files to replace:
+bashfind . -name "*CMA*" -o -name "*cma*" | grep -v node_modules
+2. Backup existing CMA data (if any):
+sqlSELECT * FROM cmas;
+
+Phase 1: Database Schema Update
+Reference: CMA_FEATURE_REFERENCE.md Section 1
+1.1 Update/Create Tables
+typescript// shared/schema.ts
+
+// Table 1: cmas
+export const cmas = pgTable('cmas', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id'),
+  name: varchar('name', { length: 255 }).notNull(),
+  subjectPropertyId: text('subject_property_id'),
+  subjectPropertyData: json('subject_property_data'),
+  comparableIds: json('comparable_ids').$type<string[]>().default([]),
+  comparablesData: json('comparables_data').$type<any[]>().default([]),
+  searchCriteria: json('search_criteria'),
+  notes: text('notes'),
+  isShared: boolean('is_shared').default(false),
+  shareToken: varchar('share_token', { length: 64 }),
+  adjustmentRates: json('adjustment_rates').$type<CmaAdjustmentRates>(),
+  compAdjustmentOverrides: json('comp_adjustment_overrides').$type<CmaCompAdjustmentOverrides>(),
+  adjustmentsData: json('adjustments_data').$type<CmaAdjustmentsData>(),
+  brochure: json('brochure').$type<CmaBrochure>(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Table 2: cma_report_configs
+export const cmaReportConfigs = pgTable('cma_report_configs', {
+  id: serial('id').primaryKey(),
+  cmaId: integer('cma_id').references(() => cmas.id, { onDelete: 'cascade' }),
+  enabledSections: json('enabled_sections').$type<string[]>(),
+  sectionOrder: json('section_order').$type<string[]>(),
+  coverLetter: text('cover_letter'),
+  coverPageConfig: json('cover_page_config').$type<CoverPageConfig>(),
+  selectedPhotos: json('selected_photos').$type<string[]>(),
+  mapStyle: varchar('map_style', { length: 50 }).default('streets'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Table 3: cma_report_templates
+export const cmaReportTemplates = pgTable('cma_report_templates', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id'),
+  name: varchar('name', { length: 255 }).notNull(),
+  enabledSections: json('enabled_sections').$type<string[]>(),
+  sectionOrder: json('section_order').$type<string[]>(),
+  coverLetterTemplate: text('cover_letter_template'),
+  isDefault: boolean('is_default').default(false),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+1.2 Create TypeScript Interfaces
+typescript// shared/types/cma.ts
+
+export interface CmaBrochure {
+  selectedPhotoUrl: string | null;
+  generatedAt: string | null;
+}
+
+export interface CmaAdjustmentRates {
+  sqftPerUnit: number;
+  bedroomValue: number;
+  bathroomValue: number;
+  poolValue: number;
+  garagePerSpace: number;
+  yearBuiltPerYear: number;
+  lotSizePerSqft: number;
+}
+
+export interface CmaCompAdjustmentOverrides {
+  [mlsId: string]: {
+    [adjustmentType: string]: number | null;
+  };
+}
+
+export interface CmaAdjustmentsData {
+  enabled: boolean;
+  rates: CmaAdjustmentRates;
+  overrides: CmaCompAdjustmentOverrides;
+}
+
+export interface CoverPageConfig {
+  title?: string;
+  subtitle?: string;
+  agentName?: string;
+  agentPhoto?: string;
+  companyLogo?: string;
+  primaryColor?: string;
+}
+
+export interface PropertyStatistics {
+  count: number;
+  avgPrice: number;
+  medianPrice: number;
+  minPrice: number;
+  maxPrice: number;
+  avgPricePerSqft: number;
+  avgSqft: number;
+  avgDom: number;
+  avgBeds: number;
+  avgBaths: number;
+}
+1.3 Run Migration
+bashnpx drizzle-kit generate
+npx drizzle-kit migrate
+
+Phase 2: API Endpoints
+Reference: CMA_FEATURE_REFERENCE.md Section 2
+typescript// server/routes/cmas.ts
+
+// CRUD Operations
+GET    /api/cmas                      // List all CMAs (with sorting)
+GET    /api/cmas/:id                  // Get single CMA
+POST   /api/cmas                      // Create CMA
+PUT    /api/cmas/:id                  // Full update
+PATCH  /api/cmas/:id                  // Partial update
+DELETE /api/cmas/:id                  // Delete CMA
+
+// Sharing
+POST   /api/cmas/:id/share            // Generate share token
+DELETE /api/cmas/:id/share            // Revoke sharing
+POST   /api/cmas/:id/email-share      // Send via email (Resend)
+GET    /api/share/cma/:token          // Public shared view
+
+// Statistics & Timeline
+GET    /api/cmas/:id/statistics       // Calculate property stats
+GET    /api/cmas/:id/timeline         // Price history timeline
+
+// Report Configuration
+GET    /api/cmas/:id/report-config    // Get report settings
+PUT    /api/cmas/:id/report-config    // Update report settings
+
+// Adjustments
+GET    /api/cmas/:id/adjustments      // Get adjustment data
+PUT    /api/cmas/:id/adjustments      // Update adjustments
+
+// Brochure
+POST   /api/cmas/:id/brochure         // Generate brochure
+DELETE /api/cmas/:id/brochure         // Delete brochure
+GET    /api/cmas/:id/brochure         // Get brochure
+
+// Report Sections
+GET    /api/cma/report-sections       // List available sections
+
+Phase 3: Frontend Pages
+3.1 CMA List Page (Screenshot 1)
+typescript// client/src/pages/CMAs.tsx
+
+// MUST MATCH SCREENSHOT 1 EXACTLY:
+// - Page title "CMAs" with count subtitle
+// - Sort dropdown top-right: "Newest to Oldest"
+// - Orange "Create New CMA" button with + icon
+// - 3-column grid of white cards
+// - Each card: name, document icon, created/modified dates, comparable count
+3.2 CMA Detail Page (Screenshots 2-5)
+typescript// client/src/pages/CMADetailPage.tsx
+
+// MUST MATCH SCREENSHOTS 2-5 EXACTLY:
+// - Back link, title with shared badge
+// - Action buttons: Copy Email, Produce URL, Print, Presentation, Share
+// - Yellow preview banner with Save, Copy Live URL, Share CMA, Modify Search, Notes
+// - Dark header bar with comparable count and view tabs
+// - Four views: Compare, Map, Stats, List
+
+Phase 4: View Components
+4.1 Compare View (Screenshot 2)
+typescript// client/src/components/CMA/views/CompareView.tsx
+
+// MUST MATCH SCREENSHOT 2 EXACTLY:
+// - Status filter tabs: All | Closed | Active Under Contract | Pending | Active
+// - Stats header row (dark bg): Low Price, High Price, Avg Price, Median, Avg $/Sqft, Avg DOM
+// - Data table with all columns
+// - Green dots for status indicator
+// - Color-coded status text (Green=Active, Red=Closed, Orange=Under Contract)
+4.2 Map View (Screenshot 3)
+typescript// client/src/components/CMA/views/MapView.tsx
+
+// MUST MATCH SCREENSHOT 3 EXACTLY:
+// - Streets/Satellite toggle top-left (orange when active)
+// - NO Dark button (theme handles dark mode)
+// - Mapbox map with price bubble markers
+// - Legend bottom-left with all 5 statuses and colors
+// - Zoom controls on right
+4.3 Stats View (Screenshot 4)
+typescript// client/src/components/CMA/views/StatsView.tsx
+
+// MUST MATCH SCREENSHOT 4 EXACTLY:
+// - Top summary cards (Average Price, Price Per Sqft, Avg Living Area)
+// - Statistics Summary table
+// - Price Comparison bar chart (orange bars)
+// - CMA Market Review section
+// - Days on Market / % of List Price section
+// - Average Price/Sq. Ft. scatter plot
+4.4 List View (Screenshot 5)
+typescript// client/src/components/CMA/views/ListView.tsx
+
+// MUST MATCH SCREENSHOT 5 EXACTLY:
+// - Horizontal scroll with arrow buttons
+// - Property cards with photos
+// - Subject badge (blue), Status badges (color-coded)
+// - Address, price (orange), property details
+// - Comparison percentages (+/- with green/red colors)
+// - Listing Details section
+// - Scroll progress bar at bottom
+
+Phase 5: Utilities
+5.1 Status Colors
+typescript// client/src/lib/statusColors.ts
+
+export const STATUS_COLORS = {
+  subject: { name: 'Subject Property', hex: '#3b82f6', bg: 'bg-blue-500', text: 'text-blue-500' },
+  active: { name: 'Active', hex: '#22c55e', bg: 'bg-green-500', text: 'text-green-500' },
+  underContract: { name: 'Under Contract', hex: '#f97316', bg: 'bg-orange-500', text: 'text-orange-500' },
+  closed: { name: 'Closed', hex: '#ef4444', bg: 'bg-red-500', text: 'text-red-500' },
+  pending: { name: 'Pending', hex: '#6b7280', bg: 'bg-gray-500', text: 'text-gray-500' },
+};
+5.2 Adjustment Calculations
+typescript// client/src/lib/adjustmentCalculations.ts
+
+export const DEFAULT_ADJUSTMENT_RATES = {
+  sqftPerUnit: 50,
+  bedroomValue: 10000,
+  bathroomValue: 7500,
+  poolValue: 25000,
+  garagePerSpace: 5000,
+  yearBuiltPerYear: 1000,
+  lotSizePerSqft: 2,
+};
+
+Phase 6: Report Sections
+typescript// shared/constants/reportSections.ts
+
+export const CMA_REPORT_SECTIONS = [
+  // Introduction
+  { id: 'cover_page', name: 'Cover Page', category: 'introduction', defaultEnabled: true },
+  { id: 'cover_letter', name: 'Cover Letter', category: 'introduction', defaultEnabled: true, editable: true },
+  { id: 'agent_resume', name: 'Agent Resume', category: 'introduction', defaultEnabled: false },
+  { id: 'listing_brochure', name: 'Listing Brochure', category: 'introduction', defaultEnabled: true },
+  { id: 'subject_property', name: 'Subject Property', category: 'introduction', defaultEnabled: true },
+  { id: 'property_photos', name: 'Property Photos', category: 'introduction', defaultEnabled: true },
+  { id: 'map_of_listings', name: 'Map of All Listings', category: 'introduction', defaultEnabled: true },
+  
+  // Analysis
+  { id: 'summary_of_comparables', name: 'Summary of Comparable Properties', category: 'analysis', defaultEnabled: true },
+  { id: 'property_details', name: 'Property Details', category: 'analysis', defaultEnabled: true },
+  { id: 'price_analysis', name: 'Price Analysis', category: 'analysis', defaultEnabled: true },
+  { id: 'market_trends', name: 'Market Trends', category: 'analysis', defaultEnabled: true },
+  { id: 'adjustments', name: 'Adjustments', category: 'analysis', defaultEnabled: false },
+  { id: 'recommended_price', name: 'Recommended Price Range', category: 'analysis', defaultEnabled: true },
+  
+  // Supporting
+  { id: 'area_info', name: 'Area Information', category: 'supporting', defaultEnabled: false },
+  { id: 'schools', name: 'Schools', category: 'supporting', defaultEnabled: false },
+  { id: 'market_conditions', name: 'Market Conditions', category: 'supporting', defaultEnabled: false },
+  { id: 'disclaimers', name: 'Disclaimers', category: 'supporting', defaultEnabled: true },
+] as const;
+
+Dependencies
+bashnpm install @react-pdf/renderer mapbox-gl recharts resend
+```
+
+---
+
+### Environment Variables
+```
+VITE_MAPBOX_TOKEN=
+REPLIERS_API_KEY=
+RESEND_API_KEY=
+OPENAI_API_KEY=
+```
+
+---
+
+### File Structure
+```
+shared/
+  schema.ts (update)
+  types/cma.ts (create)
+  constants/reportSections.ts (create)
+  utils/rentalDetection.ts (create)
+
+server/
+  routes/cmas.ts (replace)
+  routes/ai.ts (update)
+  utils/statistics.ts (create)
+
+client/src/
+  pages/
+    CMAs.tsx (replace)
+    CMANew.tsx (create)
+    CMADetailPage.tsx (replace)
+    CMAPresentationBuilder.tsx (create)
+    SharedCMAView.tsx (create)
+  components/CMA/
+    views/
+      CompareView.tsx (create)
+      MapView.tsx (create)
+      StatsView.tsx (create)
+      ListView.tsx (create)
+  lib/
+    statusColors.ts (create)
+    adjustmentCalculations.ts (create)
+
+Acceptance Criteria
+Must exactly match the attached screenshots:
+
+ CMA List page matches Screenshot 1 (grid layout, card design, sorting)
+ Compare View matches Screenshot 2 (table, filters, stats header)
+ Map View matches Screenshot 3 (Streets/Satellite toggle, legend, markers)
+ Stats View matches Screenshot 4 (charts, tables, layout)
+ List View matches Screenshot 5 (horizontal scroll cards, badges, comparisons)
+ All status colors consistent (green=Active, red=Closed, orange=Under Contract, gray=Pending, blue=Subject)
+ Orange primary color (#F37216) used throughout
+ Dark header bar for comparable count and view tabs
+ Yellow preview banner with action buttons

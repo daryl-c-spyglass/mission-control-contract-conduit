@@ -92,6 +92,66 @@ export const marketingAssets = pgTable("marketing_assets", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// CMA Brochure type
+export interface CmaBrochure {
+  type: "pdf" | "image";
+  url: string;
+  thumbnail?: string;
+  filename: string;
+  generated: boolean;
+  uploadedAt: string;
+}
+
+// CMA Adjustment Rates
+export interface CmaAdjustmentRates {
+  sqftPerUnit: number;
+  bedroomValue: number;
+  bathroomValue: number;
+  poolValue: number;
+  garagePerSpace: number;
+  yearBuiltPerYear: number;
+  lotSizePerSqft: number;
+}
+
+// CMA Comparable Adjustment Overrides
+export interface CmaCompAdjustmentOverrides {
+  sqft: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  pool: number | null;
+  garage: number | null;
+  yearBuilt: number | null;
+  lotSize: number | null;
+  custom: { name: string; value: number }[];
+}
+
+// CMA Adjustments Data
+export interface CmaAdjustmentsData {
+  rates: CmaAdjustmentRates;
+  compAdjustments: Record<string, CmaCompAdjustmentOverrides>;
+  enabled: boolean;
+}
+
+// Cover Page Config
+export interface CoverPageConfig {
+  title: string;
+  subtitle: string;
+  showDate: boolean;
+  showAgentPhoto: boolean;
+  background: "none" | "gradient" | "property";
+}
+
+// Default adjustment rates
+export const DEFAULT_ADJUSTMENT_RATES: CmaAdjustmentRates = {
+  sqftPerUnit: 50,
+  bedroomValue: 10000,
+  bathroomValue: 7500,
+  poolValue: 25000,
+  garagePerSpace: 5000,
+  yearBuiltPerYear: 1000,
+  lotSizePerSqft: 2,
+};
+
 // CMA (Comparative Market Analysis) table
 export const cmas = pgTable("cmas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -104,9 +164,51 @@ export const cmas = pgTable("cmas", {
   searchCriteria: jsonb("search_criteria"),
   notes: text("notes"),
   publicLink: text("public_link").unique(),
+  brochure: jsonb("brochure").$type<CmaBrochure>(), // Listing brochure
+  adjustments: jsonb("adjustments").$type<CmaAdjustmentsData>(), // Property value adjustments
   expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// CMA Report Configs table - 1:1 with cmas for presentation settings
+export const cmaReportConfigs = pgTable("cma_report_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cmaId: varchar("cma_id").notNull().unique(), // References cmas.id
+  includedSections: jsonb("included_sections").$type<string[]>(),
+  sectionOrder: jsonb("section_order").$type<string[]>(),
+  coverLetterOverride: text("cover_letter_override"),
+  layout: text("layout").default("two_photos"), // two_photos, single_photo, no_photos
+  template: text("template").default("default"),
+  theme: text("theme").default("spyglass"),
+  photoLayout: text("photo_layout").default("first_dozen"), // first_dozen, all, ai_suggested, custom
+  mapStyle: text("map_style").default("streets"), // streets, satellite, dark
+  showMapPolygon: boolean("show_map_polygon").default(true),
+  includeAgentFooter: boolean("include_agent_footer").default(true),
+  coverPageConfig: jsonb("cover_page_config").$type<CoverPageConfig>(),
+  customPhotoSelections: jsonb("custom_photo_selections").$type<Record<string, string[]>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// CMA Report Templates - user-owned reusable templates
+export const cmaReportTemplates = pgTable("cma_report_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  name: text("name").notNull(),
+  isDefault: boolean("is_default").default(false),
+  includedSections: jsonb("included_sections").$type<string[]>(),
+  sectionOrder: jsonb("section_order").$type<string[]>(),
+  coverLetterOverride: text("cover_letter_override"),
+  layout: text("layout").default("two_photos"),
+  theme: text("theme").default("spyglass"),
+  photoLayout: text("photo_layout").default("first_dozen"),
+  mapStyle: text("map_style").default("streets"),
+  showMapPolygon: boolean("show_map_polygon").default(true),
+  includeAgentFooter: boolean("include_agent_footer").default(true),
+  coverPageConfig: jsonb("cover_page_config").$type<CoverPageConfig>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Contract documents for transactions
@@ -182,6 +284,18 @@ export const insertCmaSchema = createInsertSchema(cmas).omit({
   updatedAt: true,
 });
 
+export const insertCmaReportConfigSchema = createInsertSchema(cmaReportConfigs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCmaReportTemplateSchema = createInsertSchema(cmaReportTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertNotificationSettingsSchema = createInsertSchema(notificationSettings).omit({
   id: true,
   createdAt: true,
@@ -209,6 +323,12 @@ export type InsertContractDocument = z.infer<typeof insertContractDocumentSchema
 
 export type Cma = typeof cmas.$inferSelect;
 export type InsertCma = z.infer<typeof insertCmaSchema>;
+
+export type CmaReportConfig = typeof cmaReportConfigs.$inferSelect;
+export type InsertCmaReportConfig = z.infer<typeof insertCmaReportConfigSchema>;
+
+export type CmaReportTemplate = typeof cmaReportTemplates.$inferSelect;
+export type InsertCmaReportTemplate = z.infer<typeof insertCmaReportTemplateSchema>;
 
 export type NotificationSetting = typeof notificationSettings.$inferSelect;
 export type InsertNotificationSetting = z.infer<typeof insertNotificationSettingsSchema>;

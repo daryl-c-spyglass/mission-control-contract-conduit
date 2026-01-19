@@ -13,6 +13,10 @@ import {
   type InsertContractDocument,
   type Cma,
   type InsertCma,
+  type CmaReportConfig,
+  type InsertCmaReportConfig,
+  type CmaReportTemplate,
+  type InsertCmaReportTemplate,
   type NotificationSetting,
   type InsertNotificationSetting,
   transactions,
@@ -22,6 +26,8 @@ import {
   marketingAssets,
   contractDocuments,
   cmas,
+  cmaReportConfigs,
+  cmaReportTemplates,
   notificationSettings,
 } from "@shared/schema";
 import { db } from "./db";
@@ -75,6 +81,18 @@ export interface IStorage {
   createCma(cma: InsertCma): Promise<Cma>;
   updateCma(id: string, cma: Partial<Cma>): Promise<Cma | undefined>;
   deleteCma(id: string): Promise<boolean>;
+
+  // CMA Report Configs
+  getCmaReportConfig(cmaId: string): Promise<CmaReportConfig | undefined>;
+  upsertCmaReportConfig(config: InsertCmaReportConfig): Promise<CmaReportConfig>;
+  deleteCmaReportConfig(cmaId: string): Promise<boolean>;
+
+  // CMA Report Templates
+  getCmaReportTemplates(userId: string): Promise<CmaReportTemplate[]>;
+  getCmaReportTemplate(id: string): Promise<CmaReportTemplate | undefined>;
+  createCmaReportTemplate(template: InsertCmaReportTemplate): Promise<CmaReportTemplate>;
+  updateCmaReportTemplate(id: string, template: Partial<InsertCmaReportTemplate>): Promise<CmaReportTemplate | undefined>;
+  deleteCmaReportTemplate(id: string): Promise<boolean>;
 
   // Notification Settings
   getNotificationSettings(userId: string, transactionId?: string | null): Promise<NotificationSetting | undefined>;
@@ -332,7 +350,65 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteCma(id: string): Promise<boolean> {
+    // Also delete related report config
+    await db.delete(cmaReportConfigs).where(eq(cmaReportConfigs.cmaId, id));
     await db.delete(cmas).where(eq(cmas.id, id));
+    return true;
+  }
+
+  // CMA Report Configs
+  async getCmaReportConfig(cmaId: string): Promise<CmaReportConfig | undefined> {
+    const [config] = await db.select().from(cmaReportConfigs).where(eq(cmaReportConfigs.cmaId, cmaId));
+    return config;
+  }
+
+  async upsertCmaReportConfig(config: InsertCmaReportConfig): Promise<CmaReportConfig> {
+    const existing = await this.getCmaReportConfig(config.cmaId);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(cmaReportConfigs)
+        .set({ ...config, updatedAt: new Date() })
+        .where(eq(cmaReportConfigs.cmaId, config.cmaId))
+        .returning();
+      return updated;
+    }
+    
+    const [created] = await db.insert(cmaReportConfigs).values(config).returning();
+    return created;
+  }
+
+  async deleteCmaReportConfig(cmaId: string): Promise<boolean> {
+    await db.delete(cmaReportConfigs).where(eq(cmaReportConfigs.cmaId, cmaId));
+    return true;
+  }
+
+  // CMA Report Templates
+  async getCmaReportTemplates(userId: string): Promise<CmaReportTemplate[]> {
+    return await db.select().from(cmaReportTemplates).where(eq(cmaReportTemplates.userId, userId));
+  }
+
+  async getCmaReportTemplate(id: string): Promise<CmaReportTemplate | undefined> {
+    const [template] = await db.select().from(cmaReportTemplates).where(eq(cmaReportTemplates.id, id));
+    return template;
+  }
+
+  async createCmaReportTemplate(template: InsertCmaReportTemplate): Promise<CmaReportTemplate> {
+    const [created] = await db.insert(cmaReportTemplates).values(template).returning();
+    return created;
+  }
+
+  async updateCmaReportTemplate(id: string, template: Partial<InsertCmaReportTemplate>): Promise<CmaReportTemplate | undefined> {
+    const [updated] = await db
+      .update(cmaReportTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(eq(cmaReportTemplates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCmaReportTemplate(id: string): Promise<boolean> {
+    await db.delete(cmaReportTemplates).where(eq(cmaReportTemplates.id, id));
     return true;
   }
 

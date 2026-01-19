@@ -1420,6 +1420,255 @@ export async function registerRoutes(
     }
   });
 
+  // Remove share link from CMA
+  app.delete("/api/cmas/:id/share", isAuthenticated, async (req, res) => {
+    try {
+      const cma = await storage.getCma(req.params.id);
+      if (!cma) {
+        return res.status(404).json({ message: "CMA not found" });
+      }
+      
+      await storage.updateCma(req.params.id, {
+        publicLink: null,
+        expiresAt: null,
+      });
+      
+      res.json({ message: "Share link removed" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to remove share link" });
+    }
+  });
+
+  // Get CMA statistics
+  app.get("/api/cmas/:id/statistics", async (req, res) => {
+    try {
+      const cma = await storage.getCma(req.params.id);
+      if (!cma) {
+        return res.status(404).json({ message: "CMA not found" });
+      }
+      
+      // Calculate statistics from propertiesData
+      const properties = (cma.propertiesData || []) as any[];
+      if (properties.length === 0) {
+        return res.json({
+          price: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+          pricePerSqFt: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+          daysOnMarket: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+          livingArea: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+          lotSize: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+          acres: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+          bedrooms: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+          bathrooms: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+          yearBuilt: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+        });
+      }
+      
+      const calcStats = (values: number[]) => {
+        const filtered = values.filter(v => v != null && !isNaN(v));
+        if (filtered.length === 0) return { range: { min: 0, max: 0 }, average: 0, median: 0 };
+        const sorted = [...filtered].sort((a, b) => a - b);
+        const sum = filtered.reduce((a, b) => a + b, 0);
+        const avg = sum / filtered.length;
+        const mid = Math.floor(sorted.length / 2);
+        const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+        return { range: { min: sorted[0], max: sorted[sorted.length - 1] }, average: Math.round(avg), median: Math.round(median) };
+      };
+      
+      const prices = properties.map(p => {
+        const isClosed = p.standardStatus === 'Closed';
+        return isClosed && p.closePrice ? Number(p.closePrice) : Number(p.listPrice || 0);
+      }).filter(p => p > 0);
+      const sqfts = properties.map(p => Number(p.livingArea || 0)).filter(s => s > 0);
+      const pricePerSqft = properties
+        .filter(p => p.livingArea && Number(p.livingArea) > 0)
+        .map(p => {
+          const isClosed = p.standardStatus === 'Closed';
+          const price = isClosed && p.closePrice ? Number(p.closePrice) : Number(p.listPrice || 0);
+          const sqft = Number(p.livingArea);
+          return sqft > 0 ? price / sqft : 0;
+        }).filter(v => v > 0 && !isNaN(v));
+      const doms = properties.map(p => Number(p.daysOnMarket || p.simpleDaysOnMarket || 0)).filter(d => d > 0);
+      const beds = properties.map(p => Number(p.bedroomsTotal || 0)).filter(b => b > 0);
+      const baths = properties.map(p => Number(p.bathroomsTotalInteger || 0)).filter(b => b > 0);
+      const years = properties.map(p => Number(p.yearBuilt || 0)).filter(y => y > 0);
+      const lots = properties.map(p => Number(p.lotSizeSquareFeet || 0)).filter(l => l > 0);
+      const acres = properties.map(p => Number(p.lotSizeAcres || (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : 0))).filter(a => a > 0);
+      
+      res.json({
+        price: calcStats(prices),
+        pricePerSqFt: calcStats(pricePerSqft),
+        daysOnMarket: calcStats(doms),
+        livingArea: calcStats(sqfts),
+        lotSize: calcStats(lots),
+        acres: calcStats(acres),
+        bedrooms: calcStats(beds),
+        bathrooms: calcStats(baths),
+        yearBuilt: calcStats(years),
+      });
+    } catch (error) {
+      console.error("CMA statistics error:", error);
+      res.status(500).json({ message: "Failed to calculate CMA statistics" });
+    }
+  });
+
+  // Get CMA timeline data
+  app.get("/api/cmas/:id/timeline", async (req, res) => {
+    try {
+      const cma = await storage.getCma(req.params.id);
+      if (!cma) {
+        return res.status(404).json({ message: "CMA not found" });
+      }
+      
+      const properties = (cma.propertiesData || []) as any[];
+      const timeline = properties
+        .filter(p => p.listDate || p.closeDate)
+        .map(p => {
+          const isClosed = p.standardStatus === 'Closed';
+          return {
+            date: isClosed && p.closeDate ? p.closeDate : p.listDate,
+            price: isClosed && p.closePrice ? Number(p.closePrice) : Number(p.listPrice || 0),
+            status: p.standardStatus || 'Active',
+            propertyId: p.id || p.mlsNumber || '',
+            address: p.unparsedAddress || '',
+            daysOnMarket: p.daysOnMarket || p.simpleDaysOnMarket || null,
+            cumulativeDaysOnMarket: p.cumulativeDaysOnMarket || null,
+          };
+        })
+        .filter(t => t.date)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      res.json(timeline);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get CMA timeline" });
+    }
+  });
+
+  // Get CMA report config
+  app.get("/api/cmas/:id/report-config", isAuthenticated, async (req, res) => {
+    try {
+      const config = await storage.getCmaReportConfig(req.params.id);
+      res.json(config || {
+        cmaId: req.params.id,
+        includedSections: ['cover_page', 'cover_letter', 'map_all_listings', 'summary_comparables', 'property_details', 'price_per_sqft', 'comparable_stats'],
+        sectionOrder: null,
+        layout: 'two_photos',
+        template: 'default',
+        theme: 'spyglass',
+        photoLayout: 'first_dozen',
+        mapStyle: 'streets',
+        showMapPolygon: true,
+        includeAgentFooter: true,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get CMA report config" });
+    }
+  });
+
+  // Update CMA report config
+  app.put("/api/cmas/:id/report-config", isAuthenticated, async (req, res) => {
+    try {
+      const config = await storage.upsertCmaReportConfig({
+        ...req.body,
+        cmaId: req.params.id,
+      });
+      res.json(config);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update CMA report config" });
+    }
+  });
+
+  // Get CMA adjustments
+  app.get("/api/cmas/:id/adjustments", async (req, res) => {
+    try {
+      const cma = await storage.getCma(req.params.id);
+      if (!cma) {
+        return res.status(404).json({ message: "CMA not found" });
+      }
+      
+      res.json(cma.adjustments || {
+        rates: {
+          sqftPerUnit: 50,
+          bedroomValue: 10000,
+          bathroomValue: 7500,
+          poolValue: 25000,
+          garagePerSpace: 5000,
+          yearBuiltPerYear: 1000,
+          lotSizePerSqft: 2,
+        },
+        compAdjustments: {},
+        enabled: false,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get CMA adjustments" });
+    }
+  });
+
+  // Update CMA adjustments
+  app.put("/api/cmas/:id/adjustments", isAuthenticated, async (req, res) => {
+    try {
+      const updated = await storage.updateCma(req.params.id, {
+        adjustments: req.body,
+      });
+      if (!updated) {
+        return res.status(404).json({ message: "CMA not found" });
+      }
+      res.json(updated.adjustments);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update CMA adjustments" });
+    }
+  });
+
+  // Get CMA brochure
+  app.get("/api/cmas/:id/brochure", async (req, res) => {
+    try {
+      const cma = await storage.getCma(req.params.id);
+      if (!cma) {
+        return res.status(404).json({ message: "CMA not found" });
+      }
+      res.json(cma.brochure || null);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get CMA brochure" });
+    }
+  });
+
+  // Delete CMA brochure
+  app.delete("/api/cmas/:id/brochure", isAuthenticated, async (req, res) => {
+    try {
+      const updated = await storage.updateCma(req.params.id, {
+        brochure: null,
+      });
+      if (!updated) {
+        return res.status(404).json({ message: "CMA not found" });
+      }
+      res.json({ message: "Brochure deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete CMA brochure" });
+    }
+  });
+
+  // CMA Report Sections constant
+  app.get("/api/cma/report-sections", async (req, res) => {
+    res.json([
+      { id: 'cover_page', name: 'Cover Page', category: 'introduction', defaultEnabled: true },
+      { id: 'cover_letter', name: 'Cover Letter', category: 'introduction', defaultEnabled: true, editable: true },
+      { id: 'listing_brochure', name: 'Listing Brochure', category: 'introduction', defaultEnabled: false },
+      { id: 'agent_resume', name: 'Agent Resume', category: 'introduction', defaultEnabled: false, editable: true },
+      { id: 'our_company', name: 'Our Company', category: 'introduction', defaultEnabled: false },
+      { id: 'what_is_cma', name: 'What is a CMA?', category: 'introduction', defaultEnabled: false },
+      { id: 'contact_me', name: 'Contact Me', category: 'introduction', defaultEnabled: true },
+      { id: 'map_all_listings', name: 'Map of All Listings', category: 'listings', defaultEnabled: true },
+      { id: 'summary_comparables', name: 'Summary of Comparable Properties', category: 'listings', defaultEnabled: true },
+      { id: 'listings_header', name: 'Listings Chapter Header', category: 'listings', defaultEnabled: false },
+      { id: 'property_details', name: 'Property Details', category: 'listings', defaultEnabled: true },
+      { id: 'property_photos', name: 'Property Photos', category: 'listings', defaultEnabled: true },
+      { id: 'adjustments', name: 'Adjustments', category: 'listings', defaultEnabled: false },
+      { id: 'analysis_header', name: 'Analysis Chapter Header', category: 'analysis', defaultEnabled: false },
+      { id: 'online_valuation', name: 'Online Valuation Analysis', category: 'analysis', defaultEnabled: false },
+      { id: 'price_per_sqft', name: 'Average Price Per Sq. Ft.', category: 'analysis', defaultEnabled: true },
+      { id: 'comparable_stats', name: 'Comparable Property Statistics', category: 'analysis', defaultEnabled: true },
+    ]);
+  });
+
   // ============ Admin ============
 
   app.get("/api/admin/integration-status", isAuthenticated, async (req: any, res) => {
