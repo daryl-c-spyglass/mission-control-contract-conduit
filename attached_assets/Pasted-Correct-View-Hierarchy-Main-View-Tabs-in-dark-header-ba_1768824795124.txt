@@ -1,0 +1,335 @@
+Correct View Hierarchy
+Main View Tabs (in dark header bar):
+Compare | Map | Stats | List
+Sub-View Options (only for Compare and List):
+[Grid] [List] [Table]
+
+Updated Structure
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ≡  7 COMPARABLE HOMES                    [Compare] [Map] [Stats] [List]     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  COMPARE VIEW:                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ [All][Closed][Active Under Contract][Pending][Active]               │   │
+│  ├─────────────────────────────────────────────────────────────────────┤   │
+│  │ LOW PRICE │ HIGH PRICE │ AVG PRICE │ MEDIAN │ AVG $/SQFT │ AVG DOM  │   │
+│  ├─────────────────────────────────────────────────────────────────────┤   │
+│  │ View: [Grid] [List] [Table]                          ← SUB-VIEWS    │   │
+│  ├─────────────────────────────────────────────────────────────────────┤   │
+│  │                                                                     │   │
+│  │              [Content based on selected sub-view]                   │   │
+│  │                                                                     │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  MAP VIEW:                                                                  │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ [Streets][Satellite]                                                │   │
+│  │                                                                     │   │
+│  │              [Mapbox map with markers - NO sub-views]               │   │
+│  │                                                                     │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  STATS VIEW:                                                                │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                                                                     │   │
+│  │              [Charts and statistics - NO sub-views]                 │   │
+│  │                                                                     │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  LIST VIEW:                                                                 │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ [All][Closed][Active Under Contract][Pending][Active]               │   │
+│  ├─────────────────────────────────────────────────────────────────────┤   │
+│  │ LOW PRICE │ HIGH PRICE │ AVG PRICE │ MEDIAN │ AVG $/SQFT │ AVG DOM  │   │
+│  ├─────────────────────────────────────────────────────────────────────┤   │
+│  │ View: [Grid] [List] [Table]                          ← SUB-VIEWS    │   │
+│  ├─────────────────────────────────────────────────────────────────────┤   │
+│  │                                                                     │   │
+│  │              [Content based on selected sub-view]                   │   │
+│  │                                                                     │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Replit Prompt: Add Main View Tabs and Sub-Views to CMA Tab
+Task
+Update the CMA tab in Transaction Detail page to include:
+
+Main view tabs: Compare, Map, Stats, List (like Client Data Portal)
+Sub-view options: Grid, List, Table (only within Compare and List views)
+Status filters and stats summary row (for Compare and List views)
+
+
+Main View Tabs Structure
+Main ViewHas Status FiltersHas Stats SummaryHas Sub-ViewsDescriptionCompareYesYesYes (Grid/List/Table)Data-focused comparisonMapNoNoNoMapbox with markersStatsNoNoNoCharts and analyticsListYesYesYes (Grid/List/Table)Property cards
+
+Implementation
+1. Add Main View State
+typescripttype MainView = 'compare' | 'map' | 'stats' | 'list';
+type SubView = 'grid' | 'list' | 'table';
+
+const [mainView, setMainView] = useState<MainView>('compare');
+const [subView, setSubView] = useState<SubView>('table'); // Default for Compare
+const [statusFilter, setStatusFilter] = useState('all');
+2. Main View Tabs Header
+typescript// Dark header bar with comparable count and main view tabs
+<div className="bg-[#2a2a2a] px-4 py-3 flex items-center justify-between rounded-t-lg">
+  <div className="flex items-center gap-2 text-white">
+    <Menu className="w-5 h-5" />
+    <span className="font-semibold">{filteredComparables.length} COMPARABLE HOMES</span>
+  </div>
+  
+  <div className="flex gap-1">
+    {[
+      { id: 'compare', label: 'Compare', icon: BarChart3 },
+      { id: 'map', label: 'Map', icon: MapIcon },
+      { id: 'stats', label: 'Stats', icon: TrendingUp },
+      { id: 'list', label: 'List', icon: Home },
+    ].map(tab => (
+      <button
+        key={tab.id}
+        onClick={() => setMainView(tab.id as MainView)}
+        className={`flex items-center gap-1 px-4 py-2 rounded text-sm font-medium transition-colors ${
+          mainView === tab.id
+            ? 'bg-primary text-white'
+            : 'text-gray-300 hover:text-white hover:bg-gray-700'
+        }`}
+      >
+        <tab.icon className="w-4 h-4" />
+        {tab.label}
+      </button>
+    ))}
+  </div>
+</div>
+3. Status Filter Tabs (Compare & List only)
+typescript// Only show for Compare and List views
+{(mainView === 'compare' || mainView === 'list') && (
+  <div className="flex gap-1 bg-[#3a3a3a] p-2">
+    {['all', 'closed', 'activeUnderContract', 'pending', 'active'].map(status => (
+      <button
+        key={status}
+        onClick={() => setStatusFilter(status)}
+        className={`px-4 py-2 text-sm rounded transition-colors ${
+          statusFilter === status
+            ? 'bg-white text-gray-900'
+            : 'text-gray-300 hover:text-white hover:bg-gray-600'
+        }`}
+      >
+        {status === 'all' ? 'All' : 
+         status === 'activeUnderContract' ? 'Active Under Contract' :
+         status.charAt(0).toUpperCase() + status.slice(1)}
+      </button>
+    ))}
+  </div>
+)}
+4. Stats Summary Row (Compare & List only)
+typescript// Only show for Compare and List views
+{(mainView === 'compare' || mainView === 'list') && (
+  <div className="grid grid-cols-6 gap-4 bg-[#2a2a2a] p-4 text-white">
+    <div>
+      <div className="text-xs text-gray-400 uppercase">Low Price</div>
+      <div className="text-xl font-bold">${stats.lowPrice.toLocaleString()}</div>
+    </div>
+    <div>
+      <div className="text-xs text-gray-400 uppercase">High Price</div>
+      <div className="text-xl font-bold">${stats.highPrice.toLocaleString()}</div>
+    </div>
+    <div>
+      <div className="text-xs text-gray-400 uppercase">Avg Price</div>
+      <div className="text-xl font-bold">${Math.round(stats.avgPrice).toLocaleString()}</div>
+    </div>
+    <div>
+      <div className="text-xs text-gray-400 uppercase">Median</div>
+      <div className="text-xl font-bold">${Math.round(stats.medianPrice).toLocaleString()}</div>
+    </div>
+    <div>
+      <div className="text-xs text-gray-400 uppercase">Avg $/Sqft</div>
+      <div className="text-xl font-bold">${stats.avgPricePerSqft}</div>
+    </div>
+    <div>
+      <div className="text-xs text-gray-400 uppercase">Avg DOM</div>
+      <div className="text-xl font-bold">{stats.avgDom} Days</div>
+    </div>
+  </div>
+)}
+5. Sub-View Toggle (Compare & List only)
+typescript// Only show for Compare and List views
+{(mainView === 'compare' || mainView === 'list') && (
+  <div className="flex items-center gap-2 p-4 border-b bg-white">
+    <span className="text-sm text-gray-500">View:</span>
+    <div className="flex rounded-lg overflow-hidden border">
+      <button
+        onClick={() => setSubView('grid')}
+        className={`flex items-center gap-1 px-3 py-2 text-sm ${
+          subView === 'grid' ? 'bg-primary text-white' : 'bg-white hover:bg-gray-100'
+        }`}
+      >
+        <LayoutGrid className="w-4 h-4" />
+        Grid
+      </button>
+      <button
+        onClick={() => setSubView('list')}
+        className={`flex items-center gap-1 px-3 py-2 text-sm ${
+          subView === 'list' ? 'bg-primary text-white' : 'bg-white hover:bg-gray-100'
+        }`}
+      >
+        <List className="w-4 h-4" />
+        List
+      </button>
+      <button
+        onClick={() => setSubView('table')}
+        className={`flex items-center gap-1 px-3 py-2 text-sm ${
+          subView === 'table' ? 'bg-primary text-white' : 'bg-white hover:bg-gray-100'
+        }`}
+      >
+        <Table2 className="w-4 h-4" />
+        Table
+      </button>
+    </div>
+  </div>
+)}
+6. Main View Content Rendering
+typescript{/* COMPARE VIEW */}
+{mainView === 'compare' && (
+  <div>
+    {subView === 'grid' && <CompareGridView comparables={filteredComparables} />}
+    {subView === 'list' && <CompareListView comparables={filteredComparables} />}
+    {subView === 'table' && <CompareTableView comparables={filteredComparables} />}
+  </div>
+)}
+
+{/* MAP VIEW - No sub-views */}
+{mainView === 'map' && (
+  <div className="relative h-[500px]">
+    <MapStyleToggle mapStyle={mapStyle} onStyleChange={setMapStyle} />
+    <MapboxMap 
+      comparables={comparables} 
+      subjectProperty={subjectProperty}
+      mapStyle={mapStyle}
+    />
+    <Legend />
+  </div>
+)}
+
+{/* STATS VIEW - No sub-views */}
+{mainView === 'stats' && (
+  <div className="p-4 space-y-6">
+    <SummaryCards stats={stats} />
+    <StatisticsTable stats={stats} />
+    <PriceComparisonChart comparables={comparables} />
+    <MarketReviewSection comparables={comparables} />
+    <PricePerSqftChart comparables={comparables} />
+  </div>
+)}
+
+{/* LIST VIEW */}
+{mainView === 'list' && (
+  <div>
+    {subView === 'grid' && <ListGridView comparables={filteredComparables} subject={subjectProperty} />}
+    {subView === 'list' && <ListListView comparables={filteredComparables} subject={subjectProperty} />}
+    {subView === 'table' && <ListTableView comparables={filteredComparables} subject={subjectProperty} />}
+  </div>
+)}
+7. Sub-View Components
+typescript// GRID Sub-View - Card grid layout
+const CompareGridView = ({ comparables }) => (
+  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
+    {comparables.map(comp => (
+      <div key={comp.mlsId} className="border rounded-lg p-4 bg-white shadow-sm">
+        <StatusBadge status={comp.status} />
+        <div className="font-medium mt-2">{comp.address}</div>
+        <div className="text-primary text-lg font-bold">${comp.listPrice?.toLocaleString()}</div>
+        <div className="text-sm text-gray-500">{comp.beds} bed | {comp.baths} bath | {comp.sqft?.toLocaleString()} sqft</div>
+      </div>
+    ))}
+  </div>
+);
+
+// LIST Sub-View - Vertical list with details
+const CompareListView = ({ comparables }) => (
+  <div className="divide-y">
+    {comparables.map(comp => (
+      <div key={comp.mlsId} className="flex items-center gap-4 p-4 hover:bg-gray-50">
+        <StatusDot status={comp.status} />
+        <div className="flex-1">
+          <div className="font-medium">{comp.address}</div>
+          <div className="text-sm text-gray-500">{comp.city}, {comp.zip}</div>
+        </div>
+        <div className="text-right">
+          <div className="text-lg font-bold text-primary">${comp.listPrice?.toLocaleString()}</div>
+          <div className="text-sm text-gray-500">${Math.round(comp.listPrice / comp.sqft)}/sqft</div>
+        </div>
+        <div className="text-sm text-gray-500 w-24 text-center">
+          {comp.beds} bd | {comp.baths} ba
+        </div>
+        <div className="text-sm text-gray-500 w-20 text-right">
+          {comp.sqft?.toLocaleString()} sqft
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+// TABLE Sub-View - Full data table (existing Compare view style)
+const CompareTableView = ({ comparables }) => (
+  <div className="overflow-x-auto">
+    <table className="w-full text-sm">
+      <thead className="bg-gray-50 text-left text-gray-500 uppercase text-xs">
+        <tr>
+          <th className="p-3">Address</th>
+          <th className="p-3">Status</th>
+          <th className="p-3">Price</th>
+          <th className="p-3">Sold Date</th>
+          <th className="p-3">$/Sq.Ft</th>
+          <th className="p-3">DOM</th>
+          <th className="p-3">Beds</th>
+          <th className="p-3">Baths</th>
+          <th className="p-3">Sq.Ft.</th>
+          <th className="p-3">Lot Size</th>
+          <th className="p-3">Garage</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y">
+        {comparables.map(comp => (
+          <tr key={comp.mlsId} className="hover:bg-gray-50">
+            <td className="p-3">
+              <div className="flex items-center gap-2">
+                <StatusDot status={comp.status} />
+                <div>
+                  <div className="font-medium">{comp.address}</div>
+                  <div className="text-gray-500 text-xs">{comp.city}, {comp.zip}</div>
+                </div>
+              </div>
+            </td>
+            <td className="p-3"><StatusText status={comp.status} /></td>
+            <td className="p-3 font-medium">${comp.listPrice?.toLocaleString()}</td>
+            <td className="p-3 text-gray-500">{comp.soldDate || '-'}</td>
+            <td className="p-3">${Math.round((comp.listPrice || 0) / (comp.sqft || 1))}</td>
+            <td className="p-3">{comp.dom ?? '-'}</td>
+            <td className="p-3">{comp.beds}</td>
+            <td className="p-3">{comp.baths}</td>
+            <td className="p-3">{comp.sqft?.toLocaleString()}</td>
+            <td className="p-3">{comp.lotSize || '-'}</td>
+            <td className="p-3">{comp.garageSpaces || '-'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+
+Summary Table
+Main ViewSub-Views AvailableFeaturesCompareGrid, List, TableStatus filters + Stats summary + Sub-view toggleMapNoneStreets/Satellite toggle + LegendStatsNoneCharts, statistics tablesListGrid, List, TableStatus filters + Stats summary + Sub-view toggle + Horizontal scroll cards
+
+Acceptance Criteria
+
+ Main view tabs: Compare, Map, Stats, List (in dark header bar)
+ Compare view has: Status filters, Stats summary row, Grid/List/Table sub-views
+ Map view has: Streets/Satellite toggle, markers, legend (no sub-views)
+ Stats view has: Charts and statistics (no sub-views)
+ List view has: Status filters, Stats summary row, Grid/List/Table sub-views
+ Status filters update stats and property list in real-time
+ Sub-view toggle only appears for Compare and List views
+ Applies to CMA tab on ALL transactions
+

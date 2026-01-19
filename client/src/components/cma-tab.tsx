@@ -34,7 +34,7 @@ import {
   Calendar,
   BarChart3,
   Grid3X3,
-  Map,
+  Map as MapIcon,
   ChevronLeft,
   ChevronRight,
   X,
@@ -42,7 +42,9 @@ import {
   Plus,
   Search,
   Table2,
-  LayoutGrid
+  LayoutGrid,
+  List,
+  Menu
 } from "lucide-react";
 
 const STATUS_FILTERS = [
@@ -181,10 +183,21 @@ function StatCard({
   );
 }
 
+type MainView = 'compare' | 'map' | 'stats' | 'list';
+type SubView = 'grid' | 'list' | 'table';
+
+const MAIN_VIEW_TABS = [
+  { id: 'compare' as MainView, label: 'Compare', icon: BarChart3 },
+  { id: 'map' as MainView, label: 'Map', icon: MapIcon },
+  { id: 'stats' as MainView, label: 'Stats', icon: TrendingUp },
+  { id: 'list' as MainView, label: 'List', icon: Home },
+] as const;
+
 export function CMATab({ transaction }: CMATabProps) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [viewMode, setViewMode] = useState<'stats' | 'grid' | 'table' | 'map'>('stats');
+  const [mainView, setMainView] = useState<MainView>('compare');
+  const [subView, setSubView] = useState<SubView>('table');
   const [statusFilter, setStatusFilter] = useState<StatusFilterType>('all');
   const [selectedProperty, setSelectedProperty] = useState<CMAComparable | null>(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -350,79 +363,38 @@ export function CMATab({ transaction }: CMATabProps) {
   }
   
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-lg font-semibold">Comparative Market Analysis</h2>
-          <p className="text-sm text-muted-foreground">
-            {filteredComparables.length} of {cmaData.length} comparable properties
-          </p>
+    <div className="space-y-0">
+      {/* Dark Header Bar with Main View Tabs */}
+      <div className="bg-zinc-800 dark:bg-zinc-900 px-4 py-3 flex items-center justify-between rounded-t-lg flex-wrap gap-3">
+        <div className="flex items-center gap-2 text-white">
+          <Menu className="w-5 h-5" />
+          <span className="font-semibold">{filteredComparables.length} COMPARABLE HOMES</span>
         </div>
         
         <div className="flex items-center gap-2">
-          <div className="flex items-center border rounded-md">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={viewMode === 'stats' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="rounded-r-none"
-                  onClick={() => setViewMode('stats')}
-                  data-testid="button-view-stats"
-                >
-                  <BarChart3 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Statistics View</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="rounded-none border-l"
-                  onClick={() => setViewMode('grid')}
-                  data-testid="button-view-grid"
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Grid View</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={viewMode === 'table' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="rounded-none border-l"
-                  onClick={() => setViewMode('table')}
-                  data-testid="button-view-table"
-                >
-                  <Table2 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Table View</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={viewMode === 'map' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="rounded-l-none border-l"
-                  onClick={() => setViewMode('map')}
-                  data-testid="button-view-map"
-                >
-                  <Map className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Map View</TooltipContent>
-            </Tooltip>
+          <div className="flex gap-1">
+            {MAIN_VIEW_TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setMainView(tab.id)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium transition-colors ${
+                  mainView === tab.id
+                    ? 'bg-primary text-white'
+                    : 'text-gray-300 hover:text-white hover:bg-zinc-700'
+                }`}
+                data-testid={`button-mainview-${tab.id}`}
+              >
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            ))}
           </div>
           
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShareDialogOpen(true)}
+            className="border-zinc-600 text-white hover:bg-zinc-700"
             data-testid="button-share-cma"
           >
             <Share2 className="h-4 w-4 mr-2" />
@@ -431,25 +403,29 @@ export function CMATab({ transaction }: CMATabProps) {
         </div>
       </div>
       
-      {/* Status Filter Tabs */}
-      <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-lg overflow-x-auto">
-        {STATUS_FILTERS.map(filter => (
-          <Button
-            key={filter.id}
-            variant={statusFilter === filter.id ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setStatusFilter(filter.id)}
-            className="whitespace-nowrap"
-            data-testid={`button-filter-${filter.id}`}
-          >
-            {filter.label}
-          </Button>
-        ))}
-      </div>
+      {/* Status Filter Tabs - Only for Compare and List views */}
+      {(mainView === 'compare' || mainView === 'list') && (
+        <div className="flex gap-1 bg-zinc-700 dark:bg-zinc-800 p-2 overflow-x-auto">
+          {STATUS_FILTERS.map(filter => (
+            <button
+              key={filter.id}
+              onClick={() => setStatusFilter(filter.id)}
+              className={`px-4 py-2 text-sm rounded transition-colors whitespace-nowrap ${
+                statusFilter === filter.id
+                  ? 'bg-white text-gray-900'
+                  : 'text-gray-300 hover:text-white hover:bg-zinc-600'
+              }`}
+              data-testid={`button-filter-${filter.id}`}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+      )}
       
-      {/* Stats Summary Row */}
-      {statistics && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 bg-zinc-900 dark:bg-zinc-950 p-4 rounded-lg text-white">
+      {/* Stats Summary Row - Only for Compare and List views */}
+      {(mainView === 'compare' || mainView === 'list') && statistics && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 bg-zinc-900 dark:bg-zinc-950 p-4 text-white">
           <div>
             <div className="text-xs text-zinc-400 uppercase tracking-wide">Low Price</div>
             <div className="text-lg sm:text-xl font-bold">{formatPrice(statistics.price.range.min)}</div>
@@ -477,196 +453,318 @@ export function CMATab({ transaction }: CMATabProps) {
         </div>
       )}
       
-      {viewMode === 'stats' && statistics && (
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-          <StatCard 
-            title="Avg Price" 
-            metric={statistics.price} 
-            format="currency"
-            icon={DollarSign}
-          />
-          <StatCard 
-            title="Price/SqFt" 
-            metric={statistics.pricePerSqFt} 
-            format="currency"
-            icon={TrendingUp}
-          />
-          <StatCard 
-            title="Days on Market" 
-            metric={statistics.daysOnMarket} 
-            format="number"
-            icon={Clock}
-          />
-          <StatCard 
-            title="Avg SqFt" 
-            metric={statistics.livingArea} 
-            format="number"
-            icon={Square}
-          />
-          <StatCard 
-            title="Avg Beds" 
-            metric={statistics.bedrooms} 
-            format="decimal"
-            icon={Bed}
-          />
-          <StatCard 
-            title="Avg Baths" 
-            metric={statistics.bathrooms} 
-            format="decimal"
-            icon={Bath}
-          />
-        </div>
-      )}
-      
-      {viewMode === 'map' && (
-        <CMAMap
-          properties={filteredComparables as unknown as Property[]}
-          subjectProperty={transaction.mlsData as unknown as Property | null}
-          onPropertyClick={(property) => {
-            setSelectedProperty(property as unknown as CMAComparable);
-            setPhotoIndex(0);
-          }}
-        />
-      )}
-      
-      {/* Table View */}
-      {viewMode === 'table' && (
-        <Card>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-left">
-                  <tr>
-                    <th className="p-3 font-medium">Address</th>
-                    <th className="p-3 font-medium">Status</th>
-                    <th className="p-3 font-medium text-right">Price</th>
-                    <th className="p-3 font-medium text-right">$/SqFt</th>
-                    <th className="p-3 font-medium text-right">DOM</th>
-                    <th className="p-3 font-medium text-center">Beds</th>
-                    <th className="p-3 font-medium text-center">Baths</th>
-                    <th className="p-3 font-medium text-right">SqFt</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filteredComparables.map((comp, index) => {
-                    const sqft = typeof comp.sqft === 'number' ? comp.sqft : parseFloat(comp.sqft as string) || 0;
-                    const pricePerSqft = sqft > 0 ? comp.price / sqft : 0;
-                    return (
-                      <tr 
-                        key={index} 
-                        className="hover:bg-muted/50 cursor-pointer transition-colors"
-                        onClick={() => {
-                          setSelectedProperty(comp);
-                          setPhotoIndex(0);
-                        }}
-                        data-testid={`row-cma-${index}`}
-                      >
-                        <td className="p-3">
-                          <div className="flex items-center gap-2">
-                            <div 
-                              className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-                                normalizeStatus(comp.status) === 'active' ? 'bg-green-500' :
-                                normalizeStatus(comp.status) === 'closed' ? 'bg-red-500' :
-                                normalizeStatus(comp.status) === 'activeUnderContract' ? 'bg-orange-500' :
-                                normalizeStatus(comp.status) === 'pending' ? 'bg-blue-500' :
-                                normalizeStatus(comp.status) === 'unknown' ? 'bg-gray-400' :
-                                'bg-gray-500'
-                              }`}
-                            />
-                            <span className="truncate max-w-[200px]">{comp.address}</span>
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          <Badge 
-                            variant="outline" 
-                            className={`text-xs ${getStatusBadgeStyle(comp.status || '')}`}
-                          >
-                            {getStatusLabel(comp.status || '')}
-                          </Badge>
-                        </td>
-                        <td className="p-3 text-right font-medium">{formatPrice(comp.price)}</td>
-                        <td className="p-3 text-right">{formatPrice(Math.round(pricePerSqft))}</td>
-                        <td className="p-3 text-right">{comp.daysOnMarket ?? '-'}</td>
-                        <td className="p-3 text-center">{comp.bedrooms}</td>
-                        <td className="p-3 text-center">{comp.bathrooms}</td>
-                        <td className="p-3 text-right">{sqft > 0 ? sqft.toLocaleString() : '-'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-      
-      {(viewMode === 'grid' || viewMode === 'stats') && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredComparables.map((comp, index) => (
-            <Card 
-              key={index} 
-              className="cursor-pointer hover-elevate transition-all"
-              onClick={() => {
-                setSelectedProperty(comp);
-                setPhotoIndex(0);
-              }}
-              data-testid={`card-cma-${index}`}
+      {/* Sub-View Toggle - Only for Compare and List views */}
+      {(mainView === 'compare' || mainView === 'list') && (
+        <div className="flex items-center gap-2 p-4 border-b bg-white dark:bg-zinc-900">
+          <span className="text-sm text-muted-foreground">View:</span>
+          <div className="flex rounded-lg overflow-hidden border">
+            <button
+              onClick={() => setSubView('grid')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${
+                subView === 'grid' ? 'bg-primary text-white' : 'bg-white dark:bg-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-700'
+              }`}
+              data-testid="button-subview-grid"
             >
-              {(comp.imageUrl || (comp.photos && comp.photos.length > 0)) && (
-                <div className="relative h-40 overflow-hidden rounded-t-lg">
-                  <img
-                    src={comp.photos?.[0] || comp.imageUrl}
-                    alt={comp.address}
-                    className="w-full h-full object-cover"
-                  />
-                  {comp.status && (
-                    <Badge 
-                      className={`absolute top-2 left-2 ${getStatusBadgeStyle(comp.status)}`}
-                    >
-                      {getStatusLabel(comp.status)}
-                    </Badge>
-                  )}
-                </div>
-              )}
-              <CardContent className="pt-4 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{comp.address}</p>
-                    <p className="text-lg font-semibold">{formatPrice(comp.price)}</p>
-                  </div>
-                  <Badge variant="outline" className="shrink-0">
-                    {comp.distance.toFixed(1)} mi
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Bed className="h-3.5 w-3.5" />
-                    {comp.bedrooms}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Bath className="h-3.5 w-3.5" />
-                    {comp.bathrooms}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Square className="h-3.5 w-3.5" />
-                    {typeof comp.sqft === 'number' ? comp.sqft.toLocaleString() : comp.sqft}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Clock className="h-3.5 w-3.5" />
-                  {comp.daysOnMarket} days on market
-                </div>
-                {comp.mlsNumber && (
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Hash className="h-3 w-3" />
-                    {comp.mlsNumber}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+              <LayoutGrid className="w-4 h-4" />
+              Grid
+            </button>
+            <button
+              onClick={() => setSubView('list')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm border-l transition-colors ${
+                subView === 'list' ? 'bg-primary text-white' : 'bg-white dark:bg-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-700'
+              }`}
+              data-testid="button-subview-list"
+            >
+              <List className="w-4 h-4" />
+              List
+            </button>
+            <button
+              onClick={() => setSubView('table')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm border-l transition-colors ${
+                subView === 'table' ? 'bg-primary text-white' : 'bg-white dark:bg-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-700'
+              }`}
+              data-testid="button-subview-table"
+            >
+              <Table2 className="w-4 h-4" />
+              Table
+            </button>
+          </div>
         </div>
       )}
+      
+      {/* Main Content Area */}
+      <div className="p-4 space-y-4">
+        {/* MAP VIEW - No sub-views */}
+        {mainView === 'map' && (
+          <CMAMap
+            properties={cmaData as unknown as Property[]}
+            subjectProperty={transaction.mlsData as unknown as Property | null}
+            onPropertyClick={(property) => {
+              setSelectedProperty(property as unknown as CMAComparable);
+              setPhotoIndex(0);
+            }}
+          />
+        )}
+        
+        {/* STATS VIEW - No sub-views */}
+        {mainView === 'stats' && statistics && (
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+            <StatCard 
+              title="Avg Price" 
+              metric={statistics.price} 
+              format="currency"
+              icon={DollarSign}
+            />
+            <StatCard 
+              title="Price/SqFt" 
+              metric={statistics.pricePerSqFt} 
+              format="currency"
+              icon={TrendingUp}
+            />
+            <StatCard 
+              title="Days on Market" 
+              metric={statistics.daysOnMarket} 
+              format="number"
+              icon={Clock}
+            />
+            <StatCard 
+              title="Avg SqFt" 
+              metric={statistics.livingArea} 
+              format="number"
+              icon={Square}
+            />
+            <StatCard 
+              title="Avg Beds" 
+              metric={statistics.bedrooms} 
+              format="decimal"
+              icon={Bed}
+            />
+            <StatCard 
+              title="Avg Baths" 
+              metric={statistics.bathrooms} 
+              format="decimal"
+              icon={Bath}
+            />
+          </div>
+        )}
+        
+        {/* COMPARE and LIST VIEWS - With sub-views */}
+        {(mainView === 'compare' || mainView === 'list') && (
+          <>
+            {/* Table Sub-View */}
+            {subView === 'table' && (
+              <Card>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50 text-left">
+                        <tr>
+                          <th className="p-3 font-medium">Address</th>
+                          <th className="p-3 font-medium">Status</th>
+                          <th className="p-3 font-medium text-right">Price</th>
+                          <th className="p-3 font-medium text-right">$/SqFt</th>
+                          <th className="p-3 font-medium text-right">DOM</th>
+                          <th className="p-3 font-medium text-center">Beds</th>
+                          <th className="p-3 font-medium text-center">Baths</th>
+                          <th className="p-3 font-medium text-right">SqFt</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {filteredComparables.map((comp, index) => {
+                          const sqft = typeof comp.sqft === 'number' ? comp.sqft : parseFloat(comp.sqft as string) || 0;
+                          const pricePerSqft = sqft > 0 ? comp.price / sqft : 0;
+                          return (
+                            <tr 
+                              key={index} 
+                              className="hover:bg-muted/50 cursor-pointer transition-colors"
+                              onClick={() => {
+                                setSelectedProperty(comp);
+                                setPhotoIndex(0);
+                              }}
+                              data-testid={`row-cma-${index}`}
+                            >
+                              <td className="p-3">
+                                <div className="flex items-center gap-2">
+                                  <div 
+                                    className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                                      normalizeStatus(comp.status) === 'active' ? 'bg-green-500' :
+                                      normalizeStatus(comp.status) === 'closed' ? 'bg-red-500' :
+                                      normalizeStatus(comp.status) === 'activeUnderContract' ? 'bg-orange-500' :
+                                      normalizeStatus(comp.status) === 'pending' ? 'bg-blue-500' :
+                                      normalizeStatus(comp.status) === 'unknown' ? 'bg-gray-400' :
+                                      'bg-gray-500'
+                                    }`}
+                                  />
+                                  <span className="truncate max-w-[200px]">{comp.address}</span>
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-xs ${getStatusBadgeStyle(comp.status || '')}`}
+                                >
+                                  {getStatusLabel(comp.status || '')}
+                                </Badge>
+                              </td>
+                              <td className="p-3 text-right font-medium">{formatPrice(comp.price)}</td>
+                              <td className="p-3 text-right">{formatPrice(Math.round(pricePerSqft))}</td>
+                              <td className="p-3 text-right">{comp.daysOnMarket ?? '-'}</td>
+                              <td className="p-3 text-center">{comp.bedrooms}</td>
+                              <td className="p-3 text-center">{comp.bathrooms}</td>
+                              <td className="p-3 text-right">{sqft > 0 ? sqft.toLocaleString() : '-'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* Grid Sub-View */}
+            {subView === 'grid' && (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredComparables.map((comp, index) => (
+                  <Card 
+                    key={index} 
+                    className="cursor-pointer hover-elevate transition-all"
+                    onClick={() => {
+                      setSelectedProperty(comp);
+                      setPhotoIndex(0);
+                    }}
+                    data-testid={`card-cma-${index}`}
+                  >
+                    {(comp.imageUrl || (comp.photos && comp.photos.length > 0)) && (
+                      <div className="relative h-40 overflow-hidden rounded-t-lg">
+                        <img
+                          src={comp.photos?.[0] || comp.imageUrl}
+                          alt={comp.address}
+                          className="w-full h-full object-cover"
+                        />
+                        {comp.status && (
+                          <Badge 
+                            className={`absolute top-2 left-2 ${getStatusBadgeStyle(comp.status)}`}
+                          >
+                            {getStatusLabel(comp.status)}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                    <CardContent className="pt-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{comp.address}</p>
+                          <p className="text-lg font-semibold">{formatPrice(comp.price)}</p>
+                        </div>
+                        <Badge variant="outline" className="shrink-0">
+                          {comp.distance.toFixed(1)} mi
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Bed className="h-3.5 w-3.5" />
+                          {comp.bedrooms}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Bath className="h-3.5 w-3.5" />
+                          {comp.bathrooms}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Square className="h-3.5 w-3.5" />
+                          {typeof comp.sqft === 'number' ? comp.sqft.toLocaleString() : comp.sqft}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Clock className="h-3.5 w-3.5" />
+                        {comp.daysOnMarket} days on market
+                      </div>
+                      {comp.mlsNumber && (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Hash className="h-3 w-3" />
+                          {comp.mlsNumber}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+            
+            {/* List Sub-View */}
+            {subView === 'list' && (
+              <div className="space-y-3">
+                {filteredComparables.map((comp, index) => {
+                  const sqft = typeof comp.sqft === 'number' ? comp.sqft : parseFloat(comp.sqft as string) || 0;
+                  const pricePerSqft = sqft > 0 ? comp.price / sqft : 0;
+                  return (
+                    <Card 
+                      key={index} 
+                      className="cursor-pointer hover-elevate transition-all"
+                      onClick={() => {
+                        setSelectedProperty(comp);
+                        setPhotoIndex(0);
+                      }}
+                      data-testid={`list-cma-${index}`}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex gap-4">
+                          {(comp.imageUrl || (comp.photos && comp.photos.length > 0)) && (
+                            <div className="relative w-32 h-24 flex-shrink-0 overflow-hidden rounded-lg">
+                              <img
+                                src={comp.photos?.[0] || comp.imageUrl}
+                                alt={comp.address}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <div>
+                                <p className="font-medium truncate">{comp.address}</p>
+                                <p className="text-xl font-semibold">{formatPrice(comp.price)}</p>
+                              </div>
+                              <Badge className={getStatusBadgeStyle(comp.status || '')}>
+                                {getStatusLabel(comp.status || '')}
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Bed className="h-3.5 w-3.5" />
+                                {comp.bedrooms} beds
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Bath className="h-3.5 w-3.5" />
+                                {comp.bathrooms} baths
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Square className="h-3.5 w-3.5" />
+                                {sqft.toLocaleString()} sqft
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <DollarSign className="h-3.5 w-3.5" />
+                                ${Math.round(pricePerSqft)}/sqft
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Clock className="h-3.5 w-3.5" />
+                                {comp.daysOnMarket} DOM
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <MapPin className="h-3.5 w-3.5" />
+                                {comp.distance.toFixed(1)} mi
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </div>
       
       <Dialog open={!!selectedProperty} onOpenChange={(open) => {
         if (!open) {
