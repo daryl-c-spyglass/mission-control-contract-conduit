@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line, ReferenceLine, ScatterChart, Scatter, ZAxis, Cell } from "recharts";
-import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar, Map as MapIcon, ExternalLink, DollarSign, TrendingUp, Target, Zap, Clock, BarChart3, Menu, LayoutGrid, MoreHorizontal } from "lucide-react";
+import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar, Map as MapIcon, ExternalLink, DollarSign, TrendingUp, Target, Zap, Clock, BarChart3, Menu, LayoutGrid, MoreHorizontal, List, Table2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { CMAMap } from "@/components/cma-map";
@@ -59,6 +59,8 @@ export function CMAReport({
 }: CMAReportProps) {
   const [activeTab, setActiveTab] = useState("compare");
   const [activeListingTab, setActiveListingTab] = useState("all");
+  const [statsStatusFilter, setStatsStatusFilter] = useState("all");
+  const [statsViewType, setStatsViewType] = useState<'grid' | 'list' | 'table'>('grid');
   
   // Property exclusion state for Include All/Exclude All functionality
   const [excludedPropertyIds, setExcludedPropertyIds] = useState<Set<string>>(new Set());
@@ -356,6 +358,81 @@ export function CMAReport({
       yearBuilt: computeStats(includedProperties.map(p => p.yearBuilt || 0)),
     };
   }, [properties, excludedPropertyIds]);
+
+  // Status-filtered properties for Stats tab (respects both status filter and exclusions)
+  const statsFilteredProperties = useMemo(() => {
+    const pendingProperties = properties.filter(p => p.standardStatus === 'Pending');
+    return (statsStatusFilter === 'all' ? allProperties :
+      statsStatusFilter === 'sold' ? soldProperties :
+      statsStatusFilter === 'under-contract' ? underContractProperties :
+      statsStatusFilter === 'pending' ? pendingProperties : activeProperties)
+      .filter(p => !excludedPropertyIds.has(p.id));
+  }, [statsStatusFilter, allProperties, soldProperties, underContractProperties, activeProperties, properties, excludedPropertyIds]);
+
+  // Status-filtered statistics for Stats tab grid view
+  const statsFilteredStats = useMemo(() => {
+    const includedProperties = statsFilteredProperties;
+    
+    if (includedProperties.length === 0) {
+      return {
+        price: { average: 0, median: 0, range: { min: 0, max: 0 } },
+        pricePerSqFt: { average: 0, median: 0, range: { min: 0, max: 0 } },
+        daysOnMarket: { average: 0, median: 0, range: { min: 0, max: 0 } },
+        livingArea: { average: 0, median: 0, range: { min: 0, max: 0 } },
+        lotSize: { average: 0, median: 0, range: { min: 0, max: 0 } },
+        acres: { average: 0, median: 0, range: { min: 0, max: 0 } },
+        bedrooms: { average: 0, median: 0, range: { min: 0, max: 0 } },
+        bathrooms: { average: 0, median: 0, range: { min: 0, max: 0 } },
+        yearBuilt: { average: 0, median: 0, range: { min: 0, max: 0 } },
+      };
+    }
+
+    const computeStats = (values: number[]) => {
+      const filtered = values.filter(v => v > 0);
+      if (filtered.length === 0) {
+        return { average: 0, median: 0, range: { min: 0, max: 0 } };
+      }
+      const sorted = [...filtered].sort((a, b) => a - b);
+      const average = sorted.reduce((a, b) => a + b, 0) / sorted.length;
+      const median = sorted.length % 2 === 0
+        ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+        : sorted[Math.floor(sorted.length / 2)];
+      return {
+        average,
+        median,
+        range: { min: sorted[0], max: sorted[sorted.length - 1] }
+      };
+    };
+
+    const prices = includedProperties.map(p => {
+      const isClosed = p.standardStatus === 'Closed';
+      return isClosed 
+        ? (p.closePrice ? Number(p.closePrice) : Number(p.listPrice || 0))
+        : Number(p.listPrice || 0);
+    });
+    
+    const pricesPerSqFt = includedProperties
+      .filter(p => p.livingArea && Number(p.livingArea) > 0)
+      .map(p => {
+        const isClosed = p.standardStatus === 'Closed';
+        const price = isClosed 
+          ? (p.closePrice ? Number(p.closePrice) : Number(p.listPrice || 0))
+          : Number(p.listPrice || 0);
+        return price / Number(p.livingArea);
+      });
+
+    return {
+      price: computeStats(prices),
+      pricePerSqFt: computeStats(pricesPerSqFt),
+      daysOnMarket: computeStats(includedProperties.map(p => p.daysOnMarket || 0)),
+      livingArea: computeStats(includedProperties.map(p => Number(p.livingArea || 0))),
+      lotSize: computeStats(includedProperties.map(p => Number((p as any).lotSizeSquareFeet || 0))),
+      acres: computeStats(includedProperties.map(p => Number(p.lotSizeAcres || 0))),
+      bedrooms: computeStats(includedProperties.map(p => (p as any).bedroomsTotal || 0)),
+      bathrooms: computeStats(includedProperties.map(p => (p as any).bathroomsTotalInteger || 0)),
+      yearBuilt: computeStats(includedProperties.map(p => p.yearBuilt || 0)),
+    };
+  }, [statsFilteredProperties]);
 
   // Dynamic pricing suggestion calculation based on market trends
   const pricingSuggestion = useMemo(() => {
@@ -1110,7 +1187,176 @@ export function CMAReport({
         </TabsContent>
 
         {/* Stats Tab - Statistics Overview with Charts */}
-        <TabsContent value="stats" className="space-y-6 p-4">
+        <TabsContent value="stats" className="space-y-0 mt-0">
+          {/* Status Filter Sub-tabs - matches Compare view */}
+          <div className="bg-zinc-800 px-2 sm:px-4 py-2 overflow-x-auto">
+            <Tabs value={statsStatusFilter} onValueChange={setStatsStatusFilter} className="w-auto">
+              <TabsList className="bg-transparent h-auto p-0 gap-1 sm:gap-2 flex-wrap sm:flex-nowrap">
+                <TabsTrigger 
+                  value="all" 
+                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1 text-sm sm:text-base"
+                  data-testid="stats-subtab-all"
+                >
+                  All
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="sold" 
+                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1 text-sm sm:text-base"
+                  data-testid="stats-subtab-closed"
+                >
+                  Closed
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="under-contract" 
+                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1 text-sm sm:text-base whitespace-nowrap"
+                  data-testid="stats-subtab-auc"
+                >
+                  <span className="hidden sm:inline">Active Under Contract</span>
+                  <span className="sm:hidden">AUC</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="pending" 
+                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1 text-sm sm:text-base"
+                  data-testid="stats-subtab-pending"
+                >
+                  Pending
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="active" 
+                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1 text-sm sm:text-base"
+                  data-testid="stats-subtab-active"
+                >
+                  Active
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+
+          {/* Summary Stats Bar - matches Compare view */}
+          {(() => {
+            const pendingProperties = properties.filter(p => p.standardStatus === 'Pending');
+            const statsFilteredProps = (statsStatusFilter === 'all' ? allProperties :
+              statsStatusFilter === 'sold' ? soldProperties :
+              statsStatusFilter === 'under-contract' ? underContractProperties :
+              statsStatusFilter === 'pending' ? pendingProperties : activeProperties)
+              .filter(p => !excludedPropertyIds.has(p.id));
+            
+            if (statsFilteredProps.length === 0) return null;
+            
+            const prices = statsFilteredProps.map(p => {
+              const isSold = p.standardStatus === 'Closed';
+              return isSold 
+                ? (p.closePrice ? Number(p.closePrice) : (p.listPrice ? Number(p.listPrice) : 0))
+                : (p.listPrice ? Number(p.listPrice) : 0);
+            }).filter(p => p > 0).sort((a, b) => a - b);
+            
+            const avgPrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+            const minPrice = prices.length > 0 ? prices[0] : 0;
+            const maxPrice = prices.length > 0 ? prices[prices.length - 1] : 0;
+            const medianPrice = prices.length > 0 
+              ? prices.length % 2 === 0 
+                ? (prices[prices.length / 2 - 1] + prices[prices.length / 2]) / 2
+                : prices[Math.floor(prices.length / 2)]
+              : 0;
+            
+            const pricesPerSqFt = statsFilteredProps
+              .filter(p => p.livingArea && Number(p.livingArea) > 0)
+              .map(p => {
+                const isSold = p.standardStatus === 'Closed';
+                const price = isSold 
+                  ? (p.closePrice ? Number(p.closePrice) : Number(p.listPrice || 0))
+                  : Number(p.listPrice || 0);
+                return price / Number(p.livingArea);
+              });
+            const avgPricePerSqFt = pricesPerSqFt.length > 0 
+              ? pricesPerSqFt.reduce((a, b) => a + b, 0) / pricesPerSqFt.length 
+              : 0;
+            
+            const doms = statsFilteredProps.map(p => p.daysOnMarket || 0).filter(d => d > 0);
+            const avgDOM = doms.length > 0 ? Math.round(doms.reduce((a, b) => a + b, 0) / doms.length) : 0;
+            
+            return (
+              <div className="bg-zinc-900 border-b border-zinc-700">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px bg-zinc-700">
+                  <div className="px-3 py-3 bg-zinc-900">
+                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Low Price</div>
+                    <div className="text-lg sm:text-xl font-bold text-white">${minPrice.toLocaleString()}</div>
+                  </div>
+                  <div className="px-3 py-3 bg-zinc-900">
+                    <div className="text-xs text-zinc-400 uppercase tracking-wide">High Price</div>
+                    <div className="text-lg sm:text-xl font-bold text-white">${maxPrice.toLocaleString()}</div>
+                  </div>
+                  <div className="px-3 py-3 bg-zinc-900">
+                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg Price</div>
+                    <div className="text-lg sm:text-xl font-bold text-white">${Math.round(avgPrice).toLocaleString()}</div>
+                  </div>
+                  <div className="px-3 py-3 bg-zinc-900">
+                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Median</div>
+                    <div className="text-lg sm:text-xl font-bold text-white">${Math.round(medianPrice).toLocaleString()}</div>
+                  </div>
+                  <div className="px-3 py-3 bg-zinc-900">
+                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg $/sqft</div>
+                    <div className="text-lg sm:text-xl font-bold text-white">${Math.round(avgPricePerSqFt)}</div>
+                  </div>
+                  <div className="px-3 py-3 bg-zinc-900">
+                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg DOM</div>
+                    <div className="text-lg sm:text-xl font-bold text-white">{avgDOM} Days</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* View Type Toggle */}
+          <div className="flex items-center justify-between p-4 bg-white dark:bg-zinc-950 border-b">
+            <span className="text-sm text-muted-foreground">
+              {(() => {
+                const pendingProperties = properties.filter(p => p.standardStatus === 'Pending');
+                const count = (statsStatusFilter === 'all' ? allProperties :
+                  statsStatusFilter === 'sold' ? soldProperties :
+                  statsStatusFilter === 'under-contract' ? underContractProperties :
+                  statsStatusFilter === 'pending' ? pendingProperties : activeProperties)
+                  .filter(p => !excludedPropertyIds.has(p.id)).length;
+                return `${count} Comparable${count !== 1 ? 's' : ''}`;
+              })()}
+            </span>
+            <div className="flex rounded-lg overflow-hidden border">
+              <Button
+                variant={statsViewType === 'grid' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setStatsViewType('grid')}
+                className="rounded-none px-3"
+                data-testid="stats-view-grid"
+              >
+                <LayoutGrid className="w-4 h-4 mr-1" />
+                <span className="hidden sm:inline">Grid</span>
+              </Button>
+              <Button
+                variant={statsViewType === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setStatsViewType('list')}
+                className="rounded-none px-3"
+                data-testid="stats-view-list"
+              >
+                <List className="w-4 h-4 mr-1" />
+                <span className="hidden sm:inline">List</span>
+              </Button>
+              <Button
+                variant={statsViewType === 'table' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setStatsViewType('table')}
+                className="rounded-none px-3"
+                data-testid="stats-view-table"
+              >
+                <Table2 className="w-4 h-4 mr-1" />
+                <span className="hidden sm:inline">Table</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Grid View - Original Stats Layout */}
+          {statsViewType === 'grid' && (
+          <div className="space-y-6 p-4">
           {/* Header Stats Cards Row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
@@ -1118,9 +1364,9 @@ export function CMAReport({
                 <CardTitle className="text-lg">Average Price</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold text-primary">${Math.round(filteredStatistics.price.average).toLocaleString()}</p>
+                <p className="text-2xl font-bold text-primary">${Math.round(statsFilteredStats.price.average).toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground">
-                  Range: ${filteredStatistics.price.range.min.toLocaleString()} - ${filteredStatistics.price.range.max.toLocaleString()}
+                  Range: ${statsFilteredStats.price.range.min.toLocaleString()} - ${statsFilteredStats.price.range.max.toLocaleString()}
                 </p>
               </CardContent>
             </Card>
@@ -1129,9 +1375,9 @@ export function CMAReport({
                 <CardTitle className="text-lg">Price Per Sqft</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">${filteredStatistics.pricePerSqFt.average.toFixed(0)}<span className="text-sm">/sqft</span></p>
+                <p className="text-2xl font-bold">${statsFilteredStats.pricePerSqFt.average.toFixed(0)}<span className="text-sm">/sqft</span></p>
                 <p className="text-xs text-muted-foreground">
-                  Range: ${filteredStatistics.pricePerSqFt.range.min.toFixed(0)} - ${filteredStatistics.pricePerSqFt.range.max.toFixed(0)}
+                  Range: ${statsFilteredStats.pricePerSqFt.range.min.toFixed(0)} - ${statsFilteredStats.pricePerSqFt.range.max.toFixed(0)}
                 </p>
               </CardContent>
             </Card>
@@ -1140,9 +1386,9 @@ export function CMAReport({
                 <CardTitle className="text-lg">Avg Living Area</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{Math.round(filteredStatistics.livingArea.average).toLocaleString()}<span className="text-sm"> sqft</span></p>
+                <p className="text-2xl font-bold">{Math.round(statsFilteredStats.livingArea.average).toLocaleString()}<span className="text-sm"> sqft</span></p>
                 <p className="text-xs text-muted-foreground">
-                  {filteredStatistics.bedrooms.average.toFixed(1)} beds / {filteredStatistics.bathrooms.average.toFixed(1)} baths avg
+                  {statsFilteredStats.bedrooms.average.toFixed(1)} beds / {statsFilteredStats.bathrooms.average.toFixed(1)} baths avg
                 </p>
               </CardContent>
             </Card>
@@ -1151,7 +1397,7 @@ export function CMAReport({
           {/* Statistics Summary Table */}
           <Card>
             <CardHeader>
-              <CardTitle>Statistics Summary ({includedAll.length} Properties)</CardTitle>
+              <CardTitle>Statistics Summary ({statsFilteredProperties.length} Properties)</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -1166,27 +1412,27 @@ export function CMAReport({
                 <TableBody>
                   <TableRow>
                     <TableCell className="font-medium">Price</TableCell>
-                    <TableCell>${filteredStatistics.price.range.min.toLocaleString()} - ${filteredStatistics.price.range.max.toLocaleString()}</TableCell>
-                    <TableCell className="font-semibold">${Math.round(filteredStatistics.price.average).toLocaleString()}</TableCell>
-                    <TableCell>${Math.round(filteredStatistics.price.median).toLocaleString()}</TableCell>
+                    <TableCell>${statsFilteredStats.price.range.min.toLocaleString()} - ${statsFilteredStats.price.range.max.toLocaleString()}</TableCell>
+                    <TableCell className="font-semibold">${Math.round(statsFilteredStats.price.average).toLocaleString()}</TableCell>
+                    <TableCell>${Math.round(statsFilteredStats.price.median).toLocaleString()}</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell className="font-medium">Price/SqFt</TableCell>
-                    <TableCell>${filteredStatistics.pricePerSqFt.range.min.toFixed(0)} - ${filteredStatistics.pricePerSqFt.range.max.toFixed(0)}</TableCell>
-                    <TableCell className="font-semibold">${filteredStatistics.pricePerSqFt.average.toFixed(0)}</TableCell>
-                    <TableCell>${filteredStatistics.pricePerSqFt.median.toFixed(0)}</TableCell>
+                    <TableCell>${statsFilteredStats.pricePerSqFt.range.min.toFixed(0)} - ${statsFilteredStats.pricePerSqFt.range.max.toFixed(0)}</TableCell>
+                    <TableCell className="font-semibold">${statsFilteredStats.pricePerSqFt.average.toFixed(0)}</TableCell>
+                    <TableCell>${statsFilteredStats.pricePerSqFt.median.toFixed(0)}</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell className="font-medium">Living Area</TableCell>
-                    <TableCell>{filteredStatistics.livingArea.range.min.toLocaleString()} - {filteredStatistics.livingArea.range.max.toLocaleString()} sqft</TableCell>
-                    <TableCell className="font-semibold">{Math.round(filteredStatistics.livingArea.average).toLocaleString()} sqft</TableCell>
-                    <TableCell>{Math.round(filteredStatistics.livingArea.median).toLocaleString()} sqft</TableCell>
+                    <TableCell>{statsFilteredStats.livingArea.range.min.toLocaleString()} - {statsFilteredStats.livingArea.range.max.toLocaleString()} sqft</TableCell>
+                    <TableCell className="font-semibold">{Math.round(statsFilteredStats.livingArea.average).toLocaleString()} sqft</TableCell>
+                    <TableCell>{Math.round(statsFilteredStats.livingArea.median).toLocaleString()} sqft</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell className="font-medium">Year Built</TableCell>
-                    <TableCell>{filteredStatistics.yearBuilt.range.min} - {filteredStatistics.yearBuilt.range.max}</TableCell>
-                    <TableCell className="font-semibold">{Math.round(filteredStatistics.yearBuilt.average)}</TableCell>
-                    <TableCell>{Math.round(filteredStatistics.yearBuilt.median)}</TableCell>
+                    <TableCell>{statsFilteredStats.yearBuilt.range.min} - {statsFilteredStats.yearBuilt.range.max}</TableCell>
+                    <TableCell className="font-semibold">{Math.round(statsFilteredStats.yearBuilt.average)}</TableCell>
+                    <TableCell>{Math.round(statsFilteredStats.yearBuilt.median)}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -1205,7 +1451,7 @@ export function CMAReport({
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={includedAll.map(property => {
+                    data={statsFilteredProperties.map(property => {
                       const isSold = property.standardStatus === 'Closed';
                       const price = isSold 
                         ? (property.closePrice ? Number(property.closePrice) : Number(property.listPrice || 0))
@@ -1261,19 +1507,19 @@ export function CMAReport({
                 <div className="space-y-2">
                   <h4 className="font-semibold text-sm">Market Overview</h4>
                   <p className="text-sm text-muted-foreground">
-                    Based on {includedAll.length} comparable properties, the average price is{' '}
-                    <span className="font-semibold text-foreground">${Math.round(filteredStatistics.price.average).toLocaleString()}</span>{' '}
+                    Based on {statsFilteredProperties.length} comparable properties, the average price is{' '}
+                    <span className="font-semibold text-foreground">${Math.round(statsFilteredStats.price.average).toLocaleString()}</span>{' '}
                     with a median of{' '}
-                    <span className="font-semibold text-foreground">${Math.round(filteredStatistics.price.median).toLocaleString()}</span>.
-                    {' '}Prices range from ${filteredStatistics.price.range.min.toLocaleString()} to ${filteredStatistics.price.range.max.toLocaleString()}.
+                    <span className="font-semibold text-foreground">${Math.round(statsFilteredStats.price.median).toLocaleString()}</span>.
+                    {' '}Prices range from ${statsFilteredStats.price.range.min.toLocaleString()} to ${statsFilteredStats.price.range.max.toLocaleString()}.
                   </p>
                 </div>
                 <div className="space-y-2">
                   <h4 className="font-semibold text-sm">Price Per Square Foot</h4>
                   <p className="text-sm text-muted-foreground">
                     Average price per square foot is{' '}
-                    <span className="font-semibold text-foreground">${filteredStatistics.pricePerSqFt.average.toFixed(2)}</span>{' '}
-                    across comparable properties. This ranges from ${filteredStatistics.pricePerSqFt.range.min.toFixed(2)} to ${filteredStatistics.pricePerSqFt.range.max.toFixed(2)}/sqft.
+                    <span className="font-semibold text-foreground">${statsFilteredStats.pricePerSqFt.average.toFixed(2)}</span>{' '}
+                    across comparable properties. This ranges from ${statsFilteredStats.pricePerSqFt.range.min.toFixed(2)} to ${statsFilteredStats.pricePerSqFt.range.max.toFixed(2)}/sqft.
                   </p>
                 </div>
               </div>
@@ -1281,25 +1527,25 @@ export function CMAReport({
                 <div className="space-y-1">
                   <h4 className="font-semibold text-sm">Days on Market</h4>
                   <p className="text-sm text-muted-foreground">
-                    Average: <span className="font-semibold text-foreground">{Math.round(filteredStatistics.daysOnMarket.average)} days</span>
+                    Average: <span className="font-semibold text-foreground">{Math.round(statsFilteredStats.daysOnMarket.average)} days</span>
                   </p>
                 </div>
                 <div className="space-y-1">
                   <h4 className="font-semibold text-sm">Property Size</h4>
                   <p className="text-sm text-muted-foreground">
-                    Avg: <span className="font-semibold text-foreground">{Math.round(filteredStatistics.livingArea.average).toLocaleString()} sqft</span>
+                    Avg: <span className="font-semibold text-foreground">{Math.round(statsFilteredStats.livingArea.average).toLocaleString()} sqft</span>
                   </p>
                 </div>
                 <div className="space-y-1">
                   <h4 className="font-semibold text-sm">Bed/Bath</h4>
                   <p className="text-sm text-muted-foreground">
-                    Avg: <span className="font-semibold text-foreground">{filteredStatistics.bedrooms.average.toFixed(1)} beds / {filteredStatistics.bathrooms.average.toFixed(1)} baths</span>
+                    Avg: <span className="font-semibold text-foreground">{statsFilteredStats.bedrooms.average.toFixed(1)} beds / {statsFilteredStats.bathrooms.average.toFixed(1)} baths</span>
                   </p>
                 </div>
               </div>
               <div className="pt-2 border-t">
                 <p className="text-xs text-muted-foreground italic">
-                  This analysis is based on {includedActive.length} Active, {includedUnderContract.length} Active Under Contract, and {includedSold.length} Closed properties in your selection.
+                  Showing {statsStatusFilter === 'all' ? 'all statuses' : statsStatusFilter.replace('-', ' ')} - {statsFilteredProperties.length} properties in current filter.
                 </p>
               </div>
             </CardContent>
@@ -1867,6 +2113,201 @@ export function CMAReport({
               </Card>
             );
           })()}
+          </div>
+          )}
+
+          {/* List View - Vertical property cards with stats */}
+          {statsViewType === 'list' && (
+            <div className="divide-y bg-white dark:bg-zinc-950">
+              {(() => {
+                const pendingProperties = properties.filter(p => p.standardStatus === 'Pending');
+                const statsFilteredProps = (statsStatusFilter === 'all' ? allProperties :
+                  statsStatusFilter === 'sold' ? soldProperties :
+                  statsStatusFilter === 'under-contract' ? underContractProperties :
+                  statsStatusFilter === 'pending' ? pendingProperties : activeProperties)
+                  .filter(p => !excludedPropertyIds.has(p.id));
+                
+                if (statsFilteredProps.length === 0) {
+                  return (
+                    <div className="p-8 text-center text-muted-foreground">
+                      No properties in this category
+                    </div>
+                  );
+                }
+                
+                const statusColors: Record<string, string> = {
+                  'Active': 'bg-green-500',
+                  'Closed': 'bg-red-500',
+                  'Active Under Contract': 'bg-orange-500',
+                  'Pending': 'bg-gray-500',
+                };
+                
+                return statsFilteredProps.map((property) => {
+                  const photos = getPropertyPhotos(property);
+                  const primaryPhoto = photos[0];
+                  const isSold = property.standardStatus === 'Closed';
+                  const price = isSold 
+                    ? (property.closePrice ? Number(property.closePrice) : Number(property.listPrice || 0))
+                    : Number(property.listPrice || 0);
+                  const pricePerSqFt = property.livingArea && Number(property.livingArea) > 0 
+                    ? Math.round(price / Number(property.livingArea))
+                    : null;
+                  
+                  return (
+                    <div 
+                      key={property.id}
+                      className="p-4 flex items-center gap-4 hover-elevate cursor-pointer"
+                      onClick={() => handlePropertyClick(property)}
+                      data-testid={`stats-list-${property.id}`}
+                    >
+                      <div className="w-20 h-16 rounded overflow-hidden flex-shrink-0">
+                        {primaryPhoto ? (
+                          <img src={primaryPhoto} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-muted flex items-center justify-center">
+                            <Home className="w-6 h-6 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{property.unparsedAddress}</div>
+                        <div className="text-sm text-muted-foreground">{property.city}, {(property as any).stateOrProvince} {property.postalCode}</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className={cn("w-2 h-2 rounded-full", statusColors[property.standardStatus || ''] || 'bg-gray-500')} />
+                          <span className="text-xs">{property.standardStatus}</span>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-lg font-bold text-primary">${price.toLocaleString()}</div>
+                        <div className="text-sm text-muted-foreground">{pricePerSqFt ? `$${pricePerSqFt}/sqft` : '-'}</div>
+                      </div>
+                      <div className="hidden sm:block text-right text-sm text-muted-foreground flex-shrink-0 w-24">
+                        <div>{(property as any).bedroomsTotal || '-'} beds</div>
+                        <div>{(property as any).bathroomsTotalInteger || '-'} baths</div>
+                        <div>{property.livingArea ? Number(property.livingArea).toLocaleString() : '-'} sqft</div>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          )}
+
+          {/* Table View - Spreadsheet-style like Compare */}
+          {statsViewType === 'table' && (
+            <div className="bg-white dark:bg-zinc-950 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-zinc-100 dark:bg-zinc-800">
+                    <TableHead className="w-12"></TableHead>
+                    <TableHead className="min-w-[250px]">ADDRESS</TableHead>
+                    <TableHead>STATUS</TableHead>
+                    <TableHead className="text-right">PRICE</TableHead>
+                    <TableHead className="text-right">SOLD DATE</TableHead>
+                    <TableHead className="text-right">$/SQ.FT</TableHead>
+                    <TableHead className="text-right">DOM</TableHead>
+                    <TableHead className="text-right">BEDS</TableHead>
+                    <TableHead className="text-right">BATHS</TableHead>
+                    <TableHead className="text-right">SQ. FT.</TableHead>
+                    <TableHead className="text-right">LOT SIZE</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(() => {
+                    const pendingProperties = properties.filter(p => p.standardStatus === 'Pending');
+                    const statsFilteredProps = (statsStatusFilter === 'all' ? allProperties :
+                      statsStatusFilter === 'sold' ? soldProperties :
+                      statsStatusFilter === 'under-contract' ? underContractProperties :
+                      statsStatusFilter === 'pending' ? pendingProperties : activeProperties)
+                      .filter(p => !excludedPropertyIds.has(p.id));
+                    
+                    if (statsFilteredProps.length === 0) {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                            No properties in this category
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                    
+                    const statusColors: Record<string, string> = {
+                      'Active': 'text-green-600',
+                      'Closed': 'text-red-600',
+                      'Active Under Contract': 'text-yellow-600',
+                      'Pending': 'text-orange-600',
+                    };
+                    
+                    return statsFilteredProps.map((property) => {
+                      const isSold = property.standardStatus === 'Closed';
+                      const price = isSold 
+                        ? (property.closePrice ? Number(property.closePrice) : Number(property.listPrice || 0))
+                        : Number(property.listPrice || 0);
+                      const pricePerSqft = property.livingArea && Number(property.livingArea) > 0 
+                        ? Math.round(price / Number(property.livingArea))
+                        : null;
+                      const lotSizeSqFt = (property as any).lotSizeSquareFeet ? Number((property as any).lotSizeSquareFeet) : null;
+                      
+                      return (
+                        <TableRow 
+                          key={property.id}
+                          className="cursor-pointer hover-elevate"
+                          onClick={() => handlePropertyClick(property)}
+                          data-testid={`stats-table-${property.id}`}
+                        >
+                          <TableCell>
+                            <div 
+                              className={cn(
+                                "w-8 h-4 rounded-full cursor-pointer transition-colors",
+                                excludedPropertyIds.has(property.id) ? "bg-zinc-300 dark:bg-zinc-600" : "bg-primary"
+                              )}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExcludedPropertyIds(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(property.id)) {
+                                    next.delete(property.id);
+                                  } else {
+                                    next.add(property.id);
+                                  }
+                                  return next;
+                                });
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex flex-col">
+                              <span className="truncate max-w-[220px]">{property.unparsedAddress}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {property.city}, {(property as any).stateOrProvince} {property.postalCode}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className={cn("font-medium text-sm", statusColors[property.standardStatus || ''] || '')}>
+                              {property.standardStatus}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">${price.toLocaleString()}</TableCell>
+                          <TableCell className="text-right">
+                            {isSold && property.closeDate 
+                              ? new Date(property.closeDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
+                              : '-'}
+                          </TableCell>
+                          <TableCell className="text-right">{pricePerSqft ? `$${pricePerSqft}` : '-'}</TableCell>
+                          <TableCell className="text-right">{property.daysOnMarket || '-'}</TableCell>
+                          <TableCell className="text-right">{(property as any).bedroomsTotal || '-'}</TableCell>
+                          <TableCell className="text-right">{(property as any).bathroomsTotalInteger || '-'}</TableCell>
+                          <TableCell className="text-right">{property.livingArea ? Number(property.livingArea).toLocaleString() : '-'}</TableCell>
+                          <TableCell className="text-right">{lotSizeSqFt ? lotSizeSqFt.toLocaleString() : '-'}</TableCell>
+                        </TableRow>
+                      );
+                    });
+                  })()}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </TabsContent>
 
         {/* List Tab - Property Cards with Horizontal Scroll */}
