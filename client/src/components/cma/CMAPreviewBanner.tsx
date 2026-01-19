@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { 
   Save, 
   ExternalLink, 
@@ -9,14 +10,18 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
 import { CMAEmailShareDialog } from './CMAEmailShareDialog';
 import { CMANotesDialog } from './CMANotesDialog';
 
 interface CMAPreviewBannerProps {
-  cmaId: string;
+  cmaId?: string | null;
+  transactionId?: string;
   propertyAddress: string;
   publicLink?: string | null;
   notes?: string | null;
+  cmaData?: any[];
+  mlsNumber?: string | null;
   onSave?: () => void;
   onModifySearch?: () => void;
   onNotesUpdate?: () => void;
@@ -25,9 +30,12 @@ interface CMAPreviewBannerProps {
 
 export function CMAPreviewBanner({
   cmaId,
+  transactionId,
   propertyAddress,
   publicLink,
   notes,
+  cmaData,
+  mlsNumber,
   onSave,
   onModifySearch,
   onNotesUpdate,
@@ -36,19 +44,52 @@ export function CMAPreviewBanner({
   const { toast } = useToast();
   const [emailShareDialogOpen, setEmailShareDialogOpen] = useState(false);
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+  const [localShareUrl, setLocalShareUrl] = useState<string | null>(null);
+
+  const generateShareMutation = useMutation({
+    mutationFn: async () => {
+      let activeCmaId = cmaId;
+      
+      // Create CMA on demand if not exists
+      if (!activeCmaId && transactionId && cmaData) {
+        const createRes = await apiRequest('POST', '/api/cmas', {
+          name: `CMA for ${propertyAddress}`,
+          transactionId,
+          subjectPropertyId: mlsNumber,
+          propertiesData: cmaData,
+        });
+        const newCma = await createRes.json() as { id: string };
+        activeCmaId = newCma.id;
+      }
+      
+      if (!activeCmaId) {
+        throw new Error('No CMA ID available');
+      }
+      
+      const response = await apiRequest('POST', `/api/cmas/${activeCmaId}/share`);
+      return await response.json() as { publicLink: string; expiresAt: string };
+    },
+    onSuccess: (data) => {
+      const shareUrl = `${window.location.origin}/shared/cma/${data.publicLink}`;
+      setLocalShareUrl(shareUrl);
+      onNotesUpdate?.(); // Invalidate cache
+    },
+  });
 
   const handleCopyLiveUrl = async () => {
-    if (!publicLink) {
-      toast({
-        title: 'No share link',
-        description: 'Generate a share link first using "Produce URL".',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    const shareUrl = `${window.location.origin}/shared/cma/${publicLink}`;
     try {
+      let shareUrl: string;
+      
+      if (publicLink) {
+        shareUrl = `${window.location.origin}/shared/cma/${publicLink}`;
+      } else if (localShareUrl) {
+        shareUrl = localShareUrl;
+      } else {
+        // Generate share link on demand
+        const result = await generateShareMutation.mutateAsync();
+        shareUrl = `${window.location.origin}/shared/cma/${result.publicLink}`;
+      }
+      
       await navigator.clipboard.writeText(shareUrl);
       toast({
         title: 'URL copied',
@@ -56,8 +97,8 @@ export function CMAPreviewBanner({
       });
     } catch {
       toast({
-        title: 'Copy failed',
-        description: 'Unable to copy to clipboard.',
+        title: 'Failed to generate/copy link',
+        description: 'Unable to create or copy share link.',
         variant: 'destructive',
       });
     }
@@ -93,10 +134,15 @@ export function CMAPreviewBanner({
             size="sm" 
             variant="outline" 
             onClick={handleCopyLiveUrl}
+            disabled={generateShareMutation.isPending}
             data-testid="button-copy-live-url"
           >
-            <ExternalLink className="w-4 h-4 mr-2" />
-            Copy Live URL
+            {generateShareMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <ExternalLink className="w-4 h-4 mr-2" />
+            )}
+            {generateShareMutation.isPending ? 'Generating...' : 'Copy Live URL'}
           </Button>
           
           <Button 
@@ -137,15 +183,23 @@ export function CMAPreviewBanner({
         open={emailShareDialogOpen}
         onOpenChange={setEmailShareDialogOpen}
         cmaId={cmaId}
+        transactionId={transactionId}
         propertyAddress={propertyAddress}
         publicLink={publicLink}
+        cmaData={cmaData}
+        mlsNumber={mlsNumber}
+        onSuccess={onNotesUpdate} // Reuse onNotesUpdate to invalidate cache
       />
 
       <CMANotesDialog
         open={notesDialogOpen}
         onOpenChange={setNotesDialogOpen}
         cmaId={cmaId}
+        transactionId={transactionId}
+        propertyAddress={propertyAddress}
         initialNotes={notes || ''}
+        cmaData={cmaData}
+        mlsNumber={mlsNumber}
         onSuccess={onNotesUpdate}
       />
     </>

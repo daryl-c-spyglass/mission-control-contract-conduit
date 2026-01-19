@@ -1,0 +1,113 @@
+Debug & Fix Missing CMA Action Buttons and Preview Banner
+ISSUE
+The CMA Action Buttons (Copy Email, Produce URL, Print, Presentation, Share) and the Yellow Preview Banner (Save, Copy Live URL, Share CMA, Modify Search, Notes) are NOT visible on the CMA tab, even though the components were supposedly created.
+Current state: Only a small "Share" button is visible on the CMA tab.
+Expected state: Full action buttons bar at the top AND yellow preview banner below, matching the Client Data Portal design.
+
+DEBUG TASKS
+Task 1: Verify components exist
+bash# Check if the component files were created
+ls -la client/src/components/cma/
+
+# Check for these specific files:
+# - CMAActionButtons.tsx
+# - CMAPreviewBanner.tsx
+# - CMAShareDialog.tsx
+# - CMAEmailShareDialog.tsx
+# - CMANotesDialog.tsx
+
+# If they exist, show their contents
+cat client/src/components/cma/CMAActionButtons.tsx
+cat client/src/components/cma/CMAPreviewBanner.tsx
+Task 2: Find where CMA tab renders
+bash# Find the CMA tab component
+grep -ri "COMPARABLE HOMES\|Compare.*Map.*Stats.*List" --include="*.tsx" client/src/
+
+# Find where CMA content is rendered
+grep -ri "CMATab\|cma-tab\|CMASection" --include="*.tsx" client/src/
+Task 3: Check if components are imported and used
+bash# Search for CMAActionButtons usage
+grep -ri "CMAActionButtons\|CMAPreviewBanner" --include="*.tsx" client/src/
+
+# Check the main CMA rendering file
+cat client/src/components/CMATab.tsx
+
+FIX: Integrate Components into CMA Tab
+The components need to be added to the CMA tab layout. Find the file that renders the CMA tab content (likely CMATab.tsx or similar) and add:
+Step 1: Add imports at the top of the CMA tab file
+typescriptimport { CMAActionButtons } from './cma/CMAActionButtons';
+import { CMAPreviewBanner } from './cma/CMAPreviewBanner';
+```
+
+**Step 2: Add the Action Buttons ABOVE the "X COMPARABLE HOMES" header bar**
+
+The layout should be:
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ [Copy Email] [Produce URL] [Print] [Presentation] [Share]          │  ← ACTION BUTTONS
+├─────────────────────────────────────────────────────────────────────┤
+│ ⚠️ You are seeing a preview... [Save] [Copy Live URL] [Share CMA]... │  ← YELLOW BANNER
+├─────────────────────────────────────────────────────────────────────┤
+│ ☰ 10 COMPARABLE HOMES                    [Compare] [Map] [Stats] [List] │
+├─────────────────────────────────────────────────────────────────────┤
+│ [All] [Closed] [Active Under Contract] [Pending] [Active]          │
+├─────────────────────────────────────────────────────────────────────┤
+│ LOW PRICE | HIGH PRICE | AVG PRICE | MEDIAN | AVG $/SQFT | AVG DOM │
+│ $749,000  | $2,199,000 | ...                                       │
+└─────────────────────────────────────────────────────────────────────┘
+Step 3: Update the CMA tab JSX structure
+Find where the CMA content starts (the "X COMPARABLE HOMES" bar) and add BEFORE it:
+tsx{/* CMA Action Buttons - Top */}
+<div className="flex justify-end mb-4 print:hidden">
+  <CMAActionButtons
+    transactionId={transaction.id}
+    propertyAddress={transaction.address || transaction.propertyAddress}
+    publicLink={transaction.cmaPublicLink}
+    statistics={{
+      price: {
+        range: { min: lowPrice, max: highPrice },
+        average: avgPrice,
+      },
+      pricePerSqFt: { average: avgPricePerSqft },
+      daysOnMarket: { average: avgDOM },
+    }}
+    onShareSuccess={() => refetch()}
+  />
+</div>
+
+{/* CMA Preview Banner - Yellow */}
+<CMAPreviewBanner
+  transactionId={transaction.id}
+  propertyAddress={transaction.address || transaction.propertyAddress}
+  publicLink={transaction.cmaPublicLink}
+  notes={transaction.cmaNotes}
+  onNotesUpdate={() => refetch()}
+/>
+
+{/* Existing: Comparable Homes Header Bar */}
+<div className="bg-zinc-800 rounded-lg p-4 flex items-center justify-between">
+  <div className="flex items-center gap-2">
+    <Menu className="h-5 w-5" />
+    <span className="font-medium">{comparables.length} COMPARABLE HOMES</span>
+  </div>
+  {/* Compare, Map, Stats, List tabs */}
+</div>
+Step 4: Remove the existing small Share button
+Find and remove the standalone Share button that currently exists, since sharing is now handled by the CMAActionButtons component.
+
+EXPECTED RESULT
+After fixing, the CMA tab should show:
+
+Top right: Row of 5 buttons (Copy Email, Produce URL, Print, Presentation, Share)
+Below that: Yellow preview banner with text "You are seeing a preview of the report." and 5 buttons (Save, Copy Live URL, Share CMA, Modify Search, Notes)
+Below that: The existing "10 COMPARABLE HOMES" bar with Compare/Map/Stats/List tabs
+
+
+VERIFICATION
+After making changes:
+
+Navigate to a transaction with CMA data
+Click on the CMA tab
+Confirm you see the 5 action buttons at the top
+Confirm you see the yellow preview banner
+Test each button works (Copy Email copies text, Print opens dialog, Share opens modal, etc.)

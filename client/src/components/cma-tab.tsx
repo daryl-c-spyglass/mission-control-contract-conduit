@@ -395,31 +395,20 @@ export function CMATab({ transaction }: CMATabProps) {
         </div>
       </div>
       
-      {/* Top Action Buttons Bar */}
+      {/* Top Action Buttons Bar - Always shown */}
       <div className="bg-background border-b px-4 py-3 print:hidden">
-        {savedCma ? (
-          <CMAActionButtons
-            cmaId={savedCma.id}
-            propertyAddress={transaction.propertyAddress || 'Property'}
-            publicLink={savedCma.publicLink}
-            statistics={statistics}
-            onShareSuccess={() => {
-              queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
-            }}
-          />
-        ) : (
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShareDialogOpen(true)}
-              data-testid="button-share-cma"
-            >
-              <Share2 className="h-4 w-4 mr-2" />
-              Share
-            </Button>
-          </div>
-        )}
+        <CMAActionButtons
+          cmaId={savedCma?.id}
+          transactionId={transaction.id}
+          propertyAddress={transaction.propertyAddress || 'Property'}
+          publicLink={savedCma?.publicLink}
+          statistics={statistics}
+          cmaData={cmaData || []}
+          mlsNumber={transaction.mlsNumber}
+          onShareSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
+          }}
+        />
       </div>
       
       {/* Status Filter Tabs - Only for Compare and List views */}
@@ -442,27 +431,28 @@ export function CMATab({ transaction }: CMATabProps) {
         </div>
       )}
       
-      {/* Preview Banner */}
-      {savedCma && (
-        <div className="p-4 pb-0">
-          <CMAPreviewBanner
-            cmaId={savedCma.id}
-            propertyAddress={transaction.propertyAddress || 'Property'}
-            publicLink={savedCma.publicLink}
-            notes={savedCma.notes}
-            onSave={() => {
-              toast({
-                title: 'CMA Saved',
-                description: 'Your CMA has been saved successfully.',
-              });
-            }}
-            onModifySearch={() => setLocation(`/cmas/new?from=${savedCma.id}`)}
-            onNotesUpdate={() => {
-              queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
-            }}
-          />
-        </div>
-      )}
+      {/* Preview Banner - Always shown */}
+      <div className="p-4 pb-0">
+        <CMAPreviewBanner
+          cmaId={savedCma?.id}
+          transactionId={transaction.id}
+          propertyAddress={transaction.propertyAddress || 'Property'}
+          publicLink={savedCma?.publicLink}
+          notes={savedCma?.notes}
+          cmaData={cmaData || []}
+          mlsNumber={transaction.mlsNumber}
+          onSave={() => {
+            toast({
+              title: 'CMA Saved',
+              description: 'Your CMA has been saved successfully.',
+            });
+          }}
+          onModifySearch={savedCma ? () => setLocation(`/cmas/new?from=${savedCma.id}`) : undefined}
+          onNotesUpdate={() => {
+            queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
+          }}
+        />
+      </div>
       
       {/* Stats Summary Row - Only for Compare and List views */}
       {(mainView === 'compare' || mainView === 'list') && statistics && (() => {

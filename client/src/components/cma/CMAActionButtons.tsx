@@ -15,30 +15,58 @@ import { CMAShareDialog } from './CMAShareDialog';
 import type { PropertyStatistics } from '@shared/schema';
 
 interface CMAActionButtonsProps {
-  cmaId: string;
+  cmaId?: string | null;
+  transactionId?: string;
   propertyAddress: string;
   publicLink?: string | null;
   statistics?: PropertyStatistics | null;
+  cmaData?: any[];
+  mlsNumber?: string | null;
   onShareSuccess?: () => void;
 }
 
 export function CMAActionButtons({
   cmaId,
+  transactionId,
   propertyAddress,
   publicLink,
   statistics,
+  cmaData,
+  mlsNumber,
   onShareSuccess,
 }: CMAActionButtonsProps) {
   const { toast } = useToast();
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
+  const [localShareUrl, setLocalShareUrl] = useState<string | null>(null);
+  
   const shareMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', `/api/cmas/${cmaId}/share`);
+      let activeCmaId = cmaId;
+      
+      // Create CMA on demand if not exists
+      if (!activeCmaId && transactionId && cmaData) {
+        const createRes = await apiRequest('POST', '/api/cmas', {
+          name: `CMA for ${propertyAddress}`,
+          transactionId,
+          subjectPropertyId: mlsNumber,
+          propertiesData: cmaData,
+        });
+        const newCma = await createRes.json() as { id: string };
+        activeCmaId = newCma.id;
+      }
+      
+      if (!activeCmaId) {
+        throw new Error('No CMA ID available');
+      }
+      
+      const response = await apiRequest('POST', `/api/cmas/${activeCmaId}/share`);
       return await response.json() as { publicLink: string; expiresAt: string };
     },
-    onSuccess: () => {
-      onShareSuccess?.();
+    onSuccess: (data) => {
+      const shareUrl = `${window.location.origin}/shared/cma/${data.publicLink}`;
+      setLocalShareUrl(shareUrl);
+      onShareSuccess?.(); // This invalidates react-query cache
       toast({
         title: 'Share link generated',
         description: 'Your CMA is now shareable via the link.',
@@ -100,6 +128,8 @@ Best regards`;
       let shareUrl: string;
       if (publicLink) {
         shareUrl = `${window.location.origin}/shared/cma/${publicLink}`;
+      } else if (localShareUrl) {
+        shareUrl = localShareUrl;
       } else {
         const result = await shareMutation.mutateAsync();
         shareUrl = `${window.location.origin}/shared/cma/${result.publicLink}`;
@@ -184,8 +214,11 @@ Best regards`;
         open={shareDialogOpen}
         onOpenChange={setShareDialogOpen}
         cmaId={cmaId}
+        transactionId={transactionId}
         propertyAddress={propertyAddress}
         publicLink={publicLink}
+        cmaData={cmaData}
+        mlsNumber={mlsNumber}
         onShareSuccess={onShareSuccess}
       />
     </div>

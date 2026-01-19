@@ -19,17 +19,25 @@ import { apiRequest } from '@/lib/queryClient';
 interface CMAEmailShareDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  cmaId: string;
+  cmaId?: string | null;
+  transactionId?: string;
   propertyAddress: string;
   publicLink?: string | null;
+  cmaData?: any[];
+  mlsNumber?: string | null;
+  onSuccess?: () => void;
 }
 
 export function CMAEmailShareDialog({
   open,
   onOpenChange,
   cmaId,
+  transactionId,
   propertyAddress,
   publicLink,
+  cmaData,
+  mlsNumber,
+  onSuccess,
 }: CMAEmailShareDialogProps) {
   const { toast } = useToast();
   const [recipientEmail, setRecipientEmail] = useState('');
@@ -44,8 +52,29 @@ export function CMAEmailShareDialog({
 
   const generateLinkMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', `/api/cmas/${cmaId}/share`);
+      let activeCmaId = cmaId;
+      
+      // Create CMA on demand if not exists
+      if (!activeCmaId && transactionId && cmaData) {
+        const createRes = await apiRequest('POST', '/api/cmas', {
+          name: `CMA for ${propertyAddress}`,
+          transactionId,
+          subjectPropertyId: mlsNumber,
+          propertiesData: cmaData,
+        });
+        const newCma = await createRes.json() as { id: string };
+        activeCmaId = newCma.id;
+      }
+      
+      if (!activeCmaId) {
+        throw new Error('No CMA ID available');
+      }
+      
+      const response = await apiRequest('POST', `/api/cmas/${activeCmaId}/share`);
       return await response.json() as { publicLink: string; expiresAt: string };
+    },
+    onSuccess: () => {
+      onSuccess?.(); // Invalidate cache so savedCma refreshes
     },
   });
 

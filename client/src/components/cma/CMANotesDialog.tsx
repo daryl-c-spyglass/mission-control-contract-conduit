@@ -17,8 +17,12 @@ import { apiRequest } from '@/lib/queryClient';
 interface CMANotesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  cmaId: string;
+  cmaId?: string | null;
+  transactionId?: string;
+  propertyAddress?: string;
   initialNotes: string;
+  cmaData?: any[];
+  mlsNumber?: string | null;
   onSuccess?: () => void;
 }
 
@@ -26,7 +30,11 @@ export function CMANotesDialog({
   open,
   onOpenChange,
   cmaId,
+  transactionId,
+  propertyAddress,
   initialNotes,
+  cmaData,
+  mlsNumber,
   onSuccess,
 }: CMANotesDialogProps) {
   const { toast } = useToast();
@@ -34,7 +42,25 @@ export function CMANotesDialog({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest('PATCH', `/api/cmas/${cmaId}`, { notes });
+      let activeCmaId = cmaId;
+      
+      // Create CMA on demand if not exists
+      if (!activeCmaId && transactionId && cmaData) {
+        const createRes = await apiRequest('POST', '/api/cmas', {
+          name: `CMA for ${propertyAddress || 'Property'}`,
+          transactionId,
+          subjectPropertyId: mlsNumber,
+          propertiesData: cmaData,
+        });
+        const newCma = await createRes.json() as { id: string };
+        activeCmaId = newCma.id;
+      }
+      
+      if (!activeCmaId) {
+        throw new Error('No CMA ID available');
+      }
+      
+      await apiRequest('PATCH', `/api/cmas/${activeCmaId}`, { notes });
     },
     onSuccess: () => {
       toast({ title: 'Notes saved' });
