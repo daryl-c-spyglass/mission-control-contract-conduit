@@ -803,117 +803,162 @@ function AveragePricePerSqftSection({ comparables, subjectProperty }: { comparab
 
           {/* RIGHT PANEL - Property Detail */}
           {selectedProperty && (
-            <div className="lg:w-64 flex-shrink-0 bg-muted rounded-lg overflow-hidden">
-              <div className="relative">
+            <div className="lg:w-64 flex-shrink-0 bg-white dark:bg-zinc-900 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700">
+              {/* Status Badge Row - SEPARATE from photo */}
+              <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-200 dark:border-zinc-700">
                 <Badge
-                  className={`absolute top-3 left-3 z-10 ${getStatusColor(selectedProperty.status)} text-white border-0`}
+                  className={`
+                    ${selectedProperty.status?.toLowerCase() === 'closed' || selectedProperty.status?.toLowerCase() === 'sold'
+                      ? 'bg-zinc-800 text-white' 
+                      : selectedProperty.status?.toLowerCase() === 'active'
+                      ? 'bg-green-500 text-white'
+                      : selectedProperty.status?.toLowerCase() === 'pending' || selectedProperty.status?.toLowerCase() === 'under contract'
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-zinc-500 text-white'
+                    } 
+                    border-0 text-xs font-medium
+                  `}
                 >
                   {selectedProperty.status}
                 </Badge>
                 <button
                   onClick={handleCloseDetail}
                   data-testid="button-close-psf-detail"
-                  className="absolute top-3 right-3 z-10 text-zinc-400 hover:text-white bg-black/40 rounded-full p-1"
+                  className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
                 >
                   <X className="h-4 w-4" />
                 </button>
-
-                <div className="relative h-40 bg-zinc-700">
-                  {selectedProperty.photos?.length > 0 ? (
-                    <img
-                      src={selectedProperty.photos[safePhotoIndex]}
-                      alt={selectedProperty.address}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Home className="w-12 h-12 text-zinc-500" />
-                    </div>
-                  )}
-
-                  {selectedProperty.photos?.length > 1 && (
-                    <>
-                      <button
-                        onClick={prevPhoto}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 rounded-full p-1"
-                      >
-                        <ChevronLeft className="h-4 w-4 text-white" />
-                      </button>
-                      <button
-                        onClick={nextPhoto}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 rounded-full p-1"
-                      >
-                        <ChevronRight className="h-4 w-4 text-white" />
-                      </button>
-                      <div className="absolute bottom-2 right-2 bg-black/60 px-2 py-0.5 rounded text-white text-xs">
-                        {safePhotoIndex + 1} / {selectedProperty.photos.length}
-                      </div>
-                    </>
-                  )}
-                </div>
               </div>
 
-              <div className="p-4">
-                <div className="mb-3">
-                  <div className="font-medium text-sm">{selectedProperty.address}</div>
+              {/* Photo Carousel */}
+              <div className="relative h-40 bg-zinc-100 dark:bg-zinc-800">
+                {selectedProperty.photos?.length > 0 ? (
+                  <img
+                    src={selectedProperty.photos[safePhotoIndex]}
+                    alt={selectedProperty.address}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/placeholder-property.jpg';
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Home className="w-12 h-12 text-zinc-400" />
+                  </div>
+                )}
+
+                {/* Photo Navigation */}
+                {selectedProperty.photos?.length > 1 && (
+                  <>
+                    <button
+                      onClick={prevPhoto}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1 shadow"
+                    >
+                      <ChevronLeft className="h-4 w-4 text-zinc-700" />
+                    </button>
+                    <button
+                      onClick={nextPhoto}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1 shadow"
+                    >
+                      <ChevronRight className="h-4 w-4 text-zinc-700" />
+                    </button>
+
+                    {/* Photo Counter */}
+                    <div className="absolute bottom-2 right-2 bg-black/60 px-2 py-0.5 rounded text-white text-xs">
+                      {safePhotoIndex + 1} / {selectedProperty.photos.length}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Property Details */}
+              <div className="p-4 bg-white dark:bg-zinc-900">
+                {/* Address */}
+                <div className="mb-2">
+                  <div className="text-zinc-900 dark:text-zinc-100 font-medium text-sm">
+                    {selectedProperty.address}
+                  </div>
                   {(selectedProperty.city || selectedProperty.zip) && (
-                    <div className="text-muted-foreground text-xs">
+                    <div className="text-zinc-500 dark:text-zinc-400 text-sm">
                       {[selectedProperty.city, selectedProperty.zip].filter(Boolean).join(', ')}
                     </div>
                   )}
                 </div>
 
-                <div className="text-xl font-bold text-primary mb-3">
+                {/* Price */}
+                <div className="text-xl font-bold text-orange-500 mb-4">
                   {formatPrice(selectedProperty.soldPrice || selectedProperty.price)}
                 </div>
 
-                <div className="space-y-1.5 text-xs border-t pt-3">
+                {/* Property Specs */}
+                <div className="space-y-1.5 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Beds</span>
-                    <span>{selectedProperty.beds || '—'}</span>
+                    <span className="text-zinc-500 dark:text-zinc-400">Beds</span>
+                    <span className="text-zinc-900 dark:text-zinc-100">{selectedProperty.beds || '—'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Baths</span>
-                    <span>{selectedProperty.baths || '—'}</span>
+                    <span className="text-zinc-500 dark:text-zinc-400">Baths</span>
+                    <span className="text-zinc-900 dark:text-zinc-100">{selectedProperty.baths || '—'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Sq. Ft.</span>
-                    <span>{selectedProperty.sqft?.toLocaleString() || '—'}</span>
+                    <span className="text-zinc-500 dark:text-zinc-400">Sq. Ft.</span>
+                    <span className="text-zinc-900 dark:text-zinc-100">
+                      {selectedProperty.sqft?.toLocaleString() || '—'}
+                    </span>
                   </div>
-                  {selectedProperty.lotSize && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Lot Size</span>
-                      <span>{selectedProperty.lotSize}</span>
-                    </div>
-                  )}
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 dark:text-zinc-400">Lot Size</span>
+                    <span className="text-zinc-900 dark:text-zinc-100">
+                      {selectedProperty.lotSize || '—'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 dark:text-zinc-400">Garage Spaces</span>
+                    <span className="text-zinc-900 dark:text-zinc-100">
+                      {selectedProperty.garageSpaces || '—'}
+                    </span>
+                  </div>
                 </div>
 
-                {!selectedProperty.isSubject && (
-                  <div className="space-y-1.5 text-xs border-t pt-3 mt-3">
-                    <div className="font-medium text-sm mb-2">Listing Details</div>
+                {/* Listing Details Section */}
+                <div className="border-t border-zinc-200 dark:border-zinc-700 pt-3 mt-3">
+                  <div className="text-zinc-900 dark:text-zinc-100 font-medium text-sm mb-2">
+                    Listing Details
+                  </div>
+                  <div className="space-y-1.5 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">List Price</span>
-                      <span>{formatPrice(selectedProperty.listPrice)}</span>
+                      <span className="text-zinc-500 dark:text-zinc-400">Orig. Price</span>
+                      <span className="text-zinc-900 dark:text-zinc-100">
+                        {formatPrice(selectedProperty.origPrice || selectedProperty.listPrice)}
+                      </span>
                     </div>
-                    {selectedProperty.soldPrice && (
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500 dark:text-zinc-400">List Price</span>
+                      <span className="text-zinc-900 dark:text-zinc-100">
+                        {formatPrice(selectedProperty.listPrice)}
+                      </span>
+                    </div>
+                    {selectedProperty.soldPrice && selectedProperty.listPrice && (
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          Sold Price
-                          {selectedProperty.soldPricePercent && (
-                            <span className="text-muted-foreground/70 ml-1">
-                              ({selectedProperty.soldPricePercent.toFixed(1)}%)
-                            </span>
-                          )}
+                        <span className="text-zinc-500 dark:text-zinc-400">
+                          Sold Price{' '}
+                          <span className="text-zinc-400 dark:text-zinc-500">
+                            ({((selectedProperty.soldPrice / selectedProperty.listPrice) * 100).toFixed(1)}%)
+                          </span>
                         </span>
-                        <span>{formatPrice(selectedProperty.soldPrice)}</span>
+                        <span className="text-zinc-900 dark:text-zinc-100">
+                          {formatPrice(selectedProperty.soldPrice)}
+                        </span>
                       </div>
                     )}
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Price per Sq. Ft.</span>
-                      <span>${selectedProperty.pricePerSqft}</span>
+                      <span className="text-zinc-500 dark:text-zinc-400">Price per Sq. Ft.</span>
+                      <span className="text-zinc-900 dark:text-zinc-100">
+                        ${selectedProperty.pricePerSqft?.toFixed(0) || '—'}
+                      </span>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
             </div>
           )}

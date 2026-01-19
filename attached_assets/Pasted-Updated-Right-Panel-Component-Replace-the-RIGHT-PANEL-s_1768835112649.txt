@@ -1,0 +1,201 @@
+Updated Right Panel Component
+Replace the RIGHT PANEL section in the AveragePriceSqftSection component:
+typescript{/* RIGHT PANEL - Property Detail */}
+{selectedProperty && (
+  <div className="w-64 flex-shrink-0 bg-white rounded-lg overflow-hidden border border-zinc-200">
+    {/* Status Badge Row - SEPARATE from photo */}
+    <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-200">
+      <Badge
+        className={`
+          ${selectedProperty.status?.toLowerCase() === 'closed' 
+            ? 'bg-zinc-800 text-white' 
+            : selectedProperty.status?.toLowerCase() === 'active'
+            ? 'bg-green-500 text-white'
+            : 'bg-zinc-500 text-white'
+          } 
+          border-0 text-xs font-medium
+        `}
+      >
+        {selectedProperty.status}
+      </Badge>
+      <button
+        onClick={handleCloseDetail}
+        className="text-zinc-400 hover:text-zinc-600"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+
+    {/* Photo Carousel */}
+    <div className="relative h-40 bg-zinc-100">
+      <img
+        src={
+          selectedProperty.photos?.[currentPhotoIndex] ||
+          '/placeholder-property.jpg'
+        }
+        alt={selectedProperty.address}
+        className="w-full h-full object-cover"
+        onError={(e) => {
+          (e.target as HTMLImageElement).src = '/placeholder-property.jpg';
+        }}
+      />
+
+      {/* Photo Navigation */}
+      {selectedProperty.photos?.length > 1 && (
+        <>
+          <button
+            onClick={prevPhoto}
+            className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1 shadow"
+          >
+            <ChevronLeft className="h-4 w-4 text-zinc-700" />
+          </button>
+          <button
+            onClick={nextPhoto}
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1 shadow"
+          >
+            <ChevronRight className="h-4 w-4 text-zinc-700" />
+          </button>
+
+          {/* Photo Counter */}
+          <div className="absolute bottom-2 right-2 bg-black/60 px-2 py-0.5 rounded text-white text-xs">
+            {currentPhotoIndex + 1} / {selectedProperty.photos.length}
+          </div>
+        </>
+      )}
+    </div>
+
+    {/* Property Details */}
+    <div className="p-4 bg-white">
+      {/* Address */}
+      <div className="mb-2">
+        <div className="text-zinc-900 font-medium text-sm">
+          {selectedProperty.address}
+        </div>
+        <div className="text-zinc-500 text-sm">
+          {selectedProperty.city}, {selectedProperty.zip}
+        </div>
+      </div>
+
+      {/* Price */}
+      <div className="text-xl font-bold text-orange-500 mb-4">
+        {formatFullPrice(selectedProperty.soldPrice || selectedProperty.price)}
+      </div>
+
+      {/* Property Specs */}
+      <div className="space-y-1.5 text-sm">
+        <div className="flex justify-between">
+          <span className="text-zinc-500">Beds</span>
+          <span className="text-zinc-900">{selectedProperty.beds}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-zinc-500">Baths</span>
+          <span className="text-zinc-900">{selectedProperty.baths}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-zinc-500">Sq. Ft.</span>
+          <span className="text-zinc-900">
+            {selectedProperty.sqft?.toLocaleString()}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-zinc-500">Lot Size</span>
+          <span className="text-zinc-900">
+            {selectedProperty.lotSize || '—'}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-zinc-500">Garage Spaces</span>
+          <span className="text-zinc-900">
+            {selectedProperty.garageSpaces || '—'}
+          </span>
+        </div>
+      </div>
+
+      {/* Listing Details Section */}
+      <div className="border-t border-zinc-200 pt-3 mt-3">
+        <div className="text-zinc-900 font-medium text-sm mb-2">
+          Listing Details
+        </div>
+        <div className="space-y-1.5 text-sm">
+          <div className="flex justify-between">
+            <span className="text-zinc-500">Orig. Price</span>
+            <span className="text-zinc-900">
+              {formatFullPrice(selectedProperty.origPrice || selectedProperty.listPrice)}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-zinc-500">List Price</span>
+            <span className="text-zinc-900">
+              {formatFullPrice(selectedProperty.listPrice)}
+            </span>
+          </div>
+          {selectedProperty.soldPrice && (
+            <div className="flex justify-between">
+              <span className="text-zinc-500">
+                Sold Price{' '}
+                <span className="text-zinc-400">
+                  ({((selectedProperty.soldPrice / selectedProperty.listPrice) * 100).toFixed(1)}%)
+                </span>
+              </span>
+              <span className="text-zinc-900">
+                {formatFullPrice(selectedProperty.soldPrice)}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span className="text-zinc-500">Price per Sq. Ft.</span>
+            <span className="text-zinc-900">
+              ${selectedProperty.pricePerSqft?.toFixed(0)}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+```
+
+---
+
+### Key Changes
+
+| Issue | Before | After |
+|-------|--------|-------|
+| Status badge | Overlaid on photo | Separate row above photo with white background |
+| Close button | Overlaid on photo | Same row as status badge, right-aligned |
+| Background | Dark (zinc-800) | Light (white) to match Client Data Portal |
+| Listing Details | Incomplete | Full section with Orig. Price, List Price, Sold Price (%), Price per Sq. Ft. |
+| Sold Price % | Missing | Calculated and displayed as "(98.6%)" |
+
+---
+
+### Visual Layout Now Matches:
+```
+┌─────────────────────────┐
+│ [Closed]           [×] │  ← Status row (separate)
+├─────────────────────────┤
+│                         │
+│      PROPERTY PHOTO     │
+│         1 / 40          │
+│     ◀            ▶     │
+│                         │
+├─────────────────────────┤
+│ 433 Stoney Point RD     │
+│ Austin, 78737           │
+│                         │
+│ $715,000                │  ← Orange price
+│                         │
+│ Beds                 4  │
+│ Baths                3  │
+│ Sq. Ft.          3,032  │
+│ Lot Size             —  │
+│ Garage Spaces        —  │
+│─────────────────────────│
+│ Listing Details         │
+│                         │
+│ Orig. Price    $725,000 │
+│ List Price     $725,000 │
+│ Sold Price     $715,000 │
+│  (98.6%)                │
+│ Price per Sq. Ft.  $236 │
+└─────────────────────────┘
