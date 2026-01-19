@@ -1723,6 +1723,88 @@ export async function registerRoutes(
     }
   });
 
+  // Save CMA brochure
+  app.post("/api/cmas/:id/brochure", isAuthenticated, async (req, res) => {
+    try {
+      const { url, filename, type, generated } = req.body;
+      const brochure = { url, filename, type, generated, uploadedAt: new Date().toISOString() };
+      
+      const updated = await storage.updateCma(req.params.id, { brochure });
+      if (!updated) {
+        return res.status(404).json({ message: "CMA not found" });
+      }
+      res.json(brochure);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to save CMA brochure" });
+    }
+  });
+
+  // Generate AI cover letter for CMA
+  app.post("/api/ai/generate-cover-letter", isAuthenticated, async (req, res) => {
+    try {
+      const { context, tone } = req.body;
+      
+      const systemPrompt = `You are a professional real estate agent writing a cover letter for a Comparative Market Analysis (CMA) report. 
+Write a personalized, compelling cover letter based on the provided property and market data.
+The tone should be ${tone || 'professional'}.
+Keep it concise (2-3 paragraphs) but impactful.
+Include specific data points from the analysis to demonstrate expertise.
+End with a clear call to action.`;
+
+      const userPrompt = `Write a CMA cover letter with this context:
+${context.clientName ? `Client: ${context.clientName}` : 'General client'}
+${context.agentInfo?.name ? `Agent: ${context.agentInfo.name}` : ''}
+${context.agentInfo?.brokerage ? `Brokerage: ${context.agentInfo.brokerage}` : ''}
+
+Subject Property: ${context.subjectProperty?.address || 'Not specified'}
+${context.subjectProperty?.price ? `List Price: $${context.subjectProperty.price.toLocaleString()}` : ''}
+${context.subjectProperty?.beds ? `Beds: ${context.subjectProperty.beds}` : ''} ${context.subjectProperty?.baths ? `Baths: ${context.subjectProperty.baths}` : ''} ${context.subjectProperty?.sqft ? `Sq Ft: ${context.subjectProperty.sqft.toLocaleString()}` : ''}
+
+Market Analysis:
+- ${context.comparables?.count || 0} comparable properties analyzed
+${context.comparables?.avgPrice ? `- Average price: $${context.comparables.avgPrice.toLocaleString()}` : ''}
+${context.comparables?.medianPrice ? `- Median price: $${context.comparables.medianPrice.toLocaleString()}` : ''}
+${context.comparables?.avgPricePerSqft ? `- Avg price/sqft: $${context.comparables.avgPricePerSqft.toFixed(0)}` : ''}
+${context.marketStats?.avgDOM ? `- Average days on market: ${context.marketStats.avgDOM}` : ''}`;
+
+      const openai = (await import('openai')).default;
+      const client = new openai();
+      
+      const completion = await client.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 800,
+      });
+
+      const coverLetter = completion.choices[0]?.message?.content || '';
+      res.json({ coverLetter });
+    } catch (error: any) {
+      console.error("AI cover letter generation error:", error);
+      res.status(500).json({ message: error.message || "Failed to generate cover letter" });
+    }
+  });
+
+  // Export CMA as PDF (stub - returns placeholder for now)
+  app.post("/api/cmas/:id/export-pdf", isAuthenticated, async (req, res) => {
+    try {
+      const cma = await storage.getCma(req.params.id);
+      if (!cma) {
+        return res.status(404).json({ message: "CMA not found" });
+      }
+
+      res.status(501).json({ 
+        message: "PDF export is handled client-side using @react-pdf/renderer",
+        note: "Use the client-side PDF generation for full presentation export"
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to export PDF" });
+    }
+  });
+
   // CMA Report Sections constant
   app.get("/api/cma/report-sections", async (req, res) => {
     res.json([

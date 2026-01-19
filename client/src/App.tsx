@@ -22,6 +22,7 @@ import SharedCMAPage from "@/pages/shared-cma";
 import CMAs from "@/pages/CMAs";
 import CMANew from "@/pages/CMANew";
 import CMADetailPage from "@/pages/CMADetailPage";
+import CMAPresentationBuilder from "@/pages/CMAPresentationBuilder";
 import NotFound from "@/pages/not-found";
 import type { Transaction } from "@shared/schema";
 
@@ -198,6 +199,7 @@ function AuthenticatedApp() {
                 <Route path="/admin" component={Admin} />
                 <Route path="/cmas" component={CMAs} />
                 <Route path="/cmas/new" component={CMANew} />
+                <Route path="/cmas/:id/presentation" component={CMAPresentationBuilder} />
                 <Route path="/cmas/:id" component={CMADetailPage} />
                 <Route component={NotFound} />
               </Switch>

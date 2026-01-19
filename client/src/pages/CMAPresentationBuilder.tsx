@@ -21,15 +21,12 @@ import {
   Calculator,
   GripVertical,
   Loader2,
-  ChevronDown,
-  ChevronUp,
-  Sparkles
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Cma, CmaBrochure, CmaAdjustmentsData, CoverPageConfig, CmaReportConfig, Property, PropertyStatistics } from "@shared/schema";
-import { CMA_REPORT_SECTIONS, DEFAULT_ENABLED_SECTIONS, SECTION_CATEGORIES } from "@shared/cma-sections";
-import { DEFAULT_COVER_PAGE_CONFIG, LAYOUT_OPTIONS, PHOTO_LAYOUT_OPTIONS, MAP_STYLE_OPTIONS } from "@shared/cma-defaults";
+import type { Cma, CmaBrochure, CmaAdjustmentsData, CoverPageConfig, Property, PropertyStatistics } from "@shared/schema";
+import { CMA_REPORT_SECTIONS, DEFAULT_ENABLED_SECTIONS } from "@shared/cma-sections";
+import { DEFAULT_COVER_PAGE_CONFIG, LAYOUT_OPTIONS, PHOTO_LAYOUT_OPTIONS } from "@shared/cma-defaults";
 import { CoverPageEditor } from "@/components/presentation/CoverPageEditor";
 import { CoverLetterEditor } from "@/components/presentation/CoverLetterEditor";
 import { MapboxCMAMap } from "@/components/presentation/MapboxCMAMap";
@@ -55,6 +52,17 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+
+interface PresentationConfig {
+  includedSections: string[];
+  sectionOrder: string[];
+  coverPageConfig: CoverPageConfig;
+  coverLetterOverride: string;
+  photoLayout: string;
+  mapStyle: string;
+  showMapPolygon: boolean;
+  layout: string;
+}
 
 interface SectionItem {
   id: string;
@@ -100,6 +108,10 @@ function SortableSectionItem({ section, onToggle }: { section: SectionItem; onTo
   );
 }
 
+function getPropertyAddress(property: Property): string {
+  return property.unparsedAddress || `${property.streetNumber || ''} ${property.streetName || ''} ${property.streetSuffix || ''}`.trim() || property.city || '';
+}
+
 export default function CMAPresentationBuilder() {
   const [, params] = useRoute("/cmas/:id/presentation");
   const [, setLocation] = useLocation();
@@ -111,15 +123,15 @@ export default function CMAPresentationBuilder() {
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [selectedPropertyForPhotos, setSelectedPropertyForPhotos] = useState<Property | null>(null);
   
-  const [config, setConfig] = useState<Partial<CmaReportConfig>>({
-    sections: DEFAULT_ENABLED_SECTIONS,
+  const [config, setConfig] = useState<PresentationConfig>({
+    includedSections: DEFAULT_ENABLED_SECTIONS as unknown as string[],
     sectionOrder: CMA_REPORT_SECTIONS.map(s => s.id),
     coverPageConfig: DEFAULT_COVER_PAGE_CONFIG,
-    coverLetter: "",
+    coverLetterOverride: "",
     photoLayout: "first_dozen",
     mapStyle: "streets",
-    showPolygon: true,
-    listingLayout: "two_photos",
+    showMapPolygon: true,
+    layout: "two_photos",
   });
   
   const [brochure, setBrochure] = useState<CmaBrochure | null>(null);
@@ -161,7 +173,7 @@ export default function CMAPresentationBuilder() {
     },
   });
 
-  const { data: existingConfig, isLoading: configLoading } = useQuery<CmaReportConfig>({
+  const { data: existingConfig, isLoading: configLoading } = useQuery<any>({
     queryKey: ['/api/cmas', id, 'report-config'],
     enabled: !!id,
     queryFn: async () => {
@@ -175,15 +187,18 @@ export default function CMAPresentationBuilder() {
   useEffect(() => {
     if (existingConfig) {
       setConfig({
-        sections: existingConfig.sections || DEFAULT_ENABLED_SECTIONS,
+        includedSections: existingConfig.includedSections || DEFAULT_ENABLED_SECTIONS as unknown as string[],
         sectionOrder: existingConfig.sectionOrder || CMA_REPORT_SECTIONS.map(s => s.id),
         coverPageConfig: existingConfig.coverPageConfig || DEFAULT_COVER_PAGE_CONFIG,
-        coverLetter: existingConfig.coverLetter || "",
+        coverLetterOverride: existingConfig.coverLetterOverride || "",
         photoLayout: existingConfig.photoLayout || "first_dozen",
         mapStyle: existingConfig.mapStyle || "streets",
-        showPolygon: existingConfig.showPolygon ?? true,
-        listingLayout: existingConfig.listingLayout || "two_photos",
+        showMapPolygon: existingConfig.showMapPolygon ?? true,
+        layout: existingConfig.layout || "two_photos",
       });
+      if (existingConfig.customPhotoSelections) {
+        setCustomPhotoSelections(existingConfig.customPhotoSelections);
+      }
     }
     if (cma?.brochure) {
       setBrochure(cma.brochure as CmaBrochure);
@@ -195,7 +210,8 @@ export default function CMAPresentationBuilder() {
 
   const saveConfigMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', `/api/cmas/${id}/report-config`, config);
+      const payload = { ...config, customPhotoSelections };
+      const response = await apiRequest('PUT', `/api/cmas/${id}/report-config`, payload);
       return response.json();
     },
     onSuccess: () => {
@@ -219,7 +235,7 @@ export default function CMAPresentationBuilder() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `CMA-${cma?.mlsNumber || id}.pdf`;
+      a.download = `CMA-${cma?.subjectPropertyId || id}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -234,11 +250,11 @@ export default function CMAPresentationBuilder() {
   });
 
   const subjectProperty = properties.find(p => 
-    p.mlsNumber === cma?.mlsNumber || p.listingId === cma?.subjectListingId
+    p.mlsNumber === cma?.subjectPropertyId
   );
 
   const comparables = properties.filter(p => 
-    p.mlsNumber !== cma?.mlsNumber && p.listingId !== cma?.subjectListingId
+    p.mlsNumber !== cma?.subjectPropertyId
   );
 
   const sections: SectionItem[] = (config.sectionOrder || CMA_REPORT_SECTIONS.map(s => s.id)).map(sectionId => {
@@ -246,16 +262,16 @@ export default function CMAPresentationBuilder() {
     return {
       id: sectionId,
       name: sectionDef?.name || sectionId,
-      enabled: (config.sections || []).includes(sectionId),
+      enabled: (config.includedSections || []).includes(sectionId),
     };
   });
 
   const handleSectionToggle = (sectionId: string) => {
-    const currentSections = config.sections || [];
+    const currentSections = config.includedSections || [];
     const newSections = currentSections.includes(sectionId)
-      ? currentSections.filter(s => s !== sectionId)
+      ? currentSections.filter((s: string) => s !== sectionId)
       : [...currentSections, sectionId];
-    setConfig({ ...config, sections: newSections });
+    setConfig({ ...config, includedSections: newSections });
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -275,13 +291,13 @@ export default function CMAPresentationBuilder() {
   };
 
   const mapProperties = properties.map(p => ({
-    id: p.listingId || p.mlsNumber || '',
-    address: p.streetAddress || p.address || '',
+    id: p.mlsNumber || p.id || '',
+    address: getPropertyAddress(p),
     lat: p.latitude || 0,
     lng: p.longitude || 0,
     price: p.closePrice || p.listPrice || 0,
     status: p.standardStatus || '',
-    isSubject: p.mlsNumber === cma?.mlsNumber,
+    isSubject: p.mlsNumber === cma?.subjectPropertyId,
   })).filter(p => p.lat && p.lng);
 
   if (cmaLoading || configLoading) {
@@ -300,7 +316,7 @@ export default function CMAPresentationBuilder() {
     return (
       <div className="p-6 text-center">
         <p className="text-muted-foreground">CMA not found</p>
-        <Button variant="link" asChild>
+        <Button variant="outline" asChild>
           <Link href="/cmas">Back to CMAs</Link>
         </Button>
       </div>
@@ -318,7 +334,7 @@ export default function CMAPresentationBuilder() {
           </Button>
           <div>
             <h1 className="text-2xl font-semibold">Presentation Builder</h1>
-            <p className="text-sm text-muted-foreground">{cma.mlsNumber || cma.address}</p>
+            <p className="text-sm text-muted-foreground">{cma.name || cma.subjectPropertyId}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -413,8 +429,8 @@ export default function CMAPresentationBuilder() {
               <div className="space-y-2">
                 <Label>Listing Layout</Label>
                 <Select
-                  value={config.listingLayout || "two_photos"}
-                  onValueChange={(v) => setConfig({ ...config, listingLayout: v as any })}
+                  value={config.layout || "two_photos"}
+                  onValueChange={(v) => setConfig({ ...config, layout: v })}
                 >
                   <SelectTrigger data-testid="select-listing-layout">
                     <SelectValue />
@@ -439,9 +455,9 @@ export default function CMAPresentationBuilder() {
                     properties={mapProperties}
                     subjectProperty={mapProperties.find(p => p.isSubject)}
                     style={config.mapStyle as 'streets' | 'satellite' | 'dark' || 'streets'}
-                    showPolygon={config.showPolygon ?? true}
+                    showPolygon={config.showMapPolygon ?? true}
                     onStyleChange={(style) => setConfig({ ...config, mapStyle: style })}
-                    onPolygonChange={(show) => setConfig({ ...config, showPolygon: show })}
+                    onPolygonChange={(show) => setConfig({ ...config, showMapPolygon: show })}
                     height="350px"
                   />
                 </CardContent>
@@ -459,7 +475,7 @@ export default function CMAPresentationBuilder() {
                     <Label>Default Photo Selection</Label>
                     <Select
                       value={config.photoLayout || "first_dozen"}
-                      onValueChange={(v) => setConfig({ ...config, photoLayout: v as any })}
+                      onValueChange={(v) => setConfig({ ...config, photoLayout: v })}
                     >
                       <SelectTrigger data-testid="select-photo-layout">
                         <SelectValue />
@@ -479,7 +495,7 @@ export default function CMAPresentationBuilder() {
                     <ScrollArea className="h-[300px] border rounded-md p-2">
                       <div className="space-y-2">
                         {properties.map((property) => {
-                          const propertyId = property.listingId || property.mlsNumber || '';
+                          const propertyId = property.mlsNumber || property.id || '';
                           const customCount = customPhotoSelections[propertyId]?.length;
                           const photoCount = (property as any).photos?.length || 0;
                           
@@ -490,7 +506,7 @@ export default function CMAPresentationBuilder() {
                             >
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium truncate text-sm">
-                                  {property.streetAddress || property.address}
+                                  {getPropertyAddress(property)}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                   {customCount ? `${customCount} selected` : `${photoCount} available`}
@@ -536,8 +552,8 @@ export default function CMAPresentationBuilder() {
           />
 
           <CoverLetterEditor
-            coverLetter={config.coverLetter || ""}
-            onChange={(coverLetter) => setConfig({ ...config, coverLetter })}
+            coverLetter={config.coverLetterOverride || ""}
+            onChange={(coverLetterOverride) => setConfig({ ...config, coverLetterOverride })}
             subjectProperty={subjectProperty}
             properties={properties}
             statistics={statistics}
@@ -556,10 +572,10 @@ export default function CMAPresentationBuilder() {
         <PhotoSelectionModal
           open={photoModalOpen}
           onOpenChange={setPhotoModalOpen}
-          propertyId={selectedPropertyForPhotos.listingId || selectedPropertyForPhotos.mlsNumber || ''}
-          propertyAddress={selectedPropertyForPhotos.streetAddress || selectedPropertyForPhotos.address || ''}
+          propertyId={selectedPropertyForPhotos.mlsNumber || selectedPropertyForPhotos.id || ''}
+          propertyAddress={getPropertyAddress(selectedPropertyForPhotos)}
           photos={(selectedPropertyForPhotos as any).photos || []}
-          selectedPhotos={customPhotoSelections[selectedPropertyForPhotos.listingId || selectedPropertyForPhotos.mlsNumber || ''] || []}
+          selectedPhotos={customPhotoSelections[selectedPropertyForPhotos.mlsNumber || selectedPropertyForPhotos.id || ''] || []}
           onSave={handlePhotoSelection}
         />
       )}
