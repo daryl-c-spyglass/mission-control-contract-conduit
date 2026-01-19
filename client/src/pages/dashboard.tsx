@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useRoute, useLocation } from "wouter";
 import { Search, Filter, Building2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,13 +14,26 @@ import type { Transaction, Coordinator, Activity } from "@shared/schema";
 interface DashboardProps {
   createDialogOpen: boolean;
   setCreateDialogOpen: (open: boolean) => void;
+  transactionId?: string | null;
+  urlTab?: string | null;
 }
 
-export default function Dashboard({ createDialogOpen, setCreateDialogOpen }: DashboardProps) {
-  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
+export default function Dashboard({ createDialogOpen, setCreateDialogOpen, transactionId: propTransactionId, urlTab }: DashboardProps) {
+  const [, setLocation] = useLocation();
+  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(propTransactionId || null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [initialTab, setInitialTab] = useState<string>("overview");
+  const [initialTab, setInitialTab] = useState<string>(urlTab || "overview");
+  
+  // Sync with URL-provided transaction ID and tab
+  useEffect(() => {
+    if (propTransactionId) {
+      setSelectedTransactionId(propTransactionId);
+    }
+    if (urlTab) {
+      setInitialTab(urlTab);
+    }
+  }, [propTransactionId, urlTab]);
 
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
@@ -78,6 +92,8 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen }: Das
         onBack={() => {
           setSelectedTransactionId(null);
           setInitialTab("overview");
+          // Navigate back to main dashboard list (without transaction URL)
+          setLocation("/");
         }}
         initialTab={initialTab}
       />

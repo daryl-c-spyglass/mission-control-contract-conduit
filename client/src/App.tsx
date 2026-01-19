@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Switch, Route } from "wouter";
+import { Switch, Route, useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -25,6 +25,24 @@ import CMADetailPage from "@/pages/CMADetailPage";
 import CMAPresentationBuilder from "@/pages/CMAPresentationBuilder";
 import NotFound from "@/pages/not-found";
 import type { Transaction } from "@shared/schema";
+
+function TransactionRoute({ createDialogOpen, setCreateDialogOpen }: { createDialogOpen: boolean; setCreateDialogOpen: (open: boolean) => void }) {
+  const [, params] = useRoute("/transactions/:id");
+  const transactionId = params?.id || null;
+  
+  // Read tab from URL query params
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlTab = urlParams.get('tab');
+  
+  return (
+    <Dashboard
+      createDialogOpen={createDialogOpen}
+      setCreateDialogOpen={setCreateDialogOpen}
+      transactionId={transactionId}
+      urlTab={urlTab}
+    />
+  );
+}
 
 function LandingPage() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -190,6 +208,12 @@ function AuthenticatedApp() {
               <Switch>
                 <Route path="/">
                   <Dashboard
+                    createDialogOpen={createDialogOpen}
+                    setCreateDialogOpen={setCreateDialogOpen}
+                  />
+                </Route>
+                <Route path="/transactions/:id">
+                  <TransactionRoute
                     createDialogOpen={createDialogOpen}
                     setCreateDialogOpen={setCreateDialogOpen}
                   />
