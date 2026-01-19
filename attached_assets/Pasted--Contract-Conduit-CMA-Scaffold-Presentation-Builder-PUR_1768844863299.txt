@@ -1,0 +1,1373 @@
+# Contract Conduit CMA — Scaffold Presentation Builder
+
+## PURPOSE
+
+Create the foundational structure for a CMA Presentation Builder feature, replicating the architecture from Spyglass Realty's Client Data Portal. This scaffold creates the complete structure that will be populated with implementation code.
+
+**Source Reference:** `CMA_PRESENTATION_BUILDER_REFERENCE.md` from Client Data Portal extraction.
+
+---
+
+## PHASE 1: Install Dependencies
+
+### Frontend Dependencies
+
+```bash
+npm install @react-pdf/renderer@^3 mapbox-gl@^2 @dnd-kit/core@^6 @dnd-kit/sortable@^8 recharts@^2
+```
+
+### Backend Dependencies
+
+```bash
+npm install openai@^4
+```
+
+### Type Definitions (if needed)
+
+```bash
+npm install -D @types/mapbox-gl
+```
+
+---
+
+## PHASE 2: Database Schema
+
+### Task 2.1: Update CMA Table
+
+Add the following columns to your existing `cmas` table (Drizzle ORM):
+
+```typescript
+// shared/schema.ts or db/schema.ts
+
+// Add these interface definitions first
+export interface CmaBrochure {
+  type: "pdf" | "image";
+  url: string;
+  thumbnail?: string;
+  filename: string;
+  generated: boolean;
+  uploadedAt: string;
+}
+
+export interface CmaAdjustmentRates {
+  sqftPerUnit: number;        // Default: 50
+  bedroomValue: number;       // Default: 10000
+  bathroomValue: number;      // Default: 7500
+  poolValue: number;          // Default: 25000
+  garagePerSpace: number;     // Default: 5000
+  yearBuiltPerYear: number;   // Default: 1000
+  lotSizePerSqft: number;     // Default: 2
+}
+
+export interface CmaCompAdjustmentOverrides {
+  sqft?: number | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  pool?: number | null;
+  garage?: number | null;
+  yearBuilt?: number | null;
+  lotSize?: number | null;
+  custom?: { name: string; value: number }[];
+}
+
+export interface CmaAdjustmentsData {
+  rates: CmaAdjustmentRates;
+  compAdjustments: Record<string, CmaCompAdjustmentOverrides>;
+  enabled: boolean;
+}
+
+// Add to existing cmas table definition:
+// brochure: json("brochure").$type<CmaBrochure>(),
+// adjustments: json("adjustments").$type<CmaAdjustmentsData>(),
+```
+
+### Task 2.2: Create Report Config Table
+
+```typescript
+// shared/schema.ts
+
+export interface CoverPageConfig {
+  title: string;
+  subtitle: string;
+  showDate: boolean;
+  showAgentPhoto: boolean;
+  background: "none" | "gradient" | "property";
+}
+
+export const cmaReportConfigs = pgTable("cma_report_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cmaId: varchar("cma_id").notNull().references(() => cmas.id, { onDelete: 'cascade' }).unique(),
+  includedSections: json("included_sections").$type<string[]>(),
+  sectionOrder: json("section_order").$type<string[]>(),
+  coverLetterOverride: text("cover_letter_override"),
+  layout: text("layout").default("two_photos"),              // 'two_photos', 'single_photo', 'no_photos'
+  template: text("template").default("default"),
+  theme: text("theme").default("default"),
+  photoLayout: text("photo_layout").default("first_dozen"),  // 'first_dozen', 'all', 'ai_suggested', 'custom'
+  mapStyle: text("map_style").default("streets"),            // 'streets', 'satellite', 'dark'
+  showMapPolygon: boolean("show_map_polygon").default(true),
+  includeAgentFooter: boolean("include_agent_footer").default(true),
+  coverPageConfig: json("cover_page_config").$type<CoverPageConfig>(),
+  customPhotoSelections: json("custom_photo_selections").$type<Record<string, string[]>>(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+```
+
+### Task 2.3: Create Templates Table
+
+```typescript
+// shared/schema.ts
+
+export const cmaReportTemplates = pgTable("cma_report_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  isDefault: boolean("is_default").default(false),
+  includedSections: json("included_sections").$type<string[]>(),
+  sectionOrder: json("section_order").$type<string[]>(),
+  coverLetterOverride: text("cover_letter_override"),
+  layout: text("layout").default("two_photos"),
+  theme: text("theme").default("default"),
+  photoLayout: text("photo_layout").default("first_dozen"),
+  mapStyle: text("map_style").default("streets"),
+  showMapPolygon: boolean("show_map_polygon").default(true),
+  includeAgentFooter: boolean("include_agent_footer").default(true),
+  coverPageConfig: json("cover_page_config").$type<CoverPageConfig>(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+```
+
+### Task 2.4: Run Migration
+
+```bash
+npm run db:push
+# or
+npx drizzle-kit push:pg
+```
+
+---
+
+## PHASE 3: Section Configuration Constants
+
+### Task 3.1: Create Section Definitions
+
+Create file: `shared/cma-sections.ts`
+
+```typescript
+// CMA Report Sections - All 17 sections for the presentation builder
+
+export const CMA_REPORT_SECTIONS = [
+  // INTRODUCTION CATEGORY (7 sections)
+  { id: 'cover_page', name: 'Cover Page', category: 'introduction', defaultEnabled: true },
+  { id: 'listing_brochure', name: 'Listing Brochure', category: 'introduction', defaultEnabled: false },
+  { id: 'cover_letter', name: 'Cover Letter', category: 'introduction', defaultEnabled: true, editable: true },
+  { id: 'agent_resume', name: 'Agent Resume', category: 'introduction', defaultEnabled: false, editable: true },
+  { id: 'our_company', name: 'Our Company', category: 'introduction', defaultEnabled: false },
+  { id: 'what_is_cma', name: 'What is a CMA?', category: 'introduction', defaultEnabled: false },
+  { id: 'contact_me', name: 'Contact Me', category: 'introduction', defaultEnabled: true },
+  
+  // LISTINGS CATEGORY (6 sections)
+  { id: 'map_all_listings', name: 'Map of All Listings', category: 'listings', defaultEnabled: true },
+  { id: 'summary_comparables', name: 'Summary of Comparable Properties', category: 'listings', defaultEnabled: true },
+  { id: 'listings_header', name: 'Listings Chapter Header', category: 'listings', defaultEnabled: false },
+  { id: 'property_details', name: 'Property Details', category: 'listings', defaultEnabled: true },
+  { id: 'property_photos', name: 'Property Photos', category: 'listings', defaultEnabled: true },
+  { id: 'adjustments', name: 'Adjustments', category: 'listings', defaultEnabled: false },
+  
+  // ANALYSIS CATEGORY (4 sections)
+  { id: 'analysis_header', name: 'Analysis Chapter Header', category: 'analysis', defaultEnabled: false },
+  { id: 'online_valuation', name: 'Online Valuation Analysis', category: 'analysis', defaultEnabled: false },
+  { id: 'price_per_sqft', name: 'Average Price Per Sq. Ft.', category: 'analysis', defaultEnabled: true },
+  { id: 'comparable_stats', name: 'Comparable Property Statistics', category: 'analysis', defaultEnabled: true },
+] as const;
+
+export type CmaSectionId = typeof CMA_REPORT_SECTIONS[number]['id'];
+export type CmaSectionCategory = 'introduction' | 'listings' | 'analysis';
+
+// Helper functions
+export const DEFAULT_ENABLED_SECTIONS = CMA_REPORT_SECTIONS
+  .filter(s => s.defaultEnabled)
+  .map(s => s.id);
+
+export const ALL_SECTION_IDS = CMA_REPORT_SECTIONS.map(s => s.id);
+
+export const SECTION_CATEGORIES = {
+  introduction: CMA_REPORT_SECTIONS.filter(s => s.category === 'introduction'),
+  listings: CMA_REPORT_SECTIONS.filter(s => s.category === 'listings'),
+  analysis: CMA_REPORT_SECTIONS.filter(s => s.category === 'analysis'),
+};
+
+export const EDITABLE_SECTIONS = CMA_REPORT_SECTIONS.filter(s => s.editable);
+```
+
+### Task 3.2: Create Default Configuration
+
+Create file: `shared/cma-defaults.ts`
+
+```typescript
+import { CoverPageConfig, CmaAdjustmentRates } from './schema';
+
+export const DEFAULT_COVER_PAGE_CONFIG: CoverPageConfig = {
+  title: "Comparative Market Analysis",
+  subtitle: "Prepared exclusively for you",
+  showDate: true,
+  showAgentPhoto: true,
+  background: "none",
+};
+
+export const DEFAULT_ADJUSTMENT_RATES: CmaAdjustmentRates = {
+  sqftPerUnit: 50,
+  bedroomValue: 10000,
+  bathroomValue: 7500,
+  poolValue: 25000,
+  garagePerSpace: 5000,
+  yearBuiltPerYear: 1000,
+  lotSizePerSqft: 2,
+};
+
+export const LAYOUT_OPTIONS = [
+  { value: "two_photos", label: "Two Photos per Property" },
+  { value: "single_photo", label: "Single Photo per Property" },
+  { value: "no_photos", label: "No Photos" },
+] as const;
+
+export const PHOTO_LAYOUT_OPTIONS = [
+  { value: "first_dozen", label: "First 12 Photos" },
+  { value: "all", label: "All Photos" },
+  { value: "ai_suggested", label: "AI Suggested (Best Quality)" },
+  { value: "custom", label: "Custom Selection" },
+] as const;
+
+export const MAP_STYLE_OPTIONS = [
+  { value: "streets", label: "Streets" },
+  { value: "satellite", label: "Satellite" },
+  { value: "dark", label: "Dark" },
+] as const;
+```
+
+---
+
+## PHASE 4: Create File Structure
+
+### Task 4.1: Create Directories
+
+```bash
+mkdir -p client/src/pages
+mkdir -p client/src/components/presentation
+mkdir -p client/src/components/cma
+mkdir -p client/src/lib
+```
+
+### Task 4.2: Create Status Colors Utility
+
+Create file: `client/src/lib/statusColors.ts`
+
+```typescript
+// Centralized status color system
+
+export const STATUS_COLORS = {
+  subject: { hex: '#3b82f6', tailwind: 'bg-blue-500', label: 'Subject Property' },
+  active: { hex: '#22c55e', tailwind: 'bg-green-500', label: 'Active' },
+  underContract: { hex: '#f97316', tailwind: 'bg-orange-500', label: 'Under Contract' },
+  closed: { hex: '#ef4444', tailwind: 'bg-red-500', label: 'Closed' },
+  pending: { hex: '#6b7280', tailwind: 'bg-gray-500', label: 'Pending' },
+};
+
+export const MAP_STYLES = {
+  streets: 'mapbox://styles/mapbox/streets-v12',
+  satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
+  dark: 'mapbox://styles/mapbox/dark-v11',
+};
+
+export function getStatusColor(status: string): typeof STATUS_COLORS[keyof typeof STATUS_COLORS] {
+  const normalizedStatus = status?.toLowerCase().replace(/\s+/g, '');
+  
+  if (normalizedStatus?.includes('active') && !normalizedStatus.includes('contract')) {
+    return STATUS_COLORS.active;
+  }
+  if (normalizedStatus?.includes('contract') || normalizedStatus?.includes('pending')) {
+    return STATUS_COLORS.underContract;
+  }
+  if (normalizedStatus?.includes('closed') || normalizedStatus?.includes('sold')) {
+    return STATUS_COLORS.closed;
+  }
+  
+  return STATUS_COLORS.pending;
+}
+
+export function getStatusHex(status: string, isSubject = false): string {
+  if (isSubject) return STATUS_COLORS.subject.hex;
+  return getStatusColor(status).hex;
+}
+```
+
+### Task 4.3: Create PDF Styles Utility
+
+Create file: `client/src/lib/pdfStyles.ts`
+
+```typescript
+// PDF styling constants for @react-pdf/renderer
+
+export const PDF_COLORS = {
+  primary: '#F37216',           // Brand Orange (change to your brand color)
+  text: '#1f2937',              // Gray-800
+  textLight: '#4b5563',         // Gray-600
+  textMuted: '#9ca3af',         // Gray-400
+  background: '#ffffff',        // White
+  backgroundAlt: '#f9fafb',     // Gray-50
+  border: '#e5e7eb',            // Gray-200
+  
+  // Status colors
+  statusSubject: '#3b82f6',     // Blue
+  statusActive: '#22c55e',      // Green
+  statusUnderContract: '#f97316', // Orange
+  statusClosed: '#ef4444',      // Red
+};
+
+export const PDF_FONTS = {
+  family: 'Inter',
+  sizes: {
+    xs: 8,
+    sm: 10,
+    base: 11,
+    lg: 14,
+    xl: 18,
+    xxl: 24,
+  },
+};
+
+export const PDF_SPACING = {
+  page: 40,
+  coverPage: 60,
+  section: 20,
+  element: 10,
+};
+```
+
+### Task 4.4: Create Adjustment Calculations Utility
+
+Create file: `client/src/lib/adjustmentCalculations.ts`
+
+```typescript
+import { CmaAdjustmentRates, CmaCompAdjustmentOverrides } from '@shared/schema';
+import { DEFAULT_ADJUSTMENT_RATES } from '@shared/cma-defaults';
+
+export interface PropertyForAdjustment {
+  listingId?: string;
+  mlsNumber?: string;
+  streetAddress?: string;
+  address?: string;
+  livingArea?: number;
+  bedroomsTotal?: number;
+  bathroomsTotal?: number;
+  poolFeatures?: string | string[];
+  garageSpaces?: number;
+  yearBuilt?: number;
+  lotSizeArea?: number;
+  lotSizeSquareFeet?: number;
+  listPrice?: number;
+  closePrice?: number;
+  soldPrice?: number;
+}
+
+export interface AdjustmentItem {
+  name: string;
+  value: number;
+  description?: string;
+}
+
+export interface CompAdjustmentResult {
+  compId: string;
+  compAddress: string;
+  salePrice: number;
+  adjustments: AdjustmentItem[];
+  totalAdjustment: number;
+  adjustedPrice: number;
+}
+
+export function getPropertyId(property: PropertyForAdjustment): string {
+  return property.listingId || property.mlsNumber || '';
+}
+
+export function hasPool(property: PropertyForAdjustment): boolean {
+  if (!property.poolFeatures) return false;
+  if (Array.isArray(property.poolFeatures)) {
+    return property.poolFeatures.length > 0 && 
+           !property.poolFeatures.every(f => f.toLowerCase() === 'none');
+  }
+  return property.poolFeatures.toLowerCase() !== 'none' && 
+         property.poolFeatures.toLowerCase() !== '';
+}
+
+export function calculateAdjustments(
+  subject: PropertyForAdjustment,
+  comp: PropertyForAdjustment,
+  rates: CmaAdjustmentRates = DEFAULT_ADJUSTMENT_RATES,
+  overrides?: Partial<CmaCompAdjustmentOverrides>
+): CompAdjustmentResult {
+  const adjustments: AdjustmentItem[] = [];
+  
+  // Square footage adjustment
+  const subjectSqft = subject.livingArea || 0;
+  const compSqft = comp.livingArea || 0;
+  const sqftDiff = subjectSqft - compSqft;
+  const sqftAdj = overrides?.sqft ?? sqftDiff * rates.sqftPerUnit;
+  if (sqftAdj !== 0) {
+    adjustments.push({ 
+      name: "Sq Ft", 
+      value: sqftAdj,
+      description: `${sqftDiff > 0 ? '+' : ''}${sqftDiff} sqft @ $${rates.sqftPerUnit}/sqft`
+    });
+  }
+  
+  // Bedroom adjustment
+  const subjectBeds = subject.bedroomsTotal || 0;
+  const compBeds = comp.bedroomsTotal || 0;
+  const bedDiff = subjectBeds - compBeds;
+  const bedAdj = overrides?.bedrooms ?? bedDiff * rates.bedroomValue;
+  if (bedAdj !== 0) {
+    adjustments.push({ 
+      name: "Beds", 
+      value: bedAdj,
+      description: `${bedDiff > 0 ? '+' : ''}${bedDiff} beds @ $${rates.bedroomValue.toLocaleString()}/bed`
+    });
+  }
+  
+  // Bathroom adjustment
+  const subjectBaths = subject.bathroomsTotal || 0;
+  const compBaths = comp.bathroomsTotal || 0;
+  const bathDiff = subjectBaths - compBaths;
+  const bathAdj = overrides?.bathrooms ?? bathDiff * rates.bathroomValue;
+  if (bathAdj !== 0) {
+    adjustments.push({ 
+      name: "Baths", 
+      value: bathAdj,
+      description: `${bathDiff > 0 ? '+' : ''}${bathDiff} baths @ $${rates.bathroomValue.toLocaleString()}/bath`
+    });
+  }
+  
+  // Pool adjustment
+  const subjectHasPool = hasPool(subject);
+  const compHasPool = hasPool(comp);
+  if (subjectHasPool !== compHasPool) {
+    const poolAdj = overrides?.pool ?? (subjectHasPool ? rates.poolValue : -rates.poolValue);
+    adjustments.push({ 
+      name: "Pool", 
+      value: poolAdj,
+      description: subjectHasPool ? 'Subject has pool' : 'Comp has pool'
+    });
+  }
+  
+  // Garage adjustment
+  const subjectGarage = subject.garageSpaces || 0;
+  const compGarage = comp.garageSpaces || 0;
+  const garageDiff = subjectGarage - compGarage;
+  const garageAdj = overrides?.garage ?? garageDiff * rates.garagePerSpace;
+  if (garageAdj !== 0) {
+    adjustments.push({ 
+      name: "Garage", 
+      value: garageAdj,
+      description: `${garageDiff > 0 ? '+' : ''}${garageDiff} spaces @ $${rates.garagePerSpace.toLocaleString()}/space`
+    });
+  }
+  
+  // Year built adjustment
+  const subjectYear = subject.yearBuilt || 0;
+  const compYear = comp.yearBuilt || 0;
+  if (subjectYear > 0 && compYear > 0) {
+    const yearDiff = subjectYear - compYear;
+    const yearAdj = overrides?.yearBuilt ?? yearDiff * rates.yearBuiltPerYear;
+    if (yearAdj !== 0) {
+      adjustments.push({ 
+        name: "Year Built", 
+        value: yearAdj,
+        description: `${yearDiff > 0 ? '+' : ''}${yearDiff} years @ $${rates.yearBuiltPerYear.toLocaleString()}/year`
+      });
+    }
+  }
+  
+  // Lot size adjustment
+  const subjectLot = subject.lotSizeSquareFeet || subject.lotSizeArea || 0;
+  const compLot = comp.lotSizeSquareFeet || comp.lotSizeArea || 0;
+  const lotDiff = subjectLot - compLot;
+  const lotAdj = overrides?.lotSize ?? lotDiff * rates.lotSizePerSqft;
+  if (Math.abs(lotAdj) > 100) { // Only show if significant
+    adjustments.push({ 
+      name: "Lot Size", 
+      value: lotAdj,
+      description: `${lotDiff > 0 ? '+' : ''}${lotDiff.toLocaleString()} sqft @ $${rates.lotSizePerSqft}/sqft`
+    });
+  }
+  
+  // Add custom adjustments
+  if (overrides?.custom) {
+    for (const custom of overrides.custom) {
+      adjustments.push({ name: custom.name, value: custom.value });
+    }
+  }
+  
+  const totalAdjustment = adjustments.reduce((sum, a) => sum + a.value, 0);
+  const salePrice = comp.closePrice || comp.soldPrice || comp.listPrice || 0;
+  const adjustedPrice = salePrice + totalAdjustment;
+  
+  return {
+    compId: getPropertyId(comp),
+    compAddress: comp.streetAddress || comp.address || 'Unknown',
+    salePrice,
+    adjustments,
+    totalAdjustment,
+    adjustedPrice,
+  };
+}
+
+export function calculateAllAdjustments(
+  subject: PropertyForAdjustment,
+  comparables: PropertyForAdjustment[],
+  rates: CmaAdjustmentRates = DEFAULT_ADJUSTMENT_RATES,
+  overridesMap: Record<string, CmaCompAdjustmentOverrides> = {}
+): CompAdjustmentResult[] {
+  return comparables.map(comp => {
+    const compId = getPropertyId(comp);
+    return calculateAdjustments(subject, comp, rates, overridesMap[compId]);
+  });
+}
+```
+
+---
+
+## PHASE 5: Create Main Page Component (Placeholder)
+
+Create file: `client/src/pages/CMAPresentationBuilder.tsx`
+
+```typescript
+import { useState, useEffect, useMemo } from 'react';
+import { useParams, useLocation } from 'wouter';  // Adjust if using react-router
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useToast } from '@/hooks/use-toast';
+import { 
+  ArrowLeft, 
+  RotateCcw, 
+  Save, 
+  FileDown, 
+  FileUp, 
+  Expand,
+  LayoutGrid,
+  FileText,
+  Settings2,
+  Loader2
+} from 'lucide-react';
+
+// Components (to be implemented)
+import { CoverPageEditor } from '@/components/presentation/CoverPageEditor';
+import { CoverLetterEditor } from '@/components/presentation/CoverLetterEditor';
+import { ListingBrochureContent } from '@/components/presentation/ListingBrochureContent';
+import { AdjustmentsSection } from '@/components/presentation/AdjustmentsSection';
+import { MapboxCMAMap } from '@/components/presentation/MapboxCMAMap';
+import { PhotoSelectionModal } from '@/components/presentation/PhotoSelectionModal';
+import { ExpandedPreviewModal } from '@/components/presentation/ExpandedPreviewModal';
+
+// Types and constants
+import { 
+  CMA_REPORT_SECTIONS, 
+  DEFAULT_ENABLED_SECTIONS, 
+  ALL_SECTION_IDS,
+  SECTION_CATEGORIES 
+} from '@shared/cma-sections';
+import { 
+  DEFAULT_COVER_PAGE_CONFIG, 
+  DEFAULT_ADJUSTMENT_RATES,
+  LAYOUT_OPTIONS,
+  PHOTO_LAYOUT_OPTIONS,
+  MAP_STYLE_OPTIONS 
+} from '@shared/cma-defaults';
+import type { 
+  CoverPageConfig, 
+  CmaBrochure, 
+  CmaAdjustmentsData 
+} from '@shared/schema';
+
+export default function CMAPresentationBuilder() {
+  const { id: cmaId } = useParams<{ id: string }>();
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // ===========================================
+  // STATE MANAGEMENT
+  // ===========================================
+  
+  // Core presentation state
+  const [includedSections, setIncludedSections] = useState<string[]>(DEFAULT_ENABLED_SECTIONS);
+  const [sectionOrder, setSectionOrder] = useState<string[]>(ALL_SECTION_IDS);
+  const [layout, setLayout] = useState<string>("two_photos");
+  const [photoLayout, setPhotoLayout] = useState<string>("first_dozen");
+  const [hasChanges, setHasChanges] = useState(false);
+  
+  // Content state
+  const [coverPageConfig, setCoverPageConfig] = useState<CoverPageConfig>(DEFAULT_COVER_PAGE_CONFIG);
+  const [coverLetterOverride, setCoverLetterOverride] = useState<string>("");
+  const [brochure, setBrochure] = useState<CmaBrochure | null>(null);
+  const [adjustments, setAdjustments] = useState<CmaAdjustmentsData | null>(null);
+  const [includeAgentFooter, setIncludeAgentFooter] = useState(true);
+  
+  // Map state
+  const [mapStyle, setMapStyle] = useState<"streets" | "satellite" | "dark">("streets");
+  const [showMapPolygon, setShowMapPolygon] = useState(true);
+  
+  // Custom photo selections
+  const [customPhotoSelections, setCustomPhotoSelections] = useState<Record<string, string[]>>({});
+  
+  // UI state
+  const [activeTab, setActiveTab] = useState("sections");
+  const [isExporting, setIsExporting] = useState(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [isPreviewUpdating, setIsPreviewUpdating] = useState(false);
+
+  // ===========================================
+  // DATA FETCHING
+  // ===========================================
+  
+  // Fetch CMA data
+  const { data: cma, isLoading: cmaLoading } = useQuery({
+    queryKey: ['cma', cmaId],
+    queryFn: async () => {
+      const response = await fetch(`/api/cmas/${cmaId}`);
+      if (!response.ok) throw new Error('Failed to fetch CMA');
+      return response.json();
+    },
+    enabled: !!cmaId,
+  });
+
+  // Fetch report config
+  const { data: reportConfig, isLoading: configLoading } = useQuery({
+    queryKey: ['cma-report-config', cmaId],
+    queryFn: async () => {
+      const response = await fetch(`/api/cmas/${cmaId}/report-config`);
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: !!cmaId,
+  });
+
+  // Initialize state from saved config
+  useEffect(() => {
+    if (reportConfig) {
+      if (reportConfig.includedSections) setIncludedSections(reportConfig.includedSections);
+      if (reportConfig.sectionOrder) setSectionOrder(reportConfig.sectionOrder);
+      if (reportConfig.layout) setLayout(reportConfig.layout);
+      if (reportConfig.photoLayout) setPhotoLayout(reportConfig.photoLayout);
+      if (reportConfig.mapStyle) setMapStyle(reportConfig.mapStyle);
+      if (reportConfig.showMapPolygon !== undefined) setShowMapPolygon(reportConfig.showMapPolygon);
+      if (reportConfig.includeAgentFooter !== undefined) setIncludeAgentFooter(reportConfig.includeAgentFooter);
+      if (reportConfig.coverPageConfig) setCoverPageConfig(reportConfig.coverPageConfig);
+      if (reportConfig.coverLetterOverride) setCoverLetterOverride(reportConfig.coverLetterOverride);
+      if (reportConfig.customPhotoSelections) setCustomPhotoSelections(reportConfig.customPhotoSelections);
+    }
+    if (cma?.brochure) setBrochure(cma.brochure);
+    if (cma?.adjustments) setAdjustments(cma.adjustments);
+  }, [reportConfig, cma]);
+
+  // ===========================================
+  // SAVE MUTATION
+  // ===========================================
+  
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/cmas/${cmaId}/report-config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          includedSections,
+          sectionOrder,
+          layout,
+          photoLayout,
+          mapStyle,
+          showMapPolygon,
+          includeAgentFooter,
+          coverPageConfig,
+          coverLetterOverride,
+          customPhotoSelections,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to save');
+      return response.json();
+    },
+    onSuccess: () => {
+      setHasChanges(false);
+      toast({ title: 'Saved', description: 'Presentation settings saved successfully.' });
+      queryClient.invalidateQueries({ queryKey: ['cma-report-config', cmaId] });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to save settings.', variant: 'destructive' });
+    },
+  });
+
+  // ===========================================
+  // DERIVED DATA
+  // ===========================================
+  
+  const properties = useMemo(() => cma?.propertiesData || [], [cma]);
+  const subjectProperty = useMemo(() => 
+    properties.find((p: any) => p.listingId === cma?.subjectPropertyId), 
+    [properties, cma?.subjectPropertyId]
+  );
+  const comparables = useMemo(() => 
+    properties.filter((p: any) => p.listingId !== cma?.subjectPropertyId), 
+    [properties, cma?.subjectPropertyId]
+  );
+
+  // ===========================================
+  // HANDLERS
+  // ===========================================
+  
+  const handleSectionToggle = (sectionId: string) => {
+    setIncludedSections(prev => 
+      prev.includes(sectionId) 
+        ? prev.filter(id => id !== sectionId)
+        : [...prev, sectionId]
+    );
+    setHasChanges(true);
+  };
+
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    try {
+      // TODO: Implement PDF export with @react-pdf/renderer
+      toast({ title: 'Export started', description: 'Generating your PDF...' });
+      
+      // Placeholder for PDF generation
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      toast({ title: 'PDF exported', description: 'Your CMA presentation has been downloaded.' });
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast({ title: 'Export failed', description: 'Please try again.', variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleReset = () => {
+    setIncludedSections(DEFAULT_ENABLED_SECTIONS);
+    setSectionOrder(ALL_SECTION_IDS);
+    setLayout("two_photos");
+    setPhotoLayout("first_dozen");
+    setMapStyle("streets");
+    setShowMapPolygon(true);
+    setIncludeAgentFooter(true);
+    setCoverPageConfig(DEFAULT_COVER_PAGE_CONFIG);
+    setCoverLetterOverride("");
+    setHasChanges(true);
+  };
+
+  // ===========================================
+  // LOADING STATE
+  // ===========================================
+  
+  if (cmaLoading || configLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!cma) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+        <p className="text-muted-foreground">CMA not found</p>
+        <Button onClick={() => navigate('/cmas')}>Back to CMAs</Button>
+      </div>
+    );
+  }
+
+  // ===========================================
+  // RENDER
+  // ===========================================
+  
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="bg-card border-b sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate(`/cmas/${cmaId}`)}
+                className="gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to CMA
+              </Button>
+              <div>
+                <h1 className="text-xl font-semibold">Presentation Builder</h1>
+                <p className="text-sm text-muted-foreground">{cma.name}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleReset}
+                className="gap-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Reset
+              </Button>
+              
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => saveMutation.mutate()}
+                disabled={!hasChanges || saveMutation.isPending}
+                className="gap-2 bg-primary hover:bg-primary/90"
+              >
+                {saveMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                Save Configuration
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportPDF}
+                disabled={isExporting}
+                className="gap-2"
+              >
+                {isExporting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileDown className="w-4 h-4" />
+                )}
+                Export PDF
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left: Configuration Tabs */}
+          <div>
+            <Card>
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <CardHeader className="pb-0">
+                  <TabsList className="w-full justify-start">
+                    <TabsTrigger value="sections" className="gap-2">
+                      <LayoutGrid className="w-4 h-4" />
+                      Sections
+                    </TabsTrigger>
+                    <TabsTrigger value="content" className="gap-2">
+                      <FileText className="w-4 h-4" />
+                      Content
+                    </TabsTrigger>
+                    <TabsTrigger value="layout" className="gap-2">
+                      <Settings2 className="w-4 h-4" />
+                      Layout
+                    </TabsTrigger>
+                  </TabsList>
+                </CardHeader>
+
+                <CardContent className="pt-6">
+                  <TabsContent value="sections" className="mt-0">
+                    {/* TODO: Implement sections tab with DndKit */}
+                    <div className="space-y-6">
+                      {Object.entries(SECTION_CATEGORIES).map(([category, sections]) => (
+                        <div key={category}>
+                          <h3 className="font-medium capitalize mb-3">{category}</h3>
+                          <div className="space-y-2">
+                            {sections.map(section => (
+                              <div 
+                                key={section.id}
+                                className="flex items-center justify-between p-3 border rounded-lg"
+                              >
+                                <span className="text-sm">{section.name}</span>
+                                {/* TODO: Add Switch component */}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="content" className="mt-0">
+                    {/* TODO: Implement content editors */}
+                    <div className="space-y-6">
+                      <p className="text-muted-foreground">Content editors will be implemented here</p>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="layout" className="mt-0">
+                    {/* TODO: Implement layout options */}
+                    <div className="space-y-6">
+                      <p className="text-muted-foreground">Layout options will be implemented here</p>
+                    </div>
+                  </TabsContent>
+                </CardContent>
+              </Tabs>
+            </Card>
+          </div>
+
+          {/* Right: Live Preview */}
+          <div className="lg:sticky lg:top-24 lg:self-start">
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-lg">Live Preview</CardTitle>
+                    <CardDescription>Preview how your CMA presentation will appear</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Badge variant="outline">{includedSections.length} sections</Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setIsPreviewModalOpen(true)}
+                    >
+                      <Expand className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[500px] md:h-[600px] lg:h-[calc(100vh-200px)] lg:min-h-[600px] lg:max-h-[900px]">
+                  <div className={`p-4 space-y-4 transition-opacity duration-300 ${isPreviewUpdating ? "opacity-50" : "opacity-100"}`}>
+                    {/* TODO: Implement preview sections */}
+                    <p className="text-muted-foreground text-center py-8">
+                      Preview content will render here
+                    </p>
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </main>
+
+      {/* Expanded Preview Modal */}
+      {/* TODO: Implement ExpandedPreviewModal */}
+    </div>
+  );
+}
+```
+
+---
+
+## PHASE 6: Create Component Placeholders
+
+### Task 6.1: CoverPageEditor
+
+Create file: `client/src/components/presentation/CoverPageEditor.tsx`
+
+```typescript
+import { CoverPageConfig } from '@shared/schema';
+import { DEFAULT_COVER_PAGE_CONFIG } from '@shared/cma-defaults';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+
+interface CoverPageEditorProps {
+  config: CoverPageConfig;
+  onChange: (config: CoverPageConfig) => void;
+  cmaName?: string;
+  agentName?: string;
+  agentPhotoUrl?: string;
+}
+
+export function CoverPageEditor({ 
+  config, 
+  onChange, 
+  cmaName,
+  agentName,
+  agentPhotoUrl 
+}: CoverPageEditorProps) {
+  const updateConfig = (updates: Partial<CoverPageConfig>) => {
+    onChange({ ...config, ...updates });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium mb-1">Cover Page</h3>
+        <p className="text-sm text-muted-foreground">Customize the title and appearance of your cover page</p>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="title">Title</Label>
+          <Input
+            id="title"
+            value={config.title}
+            onChange={(e) => updateConfig({ title: e.target.value })}
+            placeholder="Comparative Market Analysis"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="subtitle">Subtitle</Label>
+          <Input
+            id="subtitle"
+            value={config.subtitle}
+            onChange={(e) => updateConfig({ subtitle: e.target.value })}
+            placeholder="Prepared exclusively for you"
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <Label>Show Date</Label>
+            <p className="text-sm text-muted-foreground">Display report date on cover</p>
+          </div>
+          <Switch
+            checked={config.showDate}
+            onCheckedChange={(checked) => updateConfig({ showDate: checked })}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <Label>Show Agent Photo</Label>
+            <p className="text-sm text-muted-foreground">Include your photo on cover</p>
+          </div>
+          <Switch
+            checked={config.showAgentPhoto}
+            onCheckedChange={(checked) => updateConfig({ showAgentPhoto: checked })}
+          />
+        </div>
+
+        <div>
+          <Label>Cover Background</Label>
+          <div className="flex gap-2 mt-2">
+            {(['none', 'gradient', 'property'] as const).map((bg) => (
+              <Button
+                key={bg}
+                type="button"
+                variant={config.background === bg ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateConfig({ background: bg })}
+              >
+                {bg === 'none' && 'Plain White'}
+                {bg === 'gradient' && 'Gradient'}
+                {bg === 'property' && 'Property Photo'}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Preview */}
+      <div className="border rounded-lg p-4 bg-muted/50">
+        <p className="text-xs text-muted-foreground mb-2">Preview:</p>
+        <div className={`
+          bg-white rounded shadow-sm p-4 text-center
+          ${config.background === 'gradient' ? 'bg-gradient-to-br from-orange-50 to-orange-100' : ''}
+        `}>
+          <p className="text-primary font-medium text-sm">Your Company</p>
+          <h2 className="text-lg font-bold mt-1">{config.title || 'Comparative Market Analysis'}</h2>
+          <p className="text-muted-foreground text-sm mt-1">{config.subtitle || 'Prepared exclusively for you'}</p>
+          {cmaName && <p className="text-xs text-muted-foreground mt-2">{cmaName}</p>}
+          {config.showDate && (
+            <p className="text-xs text-muted-foreground">{new Date().toLocaleDateString()}</p>
+          )}
+          {config.showAgentPhoto && agentName && (
+            <div className="flex items-center justify-center gap-2 mt-3">
+              <div className="w-8 h-8 rounded-full bg-muted" />
+              <span className="text-xs">{agentName}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### Task 6.2: Create Additional Placeholder Components
+
+Create placeholder files for:
+- `client/src/components/presentation/CoverLetterEditor.tsx`
+- `client/src/components/presentation/ListingBrochureContent.tsx`
+- `client/src/components/presentation/AdjustmentsSection.tsx`
+- `client/src/components/presentation/MapboxCMAMap.tsx`
+- `client/src/components/presentation/PhotoSelectionModal.tsx`
+- `client/src/components/presentation/ExpandedPreviewModal.tsx`
+- `client/src/components/presentation/CMAPdfDocument.tsx`
+
+Each file should export a placeholder component:
+
+```typescript
+// Example: client/src/components/presentation/CoverLetterEditor.tsx
+
+interface CoverLetterEditorProps {
+  value: string;
+  onChange: (value: string) => void;
+  cmaData?: any;
+  agentName?: string;
+  companyName?: string;
+}
+
+export function CoverLetterEditor({ value, onChange, cmaData, agentName, companyName }: CoverLetterEditorProps) {
+  // TODO: Implement AI-powered cover letter editor
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-lg font-medium">Cover Letter</h3>
+        <p className="text-sm text-muted-foreground">
+          Customize the cover letter for this CMA report
+        </p>
+      </div>
+      <p className="text-muted-foreground">Cover letter editor coming soon...</p>
+    </div>
+  );
+}
+```
+
+---
+
+## PHASE 7: API Routes
+
+### Task 7.1: Add Report Config Routes
+
+Add to your server routes file:
+
+```typescript
+// server/routes.ts
+
+// Get report config
+app.get('/api/cmas/:id/report-config', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const [config] = await db.select()
+      .from(cmaReportConfigs)
+      .where(eq(cmaReportConfigs.cmaId, id))
+      .limit(1);
+    
+    if (!config) {
+      // Return defaults if no config exists
+      return res.json({
+        includedSections: DEFAULT_ENABLED_SECTIONS,
+        sectionOrder: ALL_SECTION_IDS,
+        layout: 'two_photos',
+        photoLayout: 'first_dozen',
+        mapStyle: 'streets',
+        showMapPolygon: true,
+        includeAgentFooter: true,
+        coverPageConfig: DEFAULT_COVER_PAGE_CONFIG,
+      });
+    }
+    
+    res.json(config);
+  } catch (error) {
+    console.error('Error fetching report config:', error);
+    res.status(500).json({ error: 'Failed to fetch report config' });
+  }
+});
+
+// Save report config
+app.put('/api/cmas/:id/report-config', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const config = req.body;
+    
+    // Upsert config
+    const [existing] = await db.select()
+      .from(cmaReportConfigs)
+      .where(eq(cmaReportConfigs.cmaId, id))
+      .limit(1);
+    
+    if (existing) {
+      await db.update(cmaReportConfigs)
+        .set({ ...config, updatedAt: new Date() })
+        .where(eq(cmaReportConfigs.cmaId, id));
+    } else {
+      await db.insert(cmaReportConfigs)
+        .values({ cmaId: id, ...config });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error saving report config:', error);
+    res.status(500).json({ error: 'Failed to save report config' });
+  }
+});
+
+// Get available sections
+app.get('/api/cma/report-sections', (req, res) => {
+  res.json(CMA_REPORT_SECTIONS);
+});
+```
+
+### Task 7.2: Add AI Cover Letter Route
+
+```typescript
+// server/routes.ts
+
+import OpenAI from 'openai';
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+app.post('/api/ai/generate-cover-letter', requireAuth, async (req, res) => {
+  try {
+    const { context, tone } = req.body;
+    
+    const systemPrompt = `You are a professional real estate agent writing a cover letter for a Comparative Market Analysis (CMA) report. 
+    Write in a ${tone} tone. Be concise but informative. Focus on the property and market data provided.`;
+    
+    const userPrompt = `Write a cover letter for a CMA report with the following details:
+    
+    Subject Property: ${context.subjectProperty?.address}
+    Price: $${context.subjectProperty?.price?.toLocaleString()}
+    Beds/Baths: ${context.subjectProperty?.beds}bd/${context.subjectProperty?.baths}ba
+    Square Feet: ${context.subjectProperty?.sqft?.toLocaleString()}
+    
+    Market Analysis:
+    - ${context.comparables?.count} comparable properties analyzed
+    - Average Price: $${context.comparables?.avgPrice?.toLocaleString()}
+    - Median Price: $${context.comparables?.medianPrice?.toLocaleString()}
+    - Price Range: $${context.comparables?.priceRange?.min?.toLocaleString()} - $${context.comparables?.priceRange?.max?.toLocaleString()}
+    - Average Price per Sq Ft: $${context.comparables?.avgPricePerSqft}
+    
+    Agent: ${context.agentInfo?.name}
+    Brokerage: ${context.agentInfo?.brokerage}
+    ${context.clientName ? `Client: ${context.clientName}` : ''}
+    
+    Write a professional cover letter (2-3 paragraphs) that:
+    1. Introduces the CMA and its purpose
+    2. Highlights key market insights
+    3. Offers to discuss the analysis further`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: 500,
+      temperature: 0.7,
+    });
+
+    const coverLetter = completion.choices[0]?.message?.content || '';
+    
+    res.json({ coverLetter });
+  } catch (error) {
+    console.error('Error generating cover letter:', error);
+    res.status(500).json({ error: 'Failed to generate cover letter' });
+  }
+});
+```
+
+---
+
+## PHASE 8: Add Route Registration
+
+### Task 8.1: Register Page Route
+
+Add to your client routing:
+
+```typescript
+// Using wouter
+import CMAPresentationBuilder from '@/pages/CMAPresentationBuilder';
+
+<Route path="/cmas/:id/presentation" component={CMAPresentationBuilder} />
+
+// Or using react-router
+<Route path="/cmas/:id/presentation" element={<CMAPresentationBuilder />} />
+```
+
+### Task 8.2: Enable Presentation Button
+
+In your CMA page/tab component, enable the Presentation button:
+
+```typescript
+// Find the Presentation button and update it
+<Button
+  variant="outline"
+  disabled={!cma || cma.comparablePropertyIds?.length === 0}
+  onClick={() => navigate(`/cmas/${cma.id}/presentation`)}
+  className="gap-2"
+>
+  <LayoutGrid className="w-4 h-4" />
+  Presentation
+</Button>
+```
+
+---
+
+## PHASE 9: Environment Variables
+
+### Task 9.1: Add Required Variables
+
+Add to your `.env` file:
+
+```bash
+# Mapbox (for interactive maps)
+VITE_MAPBOX_TOKEN=pk.your_mapbox_token_here
+
+# OpenAI (for AI cover letter generation)
+OPENAI_API_KEY=sk-your_openai_key_here
+
+# Object Storage (for brochure uploads) - if using Replit Object Storage
+DEFAULT_OBJECT_STORAGE_BUCKET_ID=your_bucket_id
+```
+
+---
+
+## ACCEPTANCE CRITERIA
+
+After running this scaffold:
+
+- [ ] Database tables created: `cma_report_configs`, `cma_report_templates`
+- [ ] All TypeScript types compile without errors
+- [ ] Section constants defined with 17 sections (7 intro, 6 listings, 4 analysis)
+- [ ] Main CMAPresentationBuilder page renders at `/cmas/:id/presentation`
+- [ ] Three tabs (Sections, Content, Layout) are visible
+- [ ] Live Preview panel shows placeholder
+- [ ] Save button triggers API call
+- [ ] Back button navigates to CMA
+- [ ] API routes respond (even if with default data)
+- [ ] No console errors on page load
+
+---
+
+## NEXT STEPS
+
+After scaffold is complete:
+
+1. **Copy component implementations** from Client Data Portal extraction
+2. **Implement DndKit** for section drag-and-drop reordering
+3. **Implement MapboxCMAMap** with status colors and theme sync
+4. **Implement CMAPdfDocument** with @react-pdf/renderer
+5. **Implement brochure upload** with presigned URLs
+6. **Test full flow** end-to-end
+7. **Adjust branding** (colors, logos, company name)
+
+---
+
+## KEY DIFFERENCES FROM CLIENT DATA PORTAL
+
+Update these for Contract Conduit CMA:
+
+| Item | Client Data Portal | Contract Conduit CMA |
+|------|-------------------|----------------------|
+| Brand Color | `#F37216` (Spyglass Orange) | Update to your brand color |
+| Company Name | "Spyglass Realty" | Update to your company |
+| Logo URL | Spyglass logo | Update to your logo |
+| Theme Name | "spyglass" | Update to your theme |
