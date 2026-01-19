@@ -40,8 +40,41 @@ import {
   X,
   Hash,
   Plus,
-  Search
+  Search,
+  Table2,
+  LayoutGrid
 } from "lucide-react";
+
+const STATUS_FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'closed', label: 'Closed' },
+  { id: 'activeUnderContract', label: 'Active Under Contract' },
+  { id: 'pending', label: 'Pending' },
+  { id: 'active', label: 'Active' },
+] as const;
+
+type StatusFilterType = typeof STATUS_FILTERS[number]['id'];
+type NormalizedStatusType = 'active' | 'closed' | 'activeUnderContract' | 'pending' | 'unknown';
+
+function normalizeStatus(status: string | null | undefined): NormalizedStatusType {
+  const lower = (status || '').toLowerCase().trim();
+  if (!lower) {
+    return 'unknown';
+  }
+  if (lower.includes('active under contract') || lower.includes('under contract')) {
+    return 'activeUnderContract';
+  }
+  if (lower.includes('closed') || lower.includes('sold')) {
+    return 'closed';
+  }
+  if (lower.includes('pending')) {
+    return 'pending';
+  }
+  if (lower.includes('active')) {
+    return 'active';
+  }
+  return 'unknown';
+}
 
 interface CMATabProps {
   transaction: Transaction;
@@ -151,7 +184,8 @@ function StatCard({
 export function CMATab({ transaction }: CMATabProps) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [viewMode, setViewMode] = useState<'grid' | 'stats' | 'map'>('stats');
+  const [viewMode, setViewMode] = useState<'stats' | 'grid' | 'table' | 'map'>('stats');
+  const [statusFilter, setStatusFilter] = useState<StatusFilterType>('all');
   const [selectedProperty, setSelectedProperty] = useState<CMAComparable | null>(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -159,7 +193,14 @@ export function CMATab({ transaction }: CMATabProps) {
   const [fullscreenPhoto, setFullscreenPhoto] = useState(false);
   
   const cmaData = transaction.cmaData as CMAComparable[] | null;
-  const statistics = useMemo(() => calculateStatistics(cmaData || []), [cmaData]);
+  
+  const filteredComparables = useMemo(() => {
+    if (!cmaData) return [];
+    if (statusFilter === 'all') return cmaData;
+    return cmaData.filter(comp => normalizeStatus(comp.status) === statusFilter);
+  }, [cmaData, statusFilter]);
+  
+  const statistics = useMemo(() => calculateStatistics(filteredComparables), [filteredComparables]);
   
   const { data: savedCma } = useQuery<Cma | null>({
     queryKey: ['/api/transactions', transaction.id, 'cma'],
@@ -309,12 +350,12 @@ export function CMATab({ transaction }: CMATabProps) {
   }
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-lg font-semibold">Comparative Market Analysis</h2>
           <p className="text-sm text-muted-foreground">
-            {cmaData.length} comparable properties found
+            {filteredComparables.length} of {cmaData.length} comparable properties
           </p>
         </div>
         
@@ -343,10 +384,24 @@ export function CMATab({ transaction }: CMATabProps) {
                   onClick={() => setViewMode('grid')}
                   data-testid="button-view-grid"
                 >
-                  <Grid3X3 className="h-4 w-4" />
+                  <LayoutGrid className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Grid View</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="rounded-none border-l"
+                  onClick={() => setViewMode('table')}
+                  data-testid="button-view-table"
+                >
+                  <Table2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Table View</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -375,6 +430,52 @@ export function CMATab({ transaction }: CMATabProps) {
           </Button>
         </div>
       </div>
+      
+      {/* Status Filter Tabs */}
+      <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-lg overflow-x-auto">
+        {STATUS_FILTERS.map(filter => (
+          <Button
+            key={filter.id}
+            variant={statusFilter === filter.id ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setStatusFilter(filter.id)}
+            className="whitespace-nowrap"
+            data-testid={`button-filter-${filter.id}`}
+          >
+            {filter.label}
+          </Button>
+        ))}
+      </div>
+      
+      {/* Stats Summary Row */}
+      {statistics && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 bg-zinc-900 dark:bg-zinc-950 p-4 rounded-lg text-white">
+          <div>
+            <div className="text-xs text-zinc-400 uppercase tracking-wide">Low Price</div>
+            <div className="text-lg sm:text-xl font-bold">{formatPrice(statistics.price.range.min)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-zinc-400 uppercase tracking-wide">High Price</div>
+            <div className="text-lg sm:text-xl font-bold">{formatPrice(statistics.price.range.max)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg Price</div>
+            <div className="text-lg sm:text-xl font-bold">{formatPrice(Math.round(statistics.price.average))}</div>
+          </div>
+          <div>
+            <div className="text-xs text-zinc-400 uppercase tracking-wide">Median</div>
+            <div className="text-lg sm:text-xl font-bold">{formatPrice(Math.round(statistics.price.median))}</div>
+          </div>
+          <div>
+            <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg $/SqFt</div>
+            <div className="text-lg sm:text-xl font-bold">${Math.round(statistics.pricePerSqFt.average)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg DOM</div>
+            <div className="text-lg sm:text-xl font-bold">{Math.round(statistics.daysOnMarket.average)} Days</div>
+          </div>
+        </div>
+      )}
       
       {viewMode === 'stats' && statistics && (
         <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
@@ -419,7 +520,7 @@ export function CMATab({ transaction }: CMATabProps) {
       
       {viewMode === 'map' && (
         <CMAMap
-          properties={cmaData as unknown as Property[]}
+          properties={filteredComparables as unknown as Property[]}
           subjectProperty={transaction.mlsData as unknown as Property | null}
           onPropertyClick={(property) => {
             setSelectedProperty(property as unknown as CMAComparable);
@@ -428,9 +529,80 @@ export function CMATab({ transaction }: CMATabProps) {
         />
       )}
       
+      {/* Table View */}
+      {viewMode === 'table' && (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 text-left">
+                  <tr>
+                    <th className="p-3 font-medium">Address</th>
+                    <th className="p-3 font-medium">Status</th>
+                    <th className="p-3 font-medium text-right">Price</th>
+                    <th className="p-3 font-medium text-right">$/SqFt</th>
+                    <th className="p-3 font-medium text-right">DOM</th>
+                    <th className="p-3 font-medium text-center">Beds</th>
+                    <th className="p-3 font-medium text-center">Baths</th>
+                    <th className="p-3 font-medium text-right">SqFt</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {filteredComparables.map((comp, index) => {
+                    const sqft = typeof comp.sqft === 'number' ? comp.sqft : parseFloat(comp.sqft as string) || 0;
+                    const pricePerSqft = sqft > 0 ? comp.price / sqft : 0;
+                    return (
+                      <tr 
+                        key={index} 
+                        className="hover:bg-muted/50 cursor-pointer transition-colors"
+                        onClick={() => {
+                          setSelectedProperty(comp);
+                          setPhotoIndex(0);
+                        }}
+                        data-testid={`row-cma-${index}`}
+                      >
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                                normalizeStatus(comp.status) === 'active' ? 'bg-green-500' :
+                                normalizeStatus(comp.status) === 'closed' ? 'bg-red-500' :
+                                normalizeStatus(comp.status) === 'activeUnderContract' ? 'bg-orange-500' :
+                                normalizeStatus(comp.status) === 'pending' ? 'bg-blue-500' :
+                                normalizeStatus(comp.status) === 'unknown' ? 'bg-gray-400' :
+                                'bg-gray-500'
+                              }`}
+                            />
+                            <span className="truncate max-w-[200px]">{comp.address}</span>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <Badge 
+                            variant="outline" 
+                            className={`text-xs ${getStatusBadgeStyle(comp.status || '')}`}
+                          >
+                            {getStatusLabel(comp.status || '')}
+                          </Badge>
+                        </td>
+                        <td className="p-3 text-right font-medium">{formatPrice(comp.price)}</td>
+                        <td className="p-3 text-right">{formatPrice(Math.round(pricePerSqft))}</td>
+                        <td className="p-3 text-right">{comp.daysOnMarket ?? '-'}</td>
+                        <td className="p-3 text-center">{comp.bedrooms}</td>
+                        <td className="p-3 text-center">{comp.bathrooms}</td>
+                        <td className="p-3 text-right">{sqft > 0 ? sqft.toLocaleString() : '-'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
       {(viewMode === 'grid' || viewMode === 'stats') && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {cmaData.map((comp, index) => (
+          {filteredComparables.map((comp, index) => (
             <Card 
               key={index} 
               className="cursor-pointer hover-elevate transition-all"

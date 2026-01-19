@@ -1,0 +1,292 @@
+Enhance CMA Tab in Transaction Detail Page
+Task
+Update the CMA tab within the Transaction Detail page (not the standalone CMAs feature) to add status filters, stats summary row, and view type options. This should apply to ALL transactions that have a CMA tab.
+Current State (See Screenshot)
+The CMA tab currently shows:
+
+Header: "Comparative Market Analysis" with property count
+View icons in top-right (chart, grid, columns icons) + Share button
+Stats cards row: Avg Price, Price/SqFt, Days on Market, Avg SqFt, Avg Beds, Avg Baths
+Property cards with photos in a grid below
+
+Required Changes
+1. Add Status Filter Tabs
+Add a row of filter tabs ABOVE the stats cards:
+┌─────────────────────────────────────────────────────────────────┐
+│ All │ Closed │ Active Under Contract │ Pending │ Active        │
+└─────────────────────────────────────────────────────────────────┘
+typescript// Add to the CMA tab component (likely CMATab.tsx or within transaction detail)
+
+const STATUS_FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'closed', label: 'Closed' },
+  { id: 'activeUnderContract', label: 'Active Under Contract' },
+  { id: 'pending', label: 'Pending' },
+  { id: 'active', label: 'Active' },
+];
+
+const [statusFilter, setStatusFilter] = useState('all');
+
+// Filter comparables based on selected status
+const filteredComparables = useMemo(() => {
+  if (statusFilter === 'all') return comparables;
+  return comparables.filter(comp => {
+    const normalizedStatus = normalizeStatus(comp.status);
+    return normalizedStatus === statusFilter;
+  });
+}, [comparables, statusFilter]);
+
+// Status filter tabs UI
+<div className="flex gap-1 bg-[#2a2a2a] p-2 rounded-lg mb-4">
+  {STATUS_FILTERS.map(filter => (
+    <button
+      key={filter.id}
+      onClick={() => setStatusFilter(filter.id)}
+      className={`px-4 py-2 text-sm font-medium rounded transition-colors ${
+        statusFilter === filter.id
+          ? 'bg-white text-gray-900'
+          : 'text-gray-300 hover:text-white hover:bg-gray-700'
+      }`}
+    >
+      {filter.label}
+    </button>
+  ))}
+</div>
+```
+
+**2. Add Comparable Criteria Stats Row**
+
+Add a dark stats summary row showing key metrics (like the Compare view):
+```
+┌──────────────┬──────────────┬──────────────┬──────────────┬──────────────┬──────────────┐
+│ LOW PRICE    │ HIGH PRICE   │ AVG PRICE    │ MEDIAN       │ AVG $/SQFT   │ AVG DOM      │
+│ $749,000     │ $2,199,000   │ $1,353,780   │ $1,299,000   │ $394         │ 0 Days       │
+└──────────────┴──────────────┴──────────────┴──────────────┴──────────────┴──────────────┘
+typescript// Stats summary row component
+const StatsSummaryRow = ({ comparables }) => {
+  const stats = useMemo(() => {
+    const prices = comparables.map(c => c.listPrice || c.soldPrice).filter(Boolean);
+    const pricesPerSqft = comparables
+      .filter(c => c.sqft > 0)
+      .map(c => (c.listPrice || c.soldPrice) / c.sqft);
+    const doms = comparables.map(c => c.dom).filter(d => d !== null && d !== undefined);
+    
+    const sorted = [...prices].sort((a, b) => a - b);
+    const median = sorted.length > 0 
+      ? sorted.length % 2 === 0
+        ? (sorted[sorted.length/2 - 1] + sorted[sorted.length/2]) / 2
+        : sorted[Math.floor(sorted.length/2)]
+      : 0;
+    
+    return {
+      lowPrice: prices.length > 0 ? Math.min(...prices) : 0,
+      highPrice: prices.length > 0 ? Math.max(...prices) : 0,
+      avgPrice: prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0,
+      medianPrice: median,
+      avgPricePerSqft: pricesPerSqft.length > 0 
+        ? Math.round(pricesPerSqft.reduce((a, b) => a + b, 0) / pricesPerSqft.length) 
+        : 0,
+      avgDom: doms.length > 0 
+        ? Math.round(doms.reduce((a, b) => a + b, 0) / doms.length) 
+        : 0,
+    };
+  }, [comparables]);
+
+  return (
+    <div className="grid grid-cols-6 gap-4 bg-[#2a2a2a] p-4 rounded-lg mb-4 text-white">
+      <div>
+        <div className="text-xs text-gray-400 uppercase tracking-wide">Low Price</div>
+        <div className="text-xl font-bold">${stats.lowPrice.toLocaleString()}</div>
+      </div>
+      <div>
+        <div className="text-xs text-gray-400 uppercase tracking-wide">High Price</div>
+        <div className="text-xl font-bold">${stats.highPrice.toLocaleString()}</div>
+      </div>
+      <div>
+        <div className="text-xs text-gray-400 uppercase tracking-wide">Avg Price</div>
+        <div className="text-xl font-bold">${Math.round(stats.avgPrice).toLocaleString()}</div>
+      </div>
+      <div>
+        <div className="text-xs text-gray-400 uppercase tracking-wide">Median</div>
+        <div className="text-xl font-bold">${Math.round(stats.medianPrice).toLocaleString()}</div>
+      </div>
+      <div>
+        <div className="text-xs text-gray-400 uppercase tracking-wide">Avg $/Sqft</div>
+        <div className="text-xl font-bold">${stats.avgPricePerSqft}</div>
+      </div>
+      <div>
+        <div className="text-xs text-gray-400 uppercase tracking-wide">Avg DOM</div>
+        <div className="text-xl font-bold">{stats.avgDom} Days</div>
+      </div>
+    </div>
+  );
+};
+3. Update View Type Toggle
+The existing view icons should toggle between three distinct views:
+typescripttype CMAViewType = 'stats' | 'grid' | 'table';
+
+const [viewType, setViewType] = useState<CMAViewType>('stats');
+
+// View toggle buttons (update existing icons)
+<div className="flex border rounded-lg overflow-hidden">
+  <button
+    onClick={() => setViewType('stats')}
+    className={`p-2 ${viewType === 'stats' ? 'bg-primary text-white' : 'bg-white hover:bg-gray-100'}`}
+    title="Stats View"
+  >
+    <BarChart3 className="w-5 h-5" />
+  </button>
+  <button
+    onClick={() => setViewType('grid')}
+    className={`p-2 ${viewType === 'grid' ? 'bg-primary text-white' : 'bg-white hover:bg-gray-100'}`}
+    title="Grid View"
+  >
+    <LayoutGrid className="w-5 h-5" />
+  </button>
+  <button
+    onClick={() => setViewType('table')}
+    className={`p-2 ${viewType === 'table' ? 'bg-primary text-white' : 'bg-white hover:bg-gray-100'}`}
+    title="Table View"
+  >
+    <TableIcon className="w-5 h-5" />
+  </button>
+</div>
+4. Implement Three View Types
+typescript// Stats View - Current card-based stats + property cards (existing layout)
+{viewType === 'stats' && (
+  <div>
+    {/* Existing stats cards (Avg Price, Price/SqFt, etc.) */}
+    {/* Existing property photo cards grid */}
+  </div>
+)}
+
+// Grid View - Property cards in a tighter grid layout
+{viewType === 'grid' && (
+  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    {filteredComparables.map(comp => (
+      <PropertyCard key={comp.mlsId} property={comp} />
+    ))}
+  </div>
+)}
+
+// Table View - Full data table like Compare view
+{viewType === 'table' && (
+  <div className="overflow-x-auto">
+    <table className="w-full text-sm">
+      <thead className="bg-gray-50 text-left">
+        <tr>
+          <th className="p-3">Address</th>
+          <th className="p-3">Status</th>
+          <th className="p-3">Price</th>
+          <th className="p-3">$/Sq.Ft</th>
+          <th className="p-3">DOM</th>
+          <th className="p-3">Beds</th>
+          <th className="p-3">Baths</th>
+          <th className="p-3">Sq.Ft.</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y">
+        {filteredComparables.map(comp => (
+          <tr key={comp.mlsId} className="hover:bg-gray-50">
+            <td className="p-3">
+              <div className="flex items-center gap-2">
+                <StatusDot status={comp.status} />
+                <span>{comp.address}</span>
+              </div>
+            </td>
+            <td className="p-3"><StatusText status={comp.status} /></td>
+            <td className="p-3 font-medium">${(comp.listPrice || comp.soldPrice)?.toLocaleString()}</td>
+            <td className="p-3">${Math.round((comp.listPrice || comp.soldPrice) / comp.sqft)}</td>
+            <td className="p-3">{comp.dom ?? '-'}</td>
+            <td className="p-3">{comp.beds}</td>
+            <td className="p-3">{comp.baths}</td>
+            <td className="p-3">{comp.sqft?.toLocaleString()}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
+5. Status Helper Functions
+typescript// Normalize status string to match filter IDs
+function normalizeStatus(status: string): string {
+  const lower = status?.toLowerCase() || '';
+  if (lower.includes('active under contract') || lower.includes('under contract')) {
+    return 'activeUnderContract';
+  }
+  if (lower.includes('closed') || lower.includes('sold')) {
+    return 'closed';
+  }
+  if (lower.includes('pending')) {
+    return 'pending';
+  }
+  if (lower.includes('active')) {
+    return 'active';
+  }
+  return 'active'; // default
+}
+
+// Status dot component
+const StatusDot = ({ status }: { status: string }) => {
+  const normalized = normalizeStatus(status);
+  const colors: Record<string, string> = {
+    active: 'bg-green-500',
+    closed: 'bg-red-500',
+    activeUnderContract: 'bg-orange-500',
+    pending: 'bg-gray-500',
+  };
+  return <div className={`w-3 h-3 rounded-full ${colors[normalized] || 'bg-gray-500'}`} />;
+};
+
+// Status text component
+const StatusText = ({ status }: { status: string }) => {
+  const normalized = normalizeStatus(status);
+  const config: Record<string, { text: string; class: string }> = {
+    active: { text: 'Active', class: 'text-green-600' },
+    closed: { text: 'Closed', class: 'text-red-600' },
+    activeUnderContract: { text: 'Active Under Contract', class: 'text-orange-600' },
+    pending: { text: 'Pending', class: 'text-gray-600' },
+  };
+  const { text, class: className } = config[normalized] || { text: status, class: 'text-gray-600' };
+  return <span className={className}>{text}</span>;
+};
+```
+
+---
+
+### Files to Find and Modify
+
+Look for the CMA tab component - likely one of these:
+- `client/src/components/CMATab.tsx`
+- `client/src/components/TransactionDetail.tsx` (if CMA is inline)
+- `client/src/pages/TransactionDetailPage.tsx`
+
+Search for: `Comparative Market Analysis` or `comparable properties found`
+
+---
+
+### Updated Layout Structure
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Comparative Market Analysis                    [Stats][Grid][Table] [Share] │
+│ 10 comparable properties found                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ [All] [Closed] [Active Under Contract] [Pending] [Active]    ← STATUS TABS  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ LOW PRICE  │ HIGH PRICE │ AVG PRICE  │ MEDIAN    │ AVG $/SQFT │ AVG DOM    │
+│ $749,000   │ $2,199,000 │ $1,353,780 │ $1,299,000│ $394       │ 0 Days     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│                    [CONTENT BASED ON SELECTED VIEW]                         │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Acceptance Criteria
+
+ Status filter tabs appear below the header, above the stats
+ Stats summary row (Low/High/Avg/Median/$/Sqft/DOM) displays with dark background
+ Filtering by status updates both stats and property list
+ View toggle switches between Stats, Grid, and Table views
+ Table view shows full property data with status colors
+ Changes apply to CMA tab on ALL transactions
+ Property count updates when filtering by status
