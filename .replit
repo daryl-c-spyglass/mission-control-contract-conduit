@@ -45,3 +45,6 @@ integrations = ["google-mail:1.0.0", "javascript_log_in_with_replit:2.0.0", "jav
 [userenv]
 
 [userenv.shared]
+
+[userenv.development]
+DISABLE_SLACK_NOTIFICATIONS = "true"

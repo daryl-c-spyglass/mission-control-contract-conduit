@@ -64,6 +64,11 @@ async function slackRequest(method: string, body: Record<string, any>): Promise<
 }
 
 export async function createSlackChannel(name: string): Promise<{ channelId: string; channelName: string }> {
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    console.log(`[NOTIFICATIONS DISABLED] Would have created Slack channel: ${name}`);
+    return { channelId: 'disabled', channelName: name };
+  }
+  
   const cleanName = name
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, "")
@@ -82,6 +87,11 @@ export async function createSlackChannel(name: string): Promise<{ channelId: str
 }
 
 export async function inviteUsersToChannel(channelId: string, userIds: string[]): Promise<void> {
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    console.log(`[NOTIFICATIONS DISABLED] Would have invited users to channel ${channelId}: ${userIds.join(', ')}`);
+    return;
+  }
+  
   if (userIds.length === 0) return;
 
   // Filter out empty/invalid user IDs
@@ -109,6 +119,11 @@ export async function inviteUsersToChannel(channelId: string, userIds: string[])
 }
 
 export async function postToChannel(channelId: string, text: string): Promise<void> {
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    console.log(`[NOTIFICATIONS DISABLED] Would have posted to channel ${channelId}: ${text.substring(0, 100)}...`);
+    return;
+  }
+  
   await slackRequest("chat.postMessage", {
     channel: channelId,
     text,
@@ -132,6 +147,11 @@ export async function postDocumentUploadNotification(
   channelId: string,
   doc: DocumentUploadNotification
 ): Promise<void> {
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    console.log(`[NOTIFICATIONS DISABLED] Would have sent document upload notification for: ${doc.documentName} at ${doc.propertyAddress}`);
+    return;
+  }
+  
   const timestamp = new Date().toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -231,6 +251,11 @@ export async function uploadImageFromUrl(
   filename: string,
   altText?: string
 ): Promise<{ fileId: string } | null> {
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    console.log(`[NOTIFICATIONS DISABLED] Would have uploaded image to channel ${channelId}: ${filename}`);
+    return { fileId: 'disabled' };
+  }
+  
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {
     console.log("Slack not configured, skipping image upload");
@@ -332,6 +357,11 @@ export async function postMLSListingNotification(
   channelId: string,
   listing: MLSListingData
 ): Promise<void> {
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    console.log(`[NOTIFICATIONS DISABLED] Would have sent MLS listing notification for: ${listing.address}`);
+    return;
+  }
+  
   const priceFormatted = listing.listPrice 
     ? `$${listing.listPrice.toLocaleString()}` 
     : "Price not listed";
@@ -451,6 +481,11 @@ export async function uploadFileToChannel(
   title: string,
   initialComment?: string
 ): Promise<{ fileId: string } | null> {
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    console.log(`[NOTIFICATIONS DISABLED] Would have uploaded file to channel ${channelId}: ${fileName}`);
+    return { fileId: 'disabled' };
+  }
+  
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {
     process.stderr.write(`[Slack] No SLACK_BOT_TOKEN configured, skipping file upload\n`);
@@ -542,6 +577,11 @@ export async function sendClosingReminder(
   closingDate: string,
   daysRemaining: number
 ): Promise<void> {
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    console.log(`[NOTIFICATIONS DISABLED] Would have sent closing reminder for: ${propertyAddress} (${daysRemaining} days remaining)`);
+    return;
+  }
+  
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {
     console.error("[Slack] No Slack token available for closing reminder");
@@ -651,6 +691,11 @@ export async function sendMarketingNotification(
   imageData?: string,
   fileName?: string
 ): Promise<void> {
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    console.log(`[NOTIFICATIONS DISABLED] Would have sent marketing notification for: ${propertyAddress} (${assetType})`);
+    return;
+  }
+  
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {
     console.error("[Slack] No Slack token available for marketing notification");
