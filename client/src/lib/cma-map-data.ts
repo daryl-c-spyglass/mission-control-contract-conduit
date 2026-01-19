@@ -2,22 +2,24 @@ import * as turf from '@turf/turf';
 import type { Feature, FeatureCollection, Point, Polygon } from 'geojson';
 import type { Property } from '@shared/schema';
 
-export type NormalizedStatus = 'ACTIVE' | 'PENDING' | 'SOLD' | 'UNKNOWN';
+export type NormalizedStatus = 'ACTIVE' | 'UNDER_CONTRACT' | 'PENDING' | 'SOLD' | 'UNKNOWN';
 
 export const STATUS_COLORS: Record<NormalizedStatus, string> = {
-  ACTIVE: '#2E7D32',
-  PENDING: '#F9A825',
-  SOLD: '#C62828',
-  UNKNOWN: '#757575',
+  ACTIVE: '#22c55e',        // Green
+  UNDER_CONTRACT: '#f97316', // Orange
+  PENDING: '#6b7280',        // Gray
+  SOLD: '#ef4444',          // Red
+  UNKNOWN: '#9ca3af',       // Light Gray
 };
 
-export const SUBJECT_COLOR = '#1565C0';
+export const SUBJECT_COLOR = '#3b82f6'; // Blue
 
 export const STATUS_LABELS: Record<NormalizedStatus, string> = {
-  ACTIVE: 'Active Listing',
+  ACTIVE: 'Active',
+  UNDER_CONTRACT: 'Under Contract',
   PENDING: 'Pending',
-  SOLD: 'Sold',
-  UNKNOWN: 'Unknown Status',
+  SOLD: 'Closed',
+  UNKNOWN: 'Unknown',
 };
 
 export interface CmaPointProperties {
@@ -63,14 +65,19 @@ export function normalizeStatus(rawStatus: string | null | undefined): Normalize
     return 'SOLD';
   }
 
-  // Pending/Under Contract statuses (Repliers codes: 'u', 'p', 'sc', 'k', 'b')
-  // 'k' = kick-out clause, 'b' = backup offer accepted
-  if (status === 'u' || status === 'p' || status === 'pending' ||
-      status === 'sc' || status === 'k' || status === 'b' ||
-      status.includes('pending') || status.includes('contract') ||
+  // Under Contract statuses (Repliers codes: 'u', 'sc', 'k', 'b')
+  // 'u' = under contract, 'sc' = show for contingent, 'k' = kick-out clause, 'b' = backup offer
+  if (status === 'u' || status === 'sc' || status === 'k' || status === 'b' ||
+      status.includes('under contract') || status.includes('contract') ||
       status.includes('contingent') || status.includes('backup') ||
       status.includes('option') || status.includes('kickout') ||
       status.includes('kick-out') || status.includes('accepted')) {
+    return 'UNDER_CONTRACT';
+  }
+
+  // Pending statuses (Repliers codes: 'p', 'pending')
+  if (status === 'p' || status === 'pending' ||
+      status.includes('pending')) {
     return 'PENDING';
   }
 
@@ -437,6 +444,7 @@ export function buildCmaMapModel(
     propertyMapSize: propertyByFeatureId.size,
     statusBreakdown: {
       active: compFeatures.filter(f => f.properties.status === 'ACTIVE').length,
+      underContract: compFeatures.filter(f => f.properties.status === 'UNDER_CONTRACT').length,
       pending: compFeatures.filter(f => f.properties.status === 'PENDING').length,
       sold: compFeatures.filter(f => f.properties.status === 'SOLD').length,
       unknown: compFeatures.filter(f => f.properties.status === 'UNKNOWN').length,

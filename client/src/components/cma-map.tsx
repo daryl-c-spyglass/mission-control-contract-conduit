@@ -323,6 +323,7 @@ function initCmaLayers(
           'match',
           ['get', 'status'],
           'ACTIVE', STATUS_COLORS.ACTIVE,
+          'UNDER_CONTRACT', STATUS_COLORS.UNDER_CONTRACT,
           'PENDING', STATUS_COLORS.PENDING,
           'SOLD', STATUS_COLORS.SOLD,
           STATUS_COLORS.UNKNOWN,
@@ -984,6 +985,13 @@ export function CMAMap({
               style={{ backgroundColor: STATUS_COLORS.ACTIVE }}
             />
             <span className="text-xs">{STATUS_LABELS.ACTIVE}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: STATUS_COLORS.UNDER_CONTRACT }}
+            />
+            <span className="text-xs">{STATUS_LABELS.UNDER_CONTRACT}</span>
           </div>
           <div className="flex items-center gap-2">
             <div

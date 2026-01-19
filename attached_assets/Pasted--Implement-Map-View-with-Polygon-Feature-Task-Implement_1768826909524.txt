@@ -1,0 +1,444 @@
+ Implement Map View with Polygon Feature
+Task
+Implement the Map view in the CMA tab matching the Client Data Portal design (see attached screenshot), plus add polygon functionality for subject property search area and comparable boundaries.
+Reference Screenshot Features
+The Map view should include:
+
+Streets/Satellite toggle (top-left, orange background when active)
+Mapbox GL map with property markers
+Price bubble markers showing price (e.g., "$960K", "$1.07M")
+Color-coded markers by status:
+
+Green = Active
+Red = Closed
+Orange = Under Contract
+Gray = Pending
+Blue = Subject Property
+
+
+Legend (bottom-left) showing all status colors
+Zoom controls (right side)
+No status filters or stats summary (Map view is visual only)
+
+NEW Feature: Polygon Display
+Add polygon functionality to show:
+
+Subject Property Search Area - The geographic boundary used to find comparables
+Subdivision/Neighborhood Boundaries (if available from MLS data)
+
+
+Implementation
+1. Map View Component Structure
+typescript// client/src/components/CMA/views/MapView.tsx
+
+import { useState, useEffect, useRef } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+interface MapViewProps {
+  comparables: Property[];
+  subjectProperty: Property | null;
+  searchPolygon?: GeoJSON.Polygon | null; // Search area polygon
+  subdivisionPolygon?: GeoJSON.Polygon | null; // Optional subdivision boundary
+}
+
+type MapStyle = 'streets' | 'satellite';
+
+const MAP_STYLES = {
+  streets: 'mapbox://styles/mapbox/streets-v12',
+  satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
+};
+
+const STATUS_COLORS = {
+  subject: '#3b82f6',      // Blue
+  active: '#22c55e',       // Green
+  closed: '#ef4444',       // Red
+  underContract: '#f97316', // Orange
+  pending: '#6b7280',      // Gray
+};
+
+export const MapView = ({ 
+  comparables, 
+  subjectProperty, 
+  searchPolygon,
+  subdivisionPolygon 
+}: MapViewProps) => {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const [mapStyle, setMapStyle] = useState<MapStyle>('streets');
+  const [showPolygon, setShowPolygon] = useState(true);
+
+  // Initialize map
+  useEffect(() => {
+    if (!mapContainer.current || map.current) return;
+
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: MAP_STYLES[mapStyle],
+      center: getMapCenter(),
+      zoom: 12,
+    });
+
+    // Add navigation controls
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    map.current.on('load', () => {
+      addPolygonLayers();
+      addPropertyMarkers();
+    });
+
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, []);
+
+  // Update map style
+  useEffect(() => {
+    if (map.current) {
+      map.current.setStyle(MAP_STYLES[mapStyle]);
+      
+      // Re-add layers after style change
+      map.current.once('style.load', () => {
+        addPolygonLayers();
+        addPropertyMarkers();
+      });
+    }
+  }, [mapStyle]);
+
+  // Calculate map center from properties
+  const getMapCenter = (): [number, number] => {
+    const allProperties = subjectProperty 
+      ? [subjectProperty, ...comparables] 
+      : comparables;
+    
+    if (allProperties.length === 0) return [-97.7431, 30.2672]; // Default: Austin, TX
+    
+    const lngs = allProperties.map(p => p.longitude).filter(Boolean);
+    const lats = allProperties.map(p => p.latitude).filter(Boolean);
+    
+    return [
+      lngs.reduce((a, b) => a + b, 0) / lngs.length,
+      lats.reduce((a, b) => a + b, 0) / lats.length,
+    ];
+  };
+
+  // Add polygon layers for search area
+  const addPolygonLayers = () => {
+    if (!map.current || !searchPolygon) return;
+
+    // Remove existing layers if any
+    if (map.current.getLayer('search-polygon-fill')) {
+      map.current.removeLayer('search-polygon-fill');
+    }
+    if (map.current.getLayer('search-polygon-outline')) {
+      map.current.removeLayer('search-polygon-outline');
+    }
+    if (map.current.getSource('search-polygon')) {
+      map.current.removeSource('search-polygon');
+    }
+
+    // Add search area polygon source
+    map.current.addSource('search-polygon', {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        properties: {},
+        geometry: searchPolygon,
+      },
+    });
+
+    // Add fill layer (semi-transparent)
+    map.current.addLayer({
+      id: 'search-polygon-fill',
+      type: 'fill',
+      source: 'search-polygon',
+      paint: {
+        'fill-color': '#F37216', // Primary orange
+        'fill-opacity': 0.1,
+      },
+    });
+
+    // Add outline layer
+    map.current.addLayer({
+      id: 'search-polygon-outline',
+      type: 'line',
+      source: 'search-polygon',
+      paint: {
+        'line-color': '#F37216', // Primary orange
+        'line-width': 2,
+        'line-dasharray': [2, 2], // Dashed line
+      },
+    });
+
+    // Add subdivision polygon if available
+    if (subdivisionPolygon) {
+      map.current.addSource('subdivision-polygon', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          properties: {},
+          geometry: subdivisionPolygon,
+        },
+      });
+
+      map.current.addLayer({
+        id: 'subdivision-polygon-fill',
+        type: 'fill',
+        source: 'subdivision-polygon',
+        paint: {
+          'fill-color': '#3b82f6', // Blue
+          'fill-opacity': 0.05,
+        },
+      });
+
+      map.current.addLayer({
+        id: 'subdivision-polygon-outline',
+        type: 'line',
+        source: 'subdivision-polygon',
+        paint: {
+          'line-color': '#3b82f6', // Blue
+          'line-width': 2,
+        },
+      });
+    }
+  };
+
+  // Add property markers
+  const addPropertyMarkers = () => {
+    if (!map.current) return;
+
+    // Add subject property marker
+    if (subjectProperty?.latitude && subjectProperty?.longitude) {
+      const subjectEl = createMarkerElement(subjectProperty, true);
+      new mapboxgl.Marker(subjectEl)
+        .setLngLat([subjectProperty.longitude, subjectProperty.latitude])
+        .setPopup(createPopup(subjectProperty, true))
+        .addTo(map.current);
+    }
+
+    // Add comparable markers
+    comparables.forEach(comp => {
+      if (!comp.latitude || !comp.longitude) return;
+      
+      const markerEl = createMarkerElement(comp, false);
+      new mapboxgl.Marker(markerEl)
+        .setLngLat([comp.longitude, comp.latitude])
+        .setPopup(createPopup(comp, false))
+        .addTo(map.current!);
+    });
+  };
+
+  // Create custom marker element with price bubble
+  const createMarkerElement = (property: Property, isSubject: boolean) => {
+    const el = document.createElement('div');
+    const price = property.soldPrice || property.listPrice || 0;
+    const formattedPrice = price >= 1000000 
+      ? `$${(price / 1000000).toFixed(2)}M` 
+      : `$${Math.round(price / 1000)}K`;
+    
+    const status = isSubject ? 'subject' : normalizeStatus(property.status);
+    const color = STATUS_COLORS[status] || STATUS_COLORS.active;
+    
+    el.innerHTML = `
+      <div style="
+        background-color: ${color};
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+        white-space: nowrap;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        cursor: pointer;
+      ">
+        ${formattedPrice}
+      </div>
+    `;
+    
+    return el;
+  };
+
+  // Create popup for marker
+  const createPopup = (property: Property, isSubject: boolean) => {
+    const price = property.soldPrice || property.listPrice || 0;
+    
+    return new mapboxgl.Popup({ offset: 25 }).setHTML(`
+      <div style="padding: 8px;">
+        <div style="font-weight: bold; margin-bottom: 4px;">
+          ${isSubject ? '📍 Subject Property' : property.address}
+        </div>
+        <div style="color: #F37216; font-size: 16px; font-weight: bold;">
+          $${price.toLocaleString()}
+        </div>
+        <div style="font-size: 12px; color: #666; margin-top: 4px;">
+          ${property.beds} bed | ${property.baths} bath | ${property.sqft?.toLocaleString()} sqft
+        </div>
+        ${!isSubject ? `<div style="font-size: 11px; color: #888; margin-top: 4px;">
+          Status: ${property.status}
+        </div>` : ''}
+      </div>
+    `);
+  };
+
+  return (
+    <div className="relative h-[500px] rounded-b-lg overflow-hidden">
+      {/* Map Style Toggle */}
+      <div className="absolute top-3 left-3 z-10 flex rounded-lg overflow-hidden shadow-md">
+        <button
+          onClick={() => setMapStyle('streets')}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            mapStyle === 'streets'
+              ? 'bg-primary text-white'
+              : 'bg-white text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          Streets
+        </button>
+        <button
+          onClick={() => setMapStyle('satellite')}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            mapStyle === 'satellite'
+              ? 'bg-primary text-white'
+              : 'bg-white text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          Satellite
+        </button>
+      </div>
+
+      {/* Polygon Toggle (if polygon exists) */}
+      {searchPolygon && (
+        <div className="absolute top-3 left-48 z-10">
+          <button
+            onClick={() => setShowPolygon(!showPolygon)}
+            className={`px-3 py-2 text-sm font-medium rounded-lg shadow-md transition-colors ${
+              showPolygon
+                ? 'bg-primary text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            {showPolygon ? 'Hide' : 'Show'} Search Area
+          </button>
+        </div>
+      )}
+
+      {/* Map Container */}
+      <div ref={mapContainer} className="w-full h-full" />
+
+      {/* Legend */}
+      <div className="absolute bottom-4 left-4 z-10 bg-white rounded-lg shadow-lg p-3">
+        <div className="text-sm font-semibold mb-2">Legend</div>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-blue-500" />
+            <span className="text-xs">Subject Property</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-green-500" />
+            <span className="text-xs">Active</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-orange-500" />
+            <span className="text-xs">Under Contract</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-red-500" />
+            <span className="text-xs">Closed</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-gray-500" />
+            <span className="text-xs">Pending</span>
+          </div>
+          {searchPolygon && (
+            <div className="flex items-center gap-2 pt-1 border-t mt-1">
+              <div className="w-3 h-3 border-2 border-dashed border-orange-500 bg-orange-100" />
+              <span className="text-xs">Search Area</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+2. Polygon Data Structure
+typescript// Types for polygon data
+interface SearchCriteria {
+  polygon?: GeoJSON.Polygon;
+  radius?: number;
+  center?: { lat: number; lng: number };
+  // ... other search criteria
+}
+
+// Example polygon structure from Repliers API
+const examplePolygon: GeoJSON.Polygon = {
+  type: 'Polygon',
+  coordinates: [[
+    [-97.8, 30.3],   // [longitude, latitude]
+    [-97.7, 30.3],
+    [-97.7, 30.2],
+    [-97.8, 30.2],
+    [-97.8, 30.3],   // Close the polygon (same as first point)
+  ]],
+};
+3. Helper Function for Status
+typescriptconst normalizeStatus = (status: string): string => {
+  const lower = status?.toLowerCase() || '';
+  if (lower.includes('under contract') || lower.includes('active under contract')) {
+    return 'underContract';
+  }
+  if (lower.includes('closed') || lower.includes('sold')) {
+    return 'closed';
+  }
+  if (lower.includes('pending')) {
+    return 'pending';
+  }
+  if (lower.includes('active')) {
+    return 'active';
+  }
+  return 'active';
+};
+4. Integration in CMA Tab
+typescript// In CMA tab component
+{mainView === 'map' && (
+  <MapView
+    comparables={comparables}
+    subjectProperty={subjectProperty}
+    searchPolygon={cmaData?.searchCriteria?.polygon || null}
+    subdivisionPolygon={subjectProperty?.subdivisionPolygon || null}
+  />
+)}
+
+Polygon Feature Details
+Polygon TypeColorStylePurposeSearch AreaOrange (#F37216)Dashed outline, 10% fillShows the boundary used to find comparablesSubdivisionBlue (#3b82f6)Solid outline, 5% fillShows neighborhood boundary (if available)
+Toggle Behavior
+
+"Show/Hide Search Area" button appears only when polygon data exists
+Clicking toggles polygon visibility on map
+Polygon layers render below markers so properties are always visible
+
+
+Acceptance Criteria
+
+ Map view matches Client Data Portal screenshot
+ Streets/Satellite toggle works (orange when active)
+ Price bubble markers display with correct status colors
+ Legend shows all status types in bottom-left
+ Zoom controls appear on right side
+ Search area polygon displays when data available
+ Polygon toggle button shows/hides search boundary
+ Markers have popups with property details on click
+ Map centers on properties automatically
+ Map style persists when switching between views
+
+
+Dependencies
+bashnpm install mapbox-gl
+npm install --save-dev @types/mapbox-gl
+```
+
+### Environment Variable
+```
+VITE_MAPBOX_TOKEN=your_mapbox_token_here
