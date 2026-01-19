@@ -437,6 +437,12 @@ export function CMATab({ transaction }: CMATabProps) {
           <div>
             <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg Price</div>
             <div className="text-lg sm:text-xl font-bold">{formatPrice(Math.round(statistics.price.average))}</div>
+            <div className="text-xs text-zinc-400 mt-1">
+              Range: {formatPrice(statistics.price.range.min)} - {formatPrice(statistics.price.range.max)}
+            </div>
+            <div className="text-xs text-zinc-400">
+              Median: {formatPrice(Math.round(statistics.price.median))}
+            </div>
           </div>
           <div>
             <div className="text-xs text-zinc-400 uppercase tracking-wide">Median</div>
@@ -445,10 +451,22 @@ export function CMATab({ transaction }: CMATabProps) {
           <div>
             <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg $/SqFt</div>
             <div className="text-lg sm:text-xl font-bold">${Math.round(statistics.pricePerSqFt.average)}</div>
+            <div className="text-xs text-zinc-400 mt-1">
+              Range: ${Math.round(statistics.pricePerSqFt.range.min)} - ${Math.round(statistics.pricePerSqFt.range.max)}
+            </div>
+            <div className="text-xs text-zinc-400">
+              Median: ${Math.round(statistics.pricePerSqFt.median)}
+            </div>
           </div>
           <div>
             <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg DOM</div>
             <div className="text-lg sm:text-xl font-bold">{Math.round(statistics.daysOnMarket.average)} Days</div>
+            <div className="text-xs text-zinc-400 mt-1">
+              Range: {statistics.daysOnMarket.range.min} - {statistics.daysOnMarket.range.max}
+            </div>
+            <div className="text-xs text-zinc-400">
+              Median: {Math.round(statistics.daysOnMarket.median)}
+            </div>
           </div>
         </div>
       )}
