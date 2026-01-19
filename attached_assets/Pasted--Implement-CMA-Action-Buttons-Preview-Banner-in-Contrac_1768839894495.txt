@@ -1,0 +1,1007 @@
+ Implement CMA Action Buttons & Preview Banner in Contract Conduit
+SCOPE
+Implement CMA action buttons and preview banner from Client Data Portal. This adds sharing, printing, email, and notes functionality to the CMA detail/stats view.
+
+WHAT TO BUILD
+1. Top Action Buttons Bar (5 buttons)
+
+Copy Email - Generate formatted client email and copy to clipboard
+Produce URL - Generate/copy shareable public link
+Print - Trigger browser print dialog
+Presentation - Navigate to presentation builder (placeholder for now)
+Share - Open share dialog with social media options
+
+2. Yellow Preview Banner (5 buttons)
+
+Save - Save CMA changes
+Copy Live URL - Copy existing share link
+Share CMA - Open email share dialog
+Modify Search - Navigate back to CMA builder/search
+Notes - Open notes dialog
+
+3. Dialogs
+
+Share Dialog - Social media sharing + copy link
+Email Share Dialog - Send CMA via email form
+Notes Dialog - Add/edit agent notes
+
+
+TASK 1: Create CMA Action Buttons Component
+Create client/src/components/cma/CMAActionButtons.tsx:
+typescriptimport { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { 
+  Mail, 
+  Link as LinkIcon, 
+  Printer, 
+  LayoutGrid, 
+  Share2,
+  Loader2 
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { CMAShareDialog } from './CMAShareDialog';
+
+interface CMAActionButtonsProps {
+  transactionId: number;
+  propertyAddress: string;
+  publicLink?: string | null;
+  statistics?: {
+    price?: { range?: { min?: number; max?: number }; average?: number };
+    pricePerSqFt?: { average?: number };
+    daysOnMarket?: { average?: number };
+  };
+  onShareSuccess?: () => void;
+}
+
+export function CMAActionButtons({
+  transactionId,
+  propertyAddress,
+  publicLink,
+  statistics,
+  onShareSuccess,
+}: CMAActionButtonsProps) {
+  const { toast } = useToast();
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+
+  // Share mutation to generate public link
+  const shareMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/transactions/${transactionId}/cma/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) throw new Error('Failed to generate share link');
+      return response.json();
+    },
+    onSuccess: () => {
+      onShareSuccess?.();
+      toast({
+        title: 'Share link generated',
+        description: 'Your CMA is now shareable via the link.',
+      });
+    },
+  });
+
+  // Generate client email content
+  const generateClientEmail = () => {
+    const priceMin = statistics?.price?.range?.min 
+      ? `$${statistics.price.range.min.toLocaleString()}` 
+      : 'N/A';
+    const priceMax = statistics?.price?.range?.max 
+      ? `$${statistics.price.range.max.toLocaleString()}` 
+      : 'N/A';
+    const avgPricePerSqFt = statistics?.pricePerSqFt?.average 
+      ? `$${Math.round(statistics.pricePerSqFt.average)}` 
+      : 'N/A';
+    const avgDOM = statistics?.daysOnMarket?.average 
+      ? `${Math.round(statistics.daysOnMarket.average)}` 
+      : 'N/A';
+    
+    return `Subject: Market Analysis for ${propertyAddress}
+
+---
+
+Hi there,
+
+I put together a market analysis for your home based on recent comparable sales. Here's what the data is showing:
+
+**Comparable Sales Summary**
+- Price Range: ${priceMin} – ${priceMax}
+- Average Price/Sq Ft: ${avgPricePerSqFt}
+- Average Days on Market: ${avgDOM} days
+
+I'd love to walk you through the full analysis and talk through your timing and goals. Want to grab 15 minutes this week?
+
+Best regards`;
+  };
+
+  // Copy email to clipboard
+  const handleCopyClientEmail = async () => {
+    const emailContent = generateClientEmail();
+    try {
+      await navigator.clipboard.writeText(emailContent);
+      toast({
+        title: 'Email copied',
+        description: 'Paste into your email client to send to your client.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Copy failed',
+        description: 'Unable to copy to clipboard.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Produce URL and copy to clipboard
+  const handleProduceUrl = async () => {
+    try {
+      let shareUrl: string;
+      if (publicLink) {
+        shareUrl = `${window.location.origin}/share/cma/${publicLink}`;
+      } else {
+        const result = await shareMutation.mutateAsync();
+        shareUrl = `${window.location.origin}/share/cma/${result.shareToken}`;
+      }
+      await navigator.clipboard.writeText(shareUrl);
+      toast({
+        title: 'URL copied to clipboard',
+        description: shareUrl,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to generate or copy share URL',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Print handler
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap print:hidden">
+      <Button variant="outline" size="sm" onClick={handleCopyClientEmail}>
+        <Mail className="w-4 h-4 mr-2" />
+        Copy Email
+      </Button>
+      
+      <Button 
+        variant="outline" 
+        size="sm"
+        onClick={handleProduceUrl}
+        disabled={shareMutation.isPending}
+      >
+        {shareMutation.isPending ? (
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        ) : (
+          <LinkIcon className="w-4 h-4 mr-2" />
+        )}
+        Produce URL
+      </Button>
+      
+      <Button variant="outline" size="sm" onClick={handlePrint}>
+        <Printer className="w-4 h-4 mr-2" />
+        Print
+      </Button>
+      
+      <Button variant="outline" size="sm" disabled title="Coming soon">
+        <LayoutGrid className="w-4 h-4 mr-2" />
+        Presentation
+      </Button>
+      
+      <Button variant="outline" size="sm" onClick={() => setShareDialogOpen(true)}>
+        <Share2 className="w-4 h-4 mr-2" />
+        Share
+      </Button>
+
+      <CMAShareDialog
+        open={shareDialogOpen}
+        onOpenChange={setShareDialogOpen}
+        transactionId={transactionId}
+        propertyAddress={propertyAddress}
+        publicLink={publicLink}
+        onShareSuccess={onShareSuccess}
+      />
+    </div>
+  );
+}
+
+TASK 2: Create Preview Banner Component
+Create client/src/components/cma/CMAPreviewBanner.tsx:
+typescriptimport { useState } from 'react';
+import { 
+  Save, 
+  ExternalLink, 
+  Mail, 
+  Edit, 
+  FileText,
+  Loader2
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { CMAEmailShareDialog } from './CMAEmailShareDialog';
+import { CMANotesDialog } from './CMANotesDialog';
+
+interface CMAPreviewBannerProps {
+  transactionId: number;
+  propertyAddress: string;
+  publicLink?: string | null;
+  notes?: string | null;
+  onSave?: () => void;
+  onModifySearch?: () => void;
+  onNotesUpdate?: () => void;
+  isSaving?: boolean;
+}
+
+export function CMAPreviewBanner({
+  transactionId,
+  propertyAddress,
+  publicLink,
+  notes,
+  onSave,
+  onModifySearch,
+  onNotesUpdate,
+  isSaving,
+}: CMAPreviewBannerProps) {
+  const { toast } = useToast();
+  const [emailShareDialogOpen, setEmailShareDialogOpen] = useState(false);
+  const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+
+  // Copy live URL to clipboard
+  const handleCopyLiveUrl = async () => {
+    if (!publicLink) {
+      toast({
+        title: 'No share link',
+        description: 'Generate a share link first using "Produce URL".',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    const shareUrl = `${window.location.origin}/share/cma/${publicLink}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast({
+        title: 'URL copied',
+        description: shareUrl,
+      });
+    } catch (error) {
+      toast({
+        title: 'Copy failed',
+        description: 'Unable to copy to clipboard.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  return (
+    <>
+      <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-400 dark:border-yellow-600 rounded-md p-4 flex items-center justify-between gap-4 flex-wrap print:hidden">
+        <p className="text-sm text-yellow-800 dark:text-yellow-200">
+          You are seeing a preview of the CMA report.
+        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          {onSave && (
+            <Button size="sm" onClick={onSave} disabled={isSaving}>
+              {isSaving ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
+              {isSaving ? 'Saving...' : 'Save'}
+            </Button>
+          )}
+          
+          <Button size="sm" variant="outline" onClick={handleCopyLiveUrl}>
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Copy Live URL
+          </Button>
+          
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={() => setEmailShareDialogOpen(true)}
+          >
+            <Mail className="w-4 h-4 mr-2" />
+            Share CMA
+          </Button>
+          
+          {onModifySearch && (
+            <Button size="sm" variant="outline" onClick={onModifySearch}>
+              <Edit className="w-4 h-4 mr-2" />
+              Modify Search
+            </Button>
+          )}
+          
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={() => setNotesDialogOpen(true)}
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Notes
+          </Button>
+        </div>
+      </div>
+
+      <CMAEmailShareDialog
+        open={emailShareDialogOpen}
+        onOpenChange={setEmailShareDialogOpen}
+        transactionId={transactionId}
+        propertyAddress={propertyAddress}
+        publicLink={publicLink}
+      />
+
+      <CMANotesDialog
+        open={notesDialogOpen}
+        onOpenChange={setNotesDialogOpen}
+        transactionId={transactionId}
+        initialNotes={notes || ''}
+        onSuccess={onNotesUpdate}
+      />
+    </>
+  );
+}
+
+TASK 3: Create Share Dialog Component
+Create client/src/components/cma/CMAShareDialog.tsx:
+typescriptimport { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { Copy, Check, Loader2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+
+interface CMAShareDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  transactionId: number;
+  propertyAddress: string;
+  publicLink?: string | null;
+  onShareSuccess?: () => void;
+}
+
+export function CMAShareDialog({
+  open,
+  onOpenChange,
+  transactionId,
+  propertyAddress,
+  publicLink,
+  onShareSuccess,
+}: CMAShareDialogProps) {
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
+
+  // Share mutation to generate public link
+  const shareMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/transactions/${transactionId}/cma/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) throw new Error('Failed to generate share link');
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setGeneratedLink(`${window.location.origin}/share/cma/${data.shareToken}`);
+      onShareSuccess?.();
+    },
+  });
+
+  const shareUrl = publicLink 
+    ? `${window.location.origin}/share/cma/${publicLink}`
+    : generatedLink || '';
+
+  const handleCopy = async () => {
+    if (!shareUrl) {
+      // Generate link first
+      try {
+        await shareMutation.mutateAsync();
+      } catch (error) {
+        toast({ title: 'Failed to generate link', variant: 'destructive' });
+        return;
+      }
+    }
+    
+    const urlToCopy = shareUrl || generatedLink;
+    if (urlToCopy) {
+      await navigator.clipboard.writeText(urlToCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast({ title: 'Link copied!' });
+    }
+  };
+
+  const handleSocialShare = (platform: string) => {
+    if (!shareUrl) {
+      toast({ 
+        title: 'Generate link first', 
+        description: 'Click copy to generate a share link.',
+        variant: 'destructive' 
+      });
+      return;
+    }
+    
+    const text = encodeURIComponent(`Check out this CMA report: ${propertyAddress}`);
+    const url = encodeURIComponent(shareUrl);
+    
+    const urls: Record<string, string> = {
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}`,
+      twitter: `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
+    };
+    
+    if (urls[platform]) {
+      window.open(urls[platform], '_blank', 'width=600,height=400');
+    } else {
+      // For platforms that don't support direct sharing
+      navigator.clipboard.writeText(shareUrl);
+      toast({ 
+        title: 'Link copied!', 
+        description: `Paste this link on ${platform}.` 
+      });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Share CMA Report</DialogTitle>
+          <DialogDescription>
+            Share this CMA report via social media or copy the link.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          {/* Copy Link */}
+          <div className="flex items-center gap-2">
+            <Input 
+              value={shareUrl || 'Click copy to generate link'} 
+              readOnly 
+              className="flex-1 text-sm"
+            />
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={handleCopy}
+              disabled={shareMutation.isPending}
+            >
+              {shareMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : copied ? (
+                <Check className="w-4 h-4 text-green-500" />
+              ) : (
+                <Copy className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
+
+          {/* Social Media Buttons */}
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => handleSocialShare('facebook')}
+            >
+              Facebook
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => handleSocialShare('twitter')}
+            >
+              X (Twitter)
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+TASK 4: Create Email Share Dialog Component
+Create client/src/components/cma/CMAEmailShareDialog.tsx:
+typescriptimport { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { Copy } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+
+interface CMAEmailShareDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  transactionId: number;
+  propertyAddress: string;
+  publicLink?: string | null;
+}
+
+export function CMAEmailShareDialog({
+  open,
+  onOpenChange,
+  transactionId,
+  propertyAddress,
+  publicLink,
+}: CMAEmailShareDialogProps) {
+  const { toast } = useToast();
+  const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
+  const [emailForm, setEmailForm] = useState({
+    yourName: '',
+    yourEmail: '',
+    friendName: '',
+    friendEmail: '',
+    comments: 'Check out this CMA report I created for you.',
+  });
+
+  const emailShareMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/transactions/${transactionId}/cma/email-share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderName: emailForm.yourName,
+          senderEmail: emailForm.yourEmail,
+          recipientName: emailForm.friendName,
+          recipientEmail: emailForm.friendEmail,
+          message: emailForm.comments,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok || data.shareUrl) {
+        // Email service not configured - show fallback
+        if (data.shareUrl) {
+          setFallbackUrl(data.shareUrl);
+        }
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to send email');
+        }
+      }
+      
+      return data;
+    },
+    onSuccess: (data) => {
+      if (!data.shareUrl) {
+        toast({ title: 'Email sent!', description: 'CMA report shared successfully.' });
+        onOpenChange(false);
+        resetForm();
+      }
+    },
+    onError: (error: Error) => {
+      if (!fallbackUrl) {
+        toast({ title: 'Failed to send', description: error.message, variant: 'destructive' });
+      }
+    },
+  });
+
+  const resetForm = () => {
+    setEmailForm({
+      yourName: '',
+      yourEmail: '',
+      friendName: '',
+      friendEmail: '',
+      comments: 'Check out this CMA report I created for you.',
+    });
+    setFallbackUrl(null);
+  };
+
+  const handleSubmit = () => {
+    if (!emailForm.yourName || !emailForm.yourEmail || !emailForm.friendName || !emailForm.friendEmail) {
+      toast({ title: 'Missing fields', description: 'Please fill in all required fields.', variant: 'destructive' });
+      return;
+    }
+    emailShareMutation.mutate();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(open) => { onOpenChange(open); if (!open) resetForm(); }}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Share CMA via Email</DialogTitle>
+          <DialogDescription>
+            Send this CMA report for {propertyAddress} directly to a client or colleague.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="your-name">Your Name *</Label>
+              <Input
+                id="your-name"
+                placeholder="Your name"
+                value={emailForm.yourName}
+                onChange={(e) => setEmailForm(prev => ({ ...prev, yourName: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="friend-name">Recipient's Name *</Label>
+              <Input
+                id="friend-name"
+                placeholder="Recipient name"
+                value={emailForm.friendName}
+                onChange={(e) => setEmailForm(prev => ({ ...prev, friendName: e.target.value }))}
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="your-email">Your Email *</Label>
+              <Input
+                id="your-email"
+                type="email"
+                placeholder="you@example.com"
+                value={emailForm.yourEmail}
+                onChange={(e) => setEmailForm(prev => ({ ...prev, yourEmail: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="friend-email">Recipient's Email *</Label>
+              <Input
+                id="friend-email"
+                type="email"
+                placeholder="client@example.com"
+                value={emailForm.friendEmail}
+                onChange={(e) => setEmailForm(prev => ({ ...prev, friendEmail: e.target.value }))}
+              />
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="comments">Message</Label>
+            <Textarea
+              id="comments"
+              placeholder="Add a personal message..."
+              value={emailForm.comments}
+              onChange={(e) => setEmailForm(prev => ({ ...prev, comments: e.target.value }))}
+              rows={3}
+            />
+          </div>
+
+          {fallbackUrl && (
+            <div className="p-3 bg-muted rounded-md space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Email service not configured. Share this link manually:
+              </p>
+              <div className="flex items-center gap-2">
+                <Input value={fallbackUrl} readOnly className="text-xs" />
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => {
+                    navigator.clipboard.writeText(fallbackUrl);
+                    toast({ title: 'Copied!', description: 'Link copied to clipboard.' });
+                  }}
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={emailShareMutation.isPending}>
+            {emailShareMutation.isPending ? 'Sending...' : 'Share'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+TASK 5: Create Notes Dialog Component
+Create client/src/components/cma/CMANotesDialog.tsx:
+typescriptimport { useState, useEffect } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+
+interface CMANotesDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  transactionId: number;
+  initialNotes: string;
+  onSuccess?: () => void;
+}
+
+export function CMANotesDialog({
+  open,
+  onOpenChange,
+  transactionId,
+  initialNotes,
+  onSuccess,
+}: CMANotesDialogProps) {
+  const { toast } = useToast();
+  const [notes, setNotes] = useState(initialNotes);
+
+  // Sync notes when dialog opens
+  useEffect(() => {
+    if (open) {
+      setNotes(initialNotes);
+    }
+  }, [open, initialNotes]);
+
+  const updateNotesMutation = useMutation({
+    mutationFn: async (newNotes: string) => {
+      const response = await fetch(`/api/transactions/${transactionId}/cma/notes`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: newNotes }),
+      });
+      if (!response.ok) throw new Error('Failed to update notes');
+      return response.json();
+    },
+    onSuccess: () => {
+      onSuccess?.();
+      onOpenChange(false);
+      toast({ title: 'Notes saved', description: 'Your notes have been updated.' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to save', description: 'Unable to save notes.', variant: 'destructive' });
+    },
+  });
+
+  const handleSave = () => {
+    updateNotesMutation.mutate(notes);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Agent Notes</DialogTitle>
+          <DialogDescription>
+            Add commentary or notes about this CMA for your client.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="py-4 space-y-2">
+          <Label htmlFor="notes">Your Notes</Label>
+          <Textarea
+            id="notes"
+            placeholder="Enter your notes or commentary about this CMA..."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={6}
+          />
+          <p className="text-xs text-muted-foreground">
+            These notes will appear on the shared CMA report.
+          </p>
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={updateNotesMutation.isPending}>
+            {updateNotesMutation.isPending ? 'Saving...' : 'Save Notes'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+TASK 6: Add API Endpoints
+Add to server/routes.ts (or create server/routes/cma-share.ts):
+typescriptimport { randomUUID } from 'crypto';
+
+// POST /api/transactions/:id/cma/share - Generate share token
+app.post('/api/transactions/:id/cma/share', async (req, res) => {
+  const { id } = req.params;
+  
+  const transaction = await db.query.transactions.findFirst({
+    where: eq(transactions.id, parseInt(id)),
+  });
+  
+  if (!transaction) {
+    return res.status(404).json({ error: 'Transaction not found' });
+  }
+  
+  // Generate share token if not exists
+  const shareToken = transaction.cmaPublicLink || randomUUID();
+  
+  if (!transaction.cmaPublicLink) {
+    await db.update(transactions)
+      .set({ cmaPublicLink: shareToken })
+      .where(eq(transactions.id, parseInt(id)));
+  }
+  
+  res.json({ 
+    shareToken, 
+    shareUrl: `${req.protocol}://${req.get('host')}/share/cma/${shareToken}` 
+  });
+});
+
+// DELETE /api/transactions/:id/cma/share - Remove share link
+app.delete('/api/transactions/:id/cma/share', async (req, res) => {
+  const { id } = req.params;
+  
+  await db.update(transactions)
+    .set({ cmaPublicLink: null })
+    .where(eq(transactions.id, parseInt(id)));
+  
+  res.json({ message: 'Share link removed' });
+});
+
+// POST /api/transactions/:id/cma/email-share - Send CMA via email
+app.post('/api/transactions/:id/cma/email-share', async (req, res) => {
+  const { id } = req.params;
+  const { senderName, senderEmail, recipientName, recipientEmail, message } = req.body;
+  
+  // Get or create share link
+  let transaction = await db.query.transactions.findFirst({
+    where: eq(transactions.id, parseInt(id)),
+  });
+  
+  if (!transaction) {
+    return res.status(404).json({ error: 'Transaction not found' });
+  }
+  
+  // Generate share link if needed
+  let shareToken = transaction.cmaPublicLink;
+  if (!shareToken) {
+    shareToken = randomUUID();
+    await db.update(transactions)
+      .set({ cmaPublicLink: shareToken })
+      .where(eq(transactions.id, parseInt(id)));
+  }
+  
+  const shareUrl = `${req.protocol}://${req.get('host')}/share/cma/${shareToken}`;
+  
+  // Check if email service is configured (Resend)
+  if (!process.env.RESEND_API_KEY) {
+    return res.status(200).json({ 
+      success: false, 
+      shareUrl,
+      error: 'Email service not configured' 
+    });
+  }
+  
+  // Send email using Resend
+  try {
+    const { Resend } = await import('resend');
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    
+    await resend.emails.send({
+      from: process.env.FROM_EMAIL || 'noreply@contractconduit.com',
+      to: recipientEmail,
+      subject: `${senderName} shared a CMA report with you`,
+      html: `
+        <p>Hi ${recipientName},</p>
+        <p>${senderName} (${senderEmail}) has shared a Comparative Market Analysis report with you.</p>
+        <p>${message}</p>
+        <p><a href="${shareUrl}" style="background-color: #f97316; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View CMA Report</a></p>
+      `,
+    });
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[CMA Email] Failed to send:', error);
+    res.status(200).json({ success: false, shareUrl, error: 'Failed to send email' });
+  }
+});
+
+// PATCH /api/transactions/:id/cma/notes - Update CMA notes
+app.patch('/api/transactions/:id/cma/notes', async (req, res) => {
+  const { id } = req.params;
+  const { notes } = req.body;
+  
+  const [updated] = await db.update(transactions)
+    .set({ cmaNotes: notes, updatedAt: new Date() })
+    .where(eq(transactions.id, parseInt(id)))
+    .returning();
+  
+  if (!updated) {
+    return res.status(404).json({ error: 'Transaction not found' });
+  }
+  
+  res.json(updated);
+});
+
+TASK 7: Add Database Fields
+Run migration to add new fields to transactions table:
+typescript// In your schema file, add these fields to transactions table:
+cmaPublicLink: text('cma_public_link'),
+cmaNotes: text('cma_notes'),
+Then run: npm run db:push or drizzle-kit push
+
+TASK 8: Integrate Components into CMA Tab
+In your CMA tab component (likely CMATab.tsx or similar), add:
+typescriptimport { CMAActionButtons } from './cma/CMAActionButtons';
+import { CMAPreviewBanner } from './cma/CMAPreviewBanner';
+
+// Inside the component, above the CMA content:
+<div className="space-y-4">
+  {/* Action Buttons - Top Right */}
+  <div className="flex justify-end">
+    <CMAActionButtons
+      transactionId={transaction.id}
+      propertyAddress={transaction.address}
+      publicLink={transaction.cmaPublicLink}
+      statistics={cmaStatistics}
+      onShareSuccess={refetchTransaction}
+    />
+  </div>
+
+  {/* Preview Banner */}
+  <CMAPreviewBanner
+    transactionId={transaction.id}
+    propertyAddress={transaction.address}
+    publicLink={transaction.cmaPublicLink}
+    notes={transaction.cmaNotes}
+    onNotesUpdate={refetchTransaction}
+  />
+
+  {/* Rest of CMA content */}
+</div>
+```
+
+---
+
+### FILES TO CREATE
+```
+client/src/components/cma/
+├── CMAActionButtons.tsx      [CREATE]
+├── CMAPreviewBanner.tsx      [CREATE]
+├── CMAShareDialog.tsx        [CREATE]
+├── CMAEmailShareDialog.tsx   [CREATE]
+└── CMANotesDialog.tsx        [CREATE]
+
+server/
+└── routes.ts                 [MODIFY - add share/email/notes endpoints]
+
+shared/
+└── schema.ts                 [MODIFY - add cmaPublicLink, cmaNotes fields]
+
+ACCEPTANCE CRITERIA
+
+ Top action buttons visible on CMA tab
+ Copy Email generates and copies formatted email
+ Produce URL generates share link and copies to clipboard
+ Print opens browser print dialog
+ Share opens dialog with copy link + social buttons
+ Yellow preview banner displays
+ Copy Live URL copies share link
+ Share CMA opens email dialog
+ Notes opens notes dialog and saves
+ All buttons hidden when printing (print:hidden class)

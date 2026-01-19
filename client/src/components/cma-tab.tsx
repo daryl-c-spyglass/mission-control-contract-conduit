@@ -15,6 +15,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getStatusBadgeStyle, getStatusLabel, getStatusColor } from "@/lib/utils/status-colors";
 import { CMAMap } from "@/components/cma-map";
 import { CMAStatsView } from "@/components/cma-stats-view";
+import { CMAActionButtons } from "@/components/cma/CMAActionButtons";
+import { CMAPreviewBanner } from "@/components/cma/CMAPreviewBanner";
 import type { Transaction, CMAComparable, Cma, PropertyStatistics, CmaStatMetric, Property } from "@shared/schema";
 import { useLocation } from "wouter";
 import { 
@@ -374,36 +376,50 @@ export function CMATab({ transaction }: CMATabProps) {
           <span className="font-semibold">{filteredComparables.length} COMPARABLE HOMES</span>
         </div>
         
-        <div className="flex items-center gap-2">
-          <div className="flex gap-1">
-            {MAIN_VIEW_TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setMainView(tab.id)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium transition-colors ${
-                  mainView === tab.id
-                    ? 'bg-primary text-white'
-                    : 'text-gray-300 hover:text-white hover:bg-zinc-700'
-                }`}
-                data-testid={`button-mainview-${tab.id}`}
-              >
-                <tab.icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShareDialogOpen(true)}
-            className="border-zinc-600 text-white hover:bg-zinc-700"
-            data-testid="button-share-cma"
-          >
-            <Share2 className="h-4 w-4 mr-2" />
-            Share
-          </Button>
+        <div className="flex gap-1">
+          {MAIN_VIEW_TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setMainView(tab.id)}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium transition-colors ${
+                mainView === tab.id
+                  ? 'bg-primary text-white'
+                  : 'text-gray-300 hover:text-white hover:bg-zinc-700'
+              }`}
+              data-testid={`button-mainview-${tab.id}`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
         </div>
+      </div>
+      
+      {/* Top Action Buttons Bar */}
+      <div className="bg-background border-b px-4 py-3 print:hidden">
+        {savedCma ? (
+          <CMAActionButtons
+            cmaId={savedCma.id}
+            propertyAddress={transaction.propertyAddress || 'Property'}
+            publicLink={savedCma.publicLink}
+            statistics={statistics}
+            onShareSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
+            }}
+          />
+        ) : (
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShareDialogOpen(true)}
+              data-testid="button-share-cma"
+            >
+              <Share2 className="h-4 w-4 mr-2" />
+              Share
+            </Button>
+          </div>
+        )}
       </div>
       
       {/* Status Filter Tabs - Only for Compare and List views */}
@@ -423,6 +439,28 @@ export function CMATab({ transaction }: CMATabProps) {
               {filter.label}
             </button>
           ))}
+        </div>
+      )}
+      
+      {/* Preview Banner */}
+      {savedCma && (
+        <div className="p-4 pb-0">
+          <CMAPreviewBanner
+            cmaId={savedCma.id}
+            propertyAddress={transaction.propertyAddress || 'Property'}
+            publicLink={savedCma.publicLink}
+            notes={savedCma.notes}
+            onSave={() => {
+              toast({
+                title: 'CMA Saved',
+                description: 'Your CMA has been saved successfully.',
+              });
+            }}
+            onModifySearch={() => setLocation(`/cmas/new?from=${savedCma.id}`)}
+            onNotesUpdate={() => {
+              queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
+            }}
+          />
         </div>
       )}
       
