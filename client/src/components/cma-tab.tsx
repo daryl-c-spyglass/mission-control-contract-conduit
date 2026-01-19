@@ -305,9 +305,6 @@ export function CMATab({ transaction }: CMATabProps) {
   };
 
   if (!cmaData || cmaData.length === 0) {
-    const mlsData = transaction.mlsData as any;
-    const hasMLSData = !!mlsData && !!mlsData.listPrice;
-    
     return (
       <div className="space-y-6">
         <h2 className="text-lg font-semibold">Comparative Market Analysis</h2>
@@ -315,51 +312,10 @@ export function CMATab({ transaction }: CMATabProps) {
           <CardContent className="py-12">
             <div className="max-w-md mx-auto text-center">
               <Search className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-              <h3 className="font-medium mb-2">Create a CMA for this Property</h3>
-              <p className="text-sm text-muted-foreground mb-6">
-                {hasMLSData 
-                  ? "Use this property's details to find comparable listings and create a professional market analysis."
-                  : "Once MLS data is available, you can create a comparative market analysis for this property."
-                }
+              <h3 className="font-medium mb-2">No CMA Available</h3>
+              <p className="text-sm text-muted-foreground">
+                A comparative market analysis has not been created for this property yet.
               </p>
-              
-              {hasMLSData && (
-                <div className="bg-muted/50 rounded-lg p-4 mb-6 text-left">
-                  <p className="text-sm font-medium mb-2">Subject Property</p>
-                  <p className="text-sm">{transaction.propertyAddress}</p>
-                  <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
-                    {mlsData.bedrooms && (
-                      <span className="flex items-center gap-1">
-                        <Bed className="h-3 w-3" /> {mlsData.bedrooms} beds
-                      </span>
-                    )}
-                    {mlsData.bathrooms && (
-                      <span className="flex items-center gap-1">
-                        <Bath className="h-3 w-3" /> {mlsData.bathrooms} baths
-                      </span>
-                    )}
-                    {mlsData.livingArea && (
-                      <span className="flex items-center gap-1">
-                        <Square className="h-3 w-3" /> {mlsData.livingArea.toLocaleString()} sqft
-                      </span>
-                    )}
-                    {mlsData.listPrice && (
-                      <span className="flex items-center gap-1">
-                        <DollarSign className="h-3 w-3" /> {formatPrice(mlsData.listPrice)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              <Button 
-                onClick={handleCreateCMA}
-                disabled={!hasMLSData}
-                data-testid="button-create-cma"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create CMA
-              </Button>
             </div>
           </CardContent>
         </Card>
