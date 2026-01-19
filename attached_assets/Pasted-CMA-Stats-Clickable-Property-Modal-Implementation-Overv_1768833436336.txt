@@ -1,0 +1,338 @@
+CMA Stats - Clickable Property Modal Implementation
+Overview
+Add clickable property cards in the CMA Stats "Days on Market" section that open a detailed modal with photo carousel and property information, matching the Client Data Portal behavior.
+What to Build
+1. Property Detail Modal Component
+Create a new modal that displays when clicking any property listing:
+typescript// client/src/components/cma/PropertyDetailModal.tsx
+
+import { useState } from "react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight, X, Bed, Bath, Square, MapPin } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+
+interface PropertyDetailModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  property: {
+    mlsNumber: string;
+    address: string;
+    city: string;
+    zip: string;
+    price: number;
+    pricePerSqft: number;
+    beds: number;
+    baths: number;
+    sqft: number;
+    propertyType: string;
+    yearBuilt: number;
+    subdivision: string;
+    daysOnMarket: number;
+    closeDate?: string;
+    listDate?: string;
+    status: string;
+    photos: string[];
+  };
+}
+
+export function PropertyDetailModal({ isOpen, onClose, property }: PropertyDetailModalProps) {
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  
+  const photos = property.photos?.length > 0 
+    ? property.photos 
+    : ['/placeholder-property.jpg'];
+  
+  const nextPhoto = () => {
+    setCurrentPhotoIndex((prev) => (prev + 1) % photos.length);
+  };
+  
+  const prevPhoto = () => {
+    setCurrentPhotoIndex((prev) => (prev - 1 + photos.length) % photos.length);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'closed':
+      case 'sold':
+        return 'bg-red-500';
+      case 'active':
+        return 'bg-green-500';
+      case 'pending':
+        return 'bg-gray-500';
+      case 'active under contract':
+        return 'bg-orange-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(price);
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '—';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl p-0 overflow-hidden bg-zinc-900 border-zinc-700">
+        {/* Photo Carousel */}
+        <div className="relative">
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 z-20 bg-black/50 hover:bg-black/70 rounded-full p-1.5 transition-colors"
+          >
+            <X className="h-5 w-5 text-white" />
+          </button>
+          
+          {/* Status Badge */}
+          <Badge className={`absolute top-3 left-3 z-10 ${getStatusColor(property.status)} text-white border-0`}>
+            {property.status}
+          </Badge>
+          
+          {/* Photo */}
+          <div className="relative h-72 bg-zinc-800">
+            <img
+              src={photos[currentPhotoIndex]}
+              alt={`Property photo ${currentPhotoIndex + 1}`}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/placeholder-property.jpg';
+              }}
+            />
+            
+            {/* Navigation Arrows */}
+            {photos.length > 1 && (
+              <>
+                <button
+                  onClick={prevPhoto}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 rounded-full p-2 transition-colors"
+                >
+                  <ChevronLeft className="h-5 w-5 text-white" />
+                </button>
+                <button
+                  onClick={nextPhoto}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 rounded-full p-2 transition-colors"
+                >
+                  <ChevronRight className="h-5 w-5 text-white" />
+                </button>
+                
+                {/* Photo Counter */}
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 px-3 py-1 rounded-full text-white text-sm">
+                  {currentPhotoIndex + 1} / {photos.length}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+        
+        {/* Property Info */}
+        <div className="p-6">
+          {/* Price */}
+          <div className="mb-4">
+            <div className="text-3xl font-bold text-orange-500">
+              {formatPrice(property.price)}
+            </div>
+            <div className="text-zinc-400 text-sm">
+              ${property.pricePerSqft?.toFixed(0)}/sqft
+            </div>
+          </div>
+          
+          {/* Address */}
+          <div className="flex items-start gap-2 mb-6">
+            <MapPin className="h-5 w-5 text-zinc-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <div className="text-white font-medium">{property.address}</div>
+              <div className="text-zinc-400 text-sm">{property.city}, {property.zip}</div>
+            </div>
+          </div>
+          
+          {/* Beds/Baths/Sqft */}
+          <div className="flex justify-around py-4 border-y border-zinc-700 mb-6">
+            <div className="text-center">
+              <Bed className="h-5 w-5 text-zinc-400 mx-auto mb-1" />
+              <div className="text-xl font-semibold text-white">{property.beds}</div>
+              <div className="text-xs text-zinc-400">Beds</div>
+            </div>
+            <div className="text-center">
+              <Bath className="h-5 w-5 text-zinc-400 mx-auto mb-1" />
+              <div className="text-xl font-semibold text-white">{property.baths}</div>
+              <div className="text-xs text-zinc-400">Baths</div>
+            </div>
+            <div className="text-center">
+              <Square className="h-5 w-5 text-zinc-400 mx-auto mb-1" />
+              <div className="text-xl font-semibold text-white">{property.sqft?.toLocaleString()}</div>
+              <div className="text-xs text-zinc-400">Sq Ft</div>
+            </div>
+          </div>
+          
+          {/* Property Details Table */}
+          <div className="space-y-3">
+            <div className="flex justify-between py-2 border-b border-zinc-800">
+              <span className="text-zinc-400">Property Type</span>
+              <span className="text-white">{property.propertyType || '—'}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-zinc-800">
+              <span className="text-zinc-400">Year Built</span>
+              <span className="text-white">{property.yearBuilt || '—'}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-zinc-800">
+              <span className="text-zinc-400">Subdivision</span>
+              <span className="text-white">{property.subdivision || '—'}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-zinc-800">
+              <span className="text-zinc-400">Days on Market</span>
+              <span className="text-white">{property.daysOnMarket ?? '—'}</span>
+            </div>
+            {property.status?.toLowerCase() === 'closed' && (
+              <div className="flex justify-between py-2 border-b border-zinc-800">
+                <span className="text-zinc-400">Close Date</span>
+                <span className="text-white">{formatDate(property.closeDate)}</span>
+              </div>
+            )}
+            {property.status?.toLowerCase() === 'active' && (
+              <div className="flex justify-between py-2 border-b border-zinc-800">
+                <span className="text-zinc-400">List Date</span>
+                <span className="text-white">{formatDate(property.listDate)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+2. Update Days on Market Section
+Make property listings clickable in the Stats view:
+typescript// In your CMA Stats component (e.g., CMAStatsView.tsx)
+// Add this for the Days on Market property list
+
+import { useState } from "react";
+import { PropertyDetailModal } from "./PropertyDetailModal";
+
+// Inside your component:
+const [selectedProperty, setSelectedProperty] = useState<any>(null);
+const [isModalOpen, setIsModalOpen] = useState(false);
+
+const handlePropertyClick = (property: any) => {
+  setSelectedProperty(property);
+  setIsModalOpen(true);
+};
+
+// In your JSX, wrap each property card to be clickable:
+{/* Days on Market Section */}
+<div className="bg-zinc-900 rounded-lg p-6">
+  <div className="flex items-baseline gap-2 mb-2">
+    <span className="text-4xl font-bold text-orange-500">{avgDaysOnMarket}</span>
+    <span className="text-zinc-400 text-lg">DAYS ON MARKET</span>
+  </div>
+  <p className="text-zinc-400 text-sm mb-4">
+    Sold homes were on the market for an average of {avgDaysOnMarket} days
+  </p>
+  
+  {/* Status Badge */}
+  <Badge className="bg-red-500/20 text-red-400 border-red-500/30 mb-4">
+    {closedCount} Closed
+  </Badge>
+  
+  {/* Property List - CLICKABLE */}
+  <div className="space-y-3">
+    {comparables
+      .filter(comp => comp.status?.toLowerCase() === 'closed')
+      .map((property) => (
+        <div
+          key={property.mlsNumber}
+          onClick={() => handlePropertyClick(property)}
+          className="flex items-center gap-3 p-2 rounded-lg hover:bg-zinc-800 cursor-pointer transition-colors"
+        >
+          {/* Thumbnail */}
+          <div className="w-16 h-12 rounded overflow-hidden flex-shrink-0">
+            <img
+              src={property.photos?.[0] || '/placeholder-property.jpg'}
+              alt={property.address}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/placeholder-property.jpg';
+              }}
+            />
+          </div>
+          
+          {/* Property Info */}
+          <div className="flex-1 min-w-0">
+            <div className="text-white font-medium truncate">
+              {property.address}
+            </div>
+            <div className="text-zinc-400 text-sm">
+              {property.daysOnMarket} Days • {property.sqft?.toLocaleString()} sqft
+            </div>
+          </div>
+        </div>
+      ))}
+  </div>
+</div>
+
+{/* Property Detail Modal */}
+{selectedProperty && (
+  <PropertyDetailModal
+    isOpen={isModalOpen}
+    onClose={() => {
+      setIsModalOpen(false);
+      setSelectedProperty(null);
+    }}
+    property={{
+      mlsNumber: selectedProperty.mlsNumber,
+      address: selectedProperty.address || selectedProperty.streetAddress,
+      city: selectedProperty.city || 'Austin',
+      zip: selectedProperty.zip || selectedProperty.postalCode,
+      price: selectedProperty.price || selectedProperty.listPrice || selectedProperty.closePrice,
+      pricePerSqft: selectedProperty.pricePerSqft || (selectedProperty.price / selectedProperty.sqft),
+      beds: selectedProperty.beds || selectedProperty.bedrooms,
+      baths: selectedProperty.baths || selectedProperty.bathrooms,
+      sqft: selectedProperty.sqft || selectedProperty.livingArea,
+      propertyType: selectedProperty.propertyType || 'Single Family Residence',
+      yearBuilt: selectedProperty.yearBuilt,
+      subdivision: selectedProperty.subdivision,
+      daysOnMarket: selectedProperty.daysOnMarket || selectedProperty.dom,
+      closeDate: selectedProperty.closeDate || selectedProperty.soldDate,
+      listDate: selectedProperty.listDate,
+      status: selectedProperty.status,
+      photos: selectedProperty.photos || [],
+    }}
+  />
+)}
+3. Apply Same Pattern to Other Clickable Areas
+The property cards in these sections should also open the modal:
+
+Days on Market property list
+% of List Price property list
+Any scatter plot dots (if clickable)
+Any bar chart segments representing individual properties
+
+Styling Notes
+
+Modal background: bg-zinc-900
+Orange accent color for price: text-orange-500
+Status badge colors match existing system (Closed=red, Active=green, Pending=gray, Under Contract=orange)
+Hover state on property cards: hover:bg-zinc-800
+Photo carousel with counter overlay
+
+Data Mapping
+Make sure property data from Repliers maps correctly:
+
+photos array from MLS data
+closeDate or soldDate for closed properties
+daysOnMarket or dom field
+subdivision from MLS details

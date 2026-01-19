@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import { BarChart3, FileText, Home, TrendingUp } from "lucide-react";
 import type { CMAComparable, PropertyStatistics } from "@shared/schema";
+import { PropertyDetailModal } from "./cma/PropertyDetailModal";
 
 interface StatsViewProps {
   comparables: CMAComparable[];
@@ -282,6 +283,9 @@ function CMAMarketReview({ statistics, comparables }: { statistics: PropertyStat
 }
 
 function DaysOnMarketSection({ comparables }: { comparables: CMAComparable[] }) {
+  const [selectedProperty, setSelectedProperty] = useState<CMAComparable | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   const closedProperties = useMemo(() => {
     return comparables.filter(c => 
       normalizeStatus(c.status) === 'closed' && c.price
@@ -295,7 +299,7 @@ function DaysOnMarketSection({ comparables }: { comparables: CMAComparable[] }) 
   };
 
   const chartData = useMemo(() => {
-    return closedProperties.map(comp => {
+    return closedProperties.map((comp, idx) => {
       const soldPrice = comp.closePrice || comp.price;
       const listPrice = comp.listPrice || comp.price;
       const hasValidPrices = listPrice > 0 && soldPrice > 0;
@@ -309,9 +313,20 @@ function DaysOnMarketSection({ comparables }: { comparables: CMAComparable[] }) 
         photo: comp.photos?.[0] || comp.imageUrl || '',
         mlsId: comp.mlsNumber || '',
         fill: percent !== null ? getColor(percent) : '#9ca3af',
+        originalIndex: idx,
       };
     });
   }, [closedProperties]);
+
+  const handlePropertyClick = (idx: number) => {
+    setSelectedProperty(closedProperties[idx]);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedProperty(null);
+  };
 
   if (closedProperties.length === 0) return null;
 
@@ -361,8 +376,13 @@ function DaysOnMarketSection({ comparables }: { comparables: CMAComparable[] }) 
               <span className="font-semibold">Closed</span>
             </div>
             <div className="space-y-3 max-h-[250px] overflow-y-auto">
-              {chartData.slice(0, 5).map((data, idx) => (
-                <div key={data.mlsId || idx} className="flex items-center gap-3">
+              {chartData.slice(0, 5).map((data) => (
+                <div 
+                  key={data.mlsId || data.originalIndex} 
+                  onClick={() => handlePropertyClick(data.originalIndex)}
+                  className="flex items-center gap-3 p-2 -mx-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                  data-testid={`property-card-${data.mlsId || data.originalIndex}`}
+                >
                   {data.photo ? (
                     <img 
                       src={data.photo} 
@@ -436,6 +456,42 @@ function DaysOnMarketSection({ comparables }: { comparables: CMAComparable[] }) 
           </div>
         </div>
       </CardContent>
+
+      {selectedProperty && (() => {
+        const parseSqft = (value: string | number | undefined): number | undefined => {
+          if (value === undefined || value === null) return undefined;
+          if (typeof value === 'number') return value;
+          const cleaned = String(value).replace(/[^0-9.]/g, '');
+          const parsed = parseFloat(cleaned);
+          return isNaN(parsed) ? undefined : parsed;
+        };
+        const sqft = parseSqft(selectedProperty.sqft);
+        const price = selectedProperty.closePrice || selectedProperty.price;
+        const pricePerSqft = sqft && sqft > 0 ? price / sqft : undefined;
+        
+        return (
+          <PropertyDetailModal
+            isOpen={isModalOpen}
+            onClose={handleCloseModal}
+            property={{
+              mlsNumber: selectedProperty.mlsNumber,
+              address: selectedProperty.address || 'Unknown Address',
+              price,
+              pricePerSqft,
+              beds: selectedProperty.bedrooms,
+              baths: selectedProperty.bathrooms,
+              sqft,
+              yearBuilt: selectedProperty.yearBuilt,
+              daysOnMarket: selectedProperty.daysOnMarket,
+              closeDate: selectedProperty.closeDate,
+              listDate: selectedProperty.listDate,
+              status: selectedProperty.status || 'Closed',
+              photos: selectedProperty.photos || [],
+              percentOfList: chartData.find(d => d.mlsId === selectedProperty.mlsNumber)?.percentDisplay,
+            }}
+          />
+        );
+      })()}
     </Card>
   );
 }
