@@ -912,7 +912,7 @@ export function CMAMap({
       className="relative w-full h-[550px] rounded-lg overflow-hidden border"
       data-testid="cma-map-container"
     >
-      <div ref={mapContainer} className="w-full h-full" />
+      <div ref={mapContainer} className="w-full h-full touch-manipulation" />
 
       <div className="absolute top-4 left-4 flex flex-col gap-2">
         <Button
