@@ -1,0 +1,220 @@
+Subject Property Thumbnail - Show Actual Photo
+Replace the left panel property list item for subject:
+typescript{/* LEFT PANEL - Property List */}
+<div className="w-56 flex-shrink-0 space-y-2 max-h-96 overflow-y-auto">
+  {allProperties.map((property) => (
+    <div
+      key={property.mlsNumber}
+      onClick={() => handlePropertySelect(property)}
+      className={`
+        flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all
+        ${selectedProperty?.mlsNumber === property.mlsNumber
+          ? 'border-2 border-orange-500 bg-zinc-50'
+          : 'border-2 border-transparent hover:bg-zinc-50'
+        }
+      `}
+    >
+      {/* Thumbnail - ALWAYS show photo, with blue border for subject */}
+      <div className={`
+        w-12 h-12 rounded overflow-hidden flex-shrink-0
+        ${property.isSubject ? 'ring-2 ring-blue-500' : ''}
+      `}>
+        <img
+          src={property.photos?.[0] || '/placeholder-property.jpg'}
+          alt={property.address}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = '/placeholder-property.jpg';
+          }}
+        />
+      </div>
+
+      {/* Property Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1">
+          {property.isSubject && (
+            <span className="text-green-600 text-xs font-medium">Subject:</span>
+          )}
+          <span className="text-zinc-900 text-sm font-medium truncate">
+            {property.address?.split(',')[0]?.substring(0, 12)}...
+          </span>
+        </div>
+        <div className="text-orange-500 text-sm font-medium">
+          ${property.pricePerSqft?.toFixed(0)} / sq. ft.
+        </div>
+      </div>
+    </div>
+  ))}
+</div>
+Key Change: Subject property now shows the actual photo with a blue ring border (ring-2 ring-blue-500) instead of a blue box with house icon.
+
+Fix 2: Lot Size and Garage Spaces - Map Repliers Fields
+First, let me check what fields Repliers provides. Common field names from Repliers API:
+typescript// Repliers field mapping for Lot Size and Garage
+const mapRepliersProperty = (comp: any) => ({
+  // ... other fields ...
+  
+  // Lot Size - check these Repliers fields
+  lotSize: comp.lot?.lotSizeArea 
+    || comp.lotSizeArea 
+    || comp.lotSize 
+    || comp.lotSizeSquareFeet
+    || comp.land?.lotSizeArea
+    || null,
+  lotSizeUnits: comp.lot?.lotSizeAreaUnits 
+    || comp.lotSizeAreaUnits 
+    || 'sqft',
+  
+  // Garage Spaces - check these Repliers fields  
+  garageSpaces: comp.parking?.garageSpaces 
+    || comp.garageSpaces 
+    || comp.parking?.spaces
+    || comp.parkingSpaces
+    || comp.garage?.spaces
+    || null,
+});
+Update the Property Interface and Mapping
+typescriptinterface Property {
+  mlsNumber: string;
+  address: string;
+  city: string;
+  zip: string;
+  price: number;
+  pricePerSqft: number;
+  beds: number;
+  baths: number;
+  sqft: number;
+  lotSize: string | number | null;  // Can be sqft or acres
+  lotSizeUnits?: string;
+  garageSpaces: number | null;
+  origPrice?: number;
+  listPrice: number;
+  soldPrice?: number;
+  soldPricePercent?: number;
+  status: string;
+  photos: string[];
+  isSubject?: boolean;
+}
+Format Lot Size for Display
+typescriptconst formatLotSize = (lotSize: string | number | null, units?: string): string => {
+  if (!lotSize) return '—';
+  
+  // If it's already a formatted string, return it
+  if (typeof lotSize === 'string' && lotSize.includes(' ')) {
+    return lotSize;
+  }
+  
+  const size = typeof lotSize === 'string' ? parseFloat(lotSize) : lotSize;
+  
+  if (isNaN(size)) return '—';
+  
+  // If units indicate acres or size is small (likely acres)
+  if (units?.toLowerCase().includes('acre') || size < 100) {
+    return `${size.toFixed(2)} acres`;
+  }
+  
+  // Assume square feet - format with commas
+  return `${size.toLocaleString()} sqft`;
+};
+Update Right Panel Display
+typescript{/* Property Specs */}
+<div className="space-y-1.5 text-sm">
+  <div className="flex justify-between">
+    <span className="text-zinc-500">Beds</span>
+    <span className="text-zinc-900">{selectedProperty.beds}</span>
+  </div>
+  <div className="flex justify-between">
+    <span className="text-zinc-500">Baths</span>
+    <span className="text-zinc-900">{selectedProperty.baths}</span>
+  </div>
+  <div className="flex justify-between">
+    <span className="text-zinc-500">Sq. Ft.</span>
+    <span className="text-zinc-900">
+      {selectedProperty.sqft?.toLocaleString()}
+    </span>
+  </div>
+  <div className="flex justify-between">
+    <span className="text-zinc-500">Lot Size</span>
+    <span className="text-zinc-900">
+      {formatLotSize(selectedProperty.lotSize, selectedProperty.lotSizeUnits)}
+    </span>
+  </div>
+  <div className="flex justify-between">
+    <span className="text-zinc-500">Garage Spaces</span>
+    <span className="text-zinc-900">
+      {selectedProperty.garageSpaces ?? '—'}
+    </span>
+  </div>
+</div>
+
+Fix 3: Update Data Mapping When Calling the Component
+typescript// When mapping CMA comparables from Repliers
+<AveragePriceSqftSection
+  subjectProperty={{
+    mlsNumber: transaction.mlsNumber,
+    address: transaction.address,
+    city: transaction.city || "Austin",
+    zip: transaction.zip,
+    price: transaction.listPrice,
+    pricePerSqft: transaction.listPrice / transaction.sqft,
+    beds: transaction.beds,
+    baths: transaction.baths,
+    sqft: transaction.sqft,
+    // Lot Size - map from Repliers fields
+    lotSize: transaction.lot?.lotSizeArea 
+      || transaction.lotSizeArea 
+      || transaction.lotSize 
+      || null,
+    lotSizeUnits: transaction.lot?.lotSizeAreaUnits || 'sqft',
+    // Garage - map from Repliers fields
+    garageSpaces: transaction.parking?.garageSpaces 
+      || transaction.garageSpaces 
+      || transaction.parkingSpaces 
+      || null,
+    listPrice: transaction.listPrice,
+    status: transaction.status,
+    photos: transaction.photos || [],
+  }}
+  comparables={cmaComparables.map(comp => ({
+    mlsNumber: comp.mlsNumber,
+    address: comp.address || comp.streetAddress,
+    city: comp.city || "Austin",
+    zip: comp.zip || comp.postalCode,
+    price: comp.closePrice || comp.listPrice,
+    pricePerSqft: (comp.closePrice || comp.listPrice) / (comp.sqft || comp.livingArea),
+    beds: comp.beds || comp.bedrooms,
+    baths: comp.baths || comp.bathrooms,
+    sqft: comp.sqft || comp.livingArea,
+    // Lot Size from Repliers
+    lotSize: comp.lot?.lotSizeArea 
+      || comp.lotSizeArea 
+      || comp.lotSize 
+      || null,
+    lotSizeUnits: comp.lot?.lotSizeAreaUnits || 'sqft',
+    // Garage from Repliers
+    garageSpaces: comp.parking?.garageSpaces 
+      || comp.garageSpaces 
+      || comp.parkingSpaces 
+      || null,
+    origPrice: comp.originalPrice || comp.originalListPrice,
+    listPrice: comp.listPrice,
+    soldPrice: comp.closePrice || comp.soldPrice,
+    soldPricePercent: comp.closePrice 
+      ? (comp.closePrice / comp.listPrice) * 100 
+      : undefined,
+    status: comp.status || "Closed",
+    photos: comp.photos || [],
+  }))}
+  averagePricePerSqft={calculateAveragePricePerSqft(cmaComparables)}
+/>
+
+To Find Exact Repliers Field Names
+Add this debug log temporarily to see what fields Repliers returns:
+typescript// In your API route or component where you fetch CMA data
+console.log('Repliers comparable sample:', JSON.stringify(cmaComparables[0], null, 2));
+Look for fields like:
+
+lot, lotSizeArea, lotSizeSquareFeet, lotSizeAcres
+parking, garageSpaces, parkingSpaces, garage
+
+Then update the mapping accordingly.

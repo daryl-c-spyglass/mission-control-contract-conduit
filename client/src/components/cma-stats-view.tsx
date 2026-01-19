@@ -507,7 +507,8 @@ interface PropertyData {
   beds: number;
   baths: number;
   sqft: number;
-  lotSize?: string;
+  lotSize?: string | number | null;
+  lotSizeUnits?: string;
   garageSpaces?: number;
   origPrice?: number;
   listPrice: number;
@@ -517,6 +518,27 @@ interface PropertyData {
   photos: string[];
   isSubject: boolean;
 }
+
+const formatLotSize = (lotSize: string | number | null | undefined, units?: string): string => {
+  if (!lotSize) return '—';
+  
+  // If it's already a formatted string, return it
+  if (typeof lotSize === 'string' && lotSize.includes(' ')) {
+    return lotSize;
+  }
+  
+  const size = typeof lotSize === 'string' ? parseFloat(lotSize) : lotSize;
+  
+  if (isNaN(size)) return '—';
+  
+  // If units indicate acres or size is small (likely acres)
+  if (units?.toLowerCase().includes('acre') || size < 100) {
+    return `${size.toFixed(2)} acres`;
+  }
+  
+  // Assume square feet - format with commas
+  return `${size.toLocaleString()} sqft`;
+};
 
 const getStatusBadgeColor = (status: string, isSubject?: boolean): string => {
   if (isSubject) return 'bg-blue-500 text-white';
@@ -570,8 +592,9 @@ function AveragePricePerSqftSection({ comparables, subjectProperty }: { comparab
           beds: subjectProperty.bedroomsTotal || subjectProperty.bedrooms || 0,
           baths: subjectProperty.bathroomsTotalInteger || subjectProperty.bathrooms || 0,
           sqft,
-          lotSize: subjectProperty.lotSizeArea || undefined,
-          garageSpaces: subjectProperty.garageSpaces,
+          lotSize: subjectProperty.lot?.lotSizeArea || subjectProperty.lotSizeArea || subjectProperty.lotSize || subjectProperty.lotSizeSquareFeet || undefined,
+          lotSizeUnits: subjectProperty.lot?.lotSizeAreaUnits || subjectProperty.lotSizeAreaUnits || 'sqft',
+          garageSpaces: subjectProperty.parking?.garageSpaces || subjectProperty.garageSpaces || subjectProperty.parkingSpaces,
           listPrice: price,
           status: subjectProperty.standardStatus || subjectProperty.status || 'Active',
           photos: subjectProperty.photos || [],
@@ -593,6 +616,9 @@ function AveragePricePerSqftSection({ comparables, subjectProperty }: { comparab
           beds: comp.bedrooms || 0,
           baths: comp.bathrooms || 0,
           sqft: sqftValue,
+          lotSize: (comp as any).lot?.lotSizeArea || (comp as any).lotSizeArea || (comp as any).lotSize || (comp as any).lotSizeSquareFeet || undefined,
+          lotSizeUnits: (comp as any).lot?.lotSizeAreaUnits || (comp as any).lotSizeAreaUnits || 'sqft',
+          garageSpaces: (comp as any).parking?.garageSpaces || (comp as any).garageSpaces || (comp as any).parkingSpaces,
           origPrice: listPrice,
           listPrice,
           soldPrice: comp.closePrice,
@@ -685,12 +711,12 @@ function AveragePricePerSqftSection({ comparables, subjectProperty }: { comparab
                   }
                 `}
               >
-                <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0 bg-muted">
-                  {property.isSubject ? (
-                    <div className="w-full h-full flex items-center justify-center bg-blue-500">
-                      <Home className="h-6 w-6 text-white" />
-                    </div>
-                  ) : property.photos?.[0] ? (
+                {/* Thumbnail - ALWAYS show photo, with blue border for subject */}
+                <div className={`
+                  w-12 h-12 rounded overflow-hidden flex-shrink-0 bg-muted
+                  ${property.isSubject ? 'ring-2 ring-blue-500' : ''}
+                `}>
+                  {property.photos?.[0] ? (
                     <img
                       src={property.photos[0]}
                       alt={property.address}
@@ -917,7 +943,7 @@ function AveragePricePerSqftSection({ comparables, subjectProperty }: { comparab
                   <div className="flex justify-between">
                     <span className="text-zinc-500 dark:text-zinc-400">Lot Size</span>
                     <span className="text-zinc-900 dark:text-zinc-100">
-                      {selectedProperty.lotSize || '—'}
+                      {formatLotSize(selectedProperty.lotSize, selectedProperty.lotSizeUnits)}
                     </span>
                   </div>
                   <div className="flex justify-between">
