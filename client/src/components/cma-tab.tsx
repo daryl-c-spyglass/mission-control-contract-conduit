@@ -368,35 +368,9 @@ export function CMATab({ transaction }: CMATabProps) {
   }
   
   return (
-    <div className="space-y-0">
-      {/* Dark Header Bar with Main View Tabs */}
-      <div className="bg-zinc-800 dark:bg-zinc-900 px-4 py-3 flex items-center justify-between rounded-t-lg flex-wrap gap-3">
-        <div className="flex items-center gap-2 text-white">
-          <Menu className="w-5 h-5" />
-          <span className="font-semibold">{filteredComparables.length} COMPARABLE HOMES</span>
-        </div>
-        
-        <div className="flex gap-1">
-          {MAIN_VIEW_TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setMainView(tab.id)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium transition-colors ${
-                mainView === tab.id
-                  ? 'bg-primary text-white'
-                  : 'text-gray-300 hover:text-white hover:bg-zinc-700'
-              }`}
-              data-testid={`button-mainview-${tab.id}`}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      
-      {/* Top Action Buttons Bar - Always shown */}
-      <div className="bg-background border-b px-4 py-3 print:hidden">
+    <div className="space-y-4">
+      {/* 1. ACTION BUTTONS - Top Right Aligned */}
+      <div className="flex justify-end print:hidden">
         <CMAActionButtons
           cmaId={savedCma?.id}
           transactionId={transaction.id}
@@ -410,191 +384,199 @@ export function CMATab({ transaction }: CMATabProps) {
           }}
         />
       </div>
-      
-      {/* Status Filter Tabs - Only for Compare and List views */}
-      {(mainView === 'compare' || mainView === 'list') && (
-        <div className="flex gap-1 bg-zinc-700 dark:bg-zinc-800 p-2 overflow-x-auto">
-          {STATUS_FILTERS.map(filter => (
-            <button
-              key={filter.id}
-              onClick={() => setStatusFilter(filter.id)}
-              className={`px-4 py-2 text-sm rounded transition-colors whitespace-nowrap ${
-                statusFilter === filter.id
-                  ? 'bg-white text-gray-900'
-                  : 'text-gray-300 hover:text-white hover:bg-zinc-600'
-              }`}
-              data-testid={`button-filter-${filter.id}`}
-            >
-              {filter.label}
-            </button>
-          ))}
+
+      {/* 2. PREVIEW BANNER - Yellow, Full Width */}
+      <CMAPreviewBanner
+        cmaId={savedCma?.id}
+        transactionId={transaction.id}
+        propertyAddress={transaction.propertyAddress || 'Property'}
+        publicLink={savedCma?.publicLink}
+        notes={savedCma?.notes}
+        cmaData={cmaData || []}
+        mlsNumber={transaction.mlsNumber}
+        subjectProperty={(() => {
+          const mlsData = transaction.mlsData as any;
+          return {
+            listPrice: mlsData?.listPrice || undefined,
+            sqft: mlsData?.livingArea || mlsData?.sqft || mlsData?.details?.sqft || undefined,
+            yearBuilt: mlsData?.yearBuilt || mlsData?.details?.yearBuilt || undefined,
+            beds: mlsData?.bedrooms || mlsData?.details?.numBedrooms || undefined,
+            baths: mlsData?.bathrooms || mlsData?.details?.numBathrooms || undefined,
+          };
+        })()}
+        onSave={() => {
+          toast({
+            title: 'CMA Saved',
+            description: 'Your CMA has been saved successfully.',
+          });
+        }}
+        onFiltersApplied={() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id] });
+          queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
+        }}
+        onNotesUpdate={() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
+        }}
+      />
+
+      {/* 3. MAIN CMA CONTENT CARD */}
+      <div className="bg-zinc-900 rounded-lg overflow-hidden">
+        
+        {/* 3a. DARK HEADER BAR with Comparable Count and View Tabs */}
+        <div className="bg-zinc-800 px-4 py-3 flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2 text-white">
+            <Menu className="w-5 h-5" />
+            <span className="font-semibold">{filteredComparables.length} COMPARABLE HOMES</span>
+          </div>
+          
+          {/* Compare / Map / Stats / List Tabs */}
+          <div className="flex gap-1">
+            {MAIN_VIEW_TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setMainView(tab.id)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium transition-colors ${
+                  mainView === tab.id
+                    ? 'bg-orange-500 hover:bg-orange-600 text-white'
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-700'
+                }`}
+                data-testid={`button-mainview-${tab.id}`}
+              >
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
-      )}
-      
-      {/* Preview Banner - Always shown */}
-      <div className="p-4 pb-0">
-        <CMAPreviewBanner
-          cmaId={savedCma?.id}
-          transactionId={transaction.id}
-          propertyAddress={transaction.propertyAddress || 'Property'}
-          publicLink={savedCma?.publicLink}
-          notes={savedCma?.notes}
-          cmaData={cmaData || []}
-          mlsNumber={transaction.mlsNumber}
-          subjectProperty={(() => {
+
+        {/* 3b. CONTENT AREA */}
+        <div className="p-4 space-y-4">
+          
+          {/* STATUS FILTERS - Inside content area, only for Compare and List views */}
+          {(mainView === 'compare' || mainView === 'list') && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {STATUS_FILTERS.map(filter => (
+                <button
+                  key={filter.id}
+                  onClick={() => setStatusFilter(filter.id)}
+                  className={`px-4 py-2 text-sm rounded transition-colors whitespace-nowrap ${
+                    statusFilter === filter.id
+                      ? 'bg-zinc-700 text-white border border-zinc-600'
+                      : 'bg-transparent text-zinc-400 border border-zinc-700 hover:bg-zinc-800 hover:text-white'
+                  }`}
+                  data-testid={`button-filter-${filter.id}`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* STATS SUMMARY ROW - Inside content area, only for Compare and List views */}
+          {(mainView === 'compare' || mainView === 'list') && statistics && (() => {
             const mlsData = transaction.mlsData as any;
-            return {
-              listPrice: mlsData?.listPrice || undefined,
-              sqft: mlsData?.livingArea || mlsData?.sqft || mlsData?.details?.sqft || undefined,
-              yearBuilt: mlsData?.yearBuilt || mlsData?.details?.yearBuilt || undefined,
-              beds: mlsData?.bedrooms || mlsData?.details?.numBedrooms || undefined,
-              baths: mlsData?.bathrooms || mlsData?.details?.numBathrooms || undefined,
-            };
+            const subjectPrice = mlsData?.listPrice || 0;
+            const subjectSqft = mlsData?.livingArea || mlsData?.sqft || mlsData?.details?.sqft || 0;
+            const subjectPricePerSqft = subjectSqft > 0 ? subjectPrice / subjectSqft : 0;
+            
+            const priceVsMarket = statistics.price.average > 0 && subjectPrice > 0
+              ? ((subjectPrice - statistics.price.average) / statistics.price.average) * 100
+              : null;
+            
+            const psfVsMarket = statistics.pricePerSqFt.average > 0 && subjectPricePerSqft > 0
+              ? ((subjectPricePerSqft - statistics.pricePerSqFt.average) / statistics.pricePerSqFt.average) * 100
+              : null;
+            
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 bg-zinc-800 rounded-lg p-4 text-white">
+                {/* LOW PRICE */}
+                <div>
+                  <div className="text-xs text-zinc-400 uppercase tracking-wide mb-1">Low Price</div>
+                  <div className="text-xl font-bold">{formatPrice(statistics.price.range.min)}</div>
+                </div>
+                {/* HIGH PRICE */}
+                <div>
+                  <div className="text-xs text-zinc-400 uppercase tracking-wide mb-1">High Price</div>
+                  <div className="text-xl font-bold">{formatPrice(statistics.price.range.max)}</div>
+                </div>
+                {/* AVG PRICE */}
+                <div>
+                  <div className="text-xs text-zinc-400 uppercase tracking-wide mb-1">Avg Price</div>
+                  <div className="text-xl font-bold">{formatPrice(Math.round(statistics.price.average))}</div>
+                  {priceVsMarket !== null && (
+                    <>
+                      <div className={`text-xs flex items-center gap-1 ${priceVsMarket > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                        {priceVsMarket > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                        {Math.abs(priceVsMarket).toFixed(1)}% vs market
+                      </div>
+                      <div className="text-xs text-zinc-400">Your: {formatPrice(subjectPrice)}</div>
+                    </>
+                  )}
+                </div>
+                {/* MEDIAN */}
+                <div>
+                  <div className="text-xs text-zinc-400 uppercase tracking-wide mb-1">Median</div>
+                  <div className="text-xl font-bold">{formatPrice(Math.round(statistics.price.median))}</div>
+                </div>
+                {/* AVG $/SQFT */}
+                <div>
+                  <div className="text-xs text-zinc-400 uppercase tracking-wide mb-1">Avg $/SqFt</div>
+                  <div className="text-xl font-bold">${Math.round(statistics.pricePerSqFt.average)}</div>
+                  <div className="text-xs text-zinc-500">
+                    Range: ${Math.round(statistics.pricePerSqFt.range.min)} - ${Math.round(statistics.pricePerSqFt.range.max)}
+                  </div>
+                  <div className="text-xs text-zinc-500">Median: ${Math.round(statistics.pricePerSqFt.median)}</div>
+                  {psfVsMarket !== null && (
+                    <>
+                      <div className={`text-xs flex items-center gap-1 ${psfVsMarket > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                        {psfVsMarket > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                        {Math.abs(psfVsMarket).toFixed(1)}% vs market
+                      </div>
+                      <div className="text-xs text-zinc-400">Your: ${Math.round(subjectPricePerSqft)}</div>
+                    </>
+                  )}
+                </div>
+                {/* AVG DOM */}
+                <div>
+                  <div className="text-xs text-zinc-400 uppercase tracking-wide mb-1">Avg DOM</div>
+                  <div className="text-xl font-bold">{Math.round(statistics.daysOnMarket.average)} Days</div>
+                  <div className="text-xs text-zinc-500">
+                    Range: {statistics.daysOnMarket.range.min} - {statistics.daysOnMarket.range.max}
+                  </div>
+                  <div className="text-xs text-zinc-500">Median: {Math.round(statistics.daysOnMarket.median)}</div>
+                </div>
+              </div>
+            );
           })()}
-          onSave={() => {
-            toast({
-              title: 'CMA Saved',
-              description: 'Your CMA has been saved successfully.',
-            });
-          }}
-          onFiltersApplied={() => {
-            queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id] });
-            queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
-          }}
-          onNotesUpdate={() => {
-            queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
-          }}
-        />
-      </div>
-      
-      {/* Stats Summary Row - Only for Compare and List views */}
-      {(mainView === 'compare' || mainView === 'list') && statistics && (() => {
-        const mlsData = transaction.mlsData as any;
-        const subjectPrice = mlsData?.listPrice || 0;
-        const subjectSqft = mlsData?.livingArea || mlsData?.sqft || mlsData?.details?.sqft || 0;
-        const subjectPricePerSqft = subjectSqft > 0 ? subjectPrice / subjectSqft : 0;
-        
-        const priceVsMarket = statistics.price.average > 0 && subjectPrice > 0
-          ? ((subjectPrice - statistics.price.average) / statistics.price.average) * 100
-          : null;
-        
-        const psfVsMarket = statistics.pricePerSqFt.average > 0 && subjectPricePerSqft > 0
-          ? ((subjectPricePerSqft - statistics.pricePerSqFt.average) / statistics.pricePerSqFt.average) * 100
-          : null;
-        
-        return (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 bg-zinc-900 dark:bg-zinc-950 p-4 text-white">
-            {/* LOW PRICE - No sub-values */}
-            <div>
-              <div className="text-xs text-zinc-400 uppercase tracking-wide">Low Price</div>
-              <div className="text-lg sm:text-xl font-bold">{formatPrice(statistics.price.range.min)}</div>
+
+          {/* VIEW TOGGLES - Only for Compare tab */}
+          {mainView === 'compare' && (
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-400 text-sm">View:</span>
+              {[
+                { id: 'grid' as SubView, label: 'Grid', icon: LayoutGrid },
+                { id: 'list' as SubView, label: 'List', icon: List },
+                { id: 'table' as SubView, label: 'Table', icon: Table2 },
+              ].map(view => (
+                <button
+                  key={view.id}
+                  onClick={() => setSubView(view.id)}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded transition-colors ${
+                    subView === view.id
+                      ? 'bg-orange-500 hover:bg-orange-600 text-white'
+                      : 'bg-transparent text-zinc-400 border border-zinc-700 hover:bg-zinc-800 hover:text-white'
+                  }`}
+                  data-testid={`button-subview-${view.id}`}
+                >
+                  <view.icon className="w-4 h-4" />
+                  {view.label}
+                </button>
+              ))}
             </div>
-            {/* HIGH PRICE - No sub-values */}
-            <div>
-              <div className="text-xs text-zinc-400 uppercase tracking-wide">High Price</div>
-              <div className="text-lg sm:text-xl font-bold">{formatPrice(statistics.price.range.max)}</div>
-            </div>
-            {/* AVG PRICE - VS Market only (Range/Median shown in other columns) */}
-            <div>
-              <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg Price</div>
-              <div className="text-lg sm:text-xl font-bold">{formatPrice(Math.round(statistics.price.average))}</div>
-              {priceVsMarket !== null && (
-                <div className="mt-1">
-                  <div className={`text-xs flex items-center gap-1 ${priceVsMarket > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                    {priceVsMarket > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                    {Math.abs(priceVsMarket).toFixed(1)}% vs market
-                  </div>
-                  <div className="text-xs text-zinc-400">
-                    Your: {formatPrice(subjectPrice)}
-                  </div>
-                </div>
-              )}
-            </div>
-            {/* MEDIAN - No sub-values */}
-            <div>
-              <div className="text-xs text-zinc-400 uppercase tracking-wide">Median</div>
-              <div className="text-lg sm:text-xl font-bold">{formatPrice(Math.round(statistics.price.median))}</div>
-            </div>
-            {/* AVG $/SQFT - Range, Median, VS Market (unique data) */}
-            <div>
-              <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg $/SqFt</div>
-              <div className="text-lg sm:text-xl font-bold">${Math.round(statistics.pricePerSqFt.average)}</div>
-              <div className="text-xs text-zinc-400 mt-1">
-                Range: ${Math.round(statistics.pricePerSqFt.range.min)} - ${Math.round(statistics.pricePerSqFt.range.max)}
-              </div>
-              <div className="text-xs text-zinc-400">
-                Median: ${Math.round(statistics.pricePerSqFt.median)}
-              </div>
-              {psfVsMarket !== null && (
-                <div className="mt-1">
-                  <div className={`text-xs flex items-center gap-1 ${psfVsMarket > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                    {psfVsMarket > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                    {Math.abs(psfVsMarket).toFixed(1)}% vs market
-                  </div>
-                  <div className="text-xs text-zinc-400">
-                    Your: ${Math.round(subjectPricePerSqft)}
-                  </div>
-                </div>
-              )}
-            </div>
-            {/* AVG DOM - Range, Median (unique data, no vs market) */}
-            <div>
-              <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg DOM</div>
-              <div className="text-lg sm:text-xl font-bold">{Math.round(statistics.daysOnMarket.average)} Days</div>
-              <div className="text-xs text-zinc-400 mt-1">
-                Range: {statistics.daysOnMarket.range.min} - {statistics.daysOnMarket.range.max}
-              </div>
-              <div className="text-xs text-zinc-400">
-                Median: {Math.round(statistics.daysOnMarket.median)}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-      
-      {/* Sub-View Toggle - Only for Compare and List views */}
-      {(mainView === 'compare' || mainView === 'list') && (
-        <div className="flex items-center gap-2 p-4 border-b bg-white dark:bg-zinc-900">
-          <span className="text-sm text-muted-foreground">View:</span>
-          <div className="flex rounded-lg overflow-hidden border">
-            <button
-              onClick={() => setSubView('grid')}
-              className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${
-                subView === 'grid' ? 'bg-primary text-white' : 'bg-white dark:bg-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-700'
-              }`}
-              data-testid="button-subview-grid"
-            >
-              <LayoutGrid className="w-4 h-4" />
-              Grid
-            </button>
-            <button
-              onClick={() => setSubView('list')}
-              className={`flex items-center gap-1.5 px-3 py-2 text-sm border-l transition-colors ${
-                subView === 'list' ? 'bg-primary text-white' : 'bg-white dark:bg-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-700'
-              }`}
-              data-testid="button-subview-list"
-            >
-              <List className="w-4 h-4" />
-              List
-            </button>
-            <button
-              onClick={() => setSubView('table')}
-              className={`flex items-center gap-1.5 px-3 py-2 text-sm border-l transition-colors ${
-                subView === 'table' ? 'bg-primary text-white' : 'bg-white dark:bg-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-700'
-              }`}
-              data-testid="button-subview-table"
-            >
-              <Table2 className="w-4 h-4" />
-              Table
-            </button>
-          </div>
-        </div>
-      )}
-      
-      {/* Main Content Area */}
-      <div className="p-4 space-y-4">
-        {/* MAP VIEW - No sub-views */}
-        {mainView === 'map' && (
+          )}
+
+          {/* MAP VIEW - No sub-views */}
+          {mainView === 'map' && (
           <CMAMap
             properties={cmaData as unknown as Property[]}
             subjectProperty={transaction.mlsData as unknown as Property | null}
@@ -656,7 +638,7 @@ export function CMATab({ transaction }: CMATabProps) {
                                       normalizeStatus(comp.status) === 'active' ? 'bg-green-500' :
                                       normalizeStatus(comp.status) === 'closed' ? 'bg-red-500' :
                                       normalizeStatus(comp.status) === 'activeUnderContract' ? 'bg-orange-500' :
-                                      normalizeStatus(comp.status) === 'pending' ? 'bg-blue-500' :
+                                      normalizeStatus(comp.status) === 'pending' ? 'bg-gray-500' :
                                       normalizeStatus(comp.status) === 'unknown' ? 'bg-gray-400' :
                                       'bg-gray-500'
                                     }`}
@@ -830,7 +812,10 @@ export function CMATab({ transaction }: CMATabProps) {
             )}
           </>
         )}
+        </div>
+        {/* End of 3b. CONTENT AREA */}
       </div>
+      {/* End of 3. MAIN CMA CONTENT CARD */}
       
       <Dialog open={!!selectedProperty} onOpenChange={(open) => {
         if (!open) {

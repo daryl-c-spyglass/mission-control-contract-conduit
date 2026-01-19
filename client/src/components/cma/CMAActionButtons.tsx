@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
 import { 
   Mail, 
   Link as LinkIcon, 
@@ -36,9 +37,13 @@ export function CMAActionButtons({
   onShareSuccess,
 }: CMAActionButtonsProps) {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   const [localShareUrl, setLocalShareUrl] = useState<string | null>(null);
+  
+  // Dark theme button styling for Spyglass branding
+  const darkButtonStyle = "bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700";
   
   const shareMutation = useMutation({
     mutationFn: async () => {
@@ -152,12 +157,46 @@ Best regards`;
     window.print();
   };
 
+  const handlePresentationClick = async () => {
+    if (cmaId) {
+      setLocation(`/cmas/${cmaId}/presentation`);
+    } else if (transactionId && cmaData && cmaData.length > 0) {
+      // Create CMA on demand if not exists
+      // Derive subject property ID from mlsNumber or first comparable's mlsNumber
+      const subjectPropertyId = mlsNumber || cmaData[0]?.mlsNumber || `temp-${Date.now()}`;
+      
+      try {
+        const createRes = await apiRequest('POST', '/api/cmas', {
+          name: `CMA for ${propertyAddress}`,
+          transactionId,
+          subjectPropertyId,
+          propertiesData: cmaData,
+        });
+        const newCma = await createRes.json() as { id: string };
+        setLocation(`/cmas/${newCma.id}/presentation`);
+      } catch {
+        toast({
+          title: 'Error',
+          description: 'Failed to create CMA for presentation',
+          variant: 'destructive',
+        });
+      }
+    } else {
+      toast({
+        title: 'No CMA Data',
+        description: 'Please create a CMA first before opening the presentation builder.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className="flex items-center gap-2 flex-wrap print:hidden">
       <Button 
         variant="outline" 
         size="sm" 
         onClick={handleCopyClientEmail}
+        className={darkButtonStyle}
         data-testid="button-copy-email"
       >
         <Mail className="w-4 h-4 mr-2" />
@@ -169,6 +208,7 @@ Best regards`;
         size="sm"
         onClick={handleProduceUrl}
         disabled={shareMutation.isPending}
+        className={darkButtonStyle}
         data-testid="button-produce-url"
       >
         {shareMutation.isPending ? (
@@ -183,6 +223,7 @@ Best regards`;
         variant="outline" 
         size="sm" 
         onClick={handlePrint}
+        className={darkButtonStyle}
         data-testid="button-print"
       >
         <Printer className="w-4 h-4 mr-2" />
@@ -191,9 +232,9 @@ Best regards`;
       
       <Button 
         variant="outline" 
-        size="sm" 
-        disabled 
-        title="Coming soon"
+        size="sm"
+        onClick={handlePresentationClick}
+        className={darkButtonStyle}
         data-testid="button-presentation"
       >
         <LayoutGrid className="w-4 h-4 mr-2" />
@@ -204,6 +245,7 @@ Best regards`;
         variant="outline" 
         size="sm" 
         onClick={() => setShareDialogOpen(true)}
+        className={darkButtonStyle}
         data-testid="button-share"
       >
         <Share2 className="w-4 h-4 mr-2" />

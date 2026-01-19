@@ -1,0 +1,348 @@
+Correct Layout Order (Top to Bottom)
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ← 154 Pettigrew, Buda, TX 78610 [Active Listing]              [Slack]      │
+│ # ACT2451173                                                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│         Overview | MLS Data | Docs | Marketing | CMA | Timeline            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│ ┌─────────────────────────────────────────────────────────────────────────┐ │
+│ │ [Copy Email] [Produce URL] [Print] [Presentation] [Share]        (RIGHT)│ │ ← ACTION BUTTONS
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│ ┌─────────────────────────────────────────────────────────────────────────┐ │
+│ │ ⚠️ You are seeing a preview... [Save] [Copy Live URL] [Share CMA] ...   │ │ ← YELLOW BANNER
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│ ┌─────────────────────────────────────────────────────────────────────────┐ │
+│ │ ☰ 10 COMPARABLE HOMES                    [Compare] [Map] [Stats] [List] │ │ ← DARK HEADER
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│ ┌─────────────────────────────────────────────────────────────────────────┐ │
+│ │ [All] [Closed] [Active Under Contract] [Pending] [Active]               │ │ ← STATUS FILTERS
+│ ├─────────────────────────────────────────────────────────────────────────┤ │
+│ │ LOW PRICE | HIGH PRICE | AVG PRICE | MEDIAN | AVG $/SQFT | AVG DOM      │ │ ← STATS ROW
+│ │ $749,000  | $2,199,000 | $1,353,780| ...    | $394       | 0 Days       │ │
+│ ├─────────────────────────────────────────────────────────────────────────┤ │
+│ │ View: [Grid] [List] [Table]                                             │ │ ← VIEW TOGGLES
+│ ├─────────────────────────────────────────────────────────────────────────┤ │
+│ │                                                                         │ │
+│ │                        COMPARABLE PROPERTIES                            │ │ ← CONTENT
+│ │                                                                         │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+🔧 REPLIT PROMPT: Fix CMA Tab Layout and Colors
+ISSUE
+The CMA tab layout is disorganized with elements scattered. Need to restructure for proper visual hierarchy and ensure colors follow Spyglass branding standards.
+SPYGLASS COLOR STANDARDS
+typescript// Primary accent
+orange-500: '#f97316'  // Buttons, active states, highlights
+
+// Status colors (IMPORTANT - use consistently)
+const STATUS_COLORS = {
+  closed: 'bg-red-500',           // Red for Closed/Sold
+  active: 'bg-green-500',         // Green for Active
+  'active under contract': 'bg-orange-500',  // Orange for Under Contract
+  pending: 'bg-gray-500',         // Gray for Pending
+  subject: 'bg-blue-500',         // Blue for Subject Property
+};
+
+// Backgrounds
+zinc-900: '#18181b'  // Main dark background
+zinc-800: '#27272a'  // Card/section backgrounds
+zinc-700: '#3f3f46'  // Borders, dividers
+
+// Text
+white: '#ffffff'     // Primary text on dark
+zinc-400: '#a1a1aa'  // Secondary/muted text
+orange-500: '#f97316' // Accent text (prices, highlights)
+LAYOUT RESTRUCTURE
+Update the CMA tab component to follow this structure:
+tsx// client/src/components/CMATab.tsx (or wherever CMA content renders)
+
+export function CMATab({ transaction, mlsData, comparables, refetch }) {
+  // ... existing state and logic ...
+
+  return (
+    <div className="space-y-4">
+      {/* 1. ACTION BUTTONS - Top Right Aligned */}
+      <div className="flex justify-end">
+        <CMAActionButtons
+          transactionId={transaction.id}
+          propertyAddress={transaction.address}
+          publicLink={transaction.cmaPublicLink}
+          statistics={statistics}
+          onShareSuccess={refetch}
+        />
+      </div>
+
+      {/* 2. PREVIEW BANNER - Yellow, Full Width */}
+      <CMAPreviewBanner
+        transactionId={transaction.id}
+        propertyAddress={transaction.address}
+        mlsNumber={transaction.mlsNumber}
+        publicLink={transaction.cmaPublicLink}
+        notes={transaction.cmaNotes}
+        subjectProperty={{
+          listPrice: mlsData?.listPrice,
+          sqft: mlsData?.livingArea,
+          yearBuilt: mlsData?.yearBuilt,
+          beds: mlsData?.bedrooms,
+          baths: mlsData?.bathrooms,
+        }}
+        onFiltersApplied={refetch}
+        onNotesUpdate={refetch}
+      />
+
+      {/* 3. MAIN CMA CONTENT CARD */}
+      <div className="bg-zinc-900 rounded-lg overflow-hidden">
+        
+        {/* 3a. COMPARABLE HOMES HEADER with View Tabs */}
+        <div className="bg-zinc-800 p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Menu className="h-5 w-5 text-white" />
+            <span className="font-semibold text-white">
+              {comparables.length} COMPARABLE HOMES
+            </span>
+          </div>
+          
+          {/* Compare / Map / Stats / List Tabs */}
+          <div className="flex items-center gap-1">
+            {['Compare', 'Map', 'Stats', 'List'].map((tab) => (
+              <Button
+                key={tab}
+                size="sm"
+                variant={activeTab === tab.toLowerCase() ? 'default' : 'ghost'}
+                className={
+                  activeTab === tab.toLowerCase()
+                    ? 'bg-orange-500 hover:bg-orange-600 text-white'
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-700'
+                }
+                onClick={() => setActiveTab(tab.toLowerCase())}
+              >
+                {tab === 'Compare' && <BarChart3 className="h-4 w-4 mr-1" />}
+                {tab === 'Map' && <MapIcon className="h-4 w-4 mr-1" />}
+                {tab === 'Stats' && <TrendingUp className="h-4 w-4 mr-1" />}
+                {tab === 'List' && <Home className="h-4 w-4 mr-1" />}
+                {tab}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* 3b. CONTENT AREA - Changes based on active tab */}
+        <div className="p-4">
+          
+          {/* STATUS FILTERS - Inside content area */}
+          <div className="flex items-center gap-2 mb-4">
+            {['All', 'Closed', 'Active Under Contract', 'Pending', 'Active'].map((status) => (
+              <Button
+                key={status}
+                size="sm"
+                variant={statusFilter === status ? 'default' : 'outline'}
+                className={
+                  statusFilter === status
+                    ? 'bg-zinc-700 text-white border-zinc-600'
+                    : 'bg-transparent text-zinc-400 border-zinc-700 hover:bg-zinc-800 hover:text-white'
+                }
+                onClick={() => setStatusFilter(status)}
+              >
+                {status}
+              </Button>
+            ))}
+          </div>
+
+          {/* STATS SUMMARY ROW */}
+          <div className="grid grid-cols-6 gap-4 p-4 bg-zinc-800 rounded-lg mb-4">
+            <StatCard label="LOW PRICE" value={formatPrice(stats.lowPrice)} />
+            <StatCard label="HIGH PRICE" value={formatPrice(stats.highPrice)} />
+            <StatCard 
+              label="AVG PRICE" 
+              value={formatPrice(stats.avgPrice)}
+              subValue={`↘ ${stats.vsMarketPercent}% vs market`}
+              subValueColor="text-red-400"
+              yourValue={`Your: ${formatPrice(subjectProperty.listPrice)}`}
+            />
+            <StatCard label="MEDIAN" value={formatPrice(stats.median)} />
+            <StatCard 
+              label="AVG $/SQFT" 
+              value={`$${stats.avgPricePerSqft}`}
+              range={`Range: $${stats.pricePerSqftRange.min} - $${stats.pricePerSqftRange.max}`}
+              median={`Median: $${stats.pricePerSqftMedian}`}
+              subValue={`↘ ${stats.pricePerSqftVsMarket}% vs market`}
+              subValueColor="text-red-400"
+              yourValue={`Your: $${subjectProperty.pricePerSqft}`}
+            />
+            <StatCard 
+              label="AVG DOM" 
+              value={`${stats.avgDOM} Days`}
+              range={`Range: ${stats.domRange.min} - ${stats.domRange.max}`}
+              median={`Median: ${stats.domMedian}`}
+            />
+          </div>
+
+          {/* VIEW TOGGLES (for Compare tab only) */}
+          {activeTab === 'compare' && (
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-zinc-400 text-sm">View:</span>
+              {['Grid', 'List', 'Table'].map((view) => (
+                <Button
+                  key={view}
+                  size="sm"
+                  variant={viewMode === view.toLowerCase() ? 'default' : 'outline'}
+                  className={
+                    viewMode === view.toLowerCase()
+                      ? 'bg-orange-500 hover:bg-orange-600 text-white'
+                      : 'bg-transparent text-zinc-400 border-zinc-700 hover:bg-zinc-800'
+                  }
+                  onClick={() => setViewMode(view.toLowerCase())}
+                >
+                  {view === 'Grid' && <LayoutGrid className="h-4 w-4 mr-1" />}
+                  {view === 'List' && <List className="h-4 w-4 mr-1" />}
+                  {view === 'Table' && <TableIcon className="h-4 w-4 mr-1" />}
+                  {view}
+                </Button>
+              ))}
+            </div>
+          )}
+
+          {/* COMPARABLE PROPERTIES CONTENT */}
+          {activeTab === 'compare' && (
+            <CompareView 
+              comparables={filteredComparables} 
+              viewMode={viewMode}
+              subjectProperty={subjectProperty}
+            />
+          )}
+          {activeTab === 'map' && (
+            <MapView comparables={filteredComparables} subjectProperty={subjectProperty} />
+          )}
+          {activeTab === 'stats' && (
+            <StatsView comparables={filteredComparables} subjectProperty={subjectProperty} />
+          )}
+          {activeTab === 'list' && (
+            <ListView comparables={filteredComparables} subjectProperty={subjectProperty} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Helper component for stats
+function StatCard({ 
+  label, 
+  value, 
+  subValue, 
+  subValueColor = 'text-zinc-400',
+  yourValue,
+  range,
+  median,
+}: {
+  label: string;
+  value: string;
+  subValue?: string;
+  subValueColor?: string;
+  yourValue?: string;
+  range?: string;
+  median?: string;
+}) {
+  return (
+    <div>
+      <div className="text-xs text-zinc-400 uppercase tracking-wide mb-1">
+        {label}
+      </div>
+      <div className="text-xl font-bold text-white">
+        {value}
+      </div>
+      {subValue && (
+        <div className={`text-xs ${subValueColor}`}>
+          {subValue}
+        </div>
+      )}
+      {yourValue && (
+        <div className="text-xs text-zinc-400">
+          {yourValue}
+        </div>
+      )}
+      {range && (
+        <div className="text-xs text-zinc-500">
+          {range}
+        </div>
+      )}
+      {median && (
+        <div className="text-xs text-zinc-500">
+          {median}
+        </div>
+      )}
+    </div>
+  );
+}
+SPECIFIC FIXES NEEDED
+1. Action Buttons Styling (dark theme)
+tsx// CMAActionButtons.tsx - Update button styling
+<Button 
+  variant="outline" 
+  size="sm" 
+  onClick={handleCopyClientEmail}
+  className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700"
+>
+  <Mail className="w-4 h-4 mr-2" />
+  Copy Email
+</Button>
+2. View Toggle - Active State Color
+The "Table" button should use orange when active, not stay orange always:
+tsxclassName={
+  viewMode === 'table'
+    ? 'bg-orange-500 hover:bg-orange-600 text-white'  // Active
+    : 'bg-transparent text-zinc-400 border-zinc-700'  // Inactive
+}
+3. Status Filter Tabs - Consistent Styling
+tsx// All status filter buttons should have same styling
+<Button
+  size="sm"
+  variant="ghost"
+  className={
+    statusFilter === status
+      ? 'bg-zinc-700 text-white'
+      : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+  }
+>
+  {status}
+</Button>
+```
+
+**4. Remove Duplicate/Misplaced Elements**
+
+- Remove the separate dark bar containing just status filters
+- Status filters should be inside the main content card
+- View toggles should be inside the Compare tab content
+
+### VISUAL HIERARCHY
+```
+┌─ ACTION BUTTONS (right-aligned, outline style) ─────────────────────────┐
+├─ YELLOW PREVIEW BANNER (full width) ────────────────────────────────────┤
+├─ DARK HEADER BAR ───────────────────────────────────────────────────────┤
+│   ☰ 10 COMPARABLE HOMES                    [Compare] [Map] [Stats] [List]│
+├─ CONTENT AREA (inside card) ────────────────────────────────────────────┤
+│   [Status Filters: All | Closed | Active Under Contract | Pending | Active]
+│   ┌─ STATS ROW ─────────────────────────────────────────────────────────┐
+│   │ LOW PRICE | HIGH PRICE | AVG PRICE | MEDIAN | AVG $/SQFT | AVG DOM  │
+│   └─────────────────────────────────────────────────────────────────────┘
+│   View: [Grid] [List] [Table]  (only on Compare tab)
+│   ┌─ PROPERTIES ────────────────────────────────────────────────────────┐
+│   │ ... comparable property cards/rows ...                              │
+│   └─────────────────────────────────────────────────────────────────────┘
+└─────────────────────────────────────────────────────────────────────────┘
+ACCEPTANCE CRITERIA
+
+ Action buttons at top right with dark theme styling (zinc-800 background)
+ Yellow preview banner below action buttons
+ "X COMPARABLE HOMES" header with Compare/Map/Stats/List tabs
+ Status filters inside the main content card
+ Stats summary row with proper dark styling
+ View toggles (Grid/List/Table) only visible on Compare tab
+ Orange accent color ONLY on active/selected states
+ Consistent button styling throughout
+ No floating/disconnected elements
