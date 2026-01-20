@@ -1,0 +1,694 @@
+# Contract Conduit — Add Bio, Cover Letter & Social Links to Settings
+
+## OVERVIEW
+
+Add the Bio & Cover Letter section and Social & Web Links section to Contract Conduit's Settings page. These features allow agents to configure their profile information for CMA reports.
+
+**Reference:** Implementation extracted from Client Data Portal
+
+---
+
+## PHASE 1: Database Schema
+
+### Task 1.1: Create Agent Profiles Table
+
+Add to `shared/schema.ts`:
+
+```typescript
+import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { z } from "zod";
+
+export const agentProfiles = pgTable("agent_profiles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id").notNull().unique(),
+  title: text("title"),
+  headshotUrl: text("headshot_url"),
+  bio: text("bio"),
+  defaultCoverLetter: text("default_cover_letter"),
+  // Social links
+  facebookUrl: text("facebook_url"),
+  instagramUrl: text("instagram_url"),
+  linkedinUrl: text("linkedin_url"),
+  twitterUrl: text("twitter_url"),
+  websiteUrl: text("website_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Zod validation schema
+export const updateAgentProfileSchema = z.object({
+  title: z.string().optional(),
+  headshotUrl: z.string().url().optional().or(z.literal('')),
+  bio: z.string().optional(),
+  defaultCoverLetter: z.string().optional(),
+  facebookUrl: z.string().url().optional().or(z.literal('')),
+  instagramUrl: z.string().url().optional().or(z.literal('')),
+  linkedinUrl: z.string().url().optional().or(z.literal('')),
+  twitterUrl: z.string().url().optional().or(z.literal('')),
+  websiteUrl: z.string().url().optional().or(z.literal('')),
+});
+
+export type AgentProfile = typeof agentProfiles.$inferSelect;
+export type InsertAgentProfile = typeof agentProfiles.$inferInsert;
+export type UpdateAgentProfile = z.infer<typeof updateAgentProfileSchema>;
+```
+
+### Task 1.2: Run Migration
+
+```bash
+npm run db:push
+```
+
+---
+
+## PHASE 2: Storage Methods
+
+Add to your storage file (e.g., `server/storage.ts`):
+
+```typescript
+import { eq } from "drizzle-orm";
+import { agentProfiles } from "@shared/schema";
+
+// Get agent profile
+async getAgentProfile(userId: string): Promise<AgentProfile | undefined> {
+  const result = await db
+    .select()
+    .from(agentProfiles)
+    .where(eq(agentProfiles.userId, userId))
+    .limit(1);
+  return result[0];
+}
+
+// Update agent profile (with upsert)
+async updateAgentProfile(userId: string, profile: UpdateAgentProfile): Promise<AgentProfile | undefined> {
+  const existing = await this.getAgentProfile(userId);
+  
+  if (!existing) {
+    // Create new profile if doesn't exist
+    const result = await db
+      .insert(agentProfiles)
+      .values({ userId, ...profile })
+      .returning();
+    return result[0];
+  }
+  
+  const result = await db
+    .update(agentProfiles)
+    .set({ ...profile, updatedAt: new Date() })
+    .where(eq(agentProfiles.userId, userId))
+    .returning();
+  return result[0];
+}
+```
+
+---
+
+## PHASE 3: API Endpoints
+
+Add to `server/routes.ts`:
+
+```typescript
+// GET /api/agent/profile - Fetch agent profile
+app.get("/api/agent/profile", requireAuth, async (req, res) => {
+  try {
+    const userId = (req.user as any)?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    const profile = await storage.getAgentProfile(userId);
+    const user = await storage.getUser(userId);
+    
+    res.json({
+      profile: profile || null,
+      user: user ? {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        company: user.company,
+        picture: user.picture,
+      } : null,
+    });
+  } catch (error: any) {
+    console.error("[Agent Profile] Error fetching:", error.message);
+    res.status(500).json({ error: "Failed to fetch agent profile" });
+  }
+});
+
+// PUT /api/agent/profile - Update agent profile
+app.put("/api/agent/profile", requireAuth, async (req, res) => {
+  try {
+    const userId = (req.user as any)?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    const { updateAgentProfileSchema } = await import("@shared/schema");
+    const profileData = updateAgentProfileSchema.partial().safeParse(req.body.profile || {});
+    
+    if (!profileData.success) {
+      return res.status(400).json({ error: "Invalid profile data", details: profileData.error.issues });
+    }
+    
+    const updatedProfile = await storage.updateAgentProfile(userId, profileData.data);
+    
+    // Update user basic info if provided
+    if (req.body.user) {
+      await storage.updateUser(userId, {
+        firstName: req.body.user.firstName,
+        lastName: req.body.user.lastName,
+        phone: req.body.user.phone,
+        company: req.body.user.company,
+      });
+    }
+    
+    res.json({ success: true, profile: updatedProfile });
+  } catch (error: any) {
+    console.error("[Agent Profile] Error updating:", error.message);
+    res.status(500).json({ error: "Failed to update agent profile" });
+  }
+});
+
+// POST /api/ai/generate-default-cover-letter - AI Cover Letter Generation
+app.post("/api/ai/generate-default-cover-letter", requireAuth, async (req, res) => {
+  try {
+    const userId = (req.user as any)?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { tone = 'professional', existingCoverLetter } = req.body;
+    
+    // Validate tone
+    const validTones = ['professional', 'friendly', 'confident'];
+    if (!validTones.includes(tone)) {
+      return res.status(400).json({ error: "Tone must be professional, friendly, or confident" });
+    }
+
+    // Get agent data
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const agentProfile = await storage.getAgentProfile(userId);
+    const agentName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Agent';
+    
+    // Determine if generating new or enhancing existing
+    const isEnhancing = existingCoverLetter && existingCoverLetter.trim().length > 20;
+    
+    const toneDescriptions: Record<string, string> = {
+      professional: 'professional, polished, and business-appropriate',
+      friendly: 'warm, approachable, and personable while maintaining professionalism',
+      confident: 'confident, authoritative, and compelling'
+    };
+
+    let systemPrompt: string;
+    let userPrompt: string;
+
+    if (isEnhancing) {
+      systemPrompt = `You are an expert real estate marketing copywriter. Your task is to enhance and improve an existing cover letter for a CMA (Comparative Market Analysis) report. The tone should be ${toneDescriptions[tone]}.`;
+      
+      userPrompt = `Please enhance and improve this cover letter for ${agentName}${agentProfile?.title ? `, ${agentProfile.title}` : ''}${user.company ? ` at ${user.company}` : ''}:
+
+EXISTING COVER LETTER:
+${existingCoverLetter}
+
+${agentProfile?.bio ? `AGENT BIO FOR CONTEXT:\n${agentProfile.bio}\n` : ''}
+
+Please:
+1. Improve the writing quality and flow
+2. Make it more ${tone}
+3. Keep it concise (2-3 paragraphs)
+4. Use [Client Name] as placeholder for the client's name
+5. Maintain focus on CMA value proposition
+
+Return ONLY the improved cover letter text, no additional commentary.`;
+    } else {
+      systemPrompt = `You are an expert real estate marketing copywriter. Create a compelling cover letter template for CMA (Comparative Market Analysis) reports. The tone should be ${toneDescriptions[tone]}.`;
+      
+      userPrompt = `Create a cover letter template for ${agentName}${agentProfile?.title ? `, ${agentProfile.title}` : ''}${user.company ? ` at ${user.company}` : ''}.
+
+${agentProfile?.bio ? `AGENT BIO:\n${agentProfile.bio}\n` : ''}
+
+Requirements:
+1. Start with "Dear [Client Name],"
+2. 2-3 paragraphs maximum
+3. Explain the value of the CMA
+4. ${tone === 'professional' ? 'Maintain formal business tone' : tone === 'friendly' ? 'Be warm and approachable' : 'Project confidence and expertise'}
+5. End with offer to discuss further
+6. Do NOT include signature (that's added separately)
+
+Return ONLY the cover letter text, no additional commentary.`;
+    }
+
+    const OpenAI = (await import('openai')).default;
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 500,
+    });
+
+    const coverLetter = completion.choices[0]?.message?.content?.trim() || '';
+    
+    res.json({ coverLetter, mode: isEnhancing ? 'enhanced' : 'generated' });
+  } catch (error: any) {
+    console.error("[AI Cover Letter] Error:", error.message);
+    res.status(500).json({ error: "Failed to generate cover letter" });
+  }
+});
+```
+
+---
+
+## PHASE 4: Frontend Components
+
+### Task 4.1: Install Dependencies (if needed)
+
+```bash
+npm install react-icons
+```
+
+### Task 4.2: Add to Settings Page
+
+Find your Settings page component and add these sections. Create state and handlers:
+
+```tsx
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { FileText, Globe, Sparkles, RefreshCw, RotateCcw, Loader2 } from 'lucide-react';
+import { SiFacebook, SiInstagram, SiLinkedin } from 'react-icons/si';
+
+// Profile form state interface
+interface ProfileForm {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  company: string;
+  title: string;
+  bio: string;
+  defaultCoverLetter: string;
+  websiteUrl: string;
+  facebookUrl: string;
+  instagramUrl: string;
+  linkedinUrl: string;
+}
+
+export function SettingsProfileSection() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  const [profileForm, setProfileForm] = useState<ProfileForm>({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    company: '',
+    title: '',
+    bio: '',
+    defaultCoverLetter: '',
+    websiteUrl: '',
+    facebookUrl: '',
+    instagramUrl: '',
+    linkedinUrl: '',
+  });
+  
+  const [originalProfile, setOriginalProfile] = useState<ProfileForm>(profileForm);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [aiTone, setAiTone] = useState<'professional' | 'friendly' | 'confident'>('professional');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Fetch profile data
+  const { data: profileData, isLoading } = useQuery({
+    queryKey: ['agent-profile'],
+    queryFn: async () => {
+      const response = await fetch('/api/agent/profile');
+      if (!response.ok) throw new Error('Failed to fetch profile');
+      return response.json();
+    },
+  });
+
+  // Initialize form from fetched data
+  useEffect(() => {
+    if (profileData) {
+      const form: ProfileForm = {
+        firstName: profileData.user?.firstName || '',
+        lastName: profileData.user?.lastName || '',
+        phone: profileData.user?.phone || '',
+        company: profileData.user?.company || '',
+        title: profileData.profile?.title || '',
+        bio: profileData.profile?.bio || '',
+        defaultCoverLetter: profileData.profile?.defaultCoverLetter || '',
+        websiteUrl: profileData.profile?.websiteUrl || '',
+        facebookUrl: profileData.profile?.facebookUrl || '',
+        instagramUrl: profileData.profile?.instagramUrl || '',
+        linkedinUrl: profileData.profile?.linkedinUrl || '',
+      };
+      setProfileForm(form);
+      setOriginalProfile(form);
+    }
+  }, [profileData]);
+
+  // Track changes
+  useEffect(() => {
+    setHasChanges(JSON.stringify(profileForm) !== JSON.stringify(originalProfile));
+  }, [profileForm, originalProfile]);
+
+  // Save mutation
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/agent/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user: {
+            firstName: profileForm.firstName,
+            lastName: profileForm.lastName,
+            phone: profileForm.phone,
+            company: profileForm.company,
+          },
+          profile: {
+            title: profileForm.title,
+            bio: profileForm.bio,
+            defaultCoverLetter: profileForm.defaultCoverLetter,
+            websiteUrl: profileForm.websiteUrl || '',
+            facebookUrl: profileForm.facebookUrl || '',
+            instagramUrl: profileForm.instagramUrl || '',
+            linkedinUrl: profileForm.linkedinUrl || '',
+          },
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to save');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Saved', description: 'Profile updated successfully.' });
+      setOriginalProfile(profileForm);
+      setHasChanges(false);
+      queryClient.invalidateQueries({ queryKey: ['agent-profile'] });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to save profile.', variant: 'destructive' });
+    },
+  });
+
+  // Generate cover letter with AI
+  const handleGenerateCoverLetter = async () => {
+    if (!(profileForm.firstName || profileForm.lastName)) {
+      toast({ title: 'Name Required', description: 'Please fill in your name first.', variant: 'destructive' });
+      return;
+    }
+    
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/ai/generate-default-cover-letter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tone: aiTone,
+          existingCoverLetter: profileForm.defaultCoverLetter,
+        }),
+      });
+      
+      if (!response.ok) throw new Error('Failed to generate');
+      
+      const data = await response.json();
+      setProfileForm(prev => ({ ...prev, defaultCoverLetter: data.coverLetter }));
+      toast({ 
+        title: 'Cover Letter Generated', 
+        description: data.mode === 'enhanced' ? 'Your cover letter has been enhanced.' : 'A new cover letter has been created.' 
+      });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to generate cover letter.', variant: 'destructive' });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleReset = () => {
+    setProfileForm(originalProfile);
+    setHasChanges(false);
+  };
+
+  if (isLoading) {
+    return <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin" /></div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Bio & Cover Letter Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Bio & Cover Letter
+          </CardTitle>
+          <CardDescription>
+            Your biography and default cover letter for CMA reports
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Agent Bio */}
+          <div className="space-y-2">
+            <Label htmlFor="bio">Agent Bio / Resume</Label>
+            <Textarea
+              id="bio"
+              placeholder="Tell clients about your experience, expertise, and what makes you the right agent for them..."
+              value={profileForm.bio}
+              onChange={(e) => setProfileForm(prev => ({ ...prev, bio: e.target.value }))}
+              className="min-h-[120px]"
+            />
+            <p className="text-xs text-muted-foreground">
+              This will appear on the Agent Resume page in your CMA reports
+            </p>
+          </div>
+
+          {/* Default Cover Letter */}
+          <div className="space-y-3">
+            <Label>Default Cover Letter</Label>
+            
+            {/* AI Assistant Panel */}
+            <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                  AI Assistant
+                </span>
+              </div>
+              
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Tone:</span>
+                  <Select value={aiTone} onValueChange={(v: any) => setAiTone(v)}>
+                    <SelectTrigger className="w-[140px] h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="professional">Professional</SelectItem>
+                      <SelectItem value="friendly">Friendly</SelectItem>
+                      <SelectItem value="confident">Confident</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <Button
+                  type="button"
+                  onClick={handleGenerateCoverLetter}
+                  disabled={isGenerating || !(profileForm.firstName || profileForm.lastName)}
+                  className="bg-purple-600 hover:bg-purple-700"
+                  size="sm"
+                >
+                  {isGenerating ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Generate with AI
+                    </>
+                  )}
+                </Button>
+              </div>
+              
+              <p className="text-xs text-muted-foreground mt-2">
+                {profileForm.defaultCoverLetter && profileForm.defaultCoverLetter.trim().length > 20
+                  ? "AI will enhance and improve your existing cover letter with the selected tone."
+                  : "AI will create a cover letter template based on your profile information above."
+                }
+              </p>
+              
+              {!(profileForm.firstName || profileForm.lastName) && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Fill in your name above to enable AI generation.
+                </p>
+              )}
+            </div>
+            
+            <Textarea
+              placeholder="Dear [Client Name],
+
+Thank you for the opportunity to prepare this Comparative Market Analysis for your property. This report will help you understand the current market conditions and determine the best listing price for your home..."
+              value={profileForm.defaultCoverLetter}
+              onChange={(e) => setProfileForm(prev => ({ ...prev, defaultCoverLetter: e.target.value }))}
+              className="min-h-[150px]"
+            />
+            <p className="text-xs text-muted-foreground">
+              This will be used as the default cover letter in your CMA presentations (can be customized per CMA)
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Social & Web Links Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Globe className="w-5 h-5" />
+            Social & Web Links
+          </CardTitle>
+          <CardDescription>
+            Your website and social media links for reports
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="websiteUrl" className="flex items-center gap-2">
+                <Globe className="w-4 h-4" /> Website
+              </Label>
+              <Input
+                id="websiteUrl"
+                placeholder="https://yourwebsite.com"
+                value={profileForm.websiteUrl}
+                onChange={(e) => setProfileForm(prev => ({ ...prev, websiteUrl: e.target.value }))}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="facebookUrl" className="flex items-center gap-2">
+                <SiFacebook className="w-4 h-4" /> Facebook
+              </Label>
+              <Input
+                id="facebookUrl"
+                placeholder="https://facebook.com/yourpage"
+                value={profileForm.facebookUrl}
+                onChange={(e) => setProfileForm(prev => ({ ...prev, facebookUrl: e.target.value }))}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="instagramUrl" className="flex items-center gap-2">
+                <SiInstagram className="w-4 h-4" /> Instagram
+              </Label>
+              <Input
+                id="instagramUrl"
+                placeholder="https://instagram.com/yourprofile"
+                value={profileForm.instagramUrl}
+                onChange={(e) => setProfileForm(prev => ({ ...prev, instagramUrl: e.target.value }))}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="linkedinUrl" className="flex items-center gap-2">
+                <SiLinkedin className="w-4 h-4" /> LinkedIn
+              </Label>
+              <Input
+                id="linkedinUrl"
+                placeholder="https://linkedin.com/in/yourprofile"
+                value={profileForm.linkedinUrl}
+                onChange={(e) => setProfileForm(prev => ({ ...prev, linkedinUrl: e.target.value }))}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Save/Reset Buttons */}
+      <div className="flex justify-end gap-3">
+        <Button
+          variant="outline"
+          onClick={handleReset}
+          disabled={!hasChanges}
+        >
+          <RotateCcw className="w-4 h-4 mr-2" />
+          Reset Changes
+        </Button>
+        <Button
+          onClick={() => saveMutation.mutate()}
+          disabled={!hasChanges || saveMutation.isPending}
+        >
+          {saveMutation.isPending ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save Profile'
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
+```
+
+### Task 4.3: Add to Settings Page
+
+In your Settings page, import and use the component:
+
+```tsx
+import { SettingsProfileSection } from '@/components/SettingsProfileSection';
+
+// In your Settings page:
+<SettingsProfileSection />
+```
+
+---
+
+## PHASE 5: Environment Variables
+
+Ensure `OPENAI_API_KEY` is set in your Replit Secrets and Render environment variables.
+
+---
+
+## ACCEPTANCE CRITERIA
+
+- [ ] Agent Profiles table created in database
+- [ ] GET /api/agent/profile returns profile data
+- [ ] PUT /api/agent/profile saves profile changes
+- [ ] POST /api/ai/generate-default-cover-letter generates cover letters
+- [ ] Bio & Cover Letter section displays in Settings
+- [ ] AI tone selector works (Professional, Friendly, Confident)
+- [ ] Generate with AI button creates/enhances cover letter
+- [ ] Social & Web Links section displays with 4 fields
+- [ ] Save button persists all changes
+- [ ] Reset button reverts unsaved changes
+- [ ] No console errors
+
+---
+
+## TESTING
+
+1. Go to Settings page
+2. Fill in Agent Bio / Resume
+3. Click "Generate with AI" to create a cover letter
+4. Change tone and regenerate to see different styles
+5. Fill in social media links
+6. Click Save Profile
+7. Refresh page and verify data persisted

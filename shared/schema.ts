@@ -249,6 +249,24 @@ export const notificationSettings = pgTable("notification_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Agent profiles for CMA reports and marketing
+export const agentProfiles = pgTable("agent_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull().unique(),
+  title: text("title"),
+  headshotUrl: text("headshot_url"),
+  bio: text("bio"),
+  defaultCoverLetter: text("default_cover_letter"),
+  // Social links
+  facebookUrl: text("facebook_url"),
+  instagramUrl: text("instagram_url"),
+  linkedinUrl: text("linkedin_url"),
+  twitterUrl: text("twitter_url"),
+  websiteUrl: text("website_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
   id: true,
@@ -302,6 +320,25 @@ export const insertNotificationSettingsSchema = createInsertSchema(notificationS
   updatedAt: true,
 });
 
+export const insertAgentProfileSchema = createInsertSchema(agentProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Agent profile update validation schema
+export const updateAgentProfileSchema = z.object({
+  title: z.string().optional(),
+  headshotUrl: z.string().url().optional().or(z.literal('')),
+  bio: z.string().optional(),
+  defaultCoverLetter: z.string().optional(),
+  facebookUrl: z.string().url().optional().or(z.literal('')),
+  instagramUrl: z.string().url().optional().or(z.literal('')),
+  linkedinUrl: z.string().url().optional().or(z.literal('')),
+  twitterUrl: z.string().url().optional().or(z.literal('')),
+  websiteUrl: z.string().url().optional().or(z.literal('')),
+});
+
 // Types
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
@@ -332,6 +369,10 @@ export type InsertCmaReportTemplate = z.infer<typeof insertCmaReportTemplateSche
 
 export type NotificationSetting = typeof notificationSettings.$inferSelect;
 export type InsertNotificationSetting = z.infer<typeof insertNotificationSettingsSchema>;
+
+export type AgentProfile = typeof agentProfiles.$inferSelect;
+export type InsertAgentProfile = z.infer<typeof insertAgentProfileSchema>;
+export type UpdateAgentProfile = z.infer<typeof updateAgentProfileSchema>;
 
 // CMA Statistics Types
 export interface CmaStatRange {
