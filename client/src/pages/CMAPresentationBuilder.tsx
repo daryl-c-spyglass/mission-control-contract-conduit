@@ -21,7 +21,10 @@ import {
   Calculator,
   GripVertical,
   Loader2,
+  Layout,
+  Check,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Cma, CmaBrochure, CmaAdjustmentsData, CoverPageConfig, Property, PropertyStatistics } from "@shared/schema";
@@ -67,6 +70,9 @@ interface PresentationConfig {
   mapStyle: string;
   showMapPolygon: boolean;
   layout: string;
+  photosPerProperty: string;
+  photoSelection: string;
+  selectedPhotoIndices: number[];
 }
 
 interface SectionItem {
@@ -137,6 +143,9 @@ export default function CMAPresentationBuilder() {
     mapStyle: "streets",
     showMapPolygon: true,
     layout: "two_photos",
+    photosPerProperty: "2",
+    photoSelection: "first-12",
+    selectedPhotoIndices: [],
   });
   
   const [brochure, setBrochure] = useState<CmaBrochure | null>(null);
@@ -200,6 +209,9 @@ export default function CMAPresentationBuilder() {
         mapStyle: existingConfig.mapStyle || "streets",
         showMapPolygon: existingConfig.showMapPolygon ?? true,
         layout: existingConfig.layout || "two_photos",
+        photosPerProperty: existingConfig.photosPerProperty || "2",
+        photoSelection: existingConfig.photoSelection || "first-12",
+        selectedPhotoIndices: existingConfig.selectedPhotoIndices || [],
       });
       if (existingConfig.customPhotoSelections) {
         setCustomPhotoSelections(existingConfig.customPhotoSelections);
@@ -405,10 +417,14 @@ export default function CMAPresentationBuilder() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full grid grid-cols-4">
+            <TabsList className="w-full grid grid-cols-5">
               <TabsTrigger value="sections" className="gap-1" data-testid="tab-sections">
                 <FileText className="w-4 h-4" />
                 Sections
+              </TabsTrigger>
+              <TabsTrigger value="layout" className="gap-1" data-testid="tab-layout">
+                <Layout className="w-4 h-4" />
+                Layout
               </TabsTrigger>
               <TabsTrigger value="map" className="gap-1" data-testid="tab-map">
                 <Map className="w-4 h-4" />
@@ -436,23 +452,122 @@ export default function CMAPresentationBuilder() {
                   />
                 </CardContent>
               </Card>
+            </TabsContent>
 
-              <div className="space-y-2">
-                <Label>Listing Layout</Label>
-                <Select
-                  value={config.layout || "two_photos"}
-                  onValueChange={(v) => setConfig({ ...config, layout: v })}
-                >
-                  <SelectTrigger data-testid="select-listing-layout">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LAYOUT_OPTIONS.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <TabsContent value="layout" className="space-y-4 mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Property Layout</CardTitle>
+                  <CardDescription>Choose how properties are displayed in the report</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="photos-per-property">Photos per property</Label>
+                    <Select 
+                      value={config.photosPerProperty || "2"} 
+                      onValueChange={(v) => setConfig({ ...config, photosPerProperty: v })}
+                    >
+                      <SelectTrigger id="photos-per-property" data-testid="select-photos-per-property">
+                        <SelectValue placeholder="Select photos per property" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">One photo per property</SelectItem>
+                        <SelectItem value="2">Two photos per property</SelectItem>
+                        <SelectItem value="3">Three photos per property</SelectItem>
+                        <SelectItem value="4">Four photos per property</SelectItem>
+                        <SelectItem value="6">Six photos per property</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="photo-selection">Photo selection</Label>
+                    <Select 
+                      value={config.photoSelection || "first-12"} 
+                      onValueChange={(v) => setConfig({ ...config, photoSelection: v })}
+                    >
+                      <SelectTrigger id="photo-selection" data-testid="select-photo-selection">
+                        <SelectValue placeholder="Select photo source" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="first-12">First 12 photos</SelectItem>
+                        <SelectItem value="all">All photos</SelectItem>
+                        <SelectItem value="ai-suggest">AI Suggest (best quality)</SelectItem>
+                        <SelectItem value="custom">Custom selection</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Photos are pulled directly from MLS listing via Repliers API
+                    </p>
+                  </div>
+
+                  {config.photoSelection === 'custom' && subjectProperty && (
+                    <div className="space-y-2">
+                      <Label>Select Photos</Label>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Click to select which photos to include in the report
+                      </p>
+                      <div className="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto p-2 border rounded-lg">
+                        {((subjectProperty as any).photos || []).map((photo: string, index: number) => (
+                          <div
+                            key={index}
+                            onClick={() => {
+                              const indices = config.selectedPhotoIndices || [];
+                              const newIndices = indices.includes(index)
+                                ? indices.filter(i => i !== index)
+                                : [...indices, index];
+                              setConfig({ ...config, selectedPhotoIndices: newIndices });
+                            }}
+                            className={cn(
+                              "relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all",
+                              (config.selectedPhotoIndices || []).includes(index) 
+                                ? "border-orange-500 ring-2 ring-orange-500/50" 
+                                : "border-transparent hover:border-gray-300"
+                            )}
+                            data-testid={`photo-select-${index}`}
+                          >
+                            <img 
+                              src={photo} 
+                              alt={`Photo ${index + 1}`}
+                              className="w-full h-20 object-cover"
+                            />
+                            {(config.selectedPhotoIndices || []).includes(index) && (
+                              <div className="absolute top-1 right-1 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center">
+                                <Check className="w-3 h-3 text-white" />
+                              </div>
+                            )}
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs px-1">
+                              {index + 1}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {(config.selectedPhotoIndices || []).length} photos selected
+                      </p>
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    <Label>Property display layout</Label>
+                    <Select
+                      value={config.layout || "two_photos"}
+                      onValueChange={(v) => setConfig({ ...config, layout: v })}
+                    >
+                      <SelectTrigger data-testid="select-property-layout">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LAYOUT_OPTIONS.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="map" className="space-y-4 mt-4">

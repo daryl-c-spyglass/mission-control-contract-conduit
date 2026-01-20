@@ -11,8 +11,6 @@ export const CMA_REPORT_SECTIONS = [
   { id: 'summary_comparables', name: 'Summary of Comparable Properties', category: 'listings', defaultEnabled: true },
   { id: 'listings_header', name: 'Listings Chapter Header', category: 'listings', defaultEnabled: false },
   { id: 'property_details', name: 'Property Details', category: 'listings', defaultEnabled: true },
-  { id: 'property_photos', name: 'Property Photos', category: 'listings', defaultEnabled: true },
-  { id: 'adjustments', name: 'Adjustments', category: 'listings', defaultEnabled: false },
   
   { id: 'analysis_header', name: 'Analysis Chapter Header', category: 'analysis', defaultEnabled: false },
   { id: 'online_valuation', name: 'Online Valuation Analysis', category: 'analysis', defaultEnabled: false },
