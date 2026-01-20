@@ -41,8 +41,22 @@ export function MapboxCMAMap({
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapboxToken, setMapboxToken] = useState<string>('');
+  const [tokenError, setTokenError] = useState<string | null>(null);
 
-  const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || '';
+  // Fetch token from backend API (same as cma-map.tsx)
+  useEffect(() => {
+    fetch('/api/mapbox-token')
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (data.token) setMapboxToken(data.token);
+        else setTokenError(data.error || 'Failed to load map token');
+      })
+      .catch((err) => setTokenError(`Failed to load map: ${err.message}`));
+  }, []);
 
   const allProperties = useMemo(() => {
     const props = [...properties];
@@ -138,7 +152,7 @@ export function MapboxCMAMap({
     }
   }, [allProperties, mapLoaded]);
 
-  if (!mapboxToken) {
+  if (tokenError) {
     return (
       <div 
         className="flex items-center justify-center bg-muted rounded-lg" 
@@ -146,7 +160,21 @@ export function MapboxCMAMap({
       >
         <div className="text-center text-muted-foreground">
           <Map className="w-8 h-8 mx-auto mb-2" />
-          <p>Map requires Mapbox token</p>
+          <p>{tokenError}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!mapboxToken) {
+    return (
+      <div 
+        className="flex items-center justify-center bg-muted rounded-lg" 
+        style={{ height }}
+      >
+        <div className="text-center text-muted-foreground">
+          <Map className="w-8 h-8 mx-auto mb-2 animate-pulse" />
+          <p>Loading map...</p>
         </div>
       </div>
     );
