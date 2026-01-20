@@ -36,3 +36,84 @@ export const SECTION_CATEGORIES = {
 };
 
 export const EDITABLE_SECTIONS = CMA_REPORT_SECTIONS.filter(s => 'editable' in s && s.editable);
+
+export interface CMASectionConfig {
+  id: CmaSectionId;
+  name: string;
+  category: CmaSectionCategory;
+  enabled: boolean;
+  order: number;
+  customizable: boolean;
+  customContent?: string;
+}
+
+export interface CMASubjectProperty {
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  mlsNumber: string;
+  listPrice: number;
+  bedrooms: number;
+  bathrooms: number;
+  sqft: number;
+  lotSize: number;
+  yearBuilt: number;
+  propertyType: string;
+  description: string;
+  photos: string[];
+  listDate: string;
+  status: string;
+}
+
+export interface CMAComparable {
+  address: string;
+  mlsNumber: string;
+  listPrice: number;
+  soldPrice?: number;
+  bedrooms: number;
+  bathrooms: number;
+  sqft: number;
+  lotSize: number;
+  yearBuilt: number;
+  daysOnMarket: number;
+  distance: number;
+  status: string;
+  photos: string[];
+  pricePerSqft: number;
+}
+
+export interface CMAAgentInfo {
+  firstName: string;
+  lastName: string;
+  title: string;
+  email: string;
+  phone: string;
+  photo: string;
+  company: string;
+  bio?: string;
+  coverLetter?: string;
+}
+
+export interface CMAAnalysisData {
+  averagePrice: number;
+  averagePricePerSqft: number;
+  medianPrice: number;
+  priceRange: { min: number; max: number };
+  averageDaysOnMarket: number;
+  suggestedListPrice?: number;
+}
+
+export interface CMAReportMetadata {
+  preparedFor: string;
+  preparedDate: string;
+  reportTitle: string;
+}
+
+export interface CMAReportData {
+  subjectProperty: CMASubjectProperty;
+  comparables: CMAComparable[];
+  agent: CMAAgentInfo;
+  analysis: CMAAnalysisData;
+  metadata: CMAReportMetadata;
+}

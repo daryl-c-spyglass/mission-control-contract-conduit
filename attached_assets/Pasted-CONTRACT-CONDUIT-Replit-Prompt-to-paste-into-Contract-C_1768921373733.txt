@@ -1,0 +1,1065 @@
+CONTRACT CONDUIT (Replit)
+Prompt to paste into Contract Conduit Replit:
+Build out the CMA Presentation Builder's three section categories (Introduction, Listings, Analysis) with proper data binding and PDF rendering.
+
+---
+
+## CURRENT STATE
+
+The Sections tab UI is built with toggles and reordering. Now we need to:
+1. Define the data structure for each section
+2. Create the PDF templates/components for each section
+3. Bind MLS data, agent profile data, and CMA comparables to each section
+
+---
+
+## PHASE 1: Define Section Data Types
+
+Create a types file for CMA sections:
+```typescript
+// shared/cma-sections.ts
+
+export interface CMASectionConfig {
+  id: string;
+  name: string;
+  category: 'introduction' | 'listings' | 'analysis';
+  enabled: boolean;
+  order: number;
+  customizable: boolean;
+  customContent?: string;
+}
+
+export interface CMAReportData {
+  // Subject Property
+  subjectProperty: {
+    address: string;
+    city: string;
+    state: string;
+    zip: string;
+    mlsNumber: string;
+    listPrice: number;
+    bedrooms: number;
+    bathrooms: number;
+    sqft: number;
+    lotSize: number;
+    yearBuilt: number;
+    propertyType: string;
+    description: string;
+    photos: string[];
+    listDate: string;
+    status: string;
+  };
+  
+  // Comparable Properties
+  comparables: Array<{
+    address: string;
+    mlsNumber: string;
+    listPrice: number;
+    soldPrice?: number;
+    bedrooms: number;
+    bathrooms: number;
+    sqft: number;
+    lotSize: number;
+    yearBuilt: number;
+    daysOnMarket: number;
+    distance: number;
+    status: string;
+    photos: string[];
+    pricePerSqft: number;
+  }>;
+  
+  // Agent Info
+  agent: {
+    firstName: string;
+    lastName: string;
+    title: string;
+    email: string;
+    phone: string;
+    photo: string;
+    company: string;
+    bio?: string;
+    coverLetter?: string;
+  };
+  
+  // Analysis Data (calculated)
+  analysis: {
+    averagePrice: number;
+    averagePricePerSqft: number;
+    medianPrice: number;
+    priceRange: { min: number; max: number };
+    averageDaysOnMarket: number;
+    suggestedListPrice?: number;
+  };
+  
+  // Report Metadata
+  metadata: {
+    preparedFor: string;
+    preparedDate: string;
+    reportTitle: string;
+  };
+}
+
+// Default section configuration
+export const DEFAULT_SECTIONS: CMASectionConfig[] = [
+  // Introduction (7 sections)
+  { id: 'cover-page', name: 'Cover Page', category: 'introduction', enabled: true, order: 1, customizable: false },
+  { id: 'listing-brochure', name: 'Listing Brochure', category: 'introduction', enabled: true, order: 2, customizable: false },
+  { id: 'cover-letter', name: 'Cover Letter', category: 'introduction', enabled: true, order: 3, customizable: true },
+  { id: 'agent-resume', name: 'Agent Resume', category: 'introduction', enabled: true, order: 4, customizable: true },
+  { id: 'our-company', name: 'Our Company', category: 'introduction', enabled: true, order: 5, customizable: false },
+  { id: 'what-is-cma', name: 'What is a CMA?', category: 'introduction', enabled: true, order: 6, customizable: false },
+  { id: 'contact-me', name: 'Contact Me', category: 'introduction', enabled: true, order: 7, customizable: false },
+  
+  // Listings (6 sections)
+  { id: 'map-all-listings', name: 'Map of All Listings', category: 'listings', enabled: true, order: 8, customizable: false },
+  { id: 'summary-comparables', name: 'Summary of Comparable Properties', category: 'listings', enabled: true, order: 9, customizable: false },
+  { id: 'listings-header', name: 'Listings Chapter Header', category: 'listings', enabled: true, order: 10, customizable: false },
+  { id: 'property-details', name: 'Property Details', category: 'listings', enabled: true, order: 11, customizable: false },
+  { id: 'property-photos', name: 'Property Photos', category: 'listings', enabled: true, order: 12, customizable: false },
+  { id: 'adjustments', name: 'Adjustments', category: 'listings', enabled: true, order: 13, customizable: false },
+  
+  // Analysis (4 sections)
+  { id: 'analysis-header', name: 'Analysis Chapter Header', category: 'analysis', enabled: true, order: 14, customizable: false },
+  { id: 'online-valuation', name: 'Online Valuation Analysis', category: 'analysis', enabled: true, order: 15, customizable: false },
+  { id: 'avg-price-sqft', name: 'Average Price Per Sq. Ft.', category: 'analysis', enabled: true, order: 16, customizable: false },
+  { id: 'comparable-stats', name: 'Comparable Property Statistics', category: 'analysis', enabled: true, order: 17, customizable: false },
+];
+```
+
+---
+
+## PHASE 2: Create PDF Section Templates
+
+Create Handlebars templates for each section (similar to flyer generation):
+
+### 2.1 Cover Page Template
+```typescript
+// server/templates/cma/cover-page.hbs
+
+export const coverPageTemplate = `
+<div class="cover-page" style="
+  width: 8.5in;
+  height: 11in;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+  color: white;
+  font-family: 'Inter', sans-serif;
+  position: relative;
+  page-break-after: always;
+">
+  <!-- Company Logo -->
+  <div style="margin-bottom: 40px;">
+    <img src="/spyglass-logo-white.png" alt="Spyglass Realty" style="height: 60px;" />
+  </div>
+  
+  <!-- Company Name -->
+  <h2 style="
+    color: #F37216;
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    letter-spacing: 2px;
+  ">{{agent.company}}</h2>
+  
+  <!-- Report Title -->
+  <h1 style="
+    font-size: 42px;
+    font-weight: 700;
+    margin-bottom: 30px;
+    text-align: center;
+  ">Comparative Market Analysis</h1>
+  
+  <!-- Prepared For -->
+  <p style="
+    font-size: 18px;
+    color: #9ca3af;
+    margin-bottom: 10px;
+  ">Prepared exclusively for you</p>
+  
+  <!-- Property Address -->
+  <h3 style="
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 40px;
+    text-align: center;
+  ">{{subjectProperty.address}}</h3>
+  
+  <!-- Date -->
+  <p style="
+    font-size: 16px;
+    color: #9ca3af;
+    margin-bottom: 30px;
+  ">{{metadata.preparedDate}}</p>
+  
+  <!-- Agent Info -->
+  <div style="
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  ">
+    {{#if agent.photo}}
+    <img src="{{agent.photo}}" style="
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #F37216;
+    " />
+    {{else}}
+    <div style="
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: #F37216;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 600;
+    ">{{agentInitial}}</div>
+    {{/if}}
+    <span style="font-size: 18px;">{{agent.firstName}} {{agent.lastName}}</span>
+  </div>
+</div>
+`;
+```
+
+### 2.2 Listing Brochure Template
+```typescript
+// server/templates/cma/listing-brochure.hbs
+
+export const listingBrochureTemplate = `
+<div class="listing-brochure" style="
+  width: 8.5in;
+  min-height: 11in;
+  padding: 0.5in;
+  font-family: 'Inter', sans-serif;
+  background: white;
+  page-break-after: always;
+">
+  <!-- Header -->
+  <div style="
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #F37216;
+  ">
+    <img src="/spyglass-logo.png" alt="Spyglass Realty" style="height: 40px;" />
+    <div style="text-align: right;">
+      <div style="font-size: 14px; color: #666;">MLS# {{subjectProperty.mlsNumber}}</div>
+      <div style="font-size: 12px; color: #999;">{{subjectProperty.status}}</div>
+    </div>
+  </div>
+  
+  <!-- Main Photo -->
+  <div style="
+    width: 100%;
+    height: 350px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    overflow: hidden;
+  ">
+    <img src="{{subjectProperty.photos.[0]}}" style="
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    " />
+  </div>
+  
+  <!-- Property Details Grid -->
+  <div style="
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 30px;
+  ">
+    <!-- Left Column -->
+    <div>
+      <h2 style="
+        font-size: 24px;
+        font-weight: 700;
+        color: #1a1a2e;
+        margin-bottom: 5px;
+      ">{{subjectProperty.address}}</h2>
+      <p style="
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 20px;
+      ">{{subjectProperty.city}}, {{subjectProperty.state}} {{subjectProperty.zip}}</p>
+      
+      <!-- Price -->
+      <div style="
+        font-size: 32px;
+        font-weight: 700;
+        color: #F37216;
+        margin-bottom: 20px;
+      ">${{formatPrice subjectProperty.listPrice}}</div>
+      
+      <!-- Specs -->
+      <div style="
+        display: flex;
+        gap: 30px;
+        margin-bottom: 20px;
+      ">
+        <div>
+          <div style="font-size: 24px; font-weight: 600;">{{subjectProperty.bedrooms}}</div>
+          <div style="font-size: 12px; color: #666;">Beds</div>
+        </div>
+        <div>
+          <div style="font-size: 24px; font-weight: 600;">{{subjectProperty.bathrooms}}</div>
+          <div style="font-size: 12px; color: #666;">Baths</div>
+        </div>
+        <div>
+          <div style="font-size: 24px; font-weight: 600;">{{formatNumber subjectProperty.sqft}}</div>
+          <div style="font-size: 12px; color: #666;">Sq Ft</div>
+        </div>
+        <div>
+          <div style="font-size: 24px; font-weight: 600;">{{subjectProperty.yearBuilt}}</div>
+          <div style="font-size: 12px; color: #666;">Year Built</div>
+        </div>
+      </div>
+      
+      <!-- Description -->
+      <p style="
+        font-size: 13px;
+        line-height: 1.6;
+        color: #444;
+      ">{{truncate subjectProperty.description 500}}</p>
+    </div>
+    
+    <!-- Right Column - Additional Photos -->
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      {{#each subjectProperty.photos}}
+      {{#if @index}}
+      {{#if (lt @index 4)}}
+      <div style="
+        height: 120px;
+        border-radius: 6px;
+        overflow: hidden;
+      ">
+        <img src="{{this}}" style="width: 100%; height: 100%; object-fit: cover;" />
+      </div>
+      {{/if}}
+      {{/if}}
+      {{/each}}
+    </div>
+  </div>
+  
+  <!-- Agent Footer -->
+  <div style="
+    position: absolute;
+    bottom: 0.5in;
+    left: 0.5in;
+    right: 0.5in;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+  ">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      {{#if agent.photo}}
+      <img src="{{agent.photo}}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;" />
+      {{/if}}
+      <div>
+        <div style="font-size: 14px; font-weight: 600;">{{agent.firstName}} {{agent.lastName}}</div>
+        <div style="font-size: 12px; color: #666;">{{agent.title}}</div>
+      </div>
+    </div>
+    <div style="text-align: right; font-size: 12px; color: #666;">
+      <div>{{agent.phone}}</div>
+      <div>{{agent.email}}</div>
+    </div>
+  </div>
+</div>
+`;
+```
+
+### 2.3 Cover Letter Template (Customizable)
+```typescript
+// server/templates/cma/cover-letter.hbs
+
+export const coverLetterTemplate = `
+<div class="cover-letter" style="
+  width: 8.5in;
+  min-height: 11in;
+  padding: 1in;
+  font-family: 'Inter', sans-serif;
+  background: white;
+  page-break-after: always;
+">
+  <!-- Header -->
+  <div style="
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 40px;
+  ">
+    <img src="/spyglass-logo.png" alt="Spyglass Realty" style="height: 50px;" />
+    <div style="text-align: right; font-size: 13px; color: #666;">
+      <div>{{agent.firstName}} {{agent.lastName}}</div>
+      <div>{{agent.title}}</div>
+      <div>{{agent.phone}}</div>
+      <div>{{agent.email}}</div>
+    </div>
+  </div>
+  
+  <!-- Date -->
+  <p style="font-size: 14px; color: #666; margin-bottom: 30px;">
+    {{metadata.preparedDate}}
+  </p>
+  
+  <!-- Salutation -->
+  <p style="font-size: 16px; margin-bottom: 20px;">
+    Dear {{metadata.preparedFor}},
+  </p>
+  
+  <!-- Letter Content (Customizable) -->
+  <div style="
+    font-size: 14px;
+    line-height: 1.8;
+    color: #333;
+    white-space: pre-wrap;
+  ">
+    {{#if customContent}}
+    {{{customContent}}}
+    {{else}}
+    Thank you for the opportunity to prepare this Comparative Market Analysis for your property at {{subjectProperty.address}}.
+
+    This comprehensive report provides you with valuable insights into the current real estate market conditions in your area. I've carefully analyzed recent sales, active listings, and market trends to help you understand your property's position in today's market.
+
+    Inside this report, you'll find:
+    
+    • A detailed analysis of comparable properties that have recently sold
+    • Current active listings that will be your competition
+    • Market statistics and trends for your neighborhood
+    • My professional opinion on optimal pricing strategy
+
+    I'm committed to providing you with exceptional service and would be honored to represent you in the sale of your home. Please don't hesitate to reach out with any questions about this analysis or the selling process.
+
+    Looking forward to working with you.
+
+    Warm regards,
+    {{agent.firstName}} {{agent.lastName}}
+    {{/if}}
+  </div>
+  
+  <!-- Signature -->
+  <div style="margin-top: 40px;">
+    {{#if agent.photo}}
+    <img src="{{agent.photo}}" style="
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-bottom: 15px;
+    " />
+    {{/if}}
+    <div style="font-size: 16px; font-weight: 600;">{{agent.firstName}} {{agent.lastName}}</div>
+    <div style="font-size: 14px; color: #F37216;">{{agent.title}}</div>
+    <div style="font-size: 13px; color: #666;">{{agent.company}}</div>
+  </div>
+</div>
+`;
+```
+
+### 2.4 Summary of Comparable Properties Template
+```typescript
+// server/templates/cma/summary-comparables.hbs
+
+export const summaryComparablesTemplate = `
+<div class="summary-comparables" style="
+  width: 8.5in;
+  min-height: 11in;
+  padding: 0.5in;
+  font-family: 'Inter', sans-serif;
+  background: white;
+  page-break-after: always;
+">
+  <!-- Header -->
+  <div style="
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #F37216;
+  ">
+    <h2 style="font-size: 24px; font-weight: 700; color: #1a1a2e; margin: 0;">
+      Summary of Comparable Properties
+    </h2>
+    <img src="/spyglass-logo.png" alt="Spyglass Realty" style="height: 30px;" />
+  </div>
+  
+  <!-- Comparables Table -->
+  <table style="
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  ">
+    <thead>
+      <tr style="background: #f8f9fa;">
+        <th style="padding: 12px 8px; text-align: left; border-bottom: 2px solid #dee2e6;">Address</th>
+        <th style="padding: 12px 8px; text-align: center; border-bottom: 2px solid #dee2e6;">Status</th>
+        <th style="padding: 12px 8px; text-align: right; border-bottom: 2px solid #dee2e6;">Price</th>
+        <th style="padding: 12px 8px; text-align: center; border-bottom: 2px solid #dee2e6;">Beds</th>
+        <th style="padding: 12px 8px; text-align: center; border-bottom: 2px solid #dee2e6;">Baths</th>
+        <th style="padding: 12px 8px; text-align: right; border-bottom: 2px solid #dee2e6;">Sq Ft</th>
+        <th style="padding: 12px 8px; text-align: right; border-bottom: 2px solid #dee2e6;">$/Sq Ft</th>
+        <th style="padding: 12px 8px; text-align: center; border-bottom: 2px solid #dee2e6;">DOM</th>
+        <th style="padding: 12px 8px; text-align: right; border-bottom: 2px solid #dee2e6;">Distance</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Subject Property Row (Highlighted) -->
+      <tr style="background: #fff7ed;">
+        <td style="padding: 10px 8px; border-bottom: 1px solid #dee2e6; font-weight: 600;">
+          {{subjectProperty.address}} (Subject)
+        </td>
+        <td style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #dee2e6;">
+          <span style="
+            background: #F37216;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+          ">{{subjectProperty.status}}</span>
+        </td>
+        <td style="padding: 10px 8px; text-align: right; border-bottom: 1px solid #dee2e6; font-weight: 600; color: #F37216;">
+          ${{formatPrice subjectProperty.listPrice}}
+        </td>
+        <td style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #dee2e6;">{{subjectProperty.bedrooms}}</td>
+        <td style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #dee2e6;">{{subjectProperty.bathrooms}}</td>
+        <td style="padding: 10px 8px; text-align: right; border-bottom: 1px solid #dee2e6;">{{formatNumber subjectProperty.sqft}}</td>
+        <td style="padding: 10px 8px; text-align: right; border-bottom: 1px solid #dee2e6;">${{pricePerSqft subjectProperty.listPrice subjectProperty.sqft}}</td>
+        <td style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #dee2e6;">-</td>
+        <td style="padding: 10px 8px; text-align: right; border-bottom: 1px solid #dee2e6;">-</td>
+      </tr>
+      
+      <!-- Comparable Properties -->
+      {{#each comparables}}
+      <tr>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #dee2e6;">{{this.address}}</td>
+        <td style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #dee2e6;">
+          <span style="
+            background: {{statusColor this.status}};
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+          ">{{this.status}}</span>
+        </td>
+        <td style="padding: 10px 8px; text-align: right; border-bottom: 1px solid #dee2e6;">
+          ${{formatPrice this.listPrice}}
+        </td>
+        <td style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #dee2e6;">{{this.bedrooms}}</td>
+        <td style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #dee2e6;">{{this.bathrooms}}</td>
+        <td style="padding: 10px 8px; text-align: right; border-bottom: 1px solid #dee2e6;">{{formatNumber this.sqft}}</td>
+        <td style="padding: 10px 8px; text-align: right; border-bottom: 1px solid #dee2e6;">${{this.pricePerSqft}}</td>
+        <td style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #dee2e6;">{{this.daysOnMarket}}</td>
+        <td style="padding: 10px 8px; text-align: right; border-bottom: 1px solid #dee2e6;">{{this.distance}} mi</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+  
+  <!-- Summary Stats -->
+  <div style="
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-top: 30px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+  ">
+    <div style="text-align: center;">
+      <div style="font-size: 24px; font-weight: 700; color: #F37216;">${{formatPrice analysis.averagePrice}}</div>
+      <div style="font-size: 12px; color: #666;">Avg. List Price</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 24px; font-weight: 700; color: #1a1a2e;">${{analysis.averagePricePerSqft}}</div>
+      <div style="font-size: 12px; color: #666;">Avg. $/Sq Ft</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 24px; font-weight: 700; color: #1a1a2e;">{{analysis.averageDaysOnMarket}}</div>
+      <div style="font-size: 12px; color: #666;">Avg. Days on Market</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 24px; font-weight: 700; color: #1a1a2e;">{{comparables.length}}</div>
+      <div style="font-size: 12px; color: #666;">Comparables</div>
+    </div>
+  </div>
+</div>
+`;
+```
+
+### 2.5 Comparable Property Statistics Template
+```typescript
+// server/templates/cma/comparable-stats.hbs
+
+export const comparableStatsTemplate = `
+<div class="comparable-stats" style="
+  width: 8.5in;
+  min-height: 11in;
+  padding: 0.5in;
+  font-family: 'Inter', sans-serif;
+  background: white;
+  page-break-after: always;
+">
+  <!-- Header -->
+  <div style="
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #F37216;
+  ">
+    <h2 style="font-size: 24px; font-weight: 700; color: #1a1a2e; margin: 0;">
+      Comparable Property Statistics
+    </h2>
+    <img src="/spyglass-logo.png" alt="Spyglass Realty" style="height: 30px;" />
+  </div>
+  
+  <!-- Stats Grid -->
+  <div style="
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 30px;
+  ">
+    <!-- Price Analysis -->
+    <div style="
+      padding: 25px;
+      background: #f8f9fa;
+      border-radius: 12px;
+    ">
+      <h3 style="font-size: 16px; font-weight: 600; color: #1a1a2e; margin-bottom: 20px;">
+        Price Analysis
+      </h3>
+      <div style="display: flex; flex-direction: column; gap: 15px;">
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #666;">Average Price</span>
+          <span style="font-weight: 600;">${{formatPrice analysis.averagePrice}}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #666;">Median Price</span>
+          <span style="font-weight: 600;">${{formatPrice analysis.medianPrice}}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #666;">Price Range</span>
+          <span style="font-weight: 600;">${{formatPrice analysis.priceRange.min}} - ${{formatPrice analysis.priceRange.max}}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #666;">Avg. Price/Sq Ft</span>
+          <span style="font-weight: 600; color: #F37216;">${{analysis.averagePricePerSqft}}</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Market Activity -->
+    <div style="
+      padding: 25px;
+      background: #f8f9fa;
+      border-radius: 12px;
+    ">
+      <h3 style="font-size: 16px; font-weight: 600; color: #1a1a2e; margin-bottom: 20px;">
+        Market Activity
+      </h3>
+      <div style="display: flex; flex-direction: column; gap: 15px;">
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #666;">Total Comparables</span>
+          <span style="font-weight: 600;">{{comparables.length}}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #666;">Active Listings</span>
+          <span style="font-weight: 600;">{{activeCount}}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #666;">Sold Properties</span>
+          <span style="font-weight: 600;">{{soldCount}}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #666;">Avg. Days on Market</span>
+          <span style="font-weight: 600;">{{analysis.averageDaysOnMarket}} days</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Subject Property Comparison -->
+    <div style="
+      padding: 25px;
+      background: #fff7ed;
+      border-radius: 12px;
+      border: 2px solid #F37216;
+      grid-column: span 2;
+    ">
+      <h3 style="font-size: 16px; font-weight: 600; color: #1a1a2e; margin-bottom: 20px;">
+        Your Property vs. Market
+      </h3>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; text-align: center;">
+        <div>
+          <div style="font-size: 28px; font-weight: 700; color: #F37216;">${{formatPrice subjectProperty.listPrice}}</div>
+          <div style="font-size: 12px; color: #666;">Your List Price</div>
+        </div>
+        <div>
+          <div style="font-size: 28px; font-weight: 700; color: #1a1a2e;">${{formatPrice analysis.averagePrice}}</div>
+          <div style="font-size: 12px; color: #666;">Market Average</div>
+        </div>
+        <div>
+          <div style="font-size: 28px; font-weight: 700; color: {{priceComparisonColor subjectProperty.listPrice analysis.averagePrice}};">
+            {{priceComparisonPercent subjectProperty.listPrice analysis.averagePrice}}%
+          </div>
+          <div style="font-size: 12px; color: #666;">vs. Average</div>
+        </div>
+        <div>
+          <div style="font-size: 28px; font-weight: 700; color: #1a1a2e;">${{pricePerSqft subjectProperty.listPrice subjectProperty.sqft}}</div>
+          <div style="font-size: 12px; color: #666;">Your $/Sq Ft</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+```
+
+---
+
+## PHASE 3: Create PDF Generation Service
+```typescript
+// server/services/cma-pdf-generator.ts
+
+import Handlebars from 'handlebars';
+import puppeteer from 'puppeteer';
+import { CMAReportData, CMASectionConfig } from '@shared/cma-sections';
+
+// Import all templates
+import { coverPageTemplate } from '../templates/cma/cover-page';
+import { listingBrochureTemplate } from '../templates/cma/listing-brochure';
+import { coverLetterTemplate } from '../templates/cma/cover-letter';
+import { summaryComparablesTemplate } from '../templates/cma/summary-comparables';
+import { comparableStatsTemplate } from '../templates/cma/comparable-stats';
+// ... import other templates
+
+// Register Handlebars helpers
+Handlebars.registerHelper('formatPrice', (price: number) => {
+  return price?.toLocaleString('en-US') || '0';
+});
+
+Handlebars.registerHelper('formatNumber', (num: number) => {
+  return num?.toLocaleString('en-US') || '0';
+});
+
+Handlebars.registerHelper('pricePerSqft', (price: number, sqft: number) => {
+  if (!price || !sqft) return '0';
+  return Math.round(price / sqft).toLocaleString('en-US');
+});
+
+Handlebars.registerHelper('truncate', (text: string, length: number) => {
+  if (!text) return '';
+  return text.length > length ? text.substring(0, length) + '...' : text;
+});
+
+Handlebars.registerHelper('statusColor', (status: string) => {
+  const colors: Record<string, string> = {
+    'Active': '#22c55e',
+    'Sold': '#3b82f6',
+    'Pending': '#f59e0b',
+    'Under Contract': '#8b5cf6',
+  };
+  return colors[status] || '#6b7280';
+});
+
+Handlebars.registerHelper('lt', (a: number, b: number) => a < b);
+
+// Template mapping
+const templateMap: Record<string, string> = {
+  'cover-page': coverPageTemplate,
+  'listing-brochure': listingBrochureTemplate,
+  'cover-letter': coverLetterTemplate,
+  'summary-comparables': summaryComparablesTemplate,
+  'comparable-stats': comparableStatsTemplate,
+  // ... add other templates
+};
+
+export async function generateCMAPDF(
+  data: CMAReportData,
+  sections: CMASectionConfig[],
+  customContent: Record<string, string> = {}
+): Promise<Buffer> {
+  // Filter enabled sections and sort by order
+  const enabledSections = sections
+    .filter(s => s.enabled)
+    .sort((a, b) => a.order - b.order);
+  
+  // Build HTML for each section
+  let fullHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; }
+        @page { size: 8.5in 11in; margin: 0; }
+      </style>
+    </head>
+    <body>
+  `;
+  
+  for (const section of enabledSections) {
+    const templateStr = templateMap[section.id];
+    if (!templateStr) continue;
+    
+    const template = Handlebars.compile(templateStr);
+    const sectionData = {
+      ...data,
+      customContent: section.customizable ? customContent[section.id] : null,
+      agentInitial: data.agent.firstName?.charAt(0) || 'A',
+    };
+    
+    fullHTML += template(sectionData);
+  }
+  
+  fullHTML += '</body></html>';
+  
+  // Generate PDF with Puppeteer
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  
+  const page = await browser.newPage();
+  await page.setContent(fullHTML, { waitUntil: 'networkidle0' });
+  
+  const pdfBuffer = await page.pdf({
+    format: 'Letter',
+    printBackground: true,
+    margin: { top: 0, right: 0, bottom: 0, left: 0 },
+  });
+  
+  await browser.close();
+  
+  return Buffer.from(pdfBuffer);
+}
+```
+
+---
+
+## PHASE 4: API Endpoint for PDF Export
+```typescript
+// server/routes.ts - Add CMA PDF export endpoint
+
+app.post('/api/cma/:transactionId/export-pdf', requireAuth, async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    const { sections, customContent } = req.body;
+    const userId = (req.user as any)?.id;
+    
+    // Get transaction data
+    const transaction = await storage.getTransaction(parseInt(transactionId));
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    
+    // Get MLS data for subject property
+    const mlsData = await fetchMLSData(transaction.mlsNumber);
+    
+    // Get CMA comparables
+    const comparables = await storage.getCMAComparables(parseInt(transactionId));
+    
+    // Get agent profile
+    const [user, profile] = await Promise.all([
+      storage.getUser(userId),
+      storage.getAgentProfile(userId),
+    ]);
+    
+    // Calculate analysis stats
+    const analysis = calculateCMAAnalysis(mlsData, comparables);
+    
+    // Build report data
+    const reportData: CMAReportData = {
+      subjectProperty: {
+        address: mlsData.address,
+        city: mlsData.city,
+        state: mlsData.state,
+        zip: mlsData.zip,
+        mlsNumber: mlsData.mlsNumber,
+        listPrice: mlsData.listPrice,
+        bedrooms: mlsData.bedrooms,
+        bathrooms: mlsData.bathrooms,
+        sqft: mlsData.sqft,
+        lotSize: mlsData.lotSize,
+        yearBuilt: mlsData.yearBuilt,
+        propertyType: mlsData.propertyType,
+        description: mlsData.description,
+        photos: mlsData.photos,
+        listDate: mlsData.listDate,
+        status: mlsData.status,
+      },
+      comparables: comparables.map(c => ({
+        address: c.address,
+        mlsNumber: c.mlsNumber,
+        listPrice: c.listPrice,
+        soldPrice: c.soldPrice,
+        bedrooms: c.bedrooms,
+        bathrooms: c.bathrooms,
+        sqft: c.sqft,
+        lotSize: c.lotSize,
+        yearBuilt: c.yearBuilt,
+        daysOnMarket: c.daysOnMarket,
+        distance: c.distance,
+        status: c.status,
+        photos: c.photos || [],
+        pricePerSqft: Math.round(c.listPrice / c.sqft),
+      })),
+      agent: {
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        title: profile?.title || 'Real Estate Agent',
+        email: user.email || '',
+        phone: user.phone || '',
+        photo: user.picture || '',
+        company: user.company || 'Spyglass Realty',
+        bio: profile?.bio,
+        coverLetter: profile?.defaultCoverLetter,
+      },
+      analysis,
+      metadata: {
+        preparedFor: transaction.clientName || 'Valued Client',
+        preparedDate: new Date().toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        }),
+        reportTitle: `CMA for ${mlsData.address}`,
+      },
+    };
+    
+    // Generate PDF
+    const pdfBuffer = await generateCMAPDF(reportData, sections, customContent);
+    
+    // Send response
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="CMA-${transaction.address.replace(/[^a-z0-9]/gi, '-')}.pdf"`);
+    res.send(pdfBuffer);
+    
+  } catch (error: any) {
+    console.error('[CMA PDF Export] Error:', error.message);
+    res.status(500).json({ error: 'Failed to generate CMA PDF' });
+  }
+});
+
+// Helper function to calculate analysis stats
+function calculateCMAAnalysis(subject: any, comparables: any[]) {
+  const prices = comparables.map(c => c.listPrice);
+  const pricesPerSqft = comparables.map(c => Math.round(c.listPrice / c.sqft));
+  const dom = comparables.map(c => c.daysOnMarket).filter(d => d !== null && d !== undefined);
+  
+  return {
+    averagePrice: Math.round(prices.reduce((a, b) => a + b, 0) / prices.length),
+    averagePricePerSqft: Math.round(pricesPerSqft.reduce((a, b) => a + b, 0) / pricesPerSqft.length),
+    medianPrice: prices.sort((a, b) => a - b)[Math.floor(prices.length / 2)],
+    priceRange: { min: Math.min(...prices), max: Math.max(...prices) },
+    averageDaysOnMarket: dom.length > 0 ? Math.round(dom.reduce((a, b) => a + b, 0) / dom.length) : 0,
+  };
+}
+```
+
+---
+
+## PHASE 5: Update Frontend Export Button
+```tsx
+// In PresentationBuilder component
+
+const handleExportPDF = async () => {
+  setIsExporting(true);
+  try {
+    const response = await fetch(`/api/cma/${transactionId}/export-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sections: sectionConfig,
+        customContent: {
+          'cover-letter': coverLetterContent,
+          'agent-resume': agentResumeContent,
+        },
+      }),
+    });
+    
+    if (!response.ok) throw new Error('Export failed');
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `CMA-${propertyAddress}.pdf`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+    
+    toast({ title: 'Success', description: 'CMA PDF exported successfully' });
+  } catch (error) {
+    toast({ title: 'Error', description: 'Failed to export PDF', variant: 'destructive' });
+  } finally {
+    setIsExporting(false);
+  }
+};
+```
+
+---
+
+## VERIFICATION CHECKLIST
+
+After implementing:
+
+1. [ ] All 17 sections toggle on/off correctly
+2. [ ] Drag-and-drop reordering works
+3. [ ] Cover Page shows Spyglass branding, agent info, property address
+4. [ ] Listing Brochure shows property photos and details
+5. [ ] Cover Letter shows customizable content
+6. [ ] Agent Resume pulls from profile data
+7. [ ] Summary of Comparables shows table with all comps
+8. [ ] Statistics section calculates averages correctly
+9. [ ] Export PDF generates multi-page document
+10. [ ] Live Preview updates when sections are toggled
+11. [ ] Save Configuration persists section settings
+12. [ ] Load/Save Template functionality works
+
+---
+
+## SECTION CONTENT MAPPING
+
+| Section | Data Source |
+|---------|-------------|
+| Cover Page | Agent profile, Property address, Date |
+| Listing Brochure | MLS data (photos, specs, description) |
+| Cover Letter | Agent's default cover letter (customizable) |
+| Agent Resume | Agent bio from profile (customizable) |
+| Our Company | Static Spyglass Realty content |
+| What is a CMA? | Static educational content |
+| Contact Me | Agent contact info from profile |
+| Map of All Listings | Mapbox with subject + comparables |
+| Summary of Comparables | CMA comparables from database |
+| Listings Chapter Header | Static header |
+| Property Details | Individual comp detail pages |
+| Property Photos | Comp photo galleries |
+| Adjustments | Price adjustment table |
+| Analysis Chapter Header | Static header |
+| Online Valuation Analysis | Calculated market value range |
+| Average Price Per Sq Ft | Chart/stats from comps |
+| Comparable Property Statistics | Summary stats grid |
+Architected three-section framework with data types and PDF templates.The user wants to build out the 3 section categories for the CMA Presentation Builder. I've created a comprehensive prompt that covers:
+
+Data types and interfaces for the sections
+PDF templates for key sections (Cover Page, Listing Brochure, Cover Letter, Summary of Comparables, Comparable Stats)
+PDF generation service using Puppeteer
+API endpoint for PDF export
+Frontend export button integration
+
+This should give them a solid foundation to build out all 17 sections across the 3 categories.This is a comprehensive prompt that will build out all three section categories with proper data binding and PDF generation. The key components are:
+CategorySectionsData SourcesIntroduction (7)Cover Page, Listing Brochure, Cover Letter, Agent Resume, Our Company, What is CMA?, Contact MeAgent profile, MLS data, custom contentListings (6)Map, Summary, Chapter Header, Property Details, Photos, AdjustmentsCMA comparables, Mapbox, MLS dataAnalysis (4)Chapter Header, Online Valuation, Avg $/SqFt, StatisticsCalculated from comparables
