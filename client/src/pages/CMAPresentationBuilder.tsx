@@ -544,7 +544,7 @@ export default function CMAPresentationBuilder() {
                 </CardContent>
               </Card>
 
-              {(config.photoLayout === 'ai_suggested' || config.photoLayout === 'custom') && subjectProperty && (
+              {subjectProperty && (
                 <PhotoSelectionPreview 
                   subjectProperty={subjectProperty}
                   photoSource={config.photoLayout}

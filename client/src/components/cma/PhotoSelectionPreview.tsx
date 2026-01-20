@@ -276,10 +276,6 @@ export function PhotoSelectionPreview({
     );
   }
 
-  if (photoSource !== 'ai_suggested' && photoSource !== 'custom') {
-    return null;
-  }
-
   if (!subjectProperty || photos.length === 0) {
     return (
       <Card>
@@ -293,39 +289,70 @@ export function PhotoSelectionPreview({
     );
   }
 
+  const getHeaderContent = () => {
+    switch (photoSource) {
+      case 'ai_suggested':
+        return {
+          icon: <Sparkles className="w-5 h-5 text-yellow-500" />,
+          title: 'AI Suggested Photos',
+          badge: insightsAvailable ? (
+            <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+              Repliers Image Insights
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+              Using default selection
+            </Badge>
+          ),
+          description: insightsAvailable
+            ? 'AI has selected the best quality photos based on image classification and quality scores.'
+            : 'Image Insights not available. Using first photos as default. You can manually adjust.'
+        };
+      case 'custom':
+        return {
+          icon: <ImageIcon className="w-5 h-5 text-muted-foreground" />,
+          title: 'Custom Photo Selection',
+          badge: null,
+          description: `Select up to ${photosPerProperty} photo(s) for the subject property.`
+        };
+      case 'first_dozen':
+        return {
+          icon: <ImageIcon className="w-5 h-5 text-[#F37216]" />,
+          title: 'First 12 Photos',
+          badge: (
+            <Badge variant="secondary" className="text-xs">
+              {Math.min(photos.length, 12)} photos
+            </Badge>
+          ),
+          description: `Showing the first ${Math.min(photos.length, 12)} photos from the MLS listing. Click photos to adjust selection.`
+        };
+      case 'all':
+      default:
+        return {
+          icon: <ImageIcon className="w-5 h-5 text-[#F37216]" />,
+          title: 'All Photos',
+          badge: (
+            <Badge variant="secondary" className="text-xs">
+              {photos.length} photos
+            </Badge>
+          ),
+          description: `Showing all ${photos.length} photos from the MLS listing. Click photos to adjust selection.`
+        };
+    }
+  };
+
+  const headerContent = getHeaderContent();
+  const displayPhotos = photoSource === 'all' ? photos : photos.slice(0, 12);
+
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2 flex-wrap">
-          {photoSource === 'ai_suggested' ? (
-            <>
-              <Sparkles className="w-5 h-5 text-yellow-500" />
-              <CardTitle className="text-base">AI Suggested Photos</CardTitle>
-              {insightsAvailable ? (
-                <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
-                  Repliers Image Insights
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
-                  Using default selection
-                </Badge>
-              )}
-            </>
-          ) : (
-            <>
-              <ImageIcon className="w-5 h-5 text-muted-foreground" />
-              <CardTitle className="text-base">Custom Photo Selection</CardTitle>
-            </>
-          )}
+          {headerContent.icon}
+          <CardTitle className="text-base">{headerContent.title}</CardTitle>
+          {headerContent.badge}
         </div>
-        <CardDescription>
-          {photoSource === 'ai_suggested' 
-            ? insightsAvailable
-              ? 'AI has selected the best quality photos based on image classification and quality scores.'
-              : 'Image Insights not available. Using first photos as default. You can manually adjust.'
-            : `Select up to ${photosPerProperty} photo(s) for the subject property.`
-          }
-        </CardDescription>
+        <CardDescription>{headerContent.description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
@@ -339,7 +366,7 @@ export function PhotoSelectionPreview({
           </div>
           
           <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-            {photos.slice(0, 12).map((photo: string, idx: number) => {
+            {displayPhotos.map((photo: string, idx: number) => {
               const isSelected = selectedPhotos.includes(photo);
               const aiRec = aiRecommendations.find(r => r.url === photo || r.originalIndex === idx);
               const classification = aiRec?.classification?.imageOf;
