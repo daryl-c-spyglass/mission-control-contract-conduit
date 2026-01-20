@@ -55,6 +55,7 @@ export const TIMELINE_EVENT_CONFIG: Record<string, TimelineEventConfig> = {
   'contract_date_set': { icon: Calendar, color: 'text-blue-600', bgColor: 'bg-blue-100 dark:bg-blue-900/30', label: 'Contract Date' },
   'closing_date_set': { icon: Target, color: 'text-green-600', bgColor: 'bg-green-100 dark:bg-green-900/30', label: 'Closing Date' },
   'date_updated': { icon: Pencil, color: 'text-orange-600', bgColor: 'bg-orange-100 dark:bg-orange-900/30', label: 'Date Updated' },
+  'dates_updated': { icon: Calendar, color: 'text-orange-600', bgColor: 'bg-orange-100 dark:bg-orange-900/30', label: 'Dates Updated' },
   'deadline_approaching': { icon: Clock, color: 'text-red-600', bgColor: 'bg-red-100 dark:bg-red-900/30', label: 'Deadline' },
   
   // Communication events
@@ -80,7 +81,7 @@ export function getCategoryFromType(eventType: string): string {
   if (eventType.includes('graphic') || eventType.includes('flyer') || eventType.includes('asset') || eventType.includes('marketing') || eventType === 'quick_create_all') return 'marketing';
   if (eventType.startsWith('cma_')) return 'cma';
   if (eventType.startsWith('coordinator_') || eventType === 'note_added') return 'team';
-  if (eventType.includes('date') || eventType === 'deadline_approaching') return 'dates';
+  if (eventType.includes('date') || eventType === 'deadline_approaching' || eventType === 'dates_updated') return 'dates';
   if (eventType === 'email_sent' || eventType === 'slack_notification' || eventType === 'channel_created' || eventType === 'filter_created' || eventType === 'label_created' || eventType === 'gmail_pending') return 'communication';
   return 'other';
 }

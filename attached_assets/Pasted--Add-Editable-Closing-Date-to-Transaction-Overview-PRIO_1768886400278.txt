@@ -1,0 +1,337 @@
+# Add Editable Closing Date to Transaction Overview
+
+## PRIORITY: HIGH
+Randi needs the ability to update closing dates directly in the app. Currently there's no way to edit the Expected Closing date, which causes incorrect closing reminder notifications.
+
+---
+
+## TASK 1: Verify Database Schema
+
+Check if the `transactions` table has these columns. If not, add them:
+
+```typescript
+// shared/schema.ts - transactions table should have:
+contractDate: timestamp("contract_date"),
+expectedClosing: timestamp("expected_closing"),  // This is the closing date
+closingDate: timestamp("closing_date"),          // Alternative name - check which exists
+```
+
+Run `npm run db:push` if schema changes are needed.
+
+---
+
+## TASK 2: Make Key Dates Card Editable
+
+In the transaction Overview tab (likely `client/src/components/transaction-details.tsx` or similar), find the Key Dates card and make it editable:
+
+```tsx
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Calendar, Pencil, Loader2, Check, X } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+interface KeyDatesCardProps {
+  transaction: {
+    id: number;
+    contractDate?: string | null;
+    expectedClosing?: string | null;
+    closingDate?: string | null;
+  };
+}
+
+export function KeyDatesCard({ transaction }: KeyDatesCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [contractDate, setContractDate] = useState(
+    transaction.contractDate ? new Date(transaction.contractDate).toISOString().split('T')[0] : ''
+  );
+  const [expectedClosing, setExpectedClosing] = useState(
+    (transaction.expectedClosing || transaction.closingDate) 
+      ? new Date(transaction.expectedClosing || transaction.closingDate!).toISOString().split('T')[0] 
+      : ''
+  );
+  
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const updateDatesMutation = useMutation({
+    mutationFn: async (dates: { contractDate?: string | null; expectedClosing?: string | null }) => {
+      const response = await fetch(`/api/transactions/${transaction.id}/dates`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dates),
+      });
+      if (!response.ok) throw new Error('Failed to update dates');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Dates Updated', description: 'Key dates have been saved.' });
+      queryClient.invalidateQueries({ queryKey: ['transaction', transaction.id] });
+      setIsEditing(false);
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to update dates.', variant: 'destructive' });
+    },
+  });
+
+  const handleSave = () => {
+    updateDatesMutation.mutate({
+      contractDate: contractDate || null,
+      expectedClosing: expectedClosing || null,
+    });
+  };
+
+  const handleCancel = () => {
+    setContractDate(
+      transaction.contractDate ? new Date(transaction.contractDate).toISOString().split('T')[0] : ''
+    );
+    setExpectedClosing(
+      (transaction.expectedClosing || transaction.closingDate)
+        ? new Date(transaction.expectedClosing || transaction.closingDate!).toISOString().split('T')[0]
+        : ''
+    );
+    setIsEditing(false);
+  };
+
+  // Calculate days until closing
+  const closingDateValue = expectedClosing || transaction.expectedClosing || transaction.closingDate;
+  const daysUntilClosing = closingDateValue
+    ? Math.ceil((new Date(closingDateValue).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-base font-medium flex items-center gap-2">
+          <Calendar className="h-4 w-4" />
+          Key Dates
+        </CardTitle>
+        {!isEditing ? (
+          <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+        ) : (
+          <div className="flex gap-1">
+            <Button variant="ghost" size="sm" onClick={handleCancel} disabled={updateDatesMutation.isPending}>
+              <X className="h-4 w-4" />
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={updateDatesMutation.isPending}>
+              {updateDatesMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {/* Contract Date */}
+        <div>
+          <p className="text-sm text-muted-foreground">Contract Date</p>
+          {isEditing ? (
+            <Input
+              type="date"
+              value={contractDate}
+              onChange={(e) => setContractDate(e.target.value)}
+              className="mt-1"
+            />
+          ) : (
+            <p className="font-medium">{formatDate(transaction.contractDate)}</p>
+          )}
+        </div>
+
+        {/* Expected Closing */}
+        <div>
+          <p className="text-sm text-muted-foreground">Expected Closing</p>
+          {isEditing ? (
+            <Input
+              type="date"
+              value={expectedClosing}
+              onChange={(e) => setExpectedClosing(e.target.value)}
+              className="mt-1"
+            />
+          ) : (
+            <div>
+              <p className="font-medium">
+                {formatDate(transaction.expectedClosing || transaction.closingDate)}
+              </p>
+              {daysUntilClosing !== null && daysUntilClosing > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {daysUntilClosing} days remaining
+                </span>
+              )}
+              {daysUntilClosing !== null && daysUntilClosing <= 0 && (
+                <span className="text-xs text-orange-500">
+                  {daysUntilClosing === 0 ? 'Closing today!' : `${Math.abs(daysUntilClosing)} days overdue`}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+---
+
+## TASK 3: Add API Endpoint
+
+Add this endpoint to your server routes (e.g., `server/routes.ts`):
+
+```typescript
+// PATCH /api/transactions/:id/dates - Update transaction dates
+app.patch('/api/transactions/:id/dates', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { contractDate, expectedClosing } = req.body;
+    
+    const updateData: any = {
+      updatedAt: new Date(),
+    };
+    
+    // Handle contractDate
+    if (contractDate !== undefined) {
+      updateData.contractDate = contractDate ? new Date(contractDate) : null;
+    }
+    
+    // Handle expectedClosing (check which column name exists in your schema)
+    if (expectedClosing !== undefined) {
+      // Try expectedClosing first, fall back to closingDate
+      updateData.expectedClosing = expectedClosing ? new Date(expectedClosing) : null;
+      // If your schema uses closingDate instead:
+      // updateData.closingDate = expectedClosing ? new Date(expectedClosing) : null;
+    }
+    
+    const [updated] = await db
+      .update(transactions)
+      .set(updateData)
+      .where(eq(transactions.id, parseInt(id)))
+      .returning();
+    
+    if (!updated) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    
+    // Log to timeline
+    await db.insert(timelineEvents).values({
+      transactionId: parseInt(id),
+      type: 'dates_updated',
+      description: `Key dates updated${expectedClosing ? ` - Closing: ${new Date(expectedClosing).toLocaleDateString()}` : ''}`,
+      createdAt: new Date(),
+    });
+    
+    res.json(updated);
+  } catch (error) {
+    console.error('Error updating transaction dates:', error);
+    res.status(500).json({ error: 'Failed to update dates' });
+  }
+});
+```
+
+---
+
+## TASK 4: Integrate KeyDatesCard into Overview
+
+Find where the Overview tab renders (in transaction details) and add the KeyDatesCard:
+
+```tsx
+// In the Overview tab content
+import { KeyDatesCard } from './KeyDatesCard';
+
+// In your Overview section layout:
+<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+  {/* Property Details Card */}
+  <Card>
+    <CardHeader>
+      <CardTitle>Property Details</CardTitle>
+    </CardHeader>
+    <CardContent>
+      {/* existing property details */}
+    </CardContent>
+  </Card>
+
+  {/* Key Dates Card - NOW EDITABLE */}
+  <KeyDatesCard transaction={transaction} />
+
+  {/* Coordinators Card */}
+  <Card>
+    <CardHeader>
+      <CardTitle>Coordinators</CardTitle>
+    </CardHeader>
+    <CardContent>
+      {/* existing coordinators */}
+    </CardContent>
+  </Card>
+</div>
+```
+
+---
+
+## TASK 5: Update Closing Reminders to Use Updated Date
+
+Make sure the closing reminders scheduler reads from the correct date field:
+
+```typescript
+// In the closing reminders scheduler, ensure it uses the most recent date:
+const closingDate = transaction.expectedClosing || transaction.closingDate;
+
+// When fetching transactions for reminders:
+const transactionsWithClosing = await db
+  .select()
+  .from(transactions)
+  .where(
+    and(
+      isNotNull(transactions.expectedClosing), // or closingDate
+      isNotNull(transactions.slackChannelId),
+      // Only active/in-contract transactions
+      inArray(transactions.status, ['Active', 'In Contract', 'Pending', 'Under Contract'])
+    )
+  );
+```
+
+---
+
+## ACCEPTANCE CRITERIA
+
+- [ ] Key Dates card shows pencil icon to edit
+- [ ] Clicking pencil shows date inputs for Contract Date and Expected Closing
+- [ ] Save button updates the database
+- [ ] Cancel button reverts changes
+- [ ] Days remaining/overdue displays correctly
+- [ ] Timeline logs date changes
+- [ ] Closing reminders use the updated date
+- [ ] No console errors
+
+---
+
+## TESTING
+
+1. Go to any transaction in Contract Conduit
+2. In the Overview tab, find the Key Dates card
+3. Click the pencil icon
+4. Change the Expected Closing date
+5. Click the checkmark to save
+6. Verify the new date appears
+7. Check that closing reminders would use this new date
+
+---
+
+## WHY THIS IS NEEDED
+
+Randi reported: "I'm needing a way to update the close date in the transaction. When I'm in Replit I don't have a way to update that and so notifications are being sent for files that have updated close dates."
+
+This feature allows transaction coordinators to keep closing dates current, ensuring accurate notifications.

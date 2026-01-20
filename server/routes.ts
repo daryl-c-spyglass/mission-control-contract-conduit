@@ -463,10 +463,37 @@ export async function registerRoutes(
 
   app.patch("/api/transactions/:id", isAuthenticated, async (req, res) => {
     try {
+      // Get current transaction to check for date changes
+      const currentTransaction = await storage.getTransaction(req.params.id);
+      if (!currentTransaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
       const transaction = await storage.updateTransaction(req.params.id, req.body);
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
       }
+      
+      // Log activity if dates were changed
+      const dateChanges: string[] = [];
+      if (req.body.contractDate !== undefined && req.body.contractDate !== currentTransaction.contractDate) {
+        const newDate = req.body.contractDate ? new Date(req.body.contractDate).toLocaleDateString() : 'removed';
+        dateChanges.push(`Contract Date updated to ${newDate}`);
+      }
+      if (req.body.closingDate !== undefined && req.body.closingDate !== currentTransaction.closingDate) {
+        const newDate = req.body.closingDate ? new Date(req.body.closingDate).toLocaleDateString() : 'removed';
+        dateChanges.push(`Expected Closing updated to ${newDate}`);
+      }
+      
+      if (dateChanges.length > 0) {
+        await storage.createActivity({
+          transactionId: req.params.id,
+          type: 'dates_updated',
+          description: dateChanges.join('; '),
+          category: 'update',
+        });
+      }
+      
       res.json(transaction);
     } catch (error) {
       res.status(500).json({ message: "Failed to update transaction" });
