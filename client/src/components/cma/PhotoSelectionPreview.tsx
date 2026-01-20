@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Sparkles, Check, Image as ImageIcon, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -56,120 +56,17 @@ export function PhotoSelectionPreview({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [insightsAvailable, setInsightsAvailable] = useState(true);
+  
+  const hasFetchedRef = useRef(false);
+  const lastPhotoSourceRef = useRef<string>('');
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    if (photoSource === 'ai_suggested') {
-      fetchAiRecommendations();
-    } else if (photoSource === 'custom') {
-      autoSelectPhotos();
-    }
-  }, [photoSource, properties, photosPerProperty]);
-
-  const autoSelectPhotos = () => {
-    const autoSelections: Record<string, string[]> = {};
-    
-    properties.filter(Boolean).forEach(property => {
-      const propertyId = property.listingId || property.mlsNumber || property.id || '';
-      const photos = getPropertyPhotos(property);
-      autoSelections[propertyId] = photos.slice(0, photosPerProperty);
-    });
-    
-    setSelections(autoSelections);
-    onSelectionChange(autoSelections);
-  };
-
-  const fetchAiRecommendations = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const recommendations: Record<string, ImageInfo[]> = {};
-      const validProperties = properties.filter(Boolean);
-      let anyInsightsAvailable = false;
-      
-      for (const property of validProperties) {
-        const propertyId = property.listingId || property.mlsNumber || property.id;
-        if (!propertyId) continue;
-        
-        const photos = getPropertyPhotos(property);
-        
-        if (property.imageInsights?.images && property.imageInsights.images.length > 0) {
-          recommendations[propertyId] = getTopPhotos(
-            property.imageInsights.images.map((img, idx) => ({
-              url: photos[idx] || img.image || '',
-              originalIndex: idx,
-              classification: img.classification,
-              quality: img.quality,
-            })),
-            photosPerProperty
-          );
-          anyInsightsAvailable = true;
-          continue;
-        }
-        
-        try {
-          const response = await fetch(`/api/repliers/listing/${propertyId}/image-insights`);
-          
-          if (!response.ok) {
-            console.warn(`Failed to fetch insights for ${propertyId}: ${response.status}`);
-            recommendations[propertyId] = photos.slice(0, photosPerProperty).map((url, idx) => ({
-              url,
-              originalIndex: idx,
-              classification: null,
-              quality: null,
-            }));
-            continue;
-          }
-          
-          const data = await response.json();
-          
-          if (data.available && data.images?.length > 0) {
-            anyInsightsAvailable = true;
-            recommendations[propertyId] = getTopPhotos(data.images, photosPerProperty);
-          } else {
-            recommendations[propertyId] = photos.slice(0, photosPerProperty).map((url, idx) => ({
-              url,
-              originalIndex: idx,
-              classification: null,
-              quality: null,
-            }));
-          }
-        } catch (fetchError) {
-          console.error(`Error fetching insights for ${propertyId}:`, fetchError);
-          recommendations[propertyId] = photos.slice(0, photosPerProperty).map((url, idx) => ({
-            url,
-            originalIndex: idx,
-            classification: null,
-            quality: null,
-          }));
-        }
-      }
-      
-      setInsightsAvailable(anyInsightsAvailable);
-      setAiRecommendations(recommendations);
-      
-      const autoSelections: Record<string, string[]> = {};
-      for (const [propId, photos] of Object.entries(recommendations)) {
-        autoSelections[propId] = photos.map(p => p.url).filter(Boolean);
-      }
-      setSelections(autoSelections);
-      onSelectionChange(autoSelections);
-      
-    } catch (err) {
-      console.error('Failed to fetch AI recommendations:', err);
-      setError(err instanceof Error ? err.message : 'Failed to analyze photos');
-      autoSelectPhotos();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getPropertyPhotos = (property: Property): string[] => {
+  const getPropertyPhotos = useCallback((property: Property): string[] => {
     const photos = property.photos || property.images || [];
     return photos.filter(Boolean);
-  };
+  }, []);
 
-  const getTopPhotos = (images: ImageInfo[], count: number): ImageInfo[] => {
+  const getTopPhotos = useCallback((images: ImageInfo[], count: number): ImageInfo[] => {
     const priorityOrder = [
       'front', 'exterior', 'facade',
       'kitchen', 
@@ -215,9 +112,152 @@ export function PhotoSelectionPreview({
       .filter(img => img.url)
       .sort((a, b) => (b.score || 0) - (a.score || 0))
       .slice(0, count);
-  };
+  }, []);
 
-  const togglePhotoSelection = (propertyId: string, photoUrl: string) => {
+  const autoSelectPhotos = useCallback(() => {
+    const autoSelections: Record<string, string[]> = {};
+    
+    properties.filter(Boolean).forEach(property => {
+      const propertyId = property.listingId || property.mlsNumber || property.id || '';
+      const photos = getPropertyPhotos(property);
+      autoSelections[propertyId] = photos.slice(0, photosPerProperty);
+    });
+    
+    setSelections(autoSelections);
+    onSelectionChange(autoSelections);
+  }, [properties, photosPerProperty, getPropertyPhotos, onSelectionChange]);
+
+  const fetchAiRecommendations = useCallback(async (forceRefresh = false) => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const recommendations: Record<string, ImageInfo[]> = {};
+      const validProperties = properties.filter(Boolean);
+      let anyInsightsAvailable = false;
+      
+      for (let i = 0; i < validProperties.length; i++) {
+        if (signal.aborted) return;
+        
+        const property = validProperties[i];
+        const propertyId = property.listingId || property.mlsNumber || property.id;
+        if (!propertyId) continue;
+        
+        const photos = getPropertyPhotos(property);
+        
+        if (property.imageInsights?.images && property.imageInsights.images.length > 0) {
+          recommendations[propertyId] = getTopPhotos(
+            property.imageInsights.images.map((img, idx) => ({
+              url: photos[idx] || img.image || '',
+              originalIndex: idx,
+              classification: img.classification,
+              quality: img.quality,
+            })),
+            photosPerProperty
+          );
+          anyInsightsAvailable = true;
+          continue;
+        }
+        
+        try {
+          if (i > 0) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+          
+          if (signal.aborted) return;
+          
+          const response = await fetch(`/api/repliers/listing/${propertyId}/image-insights`, { signal });
+          
+          if (!response.ok) {
+            recommendations[propertyId] = photos.slice(0, photosPerProperty).map((url, idx) => ({
+              url,
+              originalIndex: idx,
+              classification: null,
+              quality: null,
+            }));
+            continue;
+          }
+          
+          const data = await response.json();
+          
+          if (data.available && data.images?.length > 0) {
+            anyInsightsAvailable = true;
+            recommendations[propertyId] = getTopPhotos(data.images, photosPerProperty);
+          } else {
+            recommendations[propertyId] = photos.slice(0, photosPerProperty).map((url, idx) => ({
+              url,
+              originalIndex: idx,
+              classification: null,
+              quality: null,
+            }));
+          }
+        } catch (fetchError: any) {
+          if (fetchError.name === 'AbortError') return;
+          recommendations[propertyId] = photos.slice(0, photosPerProperty).map((url, idx) => ({
+            url,
+            originalIndex: idx,
+            classification: null,
+            quality: null,
+          }));
+        }
+      }
+      
+      if (signal.aborted) return;
+      
+      setInsightsAvailable(anyInsightsAvailable);
+      setAiRecommendations(recommendations);
+      
+      const autoSelections: Record<string, string[]> = {};
+      for (const [propId, propPhotos] of Object.entries(recommendations)) {
+        autoSelections[propId] = propPhotos.map(p => p.url).filter(Boolean);
+      }
+      setSelections(autoSelections);
+      onSelectionChange(autoSelections);
+      
+    } catch (err: any) {
+      if (err.name === 'AbortError') return;
+      console.error('Failed to fetch AI recommendations:', err);
+      setError(err instanceof Error ? err.message : 'Failed to analyze photos');
+      autoSelectPhotos();
+    } finally {
+      if (!signal.aborted) {
+        setLoading(false);
+      }
+    }
+  }, [properties, photosPerProperty, getPropertyPhotos, getTopPhotos, autoSelectPhotos, onSelectionChange]);
+
+  useEffect(() => {
+    if (photoSource !== lastPhotoSourceRef.current) {
+      hasFetchedRef.current = false;
+      lastPhotoSourceRef.current = photoSource;
+    }
+    
+    if (photoSource === 'ai_suggested' && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      fetchAiRecommendations();
+    } else if (photoSource === 'custom') {
+      autoSelectPhotos();
+    }
+    
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [photoSource, fetchAiRecommendations, autoSelectPhotos]);
+
+  const handleRetry = useCallback(() => {
+    hasFetchedRef.current = false;
+    fetchAiRecommendations(true);
+  }, [fetchAiRecommendations]);
+
+  const togglePhotoSelection = useCallback((propertyId: string, photoUrl: string) => {
     setSelections(prev => {
       const current = prev[propertyId] || [];
       let updated: string[];
@@ -234,7 +274,7 @@ export function PhotoSelectionPreview({
       onSelectionChange(newSelections);
       return newSelections;
     });
-  };
+  }, [photosPerProperty, onSelectionChange]);
 
   if (loading) {
     return (
@@ -261,7 +301,7 @@ export function PhotoSelectionPreview({
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={fetchAiRecommendations}
+              onClick={handleRetry}
               className="mt-2"
               data-testid="button-retry-ai-analysis"
             >

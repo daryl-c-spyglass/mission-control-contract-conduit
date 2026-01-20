@@ -2339,6 +2339,10 @@ ${context.marketStats?.avgDOM ? `- Average days on market: ${context.marketStats
     }
   });
 
+  // Simple in-memory cache for image insights (5 minute TTL)
+  const imageInsightsCache = new Map<string, { data: any; timestamp: number }>();
+  const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+  
   // Get image insights for a listing from Repliers API
   app.get("/api/repliers/listing/:listingId/image-insights", async (req, res) => {
     try {
@@ -2352,6 +2356,12 @@ ${context.marketStats?.avgDOM ? `- Average days on market: ${context.marketStats
           error: 'API key not configured',
           images: [],
         });
+      }
+      
+      // Check cache first
+      const cached = imageInsightsCache.get(listingId);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        return res.json(cached.data);
       }
 
       console.log(`Fetching image insights for listing: ${listingId}`);
@@ -2394,7 +2404,7 @@ ${context.marketStats?.avgDOM ? `- Average days on market: ${context.marketStats
         
         const photos = data.photos || data.images || [];
         
-        return res.json({
+        const result = {
           available: true,
           images: data.imageInsights.images.map((insight: any, index: number) => ({
             url: ensureFullUrl(photos[index] || insight.url),
@@ -2409,14 +2419,18 @@ ${context.marketStats?.avgDOM ? `- Average days on market: ${context.marketStats
               qualitative: insight.quality?.qualitative || null,
             },
           })),
-        });
+        };
+        
+        // Cache successful result
+        imageInsightsCache.set(listingId, { data: result, timestamp: Date.now() });
+        
+        return res.json(result);
       }
       
       // Fallback: Image Insights not enabled or no data - return photos without insights
       console.log('Image Insights not available for this listing, returning basic photos');
       const photos = data.photos || data.images || [];
-      
-      return res.json({
+      const fallbackResult = {
         available: false,
         message: 'Image Insights not enabled on this account',
         images: photos.map((url: string, index: number) => ({
@@ -2425,7 +2439,12 @@ ${context.marketStats?.avgDOM ? `- Average days on market: ${context.marketStats
           classification: null,
           quality: null,
         })),
-      });
+      };
+      
+      // Cache fallback result too
+      imageInsightsCache.set(listingId, { data: fallbackResult, timestamp: Date.now() });
+      
+      return res.json(fallbackResult);
       
     } catch (error: any) {
       console.error('Image insights fetch error:', error);
