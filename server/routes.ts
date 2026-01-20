@@ -3089,5 +3089,171 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
     }
   });
 
+  // ============ Agent Profile ============
+
+  // Get agent profile for the current user
+  app.get("/api/agent/profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const profile = await storage.getAgentProfile(userId);
+      const user = await authStorage.getUser(userId);
+
+      res.json({
+        profile: profile || null,
+        user: user ? {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          profileImageUrl: user.profileImageUrl,
+          marketingPhone: user.marketingPhone,
+          marketingEmail: user.marketingEmail,
+          marketingDisplayName: user.marketingDisplayName,
+          marketingTitle: user.marketingTitle,
+          marketingHeadshotUrl: user.marketingHeadshotUrl,
+        } : null,
+      });
+    } catch (error: any) {
+      console.error("[Agent Profile] Error fetching:", error.message);
+      res.status(500).json({ error: "Failed to fetch agent profile" });
+    }
+  });
+
+  // Update agent profile for the current user
+  app.put("/api/agent/profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { updateAgentProfileSchema } = await import("@shared/schema");
+      const profileData = updateAgentProfileSchema.partial().safeParse(req.body.profile || {});
+
+      if (!profileData.success) {
+        return res.status(400).json({ error: "Invalid profile data", details: profileData.error.issues });
+      }
+
+      const updatedProfile = await storage.updateAgentProfile(userId, profileData.data);
+
+      // Update user marketing info if provided
+      if (req.body.user) {
+        await authStorage.upsertUser({
+          id: userId,
+          firstName: req.body.user.firstName,
+          lastName: req.body.user.lastName,
+          marketingPhone: req.body.user.marketingPhone,
+          marketingEmail: req.body.user.marketingEmail,
+          marketingDisplayName: req.body.user.marketingDisplayName,
+          marketingTitle: req.body.user.marketingTitle,
+        });
+      }
+
+      res.json({ success: true, profile: updatedProfile });
+    } catch (error: any) {
+      console.error("[Agent Profile] Error updating:", error.message);
+      res.status(500).json({ error: "Failed to update agent profile" });
+    }
+  });
+
+  // Generate default cover letter with AI
+  app.post("/api/ai/generate-default-cover-letter", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { tone = 'professional', existingCoverLetter } = req.body;
+
+      // Validate tone
+      const validTones = ['professional', 'friendly', 'confident'];
+      if (!validTones.includes(tone)) {
+        return res.status(400).json({ error: "Tone must be professional, friendly, or confident" });
+      }
+
+      // Get agent data
+      const user = await authStorage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const agentProfile = await storage.getAgentProfile(userId);
+      const agentName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Agent';
+
+      // Determine if generating new or enhancing existing
+      const isEnhancing = existingCoverLetter && existingCoverLetter.trim().length > 20;
+
+      const toneDescriptions: Record<string, string> = {
+        professional: 'professional, polished, and business-appropriate',
+        friendly: 'warm, approachable, and personable while maintaining professionalism',
+        confident: 'confident, authoritative, and compelling'
+      };
+
+      let systemPrompt: string;
+      let userPrompt: string;
+
+      if (isEnhancing) {
+        systemPrompt = `You are an expert real estate marketing copywriter. Your task is to enhance and improve an existing cover letter for a CMA (Comparative Market Analysis) report. The tone should be ${toneDescriptions[tone]}.`;
+
+        userPrompt = `Please enhance and improve this cover letter for ${agentName}${agentProfile?.title ? `, ${agentProfile.title}` : ''}${user.marketingTitle ? ` at ${user.marketingTitle}` : ''}:
+
+EXISTING COVER LETTER:
+${existingCoverLetter}
+
+${agentProfile?.bio ? `AGENT BIO FOR CONTEXT:\n${agentProfile.bio}\n` : ''}
+
+Please:
+1. Improve the writing quality and flow
+2. Make it more ${tone}
+3. Keep it concise (2-3 paragraphs)
+4. Use [Client Name] as placeholder for the client's name
+5. Maintain focus on CMA value proposition
+
+Return ONLY the improved cover letter text, no additional commentary.`;
+      } else {
+        systemPrompt = `You are an expert real estate marketing copywriter. Create a compelling cover letter template for CMA (Comparative Market Analysis) reports. The tone should be ${toneDescriptions[tone]}.`;
+
+        userPrompt = `Create a cover letter template for ${agentName}${agentProfile?.title ? `, ${agentProfile.title}` : ''}${user.marketingTitle ? ` at ${user.marketingTitle}` : ''}.
+
+${agentProfile?.bio ? `AGENT BIO:\n${agentProfile.bio}\n` : ''}
+
+Requirements:
+1. Start with "Dear [Client Name],"
+2. 2-3 paragraphs maximum
+3. Explain the value of the CMA
+4. ${tone === 'professional' ? 'Maintain formal business tone' : tone === 'friendly' ? 'Be warm and approachable' : 'Project confidence and expertise'}
+5. End with offer to discuss further
+6. Do NOT include signature (that's added separately)
+
+Return ONLY the cover letter text, no additional commentary.`;
+      }
+
+      const OpenAI = (await import('openai')).default;
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+      });
+
+      const coverLetter = completion.choices[0]?.message?.content?.trim() || '';
+
+      res.json({ coverLetter, mode: isEnhancing ? 'enhanced' : 'generated' });
+    } catch (error: any) {
+      console.error("[AI Cover Letter] Error:", error.message);
+      res.status(500).json({ error: "Failed to generate cover letter" });
+    }
+  });
+
   return httpServer;
 }
