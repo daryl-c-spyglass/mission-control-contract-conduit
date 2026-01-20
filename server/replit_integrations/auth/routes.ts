@@ -125,6 +125,16 @@ export function registerAuthRoutes(app: Express): void {
       if (firstName !== undefined) updateData.firstName = firstName || null;
       if (lastName !== undefined) updateData.lastName = lastName || null;
       
+      // Auto-compose marketingDisplayName from firstName + lastName for backward compatibility with flyers/CMAs
+      if (firstName !== undefined || lastName !== undefined) {
+        const first = firstName !== undefined ? firstName : '';
+        const last = lastName !== undefined ? lastName : '';
+        const composedDisplayName = `${first} ${last}`.trim();
+        if (composedDisplayName) {
+          updateData.marketingDisplayName = composedDisplayName;
+        }
+      }
+      
       const updatedUser = await authStorage.updateUser(userId, updateData);
       
       res.json(updatedUser);

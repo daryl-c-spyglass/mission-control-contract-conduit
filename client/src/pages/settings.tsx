@@ -409,13 +409,12 @@ export default function Settings() {
   };
 
   const handleSaveMarketingProfile = () => {
-    // Store phone unformatted (just digits)
-    const unformattedPhone = marketingProfile.phone.replace(/\D/g, '');
+    // Store phone formatted for display on marketing materials
     updateMarketingProfileMutation.mutate({
       firstName: marketingProfile.firstName || undefined,
       lastName: marketingProfile.lastName || undefined,
       marketingTitle: marketingProfile.title || undefined,
-      marketingPhone: unformattedPhone || undefined,
+      marketingPhone: marketingProfile.phone || undefined,
       marketingCompany: marketingProfile.company || undefined,
       marketingHeadshotUrl: marketingProfile.headshotUrl || undefined,
     });
