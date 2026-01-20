@@ -1,0 +1,233 @@
+Implement CMA Brochure Upload Endpoint
+Problem
+When uploading a brochure in the CMA Presentation Builder, the error occurs:
+Failed to execute 'json' on 'Response': Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+This means the server endpoint /api/cmas/:id/brochure doesn't exist or is returning HTML (404 page) instead of JSON.
+
+Task
+Implement the missing brochure upload API endpoint for CMA presentations.
+
+Step 1: Add Upload Storage Setup (if not exists)
+typescript// server/lib/upload.ts
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+
+// Ensure upload directory exists
+const uploadDir = path.join(process.cwd(), 'uploads', 'brochures');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Configure multer for brochure uploads
+export const brochureUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const ext = path.extname(file.originalname);
+      cb(null, `brochure-${uniqueSuffix}${ext}`);
+    }
+  }),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only PDF, JPG, and PNG are allowed.'));
+    }
+  }
+});
+
+Step 2: Add Database Column for Brochure URL
+typescript// In shared/schema.ts - add to cmaReportConfigs table (or create if needed)
+
+// If cmaReportConfigs doesn't have brochureUrl, add it:
+brochureUrl: text('brochure_url'),
+Run migration if needed:
+bashnpm run db:push
+
+Step 3: Add Brochure API Routes
+typescript// server/routes.ts - Add these routes
+
+import { brochureUpload } from './lib/upload';
+import path from 'path';
+import fs from 'fs';
+
+// POST /api/cmas/:id/brochure - Upload brochure
+app.post('/api/cmas/:id/brochure', brochureUpload.single('brochure'), async (req, res) => {
+  try {
+    const cmaId = parseInt(req.params.id);
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    // Generate the URL for the uploaded file
+    const brochureUrl = `/uploads/brochures/${req.file.filename}`;
+    
+    // Update CMA report config with brochure URL
+    // Option A: If you have a cmaReportConfigs table
+    const existingConfig = await db.select()
+      .from(cmaReportConfigs)
+      .where(eq(cmaReportConfigs.cmaId, cmaId))
+      .limit(1);
+    
+    if (existingConfig.length > 0) {
+      await db.update(cmaReportConfigs)
+        .set({ brochureUrl })
+        .where(eq(cmaReportConfigs.cmaId, cmaId));
+    } else {
+      await db.insert(cmaReportConfigs).values({
+        cmaId,
+        brochureUrl,
+        enabledSections: [],
+        sectionOrder: [],
+      });
+    }
+    
+    // Option B: If storing on CMA directly
+    // await db.update(cmas)
+    //   .set({ brochureUrl })
+    //   .where(eq(cmas.id, cmaId));
+    
+    return res.json({ 
+      success: true, 
+      brochureUrl,
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      size: req.file.size,
+    });
+    
+  } catch (error) {
+    console.error('Brochure upload error:', error);
+    return res.status(500).json({ 
+      error: 'Failed to upload brochure',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// GET /api/cmas/:id/brochure - Get brochure info
+app.get('/api/cmas/:id/brochure', async (req, res) => {
+  try {
+    const cmaId = parseInt(req.params.id);
+    
+    const config = await db.select()
+      .from(cmaReportConfigs)
+      .where(eq(cmaReportConfigs.cmaId, cmaId))
+      .limit(1);
+    
+    if (!config.length || !config[0].brochureUrl) {
+      return res.json({ brochureUrl: null });
+    }
+    
+    return res.json({ brochureUrl: config[0].brochureUrl });
+    
+  } catch (error) {
+    console.error('Get brochure error:', error);
+    return res.status(500).json({ error: 'Failed to get brochure' });
+  }
+});
+
+// DELETE /api/cmas/:id/brochure - Delete brochure
+app.delete('/api/cmas/:id/brochure', async (req, res) => {
+  try {
+    const cmaId = parseInt(req.params.id);
+    
+    // Get current brochure URL
+    const config = await db.select()
+      .from(cmaReportConfigs)
+      .where(eq(cmaReportConfigs.cmaId, cmaId))
+      .limit(1);
+    
+    if (config.length && config[0].brochureUrl) {
+      // Delete file from disk
+      const filePath = path.join(process.cwd(), config[0].brochureUrl);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+      
+      // Clear from database
+      await db.update(cmaReportConfigs)
+        .set({ brochureUrl: null })
+        .where(eq(cmaReportConfigs.cmaId, cmaId));
+    }
+    
+    return res.json({ success: true });
+    
+  } catch (error) {
+    console.error('Delete brochure error:', error);
+    return res.status(500).json({ error: 'Failed to delete brochure' });
+  }
+});
+
+Step 4: Serve Static Upload Files
+typescript// In server/index.ts or main server file, add static file serving:
+
+import express from 'express';
+import path from 'path';
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+Step 5: Update Frontend Upload Handler
+The frontend component should already be calling the endpoint. Verify it uses:
+typescript// In CMAPresentationBuilder.tsx or similar
+
+const handleBrochureUpload = async (file: File) => {
+  const formData = new FormData();
+  formData.append('brochure', file);
+  
+  try {
+    const response = await fetch(`/api/cmas/${cmaId}/brochure`, {
+      method: 'POST',
+      body: formData,
+      // Note: Don't set Content-Type header - browser sets it with boundary
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Upload failed');
+    }
+    
+    const result = await response.json();
+    setBrochureUrl(result.brochureUrl);
+    toast({ title: 'Brochure uploaded successfully' });
+    
+  } catch (error) {
+    console.error('Upload error:', error);
+    toast({ 
+      title: 'Upload failed', 
+      description: error instanceof Error ? error.message : 'Unknown error',
+      variant: 'destructive'
+    });
+  }
+};
+
+Step 6: Add .gitignore Entry
+gitignore# Add to .gitignore
+uploads/brochures/
+
+Testing Checklist
+
+ Upload a PDF file - should succeed
+ Upload a JPG/PNG file - should succeed
+ Upload a file > 10MB - should fail with size error
+ Upload an invalid file type (e.g., .exe) - should fail
+ Brochure displays in presentation preview after upload
+ Delete brochure works and removes from preview
+ Server restart doesn't lose uploaded files
+
+
+Files to Create/Modify:
+
+server/lib/upload.ts (create)
+server/routes.ts (update)
+server/index.ts (update for static serving)
+shared/schema.ts (add brochureUrl column if needed)

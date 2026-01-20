@@ -10,6 +10,7 @@ import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAcc
 import { isRentalOrLease } from "../shared/lib/listings";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { getSyncStatus, triggerManualSync } from "./repliers-sync";
 import OpenAI from "openai";
 import { generatePrintFlyer, formatAddressForFlyer, type FlyerData, type OutputType } from "./services/flyer-generator";
@@ -49,6 +50,9 @@ export async function registerRoutes(
   // Set up authentication (BEFORE other routes)
   await setupAuth(app);
   registerAuthRoutes(app);
+  
+  // Set up object storage routes
+  registerObjectStorageRoutes(app);
 
   // ============ Transactions ============
 
