@@ -1,0 +1,145 @@
+Look at the attached screenshot. This shows the exact UI design I need for the Report Sections in the CMA Presentation Builder.
+
+---
+
+## TASK
+
+Update the Report Sections component in the Presentation Builder to match this screenshot EXACTLY.
+
+---
+
+## KEY ELEMENTS TO COPY FROM SCREENSHOT
+
+1. **Three Category Headers/Dividers:**
+   - Introduction (7/7) - with document icon
+   - Listings (6/6) - with home icon
+   - Analysis (4/4) - with chart icon
+
+2. **Category Header Style:**
+   - Icon on the left
+   - Category name (bold)
+   - Count badge showing enabled/total (e.g., "7/7") in a rounded pill
+   - Chevron on the right for collapse/expand
+   - Subtle background color to distinguish from section rows
+
+3. **Section Row Style:**
+   - Drag handle (6 dots/grip icon) on the left
+   - Section name
+   - "Customizable content" subtitle in gray for Cover Letter and Agent Resume
+   - Up/Down chevron arrows for reordering
+   - Orange toggle switch on the right
+
+4. **Sections List:**
+
+   **Introduction (7 items):**
+   - Cover Page
+   - Listing Brochure
+   - Cover Letter (Customizable content)
+   - Agent Resume (Customizable content)
+   - Our Company
+   - What is a CMA?
+   - Contact Me
+
+   **Listings (6 items):**
+   - Map of All Listings
+   - Summary of Comparable Properties
+   - Listings Chapter Header
+   - Property Details
+   - Property Photos
+   - Adjustments
+
+   **Analysis (4 items):**
+   - Analysis Chapter Header
+   - Online Valuation Analysis
+   - Average Price Per Sq. Ft.
+   - Comparable Property Statistics
+
+---
+
+## FUNCTIONALITY REQUIREMENTS
+
+1. **Toggle switches** - Orange color (#F37216) when enabled, toggle sections on/off
+2. **Count badge updates** - When a section is toggled off, the count should update (e.g., "6/7")
+3. **Collapsible categories** - Click the category header to collapse/expand its sections
+4. **Reorder buttons** - Up/down arrows move sections within their category
+5. **Drag handle** - For future drag-and-drop reordering (visual only for now is fine)
+
+---
+
+## STATE MANAGEMENT
+
+Store the sections configuration in state so it can be:
+- Saved to database via "Save Configuration" button
+- Used for PDF export (only enabled sections are included)
+- Reflected in the Live Preview panel
+```tsx
+// Example state structure
+const [sections, setSections] = useState([
+  {
+    id: 'introduction',
+    name: 'Introduction',
+    expanded: true,
+    items: [
+      { id: 'cover-page', name: 'Cover Page', enabled: true, customizable: false },
+      { id: 'listing-brochure', name: 'Listing Brochure', enabled: true, customizable: false },
+      { id: 'cover-letter', name: 'Cover Letter', enabled: true, customizable: true },
+      { id: 'agent-resume', name: 'Agent Resume', enabled: true, customizable: true },
+      { id: 'our-company', name: 'Our Company', enabled: true, customizable: false },
+      { id: 'what-is-cma', name: 'What is a CMA?', enabled: true, customizable: false },
+      { id: 'contact-me', name: 'Contact Me', enabled: true, customizable: false },
+    ],
+  },
+  {
+    id: 'listings',
+    name: 'Listings',
+    expanded: true,
+    items: [
+      { id: 'map-all-listings', name: 'Map of All Listings', enabled: true, customizable: false },
+      { id: 'summary-comparables', name: 'Summary of Comparable Properties', enabled: true, customizable: false },
+      { id: 'listings-header', name: 'Listings Chapter Header', enabled: true, customizable: false },
+      { id: 'property-details', name: 'Property Details', enabled: true, customizable: false },
+      { id: 'property-photos', name: 'Property Photos', enabled: true, customizable: false },
+      { id: 'adjustments', name: 'Adjustments', enabled: true, customizable: false },
+    ],
+  },
+  {
+    id: 'analysis',
+    name: 'Analysis',
+    expanded: true,
+    items: [
+      { id: 'analysis-header', name: 'Analysis Chapter Header', enabled: true, customizable: false },
+      { id: 'online-valuation', name: 'Online Valuation Analysis', enabled: true, customizable: false },
+      { id: 'avg-price-sqft', name: 'Average Price Per Sq. Ft.', enabled: true, customizable: false },
+      { id: 'comparable-stats', name: 'Comparable Property Statistics', enabled: true, customizable: false },
+    ],
+  },
+]);
+```
+
+---
+
+## ICONS TO USE
+```tsx
+import { 
+  FileText,      // Introduction category icon
+  Home,          // Listings category icon
+  BarChart3,     // Analysis category icon
+  GripVertical,  // Drag handle (6 dots)
+  ChevronUp,     // Move up / Collapse
+  ChevronDown,   // Move down / Expand
+} from 'lucide-react';
+```
+
+---
+
+## STYLING NOTES
+
+- Use the existing dark theme styling
+- Toggle switches should be orange (#F37216) when ON
+- Category headers should have a slightly different background to separate them from section rows
+- "Customizable content" text should be smaller and gray/muted
+- Match the exact spacing and layout shown in the screenshot
+
+---
+
+Please implement this to match the screenshot exactly.
