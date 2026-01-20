@@ -34,7 +34,8 @@ Preferred communication style: Simple, everyday language.
 - **Mobile/WebView Optimizations**: Full-screen viewport, PWA meta tags, safe area utilities, touch optimizations, and scroll behavior controls.
 
 ### Technical Implementations
-- **AI Integration**: GPT-4o-mini for social media tagline generation and MLS description summarization.
+- **AI Integration**: GPT-4o-mini for social media tagline generation, MLS description summarization, and CMA cover letter generation.
+- **Agent Profile System**: Database-backed agent profiles with bio, default cover letter (with AI generation/enhancement), and social media links for CMA reports. Includes tone selection (professional, friendly, confident) for AI-generated cover letters.
 - **Automatic MLS Synchronization**: Background service for regular MLS data sync.
 - **CMA (Comparative Market Analysis) System**: Database-backed storage, public share links, property data visualization (grid, stats, map), and configurable filters for search radius, price, size, and age. Includes API endpoints for CMA management and sharing.
 - **Status Badges & Utilities**: Consistent styling and display logic for transaction statuses and days remaining.
