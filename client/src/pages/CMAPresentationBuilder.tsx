@@ -70,6 +70,7 @@ interface PresentationConfig {
   showMapPolygon: boolean;
   layout: string;
   photosPerProperty: string;
+  includeAgentFooter: boolean;
 }
 
 interface SectionItem {
@@ -141,6 +142,7 @@ export default function CMAPresentationBuilder() {
     showMapPolygon: true,
     layout: "two_photos",
     photosPerProperty: "2",
+    includeAgentFooter: true,
   });
   
   const [brochure, setBrochure] = useState<CmaBrochure | null>(null);
@@ -238,6 +240,7 @@ export default function CMAPresentationBuilder() {
         showMapPolygon: existingConfig.showMapPolygon ?? true,
         layout: existingConfig.layout || "two_photos",
         photosPerProperty: existingConfig.photosPerProperty || "2",
+        includeAgentFooter: existingConfig.includeAgentFooter ?? true,
       });
       if (existingConfig.customPhotoSelections) {
         setCustomPhotoSelections(existingConfig.customPhotoSelections);
@@ -534,34 +537,31 @@ export default function CMAPresentationBuilder() {
             </TabsContent>
 
             <TabsContent value="content" className="space-y-4 mt-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Map Preview</CardTitle>
-                  <CardDescription>Interactive map showing subject property and comparables</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="h-[400px] relative">
-                    <CMAMap
-                      properties={comparables}
-                      subjectProperty={subjectProperty || null}
-                      showPolygon={config.showMapPolygon ?? true}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 pt-2">
-                    <Switch
-                      id="showPolygon"
-                      checked={config.showMapPolygon ?? true}
-                      onCheckedChange={(show) => setConfig({ ...config, showMapPolygon: show })}
-                      data-testid="switch-show-polygon"
-                    />
-                    <Label htmlFor="showPolygon" className="text-sm">Show search area polygon in report</Label>
-                  </div>
-                </CardContent>
-              </Card>
+              <CoverPageEditor
+                config={config.coverPageConfig || DEFAULT_COVER_PAGE_CONFIG}
+                onChange={(coverPageConfig) => setConfig({ ...config, coverPageConfig })}
+              />
+
+              <CoverLetterEditor
+                coverLetter={config.coverLetterOverride || ""}
+                onChange={(coverLetterOverride) => setConfig({ ...config, coverLetterOverride })}
+                subjectProperty={subjectProperty}
+                properties={properties}
+                statistics={statistics}
+                includeAgentFooter={config.includeAgentFooter}
+                onAgentFooterChange={(includeAgentFooter) => setConfig({ ...config, includeAgentFooter })}
+              />
+
+              <ListingBrochureContent
+                cmaId={id || ''}
+                brochure={brochure}
+                onChange={setBrochure}
+                subjectProperty={subjectProperty}
+              />
 
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Custom Photo Selection</CardTitle>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Custom Photo Selection</CardTitle>
                   <CardDescription>Override default photo selection for specific properties</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -615,26 +615,84 @@ export default function CMAPresentationBuilder() {
           </Tabs>
         </div>
 
-        <div className="space-y-6">
-          <CoverPageEditor
-            config={config.coverPageConfig || DEFAULT_COVER_PAGE_CONFIG}
-            onChange={(coverPageConfig) => setConfig({ ...config, coverPageConfig })}
-          />
+        <div className="space-y-6 lg:sticky lg:top-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Map className="w-4 h-4" />
+                    Live Preview
+                  </CardTitle>
+                  <CardDescription>Preview how your CMA will look</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">5 content sections</span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setPreviewModalOpen(true)}
+                    data-testid="button-expand-preview"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="h-[200px] relative rounded-lg overflow-hidden border">
+                <CMAMap
+                  properties={comparables}
+                  subjectProperty={subjectProperty || null}
+                  showPolygon={config.showMapPolygon ?? true}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="showPolygon"
+                  checked={config.showMapPolygon ?? true}
+                  onCheckedChange={(show) => setConfig({ ...config, showMapPolygon: show })}
+                  data-testid="switch-show-polygon"
+                />
+                <Label htmlFor="showPolygon" className="text-xs">Show polygon in report</Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {comparables.length} comparables + Subject property
+              </p>
+              
+              <Separator />
 
-          <CoverLetterEditor
-            coverLetter={config.coverLetterOverride || ""}
-            onChange={(coverLetterOverride) => setConfig({ ...config, coverLetterOverride })}
-            subjectProperty={subjectProperty}
-            properties={properties}
-            statistics={statistics}
-          />
-
-          <ListingBrochureContent
-            cmaId={id || ''}
-            brochure={brochure}
-            onChange={setBrochure}
-            subjectProperty={subjectProperty}
-          />
+              <ScrollArea className="h-[300px]">
+                <div className="space-y-3">
+                  <div className="p-3 border rounded-lg bg-muted/30">
+                    <p className="text-sm font-medium">Cover Page</p>
+                    <p className="text-xs text-muted-foreground mt-1">{config.coverPageConfig?.title || 'Comparative Market Analysis'}</p>
+                  </div>
+                  
+                  {brochure && (
+                    <div className="p-3 border rounded-lg bg-muted/30">
+                      <p className="text-sm font-medium">Listing Brochure</p>
+                      <p className="text-xs text-muted-foreground mt-1">Flyer attached</p>
+                    </div>
+                  )}
+                  
+                  {config.coverLetterOverride && (
+                    <div className="p-3 border rounded-lg bg-muted/30">
+                      <p className="text-sm font-medium">Cover Letter</p>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{config.coverLetterOverride.slice(0, 100)}...</p>
+                    </div>
+                  )}
+                  
+                  {adjustments && (
+                    <div className="p-3 border rounded-lg bg-muted/30">
+                      <p className="text-sm font-medium">Adjustments</p>
+                      <p className="text-xs text-muted-foreground mt-1">{comparables.length} properties adjusted</p>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
         </div>
       </div>
 

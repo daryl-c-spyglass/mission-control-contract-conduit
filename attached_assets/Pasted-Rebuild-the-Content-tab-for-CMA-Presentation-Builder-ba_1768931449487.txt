@@ -1,0 +1,1123 @@
+Rebuild the Content tab for CMA Presentation Builder based on the attached screenshots.
+
+This is a SINGLE SCROLLABLE PAGE with 4 sections. All changes must sync with the Live Preview panel on the right.
+
+IMPORTANT: The Map Preview should be moved to the Live Preview panel on the right side (not a separate tab).
+
+---
+
+## VISUAL DIAGRAM - Content Tab Layout
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Presentation Builder                                                           │
+│  CMA for [Property Address]                     [Preview] [Save] [Export PDF]   │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  ┌─────────────┬─────────────┬─────────────┐                                   │
+│  │  Sections   │   Content   │   Layout    │  ← 3 Tabs ONLY (Content active)   │
+│  └─────────────┴──────┬──────┴─────────────┘                                   │
+│                       │                                                         │
+│  ┌────────────────────┴────────────────────┬──────────────────────────────────┐ │
+│  │                                         │                                  │ │
+│  │  CONTENT TAB (Scrollable)               │  LIVE PREVIEW (Sticky)           │ │
+│  │                                         │                                  │ │
+│  │  ┌─────────────────────────────────┐   │  ┌──────────────────────────┐    │ │
+│  │  │ SECTION 1: COVER PAGE           │   │  │  Live Preview            │    │ │
+│  │  │                                 │   │  │  Preview how your CMA... │    │ │
+│  │  │  Cover Page                     │   │  │  [17 sections] [⛶]       │    │ │
+│  │  │  Customize the title and...     │   │  ├──────────────────────────┤    │ │
+│  │  │                                 │   │  │                          │    │ │
+│  │  │  Title                          │   │  │  ┌────────────────────┐  │    │ │
+│  │  │  ┌───────────────────────────┐  │   │  │  │ 🗺️ MAP PREVIEW     │  │    │ │
+│  │  │  │ Comparative Market...     │  │   │  │  │                    │  │    │ │
+│  │  │  └───────────────────────────┘  │   │  │  │ ┌────────────────┐ │  │    │ │
+│  │  │                                 │   │  │  │ │   [MAPBOX]     │ │  │    │ │
+│  │  │  Subtitle                       │   │  │  │ │                │ │  │    │ │
+│  │  │  ┌───────────────────────────┐  │   │  │  │ │  ● Subject     │ │  │    │ │
+│  │  │  │ Prepared exclusively...   │  │   │  │  │ │  ● ● Comps     │ │  │    │ │
+│  │  │  └───────────────────────────┘  │   │  │  │ │                │ │  │    │ │
+│  │  │                                 │   │  │  │ └────────────────┘ │  │    │ │
+│  │  │  Show Date           [====○]   │   │  │  │ 10 comparables +   │  │    │ │
+│  │  │  Display report...              │   │  │  │ Subject            │  │    │ │
+│  │  │                                 │   │  │  └────────────────────┘  │    │ │
+│  │  │  Show Agent Photo    [====○]   │   │  │                          │    │ │
+│  │  │  Include your photo...          │   │  │  ┌────────────────────┐  │    │ │
+│  │  │                                 │   │  │  │   Cover Page       │  │    │ │
+│  │  │  Cover Background               │   │  │  │                    │  │    │ │
+│  │  │  ┌───────┐ ┌───────┐ ┌───────┐ │   │  │  │  Spyglass Realty   │  │    │ │
+│  │  │  │Plain  │ │Gradient│ │Property│ │   │  │  │                    │  │    │ │
+│  │  │  │White ✓│ │       │ │Photo  │ │   │  │  │  Comparative       │  │    │ │
+│  │  │  └───────┘ └───────┘ └───────┘ │   │  │  │  Market Analysis   │  │    │ │
+│  │  │                                 │   │  │  │                    │  │    │ │
+│  │  │  Preview:                       │   │  │  │  Prepared for you  │  │    │ │
+│  │  │  ┌───────────────────────────┐  │   │  │  │                    │  │    │ │
+│  │  │  │    [Mini Cover Preview]   │  │   │  │  │  Highpointe        │  │    │ │
+│  │  │  │    Spyglass Realty        │  │   │  │  │  1/20/2026         │  │    │ │
+│  │  │  │    Comparative Market...  │  │   │  │  │                    │  │    │ │
+│  │  │  └───────────────────────────┘  │   │  │  │  (D) Daryl...      │  │    │ │
+│  │  └─────────────────────────────────┘   │  │  └────────────────────┘  │    │ │
+│  │                                         │  │                          │    │ │
+│  │  ┌─────────────────────────────────┐   │  │  ┌────────────────────┐  │    │ │
+│  │  │ SECTION 2: COVER LETTER         │   │  │  │  Listing Brochure  │  │    │ │
+│  │  │                                 │   │  │  │  [Flyer Preview]   │  │    │ │
+│  │  │  Cover Letter                   │   │  │  └────────────────────┘  │    │ │
+│  │  │  Customize the cover letter...  │   │  │                          │    │ │
+│  │  │                                 │   │  │  ┌────────────────────┐  │    │ │
+│  │  │  Client Name (Optional)         │   │  │  │   Cover Letter     │  │    │ │
+│  │  │  ┌───────────────────────────┐  │   │  │  │   Your cover...    │  │    │ │
+│  │  │  │ e.g., John and Jane Smith │  │   │  │  └────────────────────┘  │    │ │
+│  │  │  └───────────────────────────┘  │   │  │                          │    │ │
+│  │  │  Include client name for...     │   │  │  ┌────────────────────┐  │    │ │
+│  │  │                                 │   │  │  │   Agent Resume     │  │    │ │
+│  │  │  ┌─────────────────────────────┐│   │  │  │   Daryl Camingao   │  │    │ │
+│  │  │  │ ✨ AI Assistant             ││   │  │  │   Real Estate...   │  │    │ │
+│  │  │  │                             ││   │  │  └────────────────────┘  │    │ │
+│  │  │  │ Tone: [Professional ▼]      ││   │  │                          │    │ │
+│  │  │  │                             ││   │  │  ┌────────────────────┐  │    │ │
+│  │  │  │ [✨ Generate with AI]       ││   │  │  │   Adjustments      │  │    │ │
+│  │  │  │                             ││   │  │  │   [Table Preview]  │  │    │ │
+│  │  │  │ AI will create a cover...   ││   │  │  └────────────────────┘  │    │ │
+│  │  │  └─────────────────────────────┘│   │  │                          │    │ │
+│  │  │                                 │   │  │  ... more sections ...   │    │ │
+│  │  │  ┌───────────────────────────┐  │   │  │                          │    │ │
+│  │  │  │ Enter your cover letter  │  │   │  └──────────────────────────┘    │ │
+│  │  │  │ content, or use AI...    │  │   │                                  │ │
+│  │  │  │                          │  │   │                                  │ │
+│  │  │  │                          │  │   │                                  │ │
+│  │  │  └───────────────────────────┘  │   │                                  │ │
+│  │  │  Leave blank to use your...     │   │                                  │ │
+│  │  │                                 │   │                                  │ │
+│  │  │  ─────────────────────────────  │   │                                  │ │
+│  │  │                                 │   │                                  │ │
+│  │  │  Agent Footer                   │   │                                  │ │
+│  │  │  Include agent contact...       │   │                                  │ │
+│  │  │  Include agent footer [====○]  │   │                                  │ │
+│  │  └─────────────────────────────────┘   │                                  │ │
+│  │                                         │                                  │ │
+│  │  ┌─────────────────────────────────┐   │                                  │ │
+│  │  │ SECTION 3: LISTING BROCHURE     │   │                                  │ │
+│  │  │                                 │   │                                  │ │
+│  │  │  Listing Brochure               │   │                                  │ │
+│  │  │  Add a marketing flyer for...   │   │                                  │ │
+│  │  │                                 │   │                                  │ │
+│  │  │  ┌───────────────────────────┐  │   │                                  │ │
+│  │  │  │ 📄 1005_Jewell_flyer.png  │  │   │                                  │ │
+│  │  │  │    Uploaded • 1/17/2026 🗑│  │   │                                  │ │
+│  │  │  │                           │  │   │                                  │ │
+│  │  │  │ ┌───────────────────────┐ │  │   │                                  │ │
+│  │  │  │ │  SPYGLASS  $1,850,000 │ │  │   │                                  │ │
+│  │  │  │ │  REALTY               │ │  │   │                                  │ │
+│  │  │  │ │                       │ │  │   │                                  │ │
+│  │  │  │ │  1005 JEWELL, AUSTIN  │ │  │   │                                  │ │
+│  │  │  │ │                       │ │  │   │                                  │ │
+│  │  │  │ │  [Property Photos]    │ │  │   │                                  │ │
+│  │  │  │ │                       │ │  │   │                                  │ │
+│  │  │  │ │  3 bed | 3 bath       │ │  │   │                                  │ │
+│  │  │  │ │  2,579 sq ft          │ │  │   │                                  │ │
+│  │  │  │ │                       │ │  │   │                                  │ │
+│  │  │  │ │  Daryl Camingao       │ │  │   │                                  │ │
+│  │  │  │ └───────────────────────┘ │  │   │                                  │ │
+│  │  │  └───────────────────────────┘  │   │                                  │ │
+│  │  │                                 │   │                                  │ │
+│  │  │  OR                             │   │                                  │ │
+│  │  │                                 │   │                                  │ │
+│  │  │  [Upload Brochure] [Create New] │   │                                  │ │
+│  │  └─────────────────────────────────┘   │                                  │ │
+│  │                                         │                                  │ │
+│  │  ┌─────────────────────────────────┐   │                                  │ │
+│  │  │ SECTION 4: PROPERTY VALUE       │   │                                  │ │
+│  │  │           ADJUSTMENTS           │   │                                  │ │
+│  │  │                                 │   │                                  │ │
+│  │  │  Property Value Adjustments     │   │                                  │ │
+│  │  │  Configure adjustment rates...  │   │                                  │ │
+│  │  │                                 │   │                                  │ │
+│  │  │  ┌─────────────────────────────┐│   │                                  │ │
+│  │  │  │ 📋 Adjustment Rates   [↻]  ││   │                                  │ │
+│  │  │  │                             ││   │                                  │ │
+│  │  │  │ Sq Ft (/sqft)Bedroom(/sqft)  Bedroom (
+/sqft)Bedroom() ││   │                                  │ │
+│  │  │  │ ┌─────┐         ┌───────┐  ││   │                                  │ │
+│  │  │  │ │ 50  │         │ 10000 │  ││   │                                  │ │
+│  │  │  │ └─────┘         └───────┘  ││   │                                  │ │
+│  │  │  │                             ││   │                                  │ │
+│  │  │  │ Bathroom ()Pool()    Pool (
+)Pool()    ││   │                                  │ │
+│  │  │  │ ┌───────┐       ┌───────┐  ││   │                                  │ │
+│  │  │  │ │ 7500  │       │ 25000 │  ││   │                                  │ │
+│  │  │  │ └───────┘       └───────┘  ││   │                                  │ │
+│  │  │  │                             ││   │                                  │ │
+│  │  │  │ Garage ($)      Year Built  ││   │                                  │ │
+│  │  │  │ ┌───────┐       ┌───────┐  ││   │                                  │ │
+│  │  │  │ │ 5000  │       │ 1000  │  ││   │                                  │ │
+│  │  │  │ └───────┘       └───────┘  ││   │                                  │ │
+│  │  │  │                             ││   │                                  │ │
+│  │  │  │ Lot Size ($/sqft)           ││   │                                  │ │
+│  │  │  │ ┌───────┐                   ││   │                                  │ │
+│  │  │  │ │ 2     │                   ││   │                                  │ │
+│  │  │  │ └───────┘                   ││   │                                  │ │
+│  │  │  └─────────────────────────────┘│   │                                  │ │
+│  │  │                                 │   │                                  │ │
+│  │  │  Adjustments Comparison         │   │                                  │ │
+│  │  │  ┌─────────────────────────────┐│   │                                  │ │
+│  │  │  │Feature│Subject│260 Salt...│ ││   │                                  │ │
+│  │  │  │───────┼───────┼───────────│ ││   │                                  │ │
+│  │  │  │Sale $ │  —    │$939,000   │ ││   │                                  │ │
+│  │  │  │Sq Ft  │ 3,400 │3,434 -$1.7k│ ││   │                                  │ │
+│  │  │  │Beds   │   5   │  4  +$10k │ ││   │                                  │ │
+│  │  │  │───────┼───────┼───────────│ ││   │                                  │ │
+│  │  │  │Total  │  —    │  +$8,300  │ ││   │                                  │ │
+│  │  │  │Adj    │       │           │ ││   │                                  │ │
+│  │  │  │───────┼───────┼───────────│ ││   │                                  │ │
+│  │  │  │ADJUSTED│ —    │ $947,300  │ ││   │                                  │ │
+│  │  │  │PRICE  │       │           │ ││   │                                  │ │
+│  │  │  └─────────────────────────────┘│   │                                  │ │
+│  │  │                                 │   │                                  │ │
+│  │  │  [💾 Save Adjustments]          │   │                                  │ │
+│  │  └─────────────────────────────────┘   │                                  │ │
+│  │                                         │                                  │ │
+│  └─────────────────────────────────────────┴──────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+---
+
+## IMPORTANT: MOVE MAP PREVIEW TO LIVE PREVIEW PANEL
+
+The Map Preview should NOT be a separate tab. Instead, it should be displayed at the TOP of the Live Preview panel on the right side.
+
+### Live Preview Order:
+1. **Map Preview** (at the top - shows subject + comparables)
+2. Cover Page Preview
+3. Listing Brochure Preview
+4. Cover Letter Preview
+5. Agent Resume Preview
+6. Adjustments Preview
+7. ...other section previews
+
+---
+
+## IMPLEMENTATION DETAILS
+
+### SECTION 1: Cover Page
+```tsx
+interface CoverPageSettings {
+  title: string;
+  subtitle: string;
+  showDate: boolean;
+  showAgentPhoto: boolean;
+  backgroundStyle: 'plain-white' | 'gradient' | 'property-photo';
+}
+
+// Component
+<Card>
+  <CardHeader className="pb-2">
+    <CardTitle className="text-lg">Cover Page</CardTitle>
+    <CardDescription>Customize the title and appearance of your cover page</CardDescription>
+  </CardHeader>
+  <CardContent className="space-y-4">
+    {/* Duplicate header for emphasis - match screenshot */}
+    <div>
+      <h4 className="font-semibold">Cover Page</h4>
+      <p className="text-sm text-muted-foreground">Customize how your CMA cover page appears</p>
+    </div>
+    
+    {/* Title Input */}
+    <div className="space-y-2">
+      <Label htmlFor="cover-title">Title</Label>
+      <Input
+        id="cover-title"
+        value={coverPage.title}
+        onChange={(e) => updateCoverPage({ title: e.target.value })}
+        placeholder="Comparative Market Analysis"
+      />
+    </div>
+    
+    {/* Subtitle Input */}
+    <div className="space-y-2">
+      <Label htmlFor="cover-subtitle">Subtitle</Label>
+      <Input
+        id="cover-subtitle"
+        value={coverPage.subtitle}
+        onChange={(e) => updateCoverPage({ subtitle: e.target.value })}
+        placeholder="Prepared exclusively for you"
+      />
+    </div>
+    
+    {/* Show Date Toggle */}
+    <div className="flex items-center justify-between">
+      <div>
+        <Label htmlFor="show-date" className="font-medium">Show Date</Label>
+        <p className="text-sm text-muted-foreground">Display report date on cover</p>
+      </div>
+      <Switch
+        id="show-date"
+        checked={coverPage.showDate}
+        onCheckedChange={(checked) => updateCoverPage({ showDate: checked })}
+        className="data-[state=checked]:bg-orange-500"
+      />
+    </div>
+    
+    {/* Show Agent Photo Toggle */}
+    <div className="flex items-center justify-between">
+      <div>
+        <Label htmlFor="show-agent-photo" className="font-medium">Show Agent Photo</Label>
+        <p className="text-sm text-muted-foreground">Include your photo on cover</p>
+      </div>
+      <Switch
+        id="show-agent-photo"
+        checked={coverPage.showAgentPhoto}
+        onCheckedChange={(checked) => updateCoverPage({ showAgentPhoto: checked })}
+        className="data-[state=checked]:bg-orange-500"
+      />
+    </div>
+    
+    {/* Cover Background Selection */}
+    <div className="space-y-2">
+      <Label>Cover Background</Label>
+      <div className="flex gap-2">
+        {(['plain-white', 'gradient', 'property-photo'] as const).map((style) => (
+          <Button
+            key={style}
+            variant={coverPage.backgroundStyle === style ? 'default' : 'outline'}
+            onClick={() => updateCoverPage({ backgroundStyle: style })}
+            className={cn(
+              "flex-1",
+              coverPage.backgroundStyle === style && "bg-orange-500 hover:bg-orange-600"
+            )}
+          >
+            {style === 'plain-white' && 'Plain White'}
+            {style === 'gradient' && 'Gradient'}
+            {style === 'property-photo' && 'Property Photo'}
+            {coverPage.backgroundStyle === style && <Check className="w-4 h-4 ml-2" />}
+          </Button>
+        ))}
+      </div>
+    </div>
+    
+    {/* Mini Preview */}
+    <div className="space-y-2">
+      <Label>Preview:</Label>
+      <div className="border rounded-lg p-4 bg-white">
+        <CoverPagePreview settings={coverPage} agent={agentData} property={propertyData} />
+      </div>
+    </div>
+  </CardContent>
+</Card>
+```
+
+---
+
+### SECTION 2: Cover Letter
+```tsx
+interface CoverLetterSettings {
+  clientName: string;
+  tone: 'professional' | 'friendly' | 'confident';
+  content: string;
+  includeAgentFooter: boolean;
+}
+
+// Component
+<Card>
+  <CardHeader className="pb-2">
+    <CardTitle className="text-lg">Cover Letter</CardTitle>
+    <CardDescription>Customize the cover letter for this CMA report</CardDescription>
+  </CardHeader>
+  <CardContent className="space-y-4">
+    {/* Client Name */}
+    <div className="space-y-2">
+      <Label htmlFor="client-name">Client Name (Optional)</Label>
+      <Input
+        id="client-name"
+        value={coverLetter.clientName}
+        onChange={(e) => updateCoverLetter({ clientName: e.target.value })}
+        placeholder="e.g., John and Jane Smith"
+      />
+      <p className="text-xs text-muted-foreground">
+        Include client name for personalized cover letter greeting
+      </p>
+    </div>
+    
+    {/* AI Assistant Card */}
+    <Card className="bg-purple-50 border-purple-200">
+      <CardContent className="pt-4 space-y-3">
+        <div className="flex items-center gap-2 text-purple-700">
+          <Sparkles className="w-4 h-4" />
+          <span className="font-semibold">AI Assistant</span>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="space-y-1">
+            <Label className="text-sm">Tone:</Label>
+            <Select 
+              value={coverLetter.tone} 
+              onValueChange={(value) => updateCoverLetter({ tone: value as any })}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="professional">Professional</SelectItem>
+                <SelectItem value="friendly">Friendly</SelectItem>
+                <SelectItem value="confident">Confident</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <Button 
+            onClick={handleGenerateCoverLetter}
+            disabled={isGenerating}
+            className="bg-purple-600 hover:bg-purple-700"
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            {isGenerating ? 'Generating...' : 'Generate with AI'}
+          </Button>
+        </div>
+        
+        <p className="text-xs text-purple-600">
+          AI will create a cover letter based on your CMA data, comparables, and market statistics.
+        </p>
+      </CardContent>
+    </Card>
+    
+    {/* Cover Letter Textarea */}
+    <div className="space-y-2">
+      <Textarea
+        value={coverLetter.content}
+        onChange={(e) => updateCoverLetter({ content: e.target.value })}
+        placeholder="Enter your cover letter content, or use AI to generate one based on your CMA data..."
+        rows={8}
+        className="resize-none"
+      />
+      <p className="text-xs text-muted-foreground">
+        Leave blank to use your default cover letter from agent settings.
+      </p>
+    </div>
+    
+    <Separator />
+    
+    {/* Agent Footer Toggle */}
+    <div className="space-y-2">
+      <h4 className="font-semibold">Agent Footer</h4>
+      <p className="text-sm text-muted-foreground">
+        Include agent contact information at the bottom of each page
+      </p>
+      <div className="flex items-center justify-between">
+        <Label htmlFor="agent-footer">Include agent footer</Label>
+        <Switch
+          id="agent-footer"
+          checked={coverLetter.includeAgentFooter}
+          onCheckedChange={(checked) => updateCoverLetter({ includeAgentFooter: checked })}
+          className="data-[state=checked]:bg-orange-500"
+        />
+      </div>
+    </div>
+  </CardContent>
+</Card>
+```
+
+---
+
+### SECTION 3: Listing Brochure
+```tsx
+interface ListingBrochureSettings {
+  uploadedFile: {
+    name: string;
+    url: string;
+    uploadedAt: string;
+  } | null;
+}
+
+// Component
+<Card>
+  <CardHeader className="pb-2">
+    <CardTitle className="text-lg">Listing Brochure</CardTitle>
+    <CardDescription>Add a marketing flyer for the subject property</CardDescription>
+  </CardHeader>
+  <CardContent className="space-y-4">
+    {listingBrochure.uploadedFile ? (
+      // Show uploaded brochure
+      <div className="border rounded-lg p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-muted-foreground" />
+            <div>
+              <p className="font-medium">{listingBrochure.uploadedFile.name}</p>
+              <p className="text-xs text-muted-foreground">
+                Uploaded • {listingBrochure.uploadedFile.uploadedAt}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => updateListingBrochure({ uploadedFile: null })}
+            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+        
+        {/* Brochure Preview */}
+        <div className="border rounded-lg overflow-hidden">
+          <img
+            src={listingBrochure.uploadedFile.url}
+            alt="Listing Brochure"
+            className="w-full h-auto"
+          />
+        </div>
+      </div>
+    ) : (
+      // Show upload options
+      <div className="border-2 border-dashed rounded-lg p-8 text-center space-y-4">
+        <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+          <Upload className="w-6 h-6 text-muted-foreground" />
+        </div>
+        <div>
+          <p className="font-medium">No brochure uploaded</p>
+          <p className="text-sm text-muted-foreground">
+            Upload an existing flyer or create a new one
+          </p>
+        </div>
+        <div className="flex justify-center gap-3">
+          <Button variant="outline" onClick={handleUploadBrochure}>
+            <Upload className="w-4 h-4 mr-2" />
+            Upload Brochure
+          </Button>
+          <Button 
+            onClick={handleCreateNewBrochure}
+            className="bg-orange-500 hover:bg-orange-600"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create New
+          </Button>
+        </div>
+      </div>
+    )}
+  </CardContent>
+</Card>
+```
+
+---
+
+### SECTION 4: Property Value Adjustments
+```tsx
+interface AdjustmentRates {
+  sqftRate: number;      // $ per sqft
+  bedroomRate: number;   // $ per bedroom
+  bathroomRate: number;  // $ per bathroom
+  poolRate: number;      // $ for pool
+  garageRate: number;    // $ per garage space
+  yearBuiltRate: number; // $ per year
+  lotSizeRate: number;   // $ per sqft of lot
+}
+
+// Component
+<Card>
+  <CardHeader className="pb-2">
+    <CardTitle className="text-lg">Property Value Adjustments</CardTitle>
+    <CardDescription>
+      Configure adjustment rates to compare property values between subject and comparables
+    </CardDescription>
+  </CardHeader>
+  <CardContent className="space-y-6">
+    {/* Adjustment Rates Card */}
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileSpreadsheet className="w-4 h-4" />
+            <CardTitle className="text-base">Adjustment Rates</CardTitle>
+          </div>
+          <Button variant="ghost" size="sm" onClick={resetToDefaults}>
+            <RotateCcw className="w-4 h-4 mr-1" />
+            Reset Defaults
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label>Sq Ft ($/sqft)</Label>
+            <Input
+              type="number"
+              value={adjustmentRates.sqftRate}
+              onChange={(e) => updateAdjustmentRates({ sqftRate: Number(e.target.value) })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Bedroom ($)</Label>
+            <Input
+              type="number"
+              value={adjustmentRates.bedroomRate}
+              onChange={(e) => updateAdjustmentRates({ bedroomRate: Number(e.target.value) })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Bathroom ($)</Label>
+            <Input
+              type="number"
+              value={adjustmentRates.bathroomRate}
+              onChange={(e) => updateAdjustmentRates({ bathroomRate: Number(e.target.value) })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Pool ($)</Label>
+            <Input
+              type="number"
+              value={adjustmentRates.poolRate}
+              onChange={(e) => updateAdjustmentRates({ poolRate: Number(e.target.value) })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Garage ($)</Label>
+            <Input
+              type="number"
+              value={adjustmentRates.garageRate}
+              onChange={(e) => updateAdjustmentRates({ garageRate: Number(e.target.value) })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Year Built ($/yr)</Label>
+            <Input
+              type="number"
+              value={adjustmentRates.yearBuiltRate}
+              onChange={(e) => updateAdjustmentRates({ yearBuiltRate: Number(e.target.value) })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Lot Size ($/sqft)</Label>
+            <Input
+              type="number"
+              value={adjustmentRates.lotSizeRate}
+              onChange={(e) => updateAdjustmentRates({ lotSizeRate: Number(e.target.value) })}
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+    
+    {/* Adjustments Comparison Table */}
+    <div className="space-y-2">
+      <h4 className="font-semibold">Adjustments Comparison</h4>
+      <div className="border rounded-lg overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50">
+            <tr>
+              <th className="px-4 py-3 text-left font-medium">Feature</th>
+              <th className="px-4 py-3 text-center font-medium bg-orange-50">Subject</th>
+              {comparables.slice(0, 3).map((comp, i) => (
+                <th key={i} className="px-4 py-3 text-center font-medium">
+                  <div className="truncate max-w-[120px]">{comp.address}</div>
+                </th>
+              ))}
+            </tr>
+            <tr className="border-t">
+              <th className="px-4 py-1"></th>
+              <th className="px-4 py-1 text-xs text-muted-foreground bg-orange-50">Value</th>
+              {comparables.slice(0, 3).map((_, i) => (
+                <th key={i} className="px-4 py-1">
+                  <div className="flex justify-around text-xs text-muted-foreground">
+                    <span>Value</span>
+                    <span>Adj</span>
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {/* Sale Price Row */}
+            <tr>
+              <td className="px-4 py-2 font-medium">Sale Price</td>
+              <td className="px-4 py-2 text-center bg-orange-50">—</td>
+              {comparables.slice(0, 3).map((comp, i) => (
+                <td key={i} className="px-4 py-2 text-center">
+                  ${comp.soldPrice?.toLocaleString() || comp.listPrice?.toLocaleString()}
+                </td>
+              ))}
+            </tr>
+            {/* Square Feet Row */}
+            <tr>
+              <td className="px-4 py-2 font-medium">Square Feet</td>
+              <td className="px-4 py-2 text-center bg-orange-50">{subjectProperty.sqft?.toLocaleString()}</td>
+              {comparables.slice(0, 3).map((comp, i) => {
+                const diff = (subjectProperty.sqft || 0) - (comp.sqft || 0);
+                const adj = diff * adjustmentRates.sqftRate;
+                return (
+                  <td key={i} className="px-4 py-2 text-center">
+                    <div className="flex justify-around">
+                      <span>{comp.sqft?.toLocaleString()}</span>
+                      <span className={adj >= 0 ? 'text-green-600' : 'text-red-600'}>
+                        {adj >= 0 ? '+' : ''}{formatCurrency(adj)}
+                      </span>
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+            {/* Bedrooms Row */}
+            <tr>
+              <td className="px-4 py-2 font-medium">Bedrooms</td>
+              <td className="px-4 py-2 text-center bg-orange-50">{subjectProperty.bedrooms}</td>
+              {comparables.slice(0, 3).map((comp, i) => {
+                const diff = (subjectProperty.bedrooms || 0) - (comp.bedrooms || 0);
+                const adj = diff * adjustmentRates.bedroomRate;
+                return (
+                  <td key={i} className="px-4 py-2 text-center">
+                    <div className="flex justify-around">
+                      <span>{comp.bedrooms}</span>
+                      <span className={adj >= 0 ? 'text-green-600' : 'text-red-600'}>
+                        {adj >= 0 ? '+' : ''}{formatCurrency(adj)}
+                      </span>
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+            {/* Total Adjustment Row */}
+            <tr className="bg-muted/30 font-medium">
+              <td className="px-4 py-2">Total Adjustment</td>
+              <td className="px-4 py-2 text-center bg-orange-50">—</td>
+              {comparables.slice(0, 3).map((comp, i) => {
+                const total = calculateTotalAdjustment(subjectProperty, comp, adjustmentRates);
+                return (
+                  <td key={i} className="px-4 py-2 text-center">
+                    <span className={total >= 0 ? 'text-green-600' : 'text-red-600'}>
+                      {total >= 0 ? '+' : ''}{formatCurrency(total)}
+                    </span>
+                  </td>
+                );
+              })}
+            </tr>
+            {/* Adjusted Price Row */}
+            <tr className="bg-orange-50 font-bold">
+              <td className="px-4 py-2">ADJUSTED PRICE</td>
+              <td className="px-4 py-2 text-center">—</td>
+              {comparables.slice(0, 3).map((comp, i) => {
+                const total = calculateTotalAdjustment(subjectProperty, comp, adjustmentRates);
+                const adjustedPrice = (comp.soldPrice || comp.listPrice || 0) + total;
+                return (
+                  <td key={i} className="px-4 py-2 text-center text-green-600">
+                    {formatCurrency(adjustedPrice)}
+                  </td>
+                );
+              })}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-muted-foreground mt-2">
+        <span className="text-green-600">Positive adjustments</span> indicate the comparable is inferior to the subject.{' '}
+        <span className="text-red-600">Negative adjustments</span> indicate the comparable is superior.
+      </p>
+    </div>
+    
+    {/* Save Button */}
+    <Button 
+      onClick={handleSaveAdjustments}
+      className="w-full bg-orange-500 hover:bg-orange-600"
+    >
+      <Save className="w-4 h-4 mr-2" />
+      Save Adjustments
+    </Button>
+  </CardContent>
+</Card>
+```
+
+---
+
+## STATE MANAGEMENT - Sync with Live Preview
+```tsx
+// Main state for Content tab
+const [coverPage, setCoverPage] = useState<CoverPageSettings>({
+  title: 'Comparative Market Analysis',
+  subtitle: 'Prepared exclusively for you',
+  showDate: true,
+  showAgentPhoto: true,
+  backgroundStyle: 'plain-white',
+});
+
+const [coverLetter, setCoverLetter] = useState<CoverLetterSettings>({
+  clientName: '',
+  tone: 'professional',
+  content: '',
+  includeAgentFooter: true,
+});
+
+const [listingBrochure, setListingBrochure] = useState<ListingBrochureSettings>({
+  uploadedFile: null,
+});
+
+const [adjustmentRates, setAdjustmentRates] = useState<AdjustmentRates>({
+  sqftRate: 50,
+  bedroomRate: 10000,
+  bathroomRate: 7500,
+  poolRate: 25000,
+  garageRate: 5000,
+  yearBuiltRate: 1000,
+  lotSizeRate: 2,
+});
+
+// Update functions that also trigger Live Preview update
+const updateCoverPage = (updates: Partial<CoverPageSettings>) => {
+  setCoverPage(prev => ({ ...prev, ...updates }));
+  setIsPreviewUpdating(true);
+  setTimeout(() => setIsPreviewUpdating(false), 300);
+};
+
+const updateCoverLetter = (updates: Partial<CoverLetterSettings>) => {
+  setCoverLetter(prev => ({ ...prev, ...updates }));
+  setIsPreviewUpdating(true);
+  setTimeout(() => setIsPreviewUpdating(false), 300);
+};
+
+// ... similar for other sections
+
+// Pass to Live Preview component
+<LivePreview
+  coverPage={coverPage}
+  coverLetter={coverLetter}
+  listingBrochure={listingBrochure}
+  adjustmentRates={adjustmentRates}
+  subjectProperty={subjectProperty}
+  comparables={comparables}
+  agentData={agentData}
+  isUpdating={isPreviewUpdating}
+/>
+```
+
+---
+
+## LIVE PREVIEW COMPONENT - WITH MAP AT TOP
+```tsx
+function LivePreview({ 
+  coverPage, 
+  coverLetter, 
+  listingBrochure,
+  adjustmentRates,
+  subjectProperty,
+  comparables,
+  agentData,
+  isUpdating 
+}) {
+  return (
+    <Card className="sticky top-24">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg">Live Preview</CardTitle>
+            <CardDescription>Preview how your CMA presentation will appear</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">17 sections</Badge>
+            <Button variant="ghost" size="icon" onClick={openFullscreenPreview}>
+              <Expand className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <ScrollArea className="h-[600px]">
+          <div className={cn(
+            "space-y-4 transition-opacity duration-300",
+            isUpdating && "opacity-50"
+          )}>
+          
+            {/* ========== MAP PREVIEW - FIRST/TOP POSITION ========== */}
+            <PreviewCard icon={<Map />} title="Map Preview">
+              <div className="space-y-2">
+                <div className="h-48 rounded-lg overflow-hidden border">
+                  {/* Embedded Mapbox Map */}
+                  <CMAMapPreview
+                    subjectProperty={subjectProperty}
+                    comparables={comparables}
+                    height="100%"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  {comparables?.length || 0} comparables + Subject
+                </p>
+              </div>
+            </PreviewCard>
+            
+            {/* ========== COVER PAGE PREVIEW ========== */}
+            <PreviewCard icon={<FileText />} title="Cover Page">
+              <div className="text-center space-y-1 py-4">
+                <p className="text-orange-500 font-semibold text-sm">Spyglass Realty</p>
+                <h3 className="font-bold">{coverPage.title}</h3>
+                <p className="text-sm text-muted-foreground">{coverPage.subtitle}</p>
+                <p className="text-sm">{subjectProperty?.address}</p>
+                {coverPage.showDate && (
+                  <p className="text-xs text-muted-foreground">
+                    {new Date().toLocaleDateString()}
+                  </p>
+                )}
+                {coverPage.showAgentPhoto && agentData && (
+                  <div className="flex items-center justify-center gap-2 mt-2">
+                    <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-sm font-medium">
+                      {agentData.firstName?.[0]}
+                    </div>
+                    <span className="text-sm">{agentData.firstName} {agentData.lastName}</span>
+                  </div>
+                )}
+              </div>
+            </PreviewCard>
+            
+            {/* ========== LISTING BROCHURE PREVIEW ========== */}
+            {listingBrochure.uploadedFile && (
+              <PreviewCard icon={<Image />} title="Listing Brochure">
+                <img 
+                  src={listingBrochure.uploadedFile.url} 
+                  alt="Brochure"
+                  className="w-full h-32 object-cover rounded"
+                />
+              </PreviewCard>
+            )}
+            
+            {/* ========== COVER LETTER PREVIEW ========== */}
+            <PreviewCard icon={<FileText />} title="Cover Letter">
+              <p className="text-sm text-muted-foreground line-clamp-3">
+                {coverLetter.content || 'Your personalized cover letter will appear here...'}
+              </p>
+            </PreviewCard>
+            
+            {/* ========== AGENT RESUME PREVIEW ========== */}
+            <PreviewCard icon={<User />} title="Agent Resume">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                  {agentData?.firstName?.[0] || 'A'}
+                </div>
+                <div>
+                  <p className="font-medium">{agentData?.firstName} {agentData?.lastName}</p>
+                  <p className="text-xs text-muted-foreground">{agentData?.title || 'Real Estate Agent'}</p>
+                </div>
+              </div>
+            </PreviewCard>
+            
+            {/* ========== ADJUSTMENTS PREVIEW ========== */}
+            <PreviewCard icon={<Calculator />} title="Adjustments">
+              <div className="text-xs">
+                <div className="flex justify-between py-1 border-b">
+                  <span>Comparables</span>
+                  <span className="font-medium">{comparables?.length || 0}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b">
+                  <span>Avg. Adjusted Price</span>
+                  <span className="font-medium text-green-600">
+                    {formatCurrency(calculateAverageAdjustedPrice(comparables, adjustmentRates, subjectProperty))}
+                  </span>
+                </div>
+              </div>
+            </PreviewCard>
+            
+            {/* More preview cards for other enabled sections... */}
+            
+          </div>
+        </ScrollArea>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Reusable preview card component
+function PreviewCard({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="py-2 px-3 bg-muted/30">
+        <div className="flex items-center gap-2">
+          {icon}
+          <span className="text-sm font-medium">{title}</span>
+        </div>
+      </CardHeader>
+      <CardContent className="p-3">
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+---
+
+## CMA MAP PREVIEW COMPONENT (For Live Preview)
+
+Create a smaller, embedded version of the map for the Live Preview panel:
+```tsx
+// components/CMAMapPreview.tsx
+
+import { useEffect, useRef } from 'react';
+import mapboxgl from 'mapbox-gl';
+
+interface CMAMapPreviewProps {
+  subjectProperty: {
+    latitude: number;
+    longitude: number;
+    address: string;
+    listPrice: number;
+  } | null;
+  comparables: Array<{
+    latitude: number;
+    longitude: number;
+    address: string;
+    listPrice?: number;
+    status: string;
+  }>;
+  height?: string;
+}
+
+export function CMAMapPreview({ subjectProperty, comparables, height = '200px' }: CMAMapPreviewProps) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
+
+  useEffect(() => {
+    if (!mapContainer.current || map.current) return;
+
+    // Initialize map
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
+    
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [
+        subjectProperty?.longitude || -97.7431,
+        subjectProperty?.latitude || 30.2672
+      ],
+      zoom: 10,
+      interactive: false, // Disable interactions for preview
+    });
+
+    map.current.on('load', () => {
+      addMarkers();
+    });
+
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, []);
+
+  // Re-add markers when data changes
+  useEffect(() => {
+    if (map.current && map.current.loaded()) {
+      addMarkers();
+    }
+  }, [subjectProperty, comparables]);
+
+  const addMarkers = () => {
+    if (!map.current) return;
+
+    // Clear existing markers
+    markersRef.current.forEach(marker => marker.remove());
+    markersRef.current = [];
+
+    const bounds = new mapboxgl.LngLatBounds();
+
+    // Add subject property marker (blue)
+    if (subjectProperty?.latitude && subjectProperty?.longitude) {
+      const marker = new mapboxgl.Marker({ color: '#3b82f6', scale: 0.7 })
+        .setLngLat([subjectProperty.longitude, subjectProperty.latitude])
+        .addTo(map.current);
+      markersRef.current.push(marker);
+      bounds.extend([subjectProperty.longitude, subjectProperty.latitude]);
+    }
+
+    // Add comparable markers
+    comparables.forEach((comp) => {
+      if (!comp.latitude || !comp.longitude) return;
+      
+      const color = getStatusColor(comp.status);
+      const marker = new mapboxgl.Marker({ color, scale: 0.6 })
+        .setLngLat([comp.longitude, comp.latitude])
+        .addTo(map.current!);
+      markersRef.current.push(marker);
+      bounds.extend([comp.longitude, comp.latitude]);
+    });
+
+    // Fit bounds
+    if (markersRef.current.length > 0) {
+      map.current.fitBounds(bounds, { padding: 30, maxZoom: 12 });
+    }
+  };
+
+  const getStatusColor = (status: string): string => {
+    const statusLower = (status || '').toLowerCase();
+    if (statusLower.includes('active') && !statusLower.includes('contract')) return '#22c55e';
+    if (statusLower.includes('closed') || statusLower.includes('sold')) return '#ef4444';
+    if (statusLower.includes('pending')) return '#6b7280';
+    if (statusLower.includes('contract')) return '#f59e0b';
+    return '#9ca3af';
+  };
+
+  return (
+    <div ref={mapContainer} style={{ width: '100%', height }} className="rounded-lg" />
+  );
+}
+```
+
+---
+
+## TESTING CHECKLIST
+
+After implementing, verify each part works:
+
+### ✅ Test Map Preview in Live Preview Panel:
+- [ ] Map appears at the TOP of the Live Preview panel
+- [ ] Map shows subject property marker (blue)
+- [ ] Map shows all comparable markers (colored by status)
+- [ ] Map auto-fits to show all markers
+- [ ] Map shows correct count "X comparables + Subject"
+- [ ] Map is NOT interactive (preview only)
+- [ ] Map updates when comparables data changes
+
+### ✅ Test Cover Page Section:
+- [ ] Title input updates Live Preview in real-time
+- [ ] Subtitle input updates Live Preview in real-time
+- [ ] Show Date toggle shows/hides date in preview
+- [ ] Show Agent Photo toggle shows/hides agent in preview
+- [ ] Background Style buttons change selection (visual feedback)
+- [ ] Mini preview at bottom reflects all settings
+
+### ✅ Test Cover Letter Section:
+- [ ] Client Name input accepts text
+- [ ] Tone dropdown works (Professional, Friendly, Confident)
+- [ ] "Generate with AI" button triggers AI generation
+- [ ] Generated text appears in textarea
+- [ ] Manual text editing works
+- [ ] Agent Footer toggle works
+- [ ] Live Preview shows cover letter content
+
+### ✅ Test Listing Brochure Section:
+- [ ] Upload Brochure button opens file picker
+- [ ] Uploaded file shows with preview and delete button
+- [ ] Delete button removes the uploaded file
+- [ ] "Create New" button opens flyer creation flow
+- [ ] Live Preview shows uploaded brochure thumbnail
+
+### ✅ Test Property Value Adjustments Section:
+- [ ] All rate inputs accept numbers
+- [ ] Reset Defaults button resets all rates
+- [ ] Adjustments table shows subject vs comparables
+- [ ] Adjustments calculate correctly based on rates
+- [ ] Positive adjustments show in green
+- [ ] Negative adjustments show in red
+- [ ] Total Adjustment row calculates sum
+- [ ] Adjusted Price row shows final values
+- [ ] Save Adjustments button saves to database
+- [ ] Live Preview shows Adjustments summary
+
+### ✅ Test Live Preview Sync:
+- [ ] All changes reflect immediately in Live Preview
+- [ ] Preview shows subtle opacity change during updates
+- [ ] Expand button opens fullscreen preview
+- [ ] Section count badge shows correct number
+- [ ] Map Preview is at the TOP of Live Preview
+- [ ] All enabled sections show in preview
+
+### ✅ Test Tab Structure:
+- [ ] Only 3 tabs: Sections, Content, Layout
+- [ ] NO separate Map tab
+- [ ] NO separate Photos tab
+- [ ] NO separate Adjustments tab
+
+---
+
+Please implement this Content tab with the Map Preview moved to the Live Preview panel on the right side.
