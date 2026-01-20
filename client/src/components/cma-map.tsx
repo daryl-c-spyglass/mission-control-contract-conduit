@@ -241,12 +241,8 @@ function initCmaLayers(
 
     const hasComps = model.compsOnlyCollection && model.compsOnlyCollection.features.length > 0;
     const hasSubject = model.subjectFeature !== null;
-    const hasPolygon = model.polygonCollection && model.polygonCollection.features.length > 0;
 
-    map.addSource(SOURCE_IDS.polygon, {
-      type: 'geojson',
-      data: hasPolygon ? model.polygonCollection : EMPTY_FEATURE_COLLECTION,
-    });
+    // Note: Polygon layers have been removed to fix map initialization issues
 
     map.addSource(SOURCE_IDS.comps, {
       type: 'geojson',
@@ -267,32 +263,7 @@ function initCmaLayers(
       data: subjectCollection,
     });
 
-    map.addLayer({
-      id: LAYER_IDS.polygonFill,
-      type: 'fill',
-      source: SOURCE_IDS.polygon,
-      layout: {
-        visibility: showPolygon ? 'visible' : 'none',
-      },
-      paint: {
-        'fill-color': tuning.polygonFillColor,
-        'fill-opacity': tuning.polygonFillOpacity,
-      },
-    });
-
-    map.addLayer({
-      id: LAYER_IDS.polygonLine,
-      type: 'line',
-      source: SOURCE_IDS.polygon,
-      layout: {
-        visibility: showPolygon ? 'visible' : 'none',
-      },
-      paint: {
-        'line-color': tuning.polygonLineColor,
-        'line-width': tuning.polygonLineWidth,
-        'line-opacity': tuning.polygonLineOpacity,
-      },
-    });
+    // Polygon layers removed - they were causing initialization issues
 
     map.addLayer({
       id: LAYER_IDS.clusterCircle,
@@ -376,10 +347,7 @@ function removeAllCmaLayers(map: mapboxgl.Map) {
 }
 
 function updateCmaData(map: mapboxgl.Map, model: CmaMapModel) {
-  const polygonSource = map.getSource(SOURCE_IDS.polygon) as mapboxgl.GeoJSONSource;
-  if (polygonSource) {
-    polygonSource.setData(model.polygonCollection || EMPTY_FEATURE_COLLECTION);
-  }
+  // Polygon source update removed - polygon layers disabled
 
   const compsSource = map.getSource(SOURCE_IDS.comps) as mapboxgl.GeoJSONSource;
   if (compsSource) {
@@ -857,28 +825,7 @@ export function CMAMap({
     });
   }, [mapStyle, mapReady]);
 
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !mapReady) return;
-
-    const polygonFillLayer = map.getLayer(LAYER_IDS.polygonFill);
-    const polygonLineLayer = map.getLayer(LAYER_IDS.polygonLine);
-
-    if (polygonFillLayer) {
-      map.setLayoutProperty(
-        LAYER_IDS.polygonFill,
-        'visibility',
-        showPolygon ? 'visible' : 'none'
-      );
-    }
-    if (polygonLineLayer) {
-      map.setLayoutProperty(
-        LAYER_IDS.polygonLine,
-        'visibility',
-        showPolygon ? 'visible' : 'none'
-      );
-    }
-  }, [showPolygon, mapReady]);
+  // Polygon visibility effect removed - polygon layers disabled
 
   const closePropertyPopup = useCallback(() => {
     const map = mapRef.current;
