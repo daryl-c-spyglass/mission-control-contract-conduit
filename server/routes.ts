@@ -2380,6 +2380,14 @@ ${context.marketStats?.avgDOM ? `- Average days on market: ${context.marketStats
       
       const data = await response.json();
       
+      // Helper to ensure URLs are full CDN URLs
+      const REPLIERS_CDN_BASE = "https://cdn.repliers.io/";
+      const ensureFullUrl = (url: string | undefined): string => {
+        if (!url) return '';
+        if (url.startsWith('http')) return url;
+        return `${REPLIERS_CDN_BASE}${url}`;
+      };
+      
       // Check if Image Insights is available in the response
       if (data.imageInsights?.images && data.imageInsights.images.length > 0) {
         console.log(`Image Insights available: ${data.imageInsights.images.length} images analyzed`);
@@ -2389,7 +2397,7 @@ ${context.marketStats?.avgDOM ? `- Average days on market: ${context.marketStats
         return res.json({
           available: true,
           images: data.imageInsights.images.map((insight: any, index: number) => ({
-            url: photos[index] || insight.url,
+            url: ensureFullUrl(photos[index] || insight.url),
             originalIndex: index,
             classification: {
               imageOf: insight.classification?.imageOf || null,
@@ -2412,7 +2420,7 @@ ${context.marketStats?.avgDOM ? `- Average days on market: ${context.marketStats
         available: false,
         message: 'Image Insights not enabled on this account',
         images: photos.map((url: string, index: number) => ({
-          url,
+          url: ensureFullUrl(url),
           originalIndex: index,
           classification: null,
           quality: null,
