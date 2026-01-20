@@ -156,7 +156,7 @@ export function AdjustmentsSection({
     return addr.split(',')[0] || 'Unknown';
   };
 
-  const displayComps = comparables.slice(0, 4);
+  const displayComps = comparables;
 
   return (
     <Card>
