@@ -22,9 +22,7 @@ import {
   GripVertical,
   Loader2,
   Layout,
-  Check,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Cma, CmaBrochure, CmaAdjustmentsData, CoverPageConfig, Property, PropertyStatistics } from "@shared/schema";
@@ -71,8 +69,6 @@ interface PresentationConfig {
   showMapPolygon: boolean;
   layout: string;
   photosPerProperty: string;
-  photoSelection: string;
-  selectedPhotoIndices: number[];
 }
 
 interface SectionItem {
@@ -144,8 +140,6 @@ export default function CMAPresentationBuilder() {
     showMapPolygon: true,
     layout: "two_photos",
     photosPerProperty: "2",
-    photoSelection: "first-12",
-    selectedPhotoIndices: [],
   });
   
   const [brochure, setBrochure] = useState<CmaBrochure | null>(null);
@@ -210,8 +204,6 @@ export default function CMAPresentationBuilder() {
         showMapPolygon: existingConfig.showMapPolygon ?? true,
         layout: existingConfig.layout || "two_photos",
         photosPerProperty: existingConfig.photosPerProperty || "2",
-        photoSelection: existingConfig.photoSelection || "first-12",
-        selectedPhotoIndices: existingConfig.selectedPhotoIndices || [],
       });
       if (existingConfig.customPhotoSelections) {
         setCustomPhotoSelections(existingConfig.customPhotoSelections);
@@ -481,72 +473,24 @@ export default function CMAPresentationBuilder() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="photo-selection">Photo selection</Label>
+                    <Label htmlFor="photo-source">Photo source</Label>
                     <Select 
-                      value={config.photoSelection || "first-12"} 
-                      onValueChange={(v) => setConfig({ ...config, photoSelection: v })}
+                      value={config.photoLayout || "first_dozen"} 
+                      onValueChange={(v) => setConfig({ ...config, photoLayout: v })}
                     >
-                      <SelectTrigger id="photo-selection" data-testid="select-photo-selection">
+                      <SelectTrigger id="photo-source" data-testid="select-photo-source">
                         <SelectValue placeholder="Select photo source" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="first-12">First 12 photos</SelectItem>
-                        <SelectItem value="all">All photos</SelectItem>
-                        <SelectItem value="ai-suggest">AI Suggest (best quality)</SelectItem>
-                        <SelectItem value="custom">Custom selection</SelectItem>
+                        {PHOTO_LAYOUT_OPTIONS.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
                       Photos are pulled directly from MLS listing via Repliers API
                     </p>
                   </div>
-
-                  {config.photoSelection === 'custom' && subjectProperty && (
-                    <div className="space-y-2">
-                      <Label>Select Photos</Label>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        Click to select which photos to include in the report
-                      </p>
-                      <div className="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto p-2 border rounded-lg">
-                        {((subjectProperty as any).photos || []).map((photo: string, index: number) => (
-                          <div
-                            key={index}
-                            onClick={() => {
-                              const indices = config.selectedPhotoIndices || [];
-                              const newIndices = indices.includes(index)
-                                ? indices.filter(i => i !== index)
-                                : [...indices, index];
-                              setConfig({ ...config, selectedPhotoIndices: newIndices });
-                            }}
-                            className={cn(
-                              "relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all",
-                              (config.selectedPhotoIndices || []).includes(index) 
-                                ? "border-orange-500 ring-2 ring-orange-500/50" 
-                                : "border-transparent hover:border-gray-300"
-                            )}
-                            data-testid={`photo-select-${index}`}
-                          >
-                            <img 
-                              src={photo} 
-                              alt={`Photo ${index + 1}`}
-                              className="w-full h-20 object-cover"
-                            />
-                            {(config.selectedPhotoIndices || []).includes(index) && (
-                              <div className="absolute top-1 right-1 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center">
-                                <Check className="w-3 h-3 text-white" />
-                              </div>
-                            )}
-                            <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs px-1">
-                              {index + 1}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {(config.selectedPhotoIndices || []).length} photos selected
-                      </p>
-                    </div>
-                  )}
 
                   <Separator />
 
@@ -593,31 +537,17 @@ export default function CMAPresentationBuilder() {
             <TabsContent value="photos" className="space-y-4 mt-4">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Photo Selection</CardTitle>
-                  <CardDescription>Choose which photos to include for each property</CardDescription>
+                  <CardTitle className="text-base">Custom Photo Selection</CardTitle>
+                  <CardDescription>Override default photo selection for specific properties</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Default photo source is set in the Layout tab. Use this section to customize which 
+                    photos are shown for individual properties.
+                  </p>
+                  
                   <div className="space-y-2">
-                    <Label>Default Photo Selection</Label>
-                    <Select
-                      value={config.photoLayout || "first_dozen"}
-                      onValueChange={(v) => setConfig({ ...config, photoLayout: v })}
-                    >
-                      <SelectTrigger data-testid="select-photo-layout">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PHOTO_LAYOUT_OPTIONS.map(opt => (
-                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-2">
-                    <Label>Custom Photo Selection by Property</Label>
+                    <Label>Photo Selection by Property</Label>
                     <ScrollArea className="h-[300px] border rounded-md p-2">
                       <div className="space-y-2">
                         {properties.map((property) => {
