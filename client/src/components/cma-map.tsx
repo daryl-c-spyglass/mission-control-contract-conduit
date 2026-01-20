@@ -551,24 +551,34 @@ export function CMAMap({
 
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-    // Helper to initialize layers and fit bounds - reused by initial load and style changes
-    const initLayersAndFitBounds = () => {
-      if (layersReadyRef.current) return; // Prevent double initialization
+    // Track if we've done initial bounds fit to avoid repeated jumps
+    let hasInitializedLayers = false;
+    
+    // Helper to initialize layers - checks if layers already exist to avoid duplicates
+    const ensureLayersExist = () => {
+      // Check if our source already exists - if so, layers are already initialized
+      if (map.getSource(SOURCE_IDS.comps)) {
+        return;
+      }
       
-      initCmaLayers(map, model, overlayTuning, showPolygon);
+      const currentModel = modelRef.current || model;
+      const currentTuning = overlayTuningRef.current || overlayTuning;
+      
+      initCmaLayers(map, currentModel, currentTuning, showPolygonRef.current);
       layersReadyRef.current = true;
       setMapReady(true);
       
-      // Fit bounds after layers are initialized
-      map.resize();
-      if (model.bounds) {
-        if (model.compFeatures.length === 0 && model.subjectLngLat) {
+      // Fit bounds only on first initialization
+      if (!hasInitializedLayers && currentModel.bounds) {
+        hasInitializedLayers = true;
+        map.resize();
+        if (currentModel.compFeatures.length === 0 && currentModel.subjectLngLat) {
           map.jumpTo({
-            center: model.subjectLngLat,
+            center: currentModel.subjectLngLat,
             zoom: DEFAULT_SUBJECT_ZOOM,
           });
         } else {
-          map.fitBounds(model.bounds, {
+          map.fitBounds(currentModel.bounds, {
             padding: DEFAULT_FIT_PADDING,
             maxZoom: 15,
             duration: 0,
@@ -578,20 +588,18 @@ export function CMAMap({
       }
     };
 
+    // Use persistent style.load listener - this fires when all style resources are loaded
+    // This handles both initial load AND subsequent style changes (which clear our layers)
+    // style.load is more reliable than styledata because it fires after sprites/glyphs are ready
+    map.on('style.load', () => {
+      // Reset layersReadyRef since style was reloaded (layers were cleared)
+      layersReadyRef.current = false;
+      // Re-add layers since style.load means all sources were cleared
+      ensureLayersExist();
+    });
+
     map.on('load', () => {
-      // Wait for style to be fully loaded before adding layers
-      // Using styledata event ensures the style is ready and won't clear our layers
-      if (map.isStyleLoaded()) {
-        // Style is already loaded, initialize immediately
-        initLayersAndFitBounds();
-      } else {
-        // Wait for style to finish loading
-        map.once('styledata', () => {
-          initLayersAndFitBounds();
-        });
-      }
-      
-      // Register all event handlers INSIDE load callback
+      // Event handlers are registered here but layers are initialized in style.load above
       map.on('click', LAYER_IDS.clusterCircle, (e) => {
         if (!layersReadyRef.current) return;
         
@@ -812,17 +820,17 @@ export function CMAMap({
     const previousSelectedId = selectedIdRef.current;
     const previousHoveredId = hoveredIdRef.current;
 
-    // Mark layers as not ready before style change to prevent race conditions
+    // Mark layers as not ready before style change
     layersReadyRef.current = false;
 
+    // The persistent style.load listener (registered during map init) will handle layer reinitialization
+    // We just need to call setStyle and then restore selection state after layers are ready
     map.setStyle(mapStyle);
 
-    map.once('styledata', () => {
-      const currentModel = modelRef.current;
-      const currentTuning = overlayTuningRef.current;
-      if (currentModel) {
-        initCmaLayers(map, currentModel, currentTuning, showPolygonRef.current);
-
+    // Use style.load to ensure layers are fully initialized before restoring state
+    map.once('style.load', () => {
+      // Give a brief delay to ensure ensureLayersExist has completed
+      setTimeout(() => {
         // Restore selection state after layers are reinitialized
         if (previousSelectedId) {
           try {
@@ -845,10 +853,7 @@ export function CMAMap({
             // Source may not be ready
           }
         }
-
-        // Mark layers as ready after initialization is complete
-        layersReadyRef.current = true;
-      }
+      }, 50);
     });
   }, [mapStyle, mapReady]);
 
