@@ -1276,24 +1276,38 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                   </Button>
                 ) : (
                   <div className="flex gap-1">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => setIsEditingDates(false)} 
-                      data-testid="button-cancel-dates"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost"
-                      size="icon" 
-                      onClick={handleSaveDates} 
-                      disabled={updateTransactionMutation.isPending}
-                      data-testid="button-save-dates"
-                      className="text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-900/30"
-                    >
-                      {updateTransactionMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => setIsEditingDates(false)} 
+                          data-testid="button-cancel-dates"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Discard changes without saving</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="ghost"
+                          size="icon" 
+                          onClick={handleSaveDates} 
+                          disabled={updateTransactionMutation.isPending}
+                          data-testid="button-save-dates"
+                          className="text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-900/30"
+                        >
+                          {updateTransactionMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Save changes</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 )}
               </CardHeader>
