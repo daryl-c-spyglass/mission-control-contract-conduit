@@ -16,13 +16,14 @@ import {
   Eye, 
   FileText, 
   Settings, 
-  Image, 
+  Image as ImageIcon, 
   Map, 
   Calculator,
   GripVertical,
   Loader2,
   Layout,
   Sparkles,
+  MousePointer,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -39,7 +40,9 @@ import { ExpandedPreviewModal } from "@/components/presentation/ExpandedPreviewM
 import { ListingBrochureContent } from "@/components/presentation/ListingBrochureContent";
 import { CMAPreviewContent } from "@/components/presentation/CMAPreviewContent";
 import { ReportSections } from "@/components/presentation/ReportSections";
-import { PhotoSelectionPreview } from "@/components/cma/PhotoSelectionPreview";
+import { CoverPhotoGrid } from "@/components/cma/CoverPhotoGrid";
+import { PhotoPreviewModal } from "@/components/cma/PhotoPreviewModal";
+import { cn } from "@/lib/utils";
 import { transformToCMAReportData } from "@/lib/cma-transformer";
 import { pdf } from '@react-pdf/renderer';
 import { CMAPdfDocument } from "@/components/pdf/CMAPdfDocument";
@@ -73,6 +76,8 @@ interface PresentationConfig {
   layout: string;
   photosPerProperty: string;
   includeAgentFooter: boolean;
+  coverPhotoUrl: string | null;
+  coverPhotoSource: 'ai' | 'manual';
 }
 
 interface SectionItem {
@@ -145,11 +150,23 @@ export default function CMAPresentationBuilder() {
     layout: "two_photos",
     photosPerProperty: "2",
     includeAgentFooter: true,
+    coverPhotoUrl: null,
+    coverPhotoSource: 'ai',
   });
   
   const [brochure, setBrochure] = useState<CmaBrochure | null>(null);
   const [adjustments, setAdjustments] = useState<CmaAdjustmentsData | null>(null);
   const [customPhotoSelections, setCustomPhotoSelections] = useState<Record<string, string[]>>({});
+
+  const [coverPhotoModal, setCoverPhotoModal] = useState<{
+    isOpen: boolean;
+    photoUrl: string | null;
+    photoLabel: string | null;
+  }>({
+    isOpen: false,
+    photoUrl: null,
+    photoLabel: null,
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -243,6 +260,8 @@ export default function CMAPresentationBuilder() {
         layout: existingConfig.layout || "two_photos",
         photosPerProperty: existingConfig.photosPerProperty || "2",
         includeAgentFooter: existingConfig.includeAgentFooter ?? true,
+        coverPhotoUrl: existingConfig.coverPhotoUrl || null,
+        coverPhotoSource: existingConfig.coverPhotoSource || 'ai',
       });
       if (existingConfig.customPhotoSelections) {
         setCustomPhotoSelections(existingConfig.customPhotoSelections);
@@ -447,7 +466,7 @@ export default function CMAPresentationBuilder() {
                 Sections
               </TabsTrigger>
               <TabsTrigger value="content" className="gap-1" data-testid="tab-content">
-                <Image className="w-4 h-4" />
+                <ImageIcon className="w-4 h-4" />
                 Content
               </TabsTrigger>
               <TabsTrigger value="layout" className="gap-1" data-testid="tab-layout">
@@ -472,86 +491,73 @@ export default function CMAPresentationBuilder() {
 
             <TabsContent value="layout" className="space-y-4 mt-4">
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Property Layout</CardTitle>
-                  <CardDescription>Choose how properties are displayed in the report</CardDescription>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <ImageIcon className="w-5 h-5 text-[#F37216]" />
+                    <CardTitle className="text-base">Cover Page Photo</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Select the main photo for your CMA presentation cover
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="photos-per-property">Photos per property</Label>
-                    <Select 
-                      value={config.photosPerProperty || "2"} 
-                      onValueChange={(v) => setConfig({ ...config, photosPerProperty: v })}
+                <CardContent className="space-y-5">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setConfig(prev => ({ ...prev, coverPhotoSource: 'ai' }))}
+                      className={cn(
+                        "flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium",
+                        config.coverPhotoSource === 'ai'
+                          ? "border-[#F37216] bg-[#F37216]/10 text-[#F37216]"
+                          : "border-muted text-muted-foreground hover:border-muted-foreground"
+                      )}
+                      data-testid="btn-ai-photo"
                     >
-                      <SelectTrigger id="photos-per-property" data-testid="select-photos-per-property">
-                        <SelectValue placeholder="Select photos per property" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">One photo per property</SelectItem>
-                        <SelectItem value="2">Two photos per property</SelectItem>
-                        <SelectItem value="3">Three photos per property</SelectItem>
-                        <SelectItem value="4">Four photos per property</SelectItem>
-                        <SelectItem value="6">Six photos per property</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <Sparkles className="w-4 h-4" />
+                      AI Best Photo
+                    </button>
+                    <button
+                      onClick={() => setConfig(prev => ({ ...prev, coverPhotoSource: 'manual' }))}
+                      className={cn(
+                        "flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium",
+                        config.coverPhotoSource === 'manual'
+                          ? "border-[#F37216] bg-[#F37216]/10 text-[#F37216]"
+                          : "border-muted text-muted-foreground hover:border-muted-foreground"
+                      )}
+                      data-testid="btn-manual-photo"
+                    >
+                      <MousePointer className="w-4 h-4" />
+                      Manual Selection
+                    </button>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="photo-source">Photo source</Label>
-                    <Select 
-                      value={config.photoLayout || "first_dozen"} 
-                      onValueChange={(v) => setConfig({ ...config, photoLayout: v })}
-                    >
-                      <SelectTrigger id="photo-source" data-testid="select-photo-source">
-                        <SelectValue placeholder="Select photo source" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PHOTO_LAYOUT_OPTIONS.map(opt => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            <div className="flex items-center gap-2">
-                              {opt.value === 'ai_suggested' && (
-                                <Sparkles className="w-4 h-4 text-yellow-500" />
-                              )}
-                              {opt.label}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Photos are pulled directly from MLS listing via Repliers API
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <h3 className="font-medium text-foreground">
+                      {subjectProperty?.unparsedAddress?.split(',')[0] || 'Subject Property'}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {((subjectProperty as any)?.photos || (subjectProperty as any)?.images || []).length} photos available
                     </p>
                   </div>
 
-                  <Separator />
-
-                  <div className="space-y-2">
-                    <Label>Property display layout</Label>
-                    <Select
-                      value={config.layout || "two_photos"}
-                      onValueChange={(v) => setConfig({ ...config, layout: v })}
-                    >
-                      <SelectTrigger data-testid="select-property-layout">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {LAYOUT_OPTIONS.map(opt => (
-                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {subjectProperty && (
+                    <CoverPhotoGrid
+                      photos={(subjectProperty as any).photos || (subjectProperty as any).images || []}
+                      selectedPhoto={config.coverPhotoUrl}
+                      source={config.coverPhotoSource}
+                      imageInsights={(subjectProperty as any)?.imageInsights?.images}
+                      onSelect={(url) => setConfig(prev => ({ ...prev, coverPhotoUrl: url }))}
+                      onPreview={(url, label) => setCoverPhotoModal({ isOpen: true, photoUrl: url, photoLabel: label })}
+                    />
+                  )}
                 </CardContent>
               </Card>
 
-              {subjectProperty && (
-                <PhotoSelectionPreview 
-                  subjectProperty={subjectProperty}
-                  photoSource={config.photoLayout}
-                  photosPerProperty={parseInt(config.photosPerProperty) || 2}
-                  onSelectionChange={(selectedPhotos) => setCustomPhotoSelections({ subject: selectedPhotos })}
-                />
-              )}
+              <PhotoPreviewModal
+                isOpen={coverPhotoModal.isOpen}
+                photoUrl={coverPhotoModal.photoUrl}
+                photoLabel={coverPhotoModal.photoLabel}
+                onClose={() => setCoverPhotoModal({ isOpen: false, photoUrl: null, photoLabel: null })}
+              />
             </TabsContent>
 
             <TabsContent value="content" className="space-y-4 mt-4">
