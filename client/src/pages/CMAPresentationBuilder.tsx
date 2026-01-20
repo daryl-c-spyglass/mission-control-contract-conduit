@@ -436,26 +436,18 @@ export default function CMAPresentationBuilder() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full grid grid-cols-5">
+            <TabsList className="w-full grid grid-cols-3">
               <TabsTrigger value="sections" className="gap-1" data-testid="tab-sections">
                 <FileText className="w-4 h-4" />
                 Sections
               </TabsTrigger>
+              <TabsTrigger value="content" className="gap-1" data-testid="tab-content">
+                <Image className="w-4 h-4" />
+                Content
+              </TabsTrigger>
               <TabsTrigger value="layout" className="gap-1" data-testid="tab-layout">
                 <Layout className="w-4 h-4" />
                 Layout
-              </TabsTrigger>
-              <TabsTrigger value="map" className="gap-1" data-testid="tab-map">
-                <Map className="w-4 h-4" />
-                Map
-              </TabsTrigger>
-              <TabsTrigger value="photos" className="gap-1" data-testid="tab-photos">
-                <Image className="w-4 h-4" />
-                Photos
-              </TabsTrigger>
-              <TabsTrigger value="adjustments" className="gap-1" data-testid="tab-adjustments">
-                <Calculator className="w-4 h-4" />
-                Adjustments
               </TabsTrigger>
             </TabsList>
 
@@ -541,90 +533,78 @@ export default function CMAPresentationBuilder() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="map" className="space-y-4 mt-4">
+            <TabsContent value="content" className="space-y-4 mt-4">
               <Card>
-                <CardHeader>
+                <CardHeader className="pb-2">
                   <CardTitle className="text-base">Map Preview</CardTitle>
                   <CardDescription>Interactive map showing subject property and comparables</CardDescription>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <div className="h-[450px] relative">
+                <CardContent className="space-y-3">
+                  <div className="h-[400px] relative">
                     <CMAMap
                       properties={comparables}
                       subjectProperty={subjectProperty || null}
                       showPolygon={config.showMapPolygon ?? true}
                     />
                   </div>
+                  <div className="flex items-center gap-2 pt-2">
+                    <Switch
+                      id="showPolygon"
+                      checked={config.showMapPolygon ?? true}
+                      onCheckedChange={(show) => setConfig({ ...config, showMapPolygon: show })}
+                      data-testid="switch-show-polygon"
+                    />
+                    <Label htmlFor="showPolygon" className="text-sm">Show search area polygon in report</Label>
+                  </div>
                 </CardContent>
               </Card>
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="showPolygon"
-                  checked={config.showMapPolygon ?? true}
-                  onCheckedChange={(show) => setConfig({ ...config, showMapPolygon: show })}
-                  data-testid="switch-show-polygon"
-                />
-                <Label htmlFor="showPolygon" className="text-sm">Show search area polygon in report</Label>
-              </div>
-            </TabsContent>
 
-            <TabsContent value="photos" className="space-y-4 mt-4">
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Custom Photo Selection</CardTitle>
                   <CardDescription>Override default photo selection for specific properties</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Default photo source is set in the Layout tab. Use this section to customize which 
-                    photos are shown for individual properties.
-                  </p>
-                  
-                  <div className="space-y-2">
-                    <Label>Photo Selection by Property</Label>
-                    <ScrollArea className="h-[300px] border rounded-md p-2">
-                      <div className="space-y-2">
-                        {properties.map((property) => {
-                          const propertyId = property.mlsNumber || property.id || '';
-                          const customCount = customPhotoSelections[propertyId]?.length;
-                          const photoCount = (property as any).photos?.length || 0;
-                          
-                          return (
-                            <div
-                              key={propertyId}
-                              className="flex items-center justify-between p-2 rounded-md border"
-                            >
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium truncate text-sm">
-                                  {getPropertyAddress(property)}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {customCount ? `${customCount} selected` : `${photoCount} available`}
-                                </p>
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedPropertyForPhotos(property);
-                                  setPhotoModalOpen(true);
-                                }}
-                                disabled={photoCount === 0}
-                                data-testid={`button-select-photos-${propertyId}`}
-                              >
-                                {customCount ? 'Edit' : 'Select'}
-                              </Button>
+                  <ScrollArea className="h-[200px] border rounded-md p-2">
+                    <div className="space-y-2">
+                      {properties.map((property) => {
+                        const propertyId = property.mlsNumber || property.id || '';
+                        const customCount = customPhotoSelections[propertyId]?.length;
+                        const photoCount = (property as any).photos?.length || 0;
+                        
+                        return (
+                          <div
+                            key={propertyId}
+                            className="flex items-center justify-between p-2 rounded-md border"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate text-sm">
+                                {getPropertyAddress(property)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {customCount ? `${customCount} selected` : `${photoCount} available`}
+                              </p>
                             </div>
-                          );
-                        })}
-                      </div>
-                    </ScrollArea>
-                  </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedPropertyForPhotos(property);
+                                setPhotoModalOpen(true);
+                              }}
+                              disabled={photoCount === 0}
+                              data-testid={`button-select-photos-${propertyId}`}
+                            >
+                              {customCount ? 'Edit' : 'Select'}
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            <TabsContent value="adjustments" className="space-y-4 mt-4">
               <AdjustmentsSection
                 adjustments={adjustments}
                 onChange={setAdjustments}
@@ -664,7 +644,7 @@ export default function CMAPresentationBuilder() {
           onOpenChange={setPhotoModalOpen}
           propertyId={selectedPropertyForPhotos.mlsNumber || selectedPropertyForPhotos.id || ''}
           propertyAddress={getPropertyAddress(selectedPropertyForPhotos)}
-          photos={(selectedPropertyForPhotos as any).photos || []}
+          photos={((selectedPropertyForPhotos as any).photos || []).map((url: string) => sanitizePhotoUrl(url)).filter((url: string) => url.length > 0)}
           selectedPhotos={customPhotoSelections[selectedPropertyForPhotos.mlsNumber || selectedPropertyForPhotos.id || ''] || []}
           onSave={handlePhotoSelection}
         />

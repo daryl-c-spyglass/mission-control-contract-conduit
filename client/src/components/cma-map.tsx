@@ -568,7 +568,18 @@ export function CMAMap({
     });
 
     map.on('load', () => {
-      // Event handlers are registered here but layers are initialized in style.load above
+      // Fallback: Also initialize layers on load in case style.load hasn't fired yet
+      // This handles initial load reliably across all browsers
+      // Use setTimeout to ensure style resources are fully loaded
+      console.log('[CMA Map] Map load event fired, scheduling layer initialization...');
+      setTimeout(() => {
+        if (!layersReadyRef.current) {
+          console.log('[CMA Map] Layers not ready, initializing from load event fallback...');
+          ensureLayersExist();
+        }
+      }, 100);
+      
+      // Event handlers are registered here
       map.on('click', LAYER_IDS.clusterCircle, (e) => {
         if (!layersReadyRef.current) return;
         

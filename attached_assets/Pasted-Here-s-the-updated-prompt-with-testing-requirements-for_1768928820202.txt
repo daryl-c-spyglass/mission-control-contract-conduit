@@ -1,0 +1,566 @@
+Here's the updated prompt with testing requirements for each fix:
+
+Project: CONTRACT CONDUIT (Replit)
+Copy and paste this prompt into Replit:
+Fix three issues in CMA Map and Presentation Builder. 
+
+IMPORTANT: Test each fix individually and confirm it's working before moving to the next one.
+
+---
+
+## ISSUE 1: Map Markers Don't Load By Default
+
+**Problem:** The map is empty when first loaded. Markers only appear after changing the map style (street/satellite).
+
+**Cause:** The markers are likely being added before the map is fully loaded, or the marker rendering is tied to a style change event.
+
+**Fix:** Ensure markers are added AFTER the map's 'load' event fires:
+```tsx
+// In your Map component (CMA Map or Presentation Builder Map)
+
+useEffect(() => {
+  if (!mapContainer.current || map.current) return;
+
+  // Initialize map
+  map.current = new mapboxgl.Map({
+    container: mapContainer.current,
+    style: 'mapbox://styles/mapbox/streets-v12', // or your default style
+    center: defaultCenter,
+    zoom: 9,
+  });
+
+  // IMPORTANT: Add markers AFTER map loads
+  map.current.on('load', () => {
+    console.log('[Map] Map loaded, adding markers...');
+    addMarkers();
+  });
+
+  return () => {
+    map.current?.remove();
+    map.current = null;
+  };
+}, []);
+
+// Separate function to add markers
+const addMarkers = () => {
+  if (!map.current) return;
+  
+  // Clear existing markers first
+  markersRef.current.forEach(marker => marker.remove());
+  markersRef.current = [];
+
+  // Add subject property marker (blue)
+  if (subjectProperty?.latitude && subjectProperty?.longitude) {
+    const subjectEl = createMarkerElement('subject', subjectProperty.listPrice);
+    const marker = new mapboxgl.Marker({ element: subjectEl })
+      .setLngLat([subjectProperty.longitude, subjectProperty.latitude])
+      .setPopup(createPopup(subjectProperty, true))
+      .addTo(map.current);
+    markersRef.current.push(marker);
+  }
+
+  // Add comparable markers
+  comparables.forEach((comp) => {
+    if (!comp.latitude || !comp.longitude) return;
+    
+    const markerEl = createMarkerElement(comp.status, comp.listPrice || comp.price);
+    const marker = new mapboxgl.Marker({ element: markerEl })
+      .setLngLat([comp.longitude, comp.latitude])
+      .setPopup(createPopup(comp, false))
+      .addTo(map.current);
+    markersRef.current.push(marker);
+  });
+
+  // Fit bounds to show all markers
+  fitMapBounds();
+  
+  console.log(`[Map] Added ${markersRef.current.length} markers`);
+};
+
+// Also re-add markers when comparables data changes
+useEffect(() => {
+  if (map.current && map.current.loaded() && comparables.length > 0) {
+    addMarkers();
+  }
+}, [comparables, subjectProperty]);
+
+// If markers disappear on style change, re-add them
+map.current.on('style.load', () => {
+  console.log('[Map] Style changed, re-adding markers...');
+  addMarkers();
+});
+```
+
+### ✅ TEST ISSUE 1 - Verify markers load by default:
+
+1. Navigate to a transaction with CMA comparables (e.g., 154 Pettigrew, Buda, TX)
+2. Go to the CMA tab and click on "Map" view
+3. **Expected:** Map should immediately show markers WITHOUT needing to change the map style
+4. Check the console for: `[Map] Map loaded, adding markers...` and `[Map] Added X markers`
+5. Verify the header shows "10 comparables + Subject" (or correct count)
+6. Also test in Presentation Builder - markers should load immediately on the Map Preview
+
+**Confirm in console:**
+- [ ] `[Map] Map loaded, adding markers...` appears
+- [ ] `[Map] Added 11 markers` (or correct number) appears
+- [ ] Markers are visible on first load without changing map style
+
+**Only proceed to Issue 2 after confirming Issue 1 is fixed.**
+
+---
+
+## ISSUE 2: Property Images Are Broken in Map Popups
+
+**Problem:** When clicking on a marker, the popup shows broken images:
+- Main image shows gray placeholder with property address text
+- Thumbnail strip shows "Photo 1", "Photo 2", etc. instead of actual images
+
+**Cause:** The image URLs are either:
+1. Not being passed to the popup correctly
+2. The URLs are relative paths that don't resolve
+3. The Repliers API image URLs need to be fetched
+4. Wrong field name for photos array
+
+**Fix - Check and fix image URLs:**
+```tsx
+// First, debug what data we're receiving
+// Add this to see what fields contain the photos
+
+const createPopup = (property: any, isSubject: boolean) => {
+  // DEBUG: Log all property fields to find where photos are stored
+  console.log('[Popup] Full property data:', property);
+  console.log('[Popup] property.photos:', property.photos);
+  console.log('[Popup] property.images:', property.images);
+  console.log('[Popup] property.Pictures:', property.Pictures);
+  console.log('[Popup] property.Media:', property.Media);
+  
+  // Get photos array - check multiple possible field names from Repliers API
+  const photos = property.photos || property.images || property.Pictures || property.Media || [];
+  
+  // Ensure we have full URLs
+  const mainPhotoUrl = photos[0] || '/placeholder-property.jpg';
+  
+  console.log(`[Popup] Using photos array with ${photos.length} items`);
+  console.log(`[Popup] Main photo URL: ${mainPhotoUrl}`);
+  
+  // Create thumbnail HTML with error handling
+  const thumbnailsHtml = photos.slice(0, 8).map((photo: string, index: number) => `
+    <img 
+      src="${photo}" 
+      alt="Photo ${index + 1}" 
+      style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 2px solid ${index === 0 ? '#F37216' : 'transparent'};"
+      onerror="this.style.display='none';"
+    />
+  `).join('');
+
+  const popupHtml = `
+    <div style="width: 300px; font-family: system-ui, sans-serif;">
+      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+        <div>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 600;">${property.address || property.Address || 'Unknown Address'}</h3>
+          <p style="margin: 0; font-size: 12px; color: #666;">MLS# ${property.mlsNumber || property.ListingId || 'N/A'}</p>
+        </div>
+        <span style="font-size: 12px; color: #666;">${property.distance ? property.distance.toFixed(1) + ' mi away' : ''}</span>
+      </div>
+      
+      <!-- Main Photo with fallback -->
+      <div style="width: 100%; height: 180px; background: #f0f0f0; border-radius: 8px; overflow: hidden; margin-bottom: 8px; position: relative;">
+        ${photos.length > 0 ? `
+          <img 
+            src="${mainPhotoUrl}" 
+            alt="${property.address}"
+            style="width: 100%; height: 100%; object-fit: cover;"
+            onerror="this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;color:#999;font-size:14px;\\'>No Photo Available</div>'"
+          />
+          <div style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.7); color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">
+            1 / ${photos.length}
+          </div>
+        ` : `
+          <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999;font-size:14px;">No Photo Available</div>
+        `}
+      </div>
+      
+      <!-- Thumbnails (only show if we have multiple photos) -->
+      ${photos.length > 1 ? `
+        <div style="display: flex; gap: 4px; overflow-x: auto; margin-bottom: 12px; padding-bottom: 4px;">
+          ${thumbnailsHtml}
+        </div>
+      ` : ''}
+      
+      <!-- Property Details Grid -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
+        <div>
+          <div style="color: #666; font-size: 11px;">Price</div>
+          <div style="font-weight: 600; font-size: 18px; color: #1a1a2e;">$${(property.listPrice || property.price || property.ListPrice || 0).toLocaleString()}</div>
+        </div>
+        <div>
+          <div style="color: #666; font-size: 11px;">Price/SqFt</div>
+          <div style="font-weight: 600;">$${property.pricePerSqft || Math.round((property.listPrice || property.price || property.ListPrice || 0) / (property.sqft || property.livingArea || property.LivingArea || 1))}</div>
+        </div>
+        <div>
+          <div style="color: #666; font-size: 11px;">Bedrooms</div>
+          <div style="font-weight: 600;">${property.bedrooms || property.BedroomsTotal || '-'}</div>
+        </div>
+        <div>
+          <div style="color: #666; font-size: 11px;">Bathrooms</div>
+          <div style="font-weight: 600;">${property.bathrooms || property.BathroomsTotalInteger || '-'}</div>
+        </div>
+        <div>
+          <div style="color: #666; font-size: 11px;">Square Feet</div>
+          <div style="font-weight: 600;">${(property.sqft || property.livingArea || property.LivingArea || 0).toLocaleString()}</div>
+        </div>
+        <div>
+          <div style="color: #666; font-size: 11px;">Days on Market</div>
+          <div style="font-weight: 600;">${property.daysOnMarket ?? property.DOM ?? 0}</div>
+        </div>
+        <div>
+          <div style="color: #666; font-size: 11px;">Status</div>
+          <div>
+            <span style="
+              background: ${getStatusColor(property.status || property.StandardStatus)};
+              color: white;
+              padding: 2px 8px;
+              border-radius: 4px;
+              font-size: 11px;
+              font-weight: 500;
+            ">${property.status || property.StandardStatus || 'Unknown'}</span>
+          </div>
+        </div>
+        <div>
+          <div style="color: #666; font-size: 11px;">List Date</div>
+          <div style="font-weight: 600;">${property.listDate ? new Date(property.listDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  return new mapboxgl.Popup({ 
+    maxWidth: '320px',
+    closeButton: true,
+  }).setHTML(popupHtml);
+};
+
+const getStatusColor = (status: string): string => {
+  const statusLower = (status || '').toLowerCase();
+  if (statusLower.includes('active') && !statusLower.includes('contract')) return '#22c55e';
+  if (statusLower.includes('closed') || statusLower.includes('sold')) return '#ef4444';
+  if (statusLower.includes('pending')) return '#6b7280';
+  if (statusLower.includes('contract')) return '#f59e0b';
+  return '#9ca3af';
+};
+```
+
+**Server-side: Ensure photos are included in comparables API response:**
+```typescript
+// Check your API route that returns comparables
+// Make sure photos from Repliers are included
+
+app.get('/api/transactions/:id/cma/comparables', async (req, res) => {
+  const { id } = req.params;
+  
+  const comparables = await storage.getCMAComparables(parseInt(id));
+  
+  // Debug: Log what we're returning
+  console.log(`[API] Returning ${comparables.length} comparables`);
+  comparables.forEach((comp, i) => {
+    console.log(`[API] Comp ${i + 1}: ${comp.address}, photos: ${comp.photos?.length || 0}`);
+  });
+  
+  // If photos are missing, they need to be fetched from Repliers when saving comparables
+  // Or fetched on-demand here
+  
+  res.json(comparables);
+});
+```
+
+### ✅ TEST ISSUE 2 - Verify images load in popups:
+
+1. On the CMA Map view, click on any comparable marker
+2. Check the browser console for the debug logs:
+   - `[Popup] Full property data:` - shows all fields
+   - `[Popup] property.photos:` - should show array of URLs
+3. **Expected:** Popup should show the actual property photo, not a gray placeholder
+4. **Expected:** Thumbnail strip should show actual photo thumbnails, not "Photo 1", "Photo 2" text
+5. Test clicking on multiple markers to ensure all popups have working images
+6. Also test in Presentation Builder Map Preview
+
+**Confirm in console and UI:**
+- [ ] `[Popup] Using photos array with X items` shows X > 0
+- [ ] Photo URLs are full URLs (starting with http:// or https://)
+- [ ] Main property image displays correctly in popup
+- [ ] Thumbnail images display correctly (no broken image icons)
+- [ ] Status badge shows correct color (red for Closed, green for Active, etc.)
+
+**If photos array is empty or undefined:**
+- Check where comparables are saved to database
+- Ensure Repliers API response photos are being stored
+- The field might be named differently: `photos`, `images`, `Pictures`, `Media`
+
+**Only proceed to Issue 3 after confirming Issue 2 is fixed.**
+
+---
+
+## ISSUE 3: Wrong Tab Structure (Still showing 5 tabs)
+
+**Problem:** Presentation Builder shows 5 tabs: Sections, Layout, Map, Photos, Adjustments
+
+**Expected:** Only 3 tabs: Sections, Content, Layout
+
+**Fix:** Remove Map, Photos, Adjustments tabs completely:
+```tsx
+// Find the Presentation Builder component
+// Look for the Tabs component and update it
+
+// BEFORE (wrong - 5 tabs):
+<Tabs defaultValue="sections">
+  <TabsList>
+    <TabsTrigger value="sections">Sections</TabsTrigger>
+    <TabsTrigger value="layout">Layout</TabsTrigger>
+    <TabsTrigger value="map">Map</TabsTrigger>           // REMOVE
+    <TabsTrigger value="photos">Photos</TabsTrigger>     // REMOVE
+    <TabsTrigger value="adjustments">Adjustments</TabsTrigger>  // REMOVE
+  </TabsList>
+  ...
+</Tabs>
+
+// AFTER (correct - 3 tabs):
+<Tabs defaultValue="sections">
+  <TabsList className="grid w-full grid-cols-3">
+    <TabsTrigger value="sections" className="flex items-center gap-2">
+      <LayoutGrid className="w-4 h-4" />
+      Sections
+    </TabsTrigger>
+    <TabsTrigger value="content" className="flex items-center gap-2">
+      <FileText className="w-4 h-4" />
+      Content
+    </TabsTrigger>
+    <TabsTrigger value="layout" className="flex items-center gap-2">
+      <Layout className="w-4 h-4" />
+      Layout
+    </TabsTrigger>
+  </TabsList>
+
+  {/* Sections Tab - Report Sections with 3 categories */}
+  <TabsContent value="sections">
+    <ReportSections sections={sections} onSectionsChange={setSections} />
+  </TabsContent>
+
+  {/* Content Tab - Customizable content editors */}
+  <TabsContent value="content">
+    <div className="space-y-6">
+      {/* Cover Page Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Cover Page</CardTitle>
+          <CardDescription>Customize the cover page of your CMA presentation</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Title</Label>
+            <Input 
+              value={coverPageTitle} 
+              onChange={(e) => setCoverPageTitle(e.target.value)}
+              placeholder="Comparative Market Analysis"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Subtitle</Label>
+            <Input 
+              value={coverPageSubtitle} 
+              onChange={(e) => setCoverPageSubtitle(e.target.value)}
+              placeholder="Prepared exclusively for you"
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label>Show Date</Label>
+            <Switch checked={showDate} onCheckedChange={setShowDate} />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label>Show Agent Photo</Label>
+            <Switch checked={showAgentPhoto} onCheckedChange={setShowAgentPhoto} />
+          </div>
+          <div className="space-y-2">
+            <Label>Background Style</Label>
+            <RadioGroup value={backgroundStyle} onValueChange={setBackgroundStyle}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="plain-white" id="plain-white" />
+                <Label htmlFor="plain-white">Plain White</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="gradient" id="gradient" />
+                <Label htmlFor="gradient">Gradient</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="property-photo" id="property-photo" />
+                <Label htmlFor="property-photo">Property Photo</Label>
+              </div>
+            </RadioGroup>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Cover Letter Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Cover Letter</CardTitle>
+          <CardDescription>Generate an AI-powered cover letter or write your own</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Client Name (Optional)</Label>
+              <Input 
+                value={clientName} 
+                onChange={(e) => setClientName(e.target.value)}
+                placeholder="Enter client's name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Tone</Label>
+              <Select value={coverLetterTone} onValueChange={setCoverLetterTone}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="professional">Professional</SelectItem>
+                  <SelectItem value="friendly">Friendly</SelectItem>
+                  <SelectItem value="confident">Confident</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <Button 
+            onClick={generateCoverLetter} 
+            className="w-full bg-orange-500 hover:bg-orange-600"
+            disabled={isGenerating}
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            {isGenerating ? 'Generating...' : 'Generate with AI'}
+          </Button>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Cover Letter Text</Label>
+              <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(coverLetterText)}>
+                <Copy className="w-4 h-4 mr-1" /> Copy
+              </Button>
+            </div>
+            <Textarea 
+              value={coverLetterText}
+              onChange={(e) => setCoverLetterText(e.target.value)}
+              placeholder="Write your cover letter here or use AI to generate one..."
+              rows={8}
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  </TabsContent>
+
+  {/* Layout Tab - Property display options */}
+  <TabsContent value="layout">
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold">Property Layout</h3>
+        <p className="text-sm text-muted-foreground">Choose how properties are displayed in the report</p>
+      </div>
+      
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label>Photos per property</Label>
+          <Select value={photosPerProperty} onValueChange={setPhotosPerProperty}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">One photo per property</SelectItem>
+              <SelectItem value="2">Two photos per property</SelectItem>
+              <SelectItem value="3">Three photos per property</SelectItem>
+              <SelectItem value="4">Four photos per property</SelectItem>
+              <SelectItem value="6">Six photos per property</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="space-y-2">
+          <Label>Photo selection</Label>
+          <Select value={photoSelection} onValueChange={setPhotoSelection}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="first-12">First 12 photos</SelectItem>
+              <SelectItem value="all">All photos</SelectItem>
+              <SelectItem value="ai-suggest">AI Suggest (best quality)</SelectItem>
+              <SelectItem value="custom">Custom selection</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Photos are pulled directly from MLS listing via Repliers API
+          </p>
+        </div>
+      </div>
+    </div>
+  </TabsContent>
+</Tabs>
+
+// DELETE these TabsContent blocks entirely:
+// <TabsContent value="map">...</TabsContent>
+// <TabsContent value="photos">...</TabsContent>
+// <TabsContent value="adjustments">...</TabsContent>
+```
+
+### ✅ TEST ISSUE 3 - Verify correct tab structure:
+
+1. Navigate to Presentation Builder for any transaction
+2. **Expected:** Only see 3 tabs at the top: "Sections", "Content", "Layout"
+3. **NOT Expected:** Should NOT see "Map", "Photos", or "Adjustments" tabs
+4. Click each tab and verify content:
+
+**Test Sections Tab:**
+- [ ] Shows "Report Sections" with 3 categories: Introduction, Listings, Analysis
+- [ ] Each category has toggle switches for individual sections
+- [ ] Count badges show enabled/total (e.g., "7/7", "4/4", "4/4")
+
+**Test Content Tab:**
+- [ ] Shows "Cover Page" card with Title, Subtitle, Show Date toggle, Show Agent Photo toggle, Background Style options
+- [ ] Shows "Cover Letter" card with Client Name input, Tone dropdown, "Generate with AI" button, Cover Letter textarea
+
+**Test Layout Tab:**
+- [ ] Shows "Property Layout" section
+- [ ] Shows "Photos per property" dropdown with options: 1, 2, 3, 4, 6
+- [ ] Shows "Photo selection" dropdown with options: First 12, All, AI Suggest, Custom
+
+**Confirm:**
+- [ ] Only 3 tabs visible: Sections, Content, Layout
+- [ ] No Map tab
+- [ ] No Photos tab  
+- [ ] No Adjustments tab
+- [ ] All 3 tabs have correct content when clicked
+
+---
+
+## FINAL VERIFICATION CHECKLIST
+
+After fixing all three issues, do a complete test:
+
+### CMA Tab:
+- [ ] Navigate to CMA tab for a transaction with comparables
+- [ ] Click "Map" view button
+- [ ] Map loads with markers immediately visible (no need to change style)
+- [ ] Shows "10 comparables + Subject" (or correct count)
+- [ ] Click on a marker - popup shows with actual property photo
+- [ ] Thumbnail images in popup are real photos, not placeholder text
+
+### Presentation Builder:
+- [ ] Click "Presentation" button to open Presentation Builder
+- [ ] Only 3 tabs visible: Sections, Content, Layout
+- [ ] Live Preview on the right shows map with markers
+- [ ] Map shows "10 comparables + Subject" (correct count)
+
+### Console (no errors):
+- [ ] No JavaScript errors related to map or images
+- [ ] Debug logs show photos are being loaded correctly
+
+---
+
+Please fix each issue one at a time and test before moving to the next one.
