@@ -34,6 +34,10 @@ import { AdjustmentsSection } from "@/components/presentation/AdjustmentsSection
 import { PhotoSelectionModal } from "@/components/presentation/PhotoSelectionModal";
 import { ExpandedPreviewModal } from "@/components/presentation/ExpandedPreviewModal";
 import { ListingBrochureContent } from "@/components/presentation/ListingBrochureContent";
+import { CMAPreviewContent } from "@/components/presentation/CMAPreviewContent";
+import { transformToCMAReportData } from "@/lib/cma-transformer";
+import { pdf } from '@react-pdf/renderer';
+import { CMAPdfDocument } from "@/components/pdf/CMAPdfDocument";
 
 import {
   DndContext,
@@ -225,13 +229,32 @@ export default function CMAPresentationBuilder() {
 
   const exportPdfMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', `/api/cmas/${id}/export-pdf`, {
-        config,
-        brochure,
-        adjustments,
-        customPhotoSelections,
-      });
-      const blob = await response.blob();
+      if (!cma) throw new Error('CMA not found');
+      
+      const reportData = transformToCMAReportData(
+        cma,
+        subjectProperty,
+        comparables,
+        {
+          firstName: 'Agent',
+          lastName: '',
+          title: 'Real Estate Professional',
+          company: 'Spyglass Realty',
+        },
+        statistics
+      );
+
+      const pdfDoc = (
+        <CMAPdfDocument
+          data={reportData}
+          includedSections={config.includedSections}
+          sectionOrder={config.sectionOrder}
+          coverPageConfig={config.coverPageConfig}
+          coverLetterOverride={config.coverLetterOverride}
+        />
+      );
+
+      const blob = await pdf(pdfDoc).toBlob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -244,7 +267,8 @@ export default function CMAPresentationBuilder() {
     onSuccess: () => {
       toast({ title: 'PDF exported successfully' });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('PDF export error:', error);
       toast({ title: 'Failed to export PDF', variant: 'destructive' });
     },
   });
@@ -585,15 +609,26 @@ export default function CMAPresentationBuilder() {
         onOpenChange={setPreviewModalOpen}
         title="CMA Presentation Preview"
       >
-        <div className="space-y-8">
-          <div className="text-center py-12 border rounded-lg bg-muted/50">
-            <FileText className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium">Preview Coming Soon</h3>
-            <p className="text-sm text-muted-foreground">
-              The full PDF preview will be rendered here
-            </p>
-          </div>
-        </div>
+        {cma && (
+          <CMAPreviewContent
+            data={transformToCMAReportData(
+              cma,
+              subjectProperty,
+              comparables,
+              {
+                firstName: 'Agent',
+                lastName: '',
+                title: 'Real Estate Professional',
+                company: 'Spyglass Realty',
+              },
+              statistics
+            )}
+            includedSections={config.includedSections}
+            sectionOrder={config.sectionOrder}
+            coverPageConfig={config.coverPageConfig}
+            coverLetterOverride={config.coverLetterOverride}
+          />
+        )}
       </ExpandedPreviewModal>
     </div>
   );
