@@ -101,20 +101,30 @@ export function ReportSections({
     onSectionsChange(newIncludedSections, sectionOrder);
   };
 
+  const getNormalizedSectionOrder = (): string[] => {
+    const allSectionIds = CMA_REPORT_SECTIONS.map(s => s.id);
+    const existingOrder = sectionOrder.filter(id => allSectionIds.includes(id));
+    const missingIds = allSectionIds.filter(id => !existingOrder.includes(id));
+    return [...existingOrder, ...missingIds];
+  };
+
   const moveSectionUp = (categoryId: string, sectionId: string) => {
     const category = categories.find(c => c.id === categoryId);
     if (!category) return;
     
+    const normalizedOrder = getNormalizedSectionOrder();
     const categorySectionIds = category.sections.map(s => s.id);
-    const orderedCategorySections = sectionOrder.filter(id => categorySectionIds.includes(id));
+    const orderedCategorySections = normalizedOrder.filter(id => categorySectionIds.includes(id));
     const sectionIndex = orderedCategorySections.indexOf(sectionId);
     
     if (sectionIndex <= 0) return;
     
-    const newOrder = [...sectionOrder];
+    const newOrder = [...normalizedOrder];
     const globalIndex = newOrder.indexOf(sectionId);
     const prevSectionId = orderedCategorySections[sectionIndex - 1];
     const prevGlobalIndex = newOrder.indexOf(prevSectionId);
+    
+    if (globalIndex === -1 || prevGlobalIndex === -1) return;
     
     [newOrder[globalIndex], newOrder[prevGlobalIndex]] = [newOrder[prevGlobalIndex], newOrder[globalIndex]];
     
@@ -125,16 +135,19 @@ export function ReportSections({
     const category = categories.find(c => c.id === categoryId);
     if (!category) return;
     
+    const normalizedOrder = getNormalizedSectionOrder();
     const categorySectionIds = category.sections.map(s => s.id);
-    const orderedCategorySections = sectionOrder.filter(id => categorySectionIds.includes(id));
+    const orderedCategorySections = normalizedOrder.filter(id => categorySectionIds.includes(id));
     const sectionIndex = orderedCategorySections.indexOf(sectionId);
     
-    if (sectionIndex >= orderedCategorySections.length - 1) return;
+    if (sectionIndex >= orderedCategorySections.length - 1 || sectionIndex === -1) return;
     
-    const newOrder = [...sectionOrder];
+    const newOrder = [...normalizedOrder];
     const globalIndex = newOrder.indexOf(sectionId);
     const nextSectionId = orderedCategorySections[sectionIndex + 1];
     const nextGlobalIndex = newOrder.indexOf(nextSectionId);
+    
+    if (globalIndex === -1 || nextGlobalIndex === -1) return;
     
     [newOrder[globalIndex], newOrder[nextGlobalIndex]] = [newOrder[nextGlobalIndex], newOrder[globalIndex]];
     
@@ -148,10 +161,9 @@ export function ReportSections({
   };
 
   const getOrderedSections = (category: CMASectionCategory) => {
+    const normalizedOrder = getNormalizedSectionOrder();
     const categorySectionIds = category.sections.map(s => s.id);
-    const orderedIds = sectionOrder.filter(id => categorySectionIds.includes(id));
-    const remainingIds = categorySectionIds.filter(id => !orderedIds.includes(id));
-    const allOrderedIds = [...orderedIds, ...remainingIds];
+    const allOrderedIds = normalizedOrder.filter(id => categorySectionIds.includes(id));
     
     return allOrderedIds.map(id => {
       const sectionDef = category.sections.find(s => s.id === id);
