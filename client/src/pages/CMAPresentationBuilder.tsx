@@ -559,52 +559,6 @@ export default function CMAPresentationBuilder() {
                 subjectProperty={subjectProperty}
               />
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Custom Photo Selection</CardTitle>
-                  <CardDescription>Override default photo selection for specific properties</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <ScrollArea className="h-[200px] border rounded-md p-2">
-                    <div className="space-y-2">
-                      {properties.map((property) => {
-                        const propertyId = property.mlsNumber || property.id || '';
-                        const customCount = customPhotoSelections[propertyId]?.length;
-                        const photoCount = (property as any).photos?.length || 0;
-                        
-                        return (
-                          <div
-                            key={propertyId}
-                            className="flex items-center justify-between p-2 rounded-md border"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium truncate text-sm">
-                                {getPropertyAddress(property)}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {customCount ? `${customCount} selected` : `${photoCount} available`}
-                              </p>
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedPropertyForPhotos(property);
-                                setPhotoModalOpen(true);
-                              }}
-                              disabled={photoCount === 0}
-                              data-testid={`button-select-photos-${propertyId}`}
-                            >
-                              {customCount ? 'Edit' : 'Select'}
-                            </Button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-
               <AdjustmentsSection
                 adjustments={adjustments}
                 onChange={setAdjustments}
@@ -627,7 +581,7 @@ export default function CMAPresentationBuilder() {
                   <CardDescription>Preview how your CMA will look</CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">5 content sections</span>
+                  <span className="text-xs text-muted-foreground">4 content sections</span>
                   <Button
                     variant="outline"
                     size="icon"

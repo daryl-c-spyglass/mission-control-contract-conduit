@@ -1,0 +1,393 @@
+Fix Property Value Adjustments in CMA Presentation Builder
+Task
+
+Remove the "Custom Photo Selection" section from the CMA Presentation Builder
+Redesign the "Property Value Adjustments" section to match the attached screenshot
+
+
+Part 1: Remove Custom Photo Selection
+Find and remove the entire "Custom Photo Selection" section from CMAPresentationBuilder.tsx:
+tsx// DELETE this entire section:
+{/* Custom Photo Selection */}
+<div className="bg-white dark:bg-gray-900 rounded-lg border ...">
+  <h3>Custom Photo Selection</h3>
+  ...
+</div>
+
+Part 2: Redesign Property Value Adjustments
+Replace the current Property Value Adjustments section with this design:
+tsx// Property Value Adjustments Section
+const [adjustmentRates, setAdjustmentRates] = useState({
+  sqFt: 50,
+  bedroom: 10000,
+  bathroom: 7500,
+  pool: 25000,
+  garage: 5000,
+  yearBuilt: 1000,
+  lotSize: 2,
+});
+
+const defaultRates = {
+  sqFt: 50,
+  bedroom: 10000,
+  bathroom: 7500,
+  pool: 25000,
+  garage: 5000,
+  yearBuilt: 1000,
+  lotSize: 2,
+};
+
+const resetToDefaults = () => {
+  setAdjustmentRates(defaultRates);
+};
+
+// Calculate adjustments for a comparable
+const calculateAdjustments = (comparable: any, subject: any) => {
+  const adjustments: Record<string, number> = {};
+  
+  // Square Feet adjustment
+  const sqFtDiff = (subject.livingArea || 0) - (comparable.livingArea || 0);
+  adjustments.sqFt = sqFtDiff * adjustmentRates.sqFt;
+  
+  // Bedroom adjustment
+  const bedDiff = (subject.bedroomsTotal || 0) - (comparable.bedroomsTotal || 0);
+  adjustments.bedroom = bedDiff * adjustmentRates.bedroom;
+  
+  // Bathroom adjustment
+  const bathDiff = (subject.bathroomsTotalInteger || 0) - (comparable.bathroomsTotalInteger || 0);
+  adjustments.bathroom = bathDiff * adjustmentRates.bathroom;
+  
+  // Pool adjustment (if subject has pool but comparable doesn't, add value)
+  const subjectHasPool = subject.poolFeatures?.length > 0 || subject.hasPool;
+  const compHasPool = comparable.poolFeatures?.length > 0 || comparable.hasPool;
+  if (subjectHasPool && !compHasPool) {
+    adjustments.pool = adjustmentRates.pool;
+  } else if (!subjectHasPool && compHasPool) {
+    adjustments.pool = -adjustmentRates.pool;
+  } else {
+    adjustments.pool = 0;
+  }
+  
+  // Garage adjustment
+  const garageDiff = (subject.garageSpaces || 0) - (comparable.garageSpaces || 0);
+  adjustments.garage = garageDiff * adjustmentRates.garage;
+  
+  // Year Built adjustment
+  const yearDiff = (subject.yearBuilt || 0) - (comparable.yearBuilt || 0);
+  adjustments.yearBuilt = yearDiff * adjustmentRates.yearBuilt;
+  
+  // Lot Size adjustment
+  const subjectLot = subject.lotSizeSquareFeet || 0;
+  const compLot = comparable.lotSizeSquareFeet || 0;
+  const lotDiff = subjectLot - compLot;
+  adjustments.lotSize = lotDiff * adjustmentRates.lotSize;
+  
+  // Total adjustment
+  adjustments.total = Object.values(adjustments).reduce((sum, val) => sum + val, 0);
+  
+  // Adjusted price
+  const salePrice = comparable.closePrice || comparable.listPrice || 0;
+  adjustments.adjustedPrice = salePrice + adjustments.total;
+  
+  return adjustments;
+};
+
+// Format currency
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+};
+
+// Format adjustment with color
+const formatAdjustment = (value: number) => {
+  if (value === 0) return <span className="text-gray-500">—</span>;
+  const formatted = formatCurrency(Math.abs(value));
+  if (value > 0) {
+    return <span className="text-green-600">+{formatted}</span>;
+  }
+  return <span className="text-red-600">-{formatted}</span>;
+};
+
+Part 3: JSX for Property Value Adjustments
+tsx{/* Property Value Adjustments */}
+<div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+    Property Value Adjustments
+  </h2>
+  <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+    Configure adjustment rates to compare property values between subject and comparables
+  </p>
+
+  {/* Adjustment Rates */}
+  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-6">
+    <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center gap-2">
+        <Calculator className="w-4 h-4 text-gray-500" />
+        <span className="font-medium text-gray-900 dark:text-white">Adjustment Rates</span>
+      </div>
+      <button
+        onClick={resetToDefaults}
+        className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+      >
+        <RotateCcw className="w-4 h-4" />
+        Reset Defaults
+      </button>
+    </div>
+    
+    <div className="grid grid-cols-3 gap-4">
+      <div>
+        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+          Sq Ft ($/sqft)
+        </label>
+        <input
+          type="number"
+          value={adjustmentRates.sqFt}
+          onChange={(e) => setAdjustmentRates(prev => ({ ...prev, sqFt: Number(e.target.value) }))}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+          Bedroom ($)
+        </label>
+        <input
+          type="number"
+          value={adjustmentRates.bedroom}
+          onChange={(e) => setAdjustmentRates(prev => ({ ...prev, bedroom: Number(e.target.value) }))}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+          Bathroom ($)
+        </label>
+        <input
+          type="number"
+          value={adjustmentRates.bathroom}
+          onChange={(e) => setAdjustmentRates(prev => ({ ...prev, bathroom: Number(e.target.value) }))}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+          Pool ($)
+        </label>
+        <input
+          type="number"
+          value={adjustmentRates.pool}
+          onChange={(e) => setAdjustmentRates(prev => ({ ...prev, pool: Number(e.target.value) }))}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+          Garage ($)
+        </label>
+        <input
+          type="number"
+          value={adjustmentRates.garage}
+          onChange={(e) => setAdjustmentRates(prev => ({ ...prev, garage: Number(e.target.value) }))}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+          Year Built ($/yr)
+        </label>
+        <input
+          type="number"
+          value={adjustmentRates.yearBuilt}
+          onChange={(e) => setAdjustmentRates(prev => ({ ...prev, yearBuilt: Number(e.target.value) }))}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+          Lot Size ($/sqft)
+        </label>
+        <input
+          type="number"
+          value={adjustmentRates.lotSize}
+          onChange={(e) => setAdjustmentRates(prev => ({ ...prev, lotSize: Number(e.target.value) }))}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+        />
+      </div>
+    </div>
+  </div>
+
+  {/* Adjustments Comparison Table */}
+  <div>
+    <h3 className="font-medium text-gray-900 dark:text-white mb-4">Adjustments Comparison</h3>
+    
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-gray-200 dark:border-gray-700">
+            <th className="text-left py-2 pr-4 font-medium text-gray-500 dark:text-gray-400">Feature</th>
+            <th className="text-center py-2 px-2 font-medium text-gray-500 dark:text-gray-400">
+              Subject
+              <div className="text-xs font-normal">Value</div>
+            </th>
+            {comparables.slice(0, 4).map((comp, idx) => (
+              <th key={comp.id || idx} className="text-center py-2 px-2 font-medium text-gray-500 dark:text-gray-400" colSpan={2}>
+                {comp.unparsedAddress?.split(',')[0] || `Comp ${idx + 1}`}
+                <div className="flex text-xs font-normal">
+                  <span className="flex-1">Value</span>
+                  <span className="flex-1">Adj</span>
+                </div>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {/* Sale Price Row */}
+          <tr className="border-b border-gray-100 dark:border-gray-800">
+            <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">Sale Price</td>
+            <td className="py-2 px-2 text-center text-gray-500">—</td>
+            {comparables.slice(0, 4).map((comp, idx) => {
+              const price = comp.closePrice || comp.listPrice || 0;
+              return (
+                <React.Fragment key={comp.id || idx}>
+                  <td className="py-2 px-2 text-center text-gray-900 dark:text-white">
+                    {formatCurrency(price)}
+                  </td>
+                  <td className="py-2 px-2 text-center"></td>
+                </React.Fragment>
+              );
+            })}
+          </tr>
+          
+          {/* Square Feet Row */}
+          <tr className="border-b border-gray-100 dark:border-gray-800">
+            <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">Square Feet</td>
+            <td className="py-2 px-2 text-center text-gray-900 dark:text-white">
+              {subjectProperty?.livingArea?.toLocaleString() || '—'}
+            </td>
+            {comparables.slice(0, 4).map((comp, idx) => {
+              const adjustments = calculateAdjustments(comp, subjectProperty);
+              return (
+                <React.Fragment key={comp.id || idx}>
+                  <td className="py-2 px-2 text-center text-gray-900 dark:text-white">
+                    {comp.livingArea?.toLocaleString() || '—'}
+                  </td>
+                  <td className="py-2 px-2 text-center">
+                    {formatAdjustment(adjustments.sqFt)}
+                  </td>
+                </React.Fragment>
+              );
+            })}
+          </tr>
+          
+          {/* Bedrooms Row */}
+          <tr className="border-b border-gray-100 dark:border-gray-800">
+            <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">Bedrooms</td>
+            <td className="py-2 px-2 text-center text-gray-900 dark:text-white">
+              {subjectProperty?.bedroomsTotal || '—'}
+            </td>
+            {comparables.slice(0, 4).map((comp, idx) => {
+              const adjustments = calculateAdjustments(comp, subjectProperty);
+              return (
+                <React.Fragment key={comp.id || idx}>
+                  <td className="py-2 px-2 text-center text-gray-900 dark:text-white">
+                    {comp.bedroomsTotal || '—'}
+                  </td>
+                  <td className="py-2 px-2 text-center">
+                    {formatAdjustment(adjustments.bedroom)}
+                  </td>
+                </React.Fragment>
+              );
+            })}
+          </tr>
+          
+          {/* Bathrooms Row */}
+          <tr className="border-b border-gray-100 dark:border-gray-800">
+            <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">Bathrooms</td>
+            <td className="py-2 px-2 text-center text-gray-900 dark:text-white">
+              {subjectProperty?.bathroomsTotalInteger || '—'}
+            </td>
+            {comparables.slice(0, 4).map((comp, idx) => {
+              const adjustments = calculateAdjustments(comp, subjectProperty);
+              return (
+                <React.Fragment key={comp.id || idx}>
+                  <td className="py-2 px-2 text-center text-gray-900 dark:text-white">
+                    {comp.bathroomsTotalInteger || '—'}
+                  </td>
+                  <td className="py-2 px-2 text-center">
+                    {formatAdjustment(adjustments.bathroom)}
+                  </td>
+                </React.Fragment>
+              );
+            })}
+          </tr>
+          
+          {/* Total Adjustment Row */}
+          <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+            <td className="py-2 pr-4 font-medium text-gray-700 dark:text-gray-300">Total Adjustment</td>
+            <td className="py-2 px-2 text-center text-gray-500">—</td>
+            {comparables.slice(0, 4).map((comp, idx) => {
+              const adjustments = calculateAdjustments(comp, subjectProperty);
+              return (
+                <React.Fragment key={comp.id || idx}>
+                  <td className="py-2 px-2 text-center" colSpan={2}>
+                    {formatAdjustment(adjustments.total)}
+                  </td>
+                </React.Fragment>
+              );
+            })}
+          </tr>
+          
+          {/* Adjusted Price Row */}
+          <tr className="bg-gray-100 dark:bg-gray-800">
+            <td className="py-3 pr-4 font-semibold text-gray-900 dark:text-white">ADJUSTED PRICE</td>
+            <td className="py-3 px-2 text-center text-gray-500">—</td>
+            {comparables.slice(0, 4).map((comp, idx) => {
+              const adjustments = calculateAdjustments(comp, subjectProperty);
+              return (
+                <React.Fragment key={comp.id || idx}>
+                  <td className="py-3 px-2 text-center font-semibold text-gray-900 dark:text-white" colSpan={2}>
+                    {formatCurrency(adjustments.adjustedPrice)}
+                  </td>
+                </React.Fragment>
+              );
+            })}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    {/* Legend */}
+    <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+      <span className="text-green-600">Positive adjustments</span> indicate the comparable is inferior to the subject.{' '}
+      <span className="text-red-600">Negative adjustments</span> indicate the comparable is superior.
+    </div>
+  </div>
+</div>
+
+Required Imports
+tsximport { Calculator, RotateCcw } from 'lucide-react';
+
+Summary of Changes
+
+REMOVE: Custom Photo Selection section entirely
+ADD: Adjustment Rates card with 7 configurable rate inputs
+ADD: Reset Defaults button for adjustment rates
+ADD: Adjustments Comparison table with:
+
+Feature column (Sale Price, Square Feet, Bedrooms, Bathrooms)
+Subject property values
+Comparable Value + Adjustment columns
+Total Adjustment row (highlighted)
+ADJUSTED PRICE row (bold, highlighted)
+
+
+ADD: Color-coded adjustments (green = positive, red = negative)
+ADD: Legend explaining adjustment colors
+
+
+Files to Modify
+
+client/src/pages/CMAPresentationBuilder.tsx
