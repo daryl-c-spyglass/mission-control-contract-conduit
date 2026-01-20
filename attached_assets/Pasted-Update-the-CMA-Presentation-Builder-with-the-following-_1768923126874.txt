@@ -1,0 +1,272 @@
+Update the CMA Presentation Builder with the following changes:
+
+---
+
+## ISSUE 1: Fix Map Tab - "Map requires Mapbox token"
+
+The Map tab is greyed out showing "Map requires Mapbox token" but we already have Mapbox configured in the application.
+
+**Fix:** 
+- Find where the Map tab checks for the Mapbox token
+- Use the existing Mapbox token from environment variables (MAPBOX_ACCESS_TOKEN or VITE_MAPBOX_TOKEN)
+- Enable the Map tab since we already have Mapbox set up
+```tsx
+// The token should already be available - check these locations:
+const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || process.env.MAPBOX_ACCESS_TOKEN;
+
+// Remove or fix the condition that's disabling the map:
+// BEFORE (causing the issue):
+if (!mapboxToken) {
+  return <div>Map requires Mapbox token</div>;
+}
+
+// AFTER (use existing token):
+// The token is already configured, just use it
+```
+
+---
+
+## ISSUE 2: Add Layout Tab with Property Layout Options
+
+Add a **Layout** tab (next to Sections and Content tabs) with the following options:
+
+### Layout Tab Content:
+```tsx
+<TabsContent value="layout" className="mt-4">
+  <div className="space-y-6">
+    <div>
+      <h3 className="text-lg font-semibold mb-2">Property Layout</h3>
+      <p className="text-sm text-muted-foreground mb-4">
+        Choose how properties are displayed in the report
+      </p>
+    </div>
+
+    {/* Photos Per Property */}
+    <div className="space-y-2">
+      <Label htmlFor="photos-per-property">Photos per property</Label>
+      <Select value={photosPerProperty} onValueChange={setPhotosPerProperty}>
+        <SelectTrigger id="photos-per-property">
+          <SelectValue placeholder="Select photos per property" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="1">One photo per property</SelectItem>
+          <SelectItem value="2">Two photos per property</SelectItem>
+          <SelectItem value="3">Three photos per property</SelectItem>
+          <SelectItem value="4">Four photos per property</SelectItem>
+          <SelectItem value="6">Six photos per property</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+
+    {/* Photo Selection */}
+    <div className="space-y-2">
+      <Label htmlFor="photo-selection">Photo selection</Label>
+      <Select value={photoSelection} onValueChange={setPhotoSelection}>
+        <SelectTrigger id="photo-selection">
+          <SelectValue placeholder="Select photo source" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="first-12">First 12 photos</SelectItem>
+          <SelectItem value="all">All photos</SelectItem>
+          <SelectItem value="ai-suggest">AI Suggest (best quality)</SelectItem>
+          <SelectItem value="custom">Custom selection</SelectItem>
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-muted-foreground">
+        Photos are pulled directly from MLS listing via Repliers API
+      </p>
+    </div>
+
+    {/* Custom Selection UI (show only when "custom" is selected) */}
+    {photoSelection === 'custom' && (
+      <div className="space-y-2">
+        <Label>Select Photos</Label>
+        <p className="text-sm text-muted-foreground mb-2">
+          Click to select which photos to include in the report
+        </p>
+        <div className="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto p-2 border rounded-lg">
+          {propertyPhotos.map((photo, index) => (
+            <div
+              key={index}
+              onClick={() => togglePhotoSelection(index)}
+              className={cn(
+                "relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all",
+                selectedPhotos.includes(index) 
+                  ? "border-orange-500 ring-2 ring-orange-500/50" 
+                  : "border-transparent hover:border-gray-300"
+              )}
+            >
+              <img 
+                src={photo} 
+                alt={`Photo ${index + 1}`}
+                className="w-full h-20 object-cover"
+              />
+              {selectedPhotos.includes(index) && (
+                <div className="absolute top-1 right-1 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center">
+                  <Check className="w-3 h-3 text-white" />
+                </div>
+              )}
+              <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs px-1">
+                {index + 1}
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {selectedPhotos.length} photos selected
+        </p>
+      </div>
+    )}
+  </div>
+</TabsContent>
+```
+
+### State for Layout Tab:
+```tsx
+// Add these state variables
+const [photosPerProperty, setPhotosPerProperty] = useState('2'); // Default: 2 photos
+const [photoSelection, setPhotoSelection] = useState('first-12'); // Default: First 12
+const [selectedPhotos, setSelectedPhotos] = useState<number[]>([]); // For custom selection
+const [propertyPhotos, setPropertyPhotos] = useState<string[]>([]); // From Repliers API
+
+// Toggle photo selection for custom mode
+const togglePhotoSelection = (index: number) => {
+  setSelectedPhotos(prev => 
+    prev.includes(index) 
+      ? prev.filter(i => i !== index)
+      : [...prev, index]
+  );
+};
+
+// Fetch photos from Repliers API (should already be available from MLS data)
+useEffect(() => {
+  if (mlsData?.photos) {
+    setPropertyPhotos(mlsData.photos);
+  }
+}, [mlsData]);
+```
+
+### Update Tabs Structure:
+```tsx
+<Tabs defaultValue="sections">
+  <TabsList>
+    <TabsTrigger value="sections" className="flex items-center gap-2">
+      <LayoutGrid className="w-4 h-4" />
+      Sections
+    </TabsTrigger>
+    <TabsTrigger value="content" className="flex items-center gap-2">
+      <FileText className="w-4 h-4" />
+      Content
+    </TabsTrigger>
+    <TabsTrigger value="layout" className="flex items-center gap-2">
+      <Layout className="w-4 h-4" />
+      Layout
+    </TabsTrigger>
+  </TabsList>
+
+  <TabsContent value="sections">
+    {/* Report Sections component */}
+  </TabsContent>
+
+  <TabsContent value="content">
+    {/* Customizable content editor */}
+  </TabsContent>
+
+  <TabsContent value="layout">
+    {/* Property Layout options - NEW */}
+  </TabsContent>
+</Tabs>
+```
+
+---
+
+## ISSUE 3: Remove Sections from Listings Category
+
+Remove these two items from the **Listings** category in Report Sections:
+- ❌ Property Photos (REMOVE)
+- ❌ Adjustments (REMOVE)
+
+**Updated Listings sections (4 items instead of 6):**
+```tsx
+{
+  id: 'listings',
+  name: 'Listings',
+  items: [
+    { id: 'map-all-listings', name: 'Map of All Listings', enabled: true },
+    { id: 'summary-comparables', name: 'Summary of Comparable Properties', enabled: true },
+    { id: 'listings-header', name: 'Listings Chapter Header', enabled: true },
+    { id: 'property-details', name: 'Property Details', enabled: true },
+    // REMOVED: property-photos
+    // REMOVED: adjustments
+  ],
+}
+```
+
+The count badge should now show **4/4** for Listings instead of 6/6.
+
+---
+
+## ISSUE 4: Remove "Listing Layout" from Sections Tab
+
+If there's a "Listing Layout" section anywhere in the Sections tab, remove it completely. Layout options are now in the dedicated Layout tab.
+
+---
+
+## SUMMARY OF CHANGES
+
+| Change | Action |
+|--------|--------|
+| Map Tab greyed out | Fix - use existing Mapbox token from env |
+| Layout Tab missing | Add - with Property Layout options |
+| Photos per property dropdown | Add - 1, 2, 3, 4, 6 options |
+| Photo selection dropdown | Add - First 12, All, AI Suggest, Custom |
+| Custom photo selection | Add - grid with selectable thumbnails |
+| Property Photos section | Remove from Listings category |
+| Adjustments section | Remove from Listings category |
+| Listing Layout section | Remove from Sections tab |
+| Listings count badge | Update to show 4/4 |
+
+---
+
+## PHOTO SELECTION LOGIC FOR PDF EXPORT
+
+When generating the PDF, use the layout settings to determine which photos to include:
+```tsx
+// In PDF generation logic
+const getPhotosForReport = (photos: string[], settings: LayoutSettings) => {
+  const { photoSelection, photosPerProperty, selectedPhotos } = settings;
+  
+  let selectedPhotoUrls: string[] = [];
+  
+  switch (photoSelection) {
+    case 'first-12':
+      selectedPhotoUrls = photos.slice(0, 12);
+      break;
+    case 'all':
+      selectedPhotoUrls = photos;
+      break;
+    case 'ai-suggest':
+      // Use Repliers Image Insights API to get best quality photos
+      // Or fall back to first N photos
+      selectedPhotoUrls = photos.slice(0, 12); // Placeholder
+      break;
+    case 'custom':
+      selectedPhotoUrls = selectedPhotos.map(index => photos[index]).filter(Boolean);
+      break;
+    default:
+      selectedPhotoUrls = photos.slice(0, 12);
+  }
+  
+  // Limit to photos per property setting
+  const photosPerProp = parseInt(photosPerProperty) || 2;
+  
+  return {
+    photos: selectedPhotoUrls,
+    photosPerProperty: photosPerProp,
+  };
+};
+```
+
+---
+
+Please implement these changes to the Presentation Builder.
