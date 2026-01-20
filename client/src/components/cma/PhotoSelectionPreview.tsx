@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Sparkles, Check, Image as ImageIcon, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
-interface Property {
+interface SubjectProperty {
   id?: string;
   listingId?: string;
   mlsNumber?: string;
@@ -31,10 +31,10 @@ interface Property {
 }
 
 interface PhotoSelectionPreviewProps {
-  properties: Property[];
+  subjectProperty: SubjectProperty | null;
   photoSource: string;
   photosPerProperty: number;
-  onSelectionChange: (selections: Record<string, string[]>) => void;
+  onSelectionChange: (selectedPhotos: string[]) => void;
 }
 
 interface ImageInfo {
@@ -45,28 +45,42 @@ interface ImageInfo {
   score?: number;
 }
 
+const CDN_BASE = 'https://cdn.repliers.io/';
+
+function ensureFullUrl(url: string): string {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  if (url.startsWith('unlock-mls/')) return `${CDN_BASE}${url}`;
+  return url;
+}
+
 export function PhotoSelectionPreview({
-  properties,
+  subjectProperty,
   photoSource,
   photosPerProperty,
   onSelectionChange,
 }: PhotoSelectionPreviewProps) {
-  const [selections, setSelections] = useState<Record<string, string[]>>({});
-  const [aiRecommendations, setAiRecommendations] = useState<Record<string, ImageInfo[]>>({});
+  const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
+  const [aiRecommendations, setAiRecommendations] = useState<ImageInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [insightsAvailable, setInsightsAvailable] = useState(true);
   
   const hasFetchedRef = useRef(false);
   const lastPhotoSourceRef = useRef<string>('');
-  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const getPropertyPhotos = useCallback((property: Property): string[] => {
-    const photos = property.photos || property.images || [];
-    return photos.filter(Boolean);
-  }, []);
+  const photos = useMemo(() => {
+    if (!subjectProperty) return [];
+    const rawPhotos = subjectProperty.photos || subjectProperty.images || [];
+    return rawPhotos.filter(Boolean).map(ensureFullUrl);
+  }, [subjectProperty]);
 
-  const getTopPhotos = useCallback((images: ImageInfo[], count: number): ImageInfo[] => {
+  const propertyId = subjectProperty?.listingId || subjectProperty?.mlsNumber || subjectProperty?.id || '';
+  const propertyAddress = subjectProperty?.unparsedAddress?.split(',')[0] || 
+                          subjectProperty?.address || 
+                          'Subject Property';
+
+  const getTopPhotos = useCallback((insights: any[], allPhotos: string[], count: number): ImageInfo[] => {
     const priorityOrder = [
       'front', 'exterior', 'facade',
       'kitchen', 
@@ -77,7 +91,7 @@ export function PhotoSelectionPreview({
       'dining', 'dining room',
     ];
     
-    const scored = images.map((img, index) => {
+    const scored = insights.map((img, index) => {
       let score = 0;
       const classification = (img.classification?.imageOf || '').toLowerCase();
       
@@ -101,8 +115,11 @@ export function PhotoSelectionPreview({
         score += img.classification.confidence * 10;
       }
       
+      const photoUrl = ensureFullUrl(img.url) || allPhotos[img.originalIndex] || allPhotos[index] || '';
+      
       return { 
         ...img, 
+        url: photoUrl,
         score, 
         originalIndex: img.originalIndex ?? index 
       };
@@ -115,122 +132,72 @@ export function PhotoSelectionPreview({
   }, []);
 
   const autoSelectPhotos = useCallback(() => {
-    const autoSelections: Record<string, string[]> = {};
-    
-    properties.filter(Boolean).forEach(property => {
-      const propertyId = property.listingId || property.mlsNumber || property.id || '';
-      const photos = getPropertyPhotos(property);
-      autoSelections[propertyId] = photos.slice(0, photosPerProperty);
-    });
-    
-    setSelections(autoSelections);
-    onSelectionChange(autoSelections);
-  }, [properties, photosPerProperty, getPropertyPhotos, onSelectionChange]);
+    const selected = photos.slice(0, photosPerProperty);
+    setSelectedPhotos(selected);
+    onSelectionChange(selected);
+  }, [photos, photosPerProperty, onSelectionChange]);
 
-  const fetchAiRecommendations = useCallback(async (forceRefresh = false) => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
+  const fetchAiRecommendations = useCallback(async () => {
+    if (!propertyId) {
+      autoSelectPhotos();
+      return;
     }
-    abortControllerRef.current = new AbortController();
-    const signal = abortControllerRef.current.signal;
     
     setLoading(true);
     setError(null);
     
     try {
-      const recommendations: Record<string, ImageInfo[]> = {};
-      const validProperties = properties.filter(Boolean);
-      let anyInsightsAvailable = false;
-      
-      for (let i = 0; i < validProperties.length; i++) {
-        if (signal.aborted) return;
-        
-        const property = validProperties[i];
-        const propertyId = property.listingId || property.mlsNumber || property.id;
-        if (!propertyId) continue;
-        
-        const photos = getPropertyPhotos(property);
-        
-        if (property.imageInsights?.images && property.imageInsights.images.length > 0) {
-          recommendations[propertyId] = getTopPhotos(
-            property.imageInsights.images.map((img, idx) => ({
-              url: photos[idx] || img.image || '',
-              originalIndex: idx,
-              classification: img.classification,
-              quality: img.quality,
-            })),
-            photosPerProperty
-          );
-          anyInsightsAvailable = true;
-          continue;
-        }
-        
-        try {
-          if (i > 0) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
-          
-          if (signal.aborted) return;
-          
-          const response = await fetch(`/api/repliers/listing/${propertyId}/image-insights`, { signal });
-          
-          if (!response.ok) {
-            recommendations[propertyId] = photos.slice(0, photosPerProperty).map((url, idx) => ({
-              url,
-              originalIndex: idx,
-              classification: null,
-              quality: null,
-            }));
-            continue;
-          }
-          
-          const data = await response.json();
-          
-          if (data.available && data.images?.length > 0) {
-            anyInsightsAvailable = true;
-            recommendations[propertyId] = getTopPhotos(data.images, photosPerProperty);
-          } else {
-            recommendations[propertyId] = photos.slice(0, photosPerProperty).map((url, idx) => ({
-              url,
-              originalIndex: idx,
-              classification: null,
-              quality: null,
-            }));
-          }
-        } catch (fetchError: any) {
-          if (fetchError.name === 'AbortError') return;
-          recommendations[propertyId] = photos.slice(0, photosPerProperty).map((url, idx) => ({
-            url,
+      if (subjectProperty?.imageInsights?.images && subjectProperty.imageInsights.images.length > 0) {
+        const topPhotos = getTopPhotos(
+          subjectProperty.imageInsights.images.map((img, idx) => ({
+            url: photos[idx] || img.image || '',
             originalIndex: idx,
-            classification: null,
-            quality: null,
-          }));
-        }
+            classification: img.classification,
+            quality: img.quality,
+          })),
+          photos,
+          photosPerProperty
+        );
+        setAiRecommendations(topPhotos);
+        setInsightsAvailable(true);
+        
+        const selected = topPhotos.map(p => p.url).filter(Boolean);
+        setSelectedPhotos(selected);
+        onSelectionChange(selected);
+        setLoading(false);
+        return;
       }
       
-      if (signal.aborted) return;
+      const response = await fetch(`/api/repliers/listing/${propertyId}/image-insights`);
       
-      setInsightsAvailable(anyInsightsAvailable);
-      setAiRecommendations(recommendations);
-      
-      const autoSelections: Record<string, string[]> = {};
-      for (const [propId, propPhotos] of Object.entries(recommendations)) {
-        autoSelections[propId] = propPhotos.map(p => p.url).filter(Boolean);
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`);
       }
-      setSelections(autoSelections);
-      onSelectionChange(autoSelections);
       
-    } catch (err: any) {
-      if (err.name === 'AbortError') return;
+      const data = await response.json();
+      
+      if (data.available && data.images?.length > 0) {
+        setInsightsAvailable(true);
+        const topPhotos = getTopPhotos(data.images, photos, photosPerProperty);
+        setAiRecommendations(topPhotos);
+        
+        const selected = topPhotos.map(p => p.url).filter(Boolean);
+        setSelectedPhotos(selected);
+        onSelectionChange(selected);
+      } else {
+        setInsightsAvailable(false);
+        autoSelectPhotos();
+      }
+      
+    } catch (err) {
       console.error('Failed to fetch AI recommendations:', err);
       setError(err instanceof Error ? err.message : 'Failed to analyze photos');
+      setInsightsAvailable(false);
       autoSelectPhotos();
     } finally {
-      if (!signal.aborted) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
-  }, [properties, photosPerProperty, getPropertyPhotos, getTopPhotos, autoSelectPhotos, onSelectionChange]);
+  }, [propertyId, subjectProperty, photos, photosPerProperty, getTopPhotos, autoSelectPhotos, onSelectionChange]);
 
   useEffect(() => {
     if (photoSource !== lastPhotoSourceRef.current) {
@@ -238,41 +205,36 @@ export function PhotoSelectionPreview({
       lastPhotoSourceRef.current = photoSource;
     }
     
-    if (photoSource === 'ai_suggested' && !hasFetchedRef.current) {
+    if (photoSource === 'ai_suggested' && !hasFetchedRef.current && propertyId) {
       hasFetchedRef.current = true;
       fetchAiRecommendations();
     } else if (photoSource === 'custom') {
+      setSelectedPhotos([]);
+      onSelectionChange([]);
+    } else if (photoSource !== 'ai_suggested') {
       autoSelectPhotos();
     }
-    
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, [photoSource, fetchAiRecommendations, autoSelectPhotos]);
+  }, [photoSource, propertyId, fetchAiRecommendations, autoSelectPhotos, onSelectionChange]);
 
   const handleRetry = useCallback(() => {
     hasFetchedRef.current = false;
-    fetchAiRecommendations(true);
+    fetchAiRecommendations();
   }, [fetchAiRecommendations]);
 
-  const togglePhotoSelection = useCallback((propertyId: string, photoUrl: string) => {
-    setSelections(prev => {
-      const current = prev[propertyId] || [];
+  const togglePhotoSelection = useCallback((photoUrl: string) => {
+    setSelectedPhotos(prev => {
       let updated: string[];
       
-      if (current.includes(photoUrl)) {
-        updated = current.filter(url => url !== photoUrl);
-      } else if (current.length < photosPerProperty) {
-        updated = [...current, photoUrl];
+      if (prev.includes(photoUrl)) {
+        updated = prev.filter(url => url !== photoUrl);
+      } else if (prev.length < photosPerProperty) {
+        updated = [...prev, photoUrl];
       } else {
-        updated = [...current.slice(1), photoUrl];
+        updated = [...prev.slice(1), photoUrl];
       }
       
-      const newSelections = { ...prev, [propertyId]: updated };
-      onSelectionChange(newSelections);
-      return newSelections;
+      onSelectionChange(updated);
+      return updated;
     });
   }, [photosPerProperty, onSelectionChange]);
 
@@ -318,6 +280,19 @@ export function PhotoSelectionPreview({
     return null;
   }
 
+  if (!subjectProperty || photos.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <div className="flex items-center justify-center gap-2 text-muted-foreground">
+            <ImageIcon className="w-5 h-5" />
+            <span>No photos available for subject property</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -348,89 +323,80 @@ export function PhotoSelectionPreview({
             ? insightsAvailable
               ? 'AI has selected the best quality photos based on image classification and quality scores.'
               : 'Image Insights not available. Using first photos as default. You can manually adjust.'
-            : `Select up to ${photosPerProperty} photo(s) per property.`
+            : `Select up to ${photosPerProperty} photo(s) for the subject property.`
           }
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6 max-h-96 overflow-y-auto">
-        {properties.filter(Boolean).map((property) => {
-          const propertyId = property.listingId || property.mlsNumber || property.id || '';
-          const photos = getPropertyPhotos(property);
-          const selectedPhotos = selections[propertyId] || [];
-          const aiRecs = aiRecommendations[propertyId] || [];
-          
-          if (!photos.length) return null;
-          
-          return (
-            <div key={propertyId} className="border-t pt-4 first:border-t-0 first:pt-0">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h4 className="font-medium text-sm">
-                    {property.unparsedAddress?.split(',')[0] || property.address || 'Property'}
-                  </h4>
-                  <span className="text-xs text-muted-foreground">
-                    {photos.length} available &bull; {selectedPhotos.length}/{photosPerProperty} selected
-                  </span>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                {photos.slice(0, 12).map((photo: string, idx: number) => {
-                  const isSelected = selectedPhotos.includes(photo);
-                  const aiRec = aiRecs.find(r => r.url === photo || r.originalIndex === idx);
-                  const classification = aiRec?.classification?.imageOf;
-                  const quality = aiRec?.quality?.qualitative;
-                  
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => togglePhotoSelection(propertyId, photo)}
-                      className={cn(
-                        "relative aspect-square rounded-lg overflow-hidden border-2 transition-all",
-                        isSelected 
-                          ? "border-[#F37216] ring-2 ring-[#F37216]/20" 
-                          : "border-transparent hover:border-muted-foreground/50"
-                      )}
-                      title={classification ? `${classification} (${quality || 'unknown quality'})` : `Photo ${idx + 1}`}
-                      data-testid={`photo-select-${propertyId}-${idx}`}
-                    >
-                      <img 
-                        src={photo} 
-                        alt={classification || `Photo ${idx + 1}`}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                      
-                      {isSelected && (
-                        <div className="absolute top-1 right-1 w-5 h-5 bg-[#F37216] rounded-full flex items-center justify-center shadow-sm">
-                          <Check className="w-3 h-3 text-white" />
-                        </div>
-                      )}
-                      
-                      {classification && photoSource === 'ai_suggested' && (
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-1">
-                          <span className="text-[10px] text-white font-medium truncate block">
-                            {classification}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {quality && photoSource === 'ai_suggested' && (
-                        <div className={cn(
-                          "absolute top-1 left-1 w-2 h-2 rounded-full",
-                          quality === 'excellent' && "bg-green-500",
-                          quality === 'above average' && "bg-blue-500",
-                          quality === 'average' && "bg-yellow-500",
-                          quality === 'below average' && "bg-red-500",
-                        )} />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+      <CardContent className="space-y-4">
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h4 className="font-medium text-sm">{propertyAddress}</h4>
+              <span className="text-xs text-muted-foreground">
+                {photos.length} available &bull; {selectedPhotos.length}/{photosPerProperty} selected
+              </span>
             </div>
-          );
-        })}
+          </div>
+          
+          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+            {photos.slice(0, 12).map((photo: string, idx: number) => {
+              const isSelected = selectedPhotos.includes(photo);
+              const aiRec = aiRecommendations.find(r => r.url === photo || r.originalIndex === idx);
+              const classification = aiRec?.classification?.imageOf;
+              const quality = aiRec?.quality?.qualitative;
+              
+              return (
+                <button
+                  key={idx}
+                  onClick={() => togglePhotoSelection(photo)}
+                  className={cn(
+                    "relative aspect-square rounded-lg overflow-hidden border-2 transition-all bg-muted",
+                    isSelected 
+                      ? "border-[#F37216] ring-2 ring-[#F37216]/20" 
+                      : "border-transparent hover:border-muted-foreground/50"
+                  )}
+                  title={classification ? `${classification} (${quality || 'unknown quality'})` : `Photo ${idx + 1}`}
+                  data-testid={`photo-select-subject-${idx}`}
+                >
+                  <img 
+                    src={photo} 
+                    alt={classification || `Photo ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.opacity = '0';
+                    }}
+                  />
+                  
+                  {isSelected && (
+                    <div className="absolute top-1 right-1 w-5 h-5 bg-[#F37216] rounded-full flex items-center justify-center shadow-sm">
+                      <Check className="w-3 h-3 text-white" />
+                    </div>
+                  )}
+                  
+                  {classification && photoSource === 'ai_suggested' && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-1">
+                      <span className="text-[10px] text-white font-medium truncate block">
+                        {classification}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {quality && photoSource === 'ai_suggested' && (
+                    <div className={cn(
+                      "absolute top-1 left-1 w-2 h-2 rounded-full",
+                      quality === 'excellent' && "bg-green-500",
+                      quality === 'above average' && "bg-blue-500",
+                      quality === 'average' && "bg-yellow-500",
+                      quality === 'below average' && "bg-red-500",
+                    )} />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </CardContent>
       
       {photoSource === 'ai_suggested' && insightsAvailable && (

@@ -544,12 +544,12 @@ export default function CMAPresentationBuilder() {
                 </CardContent>
               </Card>
 
-              {(config.photoLayout === 'ai_suggested' || config.photoLayout === 'custom') && (
+              {(config.photoLayout === 'ai_suggested' || config.photoLayout === 'custom') && subjectProperty && (
                 <PhotoSelectionPreview 
-                  properties={subjectProperty ? [subjectProperty, ...comparables] : comparables}
+                  subjectProperty={subjectProperty}
                   photoSource={config.photoLayout}
                   photosPerProperty={parseInt(config.photosPerProperty) || 2}
-                  onSelectionChange={(selections) => setCustomPhotoSelections(selections)}
+                  onSelectionChange={(selectedPhotos) => setCustomPhotoSelections({ subject: selectedPhotos })}
                 />
               )}
             </TabsContent>
