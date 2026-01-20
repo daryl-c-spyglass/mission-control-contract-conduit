@@ -105,8 +105,8 @@ export function calculateAnalysisData(comparables: CMAComparable[], statistics?:
     averagePricePerSqft: statistics?.pricePerSqFt?.average || avgPricePerSqft,
     medianPrice: statistics?.price?.median || medianPrice,
     priceRange: {
-      min: statistics?.price?.range?.min || Math.min(...prices, 0),
-      max: statistics?.price?.range?.max || Math.max(...prices, 0),
+      min: statistics?.price?.range?.min || (prices.length > 0 ? Math.min(...prices) : 0),
+      max: statistics?.price?.range?.max || (prices.length > 0 ? Math.max(...prices) : 0),
     },
     averageDaysOnMarket: statistics?.daysOnMarket?.average || avgDom,
     suggestedListPrice: undefined,
