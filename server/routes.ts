@@ -2343,55 +2343,76 @@ ${context.marketStats?.avgDOM ? `- Average days on market: ${context.marketStats
   app.get("/api/repliers/listing/:listingId/image-insights", async (req, res) => {
     try {
       const { listingId } = req.params;
+      const apiKey = process.env.REPLIERS_API_KEY;
       
-      if (!process.env.REPLIERS_API_KEY) {
-        return res.status(400).json({ 
-          error: 'Repliers API key not configured',
+      if (!apiKey) {
+        console.error('REPLIERS_API_KEY not configured');
+        return res.status(500).json({ 
           available: false,
+          error: 'API key not configured',
           images: [],
         });
       }
 
+      console.log(`Fetching image insights for listing: ${listingId}`);
+
       // Fetch listing with imageInsights from Repliers
       const response = await fetch(
-        `https://api.repliers.io/listings/${listingId}?fields=imageInsights,photos,images`,
+        `https://api.repliers.io/listings/${listingId}`,
         {
+          method: 'GET',
           headers: {
-            'REPLIERS-API-KEY': process.env.REPLIERS_API_KEY,
+            'REPLIERS-API-KEY': apiKey,
             'Content-Type': 'application/json',
           },
         }
       );
       
       if (!response.ok) {
-        console.error(`Repliers API error for listing ${listingId}:`, response.status);
-        return res.json({
+        const errorText = await response.text();
+        console.error('Repliers API error:', response.status, errorText);
+        return res.status(response.status).json({
           available: false,
+          error: `Repliers API error: ${response.status}`,
           images: [],
         });
       }
       
       const data = await response.json();
-      const photos = data.photos || data.images || [];
       
-      // Check if Image Insights is available
+      // Check if Image Insights is available in the response
       if (data.imageInsights?.images && data.imageInsights.images.length > 0) {
+        console.log(`Image Insights available: ${data.imageInsights.images.length} images analyzed`);
+        
+        const photos = data.photos || data.images || [];
+        
         return res.json({
           available: true,
-          images: data.imageInsights.images.map((img: any, index: number) => ({
-            url: photos[index] ? `https://cdn.repliers.io/${photos[index]}` : img.image,
+          images: data.imageInsights.images.map((insight: any, index: number) => ({
+            url: photos[index] || insight.url,
             originalIndex: index,
-            classification: img.classification,
-            quality: img.quality,
+            classification: {
+              imageOf: insight.classification?.imageOf || null,
+              prediction: insight.classification?.prediction || null,
+              confidence: insight.classification?.confidence || null,
+            },
+            quality: {
+              score: insight.quality?.score || null,
+              qualitative: insight.quality?.qualitative || null,
+            },
           })),
         });
       }
       
-      // Fallback: return photos without insights
+      // Fallback: Image Insights not enabled or no data - return photos without insights
+      console.log('Image Insights not available for this listing, returning basic photos');
+      const photos = data.photos || data.images || [];
+      
       return res.json({
         available: false,
-        images: photos.map((photo: string, index: number) => ({
-          url: photo.startsWith('http') ? photo : `https://cdn.repliers.io/${photo}`,
+        message: 'Image Insights not enabled on this account',
+        images: photos.map((url: string, index: number) => ({
+          url,
           originalIndex: index,
           classification: null,
           quality: null,
@@ -2399,11 +2420,55 @@ ${context.marketStats?.avgDOM ? `- Average days on market: ${context.marketStats
       });
       
     } catch (error: any) {
-      console.error('Image insights error:', error);
+      console.error('Image insights fetch error:', error);
       return res.status(500).json({ 
-        error: 'Failed to fetch image insights',
         available: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
         images: [],
+      });
+    }
+  });
+
+  // Debug endpoint to test Repliers Image Insights
+  app.get('/api/debug/repliers-insights-check', async (req, res) => {
+    try {
+      const apiKey = process.env.REPLIERS_API_KEY;
+      
+      if (!apiKey) {
+        return res.json({ 
+          status: 'error', 
+          message: 'REPLIERS_API_KEY not set in environment' 
+        });
+      }
+      
+      const testListingId = req.query.listingId || 'ACT2572987';
+      
+      const response = await fetch(
+        `https://api.repliers.io/listings/${testListingId}`,
+        {
+          headers: {
+            'REPLIERS-API-KEY': apiKey,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      
+      const data = await response.json();
+      
+      return res.json({
+        status: 'success',
+        listingId: testListingId,
+        hasImageInsights: !!data.imageInsights?.images,
+        imageInsightsCount: data.imageInsights?.images?.length || 0,
+        photosCount: data.photos?.length || 0,
+        sampleInsight: data.imageInsights?.images?.[0] || null,
+        rawFields: Object.keys(data),
+      });
+      
+    } catch (error) {
+      return res.json({ 
+        status: 'error', 
+        message: error instanceof Error ? error.message : 'Unknown error' 
       });
     }
   });
