@@ -112,6 +112,18 @@ async function checkAndSendReminders(): Promise<void> {
 }
 
 export function startClosingRemindersScheduler(): void {
+  // STOP ALL NOTIFICATIONS - Environment variable kill switch
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    console.log('[ClosingReminders] DISABLED via DISABLE_SLACK_NOTIFICATIONS environment variable');
+    return;
+  }
+  
+  // Only run in production (Render) - prevents duplicate notifications from dev instances
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[ClosingReminders] Skipping - not in production environment (NODE_ENV:', process.env.NODE_ENV, ')');
+    return;
+  }
+  
   if (reminderIntervalId) {
     console.log("[ClosingReminders] Scheduler already running");
     return;
