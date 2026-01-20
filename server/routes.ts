@@ -2339,6 +2339,75 @@ ${context.marketStats?.avgDOM ? `- Average days on market: ${context.marketStats
     }
   });
 
+  // Get image insights for a listing from Repliers API
+  app.get("/api/repliers/listing/:listingId/image-insights", async (req, res) => {
+    try {
+      const { listingId } = req.params;
+      
+      if (!process.env.REPLIERS_API_KEY) {
+        return res.status(400).json({ 
+          error: 'Repliers API key not configured',
+          available: false,
+          images: [],
+        });
+      }
+
+      // Fetch listing with imageInsights from Repliers
+      const response = await fetch(
+        `https://api.repliers.io/listings/${listingId}?fields=imageInsights,photos,images`,
+        {
+          headers: {
+            'REPLIERS-API-KEY': process.env.REPLIERS_API_KEY,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        console.error(`Repliers API error for listing ${listingId}:`, response.status);
+        return res.json({
+          available: false,
+          images: [],
+        });
+      }
+      
+      const data = await response.json();
+      const photos = data.photos || data.images || [];
+      
+      // Check if Image Insights is available
+      if (data.imageInsights?.images && data.imageInsights.images.length > 0) {
+        return res.json({
+          available: true,
+          images: data.imageInsights.images.map((img: any, index: number) => ({
+            url: photos[index] ? `https://cdn.repliers.io/${photos[index]}` : img.image,
+            originalIndex: index,
+            classification: img.classification,
+            quality: img.quality,
+          })),
+        });
+      }
+      
+      // Fallback: return photos without insights
+      return res.json({
+        available: false,
+        images: photos.map((photo: string, index: number) => ({
+          url: photo.startsWith('http') ? photo : `https://cdn.repliers.io/${photo}`,
+          originalIndex: index,
+          classification: null,
+          quality: null,
+        })),
+      });
+      
+    } catch (error: any) {
+      console.error('Image insights error:', error);
+      return res.status(500).json({ 
+        error: 'Failed to fetch image insights',
+        available: false,
+        images: [],
+      });
+    }
+  });
+
   // ============ AI Description Summarization ============
   
   // Helper to clean up AI-generated summaries and ensure complete sentences

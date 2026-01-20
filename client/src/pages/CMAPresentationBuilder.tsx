@@ -22,6 +22,7 @@ import {
   GripVertical,
   Loader2,
   Layout,
+  Sparkles,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -38,6 +39,7 @@ import { ExpandedPreviewModal } from "@/components/presentation/ExpandedPreviewM
 import { ListingBrochureContent } from "@/components/presentation/ListingBrochureContent";
 import { CMAPreviewContent } from "@/components/presentation/CMAPreviewContent";
 import { ReportSections } from "@/components/presentation/ReportSections";
+import { PhotoSelectionPreview } from "@/components/cma/PhotoSelectionPreview";
 import { transformToCMAReportData } from "@/lib/cma-transformer";
 import { pdf } from '@react-pdf/renderer';
 import { CMAPdfDocument } from "@/components/pdf/CMAPdfDocument";
@@ -505,7 +507,14 @@ export default function CMAPresentationBuilder() {
                       </SelectTrigger>
                       <SelectContent>
                         {PHOTO_LAYOUT_OPTIONS.map(opt => (
-                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          <SelectItem key={opt.value} value={opt.value}>
+                            <div className="flex items-center gap-2">
+                              {opt.value === 'ai_suggested' && (
+                                <Sparkles className="w-4 h-4 text-yellow-500" />
+                              )}
+                              {opt.label}
+                            </div>
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -534,6 +543,15 @@ export default function CMAPresentationBuilder() {
                   </div>
                 </CardContent>
               </Card>
+
+              {(config.photoLayout === 'ai_suggested' || config.photoLayout === 'custom') && (
+                <PhotoSelectionPreview 
+                  properties={subjectProperty ? [subjectProperty, ...comparables] : comparables}
+                  photoSource={config.photoLayout}
+                  photosPerProperty={parseInt(config.photosPerProperty) || 2}
+                  onSelectionChange={(selections) => setCustomPhotoSelections(selections)}
+                />
+              )}
             </TabsContent>
 
             <TabsContent value="content" className="space-y-4 mt-4">
