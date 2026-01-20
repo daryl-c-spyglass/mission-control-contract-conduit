@@ -31,6 +31,7 @@ import { DEFAULT_COVER_PAGE_CONFIG, LAYOUT_OPTIONS, PHOTO_LAYOUT_OPTIONS } from 
 import { CoverPageEditor } from "@/components/presentation/CoverPageEditor";
 import { CoverLetterEditor } from "@/components/presentation/CoverLetterEditor";
 import { CMAMap } from "@/components/cma-map";
+import { sanitizePhotoUrl } from "@/lib/cma-map-data";
 import { AdjustmentsSection } from "@/components/presentation/AdjustmentsSection";
 import { PhotoSelectionModal } from "@/components/presentation/PhotoSelectionModal";
 import { ExpandedPreviewModal } from "@/components/presentation/ExpandedPreviewModal";
@@ -192,7 +193,9 @@ export default function CMAPresentationBuilder() {
     livingArea: typeof comp.sqft === 'string' ? parseFloat(comp.sqft) : (comp.sqft || 0),
     simpleDaysOnMarket: comp.daysOnMarket || 0,
     yearBuilt: comp.yearBuilt || null,
-    photos: comp.photos || (comp.imageUrl ? [comp.imageUrl] : []),
+    photos: (comp.photos || (comp.imageUrl ? [comp.imageUrl] : []))
+      .map((url: string) => sanitizePhotoUrl(url))
+      .filter((url: string) => url.length > 0),
     // Ensure coordinates are in the format extractCoordinates expects
     map: comp.map || (comp.latitude && comp.longitude ? { latitude: comp.latitude, longitude: comp.longitude } : null),
     latitude: comp.latitude || comp.map?.latitude,

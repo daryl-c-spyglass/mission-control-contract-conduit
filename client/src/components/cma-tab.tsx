@@ -17,6 +17,7 @@ import { CMAMap } from "@/components/cma-map";
 import { CMAStatsView } from "@/components/cma-stats-view";
 import { CMAActionButtons } from "@/components/cma/CMAActionButtons";
 import { CMAPreviewBanner } from "@/components/cma/CMAPreviewBanner";
+import { sanitizePhotoUrl } from "@/lib/cma-map-data";
 import type { Transaction, CMAComparable, Cma, PropertyStatistics, CmaStatMetric, Property } from "@shared/schema";
 import { useLocation } from "wouter";
 import { 
@@ -273,8 +274,10 @@ export function CMATab({ transaction }: CMATabProps) {
     }
   };
   
-  const currentPhotos = selectedProperty?.photos || 
-    (selectedProperty?.imageUrl ? [selectedProperty.imageUrl] : []);
+  const currentPhotos = (selectedProperty?.photos || 
+    (selectedProperty?.imageUrl ? [selectedProperty.imageUrl] : []))
+    .map(sanitizePhotoUrl)
+    .filter((url: string) => url.length > 0);
   
   const handleCreateCMA = () => {
     const mlsData = transaction.mlsData as any;
@@ -537,6 +540,16 @@ export function CMATab({ transaction }: CMATabProps) {
             properties={cmaData as unknown as Property[]}
             subjectProperty={transaction.mlsData as unknown as Property | null}
             onPropertyClick={(property) => {
+              const propAny = property as any;
+              console.log('[CMA Map Click] Property received:', {
+                address: propAny.address,
+                photos: propAny.photos,
+                imageUrl: propAny.imageUrl,
+                hasPhotos: !!propAny.photos,
+                photosLength: propAny.photos?.length,
+                firstPhoto: propAny.photos?.[0],
+                allKeys: Object.keys(propAny)
+              });
               setSelectedProperty(property as unknown as CMAComparable);
               setPhotoIndex(0);
             }}
@@ -806,6 +819,13 @@ export function CMATab({ transaction }: CMATabProps) {
                   src={currentPhotos[photoIndex]}
                   alt={selectedProperty.address}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    console.error('[CMA Photo Error] Failed to load:', {
+                      src: currentPhotos[photoIndex],
+                      allPhotos: currentPhotos,
+                      selectedProperty: selectedProperty
+                    });
+                  }}
                 />
                 {currentPhotos.length > 1 && (
                   <>

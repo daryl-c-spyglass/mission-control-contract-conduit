@@ -12,6 +12,7 @@ import {
   SUBJECT_COLOR,
   STATUS_LABELS,
   formatFullPrice,
+  sanitizePhotoUrl,
   type CmaMapModel,
   type CmaPointProperties,
   type NormalizedStatus,
@@ -620,13 +621,18 @@ export function CMAMap({
           // Source may not be ready
         }
 
-        const parsedPhotos = typeof props.photos === 'string' 
+        const rawPhotos = typeof props.photos === 'string' 
           ? JSON.parse(props.photos) 
           : props.photos;
+        
+        // Sanitize photo URLs to strip any wrapping quotes
+        const parsedPhotos = (rawPhotos || [])
+          .map((url: string) => sanitizePhotoUrl(url))
+          .filter((url: string) => url.length > 0);
 
         setSelectedProperty({
           ...props,
-          photos: parsedPhotos || [],
+          photos: parsedPhotos,
         });
 
         const currentModel = modelRef.current;

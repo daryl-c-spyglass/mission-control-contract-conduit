@@ -221,13 +221,30 @@ function extractAddress(property: any): string {
   return 'Unknown Address';
 }
 
+/**
+ * Sanitize a photo URL by stripping any wrapping quotes that may have been 
+ * incorrectly added during JSON serialization/parsing.
+ * e.g., '"https://..." ' -> 'https://...'
+ */
+export function sanitizePhotoUrl(url: string): string {
+  if (!url || typeof url !== 'string') return '';
+  // Strip leading and trailing quotes (single or double) and whitespace
+  return url.replace(/^["'\s]+|["'\s]+$/g, '');
+}
+
 function extractPhotos(property: any): string[] {
-  if (property?.photos && Array.isArray(property.photos)) return property.photos;
-  if (property?.images && Array.isArray(property.images)) return property.images;
-  if (property?.media && Array.isArray(property.media)) {
-    return property.media.map((m: any) => m.mediaURL || m.mediaUrl).filter(Boolean);
+  let photos: string[] = [];
+  
+  if (property?.photos && Array.isArray(property.photos)) {
+    photos = property.photos;
+  } else if (property?.images && Array.isArray(property.images)) {
+    photos = property.images;
+  } else if (property?.media && Array.isArray(property.media)) {
+    photos = property.media.map((m: any) => m.mediaURL || m.mediaUrl).filter(Boolean);
   }
-  return [];
+  
+  // Sanitize all photo URLs to strip any wrapping quotes
+  return photos.map(sanitizePhotoUrl).filter(url => url.length > 0);
 }
 
 function extractMlsNumber(property: any): string | null {
