@@ -30,7 +30,7 @@ import { CMA_REPORT_SECTIONS, DEFAULT_ENABLED_SECTIONS } from "@shared/cma-secti
 import { DEFAULT_COVER_PAGE_CONFIG, LAYOUT_OPTIONS, PHOTO_LAYOUT_OPTIONS } from "@shared/cma-defaults";
 import { CoverPageEditor } from "@/components/presentation/CoverPageEditor";
 import { CoverLetterEditor } from "@/components/presentation/CoverLetterEditor";
-import { MapboxCMAMap } from "@/components/presentation/MapboxCMAMap";
+import { CMAMap } from "@/components/cma-map";
 import { AdjustmentsSection } from "@/components/presentation/AdjustmentsSection";
 import { PhotoSelectionModal } from "@/components/presentation/PhotoSelectionModal";
 import { ExpandedPreviewModal } from "@/components/presentation/ExpandedPreviewModal";
@@ -319,16 +319,6 @@ export default function CMAPresentationBuilder() {
     setSelectedPropertyForPhotos(null);
   };
 
-  const mapProperties = properties.map(p => ({
-    id: p.mlsNumber || p.id || '',
-    address: getPropertyAddress(p),
-    lat: p.latitude || 0,
-    lng: p.longitude || 0,
-    price: p.closePrice || p.listPrice || 0,
-    status: p.standardStatus || '',
-    isSubject: p.mlsNumber === cma?.subjectPropertyId,
-  })).filter(p => p.lat && p.lng);
-
   if (cmaLoading || configLoading) {
     return (
       <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -517,21 +507,28 @@ export default function CMAPresentationBuilder() {
             <TabsContent value="map" className="space-y-4 mt-4">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Map Settings</CardTitle>
-                  <CardDescription>Configure the map display in your presentation</CardDescription>
+                  <CardTitle className="text-base">Map Preview</CardTitle>
+                  <CardDescription>Interactive map showing subject property and comparables</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <MapboxCMAMap
-                    properties={mapProperties}
-                    subjectProperty={mapProperties.find(p => p.isSubject)}
-                    style={config.mapStyle as 'streets' | 'satellite' | 'dark' || 'streets'}
-                    showPolygon={config.showMapPolygon ?? true}
-                    onStyleChange={(style) => setConfig({ ...config, mapStyle: style })}
-                    onPolygonChange={(show) => setConfig({ ...config, showMapPolygon: show })}
-                    height="350px"
-                  />
+                <CardContent className="p-0">
+                  <div className="h-[450px] relative">
+                    <CMAMap
+                      properties={comparables}
+                      subjectProperty={subjectProperty || null}
+                      showPolygon={config.showMapPolygon ?? true}
+                    />
+                  </div>
                 </CardContent>
               </Card>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="showPolygon"
+                  checked={config.showMapPolygon ?? true}
+                  onCheckedChange={(show) => setConfig({ ...config, showMapPolygon: show })}
+                  data-testid="switch-show-polygon"
+                />
+                <Label htmlFor="showPolygon" className="text-sm">Show search area polygon in report</Label>
+              </div>
             </TabsContent>
 
             <TabsContent value="photos" className="space-y-4 mt-4">
