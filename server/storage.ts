@@ -19,6 +19,8 @@ import {
   type InsertCmaReportTemplate,
   type NotificationSetting,
   type InsertNotificationSetting,
+  type AgentProfile,
+  type UpdateAgentProfile,
   transactions,
   coordinators,
   integrationSettings,
@@ -29,6 +31,7 @@ import {
   cmaReportConfigs,
   cmaReportTemplates,
   notificationSettings,
+  agentProfiles,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, isNull, and } from "drizzle-orm";
@@ -99,6 +102,10 @@ export interface IStorage {
   getGlobalNotificationSettings(userId: string): Promise<NotificationSetting | undefined>;
   upsertNotificationSettings(settings: InsertNotificationSetting): Promise<NotificationSetting>;
   getTransactionsWithClosingReminders(): Promise<Transaction[]>;
+
+  // Agent Profiles
+  getAgentProfile(userId: string): Promise<AgentProfile | undefined>;
+  updateAgentProfile(userId: string, profile: UpdateAgentProfile): Promise<AgentProfile | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -485,6 +492,36 @@ export class DatabaseStorage implements IStorage {
       t.status !== 'closed' && 
       t.status !== 'cancelled'
     );
+  }
+
+  // Agent Profiles
+  async getAgentProfile(userId: string): Promise<AgentProfile | undefined> {
+    const [profile] = await db
+      .select()
+      .from(agentProfiles)
+      .where(eq(agentProfiles.userId, userId))
+      .limit(1);
+    return profile;
+  }
+
+  async updateAgentProfile(userId: string, profile: UpdateAgentProfile): Promise<AgentProfile | undefined> {
+    const existing = await this.getAgentProfile(userId);
+    
+    if (!existing) {
+      // Create new profile if doesn't exist (upsert)
+      const [created] = await db
+        .insert(agentProfiles)
+        .values({ userId, ...profile })
+        .returning();
+      return created;
+    }
+    
+    const [updated] = await db
+      .update(agentProfiles)
+      .set({ ...profile, updatedAt: new Date() })
+      .where(eq(agentProfiles.userId, userId))
+      .returning();
+    return updated;
   }
 }
 
