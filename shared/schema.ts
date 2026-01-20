@@ -263,6 +263,7 @@ export const agentProfiles = pgTable("agent_profiles", {
   linkedinUrl: text("linkedin_url"),
   twitterUrl: text("twitter_url"),
   websiteUrl: text("website_url"),
+  marketingCompany: text("marketing_company"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -337,6 +338,7 @@ export const updateAgentProfileSchema = z.object({
   linkedinUrl: z.string().url().optional().or(z.literal('')),
   twitterUrl: z.string().url().optional().or(z.literal('')),
   websiteUrl: z.string().url().optional().or(z.literal('')),
+  marketingCompany: z.string().optional(),
 });
 
 // Types
