@@ -1,0 +1,484 @@
+Update the CMA Presentation Builder's Report Sections UI to include category dividers/headers that group sections into Introduction, Listings, and Analysis.
+
+---
+
+## CURRENT STATE
+
+The sections are listed flat without visual grouping.
+
+---
+
+## TARGET STATE (See Screenshot)
+
+Sections should be grouped under collapsible category headers:
+
+1. **Introduction** (7/7) - Document icon, shows enabled count
+2. **Listings** (6/6) - Home icon, shows enabled count  
+3. **Analysis** (4/4) - Chart icon, shows enabled count
+
+Each category header:
+- Has an icon on the left
+- Shows category name
+- Shows count badge (enabled/total) e.g., "7/7"
+- Is collapsible (chevron on right)
+- Has slightly different background/styling than section rows
+
+Each section row within a category:
+- Has drag handle (6 dots) on left for reordering
+- Section name
+- Subtitle for customizable sections ("Customizable content")
+- Up/down arrows for manual reordering
+- Toggle switch on right
+
+---
+
+## IMPLEMENTATION
+
+### Step 1: Define Section Categories and Data Structure
+```tsx
+// Types for sections
+interface CMASectionItem {
+  id: string;
+  name: string;
+  enabled: boolean;
+  order: number;
+  customizable?: boolean;
+  customizableLabel?: string;
+}
+
+interface CMASectionCategory {
+  id: 'introduction' | 'listings' | 'analysis';
+  name: string;
+  icon: React.ReactNode;
+  sections: CMASectionItem[];
+}
+
+// Initial section configuration
+const initialSections: CMASectionCategory[] = [
+  {
+    id: 'introduction',
+    name: 'Introduction',
+    icon: <FileText className="w-4 h-4" />,
+    sections: [
+      { id: 'cover-page', name: 'Cover Page', enabled: true, order: 1 },
+      { id: 'listing-brochure', name: 'Listing Brochure', enabled: true, order: 2 },
+      { id: 'cover-letter', name: 'Cover Letter', enabled: true, order: 3, customizable: true, customizableLabel: 'Customizable content' },
+      { id: 'agent-resume', name: 'Agent Resume', enabled: true, order: 4, customizable: true, customizableLabel: 'Customizable content' },
+      { id: 'our-company', name: 'Our Company', enabled: true, order: 5 },
+      { id: 'what-is-cma', name: 'What is a CMA?', enabled: true, order: 6 },
+      { id: 'contact-me', name: 'Contact Me', enabled: true, order: 7 },
+    ],
+  },
+  {
+    id: 'listings',
+    name: 'Listings',
+    icon: <Home className="w-4 h-4" />,
+    sections: [
+      { id: 'map-all-listings', name: 'Map of All Listings', enabled: true, order: 8 },
+      { id: 'summary-comparables', name: 'Summary of Comparable Properties', enabled: true, order: 9 },
+      { id: 'listings-header', name: 'Listings Chapter Header', enabled: true, order: 10 },
+      { id: 'property-details', name: 'Property Details', enabled: true, order: 11 },
+      { id: 'property-photos', name: 'Property Photos', enabled: true, order: 12 },
+      { id: 'adjustments', name: 'Adjustments', enabled: true, order: 13 },
+    ],
+  },
+  {
+    id: 'analysis',
+    name: 'Analysis',
+    icon: <BarChart3 className="w-4 h-4" />,
+    sections: [
+      { id: 'analysis-header', name: 'Analysis Chapter Header', enabled: true, order: 14 },
+      { id: 'online-valuation', name: 'Online Valuation Analysis', enabled: true, order: 15 },
+      { id: 'avg-price-sqft', name: 'Average Price Per Sq. Ft.', enabled: true, order: 16 },
+      { id: 'comparable-stats', name: 'Comparable Property Statistics', enabled: true, order: 17 },
+    ],
+  },
+];
+```
+
+### Step 2: Create the Report Sections Component
+```tsx
+import { useState } from 'react';
+import { 
+  FileText, 
+  Home, 
+  BarChart3, 
+  ChevronUp, 
+  ChevronDown, 
+  GripVertical 
+} from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
+
+interface ReportSectionsProps {
+  sections: CMASectionCategory[];
+  onSectionsChange: (sections: CMASectionCategory[]) => void;
+}
+
+export function ReportSections({ sections, onSectionsChange }: ReportSectionsProps) {
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
+    introduction: true,
+    listings: true,
+    analysis: true,
+  });
+
+  // Toggle category expansion
+  const toggleCategory = (categoryId: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId],
+    }));
+  };
+
+  // Toggle section enabled/disabled
+  const toggleSection = (categoryId: string, sectionId: string) => {
+    const updatedSections = sections.map(category => {
+      if (category.id === categoryId) {
+        return {
+          ...category,
+          sections: category.sections.map(section => 
+            section.id === sectionId 
+              ? { ...section, enabled: !section.enabled }
+              : section
+          ),
+        };
+      }
+      return category;
+    });
+    onSectionsChange(updatedSections);
+  };
+
+  // Move section up within category
+  const moveSectionUp = (categoryId: string, sectionIndex: number) => {
+    if (sectionIndex === 0) return;
+    
+    const updatedSections = sections.map(category => {
+      if (category.id === categoryId) {
+        const newSections = [...category.sections];
+        [newSections[sectionIndex - 1], newSections[sectionIndex]] = 
+          [newSections[sectionIndex], newSections[sectionIndex - 1]];
+        return { ...category, sections: newSections };
+      }
+      return category;
+    });
+    onSectionsChange(updatedSections);
+  };
+
+  // Move section down within category
+  const moveSectionDown = (categoryId: string, sectionIndex: number, totalSections: number) => {
+    if (sectionIndex === totalSections - 1) return;
+    
+    const updatedSections = sections.map(category => {
+      if (category.id === categoryId) {
+        const newSections = [...category.sections];
+        [newSections[sectionIndex], newSections[sectionIndex + 1]] = 
+          [newSections[sectionIndex + 1], newSections[sectionIndex]];
+        return { ...category, sections: newSections };
+      }
+      return category;
+    });
+    onSectionsChange(updatedSections);
+  };
+
+  // Calculate enabled count for category
+  const getEnabledCount = (category: CMASectionCategory) => {
+    const enabled = category.sections.filter(s => s.enabled).length;
+    const total = category.sections.length;
+    return `${enabled}/${total}`;
+  };
+
+  return (
+    <div className="space-y-1">
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold">Report Sections</h3>
+        <p className="text-sm text-muted-foreground">
+          Toggle sections on/off and reorder them for your presentation
+        </p>
+      </div>
+
+      {sections.map((category) => (
+        <div key={category.id} className="border rounded-lg overflow-hidden">
+          {/* Category Header */}
+          <button
+            onClick={() => toggleCategory(category.id)}
+            className={cn(
+              "w-full flex items-center justify-between px-4 py-3",
+              "bg-muted/50 hover:bg-muted/70 transition-colors",
+              "border-b border-border"
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-muted-foreground">
+                {category.icon}
+              </span>
+              <span className="font-medium">{category.name}</span>
+              <span className="px-2 py-0.5 text-xs font-medium bg-background border rounded-full">
+                {getEnabledCount(category)}
+              </span>
+            </div>
+            <ChevronDown 
+              className={cn(
+                "w-4 h-4 text-muted-foreground transition-transform",
+                expandedCategories[category.id] && "rotate-180"
+              )} 
+            />
+          </button>
+
+          {/* Category Sections */}
+          {expandedCategories[category.id] && (
+            <div className="divide-y divide-border">
+              {category.sections.map((section, index) => (
+                <div
+                  key={section.id}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3",
+                    "hover:bg-muted/30 transition-colors"
+                  )}
+                >
+                  {/* Drag Handle */}
+                  <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
+
+                  {/* Section Name */}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm">{section.name}</div>
+                    {section.customizable && (
+                      <div className="text-xs text-muted-foreground">
+                        {section.customizableLabel}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Reorder Buttons */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => moveSectionUp(category.id, index)}
+                      disabled={index === 0}
+                      className={cn(
+                        "p-1 rounded hover:bg-muted transition-colors",
+                        index === 0 && "opacity-30 cursor-not-allowed"
+                      )}
+                    >
+                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                    </button>
+                    <button
+                      onClick={() => moveSectionDown(category.id, index, category.sections.length)}
+                      disabled={index === category.sections.length - 1}
+                      className={cn(
+                        "p-1 rounded hover:bg-muted transition-colors",
+                        index === category.sections.length - 1 && "opacity-30 cursor-not-allowed"
+                      )}
+                    >
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                    </button>
+                  </div>
+
+                  {/* Toggle Switch */}
+                  <Switch
+                    checked={section.enabled}
+                    onCheckedChange={() => toggleSection(category.id, section.id)}
+                    className="data-[state=checked]:bg-orange-500"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+### Step 3: Use in Presentation Builder Page
+```tsx
+// In your PresentationBuilder component
+
+import { useState } from 'react';
+import { ReportSections } from './ReportSections';
+import { FileText, Home, BarChart3 } from 'lucide-react';
+
+export function PresentationBuilder({ transactionId }: { transactionId: number }) {
+  const [sections, setSections] = useState<CMASectionCategory[]>([
+    {
+      id: 'introduction',
+      name: 'Introduction',
+      icon: <FileText className="w-4 h-4" />,
+      sections: [
+        { id: 'cover-page', name: 'Cover Page', enabled: true, order: 1 },
+        { id: 'listing-brochure', name: 'Listing Brochure', enabled: true, order: 2 },
+        { id: 'cover-letter', name: 'Cover Letter', enabled: true, order: 3, customizable: true, customizableLabel: 'Customizable content' },
+        { id: 'agent-resume', name: 'Agent Resume', enabled: true, order: 4, customizable: true, customizableLabel: 'Customizable content' },
+        { id: 'our-company', name: 'Our Company', enabled: true, order: 5 },
+        { id: 'what-is-cma', name: 'What is a CMA?', enabled: true, order: 6 },
+        { id: 'contact-me', name: 'Contact Me', enabled: true, order: 7 },
+      ],
+    },
+    {
+      id: 'listings',
+      name: 'Listings',
+      icon: <Home className="w-4 h-4" />,
+      sections: [
+        { id: 'map-all-listings', name: 'Map of All Listings', enabled: true, order: 8 },
+        { id: 'summary-comparables', name: 'Summary of Comparable Properties', enabled: true, order: 9 },
+        { id: 'listings-header', name: 'Listings Chapter Header', enabled: true, order: 10 },
+        { id: 'property-details', name: 'Property Details', enabled: true, order: 11 },
+        { id: 'property-photos', name: 'Property Photos', enabled: true, order: 12 },
+        { id: 'adjustments', name: 'Adjustments', enabled: true, order: 13 },
+      ],
+    },
+    {
+      id: 'analysis',
+      name: 'Analysis',
+      icon: <BarChart3 className="w-4 h-4" />,
+      sections: [
+        { id: 'analysis-header', name: 'Analysis Chapter Header', enabled: true, order: 14 },
+        { id: 'online-valuation', name: 'Online Valuation Analysis', enabled: true, order: 15 },
+        { id: 'avg-price-sqft', name: 'Average Price Per Sq. Ft.', enabled: true, order: 16 },
+        { id: 'comparable-stats', name: 'Comparable Property Statistics', enabled: true, order: 17 },
+      ],
+    },
+  ]);
+
+  // Calculate total enabled sections for Live Preview header
+  const totalEnabledSections = sections.reduce(
+    (total, category) => total + category.sections.filter(s => s.enabled).length,
+    0
+  );
+
+  return (
+    <div className="grid grid-cols-[1fr,400px] gap-6">
+      {/* Left Panel - Sections/Content/Layout Tabs */}
+      <div className="space-y-6">
+        <Tabs defaultValue="sections">
+          <TabsList>
+            <TabsTrigger value="sections" className="flex items-center gap-2">
+              <LayoutGrid className="w-4 h-4" />
+              Sections
+            </TabsTrigger>
+            <TabsTrigger value="content" className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Content
+            </TabsTrigger>
+            <TabsTrigger value="layout" className="flex items-center gap-2">
+              <Layout className="w-4 h-4" />
+              Layout
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="sections" className="mt-4">
+            <ReportSections 
+              sections={sections} 
+              onSectionsChange={setSections} 
+            />
+          </TabsContent>
+
+          <TabsContent value="content">
+            {/* Content tab for customizable sections */}
+          </TabsContent>
+
+          <TabsContent value="layout">
+            {/* Layout options */}
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Right Panel - Live Preview */}
+      <div className="border rounded-lg p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold">Live Preview</h3>
+            <p className="text-sm text-muted-foreground">
+              Preview how your CMA presentation will appear
+            </p>
+          </div>
+          <span className="text-sm text-muted-foreground">
+            {totalEnabledSections} sections
+          </span>
+        </div>
+        
+        {/* Preview content */}
+        <div className="space-y-4">
+          {/* Render preview cards for enabled sections */}
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### Step 4: Style the Orange Toggle Switches
+
+Make sure your Switch component uses the orange brand color when checked:
+```css
+/* In your globals.css or tailwind config */
+.data-[state=checked]:bg-orange-500 {
+  background-color: #F37216 !important;
+}
+```
+
+Or override in the component:
+```tsx
+<Switch
+  checked={section.enabled}
+  onCheckedChange={() => toggleSection(category.id, section.id)}
+  className="data-[state=checked]:bg-[#F37216]"
+/>
+```
+
+---
+
+## VISUAL REFERENCE
+
+The final structure should look like:
+┌─────────────────────────────────────────────────────────┐
+│ Report Sections                                         │
+│ Toggle sections on/off and reorder them for your...     │
+├─────────────────────────────────────────────────────────┤
+│ 📄 Introduction                              7/7    ▼   │
+├─────────────────────────────────────────────────────────┤
+│   ⋮⋮  Cover Page                           ▲ ▼    🔘   │
+│   ⋮⋮  Listing Brochure                     ▲ ▼    🔘   │
+│   ⋮⋮  Cover Letter                         ▲ ▼    🔘   │
+│       Customizable content                              │
+│   ⋮⋮  Agent Resume                         ▲ ▼    🔘   │
+│       Customizable content                              │
+│   ⋮⋮  Our Company                          ▲ ▼    🔘   │
+│   ⋮⋮  What is a CMA?                       ▲ ▼    🔘   │
+│   ⋮⋮  Contact Me                           ▲ ▼    🔘   │
+├─────────────────────────────────────────────────────────┤
+│ 🏠 Listings                                  6/6    ▼   │
+├─────────────────────────────────────────────────────────┤
+│   ⋮⋮  Map of All Listings                  ▲ ▼    🔘   │
+│   ⋮⋮  Summary of Comparable Properties     ▲ ▼    🔘   │
+│   ⋮⋮  Listings Chapter Header              ▲ ▼    🔘   │
+│   ⋮⋮  Property Details                     ▲ ▼    🔘   │
+│   ⋮⋮  Property Photos                      ▲ ▼    🔘   │
+│   ⋮⋮  Adjustments                          ▲ ▼    🔘   │
+├─────────────────────────────────────────────────────────┤
+│ 📊 Analysis                                  4/4    ▼   │
+├─────────────────────────────────────────────────────────┤
+│   ⋮⋮  Analysis Chapter Header              ▲ ▼    🔘   │
+│   ⋮⋮  Online Valuation Analysis            ▲ ▼    🔘   │
+│   ⋮⋮  Average Price Per Sq. Ft.            ▲ ▼    🔘   │
+│   ⋮⋮  Comparable Property Statistics       ▲ ▼    🔘   │
+└─────────────────────────────────────────────────────────┘
+Legend:
+⋮⋮ = Drag handle (GripVertical icon)
+▲ ▼ = Up/Down reorder buttons (ChevronUp/ChevronDown)
+🔘 = Toggle switch (orange when ON)
+▼ = Collapse/expand chevron on category header
+
+---
+
+## VERIFICATION CHECKLIST
+
+1. [ ] Three category headers display: Introduction, Listings, Analysis
+2. [ ] Each category shows correct icon (FileText, Home, BarChart3)
+3. [ ] Count badge shows enabled/total (e.g., "7/7")
+4. [ ] Categories are collapsible (click header to expand/collapse)
+5. [ ] Each section row has drag handle on left
+6. [ ] Up/down arrows work for reordering within category
+7. [ ] Toggle switches are orange (#F37216) when enabled
+8. [ ] "Customizable content" subtitle shows under Cover Letter and Agent Resume
+9. [ ] Count badge updates when sections are toggled off
+10. [ ] Section order persists when reordered

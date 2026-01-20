@@ -35,6 +35,7 @@ import { PhotoSelectionModal } from "@/components/presentation/PhotoSelectionMod
 import { ExpandedPreviewModal } from "@/components/presentation/ExpandedPreviewModal";
 import { ListingBrochureContent } from "@/components/presentation/ListingBrochureContent";
 import { CMAPreviewContent } from "@/components/presentation/CMAPreviewContent";
+import { ReportSections } from "@/components/presentation/ReportSections";
 import { transformToCMAReportData } from "@/lib/cma-transformer";
 import { pdf } from '@react-pdf/renderer';
 import { CMAPdfDocument } from "@/components/pdf/CMAPdfDocument";
@@ -425,28 +426,14 @@ export default function CMAPresentationBuilder() {
 
             <TabsContent value="sections" className="space-y-4 mt-4">
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Report Sections</CardTitle>
-                  <CardDescription>Drag to reorder, toggle to include/exclude sections</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <SortableContext items={sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
-                      <div className="space-y-2">
-                        {sections.map((section) => (
-                          <SortableSectionItem
-                            key={section.id}
-                            section={section}
-                            onToggle={handleSectionToggle}
-                          />
-                        ))}
-                      </div>
-                    </SortableContext>
-                  </DndContext>
+                <CardContent className="pt-6">
+                  <ReportSections
+                    includedSections={config.includedSections}
+                    sectionOrder={config.sectionOrder}
+                    onSectionsChange={(includedSections, sectionOrder) => 
+                      setConfig({ ...config, includedSections, sectionOrder })
+                    }
+                  />
                 </CardContent>
               </Card>
 
