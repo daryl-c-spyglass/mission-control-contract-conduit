@@ -1,0 +1,306 @@
+Update the Agent Marketing Profile section in Settings to match the Client Data Portal's Profile Information layout.
+
+---
+
+## CURRENT STATE (Settings Page - Agent Marketing Profile)
+- Display Name (single field)
+- Title
+- Phone Number
+- Email Address
+- Profile Photo with "Change Photo" button
+- Save Marketing Profile button
+
+---
+
+## TARGET STATE (Client Data Portal Style)
+- Profile Photo section with:
+  - Photo preview
+  - URL input field showing the image path
+  - "Change" button
+- First Name (separate field)
+- Last Name (separate field)  
+- Email (auto-filled from Google login, read-only with gray background)
+- Phone (Texas format: XXX-XXX-XXXX with auto-formatting)
+- Title
+- Company (defaults to "Spyglass Realty" but editable)
+- Save Marketing Profile button
+
+---
+
+## IMPLEMENTATION TASKS
+
+### Task 1: Update the Form Layout
+
+Find the Agent Marketing Profile section in the Settings page and restructure the fields:
+```tsx
+// BEFORE (current structure)
+<div className="grid grid-cols-2 gap-4">
+  <div className="space-y-2">
+    <Label htmlFor="displayName">Display Name</Label>
+    <Input id="displayName" value={displayName} onChange={...} />
+  </div>
+  <div className="space-y-2">
+    <Label htmlFor="title">Title</Label>
+    <Input id="title" value={title} onChange={...} />
+  </div>
+  <div className="space-y-2">
+    <Label htmlFor="phoneNumber">Phone Number</Label>
+    <Input id="phoneNumber" value={phoneNumber} onChange={...} />
+  </div>
+  <div className="space-y-2">
+    <Label htmlFor="emailAddress">Email Address</Label>
+    <Input id="emailAddress" value={emailAddress} onChange={...} />
+  </div>
+</div>
+
+// AFTER (new structure matching Client Data Portal)
+<div className="space-y-6">
+  {/* Profile Photo Section */}
+  <div className="flex items-start gap-4">
+    <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-gray-200">
+      <img src={profilePhoto || '/default-avatar.png'} alt="Profile" className="w-full h-full object-cover" />
+    </div>
+    <div className="flex-1 space-y-2">
+      <Label className="text-sm text-muted-foreground">Profile Photo</Label>
+      <p className="text-xs text-muted-foreground">Upload a professional headshot photo (max 5MB, JPG or PNG) or paste an image URL.</p>
+      <Input 
+        value={profilePhoto || ''} 
+        onChange={(e) => setProfilePhoto(e.target.value)}
+        placeholder="/objects/uploads/..."
+        className="text-sm"
+      />
+      <Button variant="outline" size="sm" onClick={handlePhotoUpload}>
+        <Upload className="w-4 h-4 mr-2" />
+        Change
+      </Button>
+    </div>
+  </div>
+
+  {/* Name Fields Row */}
+  <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-2">
+      <Label htmlFor="firstName">First Name</Label>
+      <Input 
+        id="firstName" 
+        value={firstName} 
+        onChange={(e) => setFirstName(e.target.value)}
+        placeholder="Daryl"
+      />
+    </div>
+    <div className="space-y-2">
+      <Label htmlFor="lastName">Last Name</Label>
+      <Input 
+        id="lastName" 
+        value={lastName} 
+        onChange={(e) => setLastName(e.target.value)}
+        placeholder="Camingao"
+      />
+    </div>
+  </div>
+
+  {/* Email and Phone Row */}
+  <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-2">
+      <Label htmlFor="email">Email</Label>
+      <Input 
+        id="email" 
+        value={email} 
+        readOnly
+        disabled
+        className="bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
+        placeholder="daryl@spyglassrealty.com"
+      />
+    </div>
+    <div className="space-y-2">
+      <Label htmlFor="phone">Phone</Label>
+      <Input 
+        id="phone" 
+        value={phone} 
+        onChange={handlePhoneChange}
+        placeholder="512-452-4125"
+      />
+    </div>
+  </div>
+
+  {/* Title and Company Row */}
+  <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-2">
+      <Label htmlFor="title">Title</Label>
+      <Input 
+        id="title" 
+        value={title} 
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="AI Developer"
+      />
+    </div>
+    <div className="space-y-2">
+      <Label htmlFor="company">Company</Label>
+      <Input 
+        id="company" 
+        value={company} 
+        onChange={(e) => setCompany(e.target.value)}
+        placeholder="Spyglass Realty"
+      />
+    </div>
+  </div>
+</div>
+```
+
+---
+
+### Task 2: Add Phone Number Formatting (Texas Format)
+
+Create a helper function to format phone numbers as XXX-XXX-XXXX:
+```tsx
+// Phone formatting function
+const formatPhoneNumber = (value: string): string => {
+  // Remove all non-numeric characters
+  const cleaned = value.replace(/\D/g, '');
+  
+  // Apply formatting based on length
+  if (cleaned.length <= 3) {
+    return cleaned;
+  } else if (cleaned.length <= 6) {
+    return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
+  } else {
+    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+  }
+};
+
+// Phone change handler
+const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const formatted = formatPhoneNumber(e.target.value);
+  setPhone(formatted);
+};
+```
+
+---
+
+### Task 3: Update State Management
+
+Update the component state to use the new field structure:
+```tsx
+// Replace displayName with firstName/lastName
+const [firstName, setFirstName] = useState('');
+const [lastName, setLastName] = useState('');
+const [email, setEmail] = useState(''); // Read-only from auth
+const [phone, setPhone] = useState('');
+const [title, setTitle] = useState('');
+const [company, setCompany] = useState('Spyglass Realty'); // Default value
+const [profilePhoto, setProfilePhoto] = useState('');
+
+// Load data from API
+useEffect(() => {
+  if (profileData) {
+    setFirstName(profileData.user?.firstName || '');
+    setLastName(profileData.user?.lastName || '');
+    setEmail(profileData.user?.email || ''); // Auto-filled from login
+    setPhone(formatPhoneNumber(profileData.user?.phone || ''));
+    setTitle(profileData.profile?.title || '');
+    setCompany(profileData.user?.company || 'Spyglass Realty');
+    setProfilePhoto(profileData.user?.picture || '');
+  }
+}, [profileData]);
+```
+
+---
+
+### Task 4: Update Save Function
+
+Update the save mutation to send the new field structure:
+```tsx
+const saveMutation = useMutation({
+  mutationFn: async () => {
+    const response = await fetch('/api/agent/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user: {
+          firstName,
+          lastName,
+          phone: phone.replace(/\D/g, ''), // Store unformatted
+          company,
+          picture: profilePhoto,
+        },
+        profile: {
+          title,
+          // ... other profile fields
+        },
+      }),
+    });
+    if (!response.ok) throw new Error('Failed to save');
+    return response.json();
+  },
+  onSuccess: () => {
+    toast({ title: 'Saved', description: 'Marketing profile updated successfully.' });
+    queryClient.invalidateQueries({ queryKey: ['agent-profile'] });
+  },
+});
+```
+
+---
+
+### Task 5: Update Header Text
+
+Change the section header to match:
+```tsx
+// BEFORE
+<CardHeader>
+  <CardTitle className="flex items-center gap-2">
+    <User className="h-5 w-5 text-orange-500" />
+    Agent Marketing Profile
+  </CardTitle>
+  <CardDescription>Your headshot and contact info will appear on flyers and marketing materials</CardDescription>
+</CardHeader>
+
+// AFTER  
+<CardHeader>
+  <CardTitle className="flex items-center gap-2">
+    <User className="h-5 w-5 text-orange-500" />
+    Agent Marketing Profile
+  </CardTitle>
+  <CardDescription>Your personal information displayed on CMA reports</CardDescription>
+</CardHeader>
+```
+
+---
+
+### Task 6: Verify Database Schema
+
+The users table should already have these columns from previous work:
+- firstName
+- lastName  
+- email (from Google OAuth)
+- phone
+- company
+- picture
+
+If any are missing, add a migration:
+```sql
+ALTER TABLE users ADD COLUMN IF NOT EXISTS company VARCHAR(255) DEFAULT 'Spyglass Realty';
+```
+
+---
+
+## VERIFICATION CHECKLIST
+
+After implementing, verify:
+
+1. [ ] First Name and Last Name fields display separately
+2. [ ] Email field is auto-populated from login and read-only (grayed out)
+3. [ ] Phone number auto-formats as XXX-XXX-XXXX when typing
+4. [ ] Company field defaults to "Spyglass Realty" for new users
+5. [ ] Company field is editable
+6. [ ] Profile photo shows with URL input and Change button
+7. [ ] Save button saves all fields correctly
+8. [ ] Marketing materials (flyers, graphics) use First Name + Last Name as display name
+9. [ ] Phone number appears formatted on generated materials
+
+---
+
+## IMPORTANT NOTES
+
+1. **Email is READ-ONLY** - it comes from Google OAuth login and should not be editable
+2. **Phone formatting** - Store unformatted in database (5124524125), display formatted (512-452-4125)
+3. **Company default** - Default to "Spyglass Realty" but allow edits for non-Spyglass agents
+4. **Display Name for flyers** - When generating marketing materials, concatenate: `${firstName} ${lastName}`

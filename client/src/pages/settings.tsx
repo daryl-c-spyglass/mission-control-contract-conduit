@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Trash2, Loader2, UserPlus, Save, Mail, CheckCircle2, ExternalLink, User, Camera, Bell } from "lucide-react";
+import { Plus, Trash2, Loader2, UserPlus, Save, Mail, CheckCircle2, ExternalLink, User, Camera, Bell, FileText, Sparkles, Link as LinkIcon } from "lucide-react";
+import { SiFacebook, SiInstagram, SiLinkedin, SiX } from "react-icons/si";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,16 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
+import type { AgentProfile } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -53,6 +63,19 @@ export default function Settings() {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Agent profile state (Bio, Cover Letter, Social Links)
+  const [agentProfile, setAgentProfile] = useState({
+    bio: "",
+    defaultCoverLetter: "",
+    facebookUrl: "",
+    instagramUrl: "",
+    linkedinUrl: "",
+    twitterUrl: "",
+    websiteUrl: "",
+  });
+  const [coverLetterTone, setCoverLetterTone] = useState<'professional' | 'friendly' | 'confident'>('professional');
+  const [isGeneratingCoverLetter, setIsGeneratingCoverLetter] = useState(false);
+
   // Notification settings state
   const [notificationSettings, setNotificationSettings] = useState({
     documentUploads: true,
@@ -85,6 +108,29 @@ export default function Settings() {
   const { data: coordinators = [], isLoading } = useQuery<Coordinator[]>({
     queryKey: ["/api/coordinators"],
   });
+
+  // Agent profile query
+  const { data: agentProfileData } = useQuery<{
+    profile: AgentProfile | null;
+    user: any;
+  }>({
+    queryKey: ["/api/agent/profile"],
+  });
+
+  // Load agent profile when data arrives
+  useEffect(() => {
+    if (agentProfileData?.profile) {
+      setAgentProfile({
+        bio: agentProfileData.profile.bio || "",
+        defaultCoverLetter: agentProfileData.profile.defaultCoverLetter || "",
+        facebookUrl: agentProfileData.profile.facebookUrl || "",
+        instagramUrl: agentProfileData.profile.instagramUrl || "",
+        linkedinUrl: agentProfileData.profile.linkedinUrl || "",
+        twitterUrl: agentProfileData.profile.twitterUrl || "",
+        websiteUrl: agentProfileData.profile.websiteUrl || "",
+      });
+    }
+  }, [agentProfileData]);
 
   // Notification settings query
   const { data: savedNotificationSettings } = useQuery<{
@@ -244,6 +290,68 @@ export default function Settings() {
       });
     },
   });
+
+  const updateAgentProfileMutation = useMutation({
+    mutationFn: async (data: typeof agentProfile) => {
+      const res = await apiRequest("PUT", "/api/agent/profile", { profile: data });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Profile saved", description: "Your bio and cover letter have been updated." });
+      queryClient.invalidateQueries({ queryKey: ["/api/agent/profile"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save profile",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateSocialLinksMutation = useMutation({
+    mutationFn: async (data: Partial<typeof agentProfile>) => {
+      const res = await apiRequest("PUT", "/api/agent/profile", { profile: data });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Social links saved", description: "Your social media links have been updated." });
+      queryClient.invalidateQueries({ queryKey: ["/api/agent/profile"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save social links",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleGenerateCoverLetter = async () => {
+    setIsGeneratingCoverLetter(true);
+    try {
+      const res = await apiRequest("POST", "/api/ai/generate-default-cover-letter", {
+        tone: coverLetterTone,
+        existingCoverLetter: agentProfile.defaultCoverLetter || undefined,
+      });
+      const data = await res.json();
+      if (data.coverLetter) {
+        setAgentProfile(prev => ({ ...prev, defaultCoverLetter: data.coverLetter }));
+        toast({
+          title: data.mode === 'enhanced' ? "Cover letter enhanced" : "Cover letter generated",
+          description: "Review and save when ready.",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate cover letter",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingCoverLetter(false);
+    }
+  };
 
   const handleHeadshotUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -455,6 +563,212 @@ export default function Settings() {
                   <Save className="h-4 w-4 mr-2" />
                 )}
                 Save Marketing Profile
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-orange-500/10">
+              <FileText className="h-5 w-5 text-orange-500" />
+            </div>
+            <div>
+              <CardTitle>Bio & Default Cover Letter</CardTitle>
+              <CardDescription>
+                Your bio and default cover letter for CMA reports
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="agentBio">Professional Bio</Label>
+              <Textarea
+                id="agentBio"
+                placeholder="Write a brief professional bio that will be included in your CMA reports..."
+                value={agentProfile.bio}
+                onChange={(e) => setAgentProfile(prev => ({ ...prev, bio: e.target.value }))}
+                className="min-h-[100px] resize-none"
+                data-testid="textarea-agent-bio"
+              />
+              <p className="text-xs text-muted-foreground">
+                This bio can be used in CMA reports and other professional documents.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <Label htmlFor="defaultCoverLetter">Default Cover Letter</Label>
+                <div className="flex items-center gap-2">
+                  <Select value={coverLetterTone} onValueChange={(v) => setCoverLetterTone(v as any)}>
+                    <SelectTrigger className="w-[140px]" data-testid="select-cover-letter-tone">
+                      <SelectValue placeholder="Select tone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="professional">Professional</SelectItem>
+                      <SelectItem value="friendly">Friendly</SelectItem>
+                      <SelectItem value="confident">Confident</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateCoverLetter}
+                    disabled={isGeneratingCoverLetter}
+                    className="gap-2"
+                    data-testid="button-generate-cover-letter"
+                  >
+                    {isGeneratingCoverLetter ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
+                    {agentProfile.defaultCoverLetter ? "Enhance with AI" : "Generate with AI"}
+                  </Button>
+                </div>
+              </div>
+              <Textarea
+                id="defaultCoverLetter"
+                placeholder="Dear [Client Name],&#10;&#10;Write your default cover letter for CMA reports here..."
+                value={agentProfile.defaultCoverLetter}
+                onChange={(e) => setAgentProfile(prev => ({ ...prev, defaultCoverLetter: e.target.value }))}
+                className="min-h-[180px] resize-none"
+                data-testid="textarea-cover-letter"
+              />
+              <p className="text-xs text-muted-foreground">
+                Use [Client Name] as a placeholder - it will be replaced with the actual client's name in each report.
+              </p>
+            </div>
+
+            <div className="flex justify-end">
+              <Button
+                onClick={() => updateAgentProfileMutation.mutate(agentProfile)}
+                disabled={updateAgentProfileMutation.isPending}
+                data-testid="button-save-bio-cover-letter"
+              >
+                {updateAgentProfileMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save Bio & Cover Letter
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-blue-500/10">
+              <LinkIcon className="h-5 w-5 text-blue-500" />
+            </div>
+            <div>
+              <CardTitle>Social Media Links</CardTitle>
+              <CardDescription>
+                Add your social media profiles to display in CMA reports
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="facebookUrl" className="flex items-center gap-2">
+                  <SiFacebook className="h-4 w-4 text-[#1877F2]" />
+                  Facebook
+                </Label>
+                <Input
+                  id="facebookUrl"
+                  type="url"
+                  placeholder="https://facebook.com/yourprofile"
+                  value={agentProfile.facebookUrl}
+                  onChange={(e) => setAgentProfile(prev => ({ ...prev, facebookUrl: e.target.value }))}
+                  data-testid="input-facebook-url"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="instagramUrl" className="flex items-center gap-2">
+                  <SiInstagram className="h-4 w-4 text-[#E4405F]" />
+                  Instagram
+                </Label>
+                <Input
+                  id="instagramUrl"
+                  type="url"
+                  placeholder="https://instagram.com/yourprofile"
+                  value={agentProfile.instagramUrl}
+                  onChange={(e) => setAgentProfile(prev => ({ ...prev, instagramUrl: e.target.value }))}
+                  data-testid="input-instagram-url"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="linkedinUrl" className="flex items-center gap-2">
+                  <SiLinkedin className="h-4 w-4 text-[#0A66C2]" />
+                  LinkedIn
+                </Label>
+                <Input
+                  id="linkedinUrl"
+                  type="url"
+                  placeholder="https://linkedin.com/in/yourprofile"
+                  value={agentProfile.linkedinUrl}
+                  onChange={(e) => setAgentProfile(prev => ({ ...prev, linkedinUrl: e.target.value }))}
+                  data-testid="input-linkedin-url"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="twitterUrl" className="flex items-center gap-2">
+                  <SiX className="h-4 w-4" />
+                  X (Twitter)
+                </Label>
+                <Input
+                  id="twitterUrl"
+                  type="url"
+                  placeholder="https://x.com/yourprofile"
+                  value={agentProfile.twitterUrl}
+                  onChange={(e) => setAgentProfile(prev => ({ ...prev, twitterUrl: e.target.value }))}
+                  data-testid="input-twitter-url"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="websiteUrl" className="flex items-center gap-2">
+                <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                Website
+              </Label>
+              <Input
+                id="websiteUrl"
+                type="url"
+                placeholder="https://yourwebsite.com"
+                value={agentProfile.websiteUrl}
+                onChange={(e) => setAgentProfile(prev => ({ ...prev, websiteUrl: e.target.value }))}
+                data-testid="input-website-url"
+              />
+            </div>
+
+            <div className="flex justify-end">
+              <Button
+                onClick={() => updateSocialLinksMutation.mutate({
+                  facebookUrl: agentProfile.facebookUrl,
+                  instagramUrl: agentProfile.instagramUrl,
+                  linkedinUrl: agentProfile.linkedinUrl,
+                  twitterUrl: agentProfile.twitterUrl,
+                  websiteUrl: agentProfile.websiteUrl,
+                })}
+                disabled={updateSocialLinksMutation.isPending}
+                data-testid="button-save-social-links"
+              >
+                {updateSocialLinksMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save Social Links
               </Button>
             </div>
           </div>
