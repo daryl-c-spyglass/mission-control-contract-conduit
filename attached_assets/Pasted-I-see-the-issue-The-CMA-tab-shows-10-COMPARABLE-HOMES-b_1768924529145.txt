@@ -1,0 +1,290 @@
+I see the issue! The CMA tab shows 10 COMPARABLE HOMES but the Presentation Builder's Map shows "0 comparables + Subject". The comparables data is not being passed/loaded into the Presentation Builder.
+Here's the prompt to fix this:
+
+Project: CONTRACT CONDUIT (Replit)
+Copy and paste this prompt into Replit:
+BUG FIX: CMA Comparables not loading in Presentation Builder
+
+---
+
+## THE PROBLEM
+
+- CMA tab shows: "10 COMPARABLE HOMES" with full table of properties
+- Presentation Builder Map shows: "0 comparables + Subject"
+
+The comparables data exists in the CMA section but is NOT being loaded into the Presentation Builder.
+
+---
+
+## DIAGNOSIS
+
+Find where the Presentation Builder fetches its data. It's likely:
+
+1. Not fetching the CMA comparables at all
+2. Fetching from a different endpoint than the CMA tab uses
+3. Not passing the transaction ID correctly
+4. The data structure doesn't match what the Map component expects
+
+---
+
+## FIX STEPS
+
+### Step 1: Check how CMA tab fetches comparables
+
+Find the CMA tab component and see how it fetches the 10 comparables:
+```tsx
+// CMA tab likely does something like:
+const { data: comparables } = useQuery({
+  queryKey: ['cma-comparables', transactionId],
+  queryFn: () => fetch(`/api/transactions/${transactionId}/cma/comparables`).then(r => r.json()),
+});
+```
+
+### Step 2: Use the SAME data source in Presentation Builder
+
+The Presentation Builder should fetch comparables the same way:
+```tsx
+// In PresentationBuilder component
+export function PresentationBuilder({ transactionId }: { transactionId: number }) {
+  
+  // Fetch CMA comparables - use the SAME endpoint as CMA tab
+  const { data: cmaData, isLoading: cmaLoading } = useQuery({
+    queryKey: ['cma-comparables', transactionId],
+    queryFn: async () => {
+      const response = await fetch(`/api/transactions/${transactionId}/cma/comparables`);
+      if (!response.ok) throw new Error('Failed to fetch comparables');
+      return response.json();
+    },
+  });
+
+  // Fetch subject property MLS data
+  const { data: mlsData, isLoading: mlsLoading } = useQuery({
+    queryKey: ['mls-data', transactionId],
+    queryFn: async () => {
+      const response = await fetch(`/api/transactions/${transactionId}/mls`);
+      if (!response.ok) throw new Error('Failed to fetch MLS data');
+      return response.json();
+    },
+  });
+
+  // Extract comparables array
+  const comparables = cmaData?.comparables || cmaData || [];
+  
+  console.log('Presentation Builder - Comparables loaded:', comparables.length);
+  console.log('Presentation Builder - Comparables data:', comparables);
+
+  // ... rest of component
+}
+```
+
+### Step 3: Pass comparables to Map component
+```tsx
+// In the Map tab content
+<TabsContent value="map">
+  <div className="space-y-4">
+    <div>
+      <h3 className="text-lg font-semibold">Map Preview</h3>
+      <p className="text-sm text-muted-foreground">
+        Interactive map showing subject property and comparables
+      </p>
+    </div>
+    
+    {/* Debug info - remove after fixing */}
+    <div className="text-sm text-muted-foreground">
+      {comparables.length} comparables + Subject
+    </div>
+    
+    <CMAMap
+      subjectProperty={{
+        latitude: mlsData?.latitude,
+        longitude: mlsData?.longitude,
+        address: mlsData?.address,
+        price: mlsData?.listPrice,
+        status: mlsData?.status,
+      }}
+      comparables={comparables.map((comp: any) => ({
+        latitude: comp.latitude,
+        longitude: comp.longitude,
+        address: comp.address,
+        price: comp.listPrice || comp.price,
+        status: comp.status,
+        mlsNumber: comp.mlsNumber,
+      }))}
+    />
+  </div>
+</TabsContent>
+```
+
+### Step 4: Check the Map component props
+
+Make sure the Map component accepts and uses the comparables:
+```tsx
+// CMAMap component
+interface CMAMapProps {
+  subjectProperty: {
+    latitude: number;
+    longitude: number;
+    address: string;
+    price: number;
+    status: string;
+  };
+  comparables: Array<{
+    latitude: number;
+    longitude: number;
+    address: string;
+    price: number;
+    status: string;
+    mlsNumber?: string;
+  }>;
+}
+
+export function CMAMap({ subjectProperty, comparables }: CMAMapProps) {
+  // Update the header to show actual count
+  const headerText = `${comparables.length} comparables + Subject`;
+  
+  // Add markers for all comparables
+  useEffect(() => {
+    if (!map.current || !comparables.length) return;
+    
+    // Clear existing markers
+    markers.current.forEach(marker => marker.remove());
+    markers.current = [];
+    
+    // Add subject property marker (blue)
+    if (subjectProperty.latitude && subjectProperty.longitude) {
+      const subjectMarker = new mapboxgl.Marker({ color: '#3b82f6' })
+        .setLngLat([subjectProperty.longitude, subjectProperty.latitude])
+        .setPopup(new mapboxgl.Popup().setHTML(`
+          <strong>Subject Property</strong><br/>
+          ${subjectProperty.address}<br/>
+          $${subjectProperty.price?.toLocaleString()}
+        `))
+        .addTo(map.current);
+      markers.current.push(subjectMarker);
+    }
+    
+    // Add comparable markers with status colors
+    comparables.forEach((comp) => {
+      if (!comp.latitude || !comp.longitude) return;
+      
+      const color = getStatusColor(comp.status);
+      const marker = new mapboxgl.Marker({ color })
+        .setLngLat([comp.longitude, comp.latitude])
+        .setPopup(new mapboxgl.Popup().setHTML(`
+          <strong>${comp.address}</strong><br/>
+          Status: ${comp.status}<br/>
+          $${comp.price?.toLocaleString()}
+        `))
+        .addTo(map.current);
+      markers.current.push(marker);
+    });
+    
+    // Fit bounds to show all markers
+    if (markers.current.length > 1) {
+      const bounds = new mapboxgl.LngLatBounds();
+      markers.current.forEach(marker => {
+        bounds.extend(marker.getLngLat());
+      });
+      map.current.fitBounds(bounds, { padding: 50 });
+    }
+  }, [subjectProperty, comparables]);
+  
+  // ... rest of component
+}
+
+// Status color helper
+const getStatusColor = (status: string): string => {
+  const colors: Record<string, string> = {
+    'Active': '#22c55e',        // Green
+    'Closed': '#ef4444',        // Red
+    'Pending': '#6b7280',       // Gray
+    'Under Contract': '#f59e0b', // Orange/Yellow
+    'Unknown': '#9ca3af',       // Light gray
+  };
+  return colors[status] || colors['Unknown'];
+};
+```
+
+### Step 5: Verify the API endpoint returns coordinates
+
+Check that the CMA comparables API includes latitude/longitude:
+```typescript
+// In your API route - /api/transactions/:id/cma/comparables
+app.get('/api/transactions/:id/cma/comparables', async (req, res) => {
+  const { id } = req.params;
+  
+  // Get comparables from database
+  const comparables = await storage.getCMAComparables(parseInt(id));
+  
+  // Make sure each comparable has coordinates
+  // If not stored, you may need to fetch from Repliers API
+  const comparablesWithCoords = comparables.map(comp => ({
+    ...comp,
+    latitude: comp.latitude || comp.coordinates?.lat,
+    longitude: comp.longitude || comp.coordinates?.lng,
+    // Include all needed fields
+    address: comp.address,
+    listPrice: comp.listPrice,
+    status: comp.status,
+    mlsNumber: comp.mlsNumber,
+    bedrooms: comp.bedrooms,
+    bathrooms: comp.bathrooms,
+    sqft: comp.sqft,
+    daysOnMarket: comp.daysOnMarket,
+    distance: comp.distance,
+  }));
+  
+  console.log(`[CMA Comparables] Returning ${comparablesWithCoords.length} comparables for transaction ${id}`);
+  
+  res.json(comparablesWithCoords);
+});
+```
+
+---
+
+## DEBUGGING CHECKLIST
+
+Add these console logs to trace the data flow:
+```tsx
+// In CMA tab
+console.log('[CMA Tab] Comparables:', comparables?.length);
+
+// In Presentation Builder
+console.log('[Presentation Builder] Transaction ID:', transactionId);
+console.log('[Presentation Builder] CMA Data:', cmaData);
+console.log('[Presentation Builder] Comparables array:', comparables);
+
+// In Map component
+console.log('[CMA Map] Received comparables:', comparables?.length);
+console.log('[CMA Map] Subject property:', subjectProperty);
+```
+
+---
+
+## EXPECTED RESULT
+
+After fixing:
+- Map header should show: "10 comparables + Subject"
+- Blue marker for subject property at 154 Pettigrew, Buda, TX
+- Red markers for the 10 closed comparables (all show "Closed" status)
+- Map should auto-zoom to fit all markers
+- Legend should match the marker colors
+
+---
+
+## DATA FLOW DIAGRAM
+CMA Tab                          Presentation Builder
+│                                    │
+├─► /api/transactions/:id/cma ──────►├─► Should use SAME endpoint
+│                                    │
+▼                                    ▼
+10 comparables displayed          Map component receives
+in table view                     comparables array
+│
+▼
+Renders markers on map
+"10 comparables + Subject"
+
+---
+
+Please fix this data connection so the Presentation Builder Map shows the same 10 comparables that appear in the CMA tab.

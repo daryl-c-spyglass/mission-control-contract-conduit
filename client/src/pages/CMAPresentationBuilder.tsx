@@ -161,15 +161,46 @@ export default function CMAPresentationBuilder() {
     },
   });
 
-  const { data: properties = [], isLoading: propertiesLoading } = useQuery<Property[]>({
-    queryKey: ['/api/cmas', id, 'properties'],
-    enabled: !!id && !!cma,
+  // Fetch the linked transaction to get subject property from mlsData and cmaData fallback
+  const { data: linkedTransaction } = useQuery<any>({
+    queryKey: ['/api/transactions', cma?.transactionId],
+    enabled: !!cma?.transactionId,
     queryFn: async () => {
-      const response = await fetch(`/api/cmas/${id}/properties`);
-      if (!response.ok) throw new Error('Failed to fetch properties');
+      const response = await fetch(`/api/transactions/${cma?.transactionId}`);
+      if (!response.ok) throw new Error('Failed to fetch transaction');
       return response.json();
     },
   });
+
+  // Transform CMAComparable[] into Property-compatible objects
+  // Try cma.propertiesData first, fall back to transaction.cmaData if empty
+  const rawComparables = (cma?.propertiesData && (cma.propertiesData as any[]).length > 0)
+    ? (cma.propertiesData as any[])
+    : (linkedTransaction?.cmaData || []) as any[];
+  
+  const properties = rawComparables.map((comp: any, index: number) => ({
+    id: comp.mlsNumber || `comp-${index}`,
+    mlsNumber: comp.mlsNumber || '',
+    unparsedAddress: comp.address || '',
+    city: comp.city || '',
+    postalCode: comp.postalCode || '',
+    listPrice: comp.listPrice || comp.price || 0,
+    closePrice: comp.closePrice || (comp.status === 'Closed' ? comp.price : null),
+    standardStatus: comp.status || 'Active',
+    bedroomsTotal: comp.bedrooms || 0,
+    bathroomsTotalInteger: comp.bathrooms || 0,
+    livingArea: typeof comp.sqft === 'string' ? parseFloat(comp.sqft) : (comp.sqft || 0),
+    simpleDaysOnMarket: comp.daysOnMarket || 0,
+    yearBuilt: comp.yearBuilt || null,
+    photos: comp.photos || (comp.imageUrl ? [comp.imageUrl] : []),
+    // Ensure coordinates are in the format extractCoordinates expects
+    map: comp.map || (comp.latitude && comp.longitude ? { latitude: comp.latitude, longitude: comp.longitude } : null),
+    latitude: comp.latitude || comp.map?.latitude,
+    longitude: comp.longitude || comp.map?.longitude,
+  })) as unknown as Property[];
+
+  // Get subject property from linked transaction's mlsData
+  const subjectFromTransaction = linkedTransaction?.mlsData as Property | null;
 
   const { data: statistics } = useQuery<PropertyStatistics>({
     queryKey: ['/api/cmas', id, 'statistics'],
@@ -278,13 +309,16 @@ export default function CMAPresentationBuilder() {
     },
   });
 
-  const subjectProperty = properties.find(p => 
+  // Use subject property from linked transaction's mlsData, or try to find in properties
+  const subjectProperty = subjectFromTransaction || properties.find(p => 
     p.mlsNumber === cma?.subjectPropertyId
   );
 
-  const comparables = properties.filter(p => 
-    p.mlsNumber !== cma?.subjectPropertyId
-  );
+  // Comparables are all properties in propertiesData (subject is not included there)
+  // If subject is somehow in properties, filter it out
+  const comparables = subjectFromTransaction 
+    ? properties // All properties are comparables since subject comes from transaction
+    : properties.filter(p => p.mlsNumber !== cma?.subjectPropertyId);
 
   const sections: SectionItem[] = (config.sectionOrder || CMA_REPORT_SECTIONS.map(s => s.id)).map(sectionId => {
     const sectionDef = CMA_REPORT_SECTIONS.find(s => s.id === sectionId);
