@@ -551,44 +551,47 @@ export function CMAMap({
 
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-    map.on('load', () => {
+    // Helper to initialize layers and fit bounds - reused by initial load and style changes
+    const initLayersAndFitBounds = () => {
+      if (layersReadyRef.current) return; // Prevent double initialization
+      
       initCmaLayers(map, model, overlayTuning, showPolygon);
       layersReadyRef.current = true;
       setMapReady(true);
-
-      // Force resize and fit bounds on initial load
-      // Use multiple attempts to ensure container has dimensions
-      const attemptFit = (attempt = 0) => {
-        map.resize();
-        if (model.bounds) {
-          if (model.compFeatures.length === 0 && model.subjectLngLat) {
-            map.jumpTo({
-              center: model.subjectLngLat,
-              zoom: DEFAULT_SUBJECT_ZOOM,
-            });
-          } else {
-            map.fitBounds(model.bounds, {
-              padding: DEFAULT_FIT_PADDING,
-              maxZoom: 15,
-              duration: 0, // No animation on initial load for instant display
-            });
-          }
-          initialFitDoneRef.current = true;
-        } else if (attempt < 3) {
-          // Retry if bounds not ready
-          setTimeout(() => attemptFit(attempt + 1), 100);
-        }
-      };
       
-      // Immediate attempt + delayed attempts for tab visibility issues
-      attemptFit();
-      setTimeout(() => {
-        if (!initialFitDoneRef.current && model.bounds) {
-          attemptFit();
+      // Fit bounds after layers are initialized
+      map.resize();
+      if (model.bounds) {
+        if (model.compFeatures.length === 0 && model.subjectLngLat) {
+          map.jumpTo({
+            center: model.subjectLngLat,
+            zoom: DEFAULT_SUBJECT_ZOOM,
+          });
+        } else {
+          map.fitBounds(model.bounds, {
+            padding: DEFAULT_FIT_PADDING,
+            maxZoom: 15,
+            duration: 0,
+          });
         }
-      }, 200);
+        initialFitDoneRef.current = true;
+      }
+    };
 
-      // Register all event handlers INSIDE load callback to ensure layers exist
+    map.on('load', () => {
+      // Wait for style to be fully loaded before adding layers
+      // Using styledata event ensures the style is ready and won't clear our layers
+      if (map.isStyleLoaded()) {
+        // Style is already loaded, initialize immediately
+        initLayersAndFitBounds();
+      } else {
+        // Wait for style to finish loading
+        map.once('styledata', () => {
+          initLayersAndFitBounds();
+        });
+      }
+      
+      // Register all event handlers INSIDE load callback
       map.on('click', LAYER_IDS.clusterCircle, (e) => {
         if (!layersReadyRef.current) return;
         
