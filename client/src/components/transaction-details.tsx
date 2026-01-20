@@ -66,6 +66,7 @@ import {
   Minus,
   ZoomIn,
   AlertCircle,
+  Check,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -1275,16 +1276,23 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                   </Button>
                 ) : (
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => setIsEditingDates(false)} data-testid="button-cancel-dates">
-                      Cancel
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setIsEditingDates(false)} 
+                      data-testid="button-cancel-dates"
+                    >
+                      <X className="h-4 w-4" />
                     </Button>
                     <Button 
-                      size="sm" 
+                      variant="ghost"
+                      size="icon" 
                       onClick={handleSaveDates} 
                       disabled={updateTransactionMutation.isPending}
                       data-testid="button-save-dates"
+                      className="text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-900/30"
                     >
-                      {updateTransactionMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+                      {updateTransactionMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                     </Button>
                   </div>
                 )}
