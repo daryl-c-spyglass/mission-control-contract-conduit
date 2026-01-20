@@ -55,13 +55,32 @@ export default function Settings() {
   
   // Marketing profile state
   const [marketingProfile, setMarketingProfile] = useState({
-    displayName: "",
-    title: "",
+    firstName: "",
+    lastName: "",
+    email: "", // Read-only from OAuth
     phone: "",
-    email: "",
+    title: "",
+    company: "Spyglass Realty",
     headshotUrl: "",
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Phone number formatting helper (XXX-XXX-XXXX format)
+  const formatPhoneNumber = (value: string): string => {
+    const cleaned = value.replace(/\D/g, '');
+    if (cleaned.length <= 3) {
+      return cleaned;
+    } else if (cleaned.length <= 6) {
+      return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
+    } else {
+      return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+    }
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneNumber(e.target.value);
+    setMarketingProfile(prev => ({ ...prev, phone: formatted }));
+  };
 
   // Agent profile state (Bio, Cover Letter, Social Links)
   const [agentProfile, setAgentProfile] = useState({
@@ -96,10 +115,12 @@ export default function Settings() {
     // Load marketing profile from user
     if (user) {
       setMarketingProfile({
-        displayName: user.marketingDisplayName || "",
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        email: user.email || "", // Read-only from OAuth
+        phone: formatPhoneNumber(user.marketingPhone || ""),
         title: user.marketingTitle || "",
-        phone: user.marketingPhone || "",
-        email: user.marketingEmail || "",
+        company: user.marketingCompany || "Spyglass Realty",
         headshotUrl: user.marketingHeadshotUrl || "",
       });
     }
@@ -269,17 +290,18 @@ export default function Settings() {
 
   const updateMarketingProfileMutation = useMutation({
     mutationFn: async (data: {
-      marketingDisplayName?: string;
+      firstName?: string;
+      lastName?: string;
       marketingTitle?: string;
       marketingPhone?: string;
-      marketingEmail?: string;
+      marketingCompany?: string;
       marketingHeadshotUrl?: string;
     }) => {
       const res = await apiRequest("PATCH", "/api/user/graphics-settings", data);
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Marketing profile saved", description: "Your agent info will appear on flyers and marketing materials." });
+      toast({ title: "Marketing profile saved", description: "Your agent info will appear on CMA reports and marketing materials." });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     },
     onError: (error: Error) => {
@@ -387,11 +409,14 @@ export default function Settings() {
   };
 
   const handleSaveMarketingProfile = () => {
+    // Store phone unformatted (just digits)
+    const unformattedPhone = marketingProfile.phone.replace(/\D/g, '');
     updateMarketingProfileMutation.mutate({
-      marketingDisplayName: marketingProfile.displayName || undefined,
+      firstName: marketingProfile.firstName || undefined,
+      lastName: marketingProfile.lastName || undefined,
       marketingTitle: marketingProfile.title || undefined,
-      marketingPhone: marketingProfile.phone || undefined,
-      marketingEmail: marketingProfile.email || undefined,
+      marketingPhone: unformattedPhone || undefined,
+      marketingCompany: marketingProfile.company || undefined,
       marketingHeadshotUrl: marketingProfile.headshotUrl || undefined,
     });
   };
@@ -464,23 +489,35 @@ export default function Settings() {
             <div>
               <CardTitle>Agent Marketing Profile</CardTitle>
               <CardDescription>
-                Your headshot and contact info will appear on flyers and marketing materials
+                Your personal information displayed on CMA reports
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            <div className="flex items-start gap-6 flex-wrap">
-              <div className="flex flex-col items-center gap-3">
-                <Avatar className="h-32 w-32 border-4 border-muted">
-                  {marketingProfile.headshotUrl ? (
-                    <AvatarImage src={marketingProfile.headshotUrl} alt="Agent headshot" />
-                  ) : null}
-                  <AvatarFallback className="text-2xl">
-                    <User className="h-12 w-12 text-muted-foreground" />
-                  </AvatarFallback>
-                </Avatar>
+            {/* Profile Photo Section */}
+            <div className="flex items-start gap-4">
+              <Avatar className="h-20 w-20 border-2 border-muted">
+                {marketingProfile.headshotUrl ? (
+                  <AvatarImage src={marketingProfile.headshotUrl} alt="Agent headshot" />
+                ) : null}
+                <AvatarFallback className="text-xl">
+                  <User className="h-10 w-10 text-muted-foreground" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 space-y-2">
+                <Label className="text-sm text-muted-foreground">Profile Photo</Label>
+                <p className="text-xs text-muted-foreground">
+                  Upload a professional headshot photo (max 5MB, JPG or PNG) or paste an image URL.
+                </p>
+                <Input
+                  value={marketingProfile.headshotUrl || ''}
+                  onChange={(e) => setMarketingProfile(prev => ({ ...prev, headshotUrl: e.target.value }))}
+                  placeholder="https://example.com/photo.jpg"
+                  className="text-sm"
+                  data-testid="input-headshot-url"
+                />
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -497,57 +534,82 @@ export default function Settings() {
                   data-testid="button-upload-headshot"
                 >
                   <Camera className="h-4 w-4" />
-                  {marketingProfile.headshotUrl ? "Change Photo" : "Upload Photo"}
+                  Change
                 </Button>
               </div>
-              
-              <div className="flex-1 min-w-[280px] space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="marketingDisplayName">Display Name</Label>
-                    <Input
-                      id="marketingDisplayName"
-                      placeholder="John Smith"
-                      value={marketingProfile.displayName}
-                      onChange={(e) => setMarketingProfile(prev => ({ ...prev, displayName: e.target.value }))}
-                      data-testid="input-marketing-name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="marketingTitle">Title</Label>
-                    <Input
-                      id="marketingTitle"
-                      placeholder="REALTOR"
-                      value={marketingProfile.title}
-                      onChange={(e) => setMarketingProfile(prev => ({ ...prev, title: e.target.value }))}
-                      data-testid="input-marketing-title"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="marketingPhone">Phone Number</Label>
-                    <Input
-                      id="marketingPhone"
-                      type="tel"
-                      placeholder="(512) 555-1234"
-                      value={marketingProfile.phone}
-                      onChange={(e) => setMarketingProfile(prev => ({ ...prev, phone: e.target.value }))}
-                      data-testid="input-marketing-phone"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="marketingEmail">Email Address</Label>
-                    <Input
-                      id="marketingEmail"
-                      type="email"
-                      placeholder="john@spyglassrealty.com"
-                      value={marketingProfile.email}
-                      onChange={(e) => setMarketingProfile(prev => ({ ...prev, email: e.target.value }))}
-                      data-testid="input-marketing-email"
-                    />
-                  </div>
-                </div>
+            </div>
+
+            {/* Name Fields Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input
+                  id="firstName"
+                  placeholder="John"
+                  value={marketingProfile.firstName}
+                  onChange={(e) => setMarketingProfile(prev => ({ ...prev, firstName: e.target.value }))}
+                  data-testid="input-first-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  id="lastName"
+                  placeholder="Smith"
+                  value={marketingProfile.lastName}
+                  onChange={(e) => setMarketingProfile(prev => ({ ...prev, lastName: e.target.value }))}
+                  data-testid="input-last-name"
+                />
+              </div>
+            </div>
+
+            {/* Email and Phone Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  value={marketingProfile.email}
+                  readOnly
+                  disabled
+                  className="bg-muted cursor-not-allowed"
+                  placeholder="agent@spyglassrealty.com"
+                  data-testid="input-email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone</Label>
+                <Input
+                  id="phone"
+                  value={marketingProfile.phone}
+                  onChange={handlePhoneChange}
+                  placeholder="512-452-4125"
+                  data-testid="input-phone"
+                />
+              </div>
+            </div>
+
+            {/* Title and Company Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="title">Title</Label>
+                <Input
+                  id="title"
+                  placeholder="REALTOR"
+                  value={marketingProfile.title}
+                  onChange={(e) => setMarketingProfile(prev => ({ ...prev, title: e.target.value }))}
+                  data-testid="input-title"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="company">Company</Label>
+                <Input
+                  id="company"
+                  placeholder="Spyglass Realty"
+                  value={marketingProfile.company}
+                  onChange={(e) => setMarketingProfile(prev => ({ ...prev, company: e.target.value }))}
+                  data-testid="input-company"
+                />
               </div>
             </div>
             

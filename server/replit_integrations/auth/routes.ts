@@ -69,7 +69,16 @@ export function registerAuthRoutes(app: Express): void {
   app.patch("/api/user/graphics-settings", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { marketingHeadshotUrl, marketingDisplayName, marketingTitle, marketingPhone, marketingEmail } = req.body;
+      const { 
+        marketingHeadshotUrl, 
+        marketingDisplayName, 
+        marketingTitle, 
+        marketingPhone, 
+        marketingEmail,
+        marketingCompany,
+        firstName,
+        lastName,
+      } = req.body;
       
       // Validate headshot URL/base64 - max 7MB to allow for base64 overhead (5MB file ~= 6.67MB base64)
       if (marketingHeadshotUrl && typeof marketingHeadshotUrl === "string") {
@@ -96,14 +105,27 @@ export function registerAuthRoutes(app: Express): void {
       if (marketingEmail && marketingEmail.length > maxFieldLength) {
         return res.status(400).json({ message: "Email is too long." });
       }
+      if (marketingCompany && marketingCompany.length > maxFieldLength) {
+        return res.status(400).json({ message: "Company name is too long." });
+      }
+      if (firstName && firstName.length > 100) {
+        return res.status(400).json({ message: "First name is too long." });
+      }
+      if (lastName && lastName.length > 100) {
+        return res.status(400).json({ message: "Last name is too long." });
+      }
       
-      const updatedUser = await authStorage.updateUser(userId, {
-        marketingHeadshotUrl: marketingHeadshotUrl || null,
-        marketingDisplayName: marketingDisplayName || null,
-        marketingTitle: marketingTitle || null,
-        marketingPhone: marketingPhone || null,
-        marketingEmail: marketingEmail || null,
-      });
+      const updateData: Record<string, any> = {};
+      if (marketingHeadshotUrl !== undefined) updateData.marketingHeadshotUrl = marketingHeadshotUrl || null;
+      if (marketingDisplayName !== undefined) updateData.marketingDisplayName = marketingDisplayName || null;
+      if (marketingTitle !== undefined) updateData.marketingTitle = marketingTitle || null;
+      if (marketingPhone !== undefined) updateData.marketingPhone = marketingPhone || null;
+      if (marketingEmail !== undefined) updateData.marketingEmail = marketingEmail || null;
+      if (marketingCompany !== undefined) updateData.marketingCompany = marketingCompany || null;
+      if (firstName !== undefined) updateData.firstName = firstName || null;
+      if (lastName !== undefined) updateData.lastName = lastName || null;
+      
+      const updatedUser = await authStorage.updateUser(userId, updateData);
       
       res.json(updatedUser);
     } catch (error) {
