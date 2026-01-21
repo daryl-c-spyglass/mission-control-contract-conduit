@@ -42,6 +42,7 @@ import { CMAPreviewContent } from "@/components/presentation/CMAPreviewContent";
 import { ReportSections } from "@/components/presentation/ReportSections";
 import { CoverPhotoGrid } from "@/components/cma/CoverPhotoGrid";
 import { PhotoPreviewModal } from "@/components/cma/PhotoPreviewModal";
+import { LivePreviewPanel } from "@/components/cma/LivePreviewPanel";
 import { cn } from "@/lib/utils";
 import { transformToCMAReportData } from "@/lib/cma-transformer";
 import { pdf } from '@react-pdf/renderer';
@@ -484,8 +485,8 @@ export default function CMAPresentationBuilder() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="flex flex-col lg:flex-row gap-6">
+        <div className="w-full lg:w-[60%] space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full grid grid-cols-3">
               <TabsTrigger value="sections" className="gap-1" data-testid="tab-sections">
@@ -621,84 +622,39 @@ export default function CMAPresentationBuilder() {
           </Tabs>
         </div>
 
-        <div className="space-y-6 lg:sticky lg:top-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Map className="w-4 h-4" />
-                    Live Preview
-                  </CardTitle>
-                  <CardDescription>Preview how your CMA will look</CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">4 content sections</span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setPreviewModalOpen(true)}
-                    data-testid="button-expand-preview"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="h-[200px] relative rounded-lg overflow-hidden border">
-                <CMAMap
-                  properties={comparables}
-                  subjectProperty={subjectProperty || null}
-                  showPolygon={config.showMapPolygon ?? true}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="showPolygon"
-                  checked={config.showMapPolygon ?? true}
-                  onCheckedChange={(show) => setConfig({ ...config, showMapPolygon: show })}
-                  data-testid="switch-show-polygon"
-                />
-                <Label htmlFor="showPolygon" className="text-xs">Show polygon in report</Label>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {comparables.length} comparables + Subject property
-              </p>
-              
-              <Separator />
-
-              <ScrollArea className="h-[300px]">
-                <div className="space-y-3">
-                  <div className="p-3 border rounded-lg bg-muted/30">
-                    <p className="text-sm font-medium">Cover Page</p>
-                    <p className="text-xs text-muted-foreground mt-1">{config.coverPageConfig?.title || 'Comparative Market Analysis'}</p>
-                  </div>
-                  
-                  {brochure && (
-                    <div className="p-3 border rounded-lg bg-muted/30">
-                      <p className="text-sm font-medium">Listing Brochure</p>
-                      <p className="text-xs text-muted-foreground mt-1">Flyer attached</p>
-                    </div>
-                  )}
-                  
-                  {config.coverLetterOverride && (
-                    <div className="p-3 border rounded-lg bg-muted/30">
-                      <p className="text-sm font-medium">Cover Letter</p>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{config.coverLetterOverride.slice(0, 100)}...</p>
-                    </div>
-                  )}
-                  
-                  {adjustments && (
-                    <div className="p-3 border rounded-lg bg-muted/30">
-                      <p className="text-sm font-medium">Adjustments</p>
-                      <p className="text-xs text-muted-foreground mt-1">{comparables.length} properties adjusted</p>
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
+        <div className="w-full lg:w-[40%]">
+          <LivePreviewPanel
+            includedSections={config.includedSections}
+            contentSettings={{
+              title: config.coverPageConfig?.title || 'Comparative Market Analysis',
+              subtitle: config.coverPageConfig?.subtitle || 'Prepared exclusively for you',
+              showDate: config.coverPageConfig?.showDate ?? true,
+              showAgentPhoto: config.coverPageConfig?.showAgentPhoto ?? true,
+              coverLetter: config.coverLetterOverride,
+            }}
+            layoutSettings={{
+              coverPhotoUrl: config.coverPhotoUrl,
+              brochureUrl: brochure?.url || undefined,
+              mapStyle: (config.mapStyle as 'streets' | 'satellite') || 'streets',
+              showMapPolygon: config.showMapPolygon ?? true,
+            }}
+            subjectProperty={subjectProperty}
+            comparables={comparables}
+            agentProfile={{
+              name: 'Daryl Camingao',
+              title: 'Real Estate Professional',
+              email: 'daryl@spyglassrealty.com',
+            }}
+            onSectionClick={(sectionId) => {
+              if (['cover_page', 'cover_letter', 'agent_resume'].includes(sectionId)) {
+                setActiveTab('content');
+              } else if (['listing_brochure', 'map_all_listings'].includes(sectionId)) {
+                setActiveTab('layout');
+              } else {
+                setActiveTab('sections');
+              }
+            }}
+          />
         </div>
       </div>
 
