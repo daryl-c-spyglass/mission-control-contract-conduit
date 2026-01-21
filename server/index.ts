@@ -125,6 +125,14 @@ app.use((req, res, next) => {
     () => {
       log(`serving on port ${port}`);
       
+      // Log notification status prominently on startup
+      const notificationsDisabled = process.env.DISABLE_SLACK_NOTIFICATIONS === 'true';
+      console.log('═══════════════════════════════════════════════════════════════');
+      console.log(`[SLACK NOTIFICATIONS] Status: ${notificationsDisabled ? '🔴 DISABLED' : '🟢 ENABLED'}`);
+      console.log(`[SLACK NOTIFICATIONS] DISABLE_SLACK_NOTIFICATIONS = ${process.env.DISABLE_SLACK_NOTIFICATIONS || 'not set'}`);
+      console.log(`[SLACK NOTIFICATIONS] NODE_ENV = ${process.env.NODE_ENV || 'not set'}`);
+      console.log('═══════════════════════════════════════════════════════════════');
+      
       // Start automatic MLS data synchronization
       startRepliersSync();
       

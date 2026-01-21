@@ -41,7 +41,19 @@ export async function summarizeDescription(description: string, maxLength: numbe
   }
 }
 
+// Global notification kill switch - blocks ALL Slack API calls that send messages
+function isSlackNotificationsDisabled(): boolean {
+  return process.env.DISABLE_SLACK_NOTIFICATIONS === 'true';
+}
+
 async function slackRequest(method: string, body: Record<string, any>): Promise<any> {
+  // KILL SWITCH: Block all message-sending API calls when notifications are disabled
+  const messageMethods = ['chat.postMessage', 'chat.update', 'files.upload', 'files.uploadV2'];
+  if (isSlackNotificationsDisabled() && messageMethods.includes(method)) {
+    console.log(`[SLACK BLOCKED] Notifications disabled - would have called ${method} to channel: ${body.channel || 'unknown'}`);
+    return { ok: true, blocked: true, message: 'Notifications disabled via DISABLE_SLACK_NOTIFICATIONS' };
+  }
+
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {
     throw new Error("SLACK_BOT_TOKEN not configured");
