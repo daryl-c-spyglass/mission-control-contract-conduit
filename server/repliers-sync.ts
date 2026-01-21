@@ -52,8 +52,15 @@ async function syncTransactionMLS(transaction: Transaction): Promise<SyncResult>
     }
     
     let cmaData = comparables;
+    let cmaSourceType: 'repliers_similar' | 'coordinate_fallback' | null = null;
+    
     if (!cmaData || cmaData.length === 0) {
       cmaData = await fetchSimilarListings(transaction.mlsNumber);
+      if (cmaData && cmaData.length > 0) {
+        cmaSourceType = 'repliers_similar';
+      }
+    } else {
+      cmaSourceType = 'repliers_similar';
     }
     
     // Fallback for closed listings: use coordinate-based search if fetchSimilarListings returned empty
@@ -77,6 +84,9 @@ async function syncTransactionMLS(transaction: Transaction): Promise<SyncResult>
           transaction.mlsNumber,
           defaultFilters
         );
+        if (cmaData && cmaData.length > 0) {
+          cmaSourceType = 'coordinate_fallback';
+        }
         console.log(`[ReplierSync] Coordinate search found ${cmaData.length} comparables for closed listing`);
       }
     }
@@ -97,6 +107,10 @@ async function syncTransactionMLS(transaction: Transaction): Promise<SyncResult>
 
     if (cmaData && cmaData.length > 0) {
       updateData.cmaData = cmaData;
+      if (cmaSourceType) {
+        (updateData as any).cmaSource = cmaSourceType;
+        (updateData as any).cmaGeneratedAt = new Date();
+      }
     }
 
     await storage.updateTransaction(transaction.id, updateData as Partial<InsertTransaction>);

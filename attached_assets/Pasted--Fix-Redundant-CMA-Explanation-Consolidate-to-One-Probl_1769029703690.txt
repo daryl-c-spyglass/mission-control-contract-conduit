@@ -1,0 +1,177 @@
+# Fix Redundant CMA Explanation - Consolidate to One
+
+## Problem
+
+The CMA fallback UI has redundant information:
+1. Info box explains coordinate-based search in detail
+2. Tooltip on button repeats the same explanation
+
+## Solution
+
+Keep it simple - one concise explanation, remove the tooltip (or vice versa).
+
+---
+
+## Option A: Brief Info Box + No Tooltip (Recommended)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                              🔍                                 │
+│                                                                 │
+│                      No CMA Available                           │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ ℹ️  This property is "Closed" in the MLS. You can         │  │
+│  │     generate comparables from nearby properties instead.  │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│           [📍 Generate CMA from Nearby Properties]              │
+│                                                                 │
+│     Searches within 5 miles • Matches price ±25% • ±1 beds     │
+│                    ↑                                            │
+│         Small helper text below button (optional)               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Implementation
+
+**File: `client/src/components/cma-tab.tsx`**
+
+Update the "No CMA Available" section for closed listings:
+
+```tsx
+{/* Show fallback option for closed listings with coordinates */}
+{isClosedListing && hasCoordinates && (
+  <div className="w-full max-w-lg space-y-4">
+    {/* Brief Explanation - ONE LINE */}
+    <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+      <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+      <AlertDescription className="text-sm text-blue-700 dark:text-blue-300">
+        This property is "<strong>{status}</strong>" in the MLS. 
+        You can generate comparables from nearby properties instead.
+      </AlertDescription>
+    </Alert>
+
+    {/* Button - NO TOOLTIP */}
+    <div className="flex flex-col items-center gap-2">
+      <Button
+        onClick={() => generateCmaMutation.mutate()}
+        disabled={generateCmaMutation.isPending}
+        className="gap-2"
+      >
+        {generateCmaMutation.isPending ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Searching Nearby Properties...
+          </>
+        ) : (
+          <>
+            <MapPin className="w-4 h-4" />
+            Generate CMA from Nearby Properties
+          </>
+        )}
+      </Button>
+      
+      {/* Small helper text instead of tooltip */}
+      <p className="text-xs text-muted-foreground text-center">
+        Searches within 5 miles • Matches similar price & bedrooms
+      </p>
+    </div>
+  </div>
+)}
+```
+
+---
+
+## Option B: Minimal Info Box + Detailed Tooltip
+
+If you prefer to keep the tooltip but reduce the info box:
+
+```tsx
+{isClosedListing && hasCoordinates && (
+  <div className="w-full max-w-md space-y-4">
+    {/* Minimal note */}
+    <p className="text-sm text-muted-foreground text-center">
+      Standard CMA is not available for closed listings.
+    </p>
+
+    {/* Button WITH tooltip */}
+    <div className="flex items-center justify-center gap-2">
+      <Button
+        onClick={() => generateCmaMutation.mutate()}
+        disabled={generateCmaMutation.isPending}
+        className="gap-2"
+      >
+        <MapPin className="w-4 h-4" />
+        Generate CMA from Nearby Properties
+      </Button>
+      
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
+              <Info className="w-4 h-4 text-muted-foreground" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="max-w-xs">
+            <p className="text-sm">
+              Searches comparable properties within 5 miles. 
+              Results filtered to match similar price range (±25%) 
+              and bedroom count (±1).
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
+  </div>
+)}
+```
+
+---
+
+## Recommendation
+
+**Go with Option A** - it's cleaner:
+- Brief info box explains WHY (property is closed)
+- Button is self-explanatory with "Nearby Properties"
+- Small helper text shows search criteria
+- No tooltip needed
+
+This removes redundancy while keeping users informed.
+
+---
+
+## Before vs After
+
+**Before (Redundant):**
+```
+┌──────────────────────────────────────────┐
+│ ℹ️ Why is CMA not available?             │
+│                                          │
+│ This property is marked as "Closed"...   │
+│ You can generate comparables using a     │
+│ coordinate-based search which finds      │  ← Long explanation
+│ similar properties within a 5-mile       │
+│ radius...                                │
+└──────────────────────────────────────────┘
+
+[Generate CMA from Nearby Properties] ⓘ
+                                      ↑
+                                   Tooltip repeats
+                                   the same info
+```
+
+**After (Clean):**
+```
+┌──────────────────────────────────────────┐
+│ ℹ️ This property is "Closed" in the MLS. │
+│    You can generate comparables from     │  ← Brief, one sentence
+│    nearby properties instead.            │
+└──────────────────────────────────────────┘
+
+   [📍 Generate CMA from Nearby Properties]
+   
+   Searches within 5 miles • Similar price & beds  ← Helper text
+```

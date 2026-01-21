@@ -32,6 +32,7 @@ import { CMAPreviewBanner } from "@/components/cma/CMAPreviewBanner";
 import { CMAFiltersPanel } from "@/components/cma/CMAFiltersPanel";
 import { CMANotesDialog } from "@/components/cma/CMANotesDialog";
 import { CMAEmailShareDialog } from "@/components/cma/CMAEmailShareDialog";
+import { CMASourceIndicator } from "@/components/cma-source-indicator";
 import { sanitizePhotoUrl } from "@/lib/cma-map-data";
 import type { Transaction, CMAComparable, Cma, PropertyStatistics, CmaStatMetric, Property } from "@shared/schema";
 import { useLocation } from "wouter";
@@ -237,6 +238,7 @@ export function CMATab({ transaction }: CMATabProps) {
   
   const cmaData = transaction.cmaData as CMAComparable[] | null;
   const cmaSource = (transaction as any).cmaSource;
+  const cmaGeneratedAt = (transaction as any).cmaGeneratedAt;
   
   const mlsData = transaction.mlsData as any;
   const mlsStatus = mlsData?.standardStatus || mlsData?.status || '';
@@ -692,16 +694,6 @@ export function CMATab({ transaction }: CMATabProps) {
         }}
       />
 
-      {/* CMA Source Notice (only for coordinate fallback) */}
-      {cmaSource === 'coordinate_fallback' && (
-        <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-          <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-          <AlertDescription className="text-sm text-blue-700 dark:text-blue-300">
-            These comparables were generated using a coordinate-based search within 5 miles 
-            of this property. They may differ from standard MLS comparables.
-          </AlertDescription>
-        </Alert>
-      )}
 
       {/* Clear CMA Button - always show when CMA data exists */}
       {cmaData && cmaData.length > 0 && (
@@ -740,13 +732,18 @@ export function CMATab({ transaction }: CMATabProps) {
         
         {/* 3a. CARD HEADER with Comparable Count and View Toggle */}
         <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               Comparable Properties
             </h2>
             <span className="px-2 py-0.5 text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full">
               {filteredComparables.length} properties
             </span>
+            <CMASourceIndicator
+              source={cmaSource}
+              generatedAt={cmaGeneratedAt}
+              comparablesCount={cmaData?.length}
+            />
           </div>
           
           {/* View Toggle - Segment Control Style */}

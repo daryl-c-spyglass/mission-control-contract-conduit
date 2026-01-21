@@ -1,0 +1,384 @@
+# CMA Source Indicator with Tooltip
+
+## Overview
+
+Add a visual indicator and tooltip on transactions with CMA data to explain how the CMA was generated. This helps users understand the source and reliability of the comparable data.
+
+---
+
+## Where to Show
+
+1. **Transaction Card** - Small icon next to CMA-related info (if shown)
+2. **CMA Tab Header** - Next to the comparables count
+3. **Transaction Detail Overview** - If CMA summary is shown
+
+---
+
+## CMA Source Types
+
+| Source | Icon | Label | Description |
+|--------|------|-------|-------------|
+| `repliers_similar` | 📊 | MLS Comparables | Automatically fetched from MLS similar listings |
+| `coordinate_fallback` | 📍 | Nearby Search | Generated from coordinate-based search (5 mile radius) |
+| `manual` | ✏️ | Manually Created | User-selected comparables |
+| `null` / unknown | 📊 | MLS Comparables | Default (legacy data) |
+
+---
+
+## UI Design
+
+### CMA Tab Header with Tooltip
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Comparative Market Analysis                                                 │
+│                                                                             │
+│ 10 comparable properties  •  📊 MLS Comparables ⓘ      [Clear CMA Data]    │
+│                                      ↑                                      │
+│                               Hover for tooltip                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Tooltip Content by Source Type
+
+**For MLS Comparables (repliers_similar or default):**
+```
+┌─────────────────────────────────────────────────────────┐
+│ 📊 MLS Comparables                                      │
+│                                                         │
+│ These comparables were automatically fetched from       │
+│ the MLS using Repliers' similar listings algorithm.    │
+│                                                         │
+│ The algorithm finds properties with similar:            │
+│ • Location and neighborhood                             │
+│ • Price range                                           │
+│ • Property characteristics (beds, baths, sqft)          │
+│                                                         │
+│ Last updated: Jan 22, 2025 at 2:30 PM                  │
+└─────────────────────────────────────────────────────────┘
+```
+
+**For Nearby Search (coordinate_fallback):**
+```
+┌─────────────────────────────────────────────────────────┐
+│ 📍 Nearby Property Search                               │
+│                                                         │
+│ These comparables were generated using a coordinate-    │
+│ based search within 5 miles of this property.          │
+│                                                         │
+│ This method is used when standard MLS comparables       │
+│ are not available (e.g., for closed listings).         │
+│                                                         │
+│ Search criteria:                                        │
+│ • Radius: 5 miles                                       │
+│ • Price range: ±25% of list price                      │
+│ • Bedrooms: ±1 of subject property                     │
+│                                                         │
+│ Generated: Jan 22, 2025 at 3:15 PM                     │
+└─────────────────────────────────────────────────────────┘
+```
+
+**For Manually Created:**
+```
+┌─────────────────────────────────────────────────────────┐
+│ ✏️ Manually Selected                                    │
+│                                                         │
+│ These comparables were manually selected or modified    │
+│ by the user.                                            │
+│                                                         │
+│ Last modified: Jan 22, 2025 at 4:00 PM                 │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Implementation
+
+### 1. Database - Track CMA Source (if not already)
+
+**File: `shared/schema.ts`**
+
+Ensure these fields exist:
+
+```typescript
+export const transactions = pgTable('transactions', {
+  // ... existing fields
+  
+  cmaData: jsonb('cma_data'),
+  cmaSource: varchar('cma_source', { length: 50 }), // 'repliers_similar', 'coordinate_fallback', 'manual'
+  cmaGeneratedAt: timestamp('cma_generated_at'),
+  cmaLastUpdatedAt: timestamp('cma_last_updated_at'),
+  
+  // ... other fields
+});
+```
+
+### 2. Create CMA Source Info Component
+
+**File: `client/src/components/cma-source-indicator.tsx`**
+
+```tsx
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { BarChart3, MapPin, Pencil, Info } from 'lucide-react';
+import { format } from 'date-fns';
+
+interface CMASourceIndicatorProps {
+  source: string | null;
+  generatedAt?: string | Date | null;
+  lastUpdatedAt?: string | Date | null;
+  comparablesCount?: number;
+}
+
+const SOURCE_CONFIG = {
+  repliers_similar: {
+    icon: BarChart3,
+    label: 'MLS Comparables',
+    shortLabel: 'MLS',
+    color: 'text-green-600 dark:text-green-400',
+    bgColor: 'bg-green-50 dark:bg-green-950/30',
+    borderColor: 'border-green-200 dark:border-green-800',
+    description: 'Automatically fetched from the MLS using Repliers\' similar listings algorithm.',
+    details: [
+      'Location and neighborhood',
+      'Price range',
+      'Property characteristics (beds, baths, sqft)',
+    ],
+  },
+  coordinate_fallback: {
+    icon: MapPin,
+    label: 'Nearby Property Search',
+    shortLabel: 'Nearby',
+    color: 'text-blue-600 dark:text-blue-400',
+    bgColor: 'bg-blue-50 dark:bg-blue-950/30',
+    borderColor: 'border-blue-200 dark:border-blue-800',
+    description: 'Generated using a coordinate-based search within 5 miles of this property.',
+    details: [
+      'Radius: 5 miles',
+      'Price range: ±25% of list price',
+      'Bedrooms: ±1 of subject property',
+    ],
+    note: 'This method is used when standard MLS comparables are not available (e.g., for closed listings).',
+  },
+  manual: {
+    icon: Pencil,
+    label: 'Manually Selected',
+    shortLabel: 'Manual',
+    color: 'text-purple-600 dark:text-purple-400',
+    bgColor: 'bg-purple-50 dark:bg-purple-950/30',
+    borderColor: 'border-purple-200 dark:border-purple-800',
+    description: 'These comparables were manually selected or modified.',
+    details: [],
+  },
+};
+
+export function CMASourceIndicator({ 
+  source, 
+  generatedAt, 
+  lastUpdatedAt,
+  comparablesCount 
+}: CMASourceIndicatorProps) {
+  // Default to repliers_similar for legacy data
+  const sourceKey = source && SOURCE_CONFIG[source as keyof typeof SOURCE_CONFIG] 
+    ? source as keyof typeof SOURCE_CONFIG
+    : 'repliers_similar';
+  
+  const config = SOURCE_CONFIG[sourceKey];
+  const Icon = config.icon;
+  
+  const displayDate = lastUpdatedAt || generatedAt;
+  const formattedDate = displayDate 
+    ? format(new Date(displayDate), 'MMM d, yyyy \'at\' h:mm a')
+    : null;
+
+  return (
+    <TooltipProvider>
+      <Tooltip delayDuration={300}>
+        <TooltipTrigger asChild>
+          <button 
+            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium 
+                        ${config.bgColor} ${config.color} border ${config.borderColor}
+                        hover:opacity-80 transition-opacity cursor-help`}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            <span>{config.shortLabel}</span>
+            <Info className="w-3 h-3 opacity-60" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent 
+          side="bottom" 
+          align="start" 
+          className="max-w-sm p-0 overflow-hidden"
+        >
+          <div className={`p-3 ${config.bgColor} border-b ${config.borderColor}`}>
+            <div className="flex items-center gap-2">
+              <Icon className={`w-4 h-4 ${config.color}`} />
+              <span className={`font-semibold ${config.color}`}>{config.label}</span>
+            </div>
+          </div>
+          
+          <div className="p-3 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {config.description}
+            </p>
+            
+            {config.note && (
+              <p className="text-xs text-muted-foreground italic">
+                {config.note}
+              </p>
+            )}
+            
+            {config.details.length > 0 && (
+              <div>
+                <p className="text-xs font-medium mb-1">
+                  {sourceKey === 'coordinate_fallback' ? 'Search criteria:' : 'Algorithm considers:'}
+                </p>
+                <ul className="text-xs text-muted-foreground space-y-0.5">
+                  {config.details.map((detail, index) => (
+                    <li key={index} className="flex items-center gap-1.5">
+                      <span className="w-1 h-1 rounded-full bg-current opacity-60" />
+                      {detail}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            {formattedDate && (
+              <p className="text-xs text-muted-foreground pt-2 border-t">
+                {lastUpdatedAt ? 'Last updated:' : 'Generated:'} {formattedDate}
+              </p>
+            )}
+            
+            {comparablesCount !== undefined && (
+              <p className="text-xs font-medium">
+                {comparablesCount} comparable{comparablesCount !== 1 ? 's' : ''} found
+              </p>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+```
+
+### 3. Update CMA Tab Header
+
+**File: `client/src/components/cma-tab.tsx`**
+
+```tsx
+import { CMASourceIndicator } from '@/components/cma-source-indicator';
+
+// In the CMA tab component, update the header:
+
+return (
+  <div className="space-y-6">
+    {/* Header with source indicator */}
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">Comparative Market Analysis</h2>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-sm text-muted-foreground">
+              {cmaData.length} comparable properties
+            </span>
+            
+            {/* CMA Source Indicator */}
+            <CMASourceIndicator
+              source={transaction.cmaSource}
+              generatedAt={transaction.cmaGeneratedAt}
+              lastUpdatedAt={transaction.cmaLastUpdatedAt}
+              comparablesCount={cmaData.length}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Clear CMA button */}
+      <Button variant="outline" size="sm" onClick={() => setShowClearConfirm(true)}>
+        <Trash2 className="w-4 h-4 mr-2" />
+        Clear CMA Data
+      </Button>
+    </div>
+
+    {/* Rest of CMA content */}
+  </div>
+);
+```
+
+### 4. Update Backend to Track Source
+
+**File: `server/routes.ts`**
+
+When fetching CMA automatically (MLS sync):
+
+```typescript
+// In the MLS sync or refresh handler
+if (comparables && comparables.length > 0) {
+  await storage.updateTransaction(transactionId, {
+    cmaData: comparables,
+    cmaSource: 'repliers_similar',
+    cmaGeneratedAt: new Date(),
+    cmaLastUpdatedAt: new Date(),
+  });
+}
+```
+
+When using coordinate fallback:
+
+```typescript
+// In the generate-cma-fallback endpoint
+await storage.updateTransaction(transactionId, {
+  cmaData: comparables,
+  cmaSource: 'coordinate_fallback',
+  cmaGeneratedAt: new Date(),
+  cmaLastUpdatedAt: new Date(),
+});
+```
+
+---
+
+## Optional: Show on Transaction Card
+
+If you want to show a small CMA indicator on the transaction card:
+
+```tsx
+// In transaction card component
+{transaction.cmaData && transaction.cmaData.length > 0 && (
+  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+    <BarChart3 className="w-3 h-3" />
+    <span>{transaction.cmaData.length} comps</span>
+  </div>
+)}
+```
+
+---
+
+## Summary
+
+| Source | Badge | Tooltip Explains |
+|--------|-------|------------------|
+| MLS (auto) | 📊 MLS | Algorithm uses location, price, property features |
+| Nearby (fallback) | 📍 Nearby | 5-mile radius search, used for closed listings |
+| Manual | ✏️ Manual | User-selected comparables |
+
+This gives users clear context about:
+- Where the CMA data came from
+- How it was generated
+- When it was last updated
+- What criteria was used
+
+---
+
+## Testing Checklist
+
+- [ ] Active listing with auto CMA → Shows "📊 MLS" badge with tooltip
+- [ ] Closed listing with fallback CMA → Shows "📍 Nearby" badge with tooltip
+- [ ] Tooltip shows correct description for each source type
+- [ ] Tooltip shows generation/update timestamp
+- [ ] Legacy CMA data (no source) defaults to "MLS Comparables"
