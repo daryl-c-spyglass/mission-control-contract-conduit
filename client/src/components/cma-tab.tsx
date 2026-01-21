@@ -443,7 +443,7 @@ export function CMATab({ transaction }: CMATabProps) {
 
   const handlePresentation = () => {
     if (savedCma?.id) {
-      setLocation(`/presentation/${savedCma.id}`);
+      setLocation(`/cmas/${savedCma.id}/presentation`);
     } else {
       toast({
         title: 'Save CMA First',
@@ -475,11 +475,12 @@ export function CMATab({ transaction }: CMATabProps) {
 
   return (
     <div className="space-y-4">
-      {/* 1. ACTION BAR - Save, Share, Export, More dropdown menus */}
+      {/* 1. ACTION BAR - Save, Presentation Builder, Share, Export, More */}
       <div className="print:hidden">
         <CMAActionBar
           onSave={handleSaveCMA}
           isSaving={isSaving}
+          hasSavedCma={!!savedCma?.id}
           onCopyEmail={handleCopyEmail}
           onCopyLiveUrl={handleCopyLiveUrl}
           onShareCMA={handleShareCMA}

@@ -1,0 +1,127 @@
+Fix CMA Tab Button Layout + Presentation Builder Error
+Task 1: Rearrange Buttons
+Current layout:
+[Save CMA] [Share ▼] [Export ▼] [...]
+                      └─ Print
+                      └─ Export PDF
+                      └─ Presentation Builder  ← Move this OUT
+New layout:
+Upper right (next to Slack):  [Share] [Slack]
+
+CMA section:  [Save CMA] [Presentation Builder] [Export ▼] [...]
+                                                  └─ Print
+                                                  └─ Export PDF
+
+Code Changes
+tsx// In CMA Tab component
+
+// Upper right header area (near Slack button)
+<div className="flex items-center gap-2">
+  <Button variant="outline" className="gap-2">
+    <Share2 className="w-4 h-4" />
+    Share
+  </Button>
+  <Button variant="outline" className="gap-2">
+    <MessageSquare className="w-4 h-4" />
+    Slack
+  </Button>
+</div>
+
+// CMA action bar
+<div className="flex items-center gap-2">
+  {/* Save CMA - Primary */}
+  <Button onClick={handleSaveCMA} className="gap-2 bg-primary hover:bg-primary/90">
+    <Save className="w-4 h-4" />
+    Save CMA
+  </Button>
+
+  {/* Presentation Builder - Standalone Button */}
+  <Button 
+    variant="outline" 
+    onClick={() => navigate(`/cmas/${cmaId}/presentation`)}
+    className="gap-2"
+  >
+    <LayoutGrid className="w-4 h-4" />
+    Presentation Builder
+  </Button>
+
+  {/* Export Dropdown - Only Print & Export PDF */}
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button variant="outline" className="gap-2">
+        <Download className="w-4 h-4" />
+        Export
+        <ChevronDown className="w-3 h-3" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end">
+      <DropdownMenuItem onClick={handlePrint} className="gap-2">
+        <Printer className="w-4 h-4" />
+        Print
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={handleExportPDF} className="gap-2">
+        <FileText className="w-4 h-4" />
+        Export PDF
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+
+  {/* More options */}
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button variant="outline" size="icon">
+        <MoreHorizontal className="w-4 h-4" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end">
+      {/* Other options */}
+    </DropdownMenuContent>
+  </DropdownMenu>
+</div>
+
+Task 2: Fix Presentation Builder Error
+The Presentation Builder was working before but now shows an error. Debug and fix:
+
+Check the route exists:
+
+tsx// In App.tsx or routes file, verify this route exists:
+<Route path="/cmas/:id/presentation" component={CMAPresentationBuilder} />
+
+Check the navigation:
+
+tsx// Make sure cmaId is available when clicking
+const handlePresentationBuilder = () => {
+  if (!cmaId) {
+    console.error('No CMA ID available');
+    toast({ title: 'Error', description: 'Please save the CMA first', variant: 'destructive' });
+    return;
+  }
+  navigate(`/cmas/${cmaId}/presentation`);
+};
+
+Check for the actual error:
+
+Open browser DevTools (F12)
+Click Presentation Builder
+Check Console tab for error message
+Check Network tab for failed API calls
+
+
+Common issues to check:
+
+Is CMAPresentationBuilder.tsx imported correctly?
+Is the CMA ID being passed correctly?
+Are there any missing dependencies in the component?
+
+
+
+Show me the error message from the browser console when clicking Presentation Builder.
+
+Summary of Changes
+ChangeFromToShare buttonIn CMA action barUpper right next to SlackPresentation BuilderInside Export dropdownStandalone button next to Save CMAExport dropdownContains 3 itemsContains only Print & Export PDF
+
+Files to Modify
+
+Transaction detail header (move Share button)
+CMA tab action bar (rearrange buttons)
+Check/fix Presentation Builder route and navigation

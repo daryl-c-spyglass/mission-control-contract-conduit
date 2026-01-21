@@ -36,6 +36,7 @@ interface CMAActionBarProps {
   onAdjustFilters?: () => void;
   onNotes?: () => void;
   onProduceUrl?: () => void;
+  hasSavedCma?: boolean;
 }
 
 export function CMAActionBar({ 
@@ -50,9 +51,11 @@ export function CMAActionBar({
   onAdjustFilters,
   onNotes,
   onProduceUrl,
+  hasSavedCma = false,
 }: CMAActionBarProps) {
   return (
-    <div className="flex items-center justify-end" data-testid="cma-action-bar">
+    <div className="flex items-center justify-between" data-testid="cma-action-bar">
+      {/* Left side - Save and Presentation Builder */}
       <div className="flex items-center gap-2">
         <Button 
           onClick={onSave}
@@ -68,6 +71,21 @@ export function CMAActionBar({
           {isSaving ? 'Saving...' : 'Save CMA'}
         </Button>
 
+        {/* Presentation Builder - Standalone Button */}
+        <Button 
+          variant="outline" 
+          onClick={onPresentation}
+          className="gap-2"
+          data-testid="button-presentation-builder"
+        >
+          <LayoutGrid className="w-4 h-4" />
+          Presentation Builder
+        </Button>
+      </div>
+
+      {/* Right side - Share, Export, More */}
+      <div className="flex items-center gap-2">
+        {/* Share Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="gap-2" data-testid="button-share-dropdown">
@@ -93,6 +111,7 @@ export function CMAActionBar({
           </DropdownMenuContent>
         </DropdownMenu>
 
+        {/* Export Dropdown - Only Print & Export PDF */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="gap-2" data-testid="button-export-dropdown">
@@ -110,14 +129,10 @@ export function CMAActionBar({
               <FileText className="w-4 h-4" />
               Export PDF
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onPresentation} className="gap-2" data-testid="menu-item-presentation">
-              <LayoutGrid className="w-4 h-4" />
-              Presentation Builder
-            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
+        {/* More options */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="icon" data-testid="button-more-dropdown">
