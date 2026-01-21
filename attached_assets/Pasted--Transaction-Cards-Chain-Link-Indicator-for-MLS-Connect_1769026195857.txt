@@ -1,0 +1,433 @@
+# Transaction Cards - Chain Link Indicator for MLS Connection
+
+## Overview
+
+Add a green chain link icon (🔗) next to the status badge on transaction cards to indicate when a transaction is connected to Repliers MLS.
+
+---
+
+## Visual Design
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         LEGEND                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  [Off Market 🟣]         = No MLS connection (no chain)         │
+│                                                                 │
+│  [Active Listing 🟢] 🔗  = Connected to Repliers MLS            │
+│                                                                 │
+│  [In Contract 🟠]        = No MLS (internal status)             │
+│                                                                 │
+│  [In Contract 🟠] 🔗     = Has MLS, under contract              │
+│                                                                 │
+│  [Closed 🔴] 🔗          = Has MLS, transaction completed       │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Transaction Card Examples
+
+### Card WITH MLS Connection (Show Chain Link):
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 154 Pettigrew, Buda, TX 78...      [Active Listing 🟢] 🔗       │
+│ # ACT2451173                                          ↑         │
+│                                                 Green chain     │
+│ CONTRACT DATE          CLOSING DATE             = Connected     │
+│ 📅 —                   📅 —                                     │
+│                                                                 │
+│ [📊 MLS Data] [📷 Marketing] [📄 Docs]                          │
+│ [💬 Slack]                                                      │
+│                                                                 │
+│ Tooltip on 🔗 hover:                                            │
+│ ┌─────────────────────────────────┐                             │
+│ │ 🔗 Connected to Repliers MLS    │                             │
+│ │ MLS#: ACT2451173               │                             │
+│ │ Last synced: 2 hours ago        │                             │
+│ └─────────────────────────────────┘                             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Card WITHOUT MLS (No Chain Link):
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 612 Twelve Oaks LN                 [Off Market 🟣]              │
+│ (Off Market)                                    ↑               │
+│                                           No chain link         │
+│ CONTRACT DATE          CLOSING DATE       = Not connected       │
+│ 📅 —                   📅 —                                     │
+│                                                                 │
+│ 👥 DCC Daryl                                                    │
+│                                                                 │
+│ [📷 Marketing] [📄 Docs] [💬 Slack]                              │
+│                                                                 │
+│ + Add MLS Number    ← Link to add MLS and connect               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Card with MLS but Under Contract:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 13106 New Boston                   [Active Under Contract 🟠] 🔗│
+│ # ACT2572987                                                    │
+│                                                                 │
+│ CONTRACT DATE          CLOSING DATE                             │
+│ 📅 Jan 1, 2026         📅 Feb 7, 2026                           │
+│                                                                 │
+│ 17 days remaining                                               │
+│                                                                 │
+│ [📊 MLS Data] [📷 Marketing] [📄 Docs]                          │
+│ [💬 Slack]                                                      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Chain Link Display Rules
+
+| Condition | Show Chain Link? | Badge Color |
+|-----------|------------------|-------------|
+| Has MLS number (ACT...) | ✅ Yes (green) | Based on MLS status |
+| Has MLS number (numeric) | ✅ Yes (green) | Based on MLS status |
+| Off Market (no MLS) | ❌ No | Purple |
+| No MLS number | ❌ No | Orange (In Contract) |
+| Buyer contract (no MLS) | ❌ No | Blue |
+
+---
+
+## Implementation
+
+### 1. Update Transaction Card Component
+
+**File: Update your transaction card component**
+
+```tsx
+import { Link2 } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { formatDistanceToNow } from 'date-fns';
+
+interface TransactionCardProps {
+  transaction: {
+    id: number;
+    address: string;
+    mlsNumber?: string | null;
+    status?: string;
+    mlsStatus?: string;
+    mlsData?: any;
+    isOffMarket?: boolean;
+    contractDate?: string;
+    closingDate?: string;
+    mlsLastSynced?: string | Date;
+    updatedAt?: string | Date;
+    // ... other fields
+  };
+}
+
+export function TransactionCard({ transaction }: TransactionCardProps) {
+  // Determine if connected to MLS
+  const isConnectedToMLS = !!(
+    transaction.mlsNumber && 
+    transaction.mlsNumber.length > 0 && 
+    !transaction.isOffMarket
+  );
+
+  // Get status config
+  const { label: statusLabel, color: statusColor } = getTransactionStatus(transaction);
+
+  // Format last synced time
+  const lastSynced = transaction.mlsLastSynced || transaction.updatedAt;
+  const lastSyncedText = lastSynced 
+    ? formatDistanceToNow(new Date(lastSynced), { addSuffix: true })
+    : 'Unknown';
+
+  return (
+    <div className="bg-card border rounded-lg p-4 hover:shadow-md transition-shadow">
+      {/* Header Row */}
+      <div className="flex items-start justify-between gap-2 mb-3">
+        {/* Address & MLS Number */}
+        <div className="min-w-0 flex-1">
+          <h3 className="font-medium truncate">{transaction.address}</h3>
+          {transaction.isOffMarket && (
+            <p className="text-sm text-muted-foreground">(Off Market)</p>
+          )}
+          {transaction.mlsNumber && (
+            <p className="text-sm text-muted-foreground"># {transaction.mlsNumber}</p>
+          )}
+        </div>
+
+        {/* Status Badge + Chain Link */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {/* Status Badge */}
+          <span className={`px-2.5 py-1 rounded text-xs font-medium whitespace-nowrap ${statusColor} text-white`}>
+            {statusLabel}
+          </span>
+
+          {/* Chain Link Icon - Only show when connected to MLS */}
+          {isConnectedToMLS && (
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="cursor-help">
+                    <Link2 className="w-4 h-4 text-green-500" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="end" className="max-w-xs">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <Link2 className="w-3.5 h-3.5 text-green-500" />
+                      <span className="font-medium text-green-600">Connected to Repliers MLS</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <p>MLS#: {transaction.mlsNumber}</p>
+                      <p>Last synced: {lastSyncedText}</p>
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+      </div>
+
+      {/* Dates Row */}
+      <div className="grid grid-cols-2 gap-4 mb-3">
+        <div>
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">
+            Contract Date
+          </p>
+          <p className="text-sm flex items-center gap-1">
+            <span>📅</span>
+            {transaction.contractDate 
+              ? new Date(transaction.contractDate).toLocaleDateString('en-US', { 
+                  month: 'short', 
+                  day: 'numeric', 
+                  year: 'numeric' 
+                })
+              : '—'
+            }
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">
+            Closing Date
+          </p>
+          <p className="text-sm flex items-center gap-1">
+            <span>📅</span>
+            {transaction.closingDate 
+              ? new Date(transaction.closingDate).toLocaleDateString('en-US', { 
+                  month: 'short', 
+                  day: 'numeric', 
+                  year: 'numeric' 
+                })
+              : '—'
+            }
+          </p>
+        </div>
+      </div>
+
+      {/* Days Remaining (if applicable) */}
+      {transaction.closingDate && (
+        <DaysRemainingBadge closingDate={transaction.closingDate} />
+      )}
+
+      {/* Action Buttons */}
+      <div className="flex flex-wrap gap-2 mt-3">
+        {/* Only show MLS Data button if has MLS number */}
+        {transaction.mlsNumber && !transaction.isOffMarket && (
+          <Button size="sm" variant="outline" className="text-xs">
+            <FileText className="w-3.5 h-3.5 mr-1" />
+            MLS Data
+          </Button>
+        )}
+        <Button size="sm" variant="outline" className="text-xs">
+          <Image className="w-3.5 h-3.5 mr-1" />
+          Marketing
+        </Button>
+        <Button size="sm" variant="outline" className="text-xs">
+          <FileText className="w-3.5 h-3.5 mr-1" />
+          Docs
+        </Button>
+        {transaction.slackChannelId && (
+          <Button size="sm" variant="outline" className="text-xs">
+            <MessageSquare className="w-3.5 h-3.5 mr-1" />
+            Slack
+          </Button>
+        )}
+      </div>
+
+      {/* Add MLS Number link for Off Market */}
+      {transaction.isOffMarket && !transaction.mlsNumber && (
+        <button 
+          onClick={() => handleAddMlsNumber(transaction.id)}
+          className="mt-3 text-sm text-primary hover:text-primary/80 flex items-center gap-1"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Add MLS Number
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Helper function to calculate days remaining
+function DaysRemainingBadge({ closingDate }: { closingDate: string }) {
+  const closing = new Date(closingDate);
+  const today = new Date();
+  const diffTime = closing.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) return null; // Already closed
+  if (diffDays === 0) return <p className="text-sm text-red-600 font-medium">Closing today!</p>;
+
+  const colorClass = diffDays <= 7 
+    ? 'text-red-600' 
+    : diffDays <= 14 
+      ? 'text-orange-600' 
+      : 'text-muted-foreground';
+
+  return (
+    <p className={`text-sm ${colorClass}`}>
+      {diffDays} day{diffDays !== 1 ? 's' : ''} remaining
+    </p>
+  );
+}
+```
+
+---
+
+### 2. Status Configuration Helper
+
+**File: `client/src/lib/statusUtils.ts`** (update or create)
+
+```typescript
+export interface StatusConfig {
+  label: string;
+  color: string;
+}
+
+export function getTransactionStatus(transaction: {
+  mlsStatus?: string | null;
+  status?: string | null;
+  isOffMarket?: boolean;
+  mlsData?: { standardStatus?: string; status?: string } | null;
+}): StatusConfig {
+  
+  // Off Market
+  if (transaction.isOffMarket) {
+    return { label: 'Off Market', color: 'bg-purple-500' };
+  }
+
+  // MLS Status (from Repliers)
+  const mlsStatus = transaction.mlsData?.standardStatus || 
+                    transaction.mlsData?.status || 
+                    transaction.mlsStatus;
+
+  if (mlsStatus) {
+    const statusMap: Record<string, StatusConfig> = {
+      'Active': { label: 'Active Listing', color: 'bg-green-500' },
+      'A': { label: 'Active Listing', color: 'bg-green-500' },
+      'Active Listing': { label: 'Active Listing', color: 'bg-green-500' },
+      
+      'Active Under Contract': { label: 'Active Under Contract', color: 'bg-orange-500' },
+      'Under Contract': { label: 'Under Contract', color: 'bg-orange-500' },
+      'U': { label: 'Under Contract', color: 'bg-orange-500' },
+      'Pending': { label: 'Pending', color: 'bg-orange-500' },
+      'P': { label: 'Pending', color: 'bg-orange-500' },
+      
+      'Sold': { label: 'Sold', color: 'bg-red-500' },
+      'S': { label: 'Sold', color: 'bg-red-500' },
+      'Closed': { label: 'Closed', color: 'bg-red-500' },
+      'C': { label: 'Closed', color: 'bg-red-500' },
+      
+      'Coming Soon': { label: 'Coming Soon', color: 'bg-blue-500' },
+      'Withdrawn': { label: 'Withdrawn', color: 'bg-gray-500' },
+      'Expired': { label: 'Expired', color: 'bg-gray-500' },
+    };
+
+    return statusMap[mlsStatus] || { label: mlsStatus, color: 'bg-gray-500' };
+  }
+
+  // Internal status (no MLS)
+  const internalStatus = transaction.status || 'In Contract';
+  const internalMap: Record<string, StatusConfig> = {
+    'In Contract': { label: 'In Contract', color: 'bg-orange-500' },
+    'Pending': { label: 'Pending', color: 'bg-orange-500' },
+    'Closed': { label: 'Closed', color: 'bg-red-500' },
+    'Buyer Contract': { label: 'Buyer Contract', color: 'bg-blue-500' },
+  };
+
+  return internalMap[internalStatus] || { label: internalStatus, color: 'bg-gray-500' };
+}
+
+/**
+ * Check if transaction is connected to MLS
+ */
+export function isConnectedToMLS(transaction: {
+  mlsNumber?: string | null;
+  isOffMarket?: boolean;
+}): boolean {
+  return !!(
+    transaction.mlsNumber && 
+    transaction.mlsNumber.length > 0 && 
+    !transaction.isOffMarket
+  );
+}
+```
+
+---
+
+## Summary
+
+### Chain Link Rules:
+
+| Has MLS# | Is Off Market | Show Chain Link |
+|----------|---------------|-----------------|
+| ✅ Yes | ❌ No | ✅ Show green 🔗 |
+| ✅ Yes | ✅ Yes | ❌ Hide (contradictory state) |
+| ❌ No | ✅ Yes | ❌ Hide |
+| ❌ No | ❌ No | ❌ Hide |
+
+### Tooltip Content:
+```
+┌─────────────────────────────────┐
+│ 🔗 Connected to Repliers MLS    │
+│ MLS#: ACT2572987               │
+│ Last synced: 2 hours ago        │
+└─────────────────────────────────┘
+```
+
+### Status Colors:
+
+| Status | Color | Has Chain Link? |
+|--------|-------|-----------------|
+| Off Market | 🟣 Purple | ❌ Never |
+| Active Listing | 🟢 Green | ✅ If has MLS# |
+| Active Under Contract | 🟠 Orange | ✅ If has MLS# |
+| In Contract | 🟠 Orange | ✅ If has MLS# |
+| Closed | 🔴 Red | ✅ If has MLS# |
+| Coming Soon | 🔵 Blue | ✅ If has MLS# |
+| Buyer Contract | 🔵 Blue | ❌ Never (buyer side) |
+
+---
+
+## Files to Update
+
+| File | Changes |
+|------|---------|
+| Transaction card component | Add chain link icon with tooltip |
+| `client/src/lib/statusUtils.ts` | Add `isConnectedToMLS` helper |
+
+## Dependencies
+
+Make sure you have:
+- `lucide-react` for Link2 icon
+- `date-fns` for `formatDistanceToNow`
+- Tooltip components from shadcn/ui

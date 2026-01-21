@@ -1,10 +1,17 @@
-import { Calendar, Hash, Mail, MessageSquare, Users, FileSpreadsheet, Image as ImageIcon, FileText, Plus } from "lucide-react";
+import { Calendar, Hash, Mail, MessageSquare, Users, FileSpreadsheet, Image as ImageIcon, FileText, Plus, Link2 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { Transaction, Coordinator, MLSData } from "@shared/schema";
 import { getStatusBadgeStyle, getStatusLabel, getDaysRemainingStyle } from "@/lib/utils/status-colors";
+import { formatDistanceToNow } from "date-fns";
 
 interface TransactionCardProps {
   transaction: Transaction;
@@ -37,11 +44,24 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
   // Determine if this is an off-market listing
   const isOffMarket = transaction.isOffMarket && !transaction.mlsNumber;
   
+  // Determine if connected to Repliers MLS (has MLS number and not off-market)
+  const isConnectedToMLS = !!(
+    transaction.mlsNumber && 
+    transaction.mlsNumber.length > 0 && 
+    !transaction.isOffMarket
+  );
+  
   // Use MLS status as source of truth, fallback to transaction status, or off-market status
   const mlsData = transaction.mlsData as MLSData | null;
   const displayStatus = isOffMarket ? 'off_market' : (mlsData?.status || transaction.status);
   const statusLabel = getStatusLabel(displayStatus);
   const daysRemaining = getDaysRemaining(transaction.closingDate);
+  
+  // Format last synced time for tooltip
+  const lastSynced = transaction.mlsLastSyncedAt;
+  const lastSyncedText = lastSynced 
+    ? formatDistanceToNow(new Date(lastSynced), { addSuffix: true })
+    : 'Not yet synced';
   
   const transactionCoordinators = coordinators.filter(
     (c) => transaction.coordinatorIds?.includes(c.id)
@@ -71,9 +91,35 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
             </span>
           ) : null}
         </div>
-        <Badge className={getStatusBadgeStyle(displayStatus)} data-testid={`badge-status-${transaction.id}`}>
-          {statusLabel}
-        </Badge>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <Badge className={getStatusBadgeStyle(displayStatus)} data-testid={`badge-status-${transaction.id}`}>
+            {statusLabel}
+          </Badge>
+          
+          {isConnectedToMLS && (
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="cursor-help" data-testid={`mls-link-${transaction.id}`}>
+                    <Link2 className="w-4 h-4 text-green-500" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="end" className="max-w-xs">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <Link2 className="w-3.5 h-3.5 text-green-500" />
+                      <span className="font-medium text-green-600 dark:text-green-400">Connected to Repliers MLS</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <p>MLS#: {transaction.mlsNumber}</p>
+                      <p>Last synced: {lastSyncedText}</p>
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
