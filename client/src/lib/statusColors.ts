@@ -33,3 +33,15 @@ export function getStatusHex(status: string, isSubject = false): string {
   if (isSubject) return STATUS_COLORS.subject.hex;
   return getStatusColor(status).hex;
 }
+
+export function getAdjustmentColor(value: number): string {
+  if (value > 0) return "#ef4444";
+  if (value < 0) return "#22c55e";
+  return "inherit";
+}
+
+export function formatAdjustmentValue(value: number): string {
+  if (value === 0) return "$0";
+  const formatted = Math.abs(value).toLocaleString();
+  return value > 0 ? `+$${formatted}` : `-$${formatted}`;
+}

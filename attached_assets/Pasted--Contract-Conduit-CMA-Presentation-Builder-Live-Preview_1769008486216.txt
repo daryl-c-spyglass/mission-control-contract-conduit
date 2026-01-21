@@ -1,0 +1,1090 @@
+# Contract Conduit - CMA Presentation Builder Live Preview
+
+## Complete Implementation Guide
+
+Build a complete Live Preview system for the CMA Presentation Builder that displays all enabled sections in real-time, syncs with the Sections/Content/Layout tabs, and includes an expandable full-screen modal with zoom controls.
+
+---
+
+## ARCHITECTURE DIAGRAM
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                           PRESENTATION BUILDER PAGE                                      │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  ┌─ HEADER ──────────────────────────────────────────────────────────────────────────┐  │
+│  │  ← Presentation Builder                    [Preview] [Save] [Export PDF]          │  │
+│  │    CMA for 154 Pettigrew, Buda, TX 78610                                          │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  ┌─────────────────────────────────────────┬─────────────────────────────────────────┐  │
+│  │                                         │                                         │  │
+│  │         BUILDER TABS (Left 60%)         │      LIVE PREVIEW (Right 40%)          │  │
+│  │                                         │                                         │  │
+│  │  ┌──────────┬──────────┬──────────┐    │    ┌─────────────────────────────────┐  │  │
+│  │  │ Sections │ Content  │  Layout  │    │    │  Live Preview    17 sections [⛶]│  │  │
+│  │  └────┬─────┴────┬─────┴────┬─────┘    │    │  Preview how your CMA will look │  │  │
+│  │       │          │          │          │    ├─────────────────────────────────┤  │  │
+│  │       ▼          ▼          ▼          │    │                                 │  │  │
+│  │  ┌─────────────────────────────────┐   │    │  ┌─────────────────────────┐   │  │  │
+│  │  │                                 │   │    │  │ 📄 Cover Page           │   │  │  │
+│  │  │  TAB CONTENT                    │   │    │  │   Spyglass Realty       │   │  │  │
+│  │  │  (Changes based on active tab)  │───┼────┼─▶│   Comparative Market... │   │  │  │
+│  │  │                                 │   │    │  │   Prepared for you      │   │  │  │
+│  │  │  • Sections: Toggle on/off      │   │    │  │   1/21/2026             │   │  │  │
+│  │  │  • Content: Edit title, letter  │   │    │  │   [Agent Photo]         │   │  │  │
+│  │  │  • Layout: Cover photo, map     │   │    │  └─────────────────────────┘   │  │  │
+│  │  │                                 │   │    │                                 │  │  │
+│  │  │                                 │   │    │  ┌─────────────────────────┐   │  │  │
+│  │  │                                 │   │    │  │ 🖼️ Listing Brochure     │   │  │  │
+│  │  │                                 │   │    │  │   [Brochure Thumbnail]  │   │  │  │
+│  │  │                                 │   │    │  └─────────────────────────┘   │  │  │
+│  │  │                                 │   │    │                                 │  │  │
+│  │  │                                 │   │    │  ┌─────────────────────────┐   │  │  │
+│  │  │                                 │   │    │  │ 🗺️ Map of All Listings  │   │  │  │
+│  │  │                                 │   │    │  │   [Interactive Map]     │   │  │  │
+│  │  │                                 │   │    │  └─────────────────────────┘   │  │  │
+│  │  │                                 │   │    │                                 │  │  │
+│  │  │                                 │   │    │  ... more sections (scroll) ...│  │  │
+│  │  │                                 │   │    │                                 │  │  │
+│  │  └─────────────────────────────────┘   │    └─────────────────────────────────┘  │  │
+│  │                                         │                                         │  │
+│  └─────────────────────────────────────────┴─────────────────────────────────────────┘  │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## EXPANDED PREVIEW MODAL (Click [⛶] to open)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│  CMA Presentation Preview                              17 sections enabled  [Save as Template] │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ 📄 Cover Page                                                                     │  │
+│  │                         Spyglass Realty                                           │  │
+│  │                   Comparative Market Analysis                                     │  │
+│  │                    Prepared exclusively for you                                   │  │
+│  │                          1/21/2026                                                │  │
+│  │                     [Agent Photo] Daryl Camingao                                  │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ 🖼️ Listing Brochure                                                               │  │
+│  │                    [Uploaded Flyer Thumbnail]                                     │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ 🗺️ Map of All Listings                                                            │  │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────┐  │  │
+│  │  │  [Streets] [Satellite]                              ☑️ Show All            │  │  │
+│  │  │           🟢 Subject Property                                              │  │  │
+│  │  │                    🔴         🔴                                           │  │  │
+│  │  │              🟡         🔴                                                 │  │  │
+│  │  └─────────────────────────────────────────────────────────────────────────────┘  │  │
+│  │  Legend: 🟢 Subject  🔴 Active  🟡 Under Contract  ⚫ Closed                      │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ 📊 Summary of Comparable Properties                                               │  │
+│  │  ┌─────────────────┬─────────────────┬─────────────────┐                         │  │
+│  │  │    Avg Price    │   Avg $/SqFt    │   Properties    │                         │  │
+│  │  │    $909,888     │      $274       │        7        │                         │  │
+│  │  └─────────────────┴─────────────────┴─────────────────┘                         │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ 🧮 Adjustments (Color-coded: GREEN = negative, RED = positive)                    │  │
+│  │                                                                                   │  │
+│  │  Property          Sale Price   Sq Ft     Beds     Total Adj   Adj. Price        │  │
+│  │  ─────────────────────────────────────────────────────────────────────────────   │  │
+│  │  260 Saltgrass CV    $939k    -$1,700  +$10,000    +$8,300       $947k           │  │
+│  │                      (black)  (GREEN)    (RED)      (RED)                        │  │
+│  │  ─────────────────────────────────────────────────────────────────────────────   │  │
+│  │  1589 Cool Spring    $869k   +$10,150  +$10,000   +$20,150       $889k           │  │
+│  │                      (black)   (RED)     (RED)      (RED)                        │  │
+│  │  ─────────────────────────────────────────────────────────────────────────────   │  │
+│  │  569 Stone River     $900k    -$7,800      $0      -$7,800       $892k           │  │
+│  │                      (black)  (GREEN)   (black)   (GREEN)                        │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ 📊 Average Price Per Sq. Ft. (Orange Bar Chart)                                   │  │
+│  │                                                                                   │  │
+│  │  $350 ┤                                                                           │  │
+│  │  $300 ┤  ████                                                                     │  │
+│  │  $250 ┤  ████  ████  ████  ████                                                  │  │
+│  │  $200 ┤  ████  ████  ████  ████  ████  ████  ████                                │  │
+│  │    $0 ┼──────────────────────────────────────────                                │  │
+│  │        Prop1  Prop2  Prop3  Prop4  Prop5  Prop6  Prop7                           │  │
+│  │                      Average: $274/sqft                                           │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                              [ 50% ]  [ 100% ]  [ 150% ]                                 │
+│                                    ZOOM CONTROLS                                         │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## DATA FLOW DIAGRAM
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                                    DATA SOURCES                                          │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐ │
+│  │   CMA DATA       │  │   MLS DATA       │  │   AGENT DATA     │  │   USER INPUT     │ │
+│  │   (Comparables)  │  │   (Repliers)     │  │   (Profile)      │  │   (Builder)      │ │
+│  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘ │
+│           │                     │                     │                     │           │
+│           └──────────┬──────────┴──────────┬──────────┴──────────┬──────────┘           │
+│                      │                     │                     │                       │
+│                      ▼                     ▼                     ▼                       │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+                                             │
+                                             ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              PRESENTATION BUILDER STATE                                  │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│  │                              CMAPresentationBuilder.tsx                           │   │
+│  │                                                                                   │   │
+│  │  // Section state                                                                 │   │
+│  │  const [includedSections, setIncludedSections] = useState<CmaSectionId[]>([]);   │   │
+│  │                                                                                   │   │
+│  │  // Content state                                                                 │   │
+│  │  const [contentSettings, setContentSettings] = useState({                         │   │
+│  │    title: "Comparative Market Analysis",                                          │   │
+│  │    subtitle: "Prepared exclusively for you",                                      │   │
+│  │    showDate: true,                                                                │   │
+│  │    showAgentPhoto: true,                                                          │   │
+│  │    coverLetter: "",                                                               │   │
+│  │  });                                                                              │   │
+│  │                                                                                   │   │
+│  │  // Layout state                                                                  │   │
+│  │  const [layoutSettings, setLayoutSettings] = useState({                           │   │
+│  │    coverPhotoUrl: null,                                                           │   │
+│  │    mapStyle: 'streets',                                                           │   │
+│  │    showMapPolygon: true,                                                          │   │
+│  │  });                                                                              │   │
+│  │                                                                                   │   │
+│  └──────────────────────────────────────────────────────────────────────────────────┘   │
+│           │                              │                              │                │
+│           ▼                              ▼                              ▼                │
+│  ┌─────────────────┐          ┌─────────────────┐          ┌─────────────────┐         │
+│  │  SECTIONS TAB   │          │   CONTENT TAB   │          │   LAYOUT TAB    │         │
+│  │                 │          │                 │          │                 │         │
+│  │  • Toggle on/off│          │  • Title        │          │  • Cover photo  │         │
+│  │  • Reorder      │          │  • Subtitle     │          │  • Photo source │         │
+│  │  • Categories   │          │  • Client name  │          │  • Map settings │         │
+│  │                 │          │  • Cover letter │          │                 │         │
+│  └────────┬────────┘          └────────┬────────┘          └────────┬────────┘         │
+│           │                            │                            │                   │
+│           └────────────────────────────┼────────────────────────────┘                   │
+│                                        │                                                 │
+│                                        ▼                                                 │
+│                          ┌─────────────────────────┐                                    │
+│                          │    LIVE PREVIEW PANEL   │                                    │
+│                          │                         │                                    │
+│                          │  Props received:        │                                    │
+│                          │  - includedSections     │                                    │
+│                          │  - contentSettings      │                                    │
+│                          │  - layoutSettings       │                                    │
+│                          │  - comparables          │                                    │
+│                          │  - subjectProperty      │                                    │
+│                          │  - agentProfile         │                                    │
+│                          │                         │                                    │
+│                          │  Re-renders on ANY      │                                    │
+│                          │  state change           │                                    │
+│                          └─────────────────────────┘                                    │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## COMPONENT HIERARCHY
+
+```
+CMAPresentationBuilder (Page)
+│
+├── Header
+│   ├── Back Button
+│   ├── Title ("Presentation Builder")
+│   ├── Subtitle ("CMA for [address]")
+│   └── Actions: [Preview] [Save] [Export PDF]
+│
+├── Main Content (Split Layout: 60% / 40%)
+│   │
+│   ├── LEFT SIDE (60%) - Builder Tabs
+│   │   │
+│   │   ├── TabsList
+│   │   │   ├── "Sections" tab
+│   │   │   ├── "Content" tab
+│   │   │   └── "Layout" tab
+│   │   │
+│   │   └── TabsContent
+│   │       │
+│   │       ├── SectionsTab
+│   │       │   ├── Introduction Category (7 items with toggles)
+│   │       │   ├── Listings Category (5 items with toggles)
+│   │       │   └── Analysis Category (5 items with toggles)
+│   │       │
+│   │       ├── ContentTab
+│   │       │   ├── CoverPage Card (title, subtitle, toggles)
+│   │       │   └── CoverLetter Card (AI generate, textarea)
+│   │       │
+│   │       └── LayoutTab
+│   │           └── CoverPhotoSection (AI/Manual toggle, photo grid)
+│   │
+│   └── RIGHT SIDE (40%) - Live Preview
+│       │
+│       └── LivePreviewPanel
+│           ├── Header ("Live Preview", section count, expand button)
+│           └── ScrollablePreview (all enabled sections)
+│
+└── ExpandedPreviewModal (when [⛶] clicked)
+    ├── Header ("CMA Presentation Preview", section count)
+    ├── ScrollableContent (all sections, full size)
+    └── ZoomControls [50%] [100%] [150%]
+```
+
+---
+
+## SECTION TYPES REFERENCE (17 Total)
+
+| ID | Label | Category | Icon | Default |
+|----|-------|----------|------|---------|
+| `cover_page` | Cover Page | Introduction | FileText | ✅ ON |
+| `listing_brochure` | Listing Brochure | Introduction | Image | ❌ OFF |
+| `cover_letter` | Cover Letter | Introduction | Mail | ✅ ON |
+| `agent_resume` | Agent Resume | Introduction | User | ❌ OFF |
+| `our_company` | Our Company | Introduction | Building | ❌ OFF |
+| `what_is_cma` | What is a CMA? | Introduction | HelpCircle | ❌ OFF |
+| `contact_me` | Contact Me | Introduction | Phone | ✅ ON |
+| `map_all_listings` | Map of All Listings | Listings | Map | ✅ ON |
+| `listings_header` | Listings Chapter Header | Listings | List | ❌ OFF |
+| `summary_comparables` | Summary of Comparables | Listings | BarChart3 | ✅ ON |
+| `property_details` | Property Details | Listings | Home | ✅ ON |
+| `property_photos` | Property Photos | Listings | Images | ✅ ON |
+| `adjustments` | Adjustments | Listings | Calculator | ❌ OFF |
+| `analysis_header` | Analysis Chapter Header | Analysis | TrendingUp | ❌ OFF |
+| `online_valuation` | Online Valuation Analysis | Analysis | Globe | ❌ OFF |
+| `price_per_sqft` | Average Price Per Sq. Ft. | Analysis | BarChart | ✅ ON |
+| `comparable_stats` | Comparable Statistics | Analysis | PieChart | ✅ ON |
+
+---
+
+## COLOR CODING REFERENCE
+
+### Status Badges
+| Status | Background | Text | Use |
+|--------|------------|------|-----|
+| Active | `#22c55e` (green) | white | Property listings |
+| Under Contract | `#f97316` (orange) | white | Property listings |
+| Pending | `#eab308` (yellow) | black | Property listings |
+| Sold/Closed | `#6b7280` (gray) | white | Property listings |
+
+### Adjustment Values
+| Value | Color | Meaning |
+|-------|-------|---------|
+| Positive (+$X) | `#ef4444` (red) | Increases subject value (bad for seller) |
+| Negative (-$X) | `#22c55e` (green) | Decreases subject value (good for seller) |
+| Zero ($0) | inherit (black/gray) | No adjustment needed |
+
+### Map Markers
+| Type | Color | Border |
+|------|-------|--------|
+| Subject | `#22c55e` (green) | `#166534` |
+| Active | `#ef4444` (red) | `#b91c1c` |
+| Under Contract | `#f97316` (orange) | `#c2410c` |
+| Sold | `#6b7280` (gray) | `#4b5563` |
+
+---
+
+## IMPLEMENTATION
+
+### Step 1: Install Dependencies
+
+```bash
+npm install recharts @react-pdf/renderer
+```
+
+---
+
+### Step 2: Create Section Configuration
+
+**File: `shared/cma-sections.ts`**
+
+```typescript
+import { FileText, Home, BarChart3, Image, Mail, User, Building, HelpCircle, Phone, Map, List, Calculator, TrendingUp, Globe, BarChart, PieChart, Images, LucideIcon } from "lucide-react";
+
+export interface CmaSectionConfig {
+  id: string;
+  name: string;
+  category: 'introduction' | 'listings' | 'analysis';
+  defaultEnabled: boolean;
+  icon: LucideIcon;
+  editable?: boolean;
+}
+
+export const CMA_REPORT_SECTIONS: CmaSectionConfig[] = [
+  // Introduction
+  { id: 'cover_page', name: 'Cover Page', category: 'introduction', defaultEnabled: true, icon: FileText },
+  { id: 'listing_brochure', name: 'Listing Brochure', category: 'introduction', defaultEnabled: false, icon: Image },
+  { id: 'cover_letter', name: 'Cover Letter', category: 'introduction', defaultEnabled: true, icon: Mail, editable: true },
+  { id: 'agent_resume', name: 'Agent Resume', category: 'introduction', defaultEnabled: false, icon: User, editable: true },
+  { id: 'our_company', name: 'Our Company', category: 'introduction', defaultEnabled: false, icon: Building },
+  { id: 'what_is_cma', name: 'What is a CMA?', category: 'introduction', defaultEnabled: false, icon: HelpCircle },
+  { id: 'contact_me', name: 'Contact Me', category: 'introduction', defaultEnabled: true, icon: Phone },
+  // Listings
+  { id: 'map_all_listings', name: 'Map of All Listings', category: 'listings', defaultEnabled: true, icon: Map },
+  { id: 'listings_header', name: 'Listings Chapter Header', category: 'listings', defaultEnabled: false, icon: List },
+  { id: 'summary_comparables', name: 'Summary of Comparable Properties', category: 'listings', defaultEnabled: true, icon: BarChart3 },
+  { id: 'property_details', name: 'Property Details', category: 'listings', defaultEnabled: true, icon: Home },
+  { id: 'property_photos', name: 'Property Photos', category: 'listings', defaultEnabled: true, icon: Images },
+  { id: 'adjustments', name: 'Adjustments', category: 'listings', defaultEnabled: false, icon: Calculator },
+  // Analysis
+  { id: 'analysis_header', name: 'Analysis Chapter Header', category: 'analysis', defaultEnabled: false, icon: TrendingUp },
+  { id: 'online_valuation', name: 'Online Valuation Analysis', category: 'analysis', defaultEnabled: false, icon: Globe },
+  { id: 'price_per_sqft', name: 'Average Price Per Sq. Ft.', category: 'analysis', defaultEnabled: true, icon: BarChart },
+  { id: 'comparable_stats', name: 'Comparable Property Statistics', category: 'analysis', defaultEnabled: true, icon: PieChart },
+];
+
+export type CmaSectionId = typeof CMA_REPORT_SECTIONS[number]['id'];
+
+export const SECTION_CATEGORIES = {
+  introduction: { label: "Introduction", icon: FileText },
+  listings: { label: "Listings", icon: Home },
+  analysis: { label: "Analysis", icon: BarChart3 },
+} as const;
+
+export function getDefaultEnabledSections(): string[] {
+  return CMA_REPORT_SECTIONS.filter(s => s.defaultEnabled).map(s => s.id);
+}
+
+export function getDefaultSectionOrder(): string[] {
+  return CMA_REPORT_SECTIONS.map(s => s.id);
+}
+```
+
+---
+
+### Step 3: Create Status Colors Utility
+
+**File: `client/src/lib/statusColors.ts`**
+
+```typescript
+export const STATUS_COLORS = {
+  active: { bg: "#22c55e", text: "#ffffff", label: "Active" },
+  active_under_contract: { bg: "#f97316", text: "#ffffff", label: "Active Under Contract" },
+  pending: { bg: "#eab308", text: "#000000", label: "Pending" },
+  sold: { bg: "#6b7280", text: "#ffffff", label: "Sold" },
+  closed: { bg: "#6b7280", text: "#ffffff", label: "Closed" },
+  expired: { bg: "#ef4444", text: "#ffffff", label: "Expired" },
+  withdrawn: { bg: "#9ca3af", text: "#000000", label: "Withdrawn" },
+} as const;
+
+export function getStatusColor(status: string): { bg: string; text: string; label: string } {
+  const normalized = status?.toLowerCase().replace(/[^a-z]/g, '_') || 'active';
+  return STATUS_COLORS[normalized as keyof typeof STATUS_COLORS] || STATUS_COLORS.active;
+}
+
+// Adjustment value colors
+export function getAdjustmentColor(value: number): string {
+  if (value > 0) return "#ef4444"; // Red for positive
+  if (value < 0) return "#22c55e"; // Green for negative
+  return "inherit";
+}
+
+export function formatAdjustmentValue(value: number): string {
+  if (value === 0) return "$0";
+  const formatted = Math.abs(value).toLocaleString();
+  return value > 0 ? `+$${formatted}` : `-$${formatted}`;
+}
+```
+
+---
+
+### Step 4: Create Adjustment Calculations Utility
+
+**File: `client/src/lib/adjustmentCalculations.ts`**
+
+```typescript
+export const DEFAULT_ADJUSTMENT_RATES = {
+  sqft: 150,
+  beds: 10000,
+  baths: 8000,
+  garage: 15000,
+  pool: 25000,
+} as const;
+
+export interface PropertyForAdjustment {
+  address: string;
+  listPrice: number;
+  sqft: number;
+  beds: number;
+  baths: number;
+  garageSpaces?: number;
+  hasPool?: boolean;
+}
+
+export interface AdjustmentResult {
+  address: string;
+  salePrice: number;
+  sqftAdj: number;
+  bedsAdj: number;
+  bathsAdj: number;
+  totalAdj: number;
+  adjustedPrice: number;
+}
+
+export function calculateAdjustments(
+  subject: PropertyForAdjustment,
+  comparable: PropertyForAdjustment,
+  rates = DEFAULT_ADJUSTMENT_RATES
+): AdjustmentResult {
+  const sqftAdj = (subject.sqft - comparable.sqft) * rates.sqft;
+  const bedsAdj = (subject.beds - comparable.beds) * rates.beds;
+  const bathsAdj = (subject.baths - comparable.baths) * rates.baths;
+  
+  const totalAdj = sqftAdj + bedsAdj + bathsAdj;
+  const adjustedPrice = comparable.listPrice + totalAdj;
+  
+  return {
+    address: comparable.address,
+    salePrice: comparable.listPrice,
+    sqftAdj,
+    bedsAdj,
+    bathsAdj,
+    totalAdj,
+    adjustedPrice,
+  };
+}
+```
+
+---
+
+### Step 5: Create PreviewSection Component
+
+**File: `client/src/components/cma/PreviewSection.tsx`**
+
+```tsx
+import React from "react";
+import { cn } from "@/lib/utils";
+
+interface PreviewSectionProps {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+  sectionId?: string;
+  onClick?: (sectionId: string) => void;
+  compact?: boolean;
+}
+
+export function PreviewSection({
+  title,
+  icon: Icon,
+  children,
+  sectionId,
+  onClick,
+  compact = false,
+}: PreviewSectionProps) {
+  const handleClick = () => {
+    if (sectionId && onClick) onClick(sectionId);
+  };
+
+  return (
+    <div 
+      className={cn(
+        "border rounded-lg overflow-hidden transition-colors",
+        onClick && "cursor-pointer hover:border-primary/50 hover:bg-muted/30"
+      )}
+      onClick={handleClick}
+    >
+      <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b">
+        <Icon className="w-4 h-4 text-muted-foreground" />
+        <span className="font-medium text-sm text-muted-foreground">{title}</span>
+      </div>
+      <div className={cn("bg-background", compact ? "p-3" : "p-4")}>
+        {children}
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+### Step 6: Create Section Preview Renderers
+
+**File: `client/src/components/cma/preview-sections/CoverPagePreview.tsx`**
+
+```tsx
+import React from "react";
+import { cn } from "@/lib/utils";
+
+interface CoverPagePreviewProps {
+  title: string;
+  subtitle: string;
+  clientName?: string;
+  showDate: boolean;
+  showAgentPhoto: boolean;
+  agentName?: string;
+  agentPhoto?: string;
+  compact?: boolean;
+}
+
+export function CoverPagePreview({
+  title, subtitle, clientName, showDate, showAgentPhoto, agentName, agentPhoto, compact
+}: CoverPagePreviewProps) {
+  return (
+    <div className={cn("text-center", compact ? "py-4" : "py-8")}>
+      <p className="text-primary font-semibold text-sm">Spyglass Realty</p>
+      <h2 className={cn("font-bold mt-2", compact ? "text-lg" : "text-2xl")}>
+        {title || "Comparative Market Analysis"}
+      </h2>
+      <p className="text-muted-foreground text-sm mt-1">
+        {subtitle || "Prepared exclusively for you"}
+      </p>
+      {clientName && <p className="font-medium mt-1">{clientName}</p>}
+      {showDate && (
+        <p className="text-sm text-muted-foreground mt-1">
+          {new Date().toLocaleDateString()}
+        </p>
+      )}
+      {showAgentPhoto && agentPhoto && (
+        <div className="flex justify-center mt-3">
+          <img src={agentPhoto} alt={agentName} className="w-12 h-12 rounded-full object-cover" />
+        </div>
+      )}
+      {agentName && <p className="text-sm mt-2">{agentName}</p>}
+    </div>
+  );
+}
+```
+
+**File: `client/src/components/cma/preview-sections/SummaryComparablesPreview.tsx`**
+
+```tsx
+import React from "react";
+
+interface SummaryComparablesPreviewProps {
+  comparables: Array<{ listPrice: number; sqft: number }>;
+}
+
+export function SummaryComparablesPreview({ comparables }: SummaryComparablesPreviewProps) {
+  const avgPrice = comparables.length > 0 
+    ? comparables.reduce((sum, c) => sum + (c.listPrice || 0), 0) / comparables.length 
+    : 0;
+  const avgPricePerSqft = comparables.length > 0
+    ? comparables.reduce((sum, c) => sum + ((c.listPrice || 0) / (c.sqft || 1)), 0) / comparables.length
+    : 0;
+
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      <div className="text-center p-3 bg-muted/50 rounded-lg">
+        <p className="text-xs text-muted-foreground">Avg Price</p>
+        <p className="font-bold text-primary">
+          ${avgPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+        </p>
+      </div>
+      <div className="text-center p-3 bg-muted/50 rounded-lg">
+        <p className="text-xs text-muted-foreground">Avg $/SqFt</p>
+        <p className="font-bold text-primary">${avgPricePerSqft.toFixed(0)}</p>
+      </div>
+      <div className="text-center p-3 bg-muted/50 rounded-lg">
+        <p className="text-xs text-muted-foreground">Properties</p>
+        <p className="font-bold text-primary">{comparables.length}</p>
+      </div>
+    </div>
+  );
+}
+```
+
+**File: `client/src/components/cma/preview-sections/AdjustmentsPreview.tsx`**
+
+```tsx
+import React from "react";
+import { getAdjustmentColor, formatAdjustmentValue } from "@/lib/statusColors";
+import { calculateAdjustments, PropertyForAdjustment } from "@/lib/adjustmentCalculations";
+
+interface AdjustmentsPreviewProps {
+  subjectProperty: PropertyForAdjustment;
+  comparables: PropertyForAdjustment[];
+  compact?: boolean;
+}
+
+export function AdjustmentsPreview({ subjectProperty, comparables, compact }: AdjustmentsPreviewProps) {
+  const adjustments = comparables.slice(0, compact ? 4 : 6).map(comp => 
+    calculateAdjustments(subjectProperty, comp)
+  );
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b">
+            <th className="text-left py-2 font-medium">Property</th>
+            <th className="text-right py-2 font-medium">Sale Price</th>
+            <th className="text-right py-2 font-medium">Sq Ft</th>
+            <th className="text-right py-2 font-medium">Beds</th>
+            <th className="text-right py-2 font-medium">Total Adj</th>
+            <th className="text-right py-2 font-medium">Adj. Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {adjustments.map((adj, i) => (
+            <tr key={i} className="border-b">
+              <td className="py-2 max-w-[120px] truncate">{adj.address}</td>
+              <td className="text-right">${(adj.salePrice / 1000).toFixed(0)}k</td>
+              <td className="text-right" style={{ color: getAdjustmentColor(adj.sqftAdj) }}>
+                {formatAdjustmentValue(adj.sqftAdj)}
+              </td>
+              <td className="text-right" style={{ color: getAdjustmentColor(adj.bedsAdj) }}>
+                {formatAdjustmentValue(adj.bedsAdj)}
+              </td>
+              <td className="text-right font-medium" style={{ color: getAdjustmentColor(adj.totalAdj) }}>
+                {formatAdjustmentValue(adj.totalAdj)}
+              </td>
+              <td className="text-right font-bold">${(adj.adjustedPrice / 1000).toFixed(0)}k</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {comparables.length > (compact ? 4 : 6) && (
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          +{comparables.length - (compact ? 4 : 6)} more comparables in full report
+        </p>
+      )}
+    </div>
+  );
+}
+```
+
+**File: `client/src/components/cma/preview-sections/PricePerSqftChartPreview.tsx`**
+
+```tsx
+import React from "react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+
+interface PricePerSqftChartPreviewProps {
+  comparables: Array<{ address: string; listPrice: number; sqft: number }>;
+  compact?: boolean;
+}
+
+export function PricePerSqftChartPreview({ comparables, compact }: PricePerSqftChartPreviewProps) {
+  const data = comparables.slice(0, compact ? 5 : 8).map((comp, i) => ({
+    name: comp.address?.split(' ').slice(0, 2).join(' ') || `Comp ${i + 1}`,
+    pricePerSqft: Math.round((comp.listPrice || 0) / (comp.sqft || 1)),
+  }));
+
+  const avgPricePerSqft = data.length > 0
+    ? data.reduce((sum, d) => sum + d.pricePerSqft, 0) / data.length
+    : 0;
+
+  return (
+    <div>
+      <ResponsiveContainer width="100%" height={compact ? 150 : 200}>
+        <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+          <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
+          <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `$${v}`} />
+          <Tooltip formatter={(value) => [`$${value}/sqft`, 'Price/SqFt']} />
+          <Bar dataKey="pricePerSqft" radius={[4, 4, 0, 0]}>
+            {data.map((_, index) => (
+              <Cell key={`cell-${index}`} fill="#F37216" />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+      <p className="text-center text-sm text-muted-foreground mt-2">
+        Average: ${avgPricePerSqft.toFixed(0)}/sqft
+      </p>
+    </div>
+  );
+}
+```
+
+**File: `client/src/components/cma/preview-sections/PropertyPhotosPreview.tsx`**
+
+```tsx
+import React from "react";
+import { cn } from "@/lib/utils";
+
+interface PropertyPhotosPreviewProps {
+  photos: string[];
+  compact?: boolean;
+}
+
+export function PropertyPhotosPreview({ photos, compact }: PropertyPhotosPreviewProps) {
+  const displayCount = compact ? 6 : 12;
+  const displayPhotos = photos.slice(0, displayCount);
+  const remainingCount = photos.length - displayCount;
+
+  return (
+    <div>
+      <div className={cn("grid gap-2", compact ? "grid-cols-3" : "grid-cols-4")}>
+        {displayPhotos.map((photo, i) => (
+          <div key={i} className="aspect-square rounded overflow-hidden bg-muted">
+            <img src={photo} alt={`Property ${i + 1}`} className="w-full h-full object-cover" />
+          </div>
+        ))}
+      </div>
+      {remainingCount > 0 && (
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          +{remainingCount} more photos in full report
+        </p>
+      )}
+    </div>
+  );
+}
+```
+
+**File: `client/src/components/cma/preview-sections/PropertyDetailsPreview.tsx`**
+
+```tsx
+import React from "react";
+import { getStatusColor } from "@/lib/statusColors";
+import { Badge } from "@/components/ui/badge";
+
+interface Property {
+  address: string;
+  city?: string;
+  listPrice: number;
+  beds: number;
+  baths: number;
+  sqft: number;
+  status: string;
+}
+
+interface PropertyDetailsPreviewProps {
+  properties: Property[];
+  compact?: boolean;
+}
+
+export function PropertyDetailsPreview({ properties, compact }: PropertyDetailsPreviewProps) {
+  const displayCount = compact ? 4 : 6;
+  const displayProperties = properties.slice(0, displayCount);
+  const remainingCount = properties.length - displayCount;
+
+  return (
+    <div className="space-y-2">
+      {displayProperties.map((property, i) => {
+        const statusColor = getStatusColor(property.status);
+        return (
+          <div key={i} className="flex items-center justify-between py-2 border-b last:border-b-0">
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm truncate">{property.address}</p>
+              <p className="text-xs text-muted-foreground">{property.city || 'Austin'}</p>
+              <p className="text-xs text-muted-foreground">
+                ${property.listPrice?.toLocaleString()} · {property.beds} bd · {property.baths} ba · {property.sqft?.toLocaleString()} sqft
+              </p>
+            </div>
+            <Badge style={{ backgroundColor: statusColor.bg, color: statusColor.text }} className="ml-2 text-xs">
+              {statusColor.label}
+            </Badge>
+          </div>
+        );
+      })}
+      {remainingCount > 0 && (
+        <p className="text-xs text-muted-foreground text-center pt-2">+{remainingCount} more properties</p>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+### Step 7: Create Expanded Preview Modal
+
+**File: `client/src/components/cma/ExpandedPreviewModal.tsx`**
+
+```tsx
+import React, { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+interface ExpandedPreviewModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+  sectionsEnabled: number;
+}
+
+export function ExpandedPreviewModal({ isOpen, onClose, children, sectionsEnabled }: ExpandedPreviewModalProps) {
+  const [zoom, setZoom] = useState(100);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl w-[90vw] h-[90vh] flex flex-col p-0">
+        <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b">
+          <div className="flex items-center justify-between gap-4">
+            <DialogTitle>CMA Presentation Preview</DialogTitle>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
+                {sectionsEnabled} sections enabled
+              </span>
+              <Button variant="outline" size="sm">Save as Template</Button>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <ScrollArea className="flex-1 bg-muted/30">
+          <div className="p-6">
+            <div
+              className="max-w-2xl mx-auto bg-background shadow-lg rounded-lg transition-transform duration-200 p-6"
+              style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center" }}
+            >
+              <div className="space-y-6">{children}</div>
+            </div>
+          </div>
+        </ScrollArea>
+
+        <div className="flex-shrink-0 flex justify-center gap-2 px-6 py-4 border-t bg-background">
+          <Button variant={zoom === 50 ? "secondary" : "outline"} size="sm" onClick={() => setZoom(50)}>50%</Button>
+          <Button variant={zoom === 100 ? "secondary" : "outline"} size="sm" onClick={() => setZoom(100)}>100%</Button>
+          <Button variant={zoom === 150 ? "secondary" : "outline"} size="sm" onClick={() => setZoom(150)}>150%</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+---
+
+### Step 8: Create Live Preview Panel
+
+**File: `client/src/components/cma/LivePreviewPanel.tsx`**
+
+```tsx
+import React, { useState } from "react";
+import { Eye, Maximize2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { PreviewSection } from "./PreviewSection";
+import { ExpandedPreviewModal } from "./ExpandedPreviewModal";
+import { CMA_REPORT_SECTIONS } from "@/shared/cma-sections";
+import { CoverPagePreview } from "./preview-sections/CoverPagePreview";
+import { SummaryComparablesPreview } from "./preview-sections/SummaryComparablesPreview";
+import { AdjustmentsPreview } from "./preview-sections/AdjustmentsPreview";
+import { PricePerSqftChartPreview } from "./preview-sections/PricePerSqftChartPreview";
+import { PropertyPhotosPreview } from "./preview-sections/PropertyPhotosPreview";
+import { PropertyDetailsPreview } from "./preview-sections/PropertyDetailsPreview";
+
+interface LivePreviewPanelProps {
+  includedSections: string[];
+  contentSettings: {
+    title: string;
+    subtitle: string;
+    clientName?: string;
+    showDate: boolean;
+    showAgentPhoto: boolean;
+    coverLetter?: string;
+  };
+  layoutSettings: {
+    coverPhotoUrl?: string;
+    brochureUrl?: string;
+    mapStyle: 'streets' | 'satellite';
+    showMapPolygon: boolean;
+  };
+  subjectProperty: any;
+  comparables: any[];
+  agentProfile?: {
+    name: string;
+    title?: string;
+    photo?: string;
+    email?: string;
+    phone?: string;
+  };
+  onSectionClick?: (sectionId: string) => void;
+}
+
+export function LivePreviewPanel({
+  includedSections,
+  contentSettings,
+  layoutSettings,
+  subjectProperty,
+  comparables,
+  agentProfile,
+  onSectionClick,
+}: LivePreviewPanelProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const enabledSections = CMA_REPORT_SECTIONS.filter(s => includedSections.includes(s.id));
+  const allPhotos = comparables.flatMap(c => c.photos || c.images || []).slice(0, 24);
+
+  const renderSectionContent = (sectionId: string, compact: boolean) => {
+    switch (sectionId) {
+      case 'cover_page':
+        return <CoverPagePreview {...contentSettings} agentName={agentProfile?.name} agentPhoto={agentProfile?.photo} compact={compact} />;
+      case 'listing_brochure':
+        return layoutSettings.brochureUrl ? (
+          <div className="flex justify-center">
+            <img src={layoutSettings.brochureUrl} alt="Brochure" className={compact ? "max-h-32" : "max-h-64"} />
+          </div>
+        ) : <p className="text-sm text-muted-foreground italic text-center">No brochure uploaded</p>;
+      case 'cover_letter':
+        return <p className="text-sm text-muted-foreground">{contentSettings.coverLetter || "Your personalized cover letter will appear here..."}</p>;
+      case 'agent_resume':
+        return (
+          <div className="flex items-start gap-3">
+            {agentProfile?.photo && <img src={agentProfile.photo} alt={agentProfile.name} className="w-12 h-12 rounded-full object-cover" />}
+            <div>
+              <p className="font-medium">{agentProfile?.name || "Agent Name"}</p>
+              <p className="text-sm text-muted-foreground">{agentProfile?.title || "Real Estate Agent"}</p>
+            </div>
+          </div>
+        );
+      case 'our_company':
+        return <div><p className="font-medium text-primary">Spyglass Realty</p><p className="text-sm text-muted-foreground">Company profile and information</p></div>;
+      case 'what_is_cma':
+        return <p className="text-sm text-muted-foreground">A Comparative Market Analysis (CMA) is a detailed report that helps determine the value of a property.</p>;
+      case 'contact_me':
+        return <div className="text-sm"><p>✉️ {agentProfile?.email || "agent@spyglassrealty.com"}</p>{agentProfile?.phone && <p>📞 {agentProfile.phone}</p>}</div>;
+      case 'map_all_listings':
+        return (
+          <div className="space-y-2">
+            <div className="bg-muted rounded-lg h-32 flex items-center justify-center text-muted-foreground text-sm">
+              Map Preview ({comparables.length} comparables + Subject)
+            </div>
+            <div className="flex gap-2 text-xs">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span> Subject</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span> Active</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500"></span> Under Contract</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-500"></span> Sold</span>
+            </div>
+          </div>
+        );
+      case 'listings_header':
+        return <div className="border-l-4 border-primary pl-3 py-2"><p className="font-bold text-lg">Comparable Properties</p></div>;
+      case 'summary_comparables':
+        return <SummaryComparablesPreview comparables={comparables} />;
+      case 'property_details':
+        return <PropertyDetailsPreview properties={comparables} compact={compact} />;
+      case 'property_photos':
+        return <PropertyPhotosPreview photos={allPhotos} compact={compact} />;
+      case 'adjustments':
+        return subjectProperty ? <AdjustmentsPreview subjectProperty={subjectProperty} comparables={comparables} compact={compact} /> : <p className="text-sm text-muted-foreground italic">Subject property required</p>;
+      case 'analysis_header':
+        return <div className="border-l-4 border-primary pl-3 py-2"><p className="font-bold text-lg">Market Analysis</p></div>;
+      case 'online_valuation':
+        return <div><p className="font-medium">↗️ Online Valuations vs. Actual Sale Prices</p><p className="text-sm text-muted-foreground mt-1">Comparison of automated valuation models against actual closed sale prices.</p></div>;
+      case 'price_per_sqft':
+        return <PricePerSqftChartPreview comparables={comparables} compact={compact} />;
+      case 'comparable_stats':
+        const avgPrice = comparables.length > 0 ? comparables.reduce((sum, c) => sum + (c.listPrice || 0), 0) / comparables.length : 0;
+        const avgPricePerSqft = comparables.length > 0 ? comparables.reduce((sum, c) => sum + ((c.listPrice || 0) / (c.sqft || 1)), 0) / comparables.length : 0;
+        return (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-3 bg-muted/50 rounded-lg">
+              <p className="text-xs text-muted-foreground">Average Price</p>
+              <p className="font-bold text-lg">${avgPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+            </div>
+            <div className="p-3 bg-muted/50 rounded-lg">
+              <p className="text-xs text-muted-foreground">Avg Price/SqFt</p>
+              <p className="font-bold text-lg">${avgPricePerSqft.toFixed(0)}</p>
+            </div>
+          </div>
+        );
+      default:
+        return <p className="text-sm text-muted-foreground italic">Section preview not available</p>;
+    }
+  };
+
+  const previewContent = (compact: boolean) => (
+    <>
+      {enabledSections.map((section) => (
+        <PreviewSection key={section.id} title={section.name} icon={section.icon} sectionId={section.id} onClick={onSectionClick} compact={compact}>
+          {renderSectionContent(section.id, compact)}
+        </PreviewSection>
+      ))}
+    </>
+  );
+
+  return (
+    <>
+      <div className="bg-background rounded-lg border p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold text-sm flex items-center gap-2"><Eye className="w-4 h-4" />Live Preview</h3>
+            <p className="text-xs text-muted-foreground">Preview how your CMA will appear</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">{enabledSections.length} sections</span>
+            <Button variant="ghost" size="sm" onClick={() => setIsExpanded(true)} className="h-8 w-8 p-0"><Maximize2 className="w-4 h-4" /></Button>
+          </div>
+        </div>
+        <ScrollArea className="h-[500px]">
+          <div className="space-y-3 pr-2">{previewContent(true)}</div>
+        </ScrollArea>
+      </div>
+
+      <ExpandedPreviewModal isOpen={isExpanded} onClose={() => setIsExpanded(false)} sectionsEnabled={enabledSections.length}>
+        {previewContent(false)}
+      </ExpandedPreviewModal>
+    </>
+  );
+}
+```
+
+---
+
+## FILES TO CREATE
+
+| File | Purpose |
+|------|---------|
+| `shared/cma-sections.ts` | Section configuration and types |
+| `client/src/lib/statusColors.ts` | Status color utilities |
+| `client/src/lib/adjustmentCalculations.ts` | Adjustment calculation logic |
+| `client/src/components/cma/PreviewSection.tsx` | Section wrapper component |
+| `client/src/components/cma/ExpandedPreviewModal.tsx` | Full-screen preview modal |
+| `client/src/components/cma/LivePreviewPanel.tsx` | Main live preview component |
+| `client/src/components/cma/preview-sections/CoverPagePreview.tsx` | Cover page renderer |
+| `client/src/components/cma/preview-sections/SummaryComparablesPreview.tsx` | Summary stats renderer |
+| `client/src/components/cma/preview-sections/AdjustmentsPreview.tsx` | Adjustments table renderer |
+| `client/src/components/cma/preview-sections/PricePerSqftChartPreview.tsx` | Bar chart renderer |
+| `client/src/components/cma/preview-sections/PropertyPhotosPreview.tsx` | Photo grid renderer |
+| `client/src/components/cma/preview-sections/PropertyDetailsPreview.tsx` | Property list renderer |
+
+---
+
+## ACCEPTANCE CRITERIA
+
+- [ ] Live Preview panel shows on right side (40% width)
+- [ ] All enabled sections render in preview
+- [ ] Toggle section on/off → Preview updates immediately
+- [ ] Change content settings → Preview updates immediately
+- [ ] Click expand button [⛶] → Full modal opens
+- [ ] Zoom controls work (50%, 100%, 150%)
+- [ ] Section count shows correctly
+- [ ] Adjustments table has color-coded values (GREEN for negative, RED for positive)
+- [ ] Bar chart displays with orange bars (#F37216 Spyglass branding)
+- [ ] Property photos show with "+X more" indicator
+- [ ] Property details show with status badges
+- [ ] Dark mode styling works
+- [ ] Scrolling works in both compact and expanded views
+
+---
+
+## TESTING
+
+1. Navigate to Presentation Builder for any CMA
+2. Toggle sections in Sections tab → Verify preview updates
+3. Change title/subtitle in Content tab → Verify preview updates
+4. Click expand button [⛶] → Verify modal opens
+5. Test zoom controls → Verify scaling works
+6. Scroll through all sections → Verify all render correctly
+7. Check adjustments table → Verify green (negative) and red (positive) colors
+8. Check bar chart → Verify orange bars render
+9. Test in dark mode → Verify styling
