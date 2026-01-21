@@ -1004,7 +1004,6 @@ export async function registerRoutes(
 
       if (subjectBeds) {
         filters.minBeds = Math.max(1, subjectBeds - 1);
-        filters.maxBeds = subjectBeds + 1;
       }
 
       console.log(`[CMA Fallback] Generating for transaction ${id} at (${latitude}, ${longitude})`);

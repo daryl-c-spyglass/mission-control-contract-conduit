@@ -9,7 +9,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getStatusBadgeStyle, getStatusLabel, getStatusColor } from "@/lib/utils/status-colors";
@@ -53,7 +65,11 @@ import {
   List,
   Menu,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Info,
+  Trash2,
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 
 const STATUS_FILTERS = [
@@ -217,8 +233,71 @@ export function CMATab({ transaction }: CMATabProps) {
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
   const [emailShareDialogOpen, setEmailShareDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   
   const cmaData = transaction.cmaData as CMAComparable[] | null;
+  const cmaSource = (transaction as any).cmaSource;
+  
+  const mlsData = transaction.mlsData as any;
+  const mlsStatus = mlsData?.standardStatus || mlsData?.status || '';
+  const isClosedListing = mlsStatus.toLowerCase().includes('closed') || 
+                          mlsStatus.toLowerCase().includes('sold');
+  const hasCoordinates = !!(
+    mlsData?.coordinates?.latitude || 
+    mlsData?.map?.latitude || 
+    mlsData?.latitude
+  );
+
+  const generateCmaMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', `/api/transactions/${transaction.id}/generate-cma-fallback`, { radius: 5 });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id] });
+      if (data.comparablesCount > 0) {
+        toast({
+          title: 'CMA Generated',
+          description: `Found ${data.comparablesCount} comparable properties nearby`,
+        });
+      } else {
+        toast({
+          title: 'No Comparables Found',
+          description: 'No similar properties were found within the search radius',
+          variant: 'destructive',
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to Generate CMA',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const clearCmaMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('DELETE', `/api/transactions/${transaction.id}/cma`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id] });
+      toast({
+        title: 'CMA Data Cleared',
+        description: 'Comparative market analysis data has been removed',
+      });
+      setShowClearConfirm(false);
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to clear CMA data',
+        variant: 'destructive',
+      });
+    },
+  });
   
   const filteredComparables = useMemo(() => {
     if (!cmaData) return [];
@@ -320,12 +399,87 @@ export function CMATab({ transaction }: CMATabProps) {
         <h2 className="text-lg font-semibold">Comparative Market Analysis</h2>
         <Card>
           <CardContent className="py-12">
-            <div className="max-w-md mx-auto text-center">
+            <div className="max-w-lg mx-auto text-center space-y-6">
               <Search className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
               <h3 className="font-medium mb-2">No CMA Available</h3>
               <p className="text-sm text-muted-foreground">
                 A comparative market analysis has not been created for this property yet.
               </p>
+
+              {isClosedListing && hasCoordinates && (
+                <div className="w-full space-y-4">
+                  <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-left">
+                    <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
+                      <p className="font-medium mb-1">Why is CMA not available?</p>
+                      <p className="text-blue-700 dark:text-blue-300">
+                        This property is marked as "<strong>{mlsStatus}</strong>" in the MLS. 
+                        The standard comparable search is not available for closed listings.
+                      </p>
+                      <p className="mt-2 text-blue-700 dark:text-blue-300">
+                        You can generate comparables using a <strong>coordinate-based search</strong> which 
+                        finds similar properties within a 5-mile radius of this location. Results may include 
+                        Active, Pending, and recently Closed properties with similar characteristics.
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="flex items-center justify-center gap-2">
+                    <Button
+                      onClick={() => generateCmaMutation.mutate()}
+                      disabled={generateCmaMutation.isPending}
+                      className="gap-2"
+                      data-testid="button-generate-cma-fallback"
+                    >
+                      {generateCmaMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Searching Nearby Properties...
+                        </>
+                      ) : (
+                        <>
+                          <MapPin className="w-4 h-4" />
+                          Generate CMA from Nearby Properties
+                        </>
+                      )}
+                    </Button>
+                    
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-cma-fallback-info">
+                            <Info className="w-4 h-4 text-muted-foreground" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-xs">
+                          <p className="text-sm">
+                            This uses coordinate-based search to find comparable properties 
+                            within 5 miles of this listing. Results may include Active, 
+                            Pending, and recently Closed properties. Comparables are filtered 
+                            to match similar price range and bedroom count.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </div>
+              )}
+
+              {isClosedListing && !hasCoordinates && (
+                <Alert variant="destructive" className="max-w-lg">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Cannot generate CMA: This property does not have coordinate data (latitude/longitude) 
+                    in the MLS listing.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {!isClosedListing && (
+                <p className="text-sm text-muted-foreground">
+                  Try clicking "Refresh MLS Data" to fetch comparable properties.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -537,6 +691,49 @@ export function CMATab({ transaction }: CMATabProps) {
           queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
         }}
       />
+
+      {/* CMA Source Notice (only for coordinate fallback) */}
+      {cmaSource === 'coordinate_fallback' && (
+        <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+          <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <AlertDescription className="text-sm text-blue-700 dark:text-blue-300">
+            These comparables were generated using a coordinate-based search within 5 miles 
+            of this property. They may differ from standard MLS comparables.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Clear CMA Button - always show when CMA data exists */}
+      {cmaData && cmaData.length > 0 && (
+        <div className="flex justify-end">
+          <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" data-testid="button-clear-cma">
+                <Trash2 className="w-4 h-4 mr-2" />
+                Clear CMA Data
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear CMA Data?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will remove all {cmaData.length} comparable properties from this transaction's 
+                  CMA. You can regenerate them later if needed.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => clearCmaMutation.mutate()}
+                  disabled={clearCmaMutation.isPending}
+                >
+                  {clearCmaMutation.isPending ? 'Clearing...' : 'Clear CMA Data'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      )}
 
       {/* 3. MAIN CMA CONTENT CARD - Dashboard matching style with shadcn Card */}
       <Card className="overflow-hidden">
