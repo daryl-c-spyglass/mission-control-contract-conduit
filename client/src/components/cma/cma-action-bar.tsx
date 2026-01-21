@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { 
-  Save, 
+  Save,
   Share2, 
   Download, 
   MoreHorizontal, 
@@ -20,12 +20,13 @@ import {
   StickyNote, 
   Copy, 
   ExternalLink,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from 'lucide-react';
 
 interface CMAActionBarProps {
   onSave?: () => void;
-  hasUnsavedChanges?: boolean;
+  isSaving?: boolean;
   onCopyEmail?: () => void;
   onCopyLiveUrl?: () => void;
   onShareCMA?: () => void;
@@ -38,8 +39,8 @@ interface CMAActionBarProps {
 }
 
 export function CMAActionBar({ 
-  onSave, 
-  hasUnsavedChanges = false,
+  onSave,
+  isSaving = false,
   onCopyEmail,
   onCopyLiveUrl,
   onShareCMA,
@@ -51,16 +52,20 @@ export function CMAActionBar({
   onProduceUrl,
 }: CMAActionBarProps) {
   return (
-    <div className="flex items-center justify-between" data-testid="cma-action-bar">
+    <div className="flex items-center justify-end" data-testid="cma-action-bar">
       <div className="flex items-center gap-2">
         <Button 
           onClick={onSave}
-          disabled={!hasUnsavedChanges}
+          disabled={isSaving}
           className="gap-2"
           data-testid="button-save-cma"
         >
-          <Save className="w-4 h-4" />
-          Save
+          {isSaving ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Save className="w-4 h-4" />
+          )}
+          {isSaving ? 'Saving...' : 'Save CMA'}
         </Button>
 
         <DropdownMenu>
@@ -71,7 +76,7 @@ export function CMAActionBar({
               <ChevronDown className="w-3 h-3 ml-1" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
+          <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem onClick={onCopyEmail} className="gap-2" data-testid="menu-item-copy-email">
               <Mail className="w-4 h-4" />
               Copy Email
@@ -96,7 +101,7 @@ export function CMAActionBar({
               <ChevronDown className="w-3 h-3 ml-1" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
+          <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem onClick={onPrint} className="gap-2" data-testid="menu-item-print">
               <Printer className="w-4 h-4" />
               Print
@@ -119,7 +124,7 @@ export function CMAActionBar({
               <MoreHorizontal className="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
+          <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem onClick={onProduceUrl} className="gap-2" data-testid="menu-item-produce-url">
               <Copy className="w-4 h-4" />
               Produce URL

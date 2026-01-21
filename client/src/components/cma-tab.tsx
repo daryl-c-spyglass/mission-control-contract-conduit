@@ -213,10 +213,10 @@ export function CMATab({ transaction }: CMATabProps) {
   const [copied, setCopied] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [fullscreenPhoto, setFullscreenPhoto] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [filtersPanelOpen, setFiltersPanelOpen] = useState(false);
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
   const [emailShareDialogOpen, setEmailShareDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   const cmaData = transaction.cmaData as CMAComparable[] | null;
   
@@ -333,11 +333,24 @@ export function CMATab({ transaction }: CMATabProps) {
     );
   }
   
-  const handleSave = async () => {
+  const handleSaveCMA = async () => {
+    if (!cmaData || cmaData.length === 0) {
+      toast({
+        title: 'No Data',
+        description: 'Add comparable properties before saving.',
+      });
+      return;
+    }
+
+    setIsSaving(true);
     try {
       if (savedCma?.id) {
         await apiRequest('PATCH', `/api/cmas/${savedCma.id}`, {
           propertiesData: cmaData,
+        });
+        toast({
+          title: 'CMA Updated',
+          description: 'Your CMA has been updated successfully.',
         });
       } else {
         await apiRequest('POST', '/api/cmas', {
@@ -346,19 +359,20 @@ export function CMATab({ transaction }: CMATabProps) {
           subjectPropertyId: transaction.mlsNumber,
           propertiesData: cmaData,
         });
+        toast({
+          title: 'CMA Created',
+          description: 'Your CMA has been created successfully.',
+        });
       }
       queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
-      setHasUnsavedChanges(false);
-      toast({
-        title: 'CMA Saved',
-        description: 'Your CMA has been saved successfully.',
-      });
     } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to save CMA',
         variant: 'destructive',
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -461,11 +475,11 @@ export function CMATab({ transaction }: CMATabProps) {
 
   return (
     <div className="space-y-4">
-      {/* 1. ACTION BAR - Dropdown menus for Share, Export, More */}
+      {/* 1. ACTION BAR - Save, Share, Export, More dropdown menus */}
       <div className="print:hidden">
         <CMAActionBar
-          onSave={handleSave}
-          hasUnsavedChanges={hasUnsavedChanges}
+          onSave={handleSaveCMA}
+          isSaving={isSaving}
           onCopyEmail={handleCopyEmail}
           onCopyLiveUrl={handleCopyLiveUrl}
           onShareCMA={handleShareCMA}
@@ -477,23 +491,6 @@ export function CMATab({ transaction }: CMATabProps) {
           onProduceUrl={handleProduceUrl}
         />
       </div>
-
-      {/* 2. UNSAVED CHANGES BANNER - Only show when there are unsaved changes */}
-      {hasUnsavedChanges && (
-        <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-          <span className="text-sm text-amber-800 dark:text-amber-200">
-            You have unsaved changes to this CMA report.
-          </span>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="ghost" onClick={() => setHasUnsavedChanges(false)}>
-              Discard
-            </Button>
-            <Button size="sm" onClick={handleSave}>
-              Save Changes
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* CMA Email Share Dialog */}
       <CMAEmailShareDialog
