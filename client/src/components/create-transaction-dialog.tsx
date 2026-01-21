@@ -304,17 +304,16 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
-        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
           <DialogTitle>Create New Transaction</DialogTitle>
           <DialogDescription>
             Enter the property details to start a new transaction. This will automatically set up integrations based on your preferences.
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 max-h-[calc(90vh-180px)]">
         <Form {...form}>
-          <form id="create-transaction-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 px-6 pb-4">
+          <form id="create-transaction-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
               control={form.control}
               name="transactionType"
@@ -1045,29 +1044,26 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
               />
             </div>
 
-            </form>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                data-testid="button-cancel"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={createMutation.isPending}
+                data-testid="button-submit-transaction"
+              >
+                {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Create Transaction
+              </Button>
+            </div>
+          </form>
         </Form>
-        </ScrollArea>
-
-        <div className="flex justify-end gap-3 px-6 py-4 border-t flex-shrink-0">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            data-testid="button-cancel"
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            form="create-transaction-form"
-            disabled={createMutation.isPending}
-            data-testid="button-submit-transaction"
-          >
-            {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Create Transaction
-          </Button>
-        </div>
       </DialogContent>
     </Dialog>
   );
