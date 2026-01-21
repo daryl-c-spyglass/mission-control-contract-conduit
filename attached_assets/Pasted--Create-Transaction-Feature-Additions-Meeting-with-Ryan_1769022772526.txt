@@ -1,0 +1,1202 @@
+# Create Transaction - Feature Additions (Meeting with Ryan & Caleb)
+
+## Overview
+
+Add new features to the Create New Transaction form based on team meeting decisions:
+
+1. ✅ **"Is Company Lead" checkbox** - Below "Our Agent Represents"
+2. ✅ **"Off Market" checkbox** - Under MLS Number section
+3. ✅ **Off Market form fields** - Photo upload, property details, property types
+4. ✅ **Property Type dropdown** - Standardized list
+5. ✅ **Off Market → Active Listing transition** - Add MLS number to sync
+6. ✅ **Delete transaction button** - For removing unnecessary transactions
+
+---
+
+## Visual Design
+
+### Create Transaction Form (Updated)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Create New Transaction                                      ✕   │
+│ Enter the property details to start a new transaction...        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ Our Agent Represents                                            │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ Seller                                                    ▾ │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ ☐ Is Company Lead    ← NEW CHECKBOX                             │
+│                                                                 │
+│ ─────────────────────────────────────────────────────────────── │
+│                                                                 │
+│ Property Address                                                │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ 123 Main St, City, State 12345                              │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ MLS Number                                                      │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ MLS12345xx                                                  │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│ Used to fetch property data from MLS                            │
+│                                                                 │
+│ ☑ Off Market    ← NEW CHECKBOX                                  │
+│   (If checked, shows off-market fields below and                │
+│    auto-unchecks "Under Contract")                              │
+│                                                                 │
+│ ═══════════════════════════════════════════════════════════════ │
+│ OFF MARKET PROPERTY DETAILS (shown when Off Market is checked)  │
+│ ═══════════════════════════════════════════════════════════════ │
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │                   Drag listing photos here                  │ │
+│ │              choose from gallery or Select a File           │ │
+│ │                        (Optional)                           │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ Listing Description                                             │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │                                                             │ │
+│ │                                                             │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ ┌──────────────────────┐  ┌──────────────────────────────────┐ │
+│ │ Listing Price        │  │ Property Type                  ▾ │ │
+│ │ $                    │  │ Residential                      │ │
+│ └──────────────────────┘  └──────────────────────────────────┘ │
+│                                                                 │
+│ ┌──────────────────────┐  ┌──────────────────────────────────┐ │
+│ │ Sqft                 │  │ Lot Size (Acres)                 │ │
+│ │                      │  │                                  │ │
+│ └──────────────────────┘  └──────────────────────────────────┘ │
+│                                                                 │
+│ ┌────────────┐  ┌────────────┐  ┌────────────────────────────┐ │
+│ │ Bedrooms   │  │ Full Baths │  │ Half Baths                 │ │
+│ │            │  │            │  │                            │ │
+│ └────────────┘  └────────────┘  └────────────────────────────┘ │
+│                                                                 │
+│ ═══════════════════════════════════════════════════════════════ │
+│                                                                 │
+│ [Pull lead details from Follow Up Boss                        ▾]│
+│                                                                 │
+│ ☐ Under contract?                                               │
+│   Uncheck if this is a new listing not yet under contract       │
+│   (Auto-unchecked when "Off Market" is checked)                 │
+│                                                                 │
+│ Contract Date              Expected Closing                     │
+│ ┌──────────────────────┐  ┌──────────────────────────────────┐ │
+│ │ mm/dd/yyyy       📅  │  │ mm/dd/yyyy                   📅  │ │
+│ └──────────────────────┘  └──────────────────────────────────┘ │
+│                                                                 │
+│ Assign Transaction Coordinators                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ ○ Daryl Contract Conduit                                    │ │
+│ │   darylcamz.workwithme@gmail.com                            │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ [Creating on behalf of another agent?                         ▾]│
+│                                                                 │
+│                              ┌─────────┐ ┌────────────────────┐ │
+│                              │ Cancel  │ │ Create Transaction │ │
+│                              └─────────┘ └────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Property Types (Standardized List)
+
+Based on research standards from the meeting:
+
+```typescript
+const PROPERTY_TYPES = [
+  { value: 'residential', label: 'Residential' },
+  { value: 'residential_income', label: 'Residential Income' },
+  { value: 'residential_investment', label: 'Residential Investment' },
+  { value: 'residential_lease', label: 'Residential Lease' },
+  { value: 'commercial_sale', label: 'Commercial Sale' },
+  { value: 'farm_and_ranch', label: 'Farm and Ranch' },
+  { value: 'land_lot', label: 'Land/Lot' },
+];
+```
+
+---
+
+## Transaction Card (Off Market vs Active)
+
+### Active Listing (with MLS):
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 154 Pettigrew, Buda, TX 78...        [Active Listing 🟢] 🔗     │
+│ # ACT2451173                                                    │
+│                                                                 │
+│ LISTING DATE          CLOSING DATE                              │
+│ 📅 —                  📅 —                                      │
+│                                                                 │
+│ [MLS Data] [Marketing] [Docs]                                   │
+│ [Slack]                                                         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Off Market Listing (no MLS):
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 123 Main Street, Austin, TX          [Off Market 🟣]            │
+│ (No MLS#)                                                       │
+│                                                                 │
+│ OFF MARKET DATE       CLOSING DATE                              │
+│ 📅 Jan 22, 2026       📅 —                                      │
+│                                                                 │
+│ [Marketing] [Docs]   ← No MLS Data button (no MLS to show)      │
+│ [Slack]                                                         │
+│                                                                 │
+│ [+ Add MLS Number]   ← Button to convert to active listing      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Implementation
+
+### Step 1: Update Database Schema
+
+**File: `shared/schema.ts`**
+
+Add new columns to the transactions table:
+
+```typescript
+export const transactions = pgTable('transactions', {
+  id: serial('id').primaryKey(),
+  address: varchar('address', { length: 255 }).notNull(),
+  mlsNumber: varchar('mls_number', { length: 50 }),
+  
+  // Agent & Lead Info
+  agentRepresents: varchar('agent_represents', { length: 20 }).default('Buyer'), // 'Buyer', 'Seller', 'Both'
+  isCompanyLead: boolean('is_company_lead').default(false), // ← NEW
+  
+  // Status
+  status: varchar('status', { length: 50 }).default('In Contract'),
+  mlsStatus: varchar('mls_status', { length: 50 }),
+  isOffMarket: boolean('is_off_market').default(false), // ← NEW
+  isUnderContract: boolean('is_under_contract').default(true), // ← NEW
+  
+  // Off Market Property Details (when isOffMarket = true)
+  offMarketListingDate: timestamp('off_market_listing_date'), // ← NEW
+  listingDescription: text('listing_description'), // ← NEW
+  listingPrice: integer('listing_price'), // ← NEW
+  propertyType: varchar('property_type', { length: 50 }), // ← NEW
+  sqft: integer('sqft'), // ← NEW
+  lotSizeAcres: decimal('lot_size_acres', { precision: 10, scale: 2 }), // ← NEW
+  bedrooms: integer('bedrooms'), // ← NEW
+  fullBaths: integer('full_baths'), // ← NEW
+  halfBaths: integer('half_baths'), // ← NEW
+  
+  // Dates
+  contractDate: timestamp('contract_date'),
+  closingDate: timestamp('closing_date'),
+  listingDate: timestamp('listing_date'),
+  
+  // MLS Sync
+  mlsLastSynced: timestamp('mls_last_synced'),
+  
+  // Relations
+  userId: integer('user_id').references(() => users.id),
+  slackChannelId: varchar('slack_channel_id', { length: 100 }),
+  
+  // Timestamps
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Off Market Photos table (for storing uploaded photos)
+export const offMarketPhotos = pgTable('off_market_photos', {
+  id: serial('id').primaryKey(),
+  transactionId: integer('transaction_id').references(() => transactions.id).notNull(),
+  photoUrl: varchar('photo_url', { length: 500 }).notNull(),
+  photoOrder: integer('photo_order').default(0),
+  uploadedAt: timestamp('uploaded_at').defaultNow(),
+});
+```
+
+**Run migration:**
+```bash
+npm run db:push
+```
+
+---
+
+### Step 2: Create Property Types Constant
+
+**File: `client/src/lib/propertyTypes.ts`** (CREATE)
+
+```typescript
+export const PROPERTY_TYPES = [
+  { value: 'residential', label: 'Residential' },
+  { value: 'residential_income', label: 'Residential Income' },
+  { value: 'residential_investment', label: 'Residential Investment' },
+  { value: 'residential_lease', label: 'Residential Lease' },
+  { value: 'commercial_sale', label: 'Commercial Sale' },
+  { value: 'farm_and_ranch', label: 'Farm and Ranch' },
+  { value: 'land_lot', label: 'Land/Lot' },
+] as const;
+
+export type PropertyType = typeof PROPERTY_TYPES[number]['value'];
+```
+
+---
+
+### Step 3: Update Create Transaction Form
+
+**File: Update your Create Transaction component**
+
+```tsx
+import React, { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card } from '@/components/ui/card';
+import { PropertyAutocomplete } from '@/components/ui/property-autocomplete';
+import { usePropertySearch, PropertySearchResult } from '@/hooks/usePropertySearch';
+import { useDebounce } from '@/hooks/useDebounce';
+import { PROPERTY_TYPES } from '@/lib/propertyTypes';
+import { Upload, ImagePlus, X, Check, DollarSign, Bed, Bath, Square, Home } from 'lucide-react';
+import { useDropzone } from 'react-dropzone';
+
+interface CreateTransactionModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: any) => void;
+}
+
+export function CreateTransactionModal({ isOpen, onClose, onSubmit }: CreateTransactionModalProps) {
+  // ========================================
+  // FORM STATE
+  // ========================================
+  
+  // Agent & Lead
+  const [agentRepresents, setAgentRepresents] = useState('Seller');
+  const [isCompanyLead, setIsCompanyLead] = useState(false);
+  
+  // Property
+  const [propertyAddress, setPropertyAddress] = useState('');
+  const [mlsNumber, setMlsNumber] = useState('');
+  const [selectedProperty, setSelectedProperty] = useState<PropertySearchResult | null>(null);
+  
+  // Off Market
+  const [isOffMarket, setIsOffMarket] = useState(false);
+  const [offMarketPhotos, setOffMarketPhotos] = useState<File[]>([]);
+  const [listingDescription, setListingDescription] = useState('');
+  const [listingPrice, setListingPrice] = useState('');
+  const [propertyType, setPropertyType] = useState('residential');
+  const [sqft, setSqft] = useState('');
+  const [lotSizeAcres, setLotSizeAcres] = useState('');
+  const [bedrooms, setBedrooms] = useState('');
+  const [fullBaths, setFullBaths] = useState('');
+  const [halfBaths, setHalfBaths] = useState('');
+  
+  // Contract
+  const [isUnderContract, setIsUnderContract] = useState(true);
+  const [contractDate, setContractDate] = useState('');
+  const [expectedClosing, setExpectedClosing] = useState('');
+  
+  // Other
+  const [createSlackChannel, setCreateSlackChannel] = useState(true);
+  
+  // ========================================
+  // AUTOCOMPLETE (from existing implementation)
+  // ========================================
+  
+  const {
+    addressResults,
+    mlsResults,
+    isSearchingAddress,
+    isSearchingMls,
+    searchByAddress,
+    searchByMlsNumber,
+    clearResults,
+  } = usePropertySearch();
+
+  const debouncedAddress = useDebounce(propertyAddress, 300);
+  const debouncedMls = useDebounce(mlsNumber, 300);
+
+  useEffect(() => {
+    if (debouncedAddress && debouncedAddress.length >= 3 && !selectedProperty && !isOffMarket) {
+      searchByAddress(debouncedAddress);
+    }
+  }, [debouncedAddress, searchByAddress, selectedProperty, isOffMarket]);
+
+  useEffect(() => {
+    if (debouncedMls && debouncedMls.length >= 3 && !selectedProperty && !isOffMarket) {
+      searchByMlsNumber(debouncedMls);
+    }
+  }, [debouncedMls, searchByMlsNumber, selectedProperty, isOffMarket]);
+
+  // ========================================
+  // OFF MARKET LOGIC
+  // ========================================
+  
+  // When Off Market is checked, auto-uncheck Under Contract
+  useEffect(() => {
+    if (isOffMarket) {
+      setIsUnderContract(false);
+      setMlsNumber(''); // Clear MLS number
+      setSelectedProperty(null);
+      clearResults();
+    }
+  }, [isOffMarket, clearResults]);
+
+  // ========================================
+  // PHOTO UPLOAD (Off Market)
+  // ========================================
+  
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    accept: {
+      'image/*': ['.jpeg', '.jpg', '.png', '.webp']
+    },
+    maxFiles: 10,
+    onDrop: (acceptedFiles) => {
+      setOffMarketPhotos(prev => [...prev, ...acceptedFiles].slice(0, 10));
+    }
+  });
+
+  const removePhoto = (index: number) => {
+    setOffMarketPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // ========================================
+  // HANDLERS
+  // ========================================
+
+  const handleAddressSelect = (option: PropertySearchResult) => {
+    setPropertyAddress(option.fullAddress);
+    setMlsNumber(option.mlsNumber);
+    setSelectedProperty(option);
+    clearResults();
+  };
+
+  const handleMlsSelect = (option: PropertySearchResult) => {
+    setMlsNumber(option.mlsNumber);
+    setPropertyAddress(option.fullAddress);
+    setSelectedProperty(option);
+    clearResults();
+  };
+
+  const handleAddressChange = (value: string) => {
+    setPropertyAddress(value);
+    if (selectedProperty && value !== selectedProperty.fullAddress) {
+      setSelectedProperty(null);
+      if (!isOffMarket) setMlsNumber('');
+    }
+  };
+
+  const handleMlsChange = (value: string) => {
+    setMlsNumber(value);
+    if (selectedProperty && value !== selectedProperty.mlsNumber) {
+      setSelectedProperty(null);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Build form data
+    const formData = new FormData();
+    
+    // Basic fields
+    formData.append('agentRepresents', agentRepresents);
+    formData.append('isCompanyLead', String(isCompanyLead));
+    formData.append('propertyAddress', propertyAddress);
+    formData.append('mlsNumber', mlsNumber);
+    formData.append('isOffMarket', String(isOffMarket));
+    formData.append('isUnderContract', String(isUnderContract));
+    formData.append('contractDate', contractDate);
+    formData.append('expectedClosing', expectedClosing);
+    formData.append('createSlackChannel', String(createSlackChannel));
+    
+    // Off Market fields
+    if (isOffMarket) {
+      formData.append('listingDescription', listingDescription);
+      formData.append('listingPrice', listingPrice);
+      formData.append('propertyType', propertyType);
+      formData.append('sqft', sqft);
+      formData.append('lotSizeAcres', lotSizeAcres);
+      formData.append('bedrooms', bedrooms);
+      formData.append('fullBaths', fullBaths);
+      formData.append('halfBaths', halfBaths);
+      
+      // Photos
+      offMarketPhotos.forEach((photo, index) => {
+        formData.append(`photos`, photo);
+      });
+    }
+    
+    // Include MLS data if selected from autocomplete
+    if (selectedProperty) {
+      formData.append('mlsData', JSON.stringify(selectedProperty));
+    }
+    
+    onSubmit(formData);
+  };
+
+  // Reset form on close
+  useEffect(() => {
+    if (!isOpen) {
+      setAgentRepresents('Seller');
+      setIsCompanyLead(false);
+      setPropertyAddress('');
+      setMlsNumber('');
+      setSelectedProperty(null);
+      setIsOffMarket(false);
+      setOffMarketPhotos([]);
+      setListingDescription('');
+      setListingPrice('');
+      setPropertyType('residential');
+      setSqft('');
+      setLotSizeAcres('');
+      setBedrooms('');
+      setFullBaths('');
+      setHalfBaths('');
+      setIsUnderContract(true);
+      setContractDate('');
+      setExpectedClosing('');
+      setCreateSlackChannel(true);
+      clearResults();
+    }
+  }, [isOpen, clearResults]);
+
+  // ========================================
+  // RENDER
+  // ========================================
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create New Transaction</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Enter the property details to start a new transaction. This will automatically set up integrations based on your preferences.
+          </p>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-5 mt-4">
+          
+          {/* ======================================== */}
+          {/* AGENT REPRESENTS */}
+          {/* ======================================== */}
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label>Our Agent Represents</Label>
+              <Select value={agentRepresents} onValueChange={setAgentRepresents}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Buyer">Buyer</SelectItem>
+                  <SelectItem value="Seller">Seller</SelectItem>
+                  <SelectItem value="Both">Both (Dual Agent)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Is Company Lead Checkbox */}
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="isCompanyLead"
+                checked={isCompanyLead}
+                onCheckedChange={(checked) => setIsCompanyLead(checked as boolean)}
+              />
+              <label htmlFor="isCompanyLead" className="text-sm cursor-pointer">
+                Is Company Lead
+              </label>
+            </div>
+          </div>
+
+          {/* ======================================== */}
+          {/* PROPERTY ADDRESS */}
+          {/* ======================================== */}
+          <div className="space-y-2">
+            <Label>Property Address</Label>
+            {isOffMarket ? (
+              <Input
+                value={propertyAddress}
+                onChange={(e) => setPropertyAddress(e.target.value)}
+                placeholder="Enter property address"
+              />
+            ) : (
+              <PropertyAutocomplete
+                value={propertyAddress}
+                onChange={handleAddressChange}
+                onSelect={handleAddressSelect}
+                options={addressResults}
+                isLoading={isSearchingAddress}
+                placeholder="Start typing an address..."
+                type="address"
+              />
+            )}
+          </div>
+
+          {/* ======================================== */}
+          {/* MLS NUMBER */}
+          {/* ======================================== */}
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label>MLS Number</Label>
+              {isOffMarket ? (
+                <Input
+                  value={mlsNumber}
+                  onChange={(e) => setMlsNumber(e.target.value)}
+                  placeholder="Leave blank for off-market"
+                  disabled={isOffMarket}
+                  className="bg-muted"
+                />
+              ) : (
+                <PropertyAutocomplete
+                  value={mlsNumber}
+                  onChange={handleMlsChange}
+                  onSelect={handleMlsSelect}
+                  options={mlsResults}
+                  isLoading={isSearchingMls}
+                  placeholder="e.g., 2572987 or ACT2572987"
+                  type="mls"
+                  helperText="Used to fetch property data from MLS"
+                />
+              )}
+            </div>
+            
+            {/* Off Market Checkbox */}
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="isOffMarket"
+                checked={isOffMarket}
+                onCheckedChange={(checked) => setIsOffMarket(checked as boolean)}
+              />
+              <label htmlFor="isOffMarket" className="text-sm cursor-pointer">
+                Off Market
+              </label>
+            </div>
+          </div>
+
+          {/* ======================================== */}
+          {/* OFF MARKET FIELDS (shown when isOffMarket = true) */}
+          {/* ======================================== */}
+          {isOffMarket && (
+            <Card className="p-4 space-y-4 bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800">
+              <div className="flex items-center gap-2">
+                <Home className="w-4 h-4 text-purple-600" />
+                <span className="font-medium text-sm text-purple-800 dark:text-purple-200">
+                  Off Market Property Details
+                </span>
+              </div>
+              
+              {/* Photo Upload */}
+              <div className="space-y-2">
+                <Label className="text-sm">Listing Photos (Optional)</Label>
+                <div
+                  {...getRootProps()}
+                  className={`
+                    border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
+                    ${isDragActive 
+                      ? 'border-purple-500 bg-purple-100 dark:bg-purple-900/30' 
+                      : 'border-muted-foreground/25 hover:border-purple-400'
+                    }
+                  `}
+                >
+                  <input {...getInputProps()} />
+                  <ImagePlus className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    Drag listing photos here
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    choose from gallery or <span className="text-purple-600 underline">Select a File</span>
+                  </p>
+                </div>
+                
+                {/* Photo Previews */}
+                {offMarketPhotos.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {offMarketPhotos.map((photo, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={URL.createObjectURL(photo)}
+                          alt={`Photo ${index + 1}`}
+                          className="w-16 h-16 object-cover rounded border"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removePhoto(index)}
+                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Listing Description */}
+              <div className="space-y-2">
+                <Label className="text-sm">Listing Description</Label>
+                <Textarea
+                  value={listingDescription}
+                  onChange={(e) => setListingDescription(e.target.value)}
+                  placeholder="Enter property description..."
+                  rows={3}
+                />
+              </div>
+
+              {/* Price & Property Type */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-sm">Listing Price</Label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type="number"
+                      value={listingPrice}
+                      onChange={(e) => setListingPrice(e.target.value)}
+                      placeholder="0"
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Property Type</Label>
+                  <Select value={propertyType} onValueChange={setPropertyType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROPERTY_TYPES.map(type => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Sqft & Lot Size */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-sm">Sqft</Label>
+                  <Input
+                    type="number"
+                    value={sqft}
+                    onChange={(e) => setSqft(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Lot Size (Acres)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={lotSizeAcres}
+                    onChange={(e) => setLotSizeAcres(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              {/* Bedrooms & Baths */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-sm">Bedrooms</Label>
+                  <Input
+                    type="number"
+                    value={bedrooms}
+                    onChange={(e) => setBedrooms(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Full Baths</Label>
+                  <Input
+                    type="number"
+                    value={fullBaths}
+                    onChange={(e) => setFullBaths(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Half Baths</Label>
+                  <Input
+                    type="number"
+                    value={halfBaths}
+                    onChange={(e) => setHalfBaths(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* ======================================== */}
+          {/* SELECTED PROPERTY PREVIEW (MLS) */}
+          {/* ======================================== */}
+          {selectedProperty && !isOffMarket && (
+            <Card className="p-4 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-green-100 dark:bg-green-900 rounded-full flex-shrink-0">
+                  <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm text-green-800 dark:text-green-200">
+                    Property Found in MLS
+                  </p>
+                  <p className="text-sm text-green-700 dark:text-green-300 mt-0.5">
+                    {selectedProperty.fullAddress}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-green-600 dark:text-green-400">
+                    {selectedProperty.listPrice && (
+                      <span className="flex items-center gap-1">
+                        <DollarSign className="w-3 h-3" />
+                        ${selectedProperty.listPrice.toLocaleString()}
+                      </span>
+                    )}
+                    {selectedProperty.beds && (
+                      <span className="flex items-center gap-1">
+                        <Bed className="w-3 h-3" />
+                        {selectedProperty.beds} bed
+                      </span>
+                    )}
+                    {selectedProperty.baths && (
+                      <span className="flex items-center gap-1">
+                        <Bath className="w-3 h-3" />
+                        {selectedProperty.baths} bath
+                      </span>
+                    )}
+                    {selectedProperty.sqft && (
+                      <span className="flex items-center gap-1">
+                        <Square className="w-3 h-3" />
+                        {selectedProperty.sqft.toLocaleString()} sqft
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* ======================================== */}
+          {/* FOLLOW UP BOSS */}
+          {/* ======================================== */}
+          <div className="border rounded-lg">
+            <button 
+              type="button" 
+              className="flex items-center justify-between w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors"
+            >
+              <span className="text-primary font-medium text-sm">
+                Pull lead details from Follow Up Boss
+              </span>
+              <span className="text-muted-foreground">▾</span>
+            </button>
+          </div>
+
+          {/* ======================================== */}
+          {/* UNDER CONTRACT CHECKBOX */}
+          {/* ======================================== */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="underContract"
+                checked={isUnderContract}
+                onCheckedChange={(checked) => setIsUnderContract(checked as boolean)}
+                disabled={isOffMarket}
+              />
+              <label 
+                htmlFor="underContract" 
+                className={`text-sm cursor-pointer ${isOffMarket ? 'text-muted-foreground' : ''}`}
+              >
+                Under contract?
+              </label>
+            </div>
+            <p className="text-xs text-muted-foreground ml-6">
+              Uncheck if this is a new listing not yet under contract
+              {isOffMarket && ' (Auto-unchecked for off-market listings)'}
+            </p>
+          </div>
+
+          {/* ======================================== */}
+          {/* DATES */}
+          {/* ======================================== */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Contract Date</Label>
+              <Input
+                type="date"
+                value={contractDate}
+                onChange={(e) => setContractDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Expected Closing</Label>
+              <Input
+                type="date"
+                value={expectedClosing}
+                onChange={(e) => setExpectedClosing(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* ======================================== */}
+          {/* COORDINATORS (existing placeholder) */}
+          {/* ======================================== */}
+          <div className="border rounded-lg p-4">
+            <Label className="text-sm font-medium">Assign Transaction Coordinators</Label>
+            {/* Your existing coordinator selector */}
+          </div>
+
+          {/* ======================================== */}
+          {/* ON BEHALF OF (existing placeholder) */}
+          {/* ======================================== */}
+          <div className="border rounded-lg">
+            <button 
+              type="button" 
+              className="flex items-center justify-between w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors"
+            >
+              <span className="text-sm">Creating on behalf of another agent?</span>
+              <span className="text-muted-foreground">▾</span>
+            </button>
+          </div>
+
+          {/* ======================================== */}
+          {/* SUBMIT */}
+          {/* ======================================== */}
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-primary hover:bg-primary/90">
+              Create Transaction
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+---
+
+### Step 4: Add Off Market Status Badge
+
+**File: Update `client/src/lib/statusUtils.ts`**
+
+Add the Off Market status:
+
+```typescript
+// Add to STATUS_CONFIG or MLS_STATUS_MAP
+
+'Off Market': {
+  label: 'Off Market',
+  color: 'bg-purple-500',
+  textColor: 'text-white',
+  borderColor: 'border-purple-500',
+},
+```
+
+---
+
+### Step 5: Update Transaction Card for Off Market
+
+**File: Update your transaction card component**
+
+```tsx
+// In TransactionCard component
+
+const isOffMarket = transaction.isOffMarket && !transaction.mlsNumber;
+
+return (
+  <div className="...">
+    {/* Header */}
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <h3>{transaction.address}</h3>
+        {transaction.mlsNumber ? (
+          <p className="text-sm text-muted-foreground"># {transaction.mlsNumber}</p>
+        ) : isOffMarket ? (
+          <p className="text-sm text-muted-foreground">(Off Market)</p>
+        ) : null}
+      </div>
+      
+      <TransactionStatusBadge transaction={transaction} />
+    </div>
+    
+    {/* Dates - Show different label for off market */}
+    <div className="grid grid-cols-2 gap-4 mt-3">
+      <div>
+        <p className="text-xs text-muted-foreground uppercase">
+          {isOffMarket ? 'Off Market Date' : 'Listing Date'}
+        </p>
+        <p className="text-sm">
+          {isOffMarket 
+            ? formatDate(transaction.offMarketListingDate)
+            : formatDate(transaction.listingDate)
+          }
+        </p>
+      </div>
+      <div>
+        <p className="text-xs text-muted-foreground uppercase">Closing Date</p>
+        <p className="text-sm">{formatDate(transaction.closingDate)}</p>
+      </div>
+    </div>
+    
+    {/* Action Buttons */}
+    <div className="flex flex-wrap gap-2 mt-3">
+      {!isOffMarket && <Button size="sm" variant="outline">MLS Data</Button>}
+      <Button size="sm" variant="outline">Marketing</Button>
+      <Button size="sm" variant="outline">Docs</Button>
+      {transaction.slackChannelId && <Button size="sm" variant="outline">Slack</Button>}
+    </div>
+    
+    {/* Add MLS Number button for off market listings */}
+    {isOffMarket && (
+      <Button 
+        size="sm" 
+        variant="ghost" 
+        className="mt-2 text-purple-600"
+        onClick={() => handleAddMlsNumber(transaction.id)}
+      >
+        + Add MLS Number
+      </Button>
+    )}
+  </div>
+);
+```
+
+---
+
+### Step 6: Add Delete Transaction Button
+
+**File: Update transaction card or detail view**
+
+```tsx
+import { Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+
+// In transaction card or menu
+<AlertDialog>
+  <AlertDialogTrigger asChild>
+    <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600">
+      <Trash2 className="w-4 h-4" />
+    </Button>
+  </AlertDialogTrigger>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+      <AlertDialogDescription>
+        Are you sure you want to delete "{transaction.address}"? 
+        This action cannot be undone.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel>Cancel</AlertDialogCancel>
+      <AlertDialogAction 
+        onClick={() => handleDeleteTransaction(transaction.id)}
+        className="bg-red-500 hover:bg-red-600"
+      >
+        Delete
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+```
+
+---
+
+### Step 7: Backend Routes for Off Market
+
+**File: `server/routes.ts`**
+
+Add routes for off market photo upload and delete transaction:
+
+```typescript
+import multer from 'multer';
+
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
+
+// Create transaction with off market support
+app.post('/api/transactions', upload.array('photos', 10), async (req, res) => {
+  try {
+    const {
+      agentRepresents,
+      isCompanyLead,
+      propertyAddress,
+      mlsNumber,
+      isOffMarket,
+      isUnderContract,
+      contractDate,
+      expectedClosing,
+      listingDescription,
+      listingPrice,
+      propertyType,
+      sqft,
+      lotSizeAcres,
+      bedrooms,
+      fullBaths,
+      halfBaths,
+    } = req.body;
+
+    // Create transaction
+    const [transaction] = await db.insert(transactions).values({
+      address: propertyAddress,
+      mlsNumber: isOffMarket === 'true' ? null : mlsNumber,
+      agentRepresents,
+      isCompanyLead: isCompanyLead === 'true',
+      isOffMarket: isOffMarket === 'true',
+      isUnderContract: isUnderContract === 'true',
+      offMarketListingDate: isOffMarket === 'true' ? new Date() : null,
+      contractDate: contractDate ? new Date(contractDate) : null,
+      closingDate: expectedClosing ? new Date(expectedClosing) : null,
+      listingDescription: isOffMarket === 'true' ? listingDescription : null,
+      listingPrice: isOffMarket === 'true' && listingPrice ? parseInt(listingPrice) : null,
+      propertyType: isOffMarket === 'true' ? propertyType : null,
+      sqft: isOffMarket === 'true' && sqft ? parseInt(sqft) : null,
+      lotSizeAcres: isOffMarket === 'true' ? lotSizeAcres : null,
+      bedrooms: isOffMarket === 'true' && bedrooms ? parseInt(bedrooms) : null,
+      fullBaths: isOffMarket === 'true' && fullBaths ? parseInt(fullBaths) : null,
+      halfBaths: isOffMarket === 'true' && halfBaths ? parseInt(halfBaths) : null,
+      userId: req.user?.id,
+    }).returning();
+
+    // Handle photo uploads for off market
+    if (isOffMarket === 'true' && req.files && Array.isArray(req.files)) {
+      for (let i = 0; i < req.files.length; i++) {
+        const file = req.files[i];
+        // Upload to your storage (S3, Cloudinary, etc.)
+        const photoUrl = await uploadPhoto(file);
+        
+        await db.insert(offMarketPhotos).values({
+          transactionId: transaction.id,
+          photoUrl,
+          photoOrder: i,
+        });
+      }
+    }
+
+    res.json(transaction);
+  } catch (error: any) {
+    console.error('Create transaction error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete transaction
+app.delete('/api/transactions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Delete related records first
+    await db.delete(offMarketPhotos).where(eq(offMarketPhotos.transactionId, parseInt(id)));
+    // Delete other related records (documents, timeline, etc.)
+    
+    // Delete transaction
+    await db.delete(transactions).where(eq(transactions.id, parseInt(id)));
+    
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Delete transaction error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add MLS number to off market listing (convert to active)
+app.patch('/api/transactions/:id/add-mls', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { mlsNumber } = req.body;
+    
+    // Update transaction
+    const [updated] = await db.update(transactions)
+      .set({
+        mlsNumber,
+        isOffMarket: false, // No longer off market
+        updatedAt: new Date(),
+      })
+      .where(eq(transactions.id, parseInt(id)))
+      .returning();
+    
+    // Trigger MLS sync
+    if (mlsNumber) {
+      await syncMLSData(parseInt(id), mlsNumber);
+    }
+    
+    res.json(updated);
+  } catch (error: any) {
+    console.error('Add MLS error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+```
+
+---
+
+## Summary
+
+### New Features Added:
+
+| Feature | Location | Description |
+|---------|----------|-------------|
+| **Is Company Lead** | Below "Our Agent Represents" | Checkbox to mark company leads |
+| **Off Market** | Below MLS Number | Checkbox to create off-market listing |
+| **Off Market Fields** | Expandable section | Photo upload, description, price, type, beds/baths |
+| **Property Types** | Dropdown | 7 standardized types from meeting |
+| **Delete Transaction** | Card menu | Delete button with confirmation |
+| **Add MLS Number** | Off market card | Convert off-market to active listing |
+
+### Property Types:
+- Residential
+- Residential Income
+- Residential Investment
+- Residential Lease
+- Commercial Sale
+- Farm and Ranch
+- Land/Lot
+
+### Status Colors:
+| Status | Color |
+|--------|-------|
+| Active Listing | 🟢 Green |
+| Off Market | 🟣 Purple |
+| Under Contract | 🟠 Orange |
+| Closed | 🔴 Red |
+
+### Files to Update:
+
+| File | Changes |
+|------|---------|
+| `shared/schema.ts` | Add new columns + offMarketPhotos table |
+| `client/src/lib/propertyTypes.ts` | Create property types constant |
+| Create Transaction component | Add all new fields |
+| `client/src/lib/statusUtils.ts` | Add Off Market status |
+| Transaction card component | Show off market differently |
+| `server/routes.ts` | Add create, delete, add-mls routes |
+
+### Dependencies to Install:
+```bash
+npm install react-dropzone multer
+```
