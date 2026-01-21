@@ -1,0 +1,130 @@
+# CMA Diagnostic Investigation - READ ONLY
+
+## ⚠️ IMPORTANT: DO NOT MAKE ANY CHANGES
+
+This is a diagnostic investigation only. Please provide information and code snippets - **do not modify any files**.
+
+---
+
+## Investigation Goal
+
+We need to understand why some transactions with MLS numbers show "No CMA Available" while others have CMA data populated.
+
+**Example:**
+- Transaction "612 Twelve Oaks LN" has MLS# ACT4728035 but shows "No CMA Available"
+- Other transactions with MLS numbers DO have CMA data
+
+---
+
+## Questions to Answer
+
+### 1. CMA Data Source
+
+Please show me:
+- Where is CMA/comparables data fetched from? (Which API endpoint?)
+- What function or route handles fetching comparables?
+- Show the relevant code snippet.
+
+### 2. When is CMA Fetched?
+
+Please explain:
+- Is CMA data fetched automatically when a transaction is created?
+- Is it fetched when MLS data is synced?
+- Is there a manual trigger/button to fetch CMA?
+- Show the code that triggers the CMA fetch.
+
+### 3. CMA Fetch Conditions
+
+Please check:
+- Are there any conditions that must be met before CMA is fetched?
+- Does property STATUS affect whether CMA is fetched? (e.g., Active vs Closed)
+- Does the property need coordinates (latitude/longitude) for CMA to work?
+- Show any conditional logic around CMA fetching.
+
+### 4. Repliers API Call for Comparables
+
+Please show:
+- The exact Repliers API endpoint being called for comparables
+- What parameters are sent (lat, lng, radius, status, etc.)?
+- What does the API response look like?
+- Are there any error handling or fallback conditions?
+
+### 5. Database Storage
+
+Please show:
+- Where is CMA data stored in the database schema?
+- Is it stored in the `transactions` table or a separate `cmas` table?
+- What columns/fields hold the CMA data?
+
+### 6. CMA Tab Display Logic
+
+Please show:
+- The CMA tab component code
+- What condition determines if "No CMA Available" is shown vs actual data?
+- What data source does the CMA tab check?
+
+---
+
+## Specific Checks
+
+### Check A: Transaction Creation Flow
+
+Show the code path when a new transaction is created with an MLS number:
+1. Transaction insert
+2. MLS data fetch
+3. Is comparables/CMA fetch called here?
+
+### Check B: MLS Refresh Flow
+
+Show what happens when "Refresh MLS Data" is clicked:
+1. What API is called?
+2. Does it also refresh comparables?
+3. Show the refresh handler code.
+
+### Check C: CMA Tab Load
+
+Show what happens when user clicks the CMA tab:
+1. What query/fetch is triggered?
+2. What endpoint is called?
+3. What determines empty state vs data display?
+
+---
+
+## Expected Output Format
+
+Please provide your findings in this format:
+
+```
+## Finding 1: CMA Data Source
+[Code snippet or explanation]
+
+## Finding 2: When CMA is Fetched  
+[Code snippet or explanation]
+
+## Finding 3: Fetch Conditions
+[Code snippet or explanation]
+
+## Finding 4: Repliers API Details
+[Code snippet or explanation]
+
+## Finding 5: Database Schema
+[Code snippet or explanation]
+
+## Finding 6: Display Logic
+[Code snippet or explanation]
+```
+
+---
+
+## Do NOT:
+- ❌ Make any code changes
+- ❌ Create new files
+- ❌ Modify existing files
+- ❌ Run migrations
+- ❌ Install packages
+
+## DO:
+- ✅ Read and analyze existing code
+- ✅ Provide code snippets as examples
+- ✅ Explain the current logic flow
+- ✅ Identify any gaps or issues you see
