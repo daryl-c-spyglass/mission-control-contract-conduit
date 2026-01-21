@@ -203,7 +203,7 @@ export function CMATab({ transaction }: CMATabProps) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [mainView, setMainView] = useState<MainView>('compare');
-  const [subView, setSubView] = useState<SubView>('table');
+  const [subView, setSubView] = useState<SubView>('grid');
   const [statusFilter, setStatusFilter] = useState<StatusFilterType>('all');
   const [selectedProperty, setSelectedProperty] = useState<CMAComparable | null>(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -378,26 +378,30 @@ export function CMATab({ transaction }: CMATabProps) {
         }}
       />
 
-      {/* 3. MAIN CMA CONTENT CARD */}
-      <div className="bg-zinc-900 rounded-lg overflow-hidden">
+      {/* 3. MAIN CMA CONTENT CARD - Dashboard matching style with shadcn Card */}
+      <Card className="overflow-hidden">
         
-        {/* 3a. DARK HEADER BAR with Comparable Count and View Tabs */}
-        <div className="bg-zinc-800 px-4 py-3 flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-2 text-white">
-            <Menu className="w-5 h-5" />
-            <span className="font-semibold">{filteredComparables.length} COMPARABLE HOMES</span>
+        {/* 3a. CARD HEADER with Comparable Count and View Toggle */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Comparable Properties
+            </h2>
+            <span className="px-2 py-0.5 text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full">
+              {filteredComparables.length} properties
+            </span>
           </div>
           
-          {/* Compare / Map / Stats / List Tabs */}
-          <div className="flex gap-1">
+          {/* View Toggle - Segment Control Style */}
+          <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
             {MAIN_VIEW_TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setMainView(tab.id)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   mainView === tab.id
-                    ? 'bg-orange-500 hover:bg-orange-600 text-white'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-700'
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
                 data-testid={`button-mainview-${tab.id}`}
               >
@@ -408,30 +412,30 @@ export function CMATab({ transaction }: CMATabProps) {
           </div>
         </div>
 
-        {/* 3b. CONTENT AREA */}
-        <div className="p-4 space-y-4">
-          
-          {/* STATUS FILTERS - Inside content area, only for Compare and List views */}
-          {(mainView === 'compare' || mainView === 'list') && (
-            <div className="flex items-center gap-2 flex-wrap">
-              {STATUS_FILTERS.map(filter => (
-                <button
-                  key={filter.id}
-                  onClick={() => setStatusFilter(filter.id)}
-                  className={`px-4 py-2 text-sm rounded transition-colors whitespace-nowrap ${
-                    statusFilter === filter.id
-                      ? 'bg-zinc-700 text-white border border-zinc-600'
-                      : 'bg-transparent text-zinc-400 border border-zinc-700 hover:bg-zinc-800 hover:text-white'
-                  }`}
-                  data-testid={`button-filter-${filter.id}`}
-                >
-                  {filter.label}
-                </button>
-              ))}
-            </div>
-          )}
+        {/* 3b. STATUS FILTER TABS - Pill style */}
+        {(mainView === 'compare' || mainView === 'list') && (
+          <div className="flex items-center gap-2 p-4 border-b border-gray-100 dark:border-gray-800">
+            {STATUS_FILTERS.map(filter => (
+              <button
+                key={filter.id}
+                onClick={() => setStatusFilter(filter.id)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                  statusFilter === filter.id
+                    ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
+                data-testid={`button-filter-${filter.id}`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+        )}
 
-          {/* STATS SUMMARY ROW - Inside content area, only for Compare and List views */}
+        {/* 3c. CONTENT AREA */}
+        <div className="p-4 space-y-4">
+
+          {/* STATS SUMMARY ROW - Dashboard matching style */}
           {(mainView === 'compare' || mainView === 'list') && statistics && (() => {
             const mlsData = transaction.mlsData as any;
             const subjectPrice = mlsData?.listPrice || 0;
@@ -442,95 +446,73 @@ export function CMATab({ transaction }: CMATabProps) {
               ? ((subjectPrice - statistics.price.average) / statistics.price.average) * 100
               : null;
             
-            const psfVsMarket = statistics.pricePerSqFt.average > 0 && subjectPricePerSqft > 0
-              ? ((subjectPricePerSqft - statistics.pricePerSqFt.average) / statistics.pricePerSqFt.average) * 100
-              : null;
-            
             return (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 bg-zinc-800 rounded-lg p-4 text-white">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
                 {/* LOW PRICE */}
                 <div>
-                  <div className="text-xs text-zinc-400 uppercase tracking-wide mb-1">Low Price</div>
-                  <div className="text-xl font-bold">{formatPrice(statistics.price.range.min)}</div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Low Price</p>
+                  <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">{formatPrice(statistics.price.range.min)}</p>
                 </div>
                 {/* HIGH PRICE */}
                 <div>
-                  <div className="text-xs text-zinc-400 uppercase tracking-wide mb-1">High Price</div>
-                  <div className="text-xl font-bold">{formatPrice(statistics.price.range.max)}</div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">High Price</p>
+                  <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">{formatPrice(statistics.price.range.max)}</p>
                 </div>
                 {/* AVG PRICE */}
                 <div>
-                  <div className="text-xs text-zinc-400 uppercase tracking-wide mb-1">Avg Price</div>
-                  <div className="text-xl font-bold">{formatPrice(Math.round(statistics.price.average))}</div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Avg Price</p>
+                  <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">{formatPrice(Math.round(statistics.price.average))}</p>
                   {priceVsMarket !== null && (
-                    <>
-                      <div className={`text-xs flex items-center gap-1 ${priceVsMarket > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                        {priceVsMarket > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                        {Math.abs(priceVsMarket).toFixed(1)}% vs market
-                      </div>
-                      <div className="text-xs text-zinc-400">Your: {formatPrice(subjectPrice)}</div>
-                    </>
+                    <p className={`text-xs mt-0.5 flex items-center gap-1 ${priceVsMarket > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                      {priceVsMarket > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                      {Math.abs(priceVsMarket).toFixed(1)}% vs market
+                    </p>
                   )}
                 </div>
                 {/* MEDIAN */}
                 <div>
-                  <div className="text-xs text-zinc-400 uppercase tracking-wide mb-1">Median</div>
-                  <div className="text-xl font-bold">{formatPrice(Math.round(statistics.price.median))}</div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Median</p>
+                  <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">{formatPrice(Math.round(statistics.price.median))}</p>
                 </div>
                 {/* AVG $/SQFT */}
                 <div>
-                  <div className="text-xs text-zinc-400 uppercase tracking-wide mb-1">Avg $/SqFt</div>
-                  <div className="text-xl font-bold">${Math.round(statistics.pricePerSqFt.average)}</div>
-                  <div className="text-xs text-zinc-500">
-                    Range: ${Math.round(statistics.pricePerSqFt.range.min)} - ${Math.round(statistics.pricePerSqFt.range.max)}
-                  </div>
-                  <div className="text-xs text-zinc-500">Median: ${Math.round(statistics.pricePerSqFt.median)}</div>
-                  {psfVsMarket !== null && (
-                    <>
-                      <div className={`text-xs flex items-center gap-1 ${psfVsMarket > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                        {psfVsMarket > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                        {Math.abs(psfVsMarket).toFixed(1)}% vs market
-                      </div>
-                      <div className="text-xs text-zinc-400">Your: ${Math.round(subjectPricePerSqft)}</div>
-                    </>
-                  )}
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Avg $/SqFt</p>
+                  <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">${Math.round(statistics.pricePerSqFt.average)}</p>
                 </div>
                 {/* AVG DOM */}
                 <div>
-                  <div className="text-xs text-zinc-400 uppercase tracking-wide mb-1">Avg DOM</div>
-                  <div className="text-xl font-bold">{Math.round(statistics.daysOnMarket.average)} Days</div>
-                  <div className="text-xs text-zinc-500">
-                    Range: {statistics.daysOnMarket.range.min} - {statistics.daysOnMarket.range.max}
-                  </div>
-                  <div className="text-xs text-zinc-500">Median: {Math.round(statistics.daysOnMarket.median)}</div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Avg DOM</p>
+                  <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">{Math.round(statistics.daysOnMarket.average)} days</p>
                 </div>
               </div>
             );
           })()}
 
-          {/* VIEW TOGGLES - Only for Compare tab */}
+          {/* VIEW TOGGLES - Segment control style for Compare tab */}
           {mainView === 'compare' && (
-            <div className="flex items-center gap-2">
-              <span className="text-zinc-400 text-sm">View:</span>
-              {[
-                { id: 'grid' as SubView, label: 'Grid', icon: LayoutGrid },
-                { id: 'list' as SubView, label: 'List', icon: List },
-                { id: 'table' as SubView, label: 'Table', icon: Table2 },
-              ].map(view => (
-                <button
-                  key={view.id}
-                  onClick={() => setSubView(view.id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded transition-colors ${
-                    subView === view.id
-                      ? 'bg-orange-500 hover:bg-orange-600 text-white'
-                      : 'bg-transparent text-zinc-400 border border-zinc-700 hover:bg-zinc-800 hover:text-white'
-                  }`}
-                  data-testid={`button-subview-${view.id}`}
-                >
-                  <view.icon className="w-4 h-4" />
-                  {view.label}
-                </button>
-              ))}
+            <div className="flex items-center gap-3">
+              <span className="text-gray-500 dark:text-gray-400 text-sm">View:</span>
+              <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                {[
+                  { id: 'grid' as SubView, label: 'Grid', icon: LayoutGrid },
+                  { id: 'list' as SubView, label: 'List', icon: List },
+                  { id: 'table' as SubView, label: 'Table', icon: Table2 },
+                ].map(view => (
+                  <button
+                    key={view.id}
+                    onClick={() => setSubView(view.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                      subView === view.id
+                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                    data-testid={`button-subview-${view.id}`}
+                  >
+                    <view.icon className="w-4 h-4" />
+                    {view.label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -568,213 +550,220 @@ export function CMATab({ transaction }: CMATabProps) {
         {/* COMPARE and LIST VIEWS - With sub-views */}
         {(mainView === 'compare' || mainView === 'list') && (
           <>
-            {/* Table Sub-View */}
+            {/* Table Sub-View - Clean Dashboard style */}
             {subView === 'table' && (
-              <Card>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted/50 text-left">
-                        <tr>
-                          <th className="p-3 font-medium">Address</th>
-                          <th className="p-3 font-medium">Status</th>
-                          <th className="p-3 font-medium text-right">Price</th>
-                          <th className="p-3 font-medium text-right">$/SqFt</th>
-                          <th className="p-3 font-medium text-right">DOM</th>
-                          <th className="p-3 font-medium text-center">Beds</th>
-                          <th className="p-3 font-medium text-center">Baths</th>
-                          <th className="p-3 font-medium text-right">SqFt</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {filteredComparables.map((comp, index) => {
-                          const sqft = typeof comp.sqft === 'number' ? comp.sqft : parseFloat(comp.sqft as string) || 0;
-                          const pricePerSqft = sqft > 0 ? comp.price / sqft : 0;
-                          return (
-                            <tr 
-                              key={index} 
-                              className="hover:bg-muted/50 cursor-pointer transition-colors"
-                              onClick={() => {
-                                setSelectedProperty(comp);
-                                setPhotoIndex(0);
-                              }}
-                              data-testid={`row-cma-${index}`}
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 text-left">
+                    <tr>
+                      <th className="p-3 font-medium">Address</th>
+                      <th className="p-3 font-medium">Status</th>
+                      <th className="p-3 font-medium text-right">Price</th>
+                      <th className="p-3 font-medium text-right">$/SqFt</th>
+                      <th className="p-3 font-medium text-right">DOM</th>
+                      <th className="p-3 font-medium text-center">Beds</th>
+                      <th className="p-3 font-medium text-center">Baths</th>
+                      <th className="p-3 font-medium text-right">SqFt</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {filteredComparables.map((comp, index) => {
+                      const sqft = typeof comp.sqft === 'number' ? comp.sqft : parseFloat(comp.sqft as string) || 0;
+                      const pricePerSqft = sqft > 0 ? comp.price / sqft : 0;
+                      return (
+                        <tr 
+                          key={index} 
+                          className="hover:bg-muted/50 cursor-pointer transition-colors"
+                          onClick={() => {
+                            setSelectedProperty(comp);
+                            setPhotoIndex(0);
+                          }}
+                          data-testid={`row-cma-${index}`}
+                        >
+                          <td className="p-3">
+                            <span className="font-medium truncate max-w-[200px] block">
+                              {comp.address?.split(',')[0] || comp.address}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            <Badge 
+                              variant="outline" 
+                              className={`text-xs ${getStatusBadgeStyle(comp.status || '')}`}
                             >
-                              <td className="p-3">
-                                <div className="flex items-center gap-2">
-                                  <div 
-                                    className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-                                      normalizeStatus(comp.status) === 'active' ? 'bg-green-500' :
-                                      normalizeStatus(comp.status) === 'closed' ? 'bg-red-500' :
-                                      normalizeStatus(comp.status) === 'activeUnderContract' ? 'bg-orange-500' :
-                                      normalizeStatus(comp.status) === 'pending' ? 'bg-gray-500' :
-                                      normalizeStatus(comp.status) === 'unknown' ? 'bg-gray-400' :
-                                      'bg-gray-500'
-                                    }`}
-                                  />
-                                  <span className="truncate max-w-[200px]">{comp.address}</span>
-                                </div>
-                              </td>
-                              <td className="p-3">
-                                <Badge 
-                                  variant="outline" 
-                                  className={`text-xs ${getStatusBadgeStyle(comp.status || '')}`}
-                                >
-                                  {getStatusLabel(comp.status || '')}
-                                </Badge>
-                              </td>
-                              <td className="p-3 text-right font-medium">{formatPrice(comp.price)}</td>
-                              <td className="p-3 text-right">{formatPrice(Math.round(pricePerSqft))}</td>
-                              <td className="p-3 text-right">{comp.daysOnMarket ?? '-'}</td>
-                              <td className="p-3 text-center">{comp.bedrooms}</td>
-                              <td className="p-3 text-center">{comp.bathrooms}</td>
-                              <td className="p-3 text-right">{sqft > 0 ? sqft.toLocaleString() : '-'}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            
-            {/* Grid Sub-View */}
-            {subView === 'grid' && (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {filteredComparables.map((comp, index) => (
-                  <Card 
-                    key={index} 
-                    className="cursor-pointer hover-elevate transition-all"
-                    onClick={() => {
-                      setSelectedProperty(comp);
-                      setPhotoIndex(0);
-                    }}
-                    data-testid={`card-cma-${index}`}
-                  >
-                    {(comp.imageUrl || (comp.photos && comp.photos.length > 0)) && (
-                      <div className="relative h-40 overflow-hidden rounded-t-lg">
-                        <img
-                          src={comp.photos?.[0] || comp.imageUrl}
-                          alt={comp.address}
-                          className="w-full h-full object-cover"
-                        />
-                        {comp.status && (
-                          <Badge 
-                            className={`absolute top-2 left-2 ${getStatusBadgeStyle(comp.status)}`}
-                          >
-                            {getStatusLabel(comp.status)}
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                    <CardContent className="pt-4 space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{comp.address}</p>
-                          <p className="text-lg font-semibold">{formatPrice(comp.price)}</p>
-                        </div>
-                        <Badge variant="outline" className="shrink-0">
-                          {comp.distance.toFixed(1)} mi
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Bed className="h-3.5 w-3.5" />
-                          {comp.bedrooms}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Bath className="h-3.5 w-3.5" />
-                          {comp.bathrooms}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Square className="h-3.5 w-3.5" />
-                          {typeof comp.sqft === 'number' ? comp.sqft.toLocaleString() : comp.sqft}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <Clock className="h-3.5 w-3.5" />
-                        {comp.daysOnMarket} days on market
-                      </div>
-                      {comp.mlsNumber && (
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Hash className="h-3 w-3" />
-                          {comp.mlsNumber}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
+                              {getStatusLabel(comp.status || '')}
+                            </Badge>
+                          </td>
+                          <td className="p-3 text-right font-medium">{formatPrice(comp.price)}</td>
+                          <td className="p-3 text-right text-muted-foreground">${Math.round(pricePerSqft)}</td>
+                          <td className="p-3 text-right text-muted-foreground">{comp.daysOnMarket ?? '-'}</td>
+                          <td className="p-3 text-center text-muted-foreground">{comp.bedrooms}</td>
+                          <td className="p-3 text-center text-muted-foreground">{comp.bathrooms}</td>
+                          <td className="p-3 text-right text-muted-foreground">{sqft > 0 ? sqft.toLocaleString() : '-'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
             
-            {/* List Sub-View */}
+            {/* Grid Sub-View - Clean Dashboard style */}
+            {subView === 'grid' && (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredComparables.map((comp, index) => {
+                  const sqft = typeof comp.sqft === 'number' ? comp.sqft : parseFloat(comp.sqft as string) || 0;
+                  const pricePerSqft = sqft > 0 ? comp.price / sqft : 0;
+                  
+                  return (
+                    <div 
+                      key={index} 
+                      className="border rounded-lg overflow-hidden bg-card hover:shadow-lg transition-all cursor-pointer group"
+                      onClick={() => {
+                        setSelectedProperty(comp);
+                        setPhotoIndex(0);
+                      }}
+                      data-testid={`card-cma-${index}`}
+                    >
+                      {/* Property Image */}
+                      <div className="relative h-44 bg-muted">
+                        {(comp.imageUrl || (comp.photos && comp.photos.length > 0)) ? (
+                          <img
+                            src={comp.photos?.[0] || comp.imageUrl}
+                            alt={comp.address}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-muted-foreground">
+                            <Home className="w-12 h-12" />
+                          </div>
+                        )}
+                        {/* Status Badge */}
+                        <Badge 
+                          className={`absolute top-3 left-3 ${getStatusBadgeStyle(comp.status || '')}`}
+                        >
+                          {getStatusLabel(comp.status || '')}
+                        </Badge>
+                        {/* Distance Badge */}
+                        <Badge variant="secondary" className="absolute top-3 right-3 bg-black/60 text-white backdrop-blur-sm border-0">
+                          {comp.distance.toFixed(1)} mi
+                        </Badge>
+                      </div>
+                      
+                      {/* Property Details */}
+                      <div className="p-4 space-y-3">
+                        {/* Price */}
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-xl font-bold">{formatPrice(comp.price)}</p>
+                          <p className="text-sm text-muted-foreground">${Math.round(pricePerSqft)}/sqft</p>
+                        </div>
+                        
+                        {/* Address */}
+                        <p className="font-medium truncate">
+                          {comp.address?.split(',')[0] || comp.address}
+                        </p>
+                        
+                        {/* Property Stats */}
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1.5">
+                            <Bed className="h-4 w-4" />
+                            <span>{comp.bedrooms} beds</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Bath className="h-4 w-4" />
+                            <span>{comp.bathrooms} baths</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Square className="h-4 w-4" />
+                            <span>{sqft > 0 ? sqft.toLocaleString() : '-'} sqft</span>
+                          </div>
+                        </div>
+                        
+                        {/* DOM */}
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          <span>{comp.daysOnMarket} days on market</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            
+            {/* List Sub-View - Clean Dashboard style */}
             {subView === 'list' && (
               <div className="space-y-3">
                 {filteredComparables.map((comp, index) => {
                   const sqft = typeof comp.sqft === 'number' ? comp.sqft : parseFloat(comp.sqft as string) || 0;
                   const pricePerSqft = sqft > 0 ? comp.price / sqft : 0;
                   return (
-                    <Card 
+                    <div 
                       key={index} 
-                      className="cursor-pointer hover-elevate transition-all"
+                      className="border rounded-lg p-4 bg-card hover:shadow-md transition-all cursor-pointer"
                       onClick={() => {
                         setSelectedProperty(comp);
                         setPhotoIndex(0);
                       }}
                       data-testid={`list-cma-${index}`}
                     >
-                      <CardContent className="p-4">
-                        <div className="flex gap-4">
-                          {(comp.imageUrl || (comp.photos && comp.photos.length > 0)) && (
-                            <div className="relative w-32 h-24 flex-shrink-0 overflow-hidden rounded-lg">
-                              <img
-                                src={comp.photos?.[0] || comp.imageUrl}
-                                alt={comp.address}
-                                className="w-full h-full object-cover"
-                              />
+                      <div className="flex gap-4">
+                        {/* Thumbnail */}
+                        <div className="relative w-36 h-28 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+                          {(comp.imageUrl || (comp.photos && comp.photos.length > 0)) ? (
+                            <img
+                              src={comp.photos?.[0] || comp.imageUrl}
+                              alt={comp.address}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center h-full text-muted-foreground">
+                              <Home className="w-8 h-8" />
                             </div>
                           )}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2 mb-2">
-                              <div>
-                                <p className="font-medium truncate">{comp.address}</p>
-                                <p className="text-xl font-semibold">{formatPrice(comp.price)}</p>
-                              </div>
-                              <Badge className={getStatusBadgeStyle(comp.status || '')}>
-                                {getStatusLabel(comp.status || '')}
-                              </Badge>
+                        </div>
+                        
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div>
+                              <p className="text-xl font-bold">{formatPrice(comp.price)}</p>
+                              <p className="font-medium truncate mt-0.5">
+                                {comp.address?.split(',')[0] || comp.address}
+                              </p>
                             </div>
-                            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                <Bed className="h-3.5 w-3.5" />
-                                {comp.bedrooms} beds
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Bath className="h-3.5 w-3.5" />
-                                {comp.bathrooms} baths
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Square className="h-3.5 w-3.5" />
-                                {sqft.toLocaleString()} sqft
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <DollarSign className="h-3.5 w-3.5" />
-                                ${Math.round(pricePerSqft)}/sqft
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Clock className="h-3.5 w-3.5" />
-                                {comp.daysOnMarket} DOM
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <MapPin className="h-3.5 w-3.5" />
-                                {comp.distance.toFixed(1)} mi
-                              </div>
+                            <Badge className={getStatusBadgeStyle(comp.status || '')}>
+                              {getStatusLabel(comp.status || '')}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1.5">
+                              <Bed className="h-4 w-4" />
+                              <span>{comp.bedrooms} beds</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Bath className="h-4 w-4" />
+                              <span>{comp.bathrooms} baths</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Square className="h-4 w-4" />
+                              <span>{sqft > 0 ? sqft.toLocaleString() : '-'} sqft</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <DollarSign className="h-4 w-4" />
+                              <span>${Math.round(pricePerSqft)}/sqft</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-4 w-4" />
+                              <span>{comp.daysOnMarket} days</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <MapPin className="h-4 w-4" />
+                              <span>{comp.distance.toFixed(1)} mi</span>
                             </div>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
@@ -782,8 +771,8 @@ export function CMATab({ transaction }: CMATabProps) {
           </>
         )}
         </div>
-        {/* End of 3b. CONTENT AREA */}
-      </div>
+        {/* End of 3c. CONTENT AREA */}
+      </Card>
       {/* End of 3. MAIN CMA CONTENT CARD */}
       
       <Dialog open={!!selectedProperty} onOpenChange={(open) => {

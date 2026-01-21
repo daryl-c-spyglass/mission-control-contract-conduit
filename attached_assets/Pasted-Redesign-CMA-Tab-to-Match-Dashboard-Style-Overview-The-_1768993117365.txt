@@ -1,0 +1,603 @@
+Redesign CMA Tab to Match Dashboard Style
+Overview
+The CMA tab looks like a different application compared to the Dashboard. Redesign it to match the clean, professional style of the Dashboard tab while keeping all functionality.
+
+Design Reference
+
+Dashboard style: Light background, white cards with subtle borders, clean typography, muted colors
+Keep all action buttons visible but style them consistently
+Yellow preview banner: Only show when there are unsaved changes
+Default view: Grid
+
+
+Part 1: Color Palette (Must Match Dashboard)
+tsx// lib/statusColors.ts - Unified status colors
+
+export const statusColors = {
+  // Light mode
+  light: {
+    active: {
+      bg: 'bg-green-100',
+      text: 'text-green-700',
+      border: 'border-green-200',
+      badge: 'bg-green-500 text-white',
+    },
+    closed: {
+      bg: 'bg-gray-100',
+      text: 'text-gray-700',
+      border: 'border-gray-200',
+      badge: 'bg-gray-500 text-white',
+    },
+    activeUnderContract: {
+      bg: 'bg-amber-50',
+      text: 'text-amber-700',
+      border: 'border-amber-200',
+      badge: 'bg-amber-500 text-white',
+    },
+    pending: {
+      bg: 'bg-yellow-50',
+      text: 'text-yellow-700',
+      border: 'border-yellow-200',
+      badge: 'bg-yellow-500 text-white',
+    },
+  },
+  // Dark mode
+  dark: {
+    active: {
+      bg: 'dark:bg-green-900/30',
+      text: 'dark:text-green-400',
+      border: 'dark:border-green-800',
+      badge: 'dark:bg-green-600 dark:text-white',
+    },
+    closed: {
+      bg: 'dark:bg-gray-800',
+      text: 'dark:text-gray-400',
+      border: 'dark:border-gray-700',
+      badge: 'dark:bg-gray-600 dark:text-white',
+    },
+    activeUnderContract: {
+      bg: 'dark:bg-amber-900/30',
+      text: 'dark:text-amber-400',
+      border: 'dark:border-amber-800',
+      badge: 'dark:bg-amber-600 dark:text-white',
+    },
+    pending: {
+      bg: 'dark:bg-yellow-900/30',
+      text: 'dark:text-yellow-400',
+      border: 'dark:border-yellow-800',
+      badge: 'dark:bg-yellow-600 dark:text-white',
+    },
+  },
+};
+
+// Helper function
+export const getStatusStyle = (status: string) => {
+  const normalized = status?.toLowerCase().replace(/\s+/g, '');
+  switch (normalized) {
+    case 'active':
+      return 'active';
+    case 'closed':
+      return 'closed';
+    case 'activeundercontract':
+      return 'activeUnderContract';
+    case 'pending':
+      return 'pending';
+    default:
+      return 'closed';
+  }
+};
+
+Part 2: CMA Tab Layout Structure
+tsx// CMA Tab - Complete Redesign
+
+{activeTab === 'cma' && (
+  <div className="space-y-4">
+    
+    {/* Action Bar - Clean, consistent styling */}
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" className="gap-2">
+          <Mail className="w-4 h-4" />
+          Copy Email
+        </Button>
+        <Button variant="outline" size="sm" className="gap-2">
+          <Link className="w-4 h-4" />
+          Produce URL
+        </Button>
+        <Button variant="outline" size="sm" className="gap-2">
+          <Printer className="w-4 h-4" />
+          Print
+        </Button>
+        <Button variant="outline" size="sm" className="gap-2">
+          <LayoutGrid className="w-4 h-4" />
+          Presentation
+        </Button>
+        <Button variant="outline" size="sm" className="gap-2">
+          <Share2 className="w-4 h-4" />
+          Share
+        </Button>
+      </div>
+    </div>
+
+    {/* Unsaved Changes Banner - Only show when hasUnsavedChanges */}
+    {hasUnsavedChanges && (
+      <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+        <span className="text-sm text-amber-800 dark:text-amber-200">
+          You have unsaved changes to this CMA report.
+        </span>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={handleDiscard}>
+            Discard
+          </Button>
+          <Button size="sm" onClick={handleSave} className="bg-primary hover:bg-primary/90">
+            Save Changes
+          </Button>
+        </div>
+      </div>
+    )}
+
+    {/* Comparable Properties Card */}
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+      
+      {/* Card Header */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Comparable Properties
+          </h2>
+          <span className="px-2 py-0.5 text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full">
+            {comparables.length} properties
+          </span>
+        </div>
+        
+        {/* View Toggle */}
+        <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+          <button
+            onClick={() => setView('grid')}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+              view === 'grid' 
+                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm" 
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            )}
+          >
+            <LayoutGrid className="w-4 h-4" />
+            Grid
+          </button>
+          <button
+            onClick={() => setView('map')}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+              view === 'map' 
+                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm" 
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            )}
+          >
+            <Map className="w-4 h-4" />
+            Map
+          </button>
+          <button
+            onClick={() => setView('stats')}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+              view === 'stats' 
+                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm" 
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            )}
+          >
+            <BarChart3 className="w-4 h-4" />
+            Stats
+          </button>
+          <button
+            onClick={() => setView('list')}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+              view === 'list' 
+                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm" 
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            )}
+          >
+            <List className="w-4 h-4" />
+            List
+          </button>
+        </div>
+      </div>
+
+      {/* Status Filter Tabs */}
+      <div className="flex items-center gap-2 p-4 border-b border-gray-100 dark:border-gray-800">
+        {['All', 'Closed', 'Active Under Contract', 'Pending', 'Active'].map((status) => (
+          <button
+            key={status}
+            onClick={() => setStatusFilter(status)}
+            className={cn(
+              "px-3 py-1.5 text-sm font-medium rounded-full transition-colors",
+              statusFilter === status
+                ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+            )}
+          >
+            {status}
+          </button>
+        ))}
+      </div>
+
+      {/* Statistics Row - Matching Dashboard Card Style */}
+      <div className="grid grid-cols-6 gap-4 p-4 bg-gray-50 dark:bg-gray-800/50">
+        <div>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Low Price</p>
+          <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">{formatCurrency(stats.lowPrice)}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">High Price</p>
+          <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">{formatCurrency(stats.highPrice)}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Avg Price</p>
+          <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">{formatCurrency(stats.avgPrice)}</p>
+          {stats.percentVsMarket && (
+            <p className={cn(
+              "text-xs mt-0.5",
+              stats.percentVsMarket > 0 ? "text-green-600" : "text-red-600"
+            )}>
+              {stats.percentVsMarket > 0 ? '↑' : '↓'} {Math.abs(stats.percentVsMarket)}% vs market
+            </p>
+          )}
+        </div>
+        <div>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Median</p>
+          <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">{formatCurrency(stats.median)}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Avg $/SqFt</p>
+          <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">${stats.avgPricePerSqft}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Avg DOM</p>
+          <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">{stats.avgDom} days</p>
+        </div>
+      </div>
+
+      {/* Content Area - Based on View */}
+      <div className="p-4">
+        {view === 'grid' && <CMAGridView comparables={filteredComparables} />}
+        {view === 'map' && <CMAMapView comparables={filteredComparables} subject={subjectProperty} />}
+        {view === 'stats' && <CMAStatsView comparables={filteredComparables} subject={subjectProperty} />}
+        {view === 'list' && <CMAListView comparables={filteredComparables} />}
+      </div>
+    </div>
+  </div>
+)}
+
+Part 3: Grid View (Default View)
+tsx// components/cma/CMAGridView.tsx
+
+export function CMAGridView({ comparables }: { comparables: any[] }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {comparables.map((property) => (
+        <div 
+          key={property.id}
+          className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+        >
+          {/* Property Image */}
+          <div className="relative aspect-[4/3]">
+            <img 
+              src={property.photos?.[0] || '/placeholder-property.jpg'}
+              alt={property.unparsedAddress}
+              className="w-full h-full object-cover"
+            />
+            {/* Status Badge */}
+            <div className="absolute top-3 left-3">
+              <StatusBadge status={property.standardStatus} />
+            </div>
+            {/* Price */}
+            <div className="absolute bottom-3 left-3">
+              <span className="px-2 py-1 bg-black/70 text-white text-lg font-semibold rounded">
+                {formatCurrency(property.closePrice || property.listPrice)}
+              </span>
+            </div>
+          </div>
+          
+          {/* Property Details */}
+          <div className="p-4">
+            <h3 className="font-medium text-gray-900 dark:text-white truncate">
+              {property.unparsedAddress?.split(',')[0]}
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              {property.city}, {property.state}
+            </p>
+            
+            <div className="flex items-center gap-4 mt-3 text-sm text-gray-600 dark:text-gray-400">
+              <span className="flex items-center gap-1">
+                <Bed className="w-4 h-4" />
+                {property.bedroomsTotal}
+              </span>
+              <span className="flex items-center gap-1">
+                <Bath className="w-4 h-4" />
+                {property.bathroomsTotalInteger}
+              </span>
+              <span className="flex items-center gap-1">
+                <Square className="w-4 h-4" />
+                {property.livingArea?.toLocaleString()} sqft
+              </span>
+            </div>
+            
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                ${property.pricePerSqft || Math.round((property.closePrice || property.listPrice) / property.livingArea)}/sqft
+              </span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                {property.daysOnMarket || 0} DOM
+              </span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+Part 4: Status Badge Component
+tsx// components/ui/StatusBadge.tsx
+
+import { cn } from '@/lib/utils';
+
+interface StatusBadgeProps {
+  status: string;
+  size?: 'sm' | 'md';
+}
+
+export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
+  const getStatusStyles = (status: string) => {
+    const normalized = status?.toLowerCase();
+    
+    if (normalized?.includes('active') && !normalized?.includes('under')) {
+      return 'bg-green-500 text-white';
+    }
+    if (normalized?.includes('closed') || normalized?.includes('sold')) {
+      return 'bg-gray-500 text-white';
+    }
+    if (normalized?.includes('under contract') || normalized?.includes('activeundercontract')) {
+      return 'bg-amber-500 text-white';
+    }
+    if (normalized?.includes('pending')) {
+      return 'bg-yellow-500 text-white';
+    }
+    return 'bg-gray-500 text-white';
+  };
+
+  const getStatusLabel = (status: string) => {
+    const normalized = status?.toLowerCase();
+    
+    if (normalized?.includes('active') && !normalized?.includes('under')) {
+      return 'Active';
+    }
+    if (normalized?.includes('closed') || normalized?.includes('sold')) {
+      return 'Closed';
+    }
+    if (normalized?.includes('under contract') || normalized?.includes('activeundercontract')) {
+      return 'Under Contract';
+    }
+    if (normalized?.includes('pending')) {
+      return 'Pending';
+    }
+    return status;
+  };
+
+  return (
+    <span className={cn(
+      "inline-flex items-center font-medium rounded-full",
+      size === 'sm' ? "px-2 py-0.5 text-xs" : "px-2.5 py-1 text-sm",
+      getStatusStyles(status)
+    )}>
+      {getStatusLabel(status)}
+    </span>
+  );
+}
+
+Part 5: List/Table View (Cleaned Up)
+tsx// components/cma/CMAListView.tsx
+
+export function CMAListView({ comparables }: { comparables: any[] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-gray-200 dark:border-gray-700">
+            <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Address</th>
+            <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Status</th>
+            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Price</th>
+            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">$/SqFt</th>
+            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">DOM</th>
+            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Beds</th>
+            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Baths</th>
+            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">SqFt</th>
+          </tr>
+        </thead>
+        <tbody>
+          {comparables.map((property, idx) => (
+            <tr 
+              key={property.id}
+              className={cn(
+                "border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors",
+                idx % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50/50 dark:bg-gray-800/20"
+              )}
+            >
+              <td className="py-3 px-4">
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {property.unparsedAddress?.split(',')[0]}
+                </span>
+              </td>
+              <td className="py-3 px-4">
+                <StatusBadge status={property.standardStatus} size="sm" />
+              </td>
+              <td className="py-3 px-4 text-right font-medium text-gray-900 dark:text-white">
+                {formatCurrency(property.closePrice || property.listPrice)}
+              </td>
+              <td className="py-3 px-4 text-right text-gray-600 dark:text-gray-400">
+                ${Math.round((property.closePrice || property.listPrice) / property.livingArea)}
+              </td>
+              <td className="py-3 px-4 text-right text-gray-600 dark:text-gray-400">
+                {property.daysOnMarket || 0}
+              </td>
+              <td className="py-3 px-4 text-right text-gray-600 dark:text-gray-400">
+                {property.bedroomsTotal}
+              </td>
+              <td className="py-3 px-4 text-right text-gray-600 dark:text-gray-400">
+                {property.bathroomsTotalInteger}
+              </td>
+              <td className="py-3 px-4 text-right text-gray-600 dark:text-gray-400">
+                {property.livingArea?.toLocaleString()}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+Part 6: Map View with Theme Support
+tsx// components/cma/CMAMapView.tsx
+
+import { useTheme } from '@/hooks/useTheme';
+
+export function CMAMapView({ comparables, subject }: { comparables: any[], subject: any }) {
+  const { theme } = useTheme();
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+
+  // Mapbox style based on theme
+  const mapStyle = useMemo(() => {
+    return theme === 'dark' 
+      ? 'mapbox://styles/mapbox/dark-v11'
+      : 'mapbox://styles/mapbox/light-v11';
+  }, [theme]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    mapRef.current.setStyle(mapStyle);
+  }, [mapStyle]);
+
+  // Status colors for markers
+  const getMarkerColor = (status: string) => {
+    const normalized = status?.toLowerCase();
+    if (normalized?.includes('active') && !normalized?.includes('under')) return '#22c55e'; // green
+    if (normalized?.includes('closed')) return '#6b7280'; // gray
+    if (normalized?.includes('under contract')) return '#f59e0b'; // amber
+    if (normalized?.includes('pending')) return '#eab308'; // yellow
+    return '#6b7280';
+  };
+
+  return (
+    <div className="h-[500px] rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+      <Map
+        ref={mapRef}
+        mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN}
+        initialViewState={{
+          longitude: subject?.longitude || -97.7431,
+          latitude: subject?.latitude || 30.2672,
+          zoom: 11
+        }}
+        style={{ width: '100%', height: '100%' }}
+        mapStyle={mapStyle}
+      >
+        {/* Subject Property Marker */}
+        {subject && (
+          <Marker 
+            longitude={subject.longitude} 
+            latitude={subject.latitude}
+          >
+            <div className="w-8 h-8 bg-primary rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+              <Home className="w-4 h-4 text-white" />
+            </div>
+          </Marker>
+        )}
+
+        {/* Comparable Markers */}
+        {comparables.map((property) => (
+          <Marker
+            key={property.id}
+            longitude={property.longitude}
+            latitude={property.latitude}
+          >
+            <div 
+              className="px-2 py-1 rounded-full text-white text-xs font-medium shadow-lg border-2 border-white"
+              style={{ backgroundColor: getMarkerColor(property.standardStatus) }}
+            >
+              {formatCompactCurrency(property.closePrice || property.listPrice)}
+            </div>
+          </Marker>
+        ))}
+
+        {/* Legend */}
+        <div className="absolute bottom-4 left-4 bg-white dark:bg-gray-900 rounded-lg shadow-lg p-3 border border-gray-200 dark:border-gray-700">
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Legend</p>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-primary" />
+              <span className="text-xs text-gray-600 dark:text-gray-400">Subject</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-green-500" />
+              <span className="text-xs text-gray-600 dark:text-gray-400">Active</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-gray-500" />
+              <span className="text-xs text-gray-600 dark:text-gray-400">Closed</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-amber-500" />
+              <span className="text-xs text-gray-600 dark:text-gray-400">Under Contract</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-yellow-500" />
+              <span className="text-xs text-gray-600 dark:text-gray-400">Pending</span>
+            </div>
+          </div>
+        </div>
+      </Map>
+    </div>
+  );
+}
+
+Part 7: State Initialization
+tsx// In the CMA component, set default view to 'grid'
+
+const [view, setView] = useState<'grid' | 'map' | 'stats' | 'list'>('grid');
+const [statusFilter, setStatusFilter] = useState('All');
+const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+// Track changes
+useEffect(() => {
+  // Set hasUnsavedChanges to true when user modifies something
+  // Reset to false after save
+}, [/* dependencies */]);
+
+Summary of Changes
+ElementBeforeAfterBackgroundDark header barLight card matching dashboardAction buttonsOrange/filledOutline, consistent stylingYellow bannerAlways visibleOnly on unsaved changesStats sectionDark barLight card with subtle bgView toggleOrange buttonSubtle segment controlStatus badgesBright orange/redMuted, consistent colorsTableOrange dots, denseClean, no dots, alternating rowsDefault viewTableGridMapUnknown themeSyncs with light/dark mode
+
+Files to Create/Modify
+
+lib/statusColors.ts - Create unified status colors
+components/ui/StatusBadge.tsx - Create reusable badge
+components/cma/CMAGridView.tsx - Create grid view
+components/cma/CMAListView.tsx - Update list/table view
+components/cma/CMAMapView.tsx - Update with theme support
+components/cma/CMAStatsView.tsx - Update styling
+CMA tab main component - Complete redesign
+
+
+Acceptance Criteria
+
+ CMA tab visually matches Dashboard style
+ All cards use white background with subtle borders
+ View toggle uses segment control style (not orange buttons)
+ Status filters use pill buttons matching dashboard
+ Statistics row uses same typography as dashboard cards
+ Yellow banner only shows when hasUnsavedChanges is true
+ Default view is Grid
+ Grid view shows property cards with images
+ List view has clean table without orange dots
+ Map switches between light/dark style based on theme
+ All status badges use consistent muted colors
+ Works correctly in both light and dark mode

@@ -1,0 +1,800 @@
+# Redesign CMA Tab to Match Dashboard Style
+
+## Overview
+The CMA tab looks inconsistent with the Dashboard. Redesign it to match the clean, professional style while organizing action buttons into dropdown menus.
+
+---
+
+## Design Goals
+- Match Dashboard's light, clean aesthetic
+- White cards with subtle borders
+- Muted, consistent status colors
+- Dropdown menus for action buttons
+- Default view: Grid
+- Yellow banner only when there are unsaved changes
+- Map theme syncs with light/dark mode
+
+---
+
+## Part 1: Action Button Dropdowns
+
+Replace the row of individual buttons with grouped dropdown menus:
+
+```tsx
+// Import dropdown components
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import { 
+  Save, Share2, Download, MoreHorizontal, Mail, Link, 
+  Printer, FileText, LayoutGrid, SlidersHorizontal, 
+  StickyNote, Copy, ExternalLink 
+} from 'lucide-react';
+
+// Action Bar Component
+function CMAActionBar({ 
+  onSave, 
+  hasUnsavedChanges,
+  onCopyEmail,
+  onCopyLiveUrl,
+  onShareCMA,
+  onPrint,
+  onExportPDF,
+  onPresentation,
+  onAdjustFilters,
+  onNotes,
+  onProduceUrl,
+}: CMAActionBarProps) {
+  return (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        {/* Save Button - Primary Action */}
+        <Button 
+          onClick={onSave}
+          disabled={!hasUnsavedChanges}
+          className="gap-2"
+        >
+          <Save className="w-4 h-4" />
+          Save
+        </Button>
+
+        {/* Share Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <Share2 className="w-4 h-4" />
+              Share
+              <ChevronDown className="w-3 h-3 ml-1" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48">
+            <DropdownMenuItem onClick={onCopyEmail} className="gap-2">
+              <Mail className="w-4 h-4" />
+              Copy Email
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onCopyLiveUrl} className="gap-2">
+              <Link className="w-4 h-4" />
+              Copy Live URL
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onShareCMA} className="gap-2">
+              <ExternalLink className="w-4 h-4" />
+              Share CMA
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Export Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <Download className="w-4 h-4" />
+              Export
+              <ChevronDown className="w-3 h-3 ml-1" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48">
+            <DropdownMenuItem onClick={onPrint} className="gap-2">
+              <Printer className="w-4 h-4" />
+              Print
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onExportPDF} className="gap-2">
+              <FileText className="w-4 h-4" />
+              Export PDF
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onPresentation} className="gap-2">
+              <LayoutGrid className="w-4 h-4" />
+              Presentation Builder
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* More Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon">
+              <MoreHorizontal className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48">
+            <DropdownMenuItem onClick={onProduceUrl} className="gap-2">
+              <Copy className="w-4 h-4" />
+              Produce URL
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onAdjustFilters} className="gap-2">
+              <SlidersHorizontal className="w-4 h-4" />
+              Adjust Filters
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onNotes} className="gap-2">
+              <StickyNote className="w-4 h-4" />
+              Notes
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## Part 2: Status Colors (Unified)
+
+Create a consistent color system for property statuses:
+
+```tsx
+// lib/statusColors.ts
+
+export const getStatusConfig = (status: string) => {
+  const normalized = status?.toLowerCase().replace(/\s+/g, '') || '';
+  
+  if (normalized.includes('active') && !normalized.includes('under')) {
+    return {
+      label: 'Active',
+      badge: 'bg-green-500 text-white',
+      dot: 'bg-green-500',
+      marker: '#22c55e',
+    };
+  }
+  
+  if (normalized.includes('closed') || normalized.includes('sold')) {
+    return {
+      label: 'Closed',
+      badge: 'bg-gray-500 text-white',
+      dot: 'bg-gray-500',
+      marker: '#6b7280',
+    };
+  }
+  
+  if (normalized.includes('under') || normalized.includes('contract')) {
+    return {
+      label: 'Under Contract',
+      badge: 'bg-amber-500 text-white',
+      dot: 'bg-amber-500',
+      marker: '#f59e0b',
+    };
+  }
+  
+  if (normalized.includes('pending')) {
+    return {
+      label: 'Pending',
+      badge: 'bg-yellow-500 text-white',
+      dot: 'bg-yellow-500',
+      marker: '#eab308',
+    };
+  }
+  
+  return {
+    label: status || 'Unknown',
+    badge: 'bg-gray-500 text-white',
+    dot: 'bg-gray-500',
+    marker: '#6b7280',
+  };
+};
+```
+
+---
+
+## Part 3: Status Badge Component
+
+```tsx
+// components/ui/StatusBadge.tsx
+
+import { cn } from '@/lib/utils';
+import { getStatusConfig } from '@/lib/statusColors';
+
+interface StatusBadgeProps {
+  status: string;
+  size?: 'sm' | 'md';
+}
+
+export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
+  const config = getStatusConfig(status);
+  
+  return (
+    <span className={cn(
+      "inline-flex items-center font-medium rounded-full whitespace-nowrap",
+      size === 'sm' ? "px-2 py-0.5 text-xs" : "px-2.5 py-1 text-sm",
+      config.badge
+    )}>
+      {config.label}
+    </span>
+  );
+}
+```
+
+---
+
+## Part 4: Complete CMA Tab Layout
+
+```tsx
+// CMA Tab Component
+
+const [view, setView] = useState<'grid' | 'map' | 'stats' | 'list'>('grid');
+const [statusFilter, setStatusFilter] = useState('All');
+const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+// Filter comparables by status
+const filteredComparables = useMemo(() => {
+  if (statusFilter === 'All') return comparables;
+  return comparables.filter(c => {
+    const config = getStatusConfig(c.standardStatus);
+    return config.label === statusFilter;
+  });
+}, [comparables, statusFilter]);
+
+return (
+  <div className="space-y-4">
+    
+    {/* Action Bar */}
+    <CMAActionBar 
+      onSave={handleSave}
+      hasUnsavedChanges={hasUnsavedChanges}
+      onCopyEmail={handleCopyEmail}
+      onCopyLiveUrl={handleCopyLiveUrl}
+      onShareCMA={handleShareCMA}
+      onPrint={handlePrint}
+      onExportPDF={handleExportPDF}
+      onPresentation={handlePresentation}
+      onAdjustFilters={handleAdjustFilters}
+      onNotes={handleNotes}
+      onProduceUrl={handleProduceUrl}
+    />
+
+    {/* Unsaved Changes Banner - Only show when needed */}
+    {hasUnsavedChanges && (
+      <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+        <span className="text-sm text-amber-800 dark:text-amber-200">
+          You have unsaved changes to this CMA report.
+        </span>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setHasUnsavedChanges(false)}>
+            Discard
+          </Button>
+          <Button size="sm" onClick={handleSave}>
+            Save Changes
+          </Button>
+        </div>
+      </div>
+    )}
+
+    {/* Main Card */}
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+      
+      {/* Card Header */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Comparable Properties
+          </h2>
+          <span className="px-2.5 py-0.5 text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full">
+            {filteredComparables.length} properties
+          </span>
+        </div>
+        
+        {/* View Toggle - Segment Control Style */}
+        <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+          {[
+            { id: 'grid', icon: LayoutGrid, label: 'Grid' },
+            { id: 'map', icon: Map, label: 'Map' },
+            { id: 'stats', icon: BarChart3, label: 'Stats' },
+            { id: 'list', icon: List, label: 'List' },
+          ].map(({ id, icon: Icon, label }) => (
+            <button
+              key={id}
+              onClick={() => setView(id as any)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                view === id 
+                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm" 
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              )}
+            >
+              <Icon className="w-4 h-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Status Filter Pills */}
+      <div className="flex items-center gap-2 p-4 border-b border-gray-100 dark:border-gray-800">
+        {['All', 'Closed', 'Under Contract', 'Pending', 'Active'].map((status) => (
+          <button
+            key={status}
+            onClick={() => setStatusFilter(status)}
+            className={cn(
+              "px-3 py-1.5 text-sm font-medium rounded-full transition-colors",
+              statusFilter === status
+                ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+            )}
+          >
+            {status}
+          </button>
+        ))}
+      </div>
+
+      {/* Statistics Row */}
+      <div className="grid grid-cols-6 gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800">
+        <div>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Low Price</p>
+          <p className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
+            {formatCurrency(stats.lowPrice)}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">High Price</p>
+          <p className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
+            {formatCurrency(stats.highPrice)}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Avg Price</p>
+          <p className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
+            {formatCurrency(stats.avgPrice)}
+          </p>
+          {stats.percentVsMarket !== undefined && (
+            <p className={cn(
+              "text-xs mt-0.5 flex items-center gap-0.5",
+              stats.percentVsMarket >= 0 ? "text-green-600" : "text-red-600"
+            )}>
+              {stats.percentVsMarket >= 0 ? '↑' : '↓'} {Math.abs(stats.percentVsMarket).toFixed(1)}% vs market
+            </p>
+          )}
+        </div>
+        <div>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Median</p>
+          <p className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
+            {formatCurrency(stats.median)}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Avg $/SqFt</p>
+          <p className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
+            ${stats.avgPricePerSqft}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Avg DOM</p>
+          <p className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
+            {stats.avgDom} days
+          </p>
+        </div>
+      </div>
+
+      {/* View Content */}
+      <div className="p-4">
+        {view === 'grid' && <CMAGridView comparables={filteredComparables} />}
+        {view === 'map' && <CMAMapView comparables={filteredComparables} subject={subjectProperty} />}
+        {view === 'stats' && <CMAStatsView comparables={filteredComparables} subject={subjectProperty} />}
+        {view === 'list' && <CMAListView comparables={filteredComparables} />}
+      </div>
+    </div>
+  </div>
+);
+```
+
+---
+
+## Part 5: Grid View Component (Default View)
+
+```tsx
+// components/cma/CMAGridView.tsx
+
+import { Bed, Bath, Square } from 'lucide-react';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { formatCurrency } from '@/lib/utils';
+
+interface CMAGridViewProps {
+  comparables: any[];
+  onPropertyClick?: (property: any) => void;
+}
+
+export function CMAGridView({ comparables, onPropertyClick }: CMAGridViewProps) {
+  if (comparables.length === 0) {
+    return (
+      <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+        No properties match the current filter.
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {comparables.map((property) => (
+        <div 
+          key={property.id || property.listingId}
+          onClick={() => onPropertyClick?.(property)}
+          className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all cursor-pointer group"
+        >
+          {/* Property Image */}
+          <div className="relative aspect-[16/10] overflow-hidden">
+            <img 
+              src={property.photos?.[0] || '/placeholder-property.jpg'}
+              alt={property.unparsedAddress}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+            
+            {/* Status Badge */}
+            <div className="absolute top-3 left-3">
+              <StatusBadge status={property.standardStatus} />
+            </div>
+            
+            {/* Price Overlay */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+              <span className="text-white text-xl font-bold">
+                {formatCurrency(property.closePrice || property.listPrice)}
+              </span>
+            </div>
+          </div>
+          
+          {/* Property Details */}
+          <div className="p-4">
+            <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+              {property.unparsedAddress?.split(',')[0] || property.address}
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              {property.city}, {property.state} {property.postalCode}
+            </p>
+            
+            {/* Stats Row */}
+            <div className="flex items-center gap-4 mt-3 text-sm text-gray-600 dark:text-gray-400">
+              <span className="flex items-center gap-1.5">
+                <Bed className="w-4 h-4" />
+                {property.bedroomsTotal} bed
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Bath className="w-4 h-4" />
+                {property.bathroomsTotalInteger} bath
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Square className="w-4 h-4" />
+                {property.livingArea?.toLocaleString()} sqft
+              </span>
+            </div>
+            
+            {/* Footer Stats */}
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 text-sm">
+              <span className="text-gray-500 dark:text-gray-400">
+                ${Math.round((property.closePrice || property.listPrice) / (property.livingArea || 1))}/sqft
+              </span>
+              <span className="text-gray-500 dark:text-gray-400">
+                {property.daysOnMarket || 0} days on market
+              </span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+## Part 6: List View Component
+
+```tsx
+// components/cma/CMAListView.tsx
+
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { formatCurrency } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+
+interface CMAListViewProps {
+  comparables: any[];
+  onPropertyClick?: (property: any) => void;
+}
+
+export function CMAListView({ comparables, onPropertyClick }: CMAListViewProps) {
+  if (comparables.length === 0) {
+    return (
+      <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+        No properties match the current filter.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-gray-200 dark:border-gray-700">
+            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Address
+            </th>
+            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Status
+            </th>
+            <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Price
+            </th>
+            <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              $/SqFt
+            </th>
+            <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              DOM
+            </th>
+            <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Beds
+            </th>
+            <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Baths
+            </th>
+            <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              SqFt
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+          {comparables.map((property, idx) => (
+            <tr 
+              key={property.id || property.listingId}
+              onClick={() => onPropertyClick?.(property)}
+              className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
+            >
+              <td className="py-4 px-4">
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">
+                    {property.unparsedAddress?.split(',')[0] || property.address}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {property.city}, {property.state}
+                  </p>
+                </div>
+              </td>
+              <td className="py-4 px-4">
+                <StatusBadge status={property.standardStatus} size="sm" />
+              </td>
+              <td className="py-4 px-4 text-right">
+                <span className="font-semibold text-gray-900 dark:text-white">
+                  {formatCurrency(property.closePrice || property.listPrice)}
+                </span>
+              </td>
+              <td className="py-4 px-4 text-right text-gray-600 dark:text-gray-400">
+                ${Math.round((property.closePrice || property.listPrice) / (property.livingArea || 1))}
+              </td>
+              <td className="py-4 px-4 text-right text-gray-600 dark:text-gray-400">
+                {property.daysOnMarket || 0}
+              </td>
+              <td className="py-4 px-4 text-right text-gray-600 dark:text-gray-400">
+                {property.bedroomsTotal}
+              </td>
+              <td className="py-4 px-4 text-right text-gray-600 dark:text-gray-400">
+                {property.bathroomsTotalInteger}
+              </td>
+              <td className="py-4 px-4 text-right text-gray-600 dark:text-gray-400">
+                {property.livingArea?.toLocaleString()}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+```
+
+---
+
+## Part 7: Map View with Theme Sync
+
+```tsx
+// components/cma/CMAMapView.tsx
+
+import { useEffect, useRef, useMemo } from 'react';
+import Map, { Marker, NavigationControl } from 'react-map-gl';
+import { useTheme } from 'next-themes'; // or your theme hook
+import { Home } from 'lucide-react';
+import { getStatusConfig } from '@/lib/statusColors';
+import { formatCompactCurrency } from '@/lib/utils';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+interface CMAMapViewProps {
+  comparables: any[];
+  subject: any;
+}
+
+export function CMAMapView({ comparables, subject }: CMAMapViewProps) {
+  const { theme, systemTheme } = useTheme();
+  const currentTheme = theme === 'system' ? systemTheme : theme;
+  
+  // Map style based on theme
+  const mapStyle = useMemo(() => {
+    return currentTheme === 'dark' 
+      ? 'mapbox://styles/mapbox/dark-v11'
+      : 'mapbox://styles/mapbox/light-v11';
+  }, [currentTheme]);
+
+  // Calculate bounds to fit all markers
+  const bounds = useMemo(() => {
+    const allProperties = [subject, ...comparables].filter(p => p?.latitude && p?.longitude);
+    if (allProperties.length === 0) return null;
+    
+    const lngs = allProperties.map(p => p.longitude);
+    const lats = allProperties.map(p => p.latitude);
+    
+    return {
+      longitude: (Math.min(...lngs) + Math.max(...lngs)) / 2,
+      latitude: (Math.min(...lats) + Math.max(...lats)) / 2,
+      zoom: 11,
+    };
+  }, [subject, comparables]);
+
+  return (
+    <div className="h-[500px] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+      <Map
+        mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN}
+        initialViewState={bounds || {
+          longitude: -97.7431,
+          latitude: 30.2672,
+          zoom: 11
+        }}
+        style={{ width: '100%', height: '100%' }}
+        mapStyle={mapStyle}
+      >
+        <NavigationControl position="top-right" />
+        
+        {/* Subject Property Marker */}
+        {subject?.latitude && subject?.longitude && (
+          <Marker 
+            longitude={subject.longitude} 
+            latitude={subject.latitude}
+            anchor="center"
+          >
+            <div className="relative">
+              <div className="w-10 h-10 bg-primary rounded-full border-3 border-white shadow-lg flex items-center justify-center">
+                <Home className="w-5 h-5 text-white" />
+              </div>
+              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-primary" />
+            </div>
+          </Marker>
+        )}
+
+        {/* Comparable Property Markers */}
+        {comparables.map((property) => {
+          if (!property.latitude || !property.longitude) return null;
+          const config = getStatusConfig(property.standardStatus);
+          
+          return (
+            <Marker
+              key={property.id || property.listingId}
+              longitude={property.longitude}
+              latitude={property.latitude}
+              anchor="center"
+            >
+              <div 
+                className="px-2.5 py-1 rounded-full text-white text-xs font-semibold shadow-lg border-2 border-white cursor-pointer hover:scale-110 transition-transform"
+                style={{ backgroundColor: config.marker }}
+              >
+                {formatCompactCurrency(property.closePrice || property.listPrice)}
+              </div>
+            </Marker>
+          );
+        })}
+
+        {/* Legend */}
+        <div className="absolute bottom-4 left-4 bg-white dark:bg-gray-900 rounded-xl shadow-lg p-4 border border-gray-200 dark:border-gray-700">
+          <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-2">
+            Legend
+          </p>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                <Home className="w-3 h-3 text-white" />
+              </div>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Subject Property</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-green-500" />
+              <span className="text-sm text-gray-600 dark:text-gray-400">Active</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-gray-500" />
+              <span className="text-sm text-gray-600 dark:text-gray-400">Closed</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-amber-500" />
+              <span className="text-sm text-gray-600 dark:text-gray-400">Under Contract</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-yellow-500" />
+              <span className="text-sm text-gray-600 dark:text-gray-400">Pending</span>
+            </div>
+          </div>
+        </div>
+      </Map>
+    </div>
+  );
+}
+```
+
+---
+
+## Part 8: Utility Functions
+
+```tsx
+// lib/utils.ts - Add these helper functions
+
+export function formatCurrency(value: number | undefined | null): string {
+  if (value === undefined || value === null) return '—';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+export function formatCompactCurrency(value: number | undefined | null): string {
+  if (value === undefined || value === null) return '—';
+  if (value >= 1000000) {
+    return `$${(value / 1000000).toFixed(1)}M`;
+  }
+  if (value >= 1000) {
+    return `$${(value / 1000).toFixed(0)}K`;
+  }
+  return `$${value}`;
+}
+```
+
+---
+
+## Files to Create/Modify
+
+1. `lib/statusColors.ts` - Create new file
+2. `lib/utils.ts` - Add formatting functions
+3. `components/ui/StatusBadge.tsx` - Create new component
+4. `components/cma/CMAActionBar.tsx` - Create new component
+5. `components/cma/CMAGridView.tsx` - Create new component
+6. `components/cma/CMAListView.tsx` - Replace existing
+7. `components/cma/CMAMapView.tsx` - Replace existing with theme sync
+8. `components/cma/CMAStatsView.tsx` - Update styling to match
+9. Main CMA tab component - Update layout
+
+---
+
+## Acceptance Criteria
+
+- [ ] Action buttons grouped into dropdown menus (Share, Export, More)
+- [ ] Save button is primary, visible, disabled when no changes
+- [ ] Yellow banner only shows when hasUnsavedChanges is true
+- [ ] Cards match Dashboard style (white bg, subtle borders)
+- [ ] View toggle uses segment control style (no orange buttons)
+- [ ] Default view is Grid
+- [ ] Status filter pills match dashboard styling
+- [ ] Statistics row matches dashboard Market Analysis style
+- [ ] Grid view shows property cards with images
+- [ ] List view is clean table without orange dots
+- [ ] Map syncs light/dark style with app theme
+- [ ] Map legend visible and styled correctly
+- [ ] All status badges use consistent muted colors
+- [ ] Works correctly in both light and dark mode
+- [ ] No competing orange/red colors
