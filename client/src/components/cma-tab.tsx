@@ -409,24 +409,16 @@ export function CMATab({ transaction }: CMATabProps) {
               </p>
 
               {isClosedListing && hasCoordinates && (
-                <div className="w-full space-y-4">
-                  <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-left">
+                <div className="w-full max-w-lg space-y-4">
+                  <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
                     <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
-                      <p className="font-medium mb-1">Why is CMA not available?</p>
-                      <p className="text-blue-700 dark:text-blue-300">
-                        This property is marked as "<strong>{mlsStatus}</strong>" in the MLS. 
-                        The standard comparable search is not available for closed listings.
-                      </p>
-                      <p className="mt-2 text-blue-700 dark:text-blue-300">
-                        You can generate comparables using a <strong>coordinate-based search</strong> which 
-                        finds similar properties within a 5-mile radius of this location. Results may include 
-                        Active, Pending, and recently Closed properties with similar characteristics.
-                      </p>
+                    <AlertDescription className="text-sm text-blue-700 dark:text-blue-300">
+                      This property is "<strong>{mlsStatus}</strong>" in the MLS. 
+                      You can generate comparables from nearby properties instead.
                     </AlertDescription>
                   </Alert>
 
-                  <div className="flex items-center justify-center gap-2">
+                  <div className="flex flex-col items-center gap-2">
                     <Button
                       onClick={() => generateCmaMutation.mutate()}
                       disabled={generateCmaMutation.isPending}
@@ -446,23 +438,9 @@ export function CMATab({ transaction }: CMATabProps) {
                       )}
                     </Button>
                     
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-cma-fallback-info">
-                            <Info className="w-4 h-4 text-muted-foreground" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="max-w-xs">
-                          <p className="text-sm">
-                            This uses coordinate-based search to find comparable properties 
-                            within 5 miles of this listing. Results may include Active, 
-                            Pending, and recently Closed properties. Comparables are filtered 
-                            to match similar price range and bedroom count.
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Searches within 5 miles • Matches similar price & bedrooms
+                    </p>
                   </div>
                 </div>
               )}
