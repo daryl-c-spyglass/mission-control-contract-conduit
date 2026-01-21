@@ -1,0 +1,116 @@
+# CMA Diagnostic Part 2 - Check Specific Transaction
+
+## ⚠️ IMPORTANT: DO NOT MAKE ANY CHANGES - READ ONLY
+
+The "Refresh MLS Data" was clicked but CMA still shows "No CMA Available" for "612 Twelve Oaks LN" (MLS# ACT4728035).
+
+---
+
+## Please Check These Specific Things:
+
+### 1. Check if Transaction Has Coordinates
+
+Look at the transaction record for MLS# ACT4728035 and tell me:
+
+```
+- Does mlsData contain latitude? Value: ___
+- Does mlsData contain longitude? Value: ___
+- Are coordinates nested? (e.g., mlsData.map.latitude or mlsData.coordinates.lat)
+```
+
+Show me the relevant part of the mlsData that contains (or should contain) coordinates.
+
+### 2. Check What Repliers Actually Returns
+
+Can you make a test call to Repliers for this MLS number and show me:
+
+```
+- Does the response include a "comparables" array?
+- If yes, how many items?
+- If no, what fields ARE in the response?
+```
+
+Or check the server logs from the recent refresh - what did Repliers return?
+
+### 3. Check the fetchSimilarListings Function
+
+Show me the `fetchSimilarListings` function code:
+
+```
+- What parameters does it require?
+- What happens if coordinates are missing?
+- Does it have error handling that might silently fail?
+```
+
+### 4. Check Server Logs
+
+Look at recent server logs for any of these:
+- Errors related to ACT4728035
+- "fetchSimilarListings" calls
+- "No coordinates" or "missing lat/lng" messages
+- Any Repliers API errors
+
+### 5. Check the Property Status
+
+```
+- What is the current status of this property in MLS? (Active, Closed, etc.)
+- Does fetchSimilarListings filter by status?
+- Could "Closed" status affect comparables being returned?
+```
+
+### 6. Compare with Working Transaction
+
+Pick a transaction that DOES have CMA data (e.g., "13106 New Boston" or "154 Pettigrew") and show me:
+
+```
+- Does it have coordinates? lat: ___ lng: ___
+- What is its status?
+- How many comparables does it have?
+```
+
+This comparison will help identify the difference.
+
+---
+
+## Expected Output Format
+
+```
+## 1. Coordinates Check for ACT4728035
+- latitude: [value or "NOT FOUND"]
+- longitude: [value or "NOT FOUND"]
+- Location in mlsData: [path like mlsData.map.latitude]
+
+## 2. Repliers Response
+- Has comparables array: [YES/NO]
+- Comparables count: [number or N/A]
+- Error if any: [error message]
+
+## 3. fetchSimilarListings Logic
+[Code snippet showing coordinate requirements]
+
+## 4. Server Logs
+[Any relevant log entries]
+
+## 5. Property Status
+- Status: [Active/Closed/etc]
+- Status affects CMA: [YES/NO with explanation]
+
+## 6. Working Transaction Comparison
+- Transaction: [name]
+- Has coordinates: [YES/NO]
+- Status: [status]
+- CMA count: [number]
+```
+
+---
+
+## Do NOT:
+- ❌ Make any code changes
+- ❌ Create new files
+- ❌ Modify the database
+
+## DO:
+- ✅ Query/read existing data
+- ✅ Check server logs
+- ✅ Show code snippets
+- ✅ Compare working vs non-working transactions
