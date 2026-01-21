@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { Search, Filter, Building2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TransactionCard } from "@/components/transaction-card";
 import { TransactionDetails } from "@/components/transaction-details";
 import { CreateTransactionDialog } from "@/components/create-transaction-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Transaction, Coordinator, Activity } from "@shared/schema";
 
 interface DashboardProps {
@@ -24,6 +28,37 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen, trans
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [initialTab, setInitialTab] = useState<string>(urlTab || "overview");
+  
+  // Add MLS Number modal state
+  const [addMlsDialogOpen, setAddMlsDialogOpen] = useState(false);
+  const [addMlsTransactionId, setAddMlsTransactionId] = useState<string | null>(null);
+  const [mlsNumberInput, setMlsNumberInput] = useState("");
+  const { toast } = useToast();
+  
+  // Add MLS mutation
+  const addMlsMutation = useMutation({
+    mutationFn: async ({ transactionId, mlsNumber }: { transactionId: string; mlsNumber: string }) => {
+      const res = await apiRequest("PATCH", `/api/transactions/${transactionId}/add-mls`, { mlsNumber });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      toast({
+        title: "MLS Number Added",
+        description: "The listing has been converted to an active MLS listing and data synced.",
+      });
+      setAddMlsDialogOpen(false);
+      setMlsNumberInput("");
+      setAddMlsTransactionId(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add MLS number",
+        variant: "destructive",
+      });
+    },
+  });
   
   // Sync with URL-provided transaction ID and tab
   useEffect(() => {
@@ -166,6 +201,10 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen, trans
                 setInitialTab("docs");
                 setSelectedTransactionId(transaction.id);
               }}
+              onAddMLSClick={() => {
+                setAddMlsTransactionId(transaction.id);
+                setAddMlsDialogOpen(true);
+              }}
             />
           ))}
         </div>
@@ -192,6 +231,58 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen, trans
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
       />
+      
+      {/* Add MLS Number Dialog for off-market listings */}
+      <Dialog open={addMlsDialogOpen} onOpenChange={setAddMlsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add MLS Number</DialogTitle>
+            <DialogDescription>
+              Convert this off-market listing to an active MLS listing by adding the MLS number.
+              The system will automatically sync property data from the MLS.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="mlsNumber">MLS Number</Label>
+              <Input
+                id="mlsNumber"
+                placeholder="Enter MLS number (e.g., ACT-1234567)"
+                value={mlsNumberInput}
+                onChange={(e) => setMlsNumberInput(e.target.value)}
+                data-testid="input-add-mls-number"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAddMlsDialogOpen(false);
+                setMlsNumberInput("");
+                setAddMlsTransactionId(null);
+              }}
+              data-testid="button-cancel-add-mls"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (addMlsTransactionId && mlsNumberInput.trim()) {
+                  addMlsMutation.mutate({
+                    transactionId: addMlsTransactionId,
+                    mlsNumber: mlsNumberInput.trim(),
+                  });
+                }
+              }}
+              disabled={!mlsNumberInput.trim() || addMlsMutation.isPending}
+              data-testid="button-confirm-add-mls"
+            >
+              {addMlsMutation.isPending ? "Adding..." : "Add MLS Number"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -3,11 +3,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Loader2, ChevronDown, ChevronUp, User, Check, X, Bed, Bath, Square, DollarSign } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, User, Check, X, Bed, Bath, Square, DollarSign, Home, Ruler } from "lucide-react";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePropertySearch, type PropertySearchResult, type PlacePrediction } from "@/hooks/usePropertySearch";
 import { PropertyAutocomplete } from "@/components/ui/property-autocomplete";
 import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { PROPERTY_TYPES } from "@/lib/propertyTypes";
 import {
   Dialog,
   DialogContent,
@@ -45,9 +47,21 @@ import type { Coordinator } from "@shared/schema";
 
 const formSchema = z.object({
   transactionType: z.enum(["buy", "sell"]).default("buy"),
+  isCompanyLead: z.boolean().default(false),
   propertyAddress: z.string().min(5, "Please enter a valid property address"),
   mlsNumber: z.string().optional(),
+  isOffMarket: z.boolean().default(false),
   isUnderContract: z.boolean().default(true),
+  // Off Market property details
+  propertyDescription: z.string().optional(),
+  listPrice: z.string().optional(),
+  propertyType: z.string().optional(),
+  sqft: z.string().optional(),
+  lotSizeAcres: z.string().optional(),
+  bedrooms: z.string().optional(),
+  bathrooms: z.string().optional(),
+  halfBaths: z.string().optional(),
+  // Dates and other fields
   contractDate: z.string().optional(),
   closingDate: z.string().optional(),
   coordinatorIds: z.array(z.string()).default([]),
@@ -179,9 +193,19 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
     resolver: zodResolver(formSchema),
     defaultValues: {
       transactionType: "buy",
+      isCompanyLead: false,
       propertyAddress: "",
       mlsNumber: "",
+      isOffMarket: false,
       isUnderContract: true,
+      propertyDescription: "",
+      listPrice: "",
+      propertyType: "residential",
+      sqft: "",
+      lotSizeAcres: "",
+      bedrooms: "",
+      bathrooms: "",
+      halfBaths: "",
       contractDate: "",
       closingDate: "",
       coordinatorIds: [],
@@ -197,6 +221,19 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
       onBehalfOfName: "",
     },
   });
+  
+  // Watch isOffMarket to auto-uncheck isUnderContract and clear MLS number
+  const isOffMarket = form.watch("isOffMarket");
+  
+  useEffect(() => {
+    if (isOffMarket) {
+      form.setValue("isUnderContract", false);
+      form.setValue("mlsNumber", "");
+      setMlsInput("");
+      setSelectedProperty(null);
+      clearResults();
+    }
+  }, [isOffMarket, form, clearResults]);
 
   const pullFubMutation = useMutation({
     mutationFn: async (url: string) => {
@@ -296,6 +333,28 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
               )}
             />
 
+            {/* Is Company Lead Checkbox */}
+            <FormField
+              control={form.control}
+              name="isCompanyLead"
+              render={({ field }) => (
+                <FormItem className="flex items-center gap-2 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      data-testid="checkbox-is-company-lead"
+                    />
+                  </FormControl>
+                  <FormLabel className="text-sm font-normal cursor-pointer">
+                    Is Company Lead
+                  </FormLabel>
+                </FormItem>
+              )}
+            />
+
+            <div className="border-t my-2" />
+
             {/* Property Address with Google Places Autocomplete */}
             <FormField
               control={form.control}
@@ -386,7 +445,7 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
             />
 
             {/* Selected Property Confirmation Card */}
-            {selectedProperty && (
+            {selectedProperty && !isOffMarket && (
               <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
                 <div className="p-3 flex items-start gap-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/50 shrink-0">
@@ -443,6 +502,230 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                       )}
                     </div>
                   </div>
+                </div>
+              </Card>
+            )}
+
+            {/* Off Market Checkbox */}
+            <FormField
+              control={form.control}
+              name="isOffMarket"
+              render={({ field }) => (
+                <FormItem className="flex items-start gap-2 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      data-testid="checkbox-off-market"
+                    />
+                  </FormControl>
+                  <div className="space-y-1">
+                    <FormLabel className="text-sm font-normal cursor-pointer">
+                      Off Market
+                    </FormLabel>
+                    <FormDescription className="text-xs">
+                      Check if this property is not listed in MLS
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            {/* Off Market Property Details Section */}
+            {isOffMarket && (
+              <Card className="p-4 space-y-4 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800">
+                <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                  <Home className="w-4 h-4" />
+                  <span className="font-medium text-sm">Off Market Property Details</span>
+                </div>
+
+                {/* Listing Description */}
+                <FormField
+                  control={form.control}
+                  name="propertyDescription"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm">Listing Description</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder="Describe the property..."
+                          className="min-h-[80px] resize-none"
+                          data-testid="input-property-description"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Price and Property Type */}
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="listPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Listing Price</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              type="number"
+                              placeholder="450000"
+                              className="pl-9"
+                              data-testid="input-list-price"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="propertyType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Property Type</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-property-type">
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {PROPERTY_TYPES.map((type) => (
+                              <SelectItem key={type.value} value={type.value}>
+                                {type.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Sqft and Lot Size */}
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="sqft"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Square Feet</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Square className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              type="number"
+                              placeholder="2500"
+                              className="pl-9"
+                              data-testid="input-sqft"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="lotSizeAcres"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Lot Size (Acres)</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Ruler className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              type="number"
+                              step="0.01"
+                              placeholder="0.25"
+                              className="pl-9"
+                              data-testid="input-lot-size"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Bedrooms, Full Baths, Half Baths */}
+                <div className="grid grid-cols-3 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="bedrooms"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Bedrooms</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Bed className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              type="number"
+                              placeholder="4"
+                              className="pl-9"
+                              data-testid="input-bedrooms"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="bathrooms"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Full Baths</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Bath className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              type="number"
+                              placeholder="2"
+                              className="pl-9"
+                              data-testid="input-bathrooms"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="halfBaths"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Half Baths</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Bath className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              type="number"
+                              placeholder="1"
+                              className="pl-9"
+                              data-testid="input-half-baths"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
               </Card>
             )}
@@ -505,18 +788,22 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                 control={form.control}
                 name="isUnderContract"
                 render={({ field }) => (
-                  <FormItem className="flex items-center gap-3 space-y-0 rounded-md border p-3">
+                  <FormItem className={`flex items-center gap-3 space-y-0 rounded-md border p-3 ${isOffMarket ? 'opacity-50' : ''}`}>
                     <FormControl>
                       <Checkbox
                         checked={field.value}
                         onCheckedChange={field.onChange}
+                        disabled={isOffMarket}
                         data-testid="checkbox-under-contract"
                       />
                     </FormControl>
                     <div className="space-y-1">
-                      <FormLabel className="cursor-pointer">Under contract?</FormLabel>
+                      <FormLabel className={`cursor-pointer ${isOffMarket ? 'text-muted-foreground' : ''}`}>Under contract?</FormLabel>
                       <FormDescription className="text-xs">
-                        Uncheck if this is a new listing not yet under contract
+                        {isOffMarket 
+                          ? 'Auto-unchecked for off-market listings'
+                          : 'Uncheck if this is a new listing not yet under contract'
+                        }
                       </FormDescription>
                     </div>
                   </FormItem>

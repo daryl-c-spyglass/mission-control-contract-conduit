@@ -1,4 +1,4 @@
-import { Calendar, Hash, Mail, MessageSquare, Users, FileSpreadsheet, Image as ImageIcon, FileText } from "lucide-react";
+import { Calendar, Hash, Mail, MessageSquare, Users, FileSpreadsheet, Image as ImageIcon, FileText, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ interface TransactionCardProps {
   onMarketingClick?: () => void;
   onMLSClick?: () => void;
   onDocsClick?: () => void;
+  onAddMLSClick?: () => void;
 }
 
 function getDaysRemaining(closingDate: string | null): number | null {
@@ -32,10 +33,13 @@ function formatDate(dateString: string | null): string {
   });
 }
 
-export function TransactionCard({ transaction, coordinators, onClick, onMarketingClick, onMLSClick, onDocsClick }: TransactionCardProps) {
-  // Use MLS status as source of truth, fallback to transaction status
+export function TransactionCard({ transaction, coordinators, onClick, onMarketingClick, onMLSClick, onDocsClick, onAddMLSClick }: TransactionCardProps) {
+  // Determine if this is an off-market listing
+  const isOffMarket = transaction.isOffMarket && !transaction.mlsNumber;
+  
+  // Use MLS status as source of truth, fallback to transaction status, or off-market status
   const mlsData = transaction.mlsData as MLSData | null;
-  const displayStatus = mlsData?.status || transaction.status;
+  const displayStatus = isOffMarket ? 'off_market' : (mlsData?.status || transaction.status);
   const statusLabel = getStatusLabel(displayStatus);
   const daysRemaining = getDaysRemaining(transaction.closingDate);
   
@@ -54,14 +58,18 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
           <h3 className="font-medium text-lg leading-tight truncate" data-testid={`text-address-${transaction.id}`}>
             {transaction.propertyAddress}
           </h3>
-          {transaction.mlsNumber && (
+          {transaction.mlsNumber ? (
             <div className="flex items-center gap-1.5 mt-1 text-muted-foreground">
               <Hash className="h-3 w-3" />
               <span className="font-mono text-sm" data-testid={`text-mls-${transaction.id}`}>
                 {transaction.mlsNumber}
               </span>
             </div>
-          )}
+          ) : isOffMarket ? (
+            <span className="text-sm text-muted-foreground" data-testid={`text-off-market-${transaction.id}`}>
+              (Off Market)
+            </span>
+          ) : null}
         </div>
         <Badge className={getStatusBadgeStyle(displayStatus)} data-testid={`badge-status-${transaction.id}`}>
           {statusLabel}
@@ -121,7 +129,8 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
         )}
 
         <div className="flex items-center gap-2 pt-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
-          {onMLSClick && (
+          {/* Only show MLS Data button for listings with MLS data (not off-market) */}
+          {onMLSClick && !isOffMarket && (
             <Button
               size="sm"
               variant="outline"
@@ -181,6 +190,23 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
             </Button>
           )}
         </div>
+        
+        {/* Add MLS Number button for off-market listings */}
+        {isOffMarket && onAddMLSClick && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="gap-1.5 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/30 mt-2"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddMLSClick();
+            }}
+            data-testid={`button-add-mls-${transaction.id}`}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add MLS Number
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

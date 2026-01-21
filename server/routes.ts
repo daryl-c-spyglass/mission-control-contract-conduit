@@ -107,13 +107,57 @@ export async function registerRoutes(
 
   app.post("/api/transactions", isAuthenticated, async (req: any, res) => {
     try {
-      const { createSlackChannel: shouldCreateSlack, createGmailFilter, fetchMlsData, onBehalfOfEmail, onBehalfOfSlackId, onBehalfOfName, isUnderContract, ...transactionData } = req.body;
+      const { 
+        createSlackChannel: shouldCreateSlack, 
+        createGmailFilter, 
+        fetchMlsData, 
+        onBehalfOfEmail, 
+        onBehalfOfSlackId, 
+        onBehalfOfName, 
+        isUnderContract,
+        isOffMarket,
+        isCompanyLead,
+        // Off-market property details
+        propertyDescription,
+        listPrice,
+        propertyType,
+        sqft,
+        lotSizeAcres,
+        bedrooms,
+        bathrooms,
+        halfBaths,
+        ...transactionData 
+      } = req.body;
       
-      // Set the status based on whether property is under contract
-      if (isUnderContract === false) {
-        transactionData.status = "active";
+      // Handle off-market transactions
+      if (isOffMarket) {
+        transactionData.isOffMarket = true;
+        transactionData.offMarketListingDate = new Date();
+        transactionData.propertyDescription = propertyDescription || null;
+        transactionData.listPrice = listPrice ? parseInt(listPrice) : null;
+        transactionData.propertyType = propertyType || null;
+        transactionData.sqft = sqft ? parseInt(sqft) : null;
+        transactionData.lotSizeAcres = lotSizeAcres || null;
+        transactionData.bedrooms = bedrooms ? parseInt(bedrooms) : null;
+        transactionData.bathrooms = bathrooms ? parseInt(bathrooms) : null;
+        transactionData.halfBaths = halfBaths ? parseInt(halfBaths) : null;
+        transactionData.status = "active"; // Off-market listings are active, not in contract
+        // Clear MLS number for off-market listings
+        transactionData.mlsNumber = null;
       } else {
-        transactionData.status = "in_contract";
+        transactionData.isOffMarket = false;
+      }
+      
+      // Set company lead flag
+      transactionData.isCompanyLead = isCompanyLead === true || isCompanyLead === 'true';
+      
+      // Set the status based on whether property is under contract (for non-off-market)
+      if (!isOffMarket) {
+        if (isUnderContract === false) {
+          transactionData.status = "active";
+        } else {
+          transactionData.status = "in_contract";
+        }
       }
       
       // Get the current user's ID
@@ -513,6 +557,71 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete transaction" });
+    }
+  });
+
+  // Add MLS number to off-market listing (convert to active listing)
+  app.patch("/api/transactions/:id/add-mls", isAuthenticated, async (req, res) => {
+    try {
+      const { mlsNumber } = req.body;
+      
+      if (!mlsNumber) {
+        return res.status(400).json({ message: "MLS number is required" });
+      }
+      
+      const transaction = await storage.getTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      // Normalize MLS number with ACT prefix
+      let normalizedMLS = mlsNumber.trim().toUpperCase();
+      if (!normalizedMLS.startsWith('ACT')) {
+        normalizedMLS = `ACT${normalizedMLS}`;
+      }
+      
+      // Update transaction to no longer be off-market and add MLS number
+      const updated = await storage.updateTransaction(req.params.id, {
+        mlsNumber: normalizedMLS,
+        isOffMarket: false,
+      });
+      
+      // Try to sync MLS data
+      try {
+        const mlsResult = await fetchMLSListing(normalizedMLS);
+        if (mlsResult && mlsResult.mlsData) {
+          const mlsData = mlsResult.mlsData;
+          await storage.updateTransaction(req.params.id, {
+            mlsData,
+            mlsLastSyncedAt: new Date(),
+            listPrice: mlsData.listPrice || undefined,
+            bedrooms: mlsData.bedrooms || undefined,
+            bathrooms: mlsData.bathrooms || undefined,
+            sqft: mlsData.sqft || undefined,
+            yearBuilt: mlsData.yearBuilt || undefined,
+            propertyType: mlsData.propertyType || undefined,
+            propertyImages: mlsData.photos || undefined,
+          });
+          
+          // Log activity
+          await storage.createActivity({
+            transactionId: req.params.id,
+            type: 'mls_added',
+            category: 'mls',
+            description: `MLS listing ${normalizedMLS} added. Property converted from off-market to active listing.`,
+          });
+        }
+      } catch (mlsError) {
+        console.error('Failed to sync MLS data after adding MLS number:', mlsError);
+        // Still return success since the MLS number was added
+      }
+      
+      // Get the updated transaction
+      const finalTransaction = await storage.getTransaction(req.params.id);
+      res.json(finalTransaction);
+    } catch (error) {
+      console.error('Error adding MLS number to transaction:', error);
+      res.status(500).json({ message: "Failed to add MLS number" });
     }
   });
 

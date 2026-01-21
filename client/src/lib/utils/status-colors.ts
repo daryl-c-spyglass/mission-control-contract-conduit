@@ -9,6 +9,16 @@ export interface StatusConfig {
 export const getStatusConfig = (status: string): StatusConfig => {
   const normalized = status?.toLowerCase().replace(/\s+/g, '') || '';
   
+  // Check off market first
+  if (normalized.includes('offmarket') || normalized === 'off_market') {
+    return {
+      label: 'Off Market',
+      badge: 'bg-purple-500 text-white',
+      dot: 'bg-purple-500',
+      marker: '#a855f7',
+    };
+  }
+  
   // Check compound statuses first
   if (normalized.includes('under') || normalized.includes('contract') || normalized.includes('incontract')) {
     return {
@@ -95,6 +105,11 @@ export const getStatusConfig = (status: string): StatusConfig => {
 export const getStatusBadgeStyle = (status: string): string => {
   const statusLower = status.toLowerCase();
   
+  // Check off market first
+  if (statusLower.includes('off market') || statusLower.includes('off_market') || statusLower === 'offmarket') {
+    return 'bg-purple-500 text-white';
+  }
+  
   // IMPORTANT: Check compound/contract statuses BEFORE simple "active"
   // "Active Under Contract" should get orange contract color, not green active color
   if (statusLower.includes('contract')) {
@@ -129,6 +144,11 @@ export const getStatusBadgeStyle = (status: string): string => {
 export const getStatusColor = (status: string): string => {
   const statusLower = status.toLowerCase();
   
+  // Check off market first
+  if (statusLower.includes('off market') || statusLower.includes('off_market') || statusLower === 'offmarket') {
+    return '#a855f7'; // Purple
+  }
+  
   // IMPORTANT: Check compound/contract statuses BEFORE simple "active"
   // "Active Under Contract" should get orange contract color, not green active color
   if (statusLower.includes('contract')) return 'hsl(var(--chart-2))';
@@ -158,6 +178,11 @@ export const getStatusLabel = (status: string): string => {
   }
   
   const statusLower = status.toLowerCase();
+  
+  // Check off market first
+  if (statusLower.includes('off market') || statusLower === 'off_market' || statusLower === 'offmarket') {
+    return 'Off Market';
+  }
   
   // Only normalize internal status codes (snake_case or lowercase)
   if (statusLower === 'in_contract' || statusLower === 'in contract') return 'In Contract';
