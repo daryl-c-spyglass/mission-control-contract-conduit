@@ -9,7 +9,7 @@ import { usePropertySearch, type PropertySearchResult, type PlacePrediction } fr
 import { PropertyAutocomplete } from "@/components/ui/property-autocomplete";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { PROPERTY_TYPES } from "@/lib/propertyTypes";
+import { PROPERTY_TYPES, PROPERTY_TYPE_CATEGORIES, getPropertyTypesByCategory } from "@/lib/propertyTypes";
 import {
   Dialog,
   DialogContent,
@@ -37,7 +37,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -200,7 +202,7 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
       isUnderContract: true,
       propertyDescription: "",
       listPrice: "",
-      propertyType: "residential",
+      propertyType: "Residential",
       sqft: "",
       lotSizeAcres: "",
       bedrooms: "",
@@ -596,10 +598,15 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {PROPERTY_TYPES.map((type) => (
-                              <SelectItem key={type.value} value={type.value}>
-                                {type.label}
-                              </SelectItem>
+                            {PROPERTY_TYPE_CATEGORIES.map((category) => (
+                              <SelectGroup key={category}>
+                                <SelectLabel className="text-xs text-muted-foreground font-medium">{category}</SelectLabel>
+                                {getPropertyTypesByCategory(category).map((type) => (
+                                  <SelectItem key={type.value} value={type.value}>
+                                    {type.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
                             ))}
                           </SelectContent>
                         </Select>

@@ -1,0 +1,406 @@
+# Property Type Dropdown - RESO Standards Update
+
+## Issue
+
+The Property Type dropdown in Off Market Property Details needs to align with RESO (Real Estate Standards Organization) Data Dictionary standards.
+
+**Reference:** https://www.reso.org/data-dictionary/
+
+---
+
+## Current Property Types (in app)
+
+```
+✓ Residential
+✓ Residential Income
+✓ Residential Investment
+✓ Residential Lease
+✓ Commercial Sale
+✓ Farm and Ranch
+✓ Land/Lot
+```
+
+---
+
+## RESO Data Dictionary - PropertyType Field
+
+Per RESO Data Dictionary v2.0, the standard `PropertyType` enumeration values are:
+
+| RESO Value | Description |
+|------------|-------------|
+| `Business Opportunity` | A business for sale (not the real estate) |
+| `Commercial Lease` | Commercial property for lease |
+| `Commercial Sale` | Commercial property for sale |
+| `Farm` | Farm/agricultural property |
+| `Land` | Vacant land |
+| `Manufactured In Park` | Manufactured home in a park |
+| `Residential` | Single family residential |
+| `Residential Income` | Multi-family/income property |
+| `Residential Lease` | Residential rental |
+
+---
+
+## Meeting Decision (from transcript)
+
+From the Jan 21, 2026 meeting with Ryan, Daryl, and Caleb:
+
+> "we want to use research standards [RESO]... residential, residential investment, residential income, residential lease, commercial sale... we don't need the commercial lease. We don't do that... farm and ranch... land lot"
+
+**Explicitly excluded:** Commercial Lease (they don't do commercial leasing)
+
+---
+
+## Updated Property Types (RESO-Aligned)
+
+Based on RESO standards + meeting decisions:
+
+```typescript
+// File: client/src/lib/propertyTypes.ts
+
+export const PROPERTY_TYPES = [
+  // Residential Types
+  { value: 'Residential', label: 'Residential' },
+  { value: 'Residential Income', label: 'Residential Income' },
+  { value: 'Residential Lease', label: 'Residential Lease' },
+  
+  // Commercial Types
+  { value: 'Commercial Sale', label: 'Commercial Sale' },
+  { value: 'Business Opportunity', label: 'Business Opportunity' },
+  
+  // Land & Farm Types
+  { value: 'Farm', label: 'Farm and Ranch' },  // RESO uses "Farm", display as "Farm and Ranch"
+  { value: 'Land', label: 'Land' },
+  
+  // Manufactured Housing
+  { value: 'Manufactured In Park', label: 'Manufactured Home' },
+] as const;
+
+export type PropertyType = typeof PROPERTY_TYPES[number]['value'];
+
+// RESO-compliant mapping for API/export
+export const RESO_PROPERTY_TYPE_MAP: Record<string, string> = {
+  'Residential': 'Residential',
+  'Residential Income': 'Residential Income',
+  'Residential Lease': 'Residential Lease',
+  'Commercial Sale': 'Commercial Sale',
+  'Business Opportunity': 'Business Opportunity',
+  'Farm': 'Farm',
+  'Land': 'Land',
+  'Manufactured In Park': 'Manufactured In Park',
+};
+```
+
+---
+
+## Changes from Current
+
+| Current | Updated | Notes |
+|---------|---------|-------|
+| Residential | Residential | ✓ Same |
+| Residential Income | Residential Income | ✓ Same |
+| **Residential Investment** | **REMOVED** | Not a RESO standard - use "Residential Income" instead |
+| Residential Lease | Residential Lease | ✓ Same |
+| Commercial Sale | Commercial Sale | ✓ Same |
+| Farm and Ranch | Farm (display: "Farm and Ranch") | RESO value is "Farm" |
+| Land/Lot | Land | RESO value is "Land" |
+| — | **Business Opportunity** | **ADDED** - RESO standard |
+| — | **Manufactured In Park** | **ADDED** - RESO standard |
+
+---
+
+## Implementation
+
+### Update the Property Types Constant
+
+**File: `client/src/lib/propertyTypes.ts`**
+
+```typescript
+/**
+ * Property Types - RESO Data Dictionary v2.0 Compliant
+ * Reference: https://www.reso.org/data-dictionary/
+ * 
+ * Note: "value" is the RESO-standard value for data exchange
+ *       "label" is the user-friendly display text
+ */
+export const PROPERTY_TYPES = [
+  // ============ RESIDENTIAL ============
+  { 
+    value: 'Residential', 
+    label: 'Residential',
+    description: 'Single family residential property'
+  },
+  { 
+    value: 'Residential Income', 
+    label: 'Residential Income',
+    description: 'Multi-family or income-producing residential property'
+  },
+  { 
+    value: 'Residential Lease', 
+    label: 'Residential Lease',
+    description: 'Residential property for rent/lease'
+  },
+  
+  // ============ COMMERCIAL ============
+  { 
+    value: 'Commercial Sale', 
+    label: 'Commercial Sale',
+    description: 'Commercial property for sale'
+  },
+  { 
+    value: 'Business Opportunity', 
+    label: 'Business Opportunity',
+    description: 'Business for sale (not the real estate)'
+  },
+  
+  // ============ LAND & FARM ============
+  { 
+    value: 'Farm', 
+    label: 'Farm and Ranch',
+    description: 'Farm, ranch, or agricultural property'
+  },
+  { 
+    value: 'Land', 
+    label: 'Land',
+    description: 'Vacant land or lot'
+  },
+  
+  // ============ MANUFACTURED ============
+  { 
+    value: 'Manufactured In Park', 
+    label: 'Manufactured Home',
+    description: 'Manufactured or mobile home in a park'
+  },
+] as const;
+
+export type PropertyType = typeof PROPERTY_TYPES[number]['value'];
+
+/**
+ * Get display label for a RESO property type value
+ */
+export function getPropertyTypeLabel(value: string): string {
+  const type = PROPERTY_TYPES.find(t => t.value === value);
+  return type?.label || value;
+}
+
+/**
+ * Get description for a property type (for tooltips)
+ */
+export function getPropertyTypeDescription(value: string): string {
+  const type = PROPERTY_TYPES.find(t => t.value === value);
+  return type?.description || '';
+}
+```
+
+---
+
+### Update the Select Component
+
+**File: Update the Off Market form select**
+
+```tsx
+import { PROPERTY_TYPES, getPropertyTypeDescription } from '@/lib/propertyTypes';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Info } from 'lucide-react';
+
+// In the form:
+<div className="space-y-2">
+  <div className="flex items-center gap-1">
+    <Label className="text-sm">Property Type</Label>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>RESO Data Dictionary standard property types</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  </div>
+  
+  <Select value={propertyType} onValueChange={setPropertyType}>
+    <SelectTrigger>
+      <SelectValue placeholder="Select property type" />
+    </SelectTrigger>
+    <SelectContent>
+      {/* Residential Group */}
+      <SelectGroup>
+        <SelectLabel className="text-xs text-muted-foreground">Residential</SelectLabel>
+        {PROPERTY_TYPES.filter(t => t.value.startsWith('Residential')).map(type => (
+          <SelectItem key={type.value} value={type.value}>
+            <div className="flex items-center justify-between w-full">
+              <span>{type.label}</span>
+            </div>
+          </SelectItem>
+        ))}
+      </SelectGroup>
+      
+      {/* Commercial Group */}
+      <SelectGroup>
+        <SelectLabel className="text-xs text-muted-foreground">Commercial</SelectLabel>
+        {PROPERTY_TYPES.filter(t => 
+          t.value === 'Commercial Sale' || t.value === 'Business Opportunity'
+        ).map(type => (
+          <SelectItem key={type.value} value={type.value}>
+            {type.label}
+          </SelectItem>
+        ))}
+      </SelectGroup>
+      
+      {/* Land & Farm Group */}
+      <SelectGroup>
+        <SelectLabel className="text-xs text-muted-foreground">Land & Farm</SelectLabel>
+        {PROPERTY_TYPES.filter(t => 
+          t.value === 'Farm' || t.value === 'Land'
+        ).map(type => (
+          <SelectItem key={type.value} value={type.value}>
+            {type.label}
+          </SelectItem>
+        ))}
+      </SelectGroup>
+      
+      {/* Other */}
+      <SelectGroup>
+        <SelectLabel className="text-xs text-muted-foreground">Other</SelectLabel>
+        {PROPERTY_TYPES.filter(t => 
+          t.value === 'Manufactured In Park'
+        ).map(type => (
+          <SelectItem key={type.value} value={type.value}>
+            {type.label}
+          </SelectItem>
+        ))}
+      </SelectGroup>
+    </SelectContent>
+  </Select>
+</div>
+```
+
+---
+
+## Visual Preview
+
+```
+┌─────────────────────────────────────┐
+│ Property Type                    ▾  │
+├─────────────────────────────────────┤
+│ ── Residential ──────────────────── │
+│   ✓ Residential                     │
+│     Residential Income              │
+│     Residential Lease               │
+│ ── Commercial ───────────────────── │
+│     Commercial Sale                 │
+│     Business Opportunity            │
+│ ── Land & Farm ──────────────────── │
+│     Farm and Ranch                  │
+│     Land                            │
+│ ── Other ────────────────────────── │
+│     Manufactured Home               │
+└─────────────────────────────────────┘
+```
+
+---
+
+## Database Migration (if needed)
+
+If you have existing records with old property type values:
+
+```typescript
+// Migration script to update old values to RESO standard
+
+const VALUE_MIGRATIONS: Record<string, string> = {
+  'Residential Investment': 'Residential Income', // Merge into Residential Income
+  'residential': 'Residential',
+  'residential_income': 'Residential Income',
+  'residential_investment': 'Residential Income',
+  'residential_lease': 'Residential Lease',
+  'commercial_sale': 'Commercial Sale',
+  'farm_and_ranch': 'Farm',
+  'land_lot': 'Land',
+  'Land/Lot': 'Land',
+  'Farm and Ranch': 'Farm',
+};
+
+// Run migration
+async function migratePropertyTypes() {
+  for (const [oldValue, newValue] of Object.entries(VALUE_MIGRATIONS)) {
+    await db.update(transactions)
+      .set({ propertyType: newValue })
+      .where(eq(transactions.propertyType, oldValue));
+    
+    console.log(`Migrated "${oldValue}" → "${newValue}"`);
+  }
+}
+```
+
+---
+
+## Summary
+
+### Final RESO-Compliant Property Types:
+
+| RESO Value | Display Label | Category |
+|------------|---------------|----------|
+| `Residential` | Residential | Residential |
+| `Residential Income` | Residential Income | Residential |
+| `Residential Lease` | Residential Lease | Residential |
+| `Commercial Sale` | Commercial Sale | Commercial |
+| `Business Opportunity` | Business Opportunity | Commercial |
+| `Farm` | Farm and Ranch | Land & Farm |
+| `Land` | Land | Land & Farm |
+| `Manufactured In Park` | Manufactured Home | Other |
+
+### Removed (Not RESO Standard):
+- ~~Residential Investment~~ → Use "Residential Income" instead
+
+### Added (RESO Standard):
+- Business Opportunity
+- Manufactured In Park (Manufactured Home)
+
+---
+
+## Also Fix: Remove Double Scrollbar
+
+Looking at your screenshot, there appear to be 2 scrollbars on the right side of the modal. This is likely caused by:
+
+1. Both the `DialogContent` and an inner container having `overflow-y: auto`
+2. Or the modal height exceeding the viewport
+
+**Fix:**
+
+```tsx
+// In DialogContent, ensure only one scroll container
+<DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-hidden">
+  <DialogHeader>
+    {/* Header content */}
+  </DialogHeader>
+  
+  {/* Single scrollable form container */}
+  <form 
+    onSubmit={handleSubmit} 
+    className="space-y-5 mt-4 overflow-y-auto max-h-[calc(85vh-120px)] pr-2"
+  >
+    {/* Form fields */}
+  </form>
+</DialogContent>
+```
+
+Or use ScrollArea component from shadcn/ui:
+
+```tsx
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+<DialogContent className="sm:max-w-[550px] max-h-[85vh]">
+  <DialogHeader>...</DialogHeader>
+  
+  <ScrollArea className="max-h-[calc(85vh-100px)]">
+    <form onSubmit={handleSubmit} className="space-y-5 pr-4">
+      {/* Form fields */}
+    </form>
+  </ScrollArea>
+</DialogContent>
+```
