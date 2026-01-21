@@ -227,26 +227,38 @@ export const contractDocuments = pgTable("contract_documents", {
 });
 
 // Notification settings per user/transaction
+// ALL DEFAULTS ARE FALSE - Users must opt-in to notifications
 export const notificationSettings = pgTable("notification_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   transactionId: varchar("transaction_id"), // null = global settings for user
   
   // Toggle each notification type
-  documentUploads: boolean("document_uploads").default(true),
-  closingReminders: boolean("closing_reminders").default(true),
-  marketingAssets: boolean("marketing_assets").default(true),
+  documentUploads: boolean("document_uploads").default(false),
+  closingReminders: boolean("closing_reminders").default(false), // Parent toggle for reminder schedule
+  marketingAssets: boolean("marketing_assets").default(false),
   
-  // Reminder intervals (which ones to receive)
-  reminder30Days: boolean("reminder_30_days").default(true),
-  reminder14Days: boolean("reminder_14_days").default(true),
-  reminder7Days: boolean("reminder_7_days").default(true),
-  reminder3Days: boolean("reminder_3_days").default(true),
-  reminder1Day: boolean("reminder_1_day").default(true),
-  reminderDayOf: boolean("reminder_day_of").default(true),
+  // Reminder intervals - Limited to: 14 days, 7 days, 3 days, day of
+  // Only active when closingReminders (parent toggle) is true
+  reminder30Days: boolean("reminder_30_days").default(false), // Legacy - kept for compatibility
+  reminder14Days: boolean("reminder_14_days").default(false),
+  reminder7Days: boolean("reminder_7_days").default(false),
+  reminder3Days: boolean("reminder_3_days").default(false),
+  reminder1Day: boolean("reminder_1_day").default(false), // Legacy - kept for compatibility
+  reminderDayOf: boolean("reminder_day_of").default(false),
   
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Sent notifications - Prevents duplicate notifications (deduplication)
+export const sentNotifications = pgTable("sent_notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  transactionId: varchar("transaction_id").notNull(),
+  notificationType: varchar("notification_type", { length: 50 }).notNull(), // closing_14_days, closing_7_days, etc.
+  channelId: varchar("channel_id", { length: 100 }).notNull(),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+  messageTs: varchar("message_ts", { length: 50 }), // Slack message timestamp for reference
 });
 
 // Agent profiles for CMA reports and marketing
@@ -321,6 +333,11 @@ export const insertNotificationSettingsSchema = createInsertSchema(notificationS
   updatedAt: true,
 });
 
+export const insertSentNotificationSchema = createInsertSchema(sentNotifications).omit({
+  id: true,
+  sentAt: true,
+});
+
 export const insertAgentProfileSchema = createInsertSchema(agentProfiles).omit({
   id: true,
   createdAt: true,
@@ -371,6 +388,9 @@ export type InsertCmaReportTemplate = z.infer<typeof insertCmaReportTemplateSche
 
 export type NotificationSetting = typeof notificationSettings.$inferSelect;
 export type InsertNotificationSetting = z.infer<typeof insertNotificationSettingsSchema>;
+
+export type SentNotification = typeof sentNotifications.$inferSelect;
+export type InsertSentNotification = z.infer<typeof insertSentNotificationSchema>;
 
 export type AgentProfile = typeof agentProfiles.$inferSelect;
 export type InsertAgentProfile = z.infer<typeof insertAgentProfileSchema>;

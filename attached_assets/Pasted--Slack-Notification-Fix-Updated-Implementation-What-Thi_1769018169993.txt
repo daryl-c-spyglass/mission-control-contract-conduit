@@ -1,0 +1,983 @@
+# Slack Notification Fix - Updated Implementation
+
+## What This Does:
+1. ✅ **Closing Date Reminders = Parent Toggle** - When OFF, all reminder schedule options are disabled
+2. ✅ **Limited Reminder Options** - Only 14 days, 7 days, 3 days, and Day of closing
+3. ✅ **All defaults are OFF** - Users must opt-in
+4. ✅ **Deduplication** - Prevents notification flooding
+5. ✅ **Once per day cron** - Runs at 9 AM CT
+
+---
+
+## Step 1: Add/Update Notification Tables in Schema
+
+**File: `shared/schema.ts`**
+
+Find your existing tables and ADD this at the end (before any `export type` statements):
+
+```typescript
+// ========================================
+// NOTIFICATION SETTINGS (User Preferences)
+// ========================================
+export const notificationSettings = pgTable("notification_settings", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull().unique(),
+  
+  // Notification Types (main toggles)
+  documentUploads: boolean("document_uploads").default(false).notNull(),
+  closingDateReminders: boolean("closing_date_reminders").default(false).notNull(), // Parent toggle
+  marketingAssets: boolean("marketing_assets").default(false).notNull(),
+  
+  // Reminder Schedule (only active when closingDateReminders = true)
+  // Limited to: 14 days, 7 days, 3 days, day of
+  reminder14Days: boolean("reminder_14_days").default(false).notNull(),
+  reminder7Days: boolean("reminder_7_days").default(false).notNull(),
+  reminder3Days: boolean("reminder_3_days").default(false).notNull(),
+  reminderDayOf: boolean("reminder_day_of").default(false).notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ========================================
+// SENT NOTIFICATIONS (Prevents Duplicates)
+// ========================================
+export const sentNotifications = pgTable("sent_notifications", {
+  id: serial("id").primaryKey(),
+  transactionId: integer("transaction_id").references(() => transactions.id).notNull(),
+  notificationType: varchar("notification_type", { length: 50 }).notNull(),
+  channelId: varchar("channel_id", { length: 100 }).notNull(),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+  messageTs: varchar("message_ts", { length: 50 }),
+});
+```
+
+**After saving, run in Shell:**
+```bash
+npm run db:push
+```
+
+---
+
+## Step 2: Create Notification Service
+
+**File: `server/services/slackNotificationService.ts`**
+
+Create this NEW file in `server/services/` folder:
+
+```typescript
+import { db } from "@db";
+import { sentNotifications, transactions, notificationSettings } from "@db/schema";
+import { eq, and, gte, lte, isNotNull } from "drizzle-orm";
+import { WebClient } from "@slack/web-api";
+
+// Initialize Slack client
+const slack = process.env.SLACK_BOT_TOKEN 
+  ? new WebClient(process.env.SLACK_BOT_TOKEN)
+  : null;
+
+// ========================================
+// HELPER FUNCTIONS
+// ========================================
+
+function getStartOfDay(date: Date): Date {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+function getEndOfDay(date: Date): Date {
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
+function formatDate(date: Date | string): string {
+  return new Date(date).toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+}
+
+// ========================================
+// NOTIFICATION SETTINGS TYPES
+// ========================================
+
+export interface NotificationPreferences {
+  // Main toggles
+  documentUploads: boolean;
+  closingDateReminders: boolean; // Parent toggle for reminder schedule
+  marketingAssets: boolean;
+  
+  // Reminder schedule (only active if closingDateReminders = true)
+  reminder14Days: boolean;
+  reminder7Days: boolean;
+  reminder3Days: boolean;
+  reminderDayOf: boolean;
+}
+
+// Default all OFF
+const DEFAULT_PREFERENCES: NotificationPreferences = {
+  documentUploads: false,
+  closingDateReminders: false,
+  marketingAssets: false,
+  reminder14Days: false,
+  reminder7Days: false,
+  reminder3Days: false,
+  reminderDayOf: false,
+};
+
+// ========================================
+// NOTIFICATION SETTINGS FUNCTIONS
+// ========================================
+
+/**
+ * Get user's notification preferences
+ * ALL DEFAULTS ARE OFF - Users must opt-in
+ */
+export async function getUserNotificationSettings(userId: number): Promise<NotificationPreferences> {
+  if (!userId) {
+    return DEFAULT_PREFERENCES;
+  }
+
+  const settings = await db
+    .select()
+    .from(notificationSettings)
+    .where(eq(notificationSettings.userId, userId))
+    .limit(1);
+
+  if (settings.length === 0) {
+    return DEFAULT_PREFERENCES;
+  }
+
+  const s = settings[0];
+  return {
+    documentUploads: s.documentUploads ?? false,
+    closingDateReminders: s.closingDateReminders ?? false,
+    marketingAssets: s.marketingAssets ?? false,
+    reminder14Days: s.reminder14Days ?? false,
+    reminder7Days: s.reminder7Days ?? false,
+    reminder3Days: s.reminder3Days ?? false,
+    reminderDayOf: s.reminderDayOf ?? false,
+  };
+}
+
+/**
+ * Update user's notification preferences
+ * When closingDateReminders is turned OFF, all reminder schedule options are also turned OFF
+ */
+export async function updateUserNotificationSettings(
+  userId: number, 
+  prefs: Partial<NotificationPreferences>
+): Promise<NotificationPreferences> {
+  // If closing date reminders is being turned OFF, turn off all reminder schedule options
+  let updatedPrefs = { ...prefs };
+  if (prefs.closingDateReminders === false) {
+    updatedPrefs = {
+      ...updatedPrefs,
+      reminder14Days: false,
+      reminder7Days: false,
+      reminder3Days: false,
+      reminderDayOf: false,
+    };
+  }
+
+  const existing = await db
+    .select()
+    .from(notificationSettings)
+    .where(eq(notificationSettings.userId, userId))
+    .limit(1);
+
+  if (existing.length === 0) {
+    // Create new record with defaults + updates
+    await db.insert(notificationSettings).values({
+      userId,
+      documentUploads: updatedPrefs.documentUploads ?? false,
+      closingDateReminders: updatedPrefs.closingDateReminders ?? false,
+      marketingAssets: updatedPrefs.marketingAssets ?? false,
+      reminder14Days: updatedPrefs.reminder14Days ?? false,
+      reminder7Days: updatedPrefs.reminder7Days ?? false,
+      reminder3Days: updatedPrefs.reminder3Days ?? false,
+      reminderDayOf: updatedPrefs.reminderDayOf ?? false,
+      updatedAt: new Date(),
+    });
+  } else {
+    // Update existing
+    await db
+      .update(notificationSettings)
+      .set({
+        ...updatedPrefs,
+        updatedAt: new Date(),
+      })
+      .where(eq(notificationSettings.userId, userId));
+  }
+
+  // Return the updated settings
+  return getUserNotificationSettings(userId);
+}
+
+// ========================================
+// DEDUPLICATION FUNCTIONS
+// ========================================
+
+/**
+ * Check if notification was already sent today
+ */
+async function wasNotificationSentToday(
+  transactionId: number,
+  notificationType: string,
+  channelId: string
+): Promise<boolean> {
+  const today = new Date();
+  const startOfDay = getStartOfDay(today);
+  const endOfDay = getEndOfDay(today);
+
+  const existing = await db
+    .select()
+    .from(sentNotifications)
+    .where(
+      and(
+        eq(sentNotifications.transactionId, transactionId),
+        eq(sentNotifications.notificationType, notificationType),
+        eq(sentNotifications.channelId, channelId),
+        gte(sentNotifications.sentAt, startOfDay),
+        lte(sentNotifications.sentAt, endOfDay)
+      )
+    )
+    .limit(1);
+
+  return existing.length > 0;
+}
+
+/**
+ * Record that notification was sent
+ */
+async function recordNotificationSent(
+  transactionId: number,
+  notificationType: string,
+  channelId: string,
+  messageTs?: string
+): Promise<void> {
+  await db.insert(sentNotifications).values({
+    transactionId,
+    notificationType,
+    channelId,
+    messageTs,
+    sentAt: new Date(),
+  });
+}
+
+// ========================================
+// SEND NOTIFICATION (With Deduplication)
+// ========================================
+
+async function sendNotificationIfNotSent(
+  transaction: any,
+  notificationType: string,
+  channelId: string,
+  message: string
+): Promise<{ sent: boolean; reason?: string }> {
+  if (!slack) {
+    console.log(`[Slack] Bot not configured, skipping`);
+    return { sent: false, reason: 'bot_not_configured' };
+  }
+
+  // Check deduplication
+  const alreadySent = await wasNotificationSentToday(
+    transaction.id,
+    notificationType,
+    channelId
+  );
+
+  if (alreadySent) {
+    console.log(`[Slack] SKIPPED (already sent today): ${notificationType} for "${transaction.address}"`);
+    return { sent: false, reason: 'already_sent_today' };
+  }
+
+  try {
+    const result = await slack.chat.postMessage({
+      channel: channelId,
+      text: message,
+      mrkdwn: true,
+    });
+
+    await recordNotificationSent(
+      transaction.id,
+      notificationType,
+      channelId,
+      result.ts
+    );
+
+    console.log(`[Slack] ✅ SENT: ${notificationType} for "${transaction.address}"`);
+    return { sent: true };
+  } catch (error: any) {
+    console.error(`[Slack] ❌ ERROR:`, error?.message || error);
+    return { sent: false, reason: 'send_failed' };
+  }
+}
+
+// ========================================
+// REMINDER CONFIGURATION
+// Days before closing -> notification type mapping
+// ========================================
+
+interface ReminderConfig {
+  daysBeforeClosing: number;
+  notificationType: string;
+  settingKey: keyof NotificationPreferences;
+  messageTemplate: (address: string, closingDate: string) => string;
+}
+
+const REMINDER_CONFIGS: ReminderConfig[] = [
+  {
+    daysBeforeClosing: 14,
+    notificationType: 'closing_14_days',
+    settingKey: 'reminder14Days',
+    messageTemplate: (addr, date) => 
+      `📅 *Closing Reminder*\n\n*${addr}* is closing in *14 days* on ${date}.\n\nPlease review all documents and requirements.`,
+  },
+  {
+    daysBeforeClosing: 7,
+    notificationType: 'closing_7_days',
+    settingKey: 'reminder7Days',
+    messageTemplate: (addr, date) => 
+      `📅 *Closing Reminder*\n\n*${addr}* is closing in *7 days* on ${date}.\n\nOne week until closing - please ensure everything is in order.`,
+  },
+  {
+    daysBeforeClosing: 3,
+    notificationType: 'closing_3_days',
+    settingKey: 'reminder3Days',
+    messageTemplate: (addr, date) => 
+      `📅 *Closing Reminder*\n\n*${addr}* is closing in *3 days* on ${date}.\n\nFinal preparations should be underway.`,
+  },
+  {
+    daysBeforeClosing: 0,
+    notificationType: 'closing_day_of',
+    settingKey: 'reminderDayOf',
+    messageTemplate: (addr, date) => 
+      `🎉 *Closing Day!*\n\n*${addr}* is closing *today*!\n\nGood luck with the closing!`,
+  },
+];
+
+// ========================================
+// MAIN NOTIFICATION PROCESSOR
+// ========================================
+
+export async function processClosingDateNotifications(): Promise<{
+  processed: number;
+  sent: number;
+  skipped: number;
+  disabled: number;
+  errors: number;
+}> {
+  const stats = { processed: 0, sent: 0, skipped: 0, disabled: 0, errors: 0 };
+  
+  // Check global disable
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    console.log(`[Slack] ⚠️ Notifications DISABLED via environment variable`);
+    return stats;
+  }
+
+  if (!slack) {
+    console.log(`[Slack] ⚠️ Bot token not configured`);
+    return stats;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  console.log(`\n========================================`);
+  console.log(`[Slack] Starting notification check: ${today.toDateString()}`);
+  console.log(`========================================\n`);
+
+  try {
+    // Get transactions with closing dates and Slack channels
+    const transactionsToCheck = await db
+      .select()
+      .from(transactions)
+      .where(
+        and(
+          isNotNull(transactions.closingDate),
+          isNotNull(transactions.slackChannelId)
+        )
+      );
+
+    console.log(`[Slack] Found ${transactionsToCheck.length} transactions to check`);
+
+    for (const transaction of transactionsToCheck) {
+      stats.processed++;
+      
+      if (!transaction.closingDate || !transaction.slackChannelId) {
+        continue;
+      }
+
+      // Get user's notification preferences
+      const userPrefs = await getUserNotificationSettings(transaction.userId || 0);
+
+      // Check if PARENT toggle (closingDateReminders) is ON
+      if (!userPrefs.closingDateReminders) {
+        console.log(`[Slack] SKIPPED (closing reminders disabled): "${transaction.address}"`);
+        stats.disabled++;
+        continue;
+      }
+
+      const closingDate = new Date(transaction.closingDate);
+      closingDate.setHours(0, 0, 0, 0);
+      
+      const daysUntilClosing = Math.ceil(
+        (closingDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      console.log(`[Slack] Checking "${transaction.address}" - ${daysUntilClosing} days until closing`);
+
+      // Check each reminder config
+      for (const config of REMINDER_CONFIGS) {
+        if (daysUntilClosing === config.daysBeforeClosing) {
+          // Check if this specific reminder is enabled
+          if (!userPrefs[config.settingKey]) {
+            console.log(`[Slack] SKIPPED (${config.settingKey} disabled): "${transaction.address}"`);
+            stats.disabled++;
+            continue;
+          }
+
+          const message = config.messageTemplate(
+            transaction.address,
+            formatDate(closingDate)
+          );
+          
+          const result = await sendNotificationIfNotSent(
+            transaction,
+            config.notificationType,
+            transaction.slackChannelId,
+            message
+          );
+          
+          if (result.sent) stats.sent++;
+          else if (result.reason === 'already_sent_today') stats.skipped++;
+          else stats.errors++;
+        }
+      }
+    }
+  } catch (error: any) {
+    console.error(`[Slack] Error:`, error);
+    stats.errors++;
+  }
+
+  console.log(`\n========================================`);
+  console.log(`[Slack] Notification check complete:`);
+  console.log(`  ✅ Sent: ${stats.sent}`);
+  console.log(`  ⏭️ Skipped (already sent): ${stats.skipped}`);
+  console.log(`  🔕 Disabled by user: ${stats.disabled}`);
+  console.log(`  ❌ Errors: ${stats.errors}`);
+  console.log(`  📊 Total processed: ${stats.processed}`);
+  console.log(`========================================\n`);
+
+  return stats;
+}
+
+// ========================================
+// TEST & STATUS FUNCTIONS
+// ========================================
+
+export async function sendTestNotification(channelId: string): Promise<{ success: boolean; error?: string }> {
+  if (!slack) {
+    return { success: false, error: 'Slack bot not configured' };
+  }
+
+  try {
+    await slack.chat.postMessage({
+      channel: channelId,
+      text: `✅ *Test Notification*\n\nSlack bot is connected!\n\nTime: ${new Date().toLocaleString()}`,
+      mrkdwn: true,
+    });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error?.message };
+  }
+}
+
+export function getNotificationStatus(): {
+  botConfigured: boolean;
+  notificationsEnabled: boolean;
+  environment: string;
+  availableReminders: string[];
+} {
+  return {
+    botConfigured: !!slack,
+    notificationsEnabled: process.env.DISABLE_SLACK_NOTIFICATIONS !== 'true',
+    environment: process.env.NODE_ENV || 'development',
+    availableReminders: ['14 days', '7 days', '3 days', 'Day of closing'],
+  };
+}
+```
+
+---
+
+## Step 3: Create Cron Job
+
+**File: `server/cron/notificationCron.ts`**
+
+Create this NEW file in `server/cron/` folder:
+
+```typescript
+import cron from "node-cron";
+import { processClosingDateNotifications, getNotificationStatus } from "../services/slackNotificationService";
+
+let isProcessing = false;
+let cronJob: cron.ScheduledTask | null = null;
+
+/**
+ * Initialize notification cron - runs at 9:00 AM CT daily
+ */
+export function initializeNotificationCron(): void {
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    console.log(`[Cron] ⚠️ Slack notifications DISABLED via environment variable`);
+    return;
+  }
+
+  if (cronJob) {
+    cronJob.stop();
+  }
+
+  cronJob = cron.schedule("0 9 * * *", async () => {
+    if (isProcessing) {
+      console.log("[Cron] ⚠️ Already running, skipping...");
+      return;
+    }
+
+    isProcessing = true;
+    console.log("[Cron] 🚀 Starting daily notification job...");
+
+    try {
+      await processClosingDateNotifications();
+    } catch (error) {
+      console.error("[Cron] ❌ Job failed:", error);
+    } finally {
+      isProcessing = false;
+    }
+  }, {
+    timezone: "America/Chicago"
+  });
+
+  console.log("[Cron] ✅ Notification cron initialized - runs daily at 9:00 AM CT");
+}
+
+export function stopNotificationCron(): void {
+  if (cronJob) {
+    cronJob.stop();
+    cronJob = null;
+    console.log("[Cron] 🛑 Notification cron stopped");
+  }
+}
+
+export async function triggerNotificationsNow(): Promise<any> {
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    return { success: false, error: "Notifications disabled via environment variable" };
+  }
+
+  if (isProcessing) {
+    return { success: false, error: "Already processing" };
+  }
+
+  isProcessing = true;
+  try {
+    const stats = await processClosingDateNotifications();
+    return { success: true, stats };
+  } finally {
+    isProcessing = false;
+  }
+}
+
+export function getCronStatus() {
+  return {
+    isRunning: cronJob !== null,
+    isProcessing,
+    schedule: "Daily at 9:00 AM CT",
+    notificationStatus: getNotificationStatus(),
+  };
+}
+```
+
+---
+
+## Step 4: Add API Routes
+
+**File: `server/routes.ts`**
+
+Add these imports at the TOP:
+
+```typescript
+import { 
+  sendTestNotification, 
+  getNotificationStatus,
+  getUserNotificationSettings,
+  updateUserNotificationSettings,
+  NotificationPreferences
+} from "./services/slackNotificationService";
+import { 
+  triggerNotificationsNow, 
+  initializeNotificationCron, 
+  stopNotificationCron,
+  getCronStatus 
+} from "./cron/notificationCron";
+```
+
+Add these routes:
+
+```typescript
+// ========================================
+// USER NOTIFICATION SETTINGS
+// ========================================
+
+// Get current user's notification settings
+app.get("/api/notification-settings", async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const settings = await getUserNotificationSettings(userId);
+    res.json(settings);
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || "Failed to get settings" });
+  }
+});
+
+// Update user's notification settings
+app.put("/api/notification-settings", async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const updates: Partial<NotificationPreferences> = req.body;
+    
+    // If closingDateReminders is being turned OFF, all reminder schedule will be turned OFF too
+    const updatedSettings = await updateUserNotificationSettings(userId, updates);
+
+    res.json({ success: true, settings: updatedSettings });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || "Failed to update settings" });
+  }
+});
+
+// ========================================
+// ADMIN/TEST ROUTES
+// ========================================
+
+app.post("/api/slack/test", async (req, res) => {
+  const { channelId } = req.body;
+  if (!channelId) {
+    return res.status(400).json({ error: "channelId is required" });
+  }
+  const result = await sendTestNotification(channelId);
+  res.json(result);
+});
+
+app.get("/api/admin/notifications/status", async (req, res) => {
+  res.json(getCronStatus());
+});
+
+app.post("/api/admin/trigger-notifications", async (req, res) => {
+  const result = await triggerNotificationsNow();
+  res.json(result);
+});
+
+app.post("/api/admin/notifications/start", async (req, res) => {
+  initializeNotificationCron();
+  res.json({ success: true, message: "Cron started" });
+});
+
+app.post("/api/admin/notifications/stop", async (req, res) => {
+  stopNotificationCron();
+  res.json({ success: true, message: "Cron stopped" });
+});
+```
+
+---
+
+## Step 5: Initialize on Server Startup
+
+**File: `server/index.ts`**
+
+Add import at TOP:
+
+```typescript
+import { initializeNotificationCron } from "./cron/notificationCron";
+```
+
+Add after database connection:
+
+```typescript
+// Initialize Slack notification cron
+initializeNotificationCron();
+```
+
+---
+
+## Step 6: Update Frontend Settings Component
+
+**File: `client/src/components/settings/NotificationSettings.tsx`** (or wherever your settings UI is)
+
+Update the component to show/hide Reminder Schedule based on parent toggle:
+
+```tsx
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Bell } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+interface NotificationPreferences {
+  documentUploads: boolean;
+  closingDateReminders: boolean;
+  marketingAssets: boolean;
+  reminder14Days: boolean;
+  reminder7Days: boolean;
+  reminder3Days: boolean;
+  reminderDayOf: boolean;
+}
+
+export function NotificationSettings() {
+  const { toast } = useToast();
+  const [settings, setSettings] = useState<NotificationPreferences>({
+    documentUploads: false,
+    closingDateReminders: false,
+    marketingAssets: false,
+    reminder14Days: false,
+    reminder7Days: false,
+    reminder3Days: false,
+    reminderDayOf: false,
+  });
+  const [loading, setLoading] = useState(true);
+
+  // Fetch settings on mount
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch("/api/notification-settings");
+      if (res.ok) {
+        const data = await res.json();
+        setSettings(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch settings:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateSetting = async (key: keyof NotificationPreferences, value: boolean) => {
+    // Optimistic update
+    const newSettings = { ...settings, [key]: value };
+    
+    // If turning OFF closingDateReminders, also turn off all reminder schedule
+    if (key === 'closingDateReminders' && value === false) {
+      newSettings.reminder14Days = false;
+      newSettings.reminder7Days = false;
+      newSettings.reminder3Days = false;
+      newSettings.reminderDayOf = false;
+    }
+    
+    setSettings(newSettings);
+
+    try {
+      const res = await fetch("/api/notification-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: value }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setSettings(data.settings);
+        toast({
+          title: "Settings updated",
+          description: "Your notification preferences have been saved.",
+        });
+      } else {
+        // Revert on error
+        fetchSettings();
+        toast({
+          title: "Error",
+          description: "Failed to update settings",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      fetchSettings();
+      toast({
+        title: "Error",
+        description: "Failed to update settings",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Bell className="w-5 h-5" />
+          Slack Notifications
+        </CardTitle>
+        <CardDescription>
+          Control what notifications are sent to transaction Slack channels
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Notification Types */}
+        <div className="space-y-4">
+          <h4 className="font-medium text-sm text-muted-foreground">Notification Types</h4>
+          
+          {/* Document Uploads */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Document Uploads</Label>
+              <p className="text-sm text-muted-foreground">
+                Receive notifications when documents are uploaded
+              </p>
+            </div>
+            <Switch
+              checked={settings.documentUploads}
+              onCheckedChange={(checked) => updateSetting('documentUploads', checked)}
+            />
+          </div>
+
+          {/* Closing Date Reminders - PARENT TOGGLE */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Closing Date Reminders</Label>
+              <p className="text-sm text-muted-foreground">
+                Receive reminders as the closing date approaches
+              </p>
+            </div>
+            <Switch
+              checked={settings.closingDateReminders}
+              onCheckedChange={(checked) => updateSetting('closingDateReminders', checked)}
+            />
+          </div>
+
+          {/* Marketing Assets */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Marketing Assets</Label>
+              <p className="text-sm text-muted-foreground">
+                Receive notifications when marketing materials are created
+              </p>
+            </div>
+            <Switch
+              checked={settings.marketingAssets}
+              onCheckedChange={(checked) => updateSetting('marketingAssets', checked)}
+            />
+          </div>
+        </div>
+
+        {/* Reminder Schedule - Only visible when closingDateReminders is ON */}
+        {settings.closingDateReminders && (
+          <div className="space-y-4 pt-4 border-t">
+            <div>
+              <h4 className="font-medium text-sm">Reminder Schedule</h4>
+              <p className="text-sm text-muted-foreground">
+                Choose which closing date reminders to receive
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              {/* 14 days before */}
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">14 days before</Label>
+                <Switch
+                  checked={settings.reminder14Days}
+                  onCheckedChange={(checked) => updateSetting('reminder14Days', checked)}
+                />
+              </div>
+
+              {/* 7 days before */}
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">7 days before</Label>
+                <Switch
+                  checked={settings.reminder7Days}
+                  onCheckedChange={(checked) => updateSetting('reminder7Days', checked)}
+                />
+              </div>
+
+              {/* 3 days before */}
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">3 days before</Label>
+                <Switch
+                  checked={settings.reminder3Days}
+                  onCheckedChange={(checked) => updateSetting('reminder3Days', checked)}
+                />
+              </div>
+
+              {/* Day of closing */}
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Day of closing</Label>
+                <Switch
+                  checked={settings.reminderDayOf}
+                  onCheckedChange={(checked) => updateSetting('reminderDayOf', checked)}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+---
+
+## Summary
+
+### Reminder Schedule Options (Limited to 4):
+| Option | Setting Key |
+|--------|-------------|
+| 14 days before | `reminder14Days` |
+| 7 days before | `reminder7Days` |
+| 3 days before | `reminder3Days` |
+| Day of closing | `reminderDayOf` |
+
+### Parent Toggle Behavior:
+```
+Closing Date Reminders = OFF
+└── Reminder Schedule = HIDDEN (all options forced OFF)
+
+Closing Date Reminders = ON
+└── Reminder Schedule = VISIBLE (user can toggle individual options)
+```
+
+### All Defaults = OFF:
+```
+documentUploads: false
+closingDateReminders: false  ← Parent toggle
+marketingAssets: false
+reminder14Days: false
+reminder7Days: false
+reminder3Days: false
+reminderDayOf: false
+```
+
+---
+
+## After Applying:
+
+1. Run `npm run db:push`
+2. Restart server
+3. Check logs for: `[Cron] ✅ Notification cron initialized`
+4. Test: `GET /api/admin/notifications/status`
+5. When ready: Set `DISABLE_SLACK_NOTIFICATIONS=false` in Render

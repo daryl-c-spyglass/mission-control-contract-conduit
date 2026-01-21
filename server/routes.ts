@@ -3169,6 +3169,7 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
   // ============ Notification Settings ============
 
   // Get notification settings for the current user
+  // ALL DEFAULTS ARE FALSE - Users must opt-in to notifications
   app.get("/api/notification-settings", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
@@ -3179,20 +3180,20 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
       const { transactionId } = req.query;
       const settings = await storage.getNotificationSettings(userId, transactionId as string | undefined);
       
-      // Return default settings if none exist
+      // Return default settings if none exist - ALL DEFAULTS ARE FALSE
       if (!settings) {
         res.json({
           userId,
           transactionId: transactionId || null,
-          documentUploads: true,
-          closingReminders: true,
-          marketingAssets: true,
-          reminder30Days: true,
-          reminder14Days: true,
-          reminder7Days: true,
-          reminder3Days: true,
-          reminder1Day: true,
-          reminderDayOf: true,
+          documentUploads: false,
+          closingReminders: false,
+          marketingAssets: false,
+          reminder30Days: false,
+          reminder14Days: false,
+          reminder7Days: false,
+          reminder3Days: false,
+          reminder1Day: false,
+          reminderDayOf: false,
         });
         return;
       }
@@ -3205,6 +3206,7 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
   });
 
   // Update notification settings for the current user
+  // When closingReminders is turned OFF, all reminder schedule options are also turned OFF
   app.put("/api/notification-settings", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
@@ -3212,19 +3214,33 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
         return res.status(401).json({ message: "User not authenticated" });
       }
 
-      // Validate request body using Zod schema
+      // If closingReminders is being turned OFF, turn off all reminder schedule options
+      let updates = { ...req.body };
+      if (req.body.closingReminders === false) {
+        updates = {
+          ...updates,
+          reminder30Days: false,
+          reminder14Days: false,
+          reminder7Days: false,
+          reminder3Days: false,
+          reminder1Day: false,
+          reminderDayOf: false,
+        };
+      }
+
+      // Validate request body using Zod schema - ALL DEFAULTS ARE FALSE
       const validationResult = insertNotificationSettingsSchema.safeParse({
         userId,
-        transactionId: req.body.transactionId || null,
-        documentUploads: req.body.documentUploads ?? true,
-        closingReminders: req.body.closingReminders ?? true,
-        marketingAssets: req.body.marketingAssets ?? true,
-        reminder30Days: req.body.reminder30Days ?? true,
-        reminder14Days: req.body.reminder14Days ?? true,
-        reminder7Days: req.body.reminder7Days ?? true,
-        reminder3Days: req.body.reminder3Days ?? true,
-        reminder1Day: req.body.reminder1Day ?? true,
-        reminderDayOf: req.body.reminderDayOf ?? true,
+        transactionId: updates.transactionId || null,
+        documentUploads: updates.documentUploads ?? false,
+        closingReminders: updates.closingReminders ?? false,
+        marketingAssets: updates.marketingAssets ?? false,
+        reminder30Days: updates.reminder30Days ?? false,
+        reminder14Days: updates.reminder14Days ?? false,
+        reminder7Days: updates.reminder7Days ?? false,
+        reminder3Days: updates.reminder3Days ?? false,
+        reminder1Day: updates.reminder1Day ?? false,
+        reminderDayOf: updates.reminderDayOf ?? false,
       });
 
       if (!validationResult.success) {
@@ -3243,14 +3259,43 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
   });
 
   // Force trigger closing reminders check (for testing)
+  // Pass bypassDisable=true in body to test when notifications are globally disabled
   app.post("/api/notification-settings/check-reminders", isAuthenticated, async (req: any, res) => {
     try {
-      const { forceReminderCheck } = await import("./services/closing-reminders");
-      await forceReminderCheck();
-      res.json({ message: "Reminder check triggered" });
+      const { triggerNotificationsNow } = await import("./cron/notificationCron");
+      const bypassDisable = req.body?.bypassDisable === true;
+      const result = await triggerNotificationsNow(bypassDisable);
+      res.json({ message: "Reminder check triggered", ...result });
     } catch (error) {
       console.error("Error triggering reminder check:", error);
       res.status(500).json({ message: "Failed to trigger reminder check" });
+    }
+  });
+
+  // Get notification system status
+  app.get("/api/admin/notifications/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const { getCronStatus } = await import("./cron/notificationCron");
+      res.json(getCronStatus());
+    } catch (error) {
+      console.error("Error getting notification status:", error);
+      res.status(500).json({ message: "Failed to get notification status" });
+    }
+  });
+
+  // Test Slack notification
+  app.post("/api/slack/test", isAuthenticated, async (req: any, res) => {
+    try {
+      const { channelId } = req.body;
+      if (!channelId) {
+        return res.status(400).json({ error: "channelId is required" });
+      }
+      const { sendTestNotification } = await import("./services/slackNotificationService");
+      const result = await sendTestNotification(channelId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error sending test notification:", error);
+      res.status(500).json({ message: "Failed to send test notification" });
     }
   });
 

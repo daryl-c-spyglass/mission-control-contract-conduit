@@ -95,17 +95,17 @@ export default function Settings() {
   const [coverLetterTone, setCoverLetterTone] = useState<'professional' | 'friendly' | 'confident'>('professional');
   const [isGeneratingCoverLetter, setIsGeneratingCoverLetter] = useState(false);
 
-  // Notification settings state
+  // Notification settings state - ALL DEFAULTS ARE FALSE (opt-in)
   const [notificationSettings, setNotificationSettings] = useState({
-    documentUploads: true,
-    closingReminders: true,
-    marketingAssets: true,
-    reminder30Days: true,
-    reminder14Days: true,
-    reminder7Days: true,
-    reminder3Days: true,
-    reminder1Day: true,
-    reminderDayOf: true,
+    documentUploads: false,
+    closingReminders: false,
+    marketingAssets: false,
+    reminder30Days: false,
+    reminder14Days: false,
+    reminder7Days: false,
+    reminder3Days: false,
+    reminder1Day: false,
+    reminderDayOf: false,
   });
 
   useEffect(() => {
@@ -168,19 +168,19 @@ export default function Settings() {
     queryKey: ["/api/notification-settings"],
   });
 
-  // Load notification settings when fetched
+  // Load notification settings when fetched - ALL DEFAULTS ARE FALSE
   useEffect(() => {
     if (savedNotificationSettings) {
       setNotificationSettings({
-        documentUploads: savedNotificationSettings.documentUploads ?? true,
-        closingReminders: savedNotificationSettings.closingReminders ?? true,
-        marketingAssets: savedNotificationSettings.marketingAssets ?? true,
-        reminder30Days: savedNotificationSettings.reminder30Days ?? true,
-        reminder14Days: savedNotificationSettings.reminder14Days ?? true,
-        reminder7Days: savedNotificationSettings.reminder7Days ?? true,
-        reminder3Days: savedNotificationSettings.reminder3Days ?? true,
-        reminder1Day: savedNotificationSettings.reminder1Day ?? true,
-        reminderDayOf: savedNotificationSettings.reminderDayOf ?? true,
+        documentUploads: savedNotificationSettings.documentUploads ?? false,
+        closingReminders: savedNotificationSettings.closingReminders ?? false,
+        marketingAssets: savedNotificationSettings.marketingAssets ?? false,
+        reminder30Days: savedNotificationSettings.reminder30Days ?? false,
+        reminder14Days: savedNotificationSettings.reminder14Days ?? false,
+        reminder7Days: savedNotificationSettings.reminder7Days ?? false,
+        reminder3Days: savedNotificationSettings.reminder3Days ?? false,
+        reminder1Day: savedNotificationSettings.reminder1Day ?? false,
+        reminderDayOf: savedNotificationSettings.reminderDayOf ?? false,
       });
     }
   }, [savedNotificationSettings]);
@@ -211,18 +211,18 @@ export default function Settings() {
     onSuccess: (data) => {
       toast({ title: "Settings saved", description: "Your notification preferences have been updated." });
       queryClient.invalidateQueries({ queryKey: ["/api/notification-settings"] });
-      // Update local state with server response to ensure consistency
+      // Update local state with server response to ensure consistency - ALL DEFAULTS ARE FALSE
       if (data) {
         setNotificationSettings({
-          documentUploads: data.documentUploads ?? true,
-          closingReminders: data.closingReminders ?? true,
-          marketingAssets: data.marketingAssets ?? true,
-          reminder30Days: data.reminder30Days ?? true,
-          reminder14Days: data.reminder14Days ?? true,
-          reminder7Days: data.reminder7Days ?? true,
-          reminder3Days: data.reminder3Days ?? true,
-          reminder1Day: data.reminder1Day ?? true,
-          reminderDayOf: data.reminderDayOf ?? true,
+          documentUploads: data.documentUploads ?? false,
+          closingReminders: data.closingReminders ?? false,
+          marketingAssets: data.marketingAssets ?? false,
+          reminder30Days: data.reminder30Days ?? false,
+          reminder14Days: data.reminder14Days ?? false,
+          reminder7Days: data.reminder7Days ?? false,
+          reminder3Days: data.reminder3Days ?? false,
+          reminder1Day: data.reminder1Day ?? false,
+          reminderDayOf: data.reminderDayOf ?? false,
         });
       }
     },
@@ -944,16 +944,7 @@ export default function Settings() {
                 <p className="text-xs text-muted-foreground">
                   Choose which closing date reminders to receive
                 </p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <Label htmlFor="reminder30Days" className="text-sm">30 days before</Label>
-                    <Switch
-                      id="reminder30Days"
-                      checked={notificationSettings.reminder30Days}
-                      onCheckedChange={(checked) => handleNotificationToggle('reminder30Days', checked)}
-                      data-testid="switch-reminder-30"
-                    />
-                  </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div className="flex items-center justify-between gap-2">
                     <Label htmlFor="reminder14Days" className="text-sm">14 days before</Label>
                     <Switch
@@ -979,15 +970,6 @@ export default function Settings() {
                       checked={notificationSettings.reminder3Days}
                       onCheckedChange={(checked) => handleNotificationToggle('reminder3Days', checked)}
                       data-testid="switch-reminder-3"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <Label htmlFor="reminder1Day" className="text-sm">1 day before</Label>
-                    <Switch
-                      id="reminder1Day"
-                      checked={notificationSettings.reminder1Day}
-                      onCheckedChange={(checked) => handleNotificationToggle('reminder1Day', checked)}
-                      data-testid="switch-reminder-1"
                     />
                   </div>
                   <div className="flex items-center justify-between gap-2">

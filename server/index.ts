@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { startRepliersSync } from "./repliers-sync";
 import { startClosingRemindersScheduler } from "./services/closing-reminders";
+import { initializeNotificationCron } from "./cron/notificationCron";
 
 const app = express();
 const httpServer = createServer(app);
@@ -136,8 +137,11 @@ app.use((req, res, next) => {
       // Start automatic MLS data synchronization
       startRepliersSync();
       
-      // Start closing date reminders scheduler
+      // Start closing date reminders scheduler (legacy)
       startClosingRemindersScheduler();
+      
+      // Initialize new notification cron with deduplication (9 AM CT daily)
+      initializeNotificationCron();
     },
   );
 })();
