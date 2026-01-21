@@ -1,0 +1,380 @@
+Fix Presentation Builder Layout Tab
+Issues to Fix
+
+AI Best Photo mode: Should only show photos that have AI classification from Repliers (not all photos)
+Manual Selection mode: Should show ALL 36 photos (not limited to 12) - add "Load More" or show all
+Photo Modal: Background color should match app theme (light/dark mode sync)
+
+
+Part 1: Fix AI Best Photo Mode - Only Show AI Classified Photos
+tsx// In CoverPhotoGrid.tsx or PhotoSelectionPreview.tsx
+
+// AI Best Photo mode - ONLY show photos with Image Insights classification
+const aiClassifiedPhotos = useMemo(() => {
+  if (!imageInsights?.length) return [];
+  
+  // Filter to only photos that have classification data
+  return imageInsights
+    .filter((insight: any) => insight.classification?.imageOf)
+    .map((insight: any, index: number) => ({
+      url: photos[insight.originalIndex ?? index],
+      classification: insight.classification?.imageOf,
+      quality: insight.quality?.qualitative,
+      originalIndex: insight.originalIndex ?? index,
+    }))
+    .filter((photo: any) => photo.url); // Ensure URL exists
+}, [imageInsights, photos]);
+
+// Render based on mode
+{source === 'ai' ? (
+  <div className="space-y-4">
+    {/* AI Banner */}
+    <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+      <Sparkles className="w-4 h-4 text-amber-600" />
+      <span className="text-sm text-amber-800 dark:text-amber-200">
+        AI selected: <strong>{aiClassifiedPhotos.find(p => p.url === selectedPhoto)?.classification || 'Primary Photo'}</strong>
+      </span>
+    </div>
+    
+    {/* Only AI Classified Photos */}
+    <div className="grid grid-cols-6 gap-3">
+      {aiClassifiedPhotos.map((photo, idx) => (
+        <PhotoThumbnail
+          key={idx}
+          photo={photo}
+          isSelected={selectedPhoto === photo.url}
+          showClassification={true}
+          onSelect={() => onSelect(photo.url)}
+          onPreview={() => onPreview(photo.url, photo.classification)}
+        />
+      ))}
+    </div>
+    
+    {aiClassifiedPhotos.length === 0 && (
+      <p className="text-center text-gray-500 py-4">
+        No AI-classified photos available. Switch to Manual Selection to see all photos.
+      </p>
+    )}
+    
+    <p className="text-xs text-gray-500 text-center">
+      Showing {aiClassifiedPhotos.length} AI-analyzed photos
+    </p>
+  </div>
+) : (
+  // Manual mode - show ALL photos
+  <ManualPhotoGrid 
+    photos={photos}
+    selectedPhoto={selectedPhoto}
+    onSelect={onSelect}
+    onPreview={onPreview}
+  />
+)}
+
+Part 2: Fix Manual Selection - Show All Photos with Load More
+tsx// ManualPhotoGrid.tsx - Show all photos with pagination
+
+import React, { useState } from 'react';
+
+interface ManualPhotoGridProps {
+  photos: string[];
+  selectedPhoto: string | null;
+  onSelect: (url: string) => void;
+  onPreview: (url: string, label: string) => void;
+}
+
+export function ManualPhotoGrid({ photos, selectedPhoto, onSelect, onPreview }: ManualPhotoGridProps) {
+  const [showAll, setShowAll] = useState(false);
+  const INITIAL_COUNT = 12;
+  
+  const displayedPhotos = showAll ? photos : photos.slice(0, INITIAL_COUNT);
+  const hasMore = photos.length > INITIAL_COUNT;
+  const remainingCount = photos.length - INITIAL_COUNT;
+
+  return (
+    <div className="space-y-4">
+      {/* Photo Grid */}
+      <div className="grid grid-cols-6 gap-3">
+        {displayedPhotos.map((photo, idx) => (
+          <div key={idx} className="relative group">
+            <button
+              onClick={() => onSelect(photo)}
+              className={cn(
+                "relative aspect-square rounded-lg overflow-hidden border-2 transition-all w-full",
+                selectedPhoto === photo 
+                  ? "border-primary ring-2 ring-primary/30" 
+                  : "border-gray-200 dark:border-gray-700 hover:border-primary/50"
+              )}
+            >
+              <img 
+                src={photo} 
+                alt={`Photo ${idx + 1}`}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+              
+              {/* Selected checkmark */}
+              {selectedPhoto === photo && (
+                <div className="absolute top-1.5 right-1.5 w-6 h-6 bg-primary rounded-full flex items-center justify-center shadow-lg">
+                  <Check className="w-4 h-4 text-white" />
+                </div>
+              )}
+            </button>
+            
+            {/* Zoom button on hover */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onPreview(photo, `Photo ${idx + 1}`);
+              }}
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-9 h-9 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
+            >
+              <ZoomIn className="w-4 h-4 text-white" />
+            </button>
+          </div>
+        ))}
+      </div>
+      
+      {/* Load More / Show Less Button */}
+      {hasMore && (
+        <div className="flex justify-center">
+          <Button
+            variant="outline"
+            onClick={() => setShowAll(!showAll)}
+            className="gap-2"
+          >
+            {showAll ? (
+              <>
+                <ChevronUp className="w-4 h-4" />
+                Show Less
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-4 h-4" />
+                Load More ({remainingCount} more photos)
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+      
+      {/* Photo Count */}
+      <p className="text-xs text-gray-500 text-center">
+        Showing {displayedPhotos.length} of {photos.length} photos
+      </p>
+    </div>
+  );
+}
+
+Part 3: Fix Photo Modal Background - Match App Theme
+tsx// PhotoPreviewModal.tsx - Fix background to match light/dark mode
+
+import { useTheme } from 'next-themes'; // or your theme hook
+
+export function PhotoPreviewModal({
+  isOpen,
+  photoUrl,
+  photoLabel,
+  onClose,
+}: PhotoPreviewModalProps) {
+  const { theme, systemTheme } = useTheme();
+  const currentTheme = theme === 'system' ? systemTheme : theme;
+  const isDark = currentTheme === 'dark';
+
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+
+  // Reset on open
+  useEffect(() => {
+    if (isOpen) {
+      setZoom(1);
+      setRotation(0);
+    }
+  }, [isOpen]);
+
+  const handleDownload = () => {
+    if (!photoUrl) return;
+    const link = document.createElement('a');
+    link.href = photoUrl;
+    link.download = `${photoLabel || 'photo'}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  if (!photoUrl) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent 
+        className={cn(
+          "max-w-5xl w-[95vw] h-[85vh] p-0 overflow-hidden border-0",
+          // Light mode: light gray background
+          // Dark mode: dark gray background (matching app)
+          isDark 
+            ? "bg-gray-900" 
+            : "bg-gray-100"
+        )}
+      >
+        {/* Header */}
+        <div className={cn(
+          "absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3",
+          isDark 
+            ? "bg-gradient-to-b from-gray-900 to-transparent" 
+            : "bg-gradient-to-b from-gray-100 to-transparent"
+        )}>
+          <div>
+            <h3 className={cn(
+              "font-medium text-lg",
+              isDark ? "text-white" : "text-gray-900"
+            )}>
+              {photoLabel || 'Photo Preview'}
+            </h3>
+            <p className={cn(
+              "text-sm",
+              isDark ? "text-gray-400" : "text-gray-600"
+            )}>
+              Zoom: {Math.round(zoom * 100)}%
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className={cn(
+              "rounded-full",
+              isDark 
+                ? "text-white hover:bg-white/20" 
+                : "text-gray-700 hover:bg-gray-200"
+            )}
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+
+        {/* Image Container */}
+        <div className="flex-1 flex items-center justify-center overflow-auto p-4 pt-20 pb-24">
+          <img
+            src={photoUrl}
+            alt={photoLabel || 'Preview'}
+            className={cn(
+              "max-w-full max-h-full object-contain transition-transform duration-200 select-none rounded-lg",
+              // Add subtle shadow for better visibility
+              isDark ? "shadow-2xl" : "shadow-xl"
+            )}
+            style={{
+              transform: `scale(${zoom}) rotate(${rotation}deg)`,
+            }}
+            draggable={false}
+          />
+        </div>
+
+        {/* Controls */}
+        <div className={cn(
+          "absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-2 px-4 py-4",
+          isDark 
+            ? "bg-gradient-to-t from-gray-900 to-transparent" 
+            : "bg-gradient-to-t from-gray-100 to-transparent"
+        )}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))}
+            disabled={zoom <= 0.5}
+            className={cn(
+              isDark 
+                ? "bg-gray-800 hover:bg-gray-700 text-white border-gray-700" 
+                : "bg-white hover:bg-gray-50 text-gray-900 border-gray-200"
+            )}
+          >
+            <ZoomOut className="w-4 h-4 mr-1.5" />
+            Zoom Out
+          </Button>
+          
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setZoom(prev => Math.min(prev + 0.25, 3))}
+            disabled={zoom >= 3}
+            className={cn(
+              isDark 
+                ? "bg-gray-800 hover:bg-gray-700 text-white border-gray-700" 
+                : "bg-white hover:bg-gray-50 text-gray-900 border-gray-200"
+            )}
+          >
+            <ZoomIn className="w-4 h-4 mr-1.5" />
+            Zoom In
+          </Button>
+          
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setRotation(prev => (prev + 90) % 360)}
+            className={cn(
+              isDark 
+                ? "bg-gray-800 hover:bg-gray-700 text-white border-gray-700" 
+                : "bg-white hover:bg-gray-50 text-gray-900 border-gray-200"
+            )}
+          >
+            <RotateCw className="w-4 h-4 mr-1.5" />
+            Rotate
+          </Button>
+          
+          <div className={cn(
+            "w-px h-6 mx-1",
+            isDark ? "bg-gray-700" : "bg-gray-300"
+          )} />
+          
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => { setZoom(1); setRotation(0); }}
+            className={cn(
+              isDark 
+                ? "bg-gray-800 hover:bg-gray-700 text-white border-gray-700" 
+                : "bg-white hover:bg-gray-50 text-gray-900 border-gray-200"
+            )}
+          >
+            <Maximize2 className="w-4 h-4 mr-1.5" />
+            Reset
+          </Button>
+          
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleDownload}
+            className={cn(
+              isDark 
+                ? "bg-gray-800 hover:bg-gray-700 text-white border-gray-700" 
+                : "bg-white hover:bg-gray-50 text-gray-900 border-gray-200"
+            )}
+          >
+            <Download className="w-4 h-4 mr-1.5" />
+            Download
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+Summary of Changes
+FeatureCurrentFixedAI Best PhotoShows all 12 photosOnly shows photos with Repliers AI classificationManual SelectionLimited to 12 photosShows all photos with "Load More" buttonPhoto Modal BackgroundDark navy (hardcoded)Syncs with app theme (light gray / dark gray)Modal ControlsDark styling onlyAdapts to light/dark mode
+
+Files to Modify
+
+client/src/components/cma/CoverPhotoGrid.tsx - Fix AI vs Manual photo filtering
+client/src/components/cma/ManualPhotoGrid.tsx - Create new component with Load More
+client/src/components/cma/PhotoPreviewModal.tsx - Fix theme sync
+
+
+Acceptance Criteria
+
+ AI Best Photo mode only shows photos that have Image Insights classification
+ AI mode shows classification label (Kitchen, Exterior, etc.) on each photo
+ Manual Selection mode shows "Load More" button when > 12 photos
+ Clicking "Load More" reveals all remaining photos
+ Photo count updates correctly (e.g., "Showing 36 of 36 photos")
+ Photo modal background matches app theme
+ Modal controls (buttons) match app theme
+ Light mode: light gray background with dark text
+ Dark mode: dark gray background with light text
