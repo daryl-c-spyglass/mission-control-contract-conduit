@@ -622,7 +622,7 @@ export default function CMAPresentationBuilder() {
           </Tabs>
         </div>
 
-        <div className="w-full lg:w-[40%]">
+        <div className="w-full lg:w-[40%] lg:sticky lg:top-6 lg:self-start">
           <LivePreviewPanel
             includedSections={config.includedSections}
             contentSettings={{
@@ -646,11 +646,16 @@ export default function CMAPresentationBuilder() {
               email: 'daryl@spyglassrealty.com',
             }}
             onSectionClick={(sectionId) => {
+              // Content tab: cover page, cover letter, agent resume
               if (['cover_page', 'cover_letter', 'agent_resume'].includes(sectionId)) {
                 setActiveTab('content');
-              } else if (['listing_brochure', 'map_all_listings'].includes(sectionId)) {
+              } 
+              // Layout tab: brochure and cover photo settings
+              else if (['listing_brochure'].includes(sectionId)) {
                 setActiveTab('layout');
-              } else {
+              }
+              // Sections tab: all other sections (map, comparables, adjustments, charts, etc.)
+              else {
                 setActiveTab('sections');
               }
             }}

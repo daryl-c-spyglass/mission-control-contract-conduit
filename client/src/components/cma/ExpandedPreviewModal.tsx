@@ -24,14 +24,9 @@ export function ExpandedPreviewModal({
         <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b">
           <div className="flex items-center justify-between gap-4">
             <DialogTitle>CMA Presentation Preview</DialogTitle>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
-                {sectionsEnabled} sections enabled
-              </span>
-              <Button variant="outline" size="sm" data-testid="button-save-template">
-                Save as Template
-              </Button>
-            </div>
+            <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
+              {sectionsEnabled} sections enabled
+            </span>
           </div>
         </DialogHeader>
 
