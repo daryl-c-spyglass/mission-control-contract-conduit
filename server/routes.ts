@@ -625,35 +625,127 @@ export async function registerRoutes(
     }
   });
 
-  // Archive/Unarchive a transaction
-  app.patch("/api/transactions/:id/archive", isAuthenticated, async (req, res) => {
+  // Archive a transaction - saves notification settings and disables all reminders
+  app.patch("/api/transactions/:id/archive", isAuthenticated, async (req: any, res) => {
     try {
-      const { isArchived } = req.body;
+      const transaction = await storage.getTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      // Get current notification settings to save before archiving
+      const userId = req.user?.id || req.user?.claims?.sub;
+      let previousReminderSettings = null;
+      
+      if (userId) {
+        const currentSettings = await storage.getNotificationSettings(userId, req.params.id);
+        if (currentSettings) {
+          previousReminderSettings = {
+            closingReminders: currentSettings.closingReminders,
+            reminder14Days: currentSettings.reminder14Days,
+            reminder7Days: currentSettings.reminder7Days,
+            reminder3Days: currentSettings.reminder3Days,
+            reminderDayOf: currentSettings.reminderDayOf,
+            documentUploads: currentSettings.documentUploads,
+            marketingAssets: currentSettings.marketingAssets,
+          };
+          
+          // Disable all notifications for this transaction
+          await storage.upsertNotificationSettings({
+            userId,
+            transactionId: req.params.id,
+            closingReminders: false,
+            reminder14Days: false,
+            reminder7Days: false,
+            reminder3Days: false,
+            reminderDayOf: false,
+            documentUploads: false,
+            marketingAssets: false,
+          });
+        }
+      }
+      
+      const updated = await storage.updateTransaction(req.params.id, {
+        isArchived: true,
+        archivedAt: new Date(),
+        previousReminderSettings,
+      });
+      
+      // Log activity
+      await storage.createActivity({
+        transactionId: req.params.id,
+        type: 'transaction_archived',
+        category: 'transaction',
+        description: 'Transaction archived - all notifications disabled',
+      });
+      
+      console.log(`[Archive] Transaction ${req.params.id} archived. All notifications disabled.`);
+      
+      res.json(updated);
+    } catch (error) {
+      console.error('Error archiving transaction:', error);
+      res.status(500).json({ message: "Failed to archive transaction" });
+    }
+  });
+  
+  // Unarchive/restore a transaction with optional notification restoration
+  app.patch("/api/transactions/:id/unarchive", isAuthenticated, async (req: any, res) => {
+    try {
+      const { restoreNotifications = false } = req.body;
       
       const transaction = await storage.getTransaction(req.params.id);
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
       }
       
+      const userId = req.user?.id || req.user?.claims?.sub;
+      let notificationsRestored = false;
+      
+      // Optionally restore notification settings
+      if (restoreNotifications && transaction.previousReminderSettings && userId) {
+        const prevSettings = transaction.previousReminderSettings as any;
+        
+        await storage.upsertNotificationSettings({
+          userId,
+          transactionId: req.params.id,
+          closingReminders: prevSettings.closingReminders ?? false,
+          reminder14Days: prevSettings.reminder14Days ?? false,
+          reminder7Days: prevSettings.reminder7Days ?? false,
+          reminder3Days: prevSettings.reminder3Days ?? false,
+          reminderDayOf: prevSettings.reminderDayOf ?? false,
+          documentUploads: prevSettings.documentUploads ?? false,
+          marketingAssets: prevSettings.marketingAssets ?? false,
+        });
+        
+        notificationsRestored = prevSettings.closingReminders ?? false;
+        console.log(`[Unarchive] Transaction ${req.params.id} - Restoring notification settings`);
+      }
+      
       const updated = await storage.updateTransaction(req.params.id, {
-        isArchived: isArchived === true,
-        archivedAt: isArchived ? new Date() : null,
+        isArchived: false,
+        archivedAt: null,
+        previousReminderSettings: null, // Clear saved settings
       });
       
       // Log activity
       await storage.createActivity({
         transactionId: req.params.id,
-        type: isArchived ? 'transaction_archived' : 'transaction_restored',
+        type: 'transaction_restored',
         category: 'transaction',
-        description: isArchived 
-          ? `Transaction archived`
-          : `Transaction restored from archive`,
+        description: notificationsRestored 
+          ? 'Transaction restored from archive with notifications re-enabled'
+          : 'Transaction restored from archive - notifications remain OFF',
       });
       
-      res.json(updated);
+      console.log(`[Unarchive] Transaction ${req.params.id} restored. Notifications: ${notificationsRestored ? 'RESTORED' : 'OFF'}`);
+      
+      res.json({
+        ...updated,
+        notificationsRestored,
+      });
     } catch (error) {
-      console.error('Error archiving transaction:', error);
-      res.status(500).json({ message: "Failed to archive transaction" });
+      console.error('Error unarchiving transaction:', error);
+      res.status(500).json({ message: "Failed to unarchive transaction" });
     }
   });
 

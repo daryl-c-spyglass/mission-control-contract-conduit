@@ -33,6 +33,8 @@ import {
   Archive,
   ArchiveRestore,
   MoreVertical,
+  Bell,
+  BellOff,
   Upload,
   File,
   Search,
@@ -107,6 +109,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getStatusBadgeStyle, getStatusLabel } from "@/lib/utils/status-colors";
@@ -650,6 +653,10 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [overviewPhotoModalOpen, setOverviewPhotoModalOpen] = useState(false);
   const [overviewPhotoIndex, setOverviewPhotoIndex] = useState(0);
   
+  // Unarchive dialog state
+  const [showUnarchiveDialog, setShowUnarchiveDialog] = useState(false);
+  const [restoreNotificationsOnUnarchive, setRestoreNotificationsOnUnarchive] = useState(true);
+  
   // Photo navigation for MLS gallery
   const photos = mlsData?.photos || mlsData?.images || [];
   const nextPhoto = () => setCurrentPhoto((prev) => (prev + 1) % Math.max(photos.length, 1));
@@ -864,26 +871,49 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
 
   // Archive transaction mutation
   const archiveTransactionMutation = useMutation({
-    mutationFn: async (isArchived: boolean) => {
-      const res = await apiRequest("PATCH", `/api/transactions/${transaction.id}/archive`, { isArchived });
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/transactions/${transaction.id}/archive`);
       return res.json();
     },
-    onSuccess: (_, isArchived) => {
+    onSuccess: () => {
       toast({ 
-        title: isArchived ? "Transaction archived" : "Transaction restored",
-        description: isArchived 
-          ? "The transaction has been moved to the archive."
-          : "The transaction has been restored from the archive."
+        title: "Transaction archived",
+        description: "The transaction has been moved to the archive. All notifications disabled."
       });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", transaction.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      if (isArchived) {
-        onBack();
-      }
+      onBack();
     },
     onError: (error: any) => {
       toast({ 
         title: "Failed to archive transaction", 
+        description: error.message || "Please try again.",
+        variant: "destructive" 
+      });
+    },
+  });
+  
+  // Unarchive/restore transaction mutation
+  const unarchiveTransactionMutation = useMutation({
+    mutationFn: async (restoreNotifications: boolean) => {
+      const res = await apiRequest("PATCH", `/api/transactions/${transaction.id}/unarchive`, { restoreNotifications });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      const notificationsRestored = data.notificationsRestored;
+      toast({ 
+        title: "Transaction restored",
+        description: notificationsRestored 
+          ? "The transaction has been restored with notifications re-enabled."
+          : "The transaction has been restored. Notifications remain OFF."
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", transaction.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      setShowUnarchiveDialog(false);
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to restore transaction", 
         description: error.message || "Please try again.",
         variant: "destructive" 
       });
@@ -1034,8 +1064,8 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
             <DropdownMenuContent align="end">
               {transaction.isArchived ? (
                 <DropdownMenuItem
-                  onClick={() => archiveTransactionMutation.mutate(false)}
-                  disabled={archiveTransactionMutation.isPending}
+                  onClick={() => setShowUnarchiveDialog(true)}
+                  disabled={unarchiveTransactionMutation.isPending}
                   className="cursor-pointer"
                   data-testid="menu-item-restore"
                 >
@@ -1044,7 +1074,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 </DropdownMenuItem>
               ) : (
                 <DropdownMenuItem
-                  onClick={() => archiveTransactionMutation.mutate(true)}
+                  onClick={() => archiveTransactionMutation.mutate()}
                   disabled={archiveTransactionMutation.isPending}
                   className="cursor-pointer"
                   data-testid="menu-item-archive"
@@ -1089,6 +1119,70 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
               </AlertDialog>
             </DropdownMenuContent>
           </DropdownMenu>
+          
+          {/* Unarchive/Restore Dialog with notification restoration option */}
+          <AlertDialog open={showUnarchiveDialog} onOpenChange={setShowUnarchiveDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <ArchiveRestore className="w-5 h-5" />
+                  Restore Transaction
+                </AlertDialogTitle>
+                <AlertDialogDescription className="space-y-4">
+                  <p>
+                    Are you sure you want to restore "{transaction.propertyAddress}" from the archive?
+                  </p>
+                  
+                  {/* Only show notification restore option if there were previous settings */}
+                  {Boolean(transaction.previousReminderSettings) && (
+                    <div className="flex items-start space-x-3 p-3 rounded-lg border bg-muted/50">
+                      <Checkbox
+                        id="restore-notifications"
+                        checked={restoreNotificationsOnUnarchive}
+                        onCheckedChange={(checked) => setRestoreNotificationsOnUnarchive(checked === true)}
+                        className="mt-0.5"
+                      />
+                      <div className="space-y-1">
+                        <label
+                          htmlFor="restore-notifications"
+                          className="text-sm font-medium leading-none cursor-pointer flex items-center gap-1.5"
+                        >
+                          {restoreNotificationsOnUnarchive ? (
+                            <Bell className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <BellOff className="w-4 h-4 text-muted-foreground" />
+                          )}
+                          Restore closing date reminders
+                        </label>
+                        <p className="text-xs text-muted-foreground">
+                          Re-enable the notification settings that were active before archiving
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {!Boolean(transaction.previousReminderSettings) && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground p-3 rounded-lg border bg-muted/50">
+                      <BellOff className="w-4 h-4" />
+                      <span>Closing date reminders will remain OFF after restoration</span>
+                    </div>
+                  )}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    const shouldRestoreNotifications = Boolean(transaction.previousReminderSettings) && restoreNotificationsOnUnarchive;
+                    unarchiveTransactionMutation.mutate(shouldRestoreNotifications);
+                  }}
+                  disabled={unarchiveTransactionMutation.isPending}
+                >
+                  {unarchiveTransactionMutation.isPending ? "Restoring..." : "Restore Transaction"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
