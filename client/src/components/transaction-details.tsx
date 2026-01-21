@@ -634,8 +634,10 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [currentPhoto, setCurrentPhoto] = useState(0);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const mlsData = transaction.mlsData as MLSData | null;
-  // Use MLS status as source of truth, fallback to transaction status
-  const displayStatus = mlsData?.status || transaction.status || 'Active';
+  // Check if this is an off-market listing (has isOffMarket flag and no MLS number)
+  const isOffMarket = transaction.isOffMarket && !transaction.mlsNumber;
+  // Use Off Market status first, then MLS status, then transaction status
+  const displayStatus = isOffMarket ? 'off_market' : (mlsData?.status || transaction.status || 'Active');
   const statusLabel = getStatusLabel(displayStatus);
   const [documentUploadOpen, setDocumentUploadOpen] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<ContractDocument | null>(null);

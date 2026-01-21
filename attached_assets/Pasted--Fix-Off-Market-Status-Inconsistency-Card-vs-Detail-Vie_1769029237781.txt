@@ -1,0 +1,301 @@
+# Fix Off Market Status Inconsistency - Card vs Detail View
+
+## Problem
+
+When a transaction is created as "Off Market":
+- Transaction card shows correct purple "Off Market" badge
+- Transaction detail page shows incorrect green "Active Listing" badge
+
+The status should be consistent across all views.
+
+## Screenshots Reference
+
+**Card View (Correct):**
+```
+612 Twelve Oaks LN    [Off Market] ← Purple badge
+(Off Market)
+```
+
+**Detail View (WRONG):**
+```
+← 612 Twelve Oaks LN  [Active Listing] ← Green badge (should be purple "Off Market")
+```
+
+---
+
+## Root Cause
+
+The transaction detail header is likely:
+1. Not checking the `isOffMarket` field
+2. Defaulting to MLS status or "Active Listing"
+3. Using different logic than the transaction card
+
+---
+
+## Fix Required
+
+### 1. Update Transaction Detail Header Component
+
+Find the component that renders the transaction detail header (likely in `transaction-detail.tsx` or similar) and update the status badge logic:
+
+```tsx
+// The status badge in the detail header should use the SAME logic as the card
+
+function getTransactionStatus(transaction: any) {
+  // 1. Check Off Market FIRST (highest priority for internal status)
+  if (transaction.isOffMarket) {
+    return {
+      label: 'Off Market',
+      color: 'bg-purple-500 text-white', // Purple
+      variant: 'purple'
+    };
+  }
+
+  // 2. Check MLS status if connected
+  if (transaction.mlsNumber && transaction.mlsData) {
+    const mlsStatus = transaction.mlsData?.standardStatus || 
+                      transaction.mlsData?.status || '';
+    
+    // Map MLS status to display
+    const statusLower = mlsStatus.toLowerCase();
+    
+    if (statusLower.includes('active') && !statusLower.includes('under contract')) {
+      return { label: 'Active Listing', color: 'bg-green-500 text-white', variant: 'green' };
+    }
+    if (statusLower.includes('pending') || statusLower.includes('under contract')) {
+      return { label: 'Active Under Contract', color: 'bg-orange-500 text-white', variant: 'orange' };
+    }
+    if (statusLower.includes('sold') || statusLower.includes('closed')) {
+      return { label: 'Closed', color: 'bg-red-500 text-white', variant: 'red' };
+    }
+    if (statusLower.includes('withdrawn') || statusLower.includes('expired') || statusLower.includes('cancelled')) {
+      return { label: mlsStatus, color: 'bg-gray-500 text-white', variant: 'gray' };
+    }
+    
+    // Default for MLS connected
+    return { label: mlsStatus || 'Active Listing', color: 'bg-green-500 text-white', variant: 'green' };
+  }
+
+  // 3. Check internal status for non-MLS transactions
+  if (transaction.status) {
+    const status = transaction.status.toLowerCase();
+    
+    if (status === 'in_contract' || status === 'under_contract') {
+      return { label: 'In Contract', color: 'bg-orange-500 text-white', variant: 'orange' };
+    }
+    if (status === 'closed') {
+      return { label: 'Closed', color: 'bg-red-500 text-white', variant: 'red' };
+    }
+  }
+
+  // 4. Default fallback
+  return { label: 'Active Listing', color: 'bg-green-500 text-white', variant: 'green' };
+}
+```
+
+### 2. Apply Same Logic to Detail Header
+
+**File: Find the transaction detail header component**
+
+Look for where the status badge is rendered in the detail view and update it:
+
+```tsx
+// BEFORE (likely what's happening now - ignoring isOffMarket)
+<Badge className="bg-green-500">
+  {transaction.mlsData?.status || 'Active Listing'}
+</Badge>
+
+// AFTER (use the shared status function)
+const status = getTransactionStatus(transaction);
+<Badge className={status.color}>
+  {status.label}
+</Badge>
+```
+
+### 3. Create Shared Status Utility (Recommended)
+
+To ensure consistency, create a shared utility file:
+
+**File: `client/src/lib/utils/transaction-status.ts`**
+
+```typescript
+export interface TransactionStatus {
+  label: string;
+  color: string;
+  bgColor: string;
+  textColor: string;
+  variant: 'green' | 'purple' | 'orange' | 'red' | 'gray' | 'blue';
+}
+
+export function getTransactionStatus(transaction: any): TransactionStatus {
+  // 1. Off Market takes priority
+  if (transaction.isOffMarket) {
+    return {
+      label: 'Off Market',
+      color: 'purple',
+      bgColor: 'bg-purple-500',
+      textColor: 'text-white',
+      variant: 'purple',
+    };
+  }
+
+  // 2. Check MLS status if has MLS number and data
+  if (transaction.mlsNumber && transaction.mlsData) {
+    const mlsStatus = (
+      transaction.mlsData?.standardStatus || 
+      transaction.mlsData?.status || 
+      ''
+    ).toLowerCase();
+
+    if (mlsStatus.includes('active') && !mlsStatus.includes('under contract') && !mlsStatus.includes('pending')) {
+      return {
+        label: 'Active Listing',
+        color: 'green',
+        bgColor: 'bg-green-500',
+        textColor: 'text-white',
+        variant: 'green',
+      };
+    }
+
+    if (mlsStatus.includes('pending') || mlsStatus.includes('under contract')) {
+      return {
+        label: 'Active Under Contract',
+        color: 'orange',
+        bgColor: 'bg-orange-500',
+        textColor: 'text-white',
+        variant: 'orange',
+      };
+    }
+
+    if (mlsStatus.includes('sold') || mlsStatus.includes('closed')) {
+      return {
+        label: 'Closed',
+        color: 'red',
+        bgColor: 'bg-red-500',
+        textColor: 'text-white',
+        variant: 'red',
+      };
+    }
+
+    if (mlsStatus.includes('coming soon')) {
+      return {
+        label: 'Coming Soon',
+        color: 'blue',
+        bgColor: 'bg-blue-500',
+        textColor: 'text-white',
+        variant: 'blue',
+      };
+    }
+
+    if (mlsStatus.includes('withdrawn') || mlsStatus.includes('expired') || mlsStatus.includes('cancelled')) {
+      return {
+        label: transaction.mlsData?.standardStatus || 'Withdrawn',
+        color: 'gray',
+        bgColor: 'bg-gray-500',
+        textColor: 'text-white',
+        variant: 'gray',
+      };
+    }
+
+    // Default for MLS-connected
+    return {
+      label: 'Active Listing',
+      color: 'green',
+      bgColor: 'bg-green-500',
+      textColor: 'text-white',
+      variant: 'green',
+    };
+  }
+
+  // 3. Internal status for non-MLS
+  const internalStatus = (transaction.status || '').toLowerCase();
+  
+  if (internalStatus === 'in_contract' || internalStatus === 'under_contract') {
+    return {
+      label: 'In Contract',
+      color: 'orange',
+      bgColor: 'bg-orange-500',
+      textColor: 'text-white',
+      variant: 'orange',
+    };
+  }
+
+  if (internalStatus === 'closed') {
+    return {
+      label: 'Closed',
+      color: 'red',
+      bgColor: 'bg-red-500',
+      textColor: 'text-white',
+      variant: 'red',
+    };
+  }
+
+  // 4. Default
+  return {
+    label: 'Active Listing',
+    color: 'green',
+    bgColor: 'bg-green-500',
+    textColor: 'text-white',
+    variant: 'green',
+  };
+}
+```
+
+### 4. Update All Components to Use Shared Utility
+
+**Transaction Card:**
+```tsx
+import { getTransactionStatus } from '@/lib/utils/transaction-status';
+
+// In component
+const status = getTransactionStatus(transaction);
+
+<Badge className={`${status.bgColor} ${status.textColor}`}>
+  {status.label}
+</Badge>
+```
+
+**Transaction Detail Header:**
+```tsx
+import { getTransactionStatus } from '@/lib/utils/transaction-status';
+
+// In component
+const status = getTransactionStatus(transaction);
+
+<Badge className={`${status.bgColor} ${status.textColor}`}>
+  {status.label}
+</Badge>
+```
+
+---
+
+## Status Priority Order
+
+The status check should follow this priority:
+
+| Priority | Check | Result |
+|----------|-------|--------|
+| 1 | `isOffMarket === true` | Purple "Off Market" |
+| 2 | Has MLS + MLS status | Use MLS status color |
+| 3 | Internal `status` field | Map to appropriate color |
+| 4 | Default | Green "Active Listing" |
+
+---
+
+## Testing Checklist
+
+- [ ] Create Off Market transaction → Card shows purple "Off Market"
+- [ ] Click into Off Market transaction → Detail shows purple "Off Market"
+- [ ] Create MLS transaction (Active) → Card shows green "Active Listing"
+- [ ] Click into MLS transaction → Detail shows green "Active Listing"
+- [ ] Off Market with "Add MLS Number" → Status changes to MLS status
+- [ ] Closed MLS transaction → Both views show red "Closed"
+
+---
+
+## Files to Update
+
+1. **Create:** `client/src/lib/utils/transaction-status.ts` - Shared status utility
+2. **Update:** Transaction card component - Use shared utility
+3. **Update:** Transaction detail header - Use shared utility
+4. **Update:** Any other components showing status badges
