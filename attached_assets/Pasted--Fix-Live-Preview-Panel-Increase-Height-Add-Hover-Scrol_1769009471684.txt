@@ -1,0 +1,423 @@
+# Fix: Live Preview Panel - Increase Height & Add Hover-Scroll
+
+## Issue
+The Live Preview panel on the right side is too short. Users should be able to:
+1. See more sections without expanding to modal
+2. Hover over the preview area and scroll smoothly through all sections
+3. Have the preview take up more vertical space
+
+## Current vs Target
+
+```
+CURRENT (Too Short):                    TARGET (Full Height):
+┌─────────────────────┐                 ┌─────────────────────┐
+│ Live Preview   17 ⛶ │                 │ Live Preview   17 ⛶ │
+├─────────────────────┤                 ├─────────────────────┤
+│ ┌─────────────────┐ │                 │ ┌─────────────────┐ │
+│ │ Cover Page      │ │                 │ │ Cover Page      │ │
+│ │ Spyglass Realty │ │                 │ │ Spyglass Realty │ │
+│ └─────────────────┘ │                 │ │ CMA...          │ │
+│ ┌─────────────────┐ │                 │ └─────────────────┘ │
+│ │ Listing Brochure│ │                 │ ┌─────────────────┐ │
+│ │ [thumbnail]     │ │                 │ │ Listing Brochure│ │
+│ └─────────────────┘ │                 │ │ [thumbnail]     │ │
+│                     │                 │ └─────────────────┘ │
+│  (can't see more)   │                 │ ┌─────────────────┐ │
+│                     │                 │ │ Cover Letter    │ │
+└─────────────────────┘                 │ │ Dear client...  │ │
+                                        │ └─────────────────┘ │
+                                        │ ┌─────────────────┐ │
+                                        │ │ Agent Resume    │ │  ← Hover to scroll
+                                        │ │ [photo] Name    │ │     and see more
+                                        │ └─────────────────┘ │
+                                        │ ┌─────────────────┐ │
+                                        │ │ Map             │ │
+                                        │ │ [map preview]   │ │
+                                        │ └─────────────────┘ │
+                                        │         ↓           │
+                                        │   (scroll for more) │
+                                        └─────────────────────┘
+```
+
+---
+
+## Solution
+
+### Update: `client/src/components/cma/LivePreviewPanel.tsx`
+
+Replace the entire component with this updated version:
+
+```tsx
+import React, { useState, useRef } from "react";
+import { Eye, Maximize2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { PreviewSection } from "./PreviewSection";
+import { ExpandedPreviewModal } from "./ExpandedPreviewModal";
+import { CMA_REPORT_SECTIONS } from "@/shared/cma-sections";
+import { CoverPagePreview } from "./preview-sections/CoverPagePreview";
+import { SummaryComparablesPreview } from "./preview-sections/SummaryComparablesPreview";
+import { AdjustmentsPreview } from "./preview-sections/AdjustmentsPreview";
+import { PricePerSqftChartPreview } from "./preview-sections/PricePerSqftChartPreview";
+import { PropertyPhotosPreview } from "./preview-sections/PropertyPhotosPreview";
+import { PropertyDetailsPreview } from "./preview-sections/PropertyDetailsPreview";
+
+interface LivePreviewPanelProps {
+  includedSections: string[];
+  contentSettings: {
+    title: string;
+    subtitle: string;
+    clientName?: string;
+    showDate: boolean;
+    showAgentPhoto: boolean;
+    coverLetter?: string;
+  };
+  layoutSettings: {
+    coverPhotoUrl?: string;
+    brochureUrl?: string;
+    mapStyle: 'streets' | 'satellite';
+    showMapPolygon: boolean;
+  };
+  subjectProperty: any;
+  comparables: any[];
+  agentProfile?: {
+    name: string;
+    title?: string;
+    photo?: string;
+    email?: string;
+    phone?: string;
+  };
+  onSectionClick?: (sectionId: string) => void;
+}
+
+export function LivePreviewPanel({
+  includedSections,
+  contentSettings,
+  layoutSettings,
+  subjectProperty,
+  comparables,
+  agentProfile,
+  onSectionClick,
+}: LivePreviewPanelProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  
+  const enabledSections = CMA_REPORT_SECTIONS.filter(s => includedSections.includes(s.id));
+  const allPhotos = comparables.flatMap(c => c.photos || c.images || []).slice(0, 24);
+
+  const renderSectionContent = (sectionId: string, compact: boolean) => {
+    switch (sectionId) {
+      case 'cover_page':
+        return <CoverPagePreview {...contentSettings} agentName={agentProfile?.name} agentPhoto={agentProfile?.photo} compact={compact} />;
+      case 'listing_brochure':
+        return layoutSettings.brochureUrl ? (
+          <div className="flex justify-center">
+            <img src={layoutSettings.brochureUrl} alt="Brochure" className={compact ? "max-h-32" : "max-h-64"} />
+          </div>
+        ) : <p className="text-sm text-muted-foreground italic text-center">No brochure uploaded</p>;
+      case 'cover_letter':
+        return <p className="text-sm text-muted-foreground line-clamp-3">{contentSettings.coverLetter || "Your personalized cover letter will appear here..."}</p>;
+      case 'agent_resume':
+        return (
+          <div className="flex items-start gap-3">
+            {agentProfile?.photo && <img src={agentProfile.photo} alt={agentProfile.name} className="w-10 h-10 rounded-full object-cover" />}
+            <div>
+              <p className="font-medium text-sm">{agentProfile?.name || "Agent Name"}</p>
+              <p className="text-xs text-muted-foreground">{agentProfile?.title || "Real Estate Agent"}</p>
+            </div>
+          </div>
+        );
+      case 'our_company':
+        return <div><p className="font-medium text-primary text-sm">Spyglass Realty</p><p className="text-xs text-muted-foreground">Company profile</p></div>;
+      case 'what_is_cma':
+        return <p className="text-xs text-muted-foreground line-clamp-2">A Comparative Market Analysis (CMA) is a detailed report...</p>;
+      case 'contact_me':
+        return <p className="text-xs">✉️ {agentProfile?.email || "agent@spyglassrealty.com"}</p>;
+      case 'map_all_listings':
+        return (
+          <div className="space-y-1">
+            <div className="bg-muted rounded h-24 flex items-center justify-center text-muted-foreground text-xs">
+              Map ({comparables.length} properties)
+            </div>
+            <div className="flex gap-2 text-[10px]">
+              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>Subject</span>
+              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>Active</span>
+              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>Pending</span>
+            </div>
+          </div>
+        );
+      case 'listings_header':
+        return <div className="border-l-2 border-primary pl-2"><p className="font-semibold text-sm">Comparable Properties</p></div>;
+      case 'summary_comparables':
+        return <SummaryComparablesPreview comparables={comparables} />;
+      case 'property_details':
+        return <PropertyDetailsPreview properties={comparables} compact={compact} />;
+      case 'property_photos':
+        return <PropertyPhotosPreview photos={allPhotos} compact={compact} />;
+      case 'adjustments':
+        return subjectProperty ? <AdjustmentsPreview subjectProperty={subjectProperty} comparables={comparables} compact={compact} /> : <p className="text-xs text-muted-foreground italic">Subject property required</p>;
+      case 'analysis_header':
+        return <div className="border-l-2 border-primary pl-2"><p className="font-semibold text-sm">Market Analysis</p></div>;
+      case 'online_valuation':
+        return <p className="text-xs text-muted-foreground">Online valuation comparison...</p>;
+      case 'price_per_sqft':
+        return <PricePerSqftChartPreview comparables={comparables} compact={compact} />;
+      case 'comparable_stats':
+        const avgPrice = comparables.length > 0 ? comparables.reduce((sum, c) => sum + (c.listPrice || 0), 0) / comparables.length : 0;
+        const avgPricePerSqft = comparables.length > 0 ? comparables.reduce((sum, c) => sum + ((c.listPrice || 0) / (c.sqft || 1)), 0) / comparables.length : 0;
+        return (
+          <div className="grid grid-cols-2 gap-2">
+            <div className="p-2 bg-muted/50 rounded text-center">
+              <p className="text-[10px] text-muted-foreground">Avg Price</p>
+              <p className="font-bold text-sm">${(avgPrice/1000).toFixed(0)}k</p>
+            </div>
+            <div className="p-2 bg-muted/50 rounded text-center">
+              <p className="text-[10px] text-muted-foreground">$/SqFt</p>
+              <p className="font-bold text-sm">${avgPricePerSqft.toFixed(0)}</p>
+            </div>
+          </div>
+        );
+      default:
+        return <p className="text-xs text-muted-foreground italic">Preview</p>;
+    }
+  };
+
+  const previewContent = (compact: boolean) => (
+    <>
+      {enabledSections.map((section) => (
+        <PreviewSection key={section.id} title={section.name} icon={section.icon} sectionId={section.id} onClick={onSectionClick} compact={compact}>
+          {renderSectionContent(section.id, compact)}
+        </PreviewSection>
+      ))}
+    </>
+  );
+
+  return (
+    <>
+      {/* Main Preview Panel - FULL HEIGHT */}
+      <div 
+        className="bg-background rounded-lg border flex flex-col h-full"
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
+      >
+        {/* Fixed Header */}
+        <div className="flex-shrink-0 flex items-center justify-between p-3 border-b bg-muted/30">
+          <div>
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <Eye className="w-4 h-4" />
+              Live Preview
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Preview how your CMA will appear
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+              {enabledSections.length} sections
+            </span>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setIsExpanded(true)}
+              className="h-7 w-7 p-0"
+              title="Expand to full screen"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Scrollable Preview Area - FILLS REMAINING HEIGHT */}
+        <div 
+          ref={scrollRef}
+          className={`
+            flex-1 overflow-y-auto overflow-x-hidden
+            transition-all duration-200
+            ${isHovering ? 'scrollbar-visible' : 'scrollbar-thin scrollbar-thumb-muted'}
+          `}
+          style={{
+            // This ensures the scroll area takes all available height
+            minHeight: 0, // Important for flex children
+          }}
+        >
+          <div className="p-3 space-y-3">
+            {previewContent(true)}
+          </div>
+          
+          {/* Scroll indicator at bottom when not at end */}
+          {enabledSections.length > 3 && (
+            <div className="sticky bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none flex items-end justify-center pb-1">
+              <span className="text-[10px] text-muted-foreground animate-pulse">
+                ↓ Scroll for more sections
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Expanded Modal */}
+      <ExpandedPreviewModal 
+        isOpen={isExpanded} 
+        onClose={() => setIsExpanded(false)} 
+        sectionsEnabled={enabledSections.length}
+      >
+        {previewContent(false)}
+      </ExpandedPreviewModal>
+    </>
+  );
+}
+```
+
+---
+
+## Additional CSS (Add to your global styles or tailwind config)
+
+Add these custom scrollbar styles for better hover-scroll experience:
+
+### Option A: Add to `client/src/index.css` or global CSS file:
+
+```css
+/* Custom scrollbar for Live Preview */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+
+/* Show scrollbar on hover */
+.scrollbar-visible {
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+
+.scrollbar-visible::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+}
+
+.scrollbar-visible::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Smooth scroll behavior */
+.overflow-y-auto {
+  scroll-behavior: smooth;
+}
+```
+
+### Option B: Or add to Tailwind config (`tailwind.config.js`):
+
+```js
+module.exports = {
+  // ... existing config
+  theme: {
+    extend: {
+      // ... existing extensions
+    },
+  },
+  plugins: [
+    // Add scrollbar plugin if using tailwind-scrollbar
+    require('tailwind-scrollbar')({ nocompatible: true }),
+  ],
+}
+```
+
+---
+
+## Update Parent Container
+
+The parent container (likely in `CMAPresentationBuilder.tsx`) needs to ensure the right panel takes full height. Update the layout:
+
+```tsx
+{/* Main Content - Split Layout */}
+<div className="flex flex-1 overflow-hidden">
+  {/* Left Panel - Builder Tabs (60%) */}
+  <div className="w-3/5 border-r overflow-y-auto">
+    <div className="p-6">
+      {/* Tabs content */}
+    </div>
+  </div>
+
+  {/* Right Panel - Live Preview (40%) - FULL HEIGHT */}
+  <div className="w-2/5 p-4 bg-muted/30 flex flex-col">
+    <LivePreviewPanel
+      includedSections={includedSections}
+      contentSettings={contentSettings}
+      layoutSettings={layoutSettings}
+      subjectProperty={subjectProperty}
+      comparables={comparables}
+      agentProfile={agentProfile}
+      onSectionClick={handleSectionClick}
+    />
+  </div>
+</div>
+```
+
+And make sure the page container uses full height:
+
+```tsx
+export default function CMAPresentationBuilder() {
+  return (
+    <div className="h-screen flex flex-col bg-background">
+      {/* Header - Fixed height */}
+      <div className="flex-shrink-0 border-b px-6 py-4">
+        {/* Header content */}
+      </div>
+
+      {/* Main Content - Fills remaining height */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left and Right panels */}
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## Key Changes Summary
+
+| Change | Before | After |
+|--------|--------|-------|
+| Preview height | `h-[500px]` fixed | `flex-1` fills available space |
+| Scroll visibility | Always visible | Hidden until hover |
+| Scroll indicator | None | "↓ Scroll for more sections" |
+| Container structure | Fixed height | Flex with `h-full` |
+| Parent layout | May not fill height | Uses `h-screen` and flex |
+
+---
+
+## Acceptance Criteria
+
+- [ ] Live Preview panel fills the full height of the right side
+- [ ] Scrollbar is hidden by default, appears on hover
+- [ ] Smooth scrolling when hovering and using scroll wheel
+- [ ] "Scroll for more sections" indicator shows when content overflows
+- [ ] Expand button still works to open full modal
+- [ ] Section count still displays correctly
+- [ ] All sections render properly in the taller preview area
+- [ ] Works in both light and dark mode
+
+---
+
+## Testing
+
+1. Load Presentation Builder with 17 sections enabled
+2. Verify preview panel fills full height (matches left panel)
+3. Hover over preview → scrollbar should appear
+4. Scroll down → should see all 17 sections
+5. Look for "↓ Scroll for more" indicator at bottom
+6. Click expand [⛶] → verify modal still works
+7. Test in different viewport heights
+8. Test in dark mode

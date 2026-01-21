@@ -394,4 +394,36 @@
   .scroll-mt-safe {
     scroll-margin-top: calc(64px + env(safe-area-inset-top));
   }
+
+  /* Custom scrollbar for Live Preview - hidden by default */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 3px;
+  }
+
+  /* Show scrollbar on hover */
+  .scrollbar-visible {
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+
+  .scrollbar-visible::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+  }
+
+  .scrollbar-visible::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
 }

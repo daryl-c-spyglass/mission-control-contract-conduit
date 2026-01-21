@@ -432,61 +432,67 @@ export default function CMAPresentationBuilder() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild data-testid="button-back">
-            <Link href={cma.transactionId ? `/transactions/${cma.transactionId}?tab=cma` : `/cmas/${id}`}>
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-2xl font-semibold">Presentation Builder</h1>
-            <p className="text-sm text-muted-foreground">{cma.name || cma.subjectPropertyId}</p>
+    <div className="h-[calc(100vh-4rem)] flex flex-col bg-background">
+      {/* Header - Fixed height */}
+      <div className="flex-shrink-0 border-b px-6 py-4">
+        <div className="flex items-center justify-between gap-4 max-w-7xl mx-auto">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" asChild data-testid="button-back">
+              <Link href={cma.transactionId ? `/transactions/${cma.transactionId}?tab=cma` : `/cmas/${id}`}>
+                <ArrowLeft className="h-5 w-5" />
+              </Link>
+            </Button>
+            <div>
+              <h1 className="text-2xl font-semibold">Presentation Builder</h1>
+              <p className="text-sm text-muted-foreground">{cma.name || cma.subjectPropertyId}</p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setPreviewModalOpen(true)}
-            className="gap-2"
-            data-testid="button-preview"
-          >
-            <Eye className="w-4 h-4" />
-            Preview
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => saveConfigMutation.mutate()}
-            disabled={saveConfigMutation.isPending}
-            className="gap-2"
-            data-testid="button-save-config"
-          >
-            {saveConfigMutation.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Settings className="w-4 h-4" />
-            )}
-            Save
-          </Button>
-          <Button
-            onClick={() => exportPdfMutation.mutate()}
-            disabled={exportPdfMutation.isPending}
-            className="gap-2"
-            data-testid="button-export-pdf"
-          >
-            {exportPdfMutation.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Download className="w-4 h-4" />
-            )}
-            Export PDF
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setPreviewModalOpen(true)}
+              className="gap-2"
+              data-testid="button-preview"
+            >
+              <Eye className="w-4 h-4" />
+              Preview
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => saveConfigMutation.mutate()}
+              disabled={saveConfigMutation.isPending}
+              className="gap-2"
+              data-testid="button-save-config"
+            >
+              {saveConfigMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Settings className="w-4 h-4" />
+              )}
+              Save
+            </Button>
+            <Button
+              onClick={() => exportPdfMutation.mutate()}
+              disabled={exportPdfMutation.isPending}
+              className="gap-2"
+              data-testid="button-export-pdf"
+            >
+              {exportPdfMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              Export PDF
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        <div className="w-full lg:w-[60%] space-y-6">
+      {/* Main Content - Fills remaining height */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Panel - Builder Tabs (60%) */}
+        <div className="w-full lg:w-3/5 border-r overflow-y-auto">
+          <div className="p-6 space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full grid grid-cols-3">
               <TabsTrigger value="sections" className="gap-1" data-testid="tab-sections">
@@ -620,9 +626,11 @@ export default function CMAPresentationBuilder() {
               />
             </TabsContent>
           </Tabs>
+          </div>
         </div>
 
-        <div className="w-full lg:w-[40%] lg:sticky lg:top-6 lg:self-start">
+        {/* Right Panel - Live Preview (40%) - FULL HEIGHT */}
+        <div className="hidden lg:flex lg:w-2/5 p-4 bg-muted/30 flex-col">
           <LivePreviewPanel
             includedSections={config.includedSections}
             contentSettings={{

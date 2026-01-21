@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Eye, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { PreviewSection } from "./PreviewSection";
 import { ExpandedPreviewModal } from "./ExpandedPreviewModal";
 import { CMA_REPORT_SECTIONS, CmaSectionConfig } from "@shared/cma-sections";
@@ -51,6 +50,8 @@ export function LivePreviewPanel({
   onSectionClick,
 }: LivePreviewPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const enabledSections = CMA_REPORT_SECTIONS.filter(s => includedSections.includes(s.id));
   
@@ -284,24 +285,33 @@ export function LivePreviewPanel({
 
   return (
     <>
-      <div className="bg-background rounded-lg border p-4 sticky top-4">
-        <div className="flex items-center justify-between mb-4">
+      {/* Main Preview Panel - FULL HEIGHT */}
+      <div 
+        className="bg-background rounded-lg border flex flex-col h-full"
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
+      >
+        {/* Fixed Header */}
+        <div className="flex-shrink-0 flex items-center justify-between p-3 border-b bg-muted/30">
           <div>
             <h3 className="font-semibold text-sm flex items-center gap-2">
               <Eye className="w-4 h-4" />
               Live Preview
             </h3>
-            <p className="text-xs text-muted-foreground">Preview how your CMA will appear</p>
+            <p className="text-xs text-muted-foreground">
+              Preview how your CMA will appear
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
               {enabledSections.length} sections
             </span>
-            <Button
-              variant="ghost"
+            <Button 
+              variant="ghost" 
               size="sm"
               onClick={() => setIsExpanded(true)}
-              className="h-8 w-8 p-0"
+              className="h-7 w-7 p-0"
+              title="Expand to full screen"
               data-testid="button-expand-preview"
             >
               <Maximize2 className="w-4 h-4" />
@@ -309,16 +319,35 @@ export function LivePreviewPanel({
           </div>
         </div>
 
-        <ScrollArea className="h-[500px]">
-          <div className="space-y-3 pr-2">
+        {/* Scrollable Preview Area - FILLS REMAINING HEIGHT */}
+        <div 
+          ref={scrollRef}
+          className={`
+            flex-1 overflow-y-auto overflow-x-hidden
+            transition-all duration-200
+            ${isHovering ? 'scrollbar-visible' : 'scrollbar-thin scrollbar-thumb-muted'}
+          `}
+          style={{ minHeight: 0 }}
+        >
+          <div className="p-3 space-y-3">
             {previewContent(true)}
           </div>
-        </ScrollArea>
+          
+          {/* Scroll indicator at bottom when content overflows */}
+          {enabledSections.length > 3 && (
+            <div className="sticky bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none flex items-end justify-center pb-1">
+              <span className="text-[10px] text-muted-foreground animate-pulse">
+                Scroll for more sections
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
-      <ExpandedPreviewModal
-        isOpen={isExpanded}
-        onClose={() => setIsExpanded(false)}
+      {/* Expanded Modal */}
+      <ExpandedPreviewModal 
+        isOpen={isExpanded} 
+        onClose={() => setIsExpanded(false)} 
         sectionsEnabled={enabledSections.length}
       >
         {previewContent(false)}
