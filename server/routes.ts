@@ -896,7 +896,8 @@ export async function registerRoutes(
       const apiKey = process.env.REPLIERS_API_KEY;
       
       const url = new URL(`${REPLIERS_API_BASE}/listings`);
-      url.searchParams.append('search', query);
+      // Use 'address' parameter for address search, not 'search'
+      url.searchParams.append('address', query);
       url.searchParams.append('resultsPerPage', '8');
       url.searchParams.append('status', 'A,U,P,S');
       url.searchParams.append('sortBy', 'updatedOn');
