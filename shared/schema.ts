@@ -51,6 +51,7 @@ export const transactions = pgTable("transactions", {
   mlsLastSyncedAt: timestamp("mls_last_synced_at"),
   isArchived: boolean("is_archived").default(false),
   archivedAt: timestamp("archived_at"),
+  previousReminderSettings: jsonb("previous_reminder_settings"), // Store notification settings before archive for potential restoration
   createdAt: timestamp("created_at").defaultNow(),
 });
 

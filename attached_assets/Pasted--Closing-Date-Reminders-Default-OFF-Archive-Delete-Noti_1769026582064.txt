@@ -1,0 +1,601 @@
+# Closing Date Reminders - Default OFF & Archive/Delete Notification Handling
+
+## Overview
+
+Update the notification system:
+
+1. **Default OFF** - All "Closing Date Reminders" toggles OFF by default
+2. **Migration** - Set ALL existing transactions' reminder toggles to OFF  
+3. **Archive/Delete** - Turn off all notifications when transaction is archived or deleted
+4. **Unarchive** - Option to restore transaction AND resync notifications if they were enabled
+
+---
+
+## Current State
+
+- `DISABLE_SLACK_NOTIFICATIONS` = `false` (notifications are ENABLED)
+- Closing Date Reminders may be ON for some existing transactions
+- Need to ensure notifications don't fire for archived/deleted transactions
+
+---
+
+## Implementation
+
+### Step 1: Database Schema - Ensure Defaults are FALSE
+
+**File: `shared/schema.ts`**
+
+```typescript
+export const transactions = pgTable('transactions', {
+  id: serial('id').primaryKey(),
+  // ... existing fields
+  
+  // Closing Date Reminder Settings - ALL DEFAULT TO FALSE
+  closingReminderEnabled: boolean('closing_reminder_enabled').default(false),
+  closingReminder14Days: boolean('closing_reminder_14_days').default(false),
+  closingReminder7Days: boolean('closing_reminder_7_days').default(false),
+  closingReminder3Days: boolean('closing_reminder_3_days').default(false),
+  closingReminderDayOf: boolean('closing_reminder_day_of').default(false),
+  
+  // Store previous reminder state before archive (for restoration)
+  previousReminderSettings: jsonb('previous_reminder_settings'),
+  
+  // Archive fields
+  isArchived: boolean('is_archived').default(false),
+  archivedAt: timestamp('archived_at'),
+  
+  // ... other fields
+});
+```
+
+Run migration:
+```bash
+npm run db:push
+```
+
+---
+
+### Step 2: Migration - Set ALL Existing Reminders to OFF
+
+**Option A: Run as SQL query directly in your database:**
+
+```sql
+-- Disable ALL closing date reminders for ALL existing transactions
+UPDATE transactions
+SET 
+  closing_reminder_enabled = false,
+  closing_reminder_14_days = false,
+  closing_reminder_7_days = false,
+  closing_reminder_3_days = false,
+  closing_reminder_day_of = false;
+```
+
+**Option B: Add a one-time migration endpoint:**
+
+```typescript
+// POST /api/admin/disable-all-reminders (one-time use, remove after)
+app.post('/api/admin/disable-all-reminders', async (req, res) => {
+  try {
+    const result = await db
+      .update(transactions)
+      .set({
+        closingReminderEnabled: false,
+        closingReminder14Days: false,
+        closingReminder7Days: false,
+        closingReminder3Days: false,
+        closingReminderDayOf: false,
+      });
+    
+    res.json({ success: true, message: 'All closing date reminders disabled' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+```
+
+---
+
+### Step 3: Archive Transaction - Save Settings & Disable Notifications
+
+**File: `server/routes.ts`**
+
+Update or create the archive endpoint:
+
+```typescript
+// PATCH /api/transactions/:id/archive
+app.patch('/api/transactions/:id/archive', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const transactionId = parseInt(id);
+    
+    // Get current transaction to save reminder settings
+    const [currentTransaction] = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, transactionId));
+    
+    if (!currentTransaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    
+    // Save current reminder settings before disabling (for potential restore)
+    const previousReminderSettings = {
+      closingReminderEnabled: currentTransaction.closingReminderEnabled,
+      closingReminder14Days: currentTransaction.closingReminder14Days,
+      closingReminder7Days: currentTransaction.closingReminder7Days,
+      closingReminder3Days: currentTransaction.closingReminder3Days,
+      closingReminderDayOf: currentTransaction.closingReminderDayOf,
+    };
+    
+    // Archive transaction and DISABLE all reminders
+    const [updated] = await db
+      .update(transactions)
+      .set({
+        isArchived: true,
+        archivedAt: new Date(),
+        
+        // Save previous settings for potential restoration
+        previousReminderSettings: previousReminderSettings,
+        
+        // DISABLE all notifications
+        closingReminderEnabled: false,
+        closingReminder14Days: false,
+        closingReminder7Days: false,
+        closingReminder3Days: false,
+        closingReminderDayOf: false,
+        
+        updatedAt: new Date(),
+      })
+      .where(eq(transactions.id, transactionId))
+      .returning();
+    
+    console.log(`[Archive] Transaction ${transactionId} archived. All notifications disabled.`);
+    
+    res.json(updated);
+  } catch (error: any) {
+    console.error('Archive error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+```
+
+---
+
+### Step 4: Unarchive Transaction - Option to Restore Notifications
+
+**File: `server/routes.ts`**
+
+```typescript
+// PATCH /api/transactions/:id/unarchive
+app.patch('/api/transactions/:id/unarchive', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { restoreNotifications = false } = req.body;
+    const transactionId = parseInt(id);
+    
+    // Get current transaction
+    const [currentTransaction] = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, transactionId));
+    
+    if (!currentTransaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    
+    // Prepare update data
+    const updateData: any = {
+      isArchived: false,
+      archivedAt: null,
+      previousReminderSettings: null, // Clear saved settings
+      updatedAt: new Date(),
+    };
+    
+    // If user chooses to restore notifications
+    if (restoreNotifications && currentTransaction.previousReminderSettings) {
+      const prevSettings = currentTransaction.previousReminderSettings as any;
+      
+      updateData.closingReminderEnabled = prevSettings.closingReminderEnabled ?? false;
+      updateData.closingReminder14Days = prevSettings.closingReminder14Days ?? false;
+      updateData.closingReminder7Days = prevSettings.closingReminder7Days ?? false;
+      updateData.closingReminder3Days = prevSettings.closingReminder3Days ?? false;
+      updateData.closingReminderDayOf = prevSettings.closingReminderDayOf ?? false;
+      
+      console.log(`[Unarchive] Transaction ${transactionId} - Restoring notification settings`);
+    }
+    
+    // Update transaction
+    const [updated] = await db
+      .update(transactions)
+      .set(updateData)
+      .where(eq(transactions.id, transactionId))
+      .returning();
+    
+    const notificationsRestored = restoreNotifications && updateData.closingReminderEnabled;
+    
+    console.log(`[Unarchive] Transaction ${transactionId} restored. Notifications: ${notificationsRestored ? 'RESTORED' : 'OFF'}`);
+    
+    res.json({
+      ...updated,
+      notificationsRestored,
+    });
+  } catch (error: any) {
+    console.error('Unarchive error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+```
+
+---
+
+### Step 5: Delete Transaction - Turn Off All Notifications
+
+**File: `server/routes.ts`**
+
+```typescript
+// DELETE /api/transactions/:id
+app.delete('/api/transactions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const transactionId = parseInt(id);
+    
+    // Log that we're cancelling notifications
+    console.log(`[Delete] Cancelling all notifications for transaction ${transactionId}`);
+    
+    // Delete related records first
+    await db.delete(offMarketPhotos).where(eq(offMarketPhotos.transactionId, transactionId));
+    await db.delete(documents).where(eq(documents.transactionId, transactionId));
+    await db.delete(timelineEvents).where(eq(timelineEvents.transactionId, transactionId));
+    // Add other related tables as needed
+    
+    // Delete the transaction (notifications will stop because record no longer exists)
+    await db.delete(transactions).where(eq(transactions.id, transactionId));
+    
+    console.log(`[Delete] Transaction ${transactionId} deleted. All notifications cancelled.`);
+    
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Delete error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+```
+
+---
+
+### Step 6: Update Notification Scheduler - Skip Archived Transactions
+
+**File: Update your notification cron job**
+
+IMPORTANT: When checking for transactions to send reminders, ALWAYS filter out archived:
+
+```typescript
+// In your notification scheduler/cron job
+
+async function processClosingDateReminders() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Get transactions with reminders enabled AND NOT archived AND NOT deleted
+  const transactionsWithReminders = await db
+    .select()
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.closingReminderEnabled, true),
+        eq(transactions.isArchived, false), // ← CRITICAL: Skip archived
+        isNotNull(transactions.closingDate),
+        isNotNull(transactions.slackChannelId)
+      )
+    );
+  
+  for (const tx of transactionsWithReminders) {
+    // Double-check not archived (race condition safety)
+    if (tx.isArchived) {
+      console.log(`[Reminder] Skipping archived transaction: ${tx.id}`);
+      continue;
+    }
+    
+    const closingDate = new Date(tx.closingDate!);
+    closingDate.setHours(0, 0, 0, 0);
+    
+    const daysUntilClosing = Math.ceil(
+      (closingDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    
+    // Send appropriate reminders
+    if (daysUntilClosing === 14 && tx.closingReminder14Days) {
+      await sendClosingReminder(tx, 14);
+    }
+    if (daysUntilClosing === 7 && tx.closingReminder7Days) {
+      await sendClosingReminder(tx, 7);
+    }
+    if (daysUntilClosing === 3 && tx.closingReminder3Days) {
+      await sendClosingReminder(tx, 3);
+    }
+    if (daysUntilClosing === 0 && tx.closingReminderDayOf) {
+      await sendClosingReminder(tx, 0);
+    }
+  }
+}
+```
+
+---
+
+### Step 7: Frontend - Unarchive Dialog with Notification Option
+
+**File: Create `UnarchiveDialog.tsx`**
+
+```tsx
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ArchiveRestore, Bell, BellOff } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+
+interface UnarchiveDialogProps {
+  transaction: {
+    id: number;
+    address: string;
+    previousReminderSettings?: {
+      closingReminderEnabled?: boolean;
+    } | null;
+  };
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function UnarchiveDialog({ transaction, isOpen, onClose }: UnarchiveDialogProps) {
+  const queryClient = useQueryClient();
+  const [restoreNotifications, setRestoreNotifications] = useState(true); // Default to restore
+  
+  // Check if there were previous notification settings enabled
+  const hadNotificationsEnabled = transaction.previousReminderSettings?.closingReminderEnabled;
+  
+  const unarchiveMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/transactions/${transaction.id}/unarchive`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restoreNotifications: hadNotificationsEnabled && restoreNotifications }),
+      });
+      if (!res.ok) throw new Error('Failed to unarchive');
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['archived-transactions'] });
+      
+      toast({
+        title: 'Transaction restored',
+        description: data.notificationsRestored 
+          ? 'Closing date reminders have been re-enabled'
+          : 'Closing date reminders remain OFF',
+      });
+      
+      onClose();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  return (
+    <AlertDialog open={isOpen} onOpenChange={onClose}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <ArchiveRestore className="w-5 h-5 text-green-600" />
+            Restore Transaction
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Restore "<strong>{transaction.address}</strong>" to your active transactions.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        {/* Show notification restore option only if they had notifications enabled before */}
+        {hadNotificationsEnabled && (
+          <div className="flex items-start gap-3 p-4 bg-muted rounded-lg my-4">
+            <Checkbox
+              id="restoreNotifications"
+              checked={restoreNotifications}
+              onCheckedChange={(checked) => setRestoreNotifications(checked as boolean)}
+            />
+            <div className="space-y-1">
+              <label 
+                htmlFor="restoreNotifications" 
+                className="text-sm font-medium cursor-pointer flex items-center gap-2"
+              >
+                {restoreNotifications ? (
+                  <Bell className="w-4 h-4 text-green-600" />
+                ) : (
+                  <BellOff className="w-4 h-4 text-muted-foreground" />
+                )}
+                Restore closing date reminders
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Re-enable the notification settings that were active before archiving
+              </p>
+            </div>
+          </div>
+        )}
+
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => unarchiveMutation.mutate()}
+            disabled={unarchiveMutation.isPending}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            {unarchiveMutation.isPending ? 'Restoring...' : 'Restore Transaction'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+```
+
+---
+
+### Step 8: Update Archive Page with Unarchive Button
+
+**File: Update your archive page**
+
+```tsx
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Archive as ArchiveIcon, ArchiveRestore, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { UnarchiveDialog } from '@/components/transactions/unarchive-dialog';
+
+export default function ArchivePage() {
+  const queryClient = useQueryClient();
+  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
+  const [showUnarchiveDialog, setShowUnarchiveDialog] = useState(false);
+
+  const { data: archivedTransactions, isLoading } = useQuery({
+    queryKey: ['archived-transactions'],
+    queryFn: async () => {
+      const res = await fetch('/api/transactions/archived');
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    },
+  });
+
+  const handleUnarchiveClick = (transaction: any) => {
+    setSelectedTransaction(transaction);
+    setShowUnarchiveDialog(true);
+  };
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-64">Loading...</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Archive</h1>
+        <p className="text-muted-foreground">
+          Archived transactions. All notifications are paused.
+        </p>
+      </div>
+
+      {archivedTransactions?.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-64 text-center">
+          <ArchiveIcon className="w-12 h-12 text-muted-foreground mb-4" />
+          <h3 className="font-medium text-lg">No Archived Transactions</h3>
+          <p className="text-muted-foreground text-sm">
+            Archived transactions will appear here
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {archivedTransactions?.map((transaction: any) => (
+            <div key={transaction.id} className="bg-card border rounded-lg p-4">
+              {/* Transaction info */}
+              <h3 className="font-medium truncate">{transaction.address}</h3>
+              {transaction.mlsNumber && (
+                <p className="text-sm text-muted-foreground"># {transaction.mlsNumber}</p>
+              )}
+              
+              <p className="text-xs text-muted-foreground mt-2">
+                Archived {new Date(transaction.archivedAt).toLocaleDateString()}
+              </p>
+
+              {/* Action buttons */}
+              <div className="flex gap-2 mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleUnarchiveClick(transaction)}
+                  className="flex-1"
+                >
+                  <ArchiveRestore className="w-4 h-4 mr-1" />
+                  Restore
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Unarchive Dialog */}
+      {selectedTransaction && (
+        <UnarchiveDialog
+          transaction={selectedTransaction}
+          isOpen={showUnarchiveDialog}
+          onClose={() => {
+            setShowUnarchiveDialog(false);
+            setSelectedTransaction(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## Summary
+
+### What Gets Updated:
+
+| Action | What Happens |
+|--------|--------------|
+| **New Transaction** | All reminders OFF by default |
+| **Migration** | ALL existing reminders set to OFF |
+| **Archive** | Save settings → Disable all notifications |
+| **Unarchive** | Option to restore previous notification settings |
+| **Delete** | All notifications stop (record deleted) |
+| **Notification Cron** | Skips archived transactions |
+
+### Database Changes:
+
+```sql
+-- New column to store previous settings
+ALTER TABLE transactions ADD COLUMN previous_reminder_settings JSONB;
+
+-- Migration: Disable all reminders
+UPDATE transactions SET 
+  closing_reminder_enabled = false,
+  closing_reminder_14_days = false,
+  closing_reminder_7_days = false,
+  closing_reminder_3_days = false,
+  closing_reminder_day_of = false;
+```
+
+### API Endpoints:
+
+| Endpoint | Method | Action |
+|----------|--------|--------|
+| `/api/transactions/:id/archive` | PATCH | Archive + disable notifications |
+| `/api/transactions/:id/unarchive` | PATCH | Unarchive + optionally restore notifications |
+| `/api/transactions/:id` | DELETE | Delete + stop all notifications |
+
+---
+
+## Testing Checklist
+
+- [ ] Run migration to disable all existing reminders
+- [ ] Create new transaction → all reminders OFF by default
+- [ ] Archive transaction → notifications disabled, settings saved
+- [ ] Unarchive with restore → notifications re-enabled
+- [ ] Unarchive without restore → notifications stay OFF
+- [ ] Delete transaction → no more notifications
+- [ ] Archived transactions → not included in reminder cron
