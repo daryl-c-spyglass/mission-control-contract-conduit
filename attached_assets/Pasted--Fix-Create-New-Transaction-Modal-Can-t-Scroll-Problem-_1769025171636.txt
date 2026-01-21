@@ -1,0 +1,181 @@
+# Fix: Create New Transaction Modal - Can't Scroll
+
+## Problem
+
+The Create New Transaction modal content is cut off at the bottom and cannot scroll to see/access the remaining fields (Cancel/Create Transaction buttons).
+
+---
+
+## Solution
+
+The modal needs proper height constraints and overflow handling. Here's the fix:
+
+**File: Update your Create Transaction modal component**
+
+### Option 1: Quick CSS Fix (DialogContent)
+
+```tsx
+<DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+  <DialogHeader>
+    <DialogTitle>Create New Transaction</DialogTitle>
+    <p className="text-sm text-muted-foreground">
+      Enter the property details to start a new transaction...
+    </p>
+  </DialogHeader>
+
+  <form onSubmit={handleSubmit} className="space-y-5 pb-4">
+    {/* All your form fields */}
+    
+    {/* Submit buttons at the end */}
+    <div className="flex justify-end gap-3 pt-4">
+      <Button type="button" variant="outline" onClick={onClose}>
+        Cancel
+      </Button>
+      <Button type="submit">
+        Create Transaction
+      </Button>
+    </div>
+  </form>
+</DialogContent>
+```
+
+**Key changes:**
+- `max-h-[90vh]` - Limits modal to 90% of viewport height
+- `overflow-y-auto` - Enables vertical scrolling when content overflows
+
+---
+
+### Option 2: Using ScrollArea Component (Recommended)
+
+```tsx
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+<DialogContent className="sm:max-w-[550px] max-h-[90vh] flex flex-col p-0 gap-0">
+  {/* Fixed Header */}
+  <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
+    <DialogTitle>Create New Transaction</DialogTitle>
+    <p className="text-sm text-muted-foreground">
+      Enter the property details to start a new transaction. This will
+      automatically set up integrations based on your preferences.
+    </p>
+  </DialogHeader>
+
+  {/* Scrollable Content */}
+  <ScrollArea className="flex-1 max-h-[calc(90vh-200px)]">
+    <form id="create-transaction-form" onSubmit={handleSubmit} className="space-y-5 px-6 pb-4">
+      {/* Our Agent Represents */}
+      <div className="space-y-3">
+        {/* ... */}
+      </div>
+
+      {/* MLS Number */}
+      <div className="space-y-3">
+        {/* ... */}
+      </div>
+
+      {/* Property Address */}
+      <div className="space-y-2">
+        {/* ... */}
+      </div>
+
+      {/* Off Market Fields */}
+      {isOffMarket && (
+        <Card className="p-4 space-y-4">
+          {/* ... */}
+        </Card>
+      )}
+
+      {/* Rest of fields... */}
+    </form>
+  </ScrollArea>
+
+  {/* Fixed Footer */}
+  <div className="flex justify-end gap-3 px-6 py-4 border-t flex-shrink-0">
+    <Button type="button" variant="outline" onClick={onClose}>
+      Cancel
+    </Button>
+    <Button type="submit" form="create-transaction-form">
+      Create Transaction
+    </Button>
+  </div>
+</DialogContent>
+```
+
+**Key changes:**
+- `flex flex-col` on DialogContent - Makes it a flex container
+- `flex-shrink-0` on header and footer - Prevents them from shrinking
+- `flex-1` on ScrollArea - Takes remaining space
+- `max-h-[calc(90vh-200px)]` on ScrollArea - Accounts for header + footer height
+- `form="create-transaction-form"` on submit button - Links to form by ID
+- `p-0 gap-0` on DialogContent - Removes default padding (we add it manually)
+
+---
+
+### Option 3: Simplest Fix (If using Radix/shadcn Dialog)
+
+Just ensure the DialogContent has these classes:
+
+```tsx
+<DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-y-auto">
+```
+
+And make sure there's NO nested scrollable container inside. The form should NOT have `overflow-y-auto`:
+
+```tsx
+{/* ❌ WRONG - Nested scroll containers */}
+<DialogContent className="max-h-[90vh] overflow-y-auto">
+  <form className="overflow-y-auto max-h-[80vh]">  {/* Remove this */}
+    ...
+  </form>
+</DialogContent>
+
+{/* ✅ CORRECT - Single scroll container */}
+<DialogContent className="max-h-[90vh] overflow-y-auto">
+  <form className="space-y-5">  {/* No overflow here */}
+    ...
+  </form>
+</DialogContent>
+```
+
+---
+
+## Debug Checklist
+
+If still not scrolling, check these:
+
+1. **Check for `overflow: hidden`** anywhere in parent elements
+2. **Check for fixed heights** that might be cutting off content
+3. **Check nested scroll containers** - there should only be ONE
+4. **Check `max-height`** - the modal needs a max-height less than viewport
+
+**Browser DevTools Quick Check:**
+1. Right-click the modal → Inspect
+2. Look for the element with `overflow-y: auto` or `overflow-y: scroll`
+3. Make sure it has a `max-height` set
+4. If `max-height: none` or no max-height, add one
+
+---
+
+## Expected Result
+
+After the fix, you should be able to scroll down to see:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Create New Transaction                                      ✕   │
+├─────────────────────────────────────────────────────────────────┤
+│ ↑                                                               │
+│ │  (scrollable content)                                         │
+│ │                                                               │
+│ │  Automatic Setup                                              │
+│ │  ☑ Create Slack channel                                       │
+│ │    Invite coordinators automatically                          │
+│ │  ☑ Create Gmail filter                                        │
+│ │    Route emails with this address to Slack                    │
+│ │  ☑ Fetch MLS data                                             │
+│ │                                                               │
+│ ↓                                                               │
+├─────────────────────────────────────────────────────────────────┤
+│                              [Cancel]  [Create Transaction]     │
+└─────────────────────────────────────────────────────────────────┘
+```
