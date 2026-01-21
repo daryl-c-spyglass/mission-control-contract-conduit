@@ -15,8 +15,11 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getStatusBadgeStyle, getStatusLabel, getStatusColor } from "@/lib/utils/status-colors";
 import { CMAMap } from "@/components/cma-map";
 import { CMAStatsView } from "@/components/cma-stats-view";
-import { CMAActionButtons } from "@/components/cma/CMAActionButtons";
+import { CMAActionBar } from "@/components/cma/cma-action-bar";
 import { CMAPreviewBanner } from "@/components/cma/CMAPreviewBanner";
+import { CMAFiltersPanel } from "@/components/cma/CMAFiltersPanel";
+import { CMANotesDialog } from "@/components/cma/CMANotesDialog";
+import { CMAEmailShareDialog } from "@/components/cma/CMAEmailShareDialog";
 import { sanitizePhotoUrl } from "@/lib/cma-map-data";
 import type { Transaction, CMAComparable, Cma, PropertyStatistics, CmaStatMetric, Property } from "@shared/schema";
 import { useLocation } from "wouter";
@@ -210,6 +213,10 @@ export function CMATab({ transaction }: CMATabProps) {
   const [copied, setCopied] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [fullscreenPhoto, setFullscreenPhoto] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [filtersPanelOpen, setFiltersPanelOpen] = useState(false);
+  const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+  const [emailShareDialogOpen, setEmailShareDialogOpen] = useState(false);
   
   const cmaData = transaction.cmaData as CMAComparable[] | null;
   
@@ -326,33 +333,182 @@ export function CMATab({ transaction }: CMATabProps) {
     );
   }
   
+  const handleSave = async () => {
+    try {
+      if (savedCma?.id) {
+        await apiRequest('PATCH', `/api/cmas/${savedCma.id}`, {
+          propertiesData: cmaData,
+        });
+      } else {
+        await apiRequest('POST', '/api/cmas', {
+          name: `CMA for ${transaction.propertyAddress}`,
+          transactionId: transaction.id,
+          subjectPropertyId: transaction.mlsNumber,
+          propertiesData: cmaData,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
+      setHasUnsavedChanges(false);
+      toast({
+        title: 'CMA Saved',
+        description: 'Your CMA has been saved successfully.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to save CMA',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleCopyEmail = () => {
+    setEmailShareDialogOpen(true);
+  };
+
+  const handleCopyLiveUrl = async () => {
+    if (savedCma?.publicLink) {
+      const shareUrl = `${window.location.origin}/shared/cma/${savedCma.publicLink}`;
+      await navigator.clipboard.writeText(shareUrl);
+      toast({
+        title: 'Link Copied',
+        description: 'The CMA link has been copied to your clipboard.',
+      });
+    } else {
+      toast({
+        title: 'No Share Link',
+        description: 'Generate a share link first.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleShareCMA = async () => {
+    try {
+      let cmaId = savedCma?.id;
+      if (!cmaId && cmaData) {
+        const res = await apiRequest('POST', '/api/cmas', {
+          name: `CMA for ${transaction.propertyAddress}`,
+          transactionId: transaction.id,
+          subjectPropertyId: transaction.mlsNumber,
+          propertiesData: cmaData,
+        });
+        const newCma = await res.json() as { id: string; publicLink: string };
+        cmaId = newCma.id;
+      }
+      if (cmaId) {
+        const response = await apiRequest('POST', `/api/cmas/${cmaId}/share`);
+        const data = await response.json() as { publicLink: string };
+        const shareUrl = `${window.location.origin}/shared/cma/${data.publicLink}`;
+        await navigator.clipboard.writeText(shareUrl);
+        queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
+        toast({
+          title: 'Share Link Created',
+          description: 'The link has been copied to your clipboard.',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to generate share link',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleExportPDF = () => {
+    toast({
+      title: 'Coming Soon',
+      description: 'PDF export will be available soon.',
+    });
+  };
+
+  const handlePresentation = () => {
+    if (savedCma?.id) {
+      setLocation(`/presentation/${savedCma.id}`);
+    } else {
+      toast({
+        title: 'Save CMA First',
+        description: 'Please save the CMA before opening the Presentation Builder.',
+      });
+    }
+  };
+
+  const handleAdjustFilters = () => {
+    setFiltersPanelOpen(true);
+  };
+
+  const handleNotes = () => {
+    setNotesDialogOpen(true);
+  };
+
+  const handleProduceUrl = async () => {
+    if (savedCma?.publicLink) {
+      const shareUrl = `${window.location.origin}/shared/cma/${savedCma.publicLink}`;
+      await navigator.clipboard.writeText(shareUrl);
+      toast({
+        title: 'URL Copied',
+        description: 'The CMA URL has been copied to your clipboard.',
+      });
+    } else {
+      handleShareCMA();
+    }
+  };
+
   return (
     <div className="space-y-4">
-      {/* 1. ACTION BUTTONS - Top Right Aligned */}
-      <div className="flex justify-end print:hidden">
-        <CMAActionButtons
-          cmaId={savedCma?.id}
-          transactionId={transaction.id}
-          propertyAddress={transaction.propertyAddress || 'Property'}
-          publicLink={savedCma?.publicLink}
-          statistics={statistics}
-          cmaData={cmaData || []}
-          mlsNumber={transaction.mlsNumber}
-          onShareSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
-          }}
+      {/* 1. ACTION BAR - Dropdown menus for Share, Export, More */}
+      <div className="print:hidden">
+        <CMAActionBar
+          onSave={handleSave}
+          hasUnsavedChanges={hasUnsavedChanges}
+          onCopyEmail={handleCopyEmail}
+          onCopyLiveUrl={handleCopyLiveUrl}
+          onShareCMA={handleShareCMA}
+          onPrint={handlePrint}
+          onExportPDF={handleExportPDF}
+          onPresentation={handlePresentation}
+          onAdjustFilters={handleAdjustFilters}
+          onNotes={handleNotes}
+          onProduceUrl={handleProduceUrl}
         />
       </div>
 
-      {/* 2. PREVIEW BANNER - Yellow, Full Width */}
-      <CMAPreviewBanner
-        cmaId={savedCma?.id}
-        transactionId={transaction.id}
+      {/* 2. UNSAVED CHANGES BANNER - Only show when there are unsaved changes */}
+      {hasUnsavedChanges && (
+        <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+          <span className="text-sm text-amber-800 dark:text-amber-200">
+            You have unsaved changes to this CMA report.
+          </span>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setHasUnsavedChanges(false)}>
+              Discard
+            </Button>
+            <Button size="sm" onClick={handleSave}>
+              Save Changes
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* CMA Email Share Dialog */}
+      <CMAEmailShareDialog
+        open={emailShareDialogOpen}
+        onOpenChange={setEmailShareDialogOpen}
+        cmaId={savedCma?.id || ''}
         propertyAddress={transaction.propertyAddress || 'Property'}
-        publicLink={savedCma?.publicLink}
-        notes={savedCma?.notes}
-        cmaData={cmaData || []}
-        mlsNumber={transaction.mlsNumber}
+      />
+
+      {/* CMA Filters Panel */}
+      <CMAFiltersPanel
+        open={filtersPanelOpen}
+        onOpenChange={setFiltersPanelOpen}
+        transactionId={transaction.id}
+        mlsNumber={transaction.mlsNumber || ''}
         subjectProperty={(() => {
           const mlsData = transaction.mlsData as any;
           return {
@@ -363,17 +519,23 @@ export function CMATab({ transaction }: CMATabProps) {
             baths: mlsData?.bathrooms || mlsData?.details?.numBathrooms || undefined,
           };
         })()}
-        onSave={() => {
-          toast({
-            title: 'CMA Saved',
-            description: 'Your CMA has been saved successfully.',
-          });
-        }}
         onFiltersApplied={() => {
           queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id] });
           queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
         }}
-        onNotesUpdate={() => {
+      />
+
+      {/* CMA Notes Dialog */}
+      <CMANotesDialog
+        open={notesDialogOpen}
+        onOpenChange={setNotesDialogOpen}
+        cmaId={savedCma?.id}
+        transactionId={transaction.id}
+        propertyAddress={transaction.propertyAddress || 'Property'}
+        initialNotes={savedCma?.notes || ''}
+        cmaData={cmaData || []}
+        mlsNumber={transaction.mlsNumber}
+        onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
         }}
       />

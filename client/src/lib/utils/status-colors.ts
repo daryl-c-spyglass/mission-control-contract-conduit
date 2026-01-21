@@ -1,3 +1,97 @@
+// Status configuration object for comprehensive status handling
+export interface StatusConfig {
+  label: string;
+  badge: string;
+  dot: string;
+  marker: string;
+}
+
+export const getStatusConfig = (status: string): StatusConfig => {
+  const normalized = status?.toLowerCase().replace(/\s+/g, '') || '';
+  
+  // Check compound statuses first
+  if (normalized.includes('under') || normalized.includes('contract') || normalized.includes('incontract')) {
+    return {
+      label: 'Under Contract',
+      badge: 'bg-amber-500 text-white',
+      dot: 'bg-amber-500',
+      marker: '#f59e0b',
+    };
+  }
+  
+  if (normalized.includes('closed') || normalized.includes('sold')) {
+    return {
+      label: 'Closed',
+      badge: 'bg-gray-500 text-white',
+      dot: 'bg-gray-500',
+      marker: '#6b7280',
+    };
+  }
+  
+  if (normalized.includes('pendinginspection')) {
+    return {
+      label: 'Pending Inspection',
+      badge: 'bg-yellow-400 text-gray-900',
+      dot: 'bg-yellow-400',
+      marker: '#facc15',
+    };
+  }
+  
+  if (normalized.includes('pending')) {
+    return {
+      label: 'Pending',
+      badge: 'bg-yellow-500 text-white',
+      dot: 'bg-yellow-500',
+      marker: '#eab308',
+    };
+  }
+  
+  if (normalized.includes('cleartoclose')) {
+    return {
+      label: 'Clear to Close',
+      badge: 'bg-green-600 text-white',
+      dot: 'bg-green-600',
+      marker: '#16a34a',
+    };
+  }
+  
+  if (normalized.includes('comingsoon')) {
+    return {
+      label: 'Coming Soon',
+      badge: 'bg-purple-500 text-white',
+      dot: 'bg-purple-500',
+      marker: '#a855f7',
+    };
+  }
+  
+  if (normalized.includes('withdrawn') || normalized.includes('cancel') || normalized.includes('expired')) {
+    return {
+      label: normalized.includes('withdrawn') ? 'Withdrawn' : 
+             normalized.includes('expired') ? 'Expired' : 'Cancelled',
+      badge: 'bg-gray-400 text-white',
+      dot: 'bg-gray-400',
+      marker: '#9ca3af',
+    };
+  }
+  
+  // Check "active" last since compound statuses like "Active Under Contract" should match above
+  if (normalized.includes('active') || normalized === 'forsale') {
+    return {
+      label: 'Active',
+      badge: 'bg-green-500 text-white',
+      dot: 'bg-green-500',
+      marker: '#22c55e',
+    };
+  }
+  
+  return {
+    label: status || 'Unknown',
+    badge: 'bg-gray-500 text-white',
+    dot: 'bg-gray-500',
+    marker: '#6b7280',
+  };
+};
+
 export const getStatusBadgeStyle = (status: string): string => {
   const statusLower = status.toLowerCase();
   
