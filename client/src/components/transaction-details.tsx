@@ -30,6 +30,9 @@ import {
   FileImage,
   Download,
   Trash2,
+  Archive,
+  ArchiveRestore,
+  MoreVertical,
   Upload,
   File,
   Search,
@@ -69,6 +72,24 @@ import {
   Check,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -841,6 +862,57 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
     },
   });
 
+  // Archive transaction mutation
+  const archiveTransactionMutation = useMutation({
+    mutationFn: async (isArchived: boolean) => {
+      const res = await apiRequest("PATCH", `/api/transactions/${transaction.id}/archive`, { isArchived });
+      return res.json();
+    },
+    onSuccess: (_, isArchived) => {
+      toast({ 
+        title: isArchived ? "Transaction archived" : "Transaction restored",
+        description: isArchived 
+          ? "The transaction has been moved to the archive."
+          : "The transaction has been restored from the archive."
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", transaction.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      if (isArchived) {
+        onBack();
+      }
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to archive transaction", 
+        description: error.message || "Please try again.",
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Delete transaction mutation
+  const deleteTransactionMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", `/api/transactions/${transaction.id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ 
+        title: "Transaction deleted",
+        description: "The transaction has been permanently deleted."
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      onBack();
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to delete transaction", 
+        description: error.message || "Please try again.",
+        variant: "destructive" 
+      });
+    },
+  });
+
   const handleSaveDates = async () => {
     await updateTransactionMutation.mutateAsync({
       contractDate: editContractDate || null,
@@ -951,6 +1023,72 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
               <span className="hidden xs:inline">View</span> Emails
             </Button>
           )}
+          
+          {/* Transaction Actions Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" data-testid="button-transaction-actions">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {transaction.isArchived ? (
+                <DropdownMenuItem
+                  onClick={() => archiveTransactionMutation.mutate(false)}
+                  disabled={archiveTransactionMutation.isPending}
+                  className="cursor-pointer"
+                  data-testid="menu-item-restore"
+                >
+                  <ArchiveRestore className="w-4 h-4 mr-2" />
+                  Restore from Archive
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  onClick={() => archiveTransactionMutation.mutate(true)}
+                  disabled={archiveTransactionMutation.isPending}
+                  className="cursor-pointer"
+                  data-testid="menu-item-archive"
+                >
+                  <Archive className="w-4 h-4 mr-2" />
+                  Archive Transaction
+                </DropdownMenuItem>
+              )}
+              
+              <DropdownMenuSeparator />
+              
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem
+                    onSelect={(e) => e.preventDefault()}
+                    className="text-red-600 cursor-pointer focus:text-red-600"
+                    data-testid="menu-item-delete"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Transaction
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to permanently delete "{transaction.propertyAddress}"?
+                      This action cannot be undone and will remove all associated data.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteTransactionMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground"
+                      disabled={deleteTransactionMutation.isPending}
+                    >
+                      {deleteTransactionMutation.isPending ? "Deleting..." : "Delete"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

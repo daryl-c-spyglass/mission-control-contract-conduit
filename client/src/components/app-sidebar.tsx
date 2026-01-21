@@ -36,7 +36,7 @@ const adminNavItems = [
 export function AppSidebar({ transactions, onCreateTransaction }: AppSidebarProps) {
   const [location] = useLocation();
   const { user } = useAuth();
-  const activeCount = transactions.filter(t => t.status !== "closed" && t.status !== "cancelled").length;
+  const activeCount = transactions.filter(t => t.status !== "closed" && t.status !== "cancelled" && t.isArchived !== true).length;
   
   // Combine nav items, adding Admin if user is admin
   const navItems = user?.isAdmin === "true"

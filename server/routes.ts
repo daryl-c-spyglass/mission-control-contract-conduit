@@ -625,6 +625,38 @@ export async function registerRoutes(
     }
   });
 
+  // Archive/Unarchive a transaction
+  app.patch("/api/transactions/:id/archive", isAuthenticated, async (req, res) => {
+    try {
+      const { isArchived } = req.body;
+      
+      const transaction = await storage.getTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      const updated = await storage.updateTransaction(req.params.id, {
+        isArchived: isArchived === true,
+        archivedAt: isArchived ? new Date() : null,
+      });
+      
+      // Log activity
+      await storage.createActivity({
+        transactionId: req.params.id,
+        type: isArchived ? 'transaction_archived' : 'transaction_restored',
+        category: 'transaction',
+        description: isArchived 
+          ? `Transaction archived`
+          : `Transaction restored from archive`,
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error('Error archiving transaction:', error);
+      res.status(500).json({ message: "Failed to archive transaction" });
+    }
+  });
+
   // Connect Slack channel to an existing transaction
   app.post("/api/transactions/:id/connect-slack", isAuthenticated, async (req: any, res) => {
     try {

@@ -1,0 +1,727 @@
+# Create Transaction & Transaction Card Fixes
+
+## Issues to Fix
+
+1. ✅ Remove "Residential Investment" from Property Type dropdown (not RESO compliant)
+2. ✅ Fix double scrollbar on the Create Transaction modal
+3. ✅ Move MLS Number field ABOVE Property Address field
+4. ✅ Add Archive button inside transaction detail view
+5. ✅ Archived transactions appear in Archive section on Navigation
+
+---
+
+## Fix 1: Remove Non-RESO Property Type
+
+**File: Update your property types constant or Select component**
+
+Remove "Residential Investment" - it's not a RESO standard. Use "Residential Income" instead.
+
+```typescript
+// CORRECT - RESO Compliant Property Types
+export const PROPERTY_TYPES = [
+  // Residential
+  { value: 'Residential', label: 'Residential' },
+  { value: 'Residential Income', label: 'Residential Income' },
+  { value: 'Residential Lease', label: 'Residential Lease' },
+  
+  // Commercial
+  { value: 'Commercial Sale', label: 'Commercial Sale' },
+  { value: 'Business Opportunity', label: 'Business Opportunity' },
+  
+  // Land & Farm
+  { value: 'Farm', label: 'Farm and Ranch' },
+  { value: 'Land', label: 'Land' },
+  
+  // Other
+  { value: 'Manufactured In Park', label: 'Manufactured Home' },
+];
+
+// ❌ REMOVE: "Residential Investment" - NOT RESO standard
+```
+
+---
+
+## Fix 2: Remove Double Scrollbar
+
+The modal has two scroll containers causing double scrollbars. Fix by having only ONE scrollable area.
+
+**File: Update Create Transaction modal component**
+
+```tsx
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+// Option A: Using ScrollArea (Recommended)
+<Dialog open={isOpen} onOpenChange={onClose}>
+  <DialogContent className="sm:max-w-[550px] max-h-[90vh] flex flex-col p-0">
+    {/* Fixed Header */}
+    <DialogHeader className="px-6 pt-6 pb-4">
+      <DialogTitle>Create New Transaction</DialogTitle>
+      <p className="text-sm text-muted-foreground">
+        Enter the property details to start a new transaction. This will
+        automatically set up integrations based on your preferences.
+      </p>
+    </DialogHeader>
+
+    {/* Single Scrollable Content Area */}
+    <ScrollArea className="flex-1 px-6">
+      <form onSubmit={handleSubmit} className="space-y-5 pb-6">
+        {/* All form fields go here */}
+      </form>
+    </ScrollArea>
+
+    {/* Fixed Footer (optional - for buttons) */}
+    <div className="flex justify-end gap-3 px-6 py-4 border-t">
+      <Button type="button" variant="outline" onClick={onClose}>
+        Cancel
+      </Button>
+      <Button type="submit" form="create-transaction-form">
+        Create Transaction
+      </Button>
+    </div>
+  </DialogContent>
+</Dialog>
+
+// Option B: CSS-only fix (if not using ScrollArea)
+<DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-hidden">
+  <DialogHeader>...</DialogHeader>
+  
+  <form 
+    onSubmit={handleSubmit} 
+    className="space-y-5 overflow-y-auto max-h-[calc(90vh-180px)] pr-2"
+  >
+    {/* Form fields */}
+  </form>
+</DialogContent>
+```
+
+**Key:** Only ONE element should have `overflow-y: auto` or `overflow-y: scroll`.
+
+---
+
+## Fix 3: Move MLS Number ABOVE Property Address
+
+Reorder the form fields so MLS Number comes first.
+
+**Current Order:**
+```
+Property Address
+MLS Number
+☐ Off Market
+```
+
+**New Order:**
+```
+MLS Number
+Property Address  
+☐ Off Market
+```
+
+**File: Update Create Transaction form**
+
+```tsx
+<form onSubmit={handleSubmit} className="space-y-5">
+  {/* Agent Represents */}
+  <div className="space-y-3">
+    <div className="space-y-2">
+      <Label>Our Agent Represents</Label>
+      <Select value={agentRepresents} onValueChange={setAgentRepresents}>
+        {/* ... */}
+      </Select>
+    </div>
+    
+    {/* Is Company Lead checkbox */}
+    <div className="flex items-center gap-2">
+      <Checkbox id="isCompanyLead" checked={isCompanyLead} onCheckedChange={setIsCompanyLead} />
+      <label htmlFor="isCompanyLead" className="text-sm cursor-pointer">Is Company Lead</label>
+    </div>
+  </div>
+
+  {/* ========================================= */}
+  {/* MLS NUMBER - NOW FIRST */}
+  {/* ========================================= */}
+  <div className="space-y-3">
+    <div className="space-y-2">
+      <Label>MLS Number</Label>
+      {isOffMarket ? (
+        <Input
+          value={mlsNumber}
+          disabled
+          placeholder="N/A for off-market"
+          className="bg-muted"
+        />
+      ) : (
+        <PropertyAutocomplete
+          value={mlsNumber}
+          onChange={handleMlsChange}
+          onSelect={handleMlsSelect}
+          options={mlsResults}
+          isLoading={isSearchingMls}
+          placeholder="ACT2572987 or 2572987"
+          type="mls"
+        />
+      )}
+      <p className="text-xs text-muted-foreground">
+        Enter with or without ACT prefix
+      </p>
+    </div>
+    
+    {/* Off Market Checkbox */}
+    <div className="flex items-center gap-2">
+      <Checkbox
+        id="isOffMarket"
+        checked={isOffMarket}
+        onCheckedChange={(checked) => setIsOffMarket(checked as boolean)}
+      />
+      <div>
+        <label htmlFor="isOffMarket" className="text-sm cursor-pointer">
+          Off Market
+        </label>
+        <p className="text-xs text-muted-foreground">
+          Check if this property is not listed in MLS
+        </p>
+      </div>
+    </div>
+  </div>
+
+  {/* ========================================= */}
+  {/* PROPERTY ADDRESS - NOW SECOND */}
+  {/* ========================================= */}
+  <div className="space-y-2">
+    <Label>Property Address</Label>
+    {isOffMarket ? (
+      <Input
+        value={propertyAddress}
+        onChange={(e) => setPropertyAddress(e.target.value)}
+        placeholder="Enter property address"
+        required
+      />
+    ) : (
+      <PropertyAutocomplete
+        value={propertyAddress}
+        onChange={handleAddressChange}
+        onSelect={handleAddressSelect}
+        options={addressResults}
+        isLoading={isSearchingAddress}
+        placeholder="Start typing an address..."
+        type="address"
+      />
+    )}
+  </div>
+
+  {/* Off Market Fields (if isOffMarket) */}
+  {isOffMarket && (
+    <Card className="p-4 space-y-4 bg-purple-50 dark:bg-purple-950/20 border-purple-200">
+      {/* Off market property details */}
+    </Card>
+  )}
+
+  {/* Rest of the form... */}
+</form>
+```
+
+---
+
+## Fix 4 & 5: Archive Button & Archive Section
+
+### 4a. Add Database Column
+
+**File: `shared/schema.ts`**
+
+```typescript
+export const transactions = pgTable('transactions', {
+  id: serial('id').primaryKey(),
+  // ... existing columns
+  
+  isArchived: boolean('is_archived').default(false), // ← ADD THIS
+  archivedAt: timestamp('archived_at'), // ← ADD THIS (optional - track when archived)
+  
+  // ... rest of columns
+});
+```
+
+**Run migration:**
+```bash
+npm run db:push
+```
+
+### 4b. Add Archive Button to Transaction Detail View
+
+**File: Update your transaction detail/card component**
+
+```tsx
+import { Archive, ArchiveRestore, Trash2 } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { MoreVertical } from 'lucide-react';
+
+interface TransactionActionsProps {
+  transaction: {
+    id: number;
+    address: string;
+    isArchived?: boolean;
+  };
+}
+
+export function TransactionActions({ transaction }: TransactionActionsProps) {
+  const queryClient = useQueryClient();
+
+  // Archive mutation
+  const archiveTransaction = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/transactions/${id}/archive`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isArchived: true }),
+      });
+      if (!res.ok) throw new Error('Failed to archive');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['archived-transactions'] });
+      toast({ title: 'Transaction archived' });
+    },
+  });
+
+  // Unarchive mutation
+  const unarchiveTransaction = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/transactions/${id}/archive`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isArchived: false }),
+      });
+      if (!res.ok) throw new Error('Failed to unarchive');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['archived-transactions'] });
+      toast({ title: 'Transaction restored' });
+    },
+  });
+
+  // Delete mutation
+  const deleteTransaction = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['archived-transactions'] });
+      toast({ title: 'Transaction deleted' });
+    },
+  });
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm">
+          <MoreVertical className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {/* Archive / Unarchive */}
+        {transaction.isArchived ? (
+          <DropdownMenuItem
+            onClick={() => unarchiveTransaction.mutate(transaction.id)}
+            className="cursor-pointer"
+          >
+            <ArchiveRestore className="w-4 h-4 mr-2" />
+            Restore from Archive
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem
+            onClick={() => archiveTransaction.mutate(transaction.id)}
+            className="cursor-pointer"
+          >
+            <Archive className="w-4 h-4 mr-2" />
+            Archive Transaction
+          </DropdownMenuItem>
+        )}
+
+        <DropdownMenuSeparator />
+
+        {/* Delete with confirmation */}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <DropdownMenuItem
+              onSelect={(e) => e.preventDefault()}
+              className="text-red-600 cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Transaction
+            </DropdownMenuItem>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to permanently delete "{transaction.address}"?
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteTransaction.mutate(transaction.id)}
+                className="bg-red-500 hover:bg-red-600"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+```
+
+### 4c. Backend Routes for Archive
+
+**File: `server/routes.ts`**
+
+```typescript
+// Archive/Unarchive transaction
+app.patch('/api/transactions/:id/archive', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isArchived } = req.body;
+
+    const [updated] = await db
+      .update(transactions)
+      .set({
+        isArchived,
+        archivedAt: isArchived ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(transactions.id, parseInt(id)))
+      .returning();
+
+    res.json(updated);
+  } catch (error: any) {
+    console.error('Archive transaction error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get archived transactions
+app.get('/api/transactions/archived', async (req, res) => {
+  try {
+    const userId = req.user?.id; // If using auth
+    
+    const archivedTransactions = await db
+      .select()
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.isArchived, true),
+          userId ? eq(transactions.userId, userId) : undefined
+        )
+      )
+      .orderBy(desc(transactions.archivedAt));
+
+    res.json(archivedTransactions);
+  } catch (error: any) {
+    console.error('Get archived transactions error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update existing GET /api/transactions to exclude archived
+app.get('/api/transactions', async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    
+    const activeTransactions = await db
+      .select()
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.isArchived, false), // ← ADD THIS FILTER
+          userId ? eq(transactions.userId, userId) : undefined
+        )
+      )
+      .orderBy(desc(transactions.createdAt));
+
+    res.json(activeTransactions);
+  } catch (error: any) {
+    console.error('Get transactions error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+```
+
+### 4d. Archive Page Component
+
+**File: `client/src/pages/archive.tsx`** (CREATE)
+
+```tsx
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { TransactionCard } from '@/components/transactions/transaction-card';
+import { Archive as ArchiveIcon } from 'lucide-react';
+
+export default function ArchivePage() {
+  const { data: archivedTransactions, isLoading } = useQuery({
+    queryKey: ['archived-transactions'],
+    queryFn: async () => {
+      const res = await fetch('/api/transactions/archived');
+      if (!res.ok) throw new Error('Failed to fetch archived transactions');
+      return res.json();
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Archive</h1>
+        <p className="text-muted-foreground">
+          Archived transactions that are no longer active
+        </p>
+      </div>
+
+      {archivedTransactions?.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-64 text-center">
+          <ArchiveIcon className="w-12 h-12 text-muted-foreground mb-4" />
+          <h3 className="font-medium text-lg">No Archived Transactions</h3>
+          <p className="text-muted-foreground text-sm mt-1">
+            Archived transactions will appear here
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {archivedTransactions?.map((transaction: any) => (
+            <TransactionCard
+              key={transaction.id}
+              transaction={transaction}
+              showArchiveActions
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### 4e. Update Navigation Sidebar
+
+**File: Update your sidebar/navigation component**
+
+```tsx
+import { Archive, Home, FileText, Image, Settings } from 'lucide-react';
+import { Link, useLocation } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
+
+export function Sidebar() {
+  const [location] = useLocation();
+  
+  // Get archived count for badge
+  const { data: archivedCount } = useQuery({
+    queryKey: ['archived-transactions-count'],
+    queryFn: async () => {
+      const res = await fetch('/api/transactions/archived/count');
+      if (!res.ok) return 0;
+      const data = await res.json();
+      return data.count;
+    },
+  });
+
+  const navItems = [
+    {
+      label: 'Transactions',
+      href: '/transactions',
+      icon: FileText,
+      badge: null,
+    },
+    {
+      label: 'Archive',
+      href: '/archive',
+      icon: Archive,
+      badge: archivedCount > 0 ? archivedCount : null,
+    },
+    {
+      label: 'Graphics',
+      href: '/graphics',
+      icon: Image,
+      badge: null,
+    },
+    {
+      label: 'Settings',
+      href: '/settings',
+      icon: Settings,
+      badge: null,
+    },
+  ];
+
+  return (
+    <aside className="w-64 border-r bg-card">
+      <nav className="p-4 space-y-1">
+        {navItems.map((item) => {
+          const isActive = location === item.href;
+          const Icon = item.icon;
+          
+          return (
+            <Link key={item.href} href={item.href}>
+              <a
+                className={`
+                  flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium
+                  transition-colors
+                  ${isActive 
+                    ? 'bg-primary/10 text-primary' 
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }
+                `}
+              >
+                <Icon className="w-4 h-4" />
+                <span className="flex-1">{item.label}</span>
+                {item.badge && (
+                  <span className="bg-muted text-muted-foreground text-xs px-2 py-0.5 rounded-full">
+                    {item.badge}
+                  </span>
+                )}
+              </a>
+            </Link>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+}
+```
+
+### 4f. Add Route
+
+**File: Update your router (e.g., `App.tsx` or `routes.tsx`)**
+
+```tsx
+import ArchivePage from '@/pages/archive';
+
+// Add to your routes
+<Route path="/archive" component={ArchivePage} />
+```
+
+### 4g. Optional: Archive Count Endpoint
+
+**File: `server/routes.ts`**
+
+```typescript
+// Get archived count for badge
+app.get('/api/transactions/archived/count', async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.isArchived, true),
+          userId ? eq(transactions.userId, userId) : undefined
+        )
+      );
+
+    res.json({ count: result[0]?.count || 0 });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+```
+
+---
+
+## Summary
+
+| Fix | Description |
+|-----|-------------|
+| 1. Property Types | Remove "Residential Investment" (not RESO) |
+| 2. Double Scrollbar | Use single ScrollArea or fix overflow settings |
+| 3. Field Order | MLS Number → Property Address → Off Market checkbox |
+| 4. Archive Button | Dropdown menu with Archive/Restore/Delete options |
+| 5. Archive Section | New page at `/archive` showing archived transactions |
+
+---
+
+## New Form Field Order
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Create New Transaction                                      ✕   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ Our Agent Represents                                            │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ Seller                                                    ▾ │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│ ☐ Is Company Lead                                               │
+│                                                                 │
+│ ─────────────────────────────────────────────────────────────── │
+│                                                                 │
+│ MLS Number                        ← NOW FIRST                   │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ ACT2572987 or 2572987                                     # │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│ Enter with or without ACT prefix                                │
+│                                                                 │
+│ ☐ Off Market                                                    │
+│   Check if this property is not listed in MLS                   │
+│                                                                 │
+│ Property Address                  ← NOW SECOND                  │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ 123 Main St, City, State 12345                              │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ [Off Market Property Details - if checked]                      │
+│                                                                 │
+│ ...rest of form...                                              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Navigation with Archive
+
+```
+┌──────────────────────┐
+│ 🏠 Mission Control   │
+│ Transaction Management│
+├──────────────────────┤
+│ [+ New Transaction]  │
+├──────────────────────┤
+│ Navigation           │
+│                      │
+│ 📄 Transactions  14  │ ← Active transactions
+│ 📦 Archive       3   │ ← Archived transactions (NEW)
+│ 🖼️ Graphics          │
+│ ⚙️ Settings          │
+└──────────────────────┘
+```

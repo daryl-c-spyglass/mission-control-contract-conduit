@@ -104,6 +104,9 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen, trans
   });
 
   const filteredTransactions = transactions.filter((t) => {
+    // Exclude archived transactions from the main dashboard
+    if (t.isArchived === true) return false;
+    
     const matchesSearch = t.propertyAddress.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.mlsNumber?.toLowerCase().includes(searchQuery.toLowerCase());
     

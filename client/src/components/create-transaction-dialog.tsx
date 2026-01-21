@@ -9,6 +9,7 @@ import { usePropertySearch, type PropertySearchResult, type PlacePrediction } fr
 import { PropertyAutocomplete } from "@/components/ui/property-autocomplete";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { PROPERTY_TYPES, PROPERTY_TYPE_CATEGORIES, getPropertyTypesByCategory } from "@/lib/propertyTypes";
 import {
   Dialog,
@@ -303,16 +304,17 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
           <DialogTitle>Create New Transaction</DialogTitle>
           <DialogDescription>
             Enter the property details to start a new transaction. This will automatically set up integrations based on your preferences.
           </DialogDescription>
         </DialogHeader>
 
+        <ScrollArea className="flex-1 px-6">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 overflow-y-auto flex-1 pr-2">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-6">
             <FormField
               control={form.control}
               name="transactionType"
@@ -357,7 +359,39 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
 
             <div className="border-t my-2" />
 
-            {/* Property Address with Google Places Autocomplete */}
+            {/* MLS Number with Autocomplete - NOW FIRST */}
+            <FormField
+              control={form.control}
+              name="mlsNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>MLS Number</FormLabel>
+                  <FormControl>
+                    <PropertyAutocomplete
+                      value={mlsInput}
+                      onChange={(value) => {
+                        setMlsInput(value);
+                        field.onChange(value);
+                        // Clear selection when user edits the MLS number
+                        if (selectedProperty && value !== selectedProperty.mlsNumber) {
+                          setSelectedProperty(null);
+                        }
+                      }}
+                      onSelect={handlePropertySelect}
+                      options={selectedProperty ? [] : mlsResults}
+                      isLoading={isSearchingMls}
+                      placeholder="ACT2572987 or 2572987"
+                      type="mls"
+                      helperText="Enter with or without ACT prefix"
+                      testId="input-mls-number"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Property Address with Google Places Autocomplete - NOW SECOND */}
             <FormField
               control={form.control}
               name="propertyAddress"
@@ -408,38 +442,6 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                         </div>
                       )}
                     </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* MLS Number with Autocomplete */}
-            <FormField
-              control={form.control}
-              name="mlsNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>MLS Number</FormLabel>
-                  <FormControl>
-                    <PropertyAutocomplete
-                      value={mlsInput}
-                      onChange={(value) => {
-                        setMlsInput(value);
-                        field.onChange(value);
-                        // Clear selection when user edits the MLS number
-                        if (selectedProperty && value !== selectedProperty.mlsNumber) {
-                          setSelectedProperty(null);
-                        }
-                      }}
-                      onSelect={handlePropertySelect}
-                      options={selectedProperty ? [] : mlsResults}
-                      isLoading={isSearchingMls}
-                      placeholder="ACT2572987 or 2572987"
-                      type="mls"
-                      helperText="Enter with or without ACT prefix"
-                      testId="input-mls-number"
-                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1063,6 +1065,7 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
             </div>
           </form>
         </Form>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );

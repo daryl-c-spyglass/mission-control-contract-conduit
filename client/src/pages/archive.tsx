@@ -43,7 +43,7 @@ export default function Archive() {
   });
 
   const archivedTransactions = transactions.filter(
-    (t) => t.status === "closed" || t.status === "cancelled"
+    (t) => t.isArchived === true
   );
 
   const filteredTransactions = archivedTransactions.filter((t) => {
@@ -71,7 +71,7 @@ export default function Archive() {
       <div>
         <h1 className="text-2xl font-semibold">Archive</h1>
         <p className="text-muted-foreground">
-          View closed and cancelled transactions
+          View archived transactions
         </p>
       </div>
 

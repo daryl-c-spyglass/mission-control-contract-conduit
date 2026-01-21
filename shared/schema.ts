@@ -49,6 +49,8 @@ export const transactions = pgTable("transactions", {
   propertyDescription: text("property_description"), // For brochure/marketing materials
   notes: text("notes"),
   mlsLastSyncedAt: timestamp("mls_last_synced_at"),
+  isArchived: boolean("is_archived").default(false),
+  archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
