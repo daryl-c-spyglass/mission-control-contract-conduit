@@ -957,6 +957,134 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/transactions/:id/generate-cma-fallback
+  // Generates CMA data using coordinate-based search for closed listings
+  app.post("/api/transactions/:id/generate-cma-fallback", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { radius = 5 } = req.body;
+
+      const transaction = await storage.getTransaction(id);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+
+      const mlsData = transaction.mlsData as any;
+      if (!mlsData) {
+        return res.status(400).json({ 
+          error: "No MLS data available",
+          message: "This transaction does not have MLS data to extract coordinates from."
+        });
+      }
+
+      const latitude = mlsData.coordinates?.latitude || mlsData.map?.latitude || mlsData.latitude;
+      const longitude = mlsData.coordinates?.longitude || mlsData.map?.longitude || mlsData.longitude;
+
+      if (!latitude || !longitude) {
+        return res.status(400).json({ 
+          error: "No coordinates available",
+          message: "This property does not have latitude/longitude coordinates in the MLS data."
+        });
+      }
+
+      const subjectPrice = mlsData.listPrice || mlsData.soldPrice || mlsData.closePrice;
+      const subjectBeds = mlsData.bedrooms || mlsData.bedroomsTotal;
+
+      const filters: CMASearchFilters = {
+        radius: radius,
+        maxResults: 15,
+        statuses: ['Closed', 'Active', 'Active Under Contract', 'Pending'],
+        soldWithinMonths: 6,
+      };
+
+      if (subjectPrice) {
+        filters.minPrice = Math.round(subjectPrice * 0.75);
+        filters.maxPrice = Math.round(subjectPrice * 1.25);
+      }
+
+      if (subjectBeds) {
+        filters.minBeds = Math.max(1, subjectBeds - 1);
+        filters.maxBeds = subjectBeds + 1;
+      }
+
+      console.log(`[CMA Fallback] Generating for transaction ${id} at (${latitude}, ${longitude})`);
+
+      const comparables = await searchNearbyComparables(
+        latitude,
+        longitude,
+        transaction.mlsNumber || '',
+        filters
+      );
+
+      if (!comparables || comparables.length === 0) {
+        return res.status(200).json({ 
+          success: false,
+          message: "No comparable properties found within the search radius.",
+          comparablesCount: 0
+        });
+      }
+
+      await storage.updateTransaction(id, {
+        cmaData: comparables,
+        cmaSource: "coordinate_fallback",
+        cmaGeneratedAt: new Date(),
+      });
+
+      await storage.createActivity({
+        transactionId: id,
+        type: "cma_generated",
+        description: `Generated ${comparables.length} comparables using nearby property search`,
+        category: "cma",
+      });
+
+      console.log(`[CMA Fallback] Success: ${comparables.length} comparables found for transaction ${id}`);
+
+      res.json({ 
+        success: true,
+        message: `Found ${comparables.length} comparable properties`,
+        comparablesCount: comparables.length,
+      });
+
+    } catch (error: any) {
+      console.error("[CMA Fallback] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/transactions/:id/cma
+  // Clears CMA data from a transaction
+  app.delete("/api/transactions/:id/cma", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const transaction = await storage.getTransaction(id);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+
+      await storage.updateTransaction(id, {
+        cmaData: null,
+        cmaSource: null,
+        cmaGeneratedAt: null,
+      });
+
+      await storage.createActivity({
+        transactionId: id,
+        type: "cma_cleared",
+        description: "Comparative market analysis data was removed",
+        category: "cma",
+      });
+
+      console.log(`[CMA] Cleared CMA data for transaction ${id}`);
+
+      res.json({ success: true, message: "CMA data cleared" });
+
+    } catch (error: any) {
+      console.error("[CMA Clear] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/transactions/:id/activities", isAuthenticated, async (req, res) => {
     try {
       const category = req.query.category as string | undefined;
