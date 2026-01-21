@@ -1,5 +1,5 @@
 import { storage } from "./storage";
-import { fetchMLSListing, fetchSimilarListings } from "./repliers";
+import { fetchMLSListing, fetchSimilarListings, searchNearbyComparables, type CMASearchFilters } from "./repliers";
 import { isRentalOrLease } from "../shared/lib/listings";
 import type { Transaction, InsertTransaction } from "@shared/schema";
 
@@ -54,6 +54,31 @@ async function syncTransactionMLS(transaction: Transaction): Promise<SyncResult>
     let cmaData = comparables;
     if (!cmaData || cmaData.length === 0) {
       cmaData = await fetchSimilarListings(transaction.mlsNumber);
+    }
+    
+    // Fallback for closed listings: use coordinate-based search if fetchSimilarListings returned empty
+    // The /listings/similar endpoint returns 404 for closed listings, so we use searchNearbyComparables
+    if ((!cmaData || cmaData.length === 0) && mlsData.coordinates?.latitude && mlsData.coordinates?.longitude) {
+      const status = mlsData.status?.toLowerCase() || (mlsData as any).standardStatus?.toLowerCase() || '';
+      const isClosed = status.includes('closed') || status.includes('sold');
+      
+      if (isClosed) {
+        console.log(`[ReplierSync] Using coordinate-based search for closed listing ${transaction.mlsNumber}`);
+        const defaultFilters: CMASearchFilters = {
+          radius: 5,
+          maxResults: 10,
+          statuses: ['Closed', 'Active', 'Active Under Contract', 'Pending'],
+          soldWithinMonths: 6,
+        };
+        
+        cmaData = await searchNearbyComparables(
+          mlsData.coordinates.latitude,
+          mlsData.coordinates.longitude,
+          transaction.mlsNumber,
+          defaultFilters
+        );
+        console.log(`[ReplierSync] Coordinate search found ${cmaData.length} comparables for closed listing`);
+      }
     }
 
     const updateData: Partial<InsertTransaction> & { mlsLastSyncedAt?: Date } = {

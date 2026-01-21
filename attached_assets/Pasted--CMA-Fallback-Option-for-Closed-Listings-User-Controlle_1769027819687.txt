@@ -1,0 +1,653 @@
+# CMA Fallback Option for Closed Listings - User Controlled
+
+## Overview
+
+Add a user-controlled option to fetch CMA data for closed listings using coordinate-based search as a fallback. This feature should:
+
+1. ✅ Only appear when CMA is unavailable (shows "No CMA Available")
+2. ✅ Explain to users what this fallback does before they use it
+3. ✅ Have a tooltip explaining the feature
+4. ✅ Allow users to remove/clear CMA data if they don't want it
+5. ✅ Use existing `searchNearbyComparables()` function
+
+---
+
+## Why This is Needed
+
+The Repliers `/listings/similar` endpoint returns 404 for **Closed** listings, so CMA data is not automatically available. However, the codebase has `searchNearbyComparables()` that can search by coordinates - we just need to expose this as a user option.
+
+---
+
+## UI Design
+
+### When "No CMA Available" is shown:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Comparative Market Analysis                                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│                              🔍                                             │
+│                                                                             │
+│                      No CMA Available                                       │
+│      A comparative market analysis has not been created for this            │
+│                         property yet.                                       │
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │ ℹ️  This property is marked as "Closed" in the MLS. The standard      │  │
+│  │     comparable search is not available for closed listings.           │  │
+│  │                                                                       │  │
+│  │     You can generate comparables using a coordinate-based search      │  │
+│  │     which finds similar properties within a radius of this location.  │  │
+│  │     This may include properties that closed around the same time.     │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│              [🔍 Generate CMA from Nearby Properties]  ⓘ                    │
+│                            ↑                          ↑                     │
+│                       Button              Tooltip with more info            │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Tooltip Content (on ⓘ icon):
+
+```
+"This uses coordinate-based search to find comparable properties 
+within 5 miles of this listing. Results may include Active, 
+Pending, and recently Closed properties. This is a fallback 
+method since standard comparables are not available for 
+closed listings."
+```
+
+### When CMA data exists (from fallback), show remove option:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Comparative Market Analysis                                                 │
+│                                                                             │
+│ 10 comparable properties  •  Generated from nearby search                   │
+│                                                    [🗑️ Clear CMA Data]      │
+│                                                                             │
+│ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐                            │
+│ │ $495,000│ │ $299,900│ │ $480,000│ │ $424,000│                            │
+│ │ 4bd 2ba │ │ 3bd 2ba │ │ 4bd 2ba │ │ 3bd 2ba │                            │
+│ └─────────┘ └─────────┘ └─────────┘ └─────────┘                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Implementation
+
+### 1. Backend - Add Fallback CMA Endpoint
+
+**File: `server/routes.ts`**
+
+Add new endpoint for generating CMA from coordinates:
+
+```typescript
+// POST /api/transactions/:id/generate-cma-fallback
+// Generates CMA data using coordinate-based search for closed listings
+app.post('/api/transactions/:id/generate-cma-fallback', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { radius = 5 } = req.body; // Default 5 mile radius
+    const transactionId = parseInt(id);
+
+    // Get transaction
+    const transaction = await storage.getTransaction(transactionId);
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    // Check if transaction has MLS data with coordinates
+    const mlsData = transaction.mlsData as any;
+    if (!mlsData) {
+      return res.status(400).json({ 
+        error: 'No MLS data available',
+        message: 'This transaction does not have MLS data to extract coordinates from.'
+      });
+    }
+
+    // Extract coordinates (check multiple possible locations)
+    const latitude = mlsData.coordinates?.latitude || 
+                     mlsData.map?.latitude || 
+                     mlsData.latitude;
+    const longitude = mlsData.coordinates?.longitude || 
+                      mlsData.map?.longitude || 
+                      mlsData.longitude;
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({ 
+        error: 'No coordinates available',
+        message: 'This property does not have latitude/longitude coordinates in the MLS data.'
+      });
+    }
+
+    // Get subject property details for filtering
+    const subjectPrice = mlsData.listPrice || mlsData.soldPrice || mlsData.closePrice;
+    const subjectSqft = mlsData.sqft || mlsData.livingArea;
+    const subjectBeds = mlsData.bedrooms || mlsData.bedroomsTotal;
+    const subjectBaths = mlsData.bathrooms || mlsData.bathroomsTotalInteger;
+
+    // Build search filters
+    const filters: any = {
+      maxResults: 15,
+      radius: radius,
+    };
+
+    // Add price range filter (+/- 25%)
+    if (subjectPrice) {
+      filters.minPrice = Math.round(subjectPrice * 0.75);
+      filters.maxPrice = Math.round(subjectPrice * 1.25);
+    }
+
+    // Add beds filter (+/- 1)
+    if (subjectBeds) {
+      filters.minBeds = Math.max(1, subjectBeds - 1);
+      filters.maxBeds = subjectBeds + 1;
+    }
+
+    console.log(`[CMA Fallback] Generating for transaction ${transactionId} at (${latitude}, ${longitude})`);
+
+    // Use existing searchNearbyComparables function
+    const comparables = await searchNearbyComparables(
+      latitude,
+      longitude,
+      filters
+    );
+
+    if (!comparables || comparables.length === 0) {
+      return res.status(200).json({ 
+        success: false,
+        message: 'No comparable properties found within the search radius.',
+        comparablesCount: 0
+      });
+    }
+
+    // Save CMA data to transaction with a flag indicating it's from fallback
+    await storage.updateTransaction(transactionId, {
+      cmaData: comparables,
+      cmaSource: 'coordinate_fallback', // Track that this was generated via fallback
+      cmaGeneratedAt: new Date(),
+    });
+
+    // Log to timeline
+    await storage.createTimelineEvent({
+      transactionId,
+      eventType: 'cma_generated',
+      title: 'CMA Generated',
+      description: `Generated ${comparables.length} comparables using nearby property search`,
+      metadata: {
+        source: 'coordinate_fallback',
+        radius: radius,
+        comparablesCount: comparables.length,
+      },
+    });
+
+    console.log(`[CMA Fallback] Success: ${comparables.length} comparables found for transaction ${transactionId}`);
+
+    res.json({ 
+      success: true,
+      message: `Found ${comparables.length} comparable properties`,
+      comparablesCount: comparables.length,
+      comparables: comparables,
+    });
+
+  } catch (error: any) {
+    console.error('[CMA Fallback] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+```
+
+### 2. Backend - Add Clear CMA Endpoint
+
+**File: `server/routes.ts`**
+
+```typescript
+// DELETE /api/transactions/:id/cma
+// Clears CMA data from a transaction
+app.delete('/api/transactions/:id/cma', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const transactionId = parseInt(id);
+
+    // Get transaction
+    const transaction = await storage.getTransaction(transactionId);
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    // Clear CMA data
+    await storage.updateTransaction(transactionId, {
+      cmaData: null,
+      cmaSource: null,
+      cmaGeneratedAt: null,
+    });
+
+    // Log to timeline
+    await storage.createTimelineEvent({
+      transactionId,
+      eventType: 'cma_cleared',
+      title: 'CMA Data Cleared',
+      description: 'Comparative market analysis data was removed',
+    });
+
+    console.log(`[CMA] Cleared CMA data for transaction ${transactionId}`);
+
+    res.json({ success: true, message: 'CMA data cleared' });
+
+  } catch (error: any) {
+    console.error('[CMA Clear] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+```
+
+### 3. Database Schema Update (if needed)
+
+**File: `shared/schema.ts`**
+
+Add fields to track CMA source:
+
+```typescript
+export const transactions = pgTable('transactions', {
+  // ... existing fields
+  
+  cmaData: jsonb('cma_data'),
+  cmaSource: varchar('cma_source', { length: 50 }), // 'repliers_similar', 'coordinate_fallback', null
+  cmaGeneratedAt: timestamp('cma_generated_at'),
+  
+  // ... other fields
+});
+```
+
+Run migration:
+```bash
+npm run db:push
+```
+
+### 4. Frontend - Update CMA Tab Component
+
+**File: `client/src/components/cma-tab.tsx`**
+
+```tsx
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Search, Info, Trash2, Loader2, MapPin, AlertCircle } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+
+interface CMATabProps {
+  transaction: any;
+}
+
+export function CMATab({ transaction }: CMATabProps) {
+  const queryClient = useQueryClient();
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  const cmaData = transaction.cmaData as any[] | null;
+  const cmaSource = transaction.cmaSource;
+  const hasCmaData = cmaData && cmaData.length > 0;
+  
+  // Check if this is a closed listing
+  const mlsData = transaction.mlsData as any;
+  const status = mlsData?.standardStatus || mlsData?.status || '';
+  const isClosedListing = status.toLowerCase().includes('closed') || 
+                          status.toLowerCase().includes('sold');
+  
+  // Check if coordinates are available
+  const hasCoordinates = !!(
+    mlsData?.coordinates?.latitude || 
+    mlsData?.map?.latitude || 
+    mlsData?.latitude
+  );
+
+  // Generate CMA fallback mutation
+  const generateCmaMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/transactions/${transaction.id}/generate-cma-fallback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ radius: 5 }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'Failed to generate CMA');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['transaction', transaction.id] });
+      if (data.comparablesCount > 0) {
+        toast({
+          title: 'CMA Generated',
+          description: `Found ${data.comparablesCount} comparable properties nearby`,
+        });
+      } else {
+        toast({
+          title: 'No Comparables Found',
+          description: 'No similar properties were found within the search radius',
+          variant: 'destructive',
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to Generate CMA',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Clear CMA mutation
+  const clearCmaMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/transactions/${transaction.id}/cma`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to clear CMA');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transaction', transaction.id] });
+      toast({
+        title: 'CMA Data Cleared',
+        description: 'Comparative market analysis data has been removed',
+      });
+      setShowClearConfirm(false);
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to clear CMA data',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // ==========================================
+  // NO CMA AVAILABLE - Show fallback option
+  // ==========================================
+  if (!hasCmaData) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-xl font-semibold">Comparative Market Analysis</h2>
+        
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Search className="w-12 h-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">No CMA Available</h3>
+            <p className="text-muted-foreground text-center mb-6 max-w-md">
+              A comparative market analysis has not been created for this property yet.
+            </p>
+
+            {/* Show fallback option for closed listings with coordinates */}
+            {isClosedListing && hasCoordinates && (
+              <div className="w-full max-w-lg space-y-4">
+                {/* Explanation Alert */}
+                <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+                  <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
+                    <p className="font-medium mb-1">Why is CMA not available?</p>
+                    <p className="text-blue-700 dark:text-blue-300">
+                      This property is marked as "<strong>{status}</strong>" in the MLS. 
+                      The standard comparable search is not available for closed listings.
+                    </p>
+                    <p className="mt-2 text-blue-700 dark:text-blue-300">
+                      You can generate comparables using a <strong>coordinate-based search</strong> which 
+                      finds similar properties within a 5-mile radius of this location. Results may include 
+                      Active, Pending, and recently Closed properties with similar characteristics.
+                    </p>
+                  </AlertDescription>
+                </Alert>
+
+                {/* Generate Button with Tooltip */}
+                <div className="flex items-center justify-center gap-2">
+                  <Button
+                    onClick={() => generateCmaMutation.mutate()}
+                    disabled={generateCmaMutation.isPending}
+                    className="gap-2"
+                  >
+                    {generateCmaMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Searching Nearby Properties...
+                      </>
+                    ) : (
+                      <>
+                        <MapPin className="w-4 h-4" />
+                        Generate CMA from Nearby Properties
+                      </>
+                    )}
+                  </Button>
+                  
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="rounded-full">
+                          <Info className="w-4 h-4 text-muted-foreground" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs">
+                        <p className="text-sm">
+                          This uses coordinate-based search to find comparable properties 
+                          within 5 miles of this listing. Results may include Active, 
+                          Pending, and recently Closed properties. Comparables are filtered 
+                          to match similar price range (±25%) and bedroom count (±1).
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              </div>
+            )}
+
+            {/* Show message if no coordinates available */}
+            {isClosedListing && !hasCoordinates && (
+              <Alert variant="destructive" className="max-w-lg">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Cannot generate CMA: This property does not have coordinate data (latitude/longitude) 
+                  in the MLS listing.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Show message for non-closed listings without CMA */}
+            {!isClosedListing && (
+              <p className="text-sm text-muted-foreground">
+                Try clicking "Refresh MLS Data" to fetch comparable properties.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // HAS CMA DATA - Show comparables with clear option
+  // ==========================================
+  return (
+    <div className="space-y-6">
+      {/* Header with clear option */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">Comparative Market Analysis</h2>
+          <p className="text-sm text-muted-foreground">
+            {cmaData.length} comparable properties
+            {cmaSource === 'coordinate_fallback' && (
+              <span className="ml-2 text-blue-600 dark:text-blue-400">
+                • Generated from nearby search
+              </span>
+            )}
+          </p>
+        </div>
+
+        {/* Clear CMA Button */}
+        <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+          <AlertDialogTrigger asChild>
+            <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+              <Trash2 className="w-4 h-4 mr-2" />
+              Clear CMA Data
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clear CMA Data?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will remove all {cmaData.length} comparable properties from this transaction's 
+                CMA. You can regenerate them later if needed.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => clearCmaMutation.mutate()}
+                disabled={clearCmaMutation.isPending}
+                className="bg-red-500 hover:bg-red-600"
+              >
+                {clearCmaMutation.isPending ? 'Clearing...' : 'Clear CMA Data'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+
+      {/* Show notice if from fallback */}
+      {cmaSource === 'coordinate_fallback' && (
+        <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+          <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <AlertDescription className="text-sm text-blue-700 dark:text-blue-300">
+            These comparables were generated using a coordinate-based search within 5 miles 
+            of this property. They may differ from standard MLS comparables.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* CMA Property Grid - Your existing CMA display component */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {cmaData.map((comp: any, index: number) => (
+          <Card key={comp.mlsNumber || index} className="overflow-hidden">
+            {/* Property Photo */}
+            {comp.photos?.[0] && (
+              <div className="aspect-video relative">
+                <img 
+                  src={comp.photos[0]} 
+                  alt={comp.address}
+                  className="object-cover w-full h-full"
+                />
+                {comp.distance && (
+                  <span className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                    {comp.distance.toFixed(1)} mi
+                  </span>
+                )}
+              </div>
+            )}
+            
+            <CardContent className="p-4">
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <p className="font-semibold text-primary">
+                    ${(comp.listPrice || comp.soldPrice || 0).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-muted-foreground truncate max-w-[200px]">
+                    {comp.address}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex gap-4 text-sm text-muted-foreground">
+                <span>{comp.bedrooms || comp.beds || '—'} bd</span>
+                <span>{comp.bathrooms || comp.baths || '—'} ba</span>
+                <span>{(comp.sqft || comp.livingArea || 0).toLocaleString()} sqft</span>
+              </div>
+              
+              {comp.daysOnMarket !== undefined && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  {comp.daysOnMarket} days on market
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## Summary
+
+### User Experience Flow:
+
+```
+1. User opens CMA tab for a CLOSED listing
+   ↓
+2. Sees "No CMA Available" message
+   ↓
+3. Sees explanation: "This property is Closed... standard search not available"
+   ↓
+4. Sees button: [🔍 Generate CMA from Nearby Properties] with ⓘ tooltip
+   ↓
+5. User clicks button
+   ↓
+6. System searches nearby properties using coordinates
+   ↓
+7. CMA data is populated with "Generated from nearby search" indicator
+   ↓
+8. User can click [🗑️ Clear CMA Data] if they don't want it
+```
+
+### What Gets Stored:
+
+| Field | Value |
+|-------|-------|
+| `cmaData` | Array of comparable properties |
+| `cmaSource` | `'coordinate_fallback'` or `'repliers_similar'` |
+| `cmaGeneratedAt` | Timestamp when generated |
+
+### Timeline Events:
+
+- `cma_generated` - When user generates CMA from fallback
+- `cma_cleared` - When user clears CMA data
+
+---
+
+## Testing Checklist
+
+- [ ] Closed listing shows "No CMA Available" with explanation
+- [ ] "Generate CMA" button appears for closed listings with coordinates
+- [ ] Tooltip shows on info icon
+- [ ] Clicking button generates comparables
+- [ ] Success toast shows count of comparables found
+- [ ] CMA tab shows comparables with "Generated from nearby search" label
+- [ ] "Clear CMA Data" button appears when CMA exists
+- [ ] Confirmation dialog appears before clearing
+- [ ] CMA data is cleared after confirmation
+- [ ] Timeline shows generation and clearing events
+- [ ] Active listings still get CMA automatically (no change to existing behavior)

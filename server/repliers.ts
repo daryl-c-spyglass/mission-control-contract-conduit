@@ -1083,6 +1083,26 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
+// Generate a circular polygon around a point for GeoJSON map queries
+function generateCircularPolygon(lat: number, lng: number, radiusMiles: number, numPoints: number = 16): number[][] {
+  const radiusKm = radiusMiles * 1.60934;
+  const radiusDegrees = radiusKm / 111.32; // Approximate km per degree at equator
+  const latRadians = lat * Math.PI / 180;
+  
+  const coords: number[][] = [];
+  for (let i = 0; i < numPoints; i++) {
+    const angle = (i * 2 * Math.PI) / numPoints;
+    // Correct formula: lat offset = sin(angle), lng offset = cos(angle) adjusted for latitude
+    const latOffset = radiusDegrees * Math.sin(angle);
+    const lngOffset = radiusDegrees * Math.cos(angle) / Math.cos(latRadians);
+    coords.push([lng + lngOffset, lat + latOffset]); // GeoJSON uses [lng, lat] order
+  }
+  
+  // Close the polygon by appending the first point
+  coords.push([...coords[0]]);
+  return coords;
+}
+
 export async function searchNearbyComparables(
   subjectLat: number,
   subjectLng: number,
@@ -1094,14 +1114,15 @@ export async function searchNearbyComparables(
     if (!apiKey) {
       throw new Error("REPLIERS_API_KEY not configured");
     }
+    
+    // Generate polygon for map search
+    const mapPolygon = [generateCircularPolygon(subjectLat, subjectLng, filters.radius)];
 
-    // Build base query params (common to all requests)
+    // Build base query params (common to all requests) - no map params since they go in POST body
     const buildBaseParams = (): Record<string, string> => {
       const params: Record<string, string> = {
         type: "Sale",
         resultsPerPage: filters.maxResults.toString(),
-        map: `${subjectLat},${subjectLng}`,
-        mapRadius: filters.radius.toString(),
       };
 
       // Price filters
@@ -1131,28 +1152,30 @@ export async function searchNearbyComparables(
     const wantUnderContract = statuses.includes('Active Under Contract') || statuses.includes('Pending');
     const wantClosed = statuses.includes('Closed');
 
-    // Query 1: Active listings (status=A and/or U)
+    // Query 1: Active listings (status=A and/or U) - using POST with GeoJSON polygon
     if (wantActive || wantUnderContract) {
       const activeParams = buildBaseParams();
-      const activeStatuses: string[] = [];
-      if (wantActive) activeStatuses.push('A');
-      if (wantUnderContract) activeStatuses.push('U');
-      activeParams.status = activeStatuses.join(',');
-
-      console.log("[CMA Refresh] Searching active listings with params:", activeParams);
+      
+      console.log("[CMA Refresh] Searching active listings with POST and polygon, params:", activeParams);
 
       const activeUrl = new URL(`${REPLIERS_API_BASE}/listings`);
       Object.entries(activeParams).forEach(([key, value]) => {
         activeUrl.searchParams.append(key, value);
       });
+      
+      // Add status params separately for proper API format
+      if (wantActive) activeUrl.searchParams.append('status', 'A');
+      if (wantUnderContract) activeUrl.searchParams.append('status', 'U');
 
       try {
         const activeResponse = await fetch(activeUrl.toString(), {
-          method: "GET",
+          method: "POST",
           headers: {
             "REPLIERS-API-KEY": apiKey,
+            "Content-Type": "application/json",
             "Accept": "application/json",
           },
+          body: JSON.stringify({ map: mapPolygon }),
         });
 
         if (activeResponse.ok) {
@@ -1170,10 +1193,9 @@ export async function searchNearbyComparables(
       }
     }
 
-    // Query 2: Closed/Sold listings (lastStatus=Sld)
+    // Query 2: Closed/Sold listings (status=U with lastStatus=Sld) - using POST with GeoJSON polygon
     if (wantClosed) {
       const closedParams = buildBaseParams();
-      closedParams.lastStatus = 'Sld';
       
       // Add sold date filter
       if (filters.soldWithinMonths) {
@@ -1182,20 +1204,26 @@ export async function searchNearbyComparables(
         closedParams.soldDateFrom = closeDateMin.toISOString().split('T')[0];
       }
 
-      console.log("[CMA Refresh] Searching closed listings with params:", closedParams);
+      console.log("[CMA Refresh] Searching closed listings with POST and polygon, params:", closedParams);
 
       const closedUrl = new URL(`${REPLIERS_API_BASE}/listings`);
       Object.entries(closedParams).forEach(([key, value]) => {
         closedUrl.searchParams.append(key, value);
       });
+      
+      // Add status=U and lastStatus=Sld for sold/closed listings
+      closedUrl.searchParams.append('status', 'U');
+      closedUrl.searchParams.append('lastStatus', 'Sld');
 
       try {
         const closedResponse = await fetch(closedUrl.toString(), {
-          method: "GET",
+          method: "POST",
           headers: {
             "REPLIERS-API-KEY": apiKey,
+            "Content-Type": "application/json",
             "Accept": "application/json",
           },
+          body: JSON.stringify({ map: mapPolygon }),
         });
 
         if (closedResponse.ok) {
