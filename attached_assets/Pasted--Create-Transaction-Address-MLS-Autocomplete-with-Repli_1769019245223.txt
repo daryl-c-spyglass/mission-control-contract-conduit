@@ -1,0 +1,1189 @@
+# Create Transaction: Address & MLS Autocomplete with Repliers API
+
+## Feature Overview
+
+Add smart autocomplete to the "Create New Transaction" form that searches the Repliers MLS database:
+
+1. **Property Address** - Type to search MLS by address, shows suggestions with property details
+2. **MLS Number** - Type to search by MLS number (accepts just numbers OR with ACT prefix)
+3. **Bi-directional Auto-fill** - Selecting from either field auto-fills the other
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Property Address                                                     │
+│ ┌─────────────────────────────────────────────────────────────────┐ │
+│ │ 13106 New Bos...                                                │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+│ ┌─────────────────────────────────────────────────────────────────┐ │
+│ │ 🏠 13106 New Boston Dr, Austin, TX 78729    $434,990            │ │
+│ │    MLS# ACT2572987 • 4 bed • 2 bath • 1,850 sqft       Active  │ │
+│ ├─────────────────────────────────────────────────────────────────┤ │
+│ │ 🏠 13108 New Boston Ct, Round Rock, TX 78664  $525,000         │ │
+│ │    MLS# ACT2589123 • 3 bed • 2 bath • 2,100 sqft       Active  │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+│ MLS Number                                                           │
+│ ┌─────────────────────────────────────────────────────────────────┐ │
+│ │ ACT2572987  ← (auto-filled after selection)                     │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+│ You can enter just the number (2572987) or full MLS (ACT2572987)    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Repliers API Reference
+
+**Documentation Links:**
+- API Docs: https://docs.repliers.io
+- Listing Response Fields: https://help.repliers.com/en/article/understanding-the-data-in-a-listings-response-v0gh0d/
+- Images Guide: https://help.repliers.com/en/article/listing-images-implementation-guide-198p8u8/
+- Filtering Listings: https://help.repliers.com/en/article/filtering-listings-geo-spatially-using-the-map-parameter-7sorw0/
+
+**Authentication:**
+```
+Header: REPLIERS-API-KEY: ${process.env.REPLIERS_API_KEY}
+```
+
+**Base URL:**
+```
+https://api.repliers.io
+```
+
+**Key Endpoints:**
+- `GET /listings` - Search listings with query parameters
+- `GET /listings/{mlsNumber}` - Get single listing by MLS number
+
+**Environment Variable Required:**
+```
+REPLIERS_API_KEY (already configured in your project)
+```
+
+---
+
+## MLS Number Format - IMPORTANT
+
+Austin Board of Realtors (ABOR) MLS numbers use the format: `ACT` + numbers
+
+**Examples:**
+- `ACT2572987`
+- `ACT1234567`
+
+**User Input Handling:**
+| User Types | System Should Search |
+|------------|---------------------|
+| `2572987` | `ACT2572987` |
+| `ACT2572987` | `ACT2572987` |
+| `act2572987` | `ACT2572987` |
+| `25729` (partial) | Search for MLS numbers containing `25729` |
+
+The system must handle BOTH formats seamlessly - users should be able to type just the number OR include the ACT prefix.
+
+---
+
+## Step 1: Create MLS Search API Endpoints
+
+**File: `server/routes.ts`**
+
+Add these endpoints and helper functions:
+
+```typescript
+import fetch from 'node-fetch';
+
+const REPLIERS_API_KEY = process.env.REPLIERS_API_KEY;
+const REPLIERS_BASE_URL = 'https://api.repliers.io';
+
+// ========================================
+// HELPER: Normalize MLS Number Input
+// Handles: "2572987" → "ACT2572987"
+//          "ACT2572987" → "ACT2572987"
+//          "act2572987" → "ACT2572987"
+// ========================================
+function normalizeMlsNumber(input: string): { 
+  normalized: string; 
+  isPartial: boolean;
+  numbersOnly: string;
+} {
+  const cleaned = input.trim().toUpperCase();
+  
+  // Extract just the numbers
+  const numbersOnly = cleaned.replace(/[^0-9]/g, '');
+  
+  // If it already starts with ACT, extract and re-add
+  if (cleaned.startsWith('ACT')) {
+    return {
+      normalized: `ACT${numbersOnly}`,
+      isPartial: numbersOnly.length < 7,
+      numbersOnly,
+    };
+  }
+  
+  // If it's just numbers, add ACT prefix
+  if (/^\d+$/.test(cleaned)) {
+    return {
+      normalized: `ACT${cleaned}`,
+      isPartial: cleaned.length < 7,
+      numbersOnly: cleaned,
+    };
+  }
+  
+  // Other formats - return as-is (for other MLS systems)
+  return {
+    normalized: cleaned,
+    isPartial: true,
+    numbersOnly,
+  };
+}
+
+// ========================================
+// HELPER: Format Address from Repliers
+// ========================================
+function formatAddressFromRepliers(listing: any): string {
+  // Try address object first
+  if (listing.address) {
+    if (typeof listing.address === 'string') {
+      return listing.address;
+    }
+    const parts = [
+      listing.address.streetNumber,
+      listing.address.streetName,
+      listing.address.streetSuffix,
+      listing.address.unitNumber ? `#${listing.address.unitNumber}` : null,
+    ].filter(Boolean);
+    if (parts.length > 0) {
+      return parts.join(' ');
+    }
+  }
+  
+  // Fallback to individual fields
+  const parts = [
+    listing.streetNumber,
+    listing.streetName, 
+    listing.streetSuffix,
+    listing.unitNumber ? `#${listing.unitNumber}` : null,
+  ].filter(Boolean);
+  
+  return parts.join(' ') || listing.unparsedAddress || 'Unknown Address';
+}
+
+function formatFullAddressFromRepliers(listing: any): string {
+  const street = formatAddressFromRepliers(listing);
+  const city = listing.address?.city || listing.city || '';
+  const state = listing.address?.state || listing.address?.stateOrProvince || listing.stateOrProvince || 'TX';
+  const zip = listing.address?.postalCode || listing.postalCode || '';
+  
+  const cityStateZip = [city, state].filter(Boolean).join(', ');
+  return street ? `${street}, ${cityStateZip} ${zip}`.trim() : `${cityStateZip} ${zip}`.trim();
+}
+
+// ========================================
+// HELPER: Map Repliers Listing to Result
+// ========================================
+function mapListingToResult(listing: any) {
+  return {
+    mlsNumber: listing.mlsNumber || listing.listingId || '',
+    address: formatAddressFromRepliers(listing),
+    fullAddress: formatFullAddressFromRepliers(listing),
+    listPrice: listing.listPrice,
+    status: listing.standardStatus || listing.mlsStatus || listing.status,
+    beds: listing.bedroomsTotal || listing.bedrooms,
+    baths: listing.bathroomsTotal || listing.bathrooms,
+    sqft: listing.livingArea || listing.squareFeet,
+    propertyType: listing.propertyType,
+    yearBuilt: listing.yearBuilt,
+    lotSize: listing.lotSizeArea,
+    daysOnMarket: listing.daysOnMarket,
+    photos: listing.images?.slice(0, 3) || listing.photos?.slice(0, 3) || [],
+  };
+}
+
+// ========================================
+// HELPER: Repliers API Request
+// ========================================
+async function repliersRequest(endpoint: string, params: Record<string, string> = {}): Promise<any> {
+  if (!REPLIERS_API_KEY) {
+    throw new Error('REPLIERS_API_KEY not configured');
+  }
+
+  const url = new URL(`${REPLIERS_BASE_URL}${endpoint}`);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) url.searchParams.append(key, value);
+  });
+
+  console.log(`[Repliers] Fetching: ${url.toString()}`);
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      'REPLIERS-API-KEY': REPLIERS_API_KEY,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`[Repliers] Error ${response.status}: ${errorText}`);
+    throw new Error(`Repliers API error: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// ========================================
+// ENDPOINT: Search Properties by Address
+// GET /api/mls/search/address?query=13106+New+Boston
+// ========================================
+app.get("/api/mls/search/address", async (req, res) => {
+  try {
+    const { query } = req.query;
+    
+    if (!query || typeof query !== 'string' || query.length < 3) {
+      return res.json({ results: [] });
+    }
+
+    console.log(`[MLS Search] Searching by address: "${query}"`);
+
+    // Search Repliers by address using the search parameter
+    const data = await repliersRequest('/listings', {
+      search: query,
+      resultsPerPage: '8',
+      status: 'A,U,P,S', // Active, Under Contract, Pending, Sold
+      sortBy: 'updatedOn',
+      sortOrder: 'desc',
+      class: 'residential',
+    });
+
+    const results = (data.listings || []).map(mapListingToResult);
+    
+    console.log(`[MLS Search] Found ${results.length} properties for address: "${query}"`);
+    res.json({ results });
+  } catch (error: any) {
+    console.error('[MLS Search Address] Error:', error.message);
+    res.json({ results: [] });
+  }
+});
+
+// ========================================
+// ENDPOINT: Search Properties by MLS Number
+// GET /api/mls/search/mlsNumber?query=2572987
+// GET /api/mls/search/mlsNumber?query=ACT2572987
+// Handles both formats!
+// ========================================
+app.get("/api/mls/search/mlsNumber", async (req, res) => {
+  try {
+    const { query } = req.query;
+    
+    if (!query || typeof query !== 'string' || query.length < 3) {
+      return res.json({ results: [] });
+    }
+
+    console.log(`[MLS Search] Searching by MLS#: "${query}"`);
+
+    const { normalized, isPartial, numbersOnly } = normalizeMlsNumber(query);
+    const results: any[] = [];
+
+    // Strategy 1: Try exact match with normalized MLS number
+    if (!isPartial && normalized) {
+      try {
+        console.log(`[MLS Search] Trying exact match: ${normalized}`);
+        const exactMatch = await repliersRequest(`/listings/${normalized}`);
+        
+        if (exactMatch && (exactMatch.mlsNumber || exactMatch.listingId)) {
+          results.push(mapListingToResult(exactMatch));
+          console.log(`[MLS Search] Exact match found: ${normalized}`);
+        }
+      } catch (e) {
+        console.log(`[MLS Search] No exact match for ${normalized}`);
+      }
+    }
+
+    // Strategy 2: If no exact match or partial input, search listings
+    if (results.length === 0) {
+      try {
+        // Search with the normalized MLS number
+        const searchData = await repliersRequest('/listings', {
+          mlsNumber: normalized,
+          resultsPerPage: '8',
+        });
+
+        if (searchData.listings && searchData.listings.length > 0) {
+          searchData.listings.forEach((listing: any) => {
+            results.push(mapListingToResult(listing));
+          });
+        }
+      } catch (e) {
+        console.log(`[MLS Search] Search failed for ${normalized}`);
+      }
+    }
+
+    // Strategy 3: If still no results and user typed numbers only, try broader search
+    if (results.length === 0 && numbersOnly.length >= 3) {
+      try {
+        const searchData = await repliersRequest('/listings', {
+          search: numbersOnly,
+          resultsPerPage: '8',
+        });
+
+        if (searchData.listings && searchData.listings.length > 0) {
+          searchData.listings.forEach((listing: any) => {
+            // Only include if MLS number contains the search term
+            const mlsNum = (listing.mlsNumber || listing.listingId || '').toString();
+            if (mlsNum.includes(numbersOnly)) {
+              results.push(mapListingToResult(listing));
+            }
+          });
+        }
+      } catch (e) {
+        console.log(`[MLS Search] Broad search failed`);
+      }
+    }
+
+    // Remove duplicates
+    const uniqueResults = results.filter((item, index, self) => 
+      index === self.findIndex(t => t.mlsNumber === item.mlsNumber)
+    );
+
+    console.log(`[MLS Search] Found ${uniqueResults.length} properties for MLS#: "${query}"`);
+    res.json({ results: uniqueResults });
+  } catch (error: any) {
+    console.error('[MLS Search MLS#] Error:', error.message);
+    res.json({ results: [] });
+  }
+});
+
+// ========================================
+// ENDPOINT: Get Single Listing by MLS Number
+// GET /api/mls/listing/ACT2572987
+// GET /api/mls/listing/2572987 (also works)
+// ========================================
+app.get("/api/mls/listing/:mlsNumber", async (req, res) => {
+  try {
+    let { mlsNumber } = req.params;
+    
+    // Normalize the MLS number
+    const { normalized } = normalizeMlsNumber(mlsNumber);
+    console.log(`[MLS Listing] Fetching: ${normalized}`);
+
+    const listing = await repliersRequest(`/listings/${normalized}`);
+    
+    if (!listing || (!listing.mlsNumber && !listing.listingId)) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    res.json({
+      ...mapListingToResult(listing),
+      // Additional fields for detail view
+      description: listing.publicRemarks || listing.description,
+      city: listing.address?.city || listing.city,
+      state: listing.address?.state || listing.stateOrProvince,
+      postalCode: listing.address?.postalCode || listing.postalCode,
+      county: listing.countyOrParish,
+      listDate: listing.listDate,
+      originalPrice: listing.originalListPrice,
+      pricePerSqft: listing.listPrice && listing.livingArea 
+        ? Math.round(listing.listPrice / listing.livingArea) 
+        : null,
+      listAgent: listing.listAgent,
+      listOffice: listing.listOffice,
+    });
+  } catch (error: any) {
+    console.error('[MLS Listing] Error:', error.message);
+    res.status(500).json({ error: "Failed to fetch listing" });
+  }
+});
+```
+
+---
+
+## Step 2: Create Property Search Hook
+
+**File: `client/src/hooks/usePropertySearch.ts`** (CREATE NEW)
+
+```typescript
+import { useState, useCallback, useRef } from 'react';
+
+export interface PropertySearchResult {
+  mlsNumber: string;
+  address: string;
+  fullAddress: string;
+  listPrice?: number;
+  status?: string;
+  beds?: number;
+  baths?: number;
+  sqft?: number;
+  propertyType?: string;
+  yearBuilt?: number;
+  daysOnMarket?: number;
+  photos?: string[];
+}
+
+export function usePropertySearch() {
+  const [addressResults, setAddressResults] = useState<PropertySearchResult[]>([]);
+  const [mlsResults, setMlsResults] = useState<PropertySearchResult[]>([]);
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+  const [isSearchingMls, setIsSearchingMls] = useState(false);
+  
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const searchByAddress = useCallback(async (query: string) => {
+    if (query.length < 3) {
+      setAddressResults([]);
+      return;
+    }
+
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    setIsSearchingAddress(true);
+    
+    try {
+      const response = await fetch(
+        `/api/mls/search/address?query=${encodeURIComponent(query)}`,
+        { signal: abortControllerRef.current.signal }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAddressResults(data.results || []);
+      }
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('Address search error:', error);
+        setAddressResults([]);
+      }
+    } finally {
+      setIsSearchingAddress(false);
+    }
+  }, []);
+
+  const searchByMlsNumber = useCallback(async (query: string) => {
+    if (query.length < 3) {
+      setMlsResults([]);
+      return;
+    }
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    setIsSearchingMls(true);
+    
+    try {
+      const response = await fetch(
+        `/api/mls/search/mlsNumber?query=${encodeURIComponent(query)}`,
+        { signal: abortControllerRef.current.signal }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        setMlsResults(data.results || []);
+      }
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('MLS search error:', error);
+        setMlsResults([]);
+      }
+    } finally {
+      setIsSearchingMls(false);
+    }
+  }, []);
+
+  const clearResults = useCallback(() => {
+    setAddressResults([]);
+    setMlsResults([]);
+  }, []);
+
+  return {
+    addressResults,
+    mlsResults,
+    isSearchingAddress,
+    isSearchingMls,
+    searchByAddress,
+    searchByMlsNumber,
+    clearResults,
+  };
+}
+```
+
+---
+
+## Step 3: Create Debounce Hook
+
+**File: `client/src/hooks/useDebounce.ts`** (CREATE if doesn't exist)
+
+```typescript
+import { useState, useEffect } from 'react';
+
+export function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+```
+
+---
+
+## Step 4: Create Autocomplete Component
+
+**File: `client/src/components/ui/property-autocomplete.tsx`** (CREATE NEW)
+
+```tsx
+import React, { useState, useRef, useEffect } from 'react';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+import { Loader2, MapPin, Hash, Home, Bed, Bath, Square } from 'lucide-react';
+
+interface PropertyOption {
+  mlsNumber: string;
+  address: string;
+  fullAddress: string;
+  listPrice?: number;
+  status?: string;
+  beds?: number;
+  baths?: number;
+  sqft?: number;
+}
+
+interface PropertyAutocompleteProps {
+  value: string;
+  onChange: (value: string) => void;
+  onSelect: (option: PropertyOption) => void;
+  options: PropertyOption[];
+  isLoading?: boolean;
+  placeholder?: string;
+  type: 'address' | 'mls';
+  helperText?: string;
+  className?: string;
+}
+
+export function PropertyAutocomplete({
+  value,
+  onChange,
+  onSelect,
+  options,
+  isLoading,
+  placeholder,
+  type,
+  helperText,
+  className,
+}: PropertyAutocompleteProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Open dropdown when there are options
+  useEffect(() => {
+    if (options.length > 0 && value.length >= 3) {
+      setIsOpen(true);
+      setHighlightedIndex(-1);
+    } else if (options.length === 0) {
+      setIsOpen(false);
+    }
+  }, [options, value]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isOpen || options.length === 0) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setHighlightedIndex(prev => prev < options.length - 1 ? prev + 1 : 0);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setHighlightedIndex(prev => prev > 0 ? prev - 1 : options.length - 1);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (highlightedIndex >= 0 && options[highlightedIndex]) {
+          handleSelect(options[highlightedIndex]);
+        }
+        break;
+      case 'Escape':
+        setIsOpen(false);
+        break;
+    }
+  };
+
+  const handleSelect = (option: PropertyOption) => {
+    onSelect(option);
+    setIsOpen(false);
+    setHighlightedIndex(-1);
+  };
+
+  const formatPrice = (price?: number) => {
+    if (!price) return '';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(price);
+  };
+
+  const getStatusBadge = (status?: string) => {
+    const statusLower = status?.toLowerCase() || '';
+    const config: Record<string, { bg: string; text: string; label: string }> = {
+      'active': { bg: 'bg-green-100', text: 'text-green-700', label: 'Active' },
+      'a': { bg: 'bg-green-100', text: 'text-green-700', label: 'Active' },
+      'pending': { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pending' },
+      'p': { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pending' },
+      'under contract': { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Under Contract' },
+      'u': { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Under Contract' },
+      'sold': { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Sold' },
+      's': { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Sold' },
+    };
+    return config[statusLower] || { bg: 'bg-gray-100', text: 'text-gray-600', label: status };
+  };
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <div className="relative">
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => options.length > 0 && value.length >= 3 && setIsOpen(true)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          className={cn("pr-10", className)}
+        />
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          {isLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          ) : type === 'address' ? (
+            <MapPin className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <Hash className="w-4 h-4 text-muted-foreground" />
+          )}
+        </div>
+      </div>
+
+      {helperText && (
+        <p className="text-xs text-muted-foreground mt-1.5">{helperText}</p>
+      )}
+
+      {/* Dropdown */}
+      {isOpen && options.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-80 overflow-y-auto">
+          {options.map((option, index) => {
+            const statusBadge = getStatusBadge(option.status);
+            return (
+              <div
+                key={`${option.mlsNumber}-${index}`}
+                className={cn(
+                  "px-3 py-3 cursor-pointer transition-colors border-b border-border/50 last:border-b-0",
+                  highlightedIndex === index ? "bg-accent" : "hover:bg-muted/50"
+                )}
+                onClick={() => handleSelect(option)}
+                onMouseEnter={() => setHighlightedIndex(index)}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 p-2 bg-primary/10 rounded-lg flex-shrink-0">
+                    <Home className="w-4 h-4 text-primary" />
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    {/* Address & Status */}
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-medium text-sm leading-tight">
+                        {type === 'address' ? option.fullAddress : option.mlsNumber}
+                      </span>
+                      {option.status && (
+                        <span className={cn(
+                          "text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0",
+                          statusBadge.bg, statusBadge.text
+                        )}>
+                          {statusBadge.label}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Secondary info */}
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {type === 'address' ? (
+                        <span>MLS# {option.mlsNumber}</span>
+                      ) : (
+                        <span className="truncate">{option.fullAddress}</span>
+                      )}
+                    </div>
+
+                    {/* Price & Details */}
+                    <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1.5">
+                      {option.listPrice && (
+                        <span className="text-sm font-semibold text-primary">
+                          {formatPrice(option.listPrice)}
+                        </span>
+                      )}
+                      {option.beds && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Bed className="w-3 h-3" /> {option.beds}
+                        </span>
+                      )}
+                      {option.baths && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Bath className="w-3 h-3" /> {option.baths}
+                        </span>
+                      )}
+                      {option.sqft && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Square className="w-3 h-3" /> {option.sqft.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* No results state */}
+      {isOpen && value.length >= 3 && options.length === 0 && !isLoading && (
+        <div className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg p-4">
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">No properties found</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {type === 'address' 
+                ? "Try a different address or enter details manually"
+                : "Check the MLS number and try again"
+              }
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Loading state */}
+      {isOpen && value.length >= 3 && isLoading && options.length === 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg p-4">
+          <div className="flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            <span className="text-sm text-muted-foreground">Searching MLS...</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## Step 5: Update Create Transaction Form
+
+**File: Update your existing Create Transaction component/modal**
+
+Replace/update the Property Address and MLS Number fields with the autocomplete:
+
+```tsx
+import React, { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Card } from '@/components/ui/card';
+import { PropertyAutocomplete } from '@/components/ui/property-autocomplete';
+import { usePropertySearch, PropertySearchResult } from '@/hooks/usePropertySearch';
+import { useDebounce } from '@/hooks/useDebounce';
+import { Check, DollarSign, Bed, Bath, Square, X } from 'lucide-react';
+
+interface CreateTransactionModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: any) => void;
+}
+
+export function CreateTransactionModal({ isOpen, onClose, onSubmit }: CreateTransactionModalProps) {
+  // Form state
+  const [agentRepresents, setAgentRepresents] = useState('Buyer');
+  const [propertyAddress, setPropertyAddress] = useState('');
+  const [mlsNumber, setMlsNumber] = useState('');
+  const [contractDate, setContractDate] = useState('');
+  const [expectedClosing, setExpectedClosing] = useState('');
+  const [createSlackChannel, setCreateSlackChannel] = useState(true);
+  
+  // Selected property from MLS autocomplete
+  const [selectedProperty, setSelectedProperty] = useState<PropertySearchResult | null>(null);
+
+  // Autocomplete hook
+  const {
+    addressResults,
+    mlsResults,
+    isSearchingAddress,
+    isSearchingMls,
+    searchByAddress,
+    searchByMlsNumber,
+    clearResults,
+  } = usePropertySearch();
+
+  // Debounce search inputs (300ms delay)
+  const debouncedAddress = useDebounce(propertyAddress, 300);
+  const debouncedMls = useDebounce(mlsNumber, 300);
+
+  // Search when address changes
+  useEffect(() => {
+    if (debouncedAddress && debouncedAddress.length >= 3 && !selectedProperty) {
+      searchByAddress(debouncedAddress);
+    }
+  }, [debouncedAddress, searchByAddress, selectedProperty]);
+
+  // Search when MLS number changes
+  useEffect(() => {
+    if (debouncedMls && debouncedMls.length >= 3 && !selectedProperty) {
+      searchByMlsNumber(debouncedMls);
+    }
+  }, [debouncedMls, searchByMlsNumber, selectedProperty]);
+
+  // Handle address selection → auto-fill MLS number
+  const handleAddressSelect = (option: PropertySearchResult) => {
+    setPropertyAddress(option.fullAddress);
+    setMlsNumber(option.mlsNumber);
+    setSelectedProperty(option);
+    clearResults();
+  };
+
+  // Handle MLS selection → auto-fill address
+  const handleMlsSelect = (option: PropertySearchResult) => {
+    setMlsNumber(option.mlsNumber);
+    setPropertyAddress(option.fullAddress);
+    setSelectedProperty(option);
+    clearResults();
+  };
+
+  // Clear selection when user modifies address
+  const handleAddressChange = (value: string) => {
+    setPropertyAddress(value);
+    if (selectedProperty && value !== selectedProperty.fullAddress) {
+      setSelectedProperty(null);
+      setMlsNumber('');
+    }
+  };
+
+  // Clear selection when user modifies MLS
+  const handleMlsChange = (value: string) => {
+    setMlsNumber(value);
+    if (selectedProperty && value !== selectedProperty.mlsNumber) {
+      setSelectedProperty(null);
+    }
+  };
+
+  // Clear selected property
+  const handleClearSelection = () => {
+    setSelectedProperty(null);
+    setPropertyAddress('');
+    setMlsNumber('');
+    clearResults();
+  };
+
+  // Submit form
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    onSubmit({
+      agentRepresents,
+      propertyAddress,
+      mlsNumber,
+      contractDate,
+      expectedClosing,
+      createSlackChannel,
+      // Include MLS data if property was selected from autocomplete
+      mlsData: selectedProperty || undefined,
+    });
+  };
+
+  // Reset form when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setAgentRepresents('Buyer');
+      setPropertyAddress('');
+      setMlsNumber('');
+      setContractDate('');
+      setExpectedClosing('');
+      setSelectedProperty(null);
+      setCreateSlackChannel(true);
+      clearResults();
+    }
+  }, [isOpen, clearResults]);
+
+  const formatPrice = (price?: number) => {
+    if (!price) return '';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(price);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create New Transaction</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Enter the property details to start a new transaction. This will automatically set up integrations based on your preferences.
+          </p>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-5 mt-4">
+          {/* Agent Represents */}
+          <div className="space-y-2">
+            <Label>Our Agent Represents</Label>
+            <Select value={agentRepresents} onValueChange={setAgentRepresents}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Buyer">Buyer</SelectItem>
+                <SelectItem value="Seller">Seller</SelectItem>
+                <SelectItem value="Both">Both (Dual Agent)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Property Address with Autocomplete */}
+          <div className="space-y-2">
+            <Label>Property Address</Label>
+            <PropertyAutocomplete
+              value={propertyAddress}
+              onChange={handleAddressChange}
+              onSelect={handleAddressSelect}
+              options={addressResults}
+              isLoading={isSearchingAddress}
+              placeholder="Start typing an address..."
+              type="address"
+            />
+          </div>
+
+          {/* MLS Number with Autocomplete */}
+          <div className="space-y-2">
+            <Label>MLS Number</Label>
+            <PropertyAutocomplete
+              value={mlsNumber}
+              onChange={handleMlsChange}
+              onSelect={handleMlsSelect}
+              options={mlsResults}
+              isLoading={isSearchingMls}
+              placeholder="e.g., 2572987 or ACT2572987"
+              type="mls"
+              helperText="You can enter just the number or include the ACT prefix"
+            />
+          </div>
+
+          {/* Selected Property Preview Card */}
+          {selectedProperty && (
+            <Card className="p-4 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-green-100 dark:bg-green-900 rounded-full flex-shrink-0">
+                  <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium text-sm text-green-800 dark:text-green-200">
+                        Property Found in MLS
+                      </p>
+                      <p className="text-sm text-green-700 dark:text-green-300 mt-0.5">
+                        {selectedProperty.fullAddress}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleClearSelection}
+                      className="p-1 hover:bg-green-200 dark:hover:bg-green-800 rounded transition-colors"
+                    >
+                      <X className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-green-600 dark:text-green-400">
+                    {selectedProperty.listPrice && (
+                      <span className="flex items-center gap-1 font-medium">
+                        <DollarSign className="w-3 h-3" />
+                        {formatPrice(selectedProperty.listPrice)}
+                      </span>
+                    )}
+                    {selectedProperty.beds && (
+                      <span className="flex items-center gap-1">
+                        <Bed className="w-3 h-3" />
+                        {selectedProperty.beds} bed
+                      </span>
+                    )}
+                    {selectedProperty.baths && (
+                      <span className="flex items-center gap-1">
+                        <Bath className="w-3 h-3" />
+                        {selectedProperty.baths} bath
+                      </span>
+                    )}
+                    {selectedProperty.sqft && (
+                      <span className="flex items-center gap-1">
+                        <Square className="w-3 h-3" />
+                        {selectedProperty.sqft.toLocaleString()} sqft
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Pull from Follow Up Boss (keep existing) */}
+          <div className="border rounded-lg">
+            <button 
+              type="button" 
+              className="flex items-center justify-between w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors"
+            >
+              <span className="text-primary font-medium text-sm">
+                Pull lead details from Follow Up Boss
+              </span>
+              <span className="text-muted-foreground">▾</span>
+            </button>
+          </div>
+
+          {/* Contract & Closing Dates */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Contract Date</Label>
+              <Input
+                type="date"
+                value={contractDate}
+                onChange={(e) => setContractDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Expected Closing</Label>
+              <Input
+                type="date"
+                value={expectedClosing}
+                onChange={(e) => setExpectedClosing(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Assign Coordinators (keep existing placeholder) */}
+          <div className="border rounded-lg p-4">
+            <Label className="text-sm font-medium">Assign Transaction Coordinators</Label>
+            {/* Your existing coordinator selector component */}
+          </div>
+
+          {/* Creating on behalf (keep existing) */}
+          <div className="border rounded-lg">
+            <button 
+              type="button" 
+              className="flex items-center justify-between w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors"
+            >
+              <span className="text-sm">Creating on behalf of another agent?</span>
+              <span className="text-muted-foreground">▾</span>
+            </button>
+          </div>
+
+          {/* Automatic Setup */}
+          <div className="border rounded-lg p-4 space-y-3">
+            <Label className="text-sm font-medium">Automatic Setup</Label>
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="createSlack"
+                checked={createSlackChannel}
+                onCheckedChange={(checked) => setCreateSlackChannel(checked as boolean)}
+              />
+              <div>
+                <label htmlFor="createSlack" className="text-sm font-medium cursor-pointer">
+                  Create Slack channel
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Invite coordinators automatically
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Submit Buttons */}
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-primary hover:bg-primary/90">
+              Create Transaction
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+---
+
+## Summary
+
+### What This Adds:
+
+| Feature | Description |
+|---------|-------------|
+| **Address Autocomplete** | Type 3+ characters → searches Repliers MLS → shows property suggestions |
+| **MLS Autocomplete** | Type 3+ characters → searches by MLS number |
+| **Flexible MLS Input** | Accepts `2572987` OR `ACT2572987` - handles both formats |
+| **Bi-directional Auto-fill** | Select address → fills MLS, Select MLS → fills address |
+| **Property Preview Card** | Shows selected property details (price, beds, baths, sqft) |
+| **Keyboard Navigation** | Arrow keys + Enter to select + Escape to close |
+
+### MLS Number Input Handling:
+
+| User Types | System Searches |
+|------------|-----------------|
+| `2572987` | `ACT2572987` |
+| `ACT2572987` | `ACT2572987` |
+| `act2572987` | `ACT2572987` |
+| `25729` (partial) | Finds listings containing `25729` |
+
+### Files to Create/Update:
+
+| File | Action |
+|------|--------|
+| `server/routes.ts` | ADD 3 endpoints + helper functions |
+| `client/src/hooks/usePropertySearch.ts` | CREATE NEW |
+| `client/src/hooks/useDebounce.ts` | CREATE if doesn't exist |
+| `client/src/components/ui/property-autocomplete.tsx` | CREATE NEW |
+| Create Transaction component | UPDATE form fields |
+
+### API Endpoints:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/mls/search/address?query=...` | Search MLS by address |
+| GET | `/api/mls/search/mlsNumber?query=...` | Search MLS by number |
+| GET | `/api/mls/listing/:mlsNumber` | Get single listing details |
+
+### Environment Variable:
+
+```
+REPLIERS_API_KEY (already configured)
+```
+
+### Repliers API Reference:
+
+- **Docs:** https://docs.repliers.io
+- **Listing Fields:** https://help.repliers.com/en/article/understanding-the-data-in-a-listings-response-v0gh0d/
+- **Images:** https://help.repliers.com/en/article/listing-images-implementation-guide-198p8u8/

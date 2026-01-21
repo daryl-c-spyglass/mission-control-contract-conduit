@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Loader2, ChevronDown, ChevronUp, User, Check } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, User, Check, X, Bed, Bath, Square, DollarSign } from "lucide-react";
+import { useDebounce } from "@/hooks/useDebounce";
+import { usePropertySearch, type PropertySearchResult } from "@/hooks/usePropertySearch";
+import { PropertyAutocomplete } from "@/components/ui/property-autocomplete";
+import { Card } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -79,6 +83,72 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
   const [fubUrl, setFubUrl] = useState("");
   const [fubExpanded, setFubExpanded] = useState(false);
   const [fubContact, setFubContact] = useState<FUBContact | null>(null);
+  
+  // MLS Autocomplete state
+  const [addressInput, setAddressInput] = useState("");
+  const [mlsInput, setMlsInput] = useState("");
+  const [selectedProperty, setSelectedProperty] = useState<PropertySearchResult | null>(null);
+  
+  const debouncedAddress = useDebounce(addressInput, 300);
+  const debouncedMls = useDebounce(mlsInput, 300);
+  
+  const { 
+    addressResults, 
+    mlsResults, 
+    isSearchingAddress, 
+    isSearchingMls, 
+    searchByAddress, 
+    searchByMlsNumber,
+    clearResults 
+  } = usePropertySearch();
+  
+  // Search by address when input changes
+  useEffect(() => {
+    if (debouncedAddress && debouncedAddress.length >= 3 && !selectedProperty) {
+      searchByAddress(debouncedAddress);
+    }
+  }, [debouncedAddress, searchByAddress, selectedProperty]);
+  
+  // Search by MLS when input changes
+  useEffect(() => {
+    if (debouncedMls && debouncedMls.length >= 3 && !selectedProperty) {
+      searchByMlsNumber(debouncedMls);
+    }
+  }, [debouncedMls, searchByMlsNumber, selectedProperty]);
+  
+  // Handle property selection - fills both address and MLS
+  const handlePropertySelect = (property: PropertySearchResult) => {
+    setSelectedProperty(property);
+    setAddressInput(property.fullAddress);
+    setMlsInput(property.mlsNumber);
+    form.setValue("propertyAddress", property.fullAddress);
+    form.setValue("mlsNumber", property.mlsNumber);
+    clearResults();
+    toast({
+      title: "Property selected",
+      description: `${property.fullAddress} (MLS# ${property.mlsNumber})`,
+    });
+  };
+  
+  // Clear selection
+  const handleClearSelection = () => {
+    setSelectedProperty(null);
+    setAddressInput("");
+    setMlsInput("");
+    form.setValue("propertyAddress", "");
+    form.setValue("mlsNumber", "");
+    clearResults();
+  };
+  
+  // Format price helper
+  const formatPrice = (price?: number) => {
+    if (!price) return '';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(price);
+  };
 
   const { data: coordinators = [], isLoading: coordinatorsLoading, error: coordinatorsError, status } = useQuery<Coordinator[]>({
     queryKey: ["/api/coordinators"],
@@ -171,6 +241,10 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
       setFubUrl("");
       setFubContact(null);
       setFubExpanded(false);
+      setAddressInput("");
+      setMlsInput("");
+      setSelectedProperty(null);
+      clearResults();
       onOpenChange(false);
     },
     onError: (error: Error) => {
@@ -220,6 +294,7 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
               )}
             />
 
+            {/* Property Address with MLS Autocomplete */}
             <FormField
               control={form.control}
               name="propertyAddress"
@@ -227,10 +302,22 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                 <FormItem>
                   <FormLabel>Property Address</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="123 Main St, City, State 12345"
-                      data-testid="input-property-address"
-                      {...field}
+                    <PropertyAutocomplete
+                      value={addressInput}
+                      onChange={(value) => {
+                        setAddressInput(value);
+                        field.onChange(value);
+                        // Clear selection when user edits the address
+                        if (selectedProperty && value !== selectedProperty.fullAddress) {
+                          setSelectedProperty(null);
+                        }
+                      }}
+                      onSelect={handlePropertySelect}
+                      options={selectedProperty ? [] : addressResults}
+                      isLoading={isSearchingAddress}
+                      placeholder="Start typing address..."
+                      type="address"
+                      testId="input-property-address"
                     />
                   </FormControl>
                   <FormMessage />
@@ -238,6 +325,7 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
               )}
             />
 
+            {/* MLS Number with Autocomplete */}
             <FormField
               control={form.control}
               name="mlsNumber"
@@ -245,20 +333,91 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                 <FormItem>
                   <FormLabel>MLS Number</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="MLS123456"
-                      className="font-mono"
-                      data-testid="input-mls-number"
-                      {...field}
+                    <PropertyAutocomplete
+                      value={mlsInput}
+                      onChange={(value) => {
+                        setMlsInput(value);
+                        field.onChange(value);
+                        // Clear selection when user edits the MLS number
+                        if (selectedProperty && value !== selectedProperty.mlsNumber) {
+                          setSelectedProperty(null);
+                        }
+                      }}
+                      onSelect={handlePropertySelect}
+                      options={selectedProperty ? [] : mlsResults}
+                      isLoading={isSearchingMls}
+                      placeholder="ACT2572987 or 2572987"
+                      type="mls"
+                      helperText="Enter with or without ACT prefix"
+                      testId="input-mls-number"
                     />
                   </FormControl>
-                  <FormDescription>
-                    Used to fetch property data from MLS
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            {/* Selected Property Confirmation Card */}
+            {selectedProperty && (
+              <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                <div className="p-3 flex items-start gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/50 shrink-0">
+                    <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-sm text-green-800 dark:text-green-200">
+                          Property Found in MLS
+                        </p>
+                        <p className="text-sm text-green-700 dark:text-green-300 mt-0.5 truncate">
+                          {selectedProperty.fullAddress}
+                        </p>
+                        <p className="text-xs text-green-600 dark:text-green-400 font-mono">
+                          MLS# {selectedProperty.mlsNumber}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleClearSelection}
+                        className="h-6 w-6 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800"
+                        data-testid="button-clear-property"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-green-600 dark:text-green-400">
+                      {selectedProperty.listPrice && (
+                        <span className="flex items-center gap-1 font-medium">
+                          <DollarSign className="w-3 h-3" />
+                          {formatPrice(selectedProperty.listPrice)}
+                        </span>
+                      )}
+                      {selectedProperty.beds && (
+                        <span className="flex items-center gap-1">
+                          <Bed className="w-3 h-3" />
+                          {selectedProperty.beds} bed
+                        </span>
+                      )}
+                      {selectedProperty.baths && (
+                        <span className="flex items-center gap-1">
+                          <Bath className="w-3 h-3" />
+                          {selectedProperty.baths} bath
+                        </span>
+                      )}
+                      {selectedProperty.sqft && (
+                        <span className="flex items-center gap-1">
+                          <Square className="w-3 h-3" />
+                          {selectedProperty.sqft.toLocaleString()} sqft
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
 
             <Collapsible open={fubExpanded} onOpenChange={setFubExpanded}>
               <CollapsibleTrigger asChild>

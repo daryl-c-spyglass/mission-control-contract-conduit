@@ -783,6 +783,302 @@ export async function registerRoutes(
     }
   });
 
+  // ============ MLS Autocomplete Search ============
+
+  // Helper: Normalize MLS Number Input
+  // Handles: "2572987" → "ACT2572987"
+  //          "ACT2572987" → "ACT2572987"
+  //          "act2572987" → "ACT2572987"
+  function normalizeMlsNumber(input: string): { 
+    normalized: string; 
+    isPartial: boolean;
+    numbersOnly: string;
+  } {
+    const cleaned = input.trim().toUpperCase();
+    const numbersOnly = cleaned.replace(/[^0-9]/g, '');
+    
+    if (cleaned.startsWith('ACT')) {
+      return {
+        normalized: `ACT${numbersOnly}`,
+        isPartial: numbersOnly.length < 7,
+        numbersOnly,
+      };
+    }
+    
+    if (/^\d+$/.test(cleaned)) {
+      return {
+        normalized: `ACT${cleaned}`,
+        isPartial: cleaned.length < 7,
+        numbersOnly: cleaned,
+      };
+    }
+    
+    return {
+      normalized: cleaned,
+      isPartial: true,
+      numbersOnly,
+    };
+  }
+
+  // Helper: Format address from Repliers listing
+  function formatAddressFromRepliers(listing: any): string {
+    if (listing.address) {
+      if (typeof listing.address === 'string') {
+        return listing.address;
+      }
+      const parts = [
+        listing.address.streetNumber,
+        listing.address.streetName,
+        listing.address.streetSuffix,
+        listing.address.unitNumber ? `#${listing.address.unitNumber}` : null,
+      ].filter(Boolean);
+      if (parts.length > 0) {
+        return parts.join(' ');
+      }
+    }
+    
+    const parts = [
+      listing.streetNumber,
+      listing.streetName, 
+      listing.streetSuffix,
+      listing.unitNumber ? `#${listing.unitNumber}` : null,
+    ].filter(Boolean);
+    
+    return parts.join(' ') || listing.unparsedAddress || 'Unknown Address';
+  }
+
+  function formatFullAddressFromRepliers(listing: any): string {
+    const street = formatAddressFromRepliers(listing);
+    const city = listing.address?.city || listing.city || '';
+    const state = listing.address?.state || listing.address?.stateOrProvince || listing.stateOrProvince || 'TX';
+    const zip = listing.address?.postalCode || listing.postalCode || '';
+    
+    const cityStateZip = [city, state].filter(Boolean).join(', ');
+    return street ? `${street}, ${cityStateZip} ${zip}`.trim() : `${cityStateZip} ${zip}`.trim();
+  }
+
+  // Helper: Map Repliers Listing to Result
+  function mapListingToSearchResult(listing: any) {
+    return {
+      mlsNumber: listing.mlsNumber || listing.listingId || '',
+      address: formatAddressFromRepliers(listing),
+      fullAddress: formatFullAddressFromRepliers(listing),
+      listPrice: listing.listPrice,
+      status: listing.standardStatus || listing.mlsStatus || listing.status,
+      beds: listing.bedroomsTotal || listing.bedrooms,
+      baths: listing.bathroomsTotal || listing.bathrooms,
+      sqft: listing.livingArea || listing.squareFeet || listing.sqft,
+      propertyType: listing.propertyType,
+      yearBuilt: listing.yearBuilt,
+      daysOnMarket: listing.daysOnMarket,
+      photos: listing.images?.slice(0, 3) || listing.photos?.slice(0, 3) || [],
+    };
+  }
+
+  // Search Properties by Address (autocomplete)
+  // GET /api/mls/search/address?query=13106+New+Boston
+  app.get("/api/mls/search/address", isAuthenticated, async (req, res) => {
+    try {
+      const { query } = req.query;
+      
+      if (!query || typeof query !== 'string' || query.length < 3) {
+        return res.json({ results: [] });
+      }
+
+      console.log(`[MLS Search] Searching by address: "${query}"`);
+
+      if (!process.env.REPLIERS_API_KEY) {
+        return res.json({ results: [] });
+      }
+
+      // Use the repliersRequest from repliers.ts
+      const REPLIERS_API_BASE = "https://api.repliers.io";
+      const apiKey = process.env.REPLIERS_API_KEY;
+      
+      const url = new URL(`${REPLIERS_API_BASE}/listings`);
+      url.searchParams.append('search', query);
+      url.searchParams.append('resultsPerPage', '8');
+      url.searchParams.append('status', 'A,U,P,S');
+      url.searchParams.append('sortBy', 'updatedOn');
+      url.searchParams.append('sortOrder', 'desc');
+      url.searchParams.append('class', 'residential');
+      url.searchParams.append('type', 'Sale');
+
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: {
+          "REPLIERS-API-KEY": apiKey,
+          "Accept": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        console.error(`[MLS Search] Address search error: ${response.status}`);
+        return res.json({ results: [] });
+      }
+
+      const data = await response.json();
+      const results = (data.listings || [])
+        .filter((l: any) => !isRentalOrLease(l))
+        .map(mapListingToSearchResult);
+      
+      console.log(`[MLS Search] Found ${results.length} properties for address: "${query}"`);
+      res.json({ results });
+    } catch (error: any) {
+      console.error('[MLS Search Address] Error:', error.message);
+      res.json({ results: [] });
+    }
+  });
+
+  // Search Properties by MLS Number (autocomplete)
+  // GET /api/mls/search/mlsNumber?query=2572987
+  // GET /api/mls/search/mlsNumber?query=ACT2572987
+  app.get("/api/mls/search/mlsNumber", isAuthenticated, async (req, res) => {
+    try {
+      const { query } = req.query;
+      
+      if (!query || typeof query !== 'string' || query.length < 3) {
+        return res.json({ results: [] });
+      }
+
+      console.log(`[MLS Search] Searching by MLS#: "${query}"`);
+
+      if (!process.env.REPLIERS_API_KEY) {
+        return res.json({ results: [] });
+      }
+
+      const { normalized, isPartial, numbersOnly } = normalizeMlsNumber(query);
+      const results: any[] = [];
+      const REPLIERS_API_BASE = "https://api.repliers.io";
+      const apiKey = process.env.REPLIERS_API_KEY;
+
+      // Strategy 1: Try exact match with normalized MLS number
+      if (!isPartial && normalized) {
+        try {
+          console.log(`[MLS Search] Trying exact match: ${normalized}`);
+          const exactUrl = `${REPLIERS_API_BASE}/listings/${normalized}`;
+          const exactResponse = await fetch(exactUrl, {
+            method: "GET",
+            headers: {
+              "REPLIERS-API-KEY": apiKey,
+              "Accept": "application/json",
+            },
+          });
+          
+          if (exactResponse.ok) {
+            const exactMatch = await exactResponse.json();
+            if (exactMatch && (exactMatch.mlsNumber || exactMatch.listingId)) {
+              if (!isRentalOrLease(exactMatch)) {
+                results.push(mapListingToSearchResult(exactMatch));
+                console.log(`[MLS Search] Exact match found: ${normalized}`);
+              }
+            }
+          }
+        } catch (e) {
+          console.log(`[MLS Search] No exact match for ${normalized}`);
+        }
+      }
+
+      // Strategy 2: If no exact match or partial input, search listings
+      if (results.length === 0) {
+        try {
+          const url = new URL(`${REPLIERS_API_BASE}/listings`);
+          url.searchParams.append('search', normalized);
+          url.searchParams.append('resultsPerPage', '8');
+          url.searchParams.append('type', 'Sale');
+
+          const response = await fetch(url.toString(), {
+            method: "GET",
+            headers: {
+              "REPLIERS-API-KEY": apiKey,
+              "Accept": "application/json",
+            },
+          });
+
+          if (response.ok) {
+            const searchData = await response.json();
+            if (searchData.listings && searchData.listings.length > 0) {
+              searchData.listings.forEach((listing: any) => {
+                if (!isRentalOrLease(listing)) {
+                  const mlsNum = (listing.mlsNumber || listing.listingId || '').toString();
+                  if (mlsNum.toLowerCase().includes(numbersOnly.toLowerCase())) {
+                    results.push(mapListingToSearchResult(listing));
+                  }
+                }
+              });
+            }
+          }
+        } catch (e) {
+          console.log(`[MLS Search] Search failed for ${normalized}`);
+        }
+      }
+
+      // Remove duplicates
+      const uniqueResults = results.filter((item, index, self) => 
+        index === self.findIndex(t => t.mlsNumber === item.mlsNumber)
+      );
+
+      console.log(`[MLS Search] Found ${uniqueResults.length} properties for MLS#: "${query}"`);
+      res.json({ results: uniqueResults });
+    } catch (error: any) {
+      console.error('[MLS Search MLS#] Error:', error.message);
+      res.json({ results: [] });
+    }
+  });
+
+  // Get Single Listing by MLS Number
+  // GET /api/mls/listing/ACT2572987
+  // GET /api/mls/listing/2572987 (also works)
+  app.get("/api/mls/listing/:mlsNumber", isAuthenticated, async (req, res) => {
+    try {
+      let { mlsNumber } = req.params;
+      const { normalized } = normalizeMlsNumber(mlsNumber);
+      console.log(`[MLS Listing] Fetching: ${normalized}`);
+
+      const result = await fetchMLSListing(normalized);
+      
+      if (!result || !result.mlsData) {
+        return res.status(404).json({ error: "Listing not found" });
+      }
+
+      // Check if rental
+      if (isRentalOrLease(result.mlsData.rawData ?? result.mlsData)) {
+        return res.status(422).json({
+          message: "Rental/Lease listings are not supported.",
+          code: "RENTAL_EXCLUDED",
+        });
+      }
+
+      const listing = result.mlsData;
+      res.json({
+        mlsNumber: listing.mlsNumber,
+        address: listing.address,
+        fullAddress: `${listing.address}, ${listing.city}, ${listing.state} ${listing.zipCode}`,
+        listPrice: listing.listPrice,
+        status: listing.status,
+        beds: listing.bedrooms,
+        baths: listing.bathrooms,
+        sqft: listing.sqft,
+        propertyType: listing.propertyType,
+        yearBuilt: listing.yearBuilt,
+        daysOnMarket: listing.daysOnMarket,
+        photos: listing.photos?.slice(0, 5) || [],
+        description: listing.description,
+        city: listing.city,
+        state: listing.state,
+        postalCode: listing.zipCode,
+        listDate: listing.listDate,
+        originalPrice: listing.originalPrice,
+        pricePerSqft: listing.listPrice && listing.sqft 
+          ? Math.round(listing.listPrice / listing.sqft) 
+          : null,
+      });
+    } catch (error: any) {
+      console.error('[MLS Listing] Error:', error.message);
+      res.status(500).json({ error: "Failed to fetch listing" });
+    }
+  });
+
   // ============ Coordinators ============
   // Note: Coordinators are internal team data, no auth required for read
   app.get("/api/coordinators", async (req, res) => {
