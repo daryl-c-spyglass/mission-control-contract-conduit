@@ -341,6 +341,33 @@ export default function CMAPresentationBuilder() {
     p.mlsNumber === cma?.subjectPropertyId
   );
 
+  // Get MLS number for fetching image insights
+  const subjectMlsNumber = (subjectProperty as any)?.mlsNumber || 
+                           linkedTransaction?.mlsNumber || 
+                           cma?.subjectPropertyId;
+
+  // Fetch image insights from Repliers API (same endpoint as flyer generator)
+  const { data: imageInsightsData, isLoading: imageInsightsLoading } = useQuery<{
+    available: boolean;
+    images: Array<{
+      url: string;
+      originalIndex: number;
+      classification: { imageOf: string | null; prediction: number | null };
+      quality: { qualitative: string | null; score: number | null };
+    }>;
+  }>({
+    queryKey: ['/api/repliers/listing', subjectMlsNumber, 'image-insights'],
+    enabled: !!subjectMlsNumber,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    queryFn: async () => {
+      const response = await fetch(`/api/repliers/listing/${subjectMlsNumber}/image-insights`);
+      if (!response.ok) {
+        return { available: false, images: [] };
+      }
+      return response.json();
+    },
+  });
+
   // Comparables are all properties in propertiesData (subject is not included there)
   // If subject is somehow in properties, filter it out
   const comparables = subjectFromTransaction 
@@ -544,7 +571,8 @@ export default function CMAPresentationBuilder() {
                       photos={(subjectProperty as any).photos || (subjectProperty as any).images || []}
                       selectedPhoto={config.coverPhotoUrl}
                       source={config.coverPhotoSource}
-                      imageInsights={(subjectProperty as any)?.imageInsights?.images}
+                      imageInsights={imageInsightsData?.images}
+                      isLoadingInsights={imageInsightsLoading && config.coverPhotoSource === 'ai'}
                       onSelect={(url) => setConfig(prev => ({ ...prev, coverPhotoUrl: url }))}
                       onPreview={(url, label) => setCoverPhotoModal({ isOpen: true, photoUrl: url, photoLabel: label })}
                     />

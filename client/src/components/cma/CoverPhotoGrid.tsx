@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Check, Sparkles, ZoomIn, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, Sparkles, ZoomIn, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ interface CoverPhotoGridProps {
   selectedPhoto: string | null;
   source: 'ai' | 'manual';
   imageInsights?: any[];
+  isLoadingInsights?: boolean;
   onSelect: (url: string) => void;
   onPreview: (url: string, label: string | null) => void;
 }
@@ -27,6 +28,7 @@ export function CoverPhotoGrid({
   selectedPhoto,
   source,
   imageInsights,
+  isLoadingInsights = false,
   onSelect,
   onPreview,
 }: CoverPhotoGridProps) {
@@ -106,6 +108,15 @@ export function CoverPhotoGrid({
   }
 
   if (source === 'ai') {
+    if (isLoadingInsights) {
+      return (
+        <div className="flex items-center justify-center py-8 gap-3">
+          <Loader2 className="w-5 h-5 animate-spin text-amber-600" />
+          <span className="text-sm text-muted-foreground">Analyzing photos with AI...</span>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-4">
         {aiRecommendation && (
