@@ -15,23 +15,29 @@ export interface PropertySearchResult {
   photos?: string[];
 }
 
+export interface PlacePrediction {
+  description: string;
+  placeId: string;
+  mainText: string;
+  secondaryText: string;
+}
+
 export function usePropertySearch() {
   const [addressResults, setAddressResults] = useState<PropertySearchResult[]>([]);
+  const [placePredictions, setPlacePredictions] = useState<PlacePrediction[]>([]);
   const [mlsResults, setMlsResults] = useState<PropertySearchResult[]>([]);
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
   const [isSearchingMls, setIsSearchingMls] = useState(false);
   
-  // Separate abort controllers to prevent one search from canceling the other
   const addressAbortRef = useRef<AbortController | null>(null);
   const mlsAbortRef = useRef<AbortController | null>(null);
 
   const searchByAddress = useCallback(async (query: string) => {
     if (query.length < 3) {
-      setAddressResults([]);
+      setPlacePredictions([]);
       return;
     }
 
-    // Only abort previous address searches, not MLS searches
     if (addressAbortRef.current) {
       addressAbortRef.current.abort();
     }
@@ -41,18 +47,18 @@ export function usePropertySearch() {
     
     try {
       const response = await fetch(
-        `/api/mls/search/address?query=${encodeURIComponent(query)}`,
+        `/api/places/autocomplete?query=${encodeURIComponent(query)}`,
         { signal: addressAbortRef.current.signal }
       );
       
       if (response.ok) {
         const data = await response.json();
-        setAddressResults(data.results || []);
+        setPlacePredictions(data.predictions || []);
       }
     } catch (error: any) {
       if (error.name !== 'AbortError') {
         console.error('Address search error:', error);
-        setAddressResults([]);
+        setPlacePredictions([]);
       }
     } finally {
       setIsSearchingAddress(false);
@@ -65,7 +71,6 @@ export function usePropertySearch() {
       return;
     }
 
-    // Only abort previous MLS searches, not address searches
     if (mlsAbortRef.current) {
       mlsAbortRef.current.abort();
     }
@@ -95,11 +100,13 @@ export function usePropertySearch() {
 
   const clearResults = useCallback(() => {
     setAddressResults([]);
+    setPlacePredictions([]);
     setMlsResults([]);
   }, []);
 
   return {
     addressResults,
+    placePredictions,
     mlsResults,
     isSearchingAddress,
     isSearchingMls,

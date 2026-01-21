@@ -876,7 +876,61 @@ export async function registerRoutes(
   }
 
   // Search Properties by Address (autocomplete)
+  // GET /api/places/autocomplete?query=13106+New+Boston
+  // Uses Google Places API for address suggestions
+  app.get("/api/places/autocomplete", isAuthenticated, async (req, res) => {
+    try {
+      const { query } = req.query;
+      
+      if (!query || typeof query !== 'string' || query.length < 3) {
+        return res.json({ predictions: [] });
+      }
+
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        console.error('[Places API] GOOGLE_MAPS_API_KEY not configured');
+        return res.json({ predictions: [] });
+      }
+
+      console.log(`[Places API] Searching for: "${query}"`);
+
+      const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
+      url.searchParams.append('input', query);
+      url.searchParams.append('types', 'address');
+      url.searchParams.append('components', 'country:us');
+      url.searchParams.append('key', apiKey);
+
+      const response = await fetch(url.toString());
+      
+      if (!response.ok) {
+        console.error(`[Places API] Error: ${response.status}`);
+        return res.json({ predictions: [] });
+      }
+
+      const data = await response.json();
+      
+      if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+        console.error(`[Places API] Status: ${data.status}`);
+        return res.json({ predictions: [] });
+      }
+
+      const predictions = (data.predictions || []).map((p: any) => ({
+        description: p.description,
+        placeId: p.place_id,
+        mainText: p.structured_formatting?.main_text || '',
+        secondaryText: p.structured_formatting?.secondary_text || '',
+      }));
+      
+      console.log(`[Places API] Found ${predictions.length} suggestions`);
+      res.json({ predictions });
+    } catch (error: any) {
+      console.error('[Places API] Error:', error.message);
+      res.json({ predictions: [] });
+    }
+  });
+
   // GET /api/mls/search/address?query=13106+New+Boston
+  // Now uses the full address to search MLS (called after selecting from Places)
   app.get("/api/mls/search/address", isAuthenticated, async (req, res) => {
     try {
       const { query } = req.query;
@@ -896,7 +950,7 @@ export async function registerRoutes(
       const apiKey = process.env.REPLIERS_API_KEY;
       
       const url = new URL(`${REPLIERS_API_BASE}/listings`);
-      // Use 'address' parameter for address search, not 'search'
+      // Use 'address' parameter for address search
       url.searchParams.append('address', query);
       url.searchParams.append('resultsPerPage', '8');
       url.searchParams.append('status', 'A,U,P,S');

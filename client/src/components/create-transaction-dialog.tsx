@@ -5,7 +5,7 @@ import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2, ChevronDown, ChevronUp, User, Check, X, Bed, Bath, Square, DollarSign } from "lucide-react";
 import { useDebounce } from "@/hooks/useDebounce";
-import { usePropertySearch, type PropertySearchResult } from "@/hooks/usePropertySearch";
+import { usePropertySearch, type PropertySearchResult, type PlacePrediction } from "@/hooks/usePropertySearch";
 import { PropertyAutocomplete } from "@/components/ui/property-autocomplete";
 import { Card } from "@/components/ui/card";
 import {
@@ -93,7 +93,7 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
   const debouncedMls = useDebounce(mlsInput, 300);
   
   const { 
-    addressResults, 
+    placePredictions,
     mlsResults, 
     isSearchingAddress, 
     isSearchingMls, 
@@ -101,6 +101,8 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
     searchByMlsNumber,
     clearResults 
   } = usePropertySearch();
+  
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   
   // Search by address when input changes
   useEffect(() => {
@@ -294,31 +296,57 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
               )}
             />
 
-            {/* Property Address with MLS Autocomplete */}
+            {/* Property Address with Google Places Autocomplete */}
             <FormField
               control={form.control}
               name="propertyAddress"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="relative">
                   <FormLabel>Property Address</FormLabel>
                   <FormControl>
-                    <PropertyAutocomplete
-                      value={addressInput}
-                      onChange={(value) => {
-                        setAddressInput(value);
-                        field.onChange(value);
-                        // Clear selection when user edits the address
-                        if (selectedProperty && value !== selectedProperty.fullAddress) {
-                          setSelectedProperty(null);
-                        }
-                      }}
-                      onSelect={handlePropertySelect}
-                      options={selectedProperty ? [] : addressResults}
-                      isLoading={isSearchingAddress}
-                      placeholder="Start typing address..."
-                      type="address"
-                      testId="input-property-address"
-                    />
+                    <div className="relative">
+                      <Input
+                        value={addressInput}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setAddressInput(value);
+                          field.onChange(value);
+                          setShowAddressSuggestions(true);
+                          if (selectedProperty && value !== selectedProperty.fullAddress) {
+                            setSelectedProperty(null);
+                          }
+                        }}
+                        onFocus={() => setShowAddressSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowAddressSuggestions(false), 200)}
+                        placeholder="Start typing address..."
+                        data-testid="input-property-address"
+                      />
+                      {isSearchingAddress && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                        </div>
+                      )}
+                      {showAddressSuggestions && placePredictions.length > 0 && !selectedProperty && (
+                        <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+                          {placePredictions.map((prediction) => (
+                            <button
+                              key={prediction.placeId}
+                              type="button"
+                              className="w-full px-3 py-2 text-left hover:bg-accent focus:bg-accent focus:outline-none text-sm"
+                              onClick={() => {
+                                setAddressInput(prediction.description);
+                                field.onChange(prediction.description);
+                                setShowAddressSuggestions(false);
+                                clearResults();
+                              }}
+                            >
+                              <div className="font-medium">{prediction.mainText}</div>
+                              <div className="text-xs text-muted-foreground">{prediction.secondaryText}</div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
