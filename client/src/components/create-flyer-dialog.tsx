@@ -447,10 +447,11 @@ export function CreateFlyerDialog({
   const [hasGeneratedHeadline, setHasGeneratedHeadline] = useState(false);
   const [renderedPreviewUrl, setRenderedPreviewUrl] = useState<string | null>(null);
   const [isRenderingPreview, setIsRenderingPreview] = useState(false);
-  const [profileSynced, setProfileSynced] = useState(false);
+  const [profileSyncApplied, setProfileSyncApplied] = useState(false);
+  const [profileSyncProcessed, setProfileSyncProcessed] = useState(false);
   
-  // Check if profile is incomplete
-  const isProfileIncomplete = !agentProfile?.firstName || !agentProfile?.phone;
+  // Check if profile is incomplete (only after loading)
+  const isProfileIncomplete = !profileLoading && (!agentProfile?.firstName || !agentProfile?.phone);
 
   const handleZoomIn = useCallback(() => {
     setZoomLevel(prev => Math.min(prev + 25, 300));
@@ -516,7 +517,8 @@ export function CreateFlyerDialog({
 
   useEffect(() => {
     if (open) {
-      setProfileSynced(false);
+      setProfileSyncApplied(false);
+      setProfileSyncProcessed(false);
       
       // If editing, restore saved state from initialData
       if (isEditMode && initialData) {
@@ -630,7 +632,10 @@ export function CreateFlyerDialog({
   
   // Sync agent profile data when it loads (for new flyers only, not edit mode)
   useEffect(() => {
-    if (open && agentProfile && !isEditMode && !profileSynced) {
+    if (open && agentProfile && !isEditMode && !profileSyncProcessed) {
+      // Track if we actually apply any values from profile
+      let didApplyAnyField = false;
+      
       // Combine first and last name
       const fullName = [agentProfile.firstName, agentProfile.lastName]
         .filter(Boolean)
@@ -643,20 +648,27 @@ export function CreateFlyerDialog({
       
       if (!currentName && fullName) {
         form.setValue("agentName", fullName);
+        didApplyAnyField = true;
       }
       if (!currentPhone && agentProfile.phone) {
         form.setValue("agentPhone", formatPhoneNumber(agentProfile.phone));
+        didApplyAnyField = true;
       }
       if ((!currentTitle || currentTitle === "REALTOR®") && agentProfile.title && agentProfile.title !== "REALTOR®") {
         form.setValue("agentTitle", agentProfile.title);
+        didApplyAnyField = true;
       }
       if (!localAgentPhoto && agentProfile.profilePhoto) {
         setLocalAgentPhoto(agentProfile.profilePhoto);
+        didApplyAnyField = true;
       }
       
-      setProfileSynced(true);
+      // Only show sync indicator if we actually applied values
+      setProfileSyncApplied(didApplyAnyField);
+      // Mark that we've processed the profile (prevents re-runs)
+      setProfileSyncProcessed(true);
     }
-  }, [open, agentProfile, isEditMode, profileSynced, form, localAgentPhoto]);
+  }, [open, agentProfile, isEditMode, profileSyncProcessed, form, localAgentPhoto]);
 
   const handleSummarize = useCallback(async () => {
     // Always use the FULL original MLS description as source
@@ -2218,9 +2230,9 @@ export function CreateFlyerDialog({
 
                 <div className="border-t pt-3 mt-2 space-y-3">
                   <div className="flex items-center justify-between">
-                    <FormLabel className="text-sm font-medium text-muted-foreground">Agent Information</FormLabel>
+                    <span className="text-sm font-medium text-muted-foreground">Agent Information</span>
                     
-                    {profileSynced && !isProfileIncomplete && (
+                    {profileSyncApplied && (
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
