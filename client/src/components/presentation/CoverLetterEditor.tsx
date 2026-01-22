@@ -16,6 +16,8 @@ interface CoverLetterEditorProps {
   coverLetter: string;
   onChange: (coverLetter: string) => void;
   defaultCoverLetter?: string;
+  clientName?: string;
+  onClientNameChange?: (name: string) => void;
   subjectProperty?: any;
   properties?: any[];
   statistics?: any;
@@ -29,6 +31,8 @@ export function CoverLetterEditor({
   coverLetter,
   onChange,
   defaultCoverLetter = '',
+  clientName = '',
+  onClientNameChange,
   subjectProperty,
   properties = [],
   statistics,
@@ -38,9 +42,12 @@ export function CoverLetterEditor({
   onAgentFooterChange,
 }: CoverLetterEditorProps) {
   const { toast } = useToast();
-  const [clientName, setClientName] = useState('');
   const [tone, setTone] = useState<'professional' | 'friendly' | 'confident'>('professional');
   const [copied, setCopied] = useState(false);
+
+  const handleClientNameChange = (name: string) => {
+    onClientNameChange?.(name);
+  };
 
   const displayedCoverLetter = coverLetter || defaultCoverLetter;
   const isUsingDefault = !coverLetter && !!defaultCoverLetter;
@@ -123,7 +130,7 @@ export function CoverLetterEditor({
           <Input
             id="clientName"
             value={clientName}
-            onChange={(e) => setClientName(e.target.value)}
+            onChange={(e) => handleClientNameChange(e.target.value)}
             placeholder="e.g., John and Jane Smith"
             data-testid="input-client-name"
           />

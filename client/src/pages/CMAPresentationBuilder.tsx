@@ -158,6 +158,7 @@ export default function CMAPresentationBuilder() {
   const [brochure, setBrochure] = useState<CmaBrochure | null>(null);
   const [adjustments, setAdjustments] = useState<CmaAdjustmentsData | null>(null);
   const [customPhotoSelections, setCustomPhotoSelections] = useState<Record<string, string[]>>({});
+  const [clientName, setClientName] = useState('');
 
   const [coverPhotoModal, setCoverPhotoModal] = useState<{
     isOpen: boolean;
@@ -644,6 +645,8 @@ export default function CMAPresentationBuilder() {
                 coverLetter={config.coverLetterOverride || ""}
                 onChange={(coverLetterOverride) => setConfig({ ...config, coverLetterOverride })}
                 defaultCoverLetter={agentInfo.coverLetter || ''}
+                clientName={clientName}
+                onClientNameChange={setClientName}
                 subjectProperty={subjectProperty}
                 properties={properties}
                 statistics={statistics}
@@ -676,6 +679,7 @@ export default function CMAPresentationBuilder() {
             contentSettings={{
               title: config.coverPageConfig?.title || 'Comparative Market Analysis',
               subtitle: config.coverPageConfig?.subtitle || 'Prepared exclusively for you',
+              clientName: clientName,
               showDate: config.coverPageConfig?.showDate ?? true,
               showAgentPhoto: config.coverPageConfig?.showAgentPhoto ?? true,
               coverLetter: config.coverLetterOverride || agentInfo.coverLetter || '',

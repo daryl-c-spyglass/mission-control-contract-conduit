@@ -110,9 +110,12 @@ export function LivePreviewPanel({
 
       case 'cover_letter':
         return contentSettings.coverLetter ? (
-          <p className="text-sm text-muted-foreground line-clamp-4 whitespace-pre-wrap">
+          <div className="text-sm text-muted-foreground line-clamp-4 whitespace-pre-wrap">
+            {contentSettings.clientName && (
+              <p className="font-medium text-foreground mb-2">Dear {contentSettings.clientName},</p>
+            )}
             {contentSettings.coverLetter}
-          </p>
+          </div>
         ) : (
           <p className="text-sm text-muted-foreground italic">
             No cover letter set. Add one in Settings → Agent Profile → Default Cover Letter
