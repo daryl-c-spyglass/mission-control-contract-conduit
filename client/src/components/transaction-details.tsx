@@ -2879,21 +2879,36 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                         Add More
                       </Button>
                     )}
-                    {!isOffMarket && mlsPhotos.length > 0 && (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => refreshMlsMutation.mutate()}
-                        disabled={refreshMlsMutation.isPending}
-                        data-testid="button-refresh-mls-photos"
-                      >
-                        {refreshMlsMutation.isPending ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-3 w-3" />
+                    {!isOffMarket && (
+                      <div className="flex items-center gap-2">
+                        {uploadedPhotos.length > 0 && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => photoInputRef.current?.click()}
+                            data-testid="button-add-more-photos-mls"
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add More
+                          </Button>
                         )}
-                        <span className="ml-1 hidden sm:inline">Refresh</span>
-                      </Button>
+                        {mlsPhotos.length > 0 && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => refreshMlsMutation.mutate()}
+                            disabled={refreshMlsMutation.isPending}
+                            data-testid="button-refresh-mls-photos"
+                          >
+                            {refreshMlsMutation.isPending ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-3 w-3" />
+                            )}
+                            <span className="ml-1 hidden sm:inline">Refresh</span>
+                          </Button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </CardHeader>
@@ -3014,8 +3029,9 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                       )}
                     </>
                   ) : (
-                    /* MLS-connected: Show synced photos (read-only) */
-                    <>
+                    /* MLS-connected: Show synced photos + upload option */
+                    <div className="space-y-4">
+                      {/* MLS Photos Section */}
                       {mlsPhotos.length > 0 ? (
                         <div className="space-y-3">
                           <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
@@ -3069,7 +3085,117 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                           </Button>
                         </div>
                       )}
-                    </>
+
+                      {/* User Uploaded Photos Section */}
+                      {uploadedPhotos.length > 0 && (
+                        <div className="border-t border-dashed pt-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-sm font-medium flex items-center gap-2">
+                              <Upload className="h-4 w-4" />
+                              Your Uploaded Photos ({uploadedPhotos.length})
+                            </h4>
+                          </div>
+                          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+                            {uploadedPhotos.map((photo, index) => (
+                              <div 
+                                key={index} 
+                                className={cn(
+                                  "relative group aspect-square rounded-md overflow-hidden border-2",
+                                  primaryIndex === index ? "border-yellow-500" : "border-transparent hover:border-primary/50"
+                                )}
+                                data-testid={`uploaded-photo-${index}`}
+                              >
+                                <img 
+                                  src={photo} 
+                                  alt={`Uploaded photo ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7 text-white hover:bg-white/20"
+                                    onClick={() => setPrimaryPhotoMutation.mutate(index)}
+                                    data-testid={`button-set-primary-uploaded-${index}`}
+                                  >
+                                    <Star className={cn("h-4 w-4", primaryIndex === index && "fill-yellow-400 text-yellow-400")} />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7 text-white hover:bg-white/20"
+                                    onClick={() => deletePhotoMutation.mutate(index)}
+                                    data-testid={`button-delete-uploaded-${index}`}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                {primaryIndex === index && (
+                                  <div className="absolute bottom-1 left-1">
+                                    <Badge variant="secondary" className="bg-yellow-500 text-white text-[10px] px-1.5 py-0">
+                                      Primary
+                                    </Badge>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            <div 
+                              className="aspect-square rounded-md border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 flex items-center justify-center cursor-pointer transition-colors"
+                              onClick={() => photoInputRef.current?.click()}
+                              data-testid="button-add-photo-grid-mls"
+                            >
+                              <Plus className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            <Star className="h-3 w-3 inline text-yellow-500 mr-1" />
+                            Click star to set primary photo for marketing materials
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Compact upload area for MLS properties */}
+                      {uploadedPhotos.length === 0 && (
+                        <div className="border-t border-dashed pt-4">
+                          <div 
+                            className={cn(
+                              "flex items-center gap-3 p-3 border border-dashed rounded-lg cursor-pointer transition-colors",
+                              isDraggingPhoto ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                            )}
+                            onClick={() => photoInputRef.current?.click()}
+                            onDrop={handlePhotoDrop}
+                            onDragOver={handlePhotoDragOver}
+                            onDragLeave={handlePhotoDragLeave}
+                            data-testid="dropzone-photos-mls"
+                          >
+                            <div className="p-2 bg-muted rounded-lg">
+                              {isUploadingPhoto ? (
+                                <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
+                              ) : (
+                                <Plus className="w-5 h-5 text-muted-foreground" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">Add your own photos</p>
+                              <p className="text-xs text-muted-foreground">
+                                Drag photos here or click to browse
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Hidden file input */}
+                      <input
+                        ref={photoInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => handlePhotoUpload(e.target.files)}
+                        data-testid="input-photo-upload-mls"
+                      />
+                    </div>
                   )}
                 </CardContent>
               </Card>

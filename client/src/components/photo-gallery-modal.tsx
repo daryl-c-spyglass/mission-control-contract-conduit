@@ -121,7 +121,7 @@ export function PhotoGalleryModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] w-full h-[95vh] p-0 gap-0 bg-background border-border flex flex-col" aria-describedby={undefined}>
+      <DialogContent className="max-w-[95vw] w-full h-[95vh] p-0 gap-0 bg-background border-border flex flex-col [&>button]:hidden" aria-describedby={undefined}>
         <VisuallyHidden>
           <DialogTitle>Photo Gallery</DialogTitle>
         </VisuallyHidden>

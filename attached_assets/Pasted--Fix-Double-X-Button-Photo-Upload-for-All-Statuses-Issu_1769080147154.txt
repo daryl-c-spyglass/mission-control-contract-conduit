@@ -1,0 +1,243 @@
+# Fix: Double X Button + Photo Upload for All Statuses
+
+## Issue 1: Double X Button in Photo Gallery Modal
+
+### Problem
+There are two X buttons - one from the Dialog component and one added manually.
+
+### Fix
+Remove the manual X button since Dialog already provides one, OR hide the Dialog's default close button.
+
+**Option A: Remove the manual X button**
+
+```tsx
+{/* Header */}
+<div className="flex items-center justify-between px-4 py-3 border-b border-border">
+  <div>
+    <h3 className="text-foreground font-medium">
+      {currentPhoto.caption || `Photo ${currentIndex + 1} of ${photos.length}`}
+    </h3>
+    <p className="text-muted-foreground text-sm">Zoom: {zoom}%</p>
+  </div>
+  {/* REMOVE THIS BUTTON - Dialog already has X */}
+  {/* 
+  <Button variant="ghost" size="icon" onClick={onClose}>
+    <X className="w-5 h-5" />
+  </Button>
+  */}
+</div>
+```
+
+**Option B: Hide Dialog's default X and keep manual one**
+
+```tsx
+<DialogContent 
+  className="max-w-[95vw] w-full h-[95vh] p-0 gap-0 bg-background border-border"
+  hideCloseButton={true}  // Add this if your Dialog supports it
+>
+```
+
+**Option C: Use CSS to hide Dialog's X**
+
+```tsx
+<DialogContent 
+  className="max-w-[95vw] w-full h-[95vh] p-0 gap-0 bg-background border-border [&>button]:hidden"
+>
+```
+
+---
+
+## Issue 2: Photo Upload for All Statuses
+
+### Current Behavior
+- MLS properties: Show MLS photos only (no upload option)
+- Off Market: Show upload dropzone
+
+### New Behavior
+- ALL statuses: Show existing photos + upload option below
+
+---
+
+## Visualization: Photo Upload for All Statuses
+
+### MLS Property (e.g., Closed, Active, Under Contract)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 📷 Property Photos (34 from MLS)                                 [Refresh] │
+│                                                                             │
+│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐          │
+│  │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ +27 │          │
+│  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘          │
+│                                                                             │
+│  Photos synced from MLS • Click to view full size                          │
+│                                                                             │
+│  ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐  │
+│  │                                                                     │  │
+│  │     ＋  Add your own photos                                         │  │
+│  │         Drag photos here or click to browse                        │  │
+│  │                                                                     │  │
+│  └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘  │
+│                        ↑                                                   │
+│              NEW: Upload area below MLS photos                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### MLS Property WITH User-Uploaded Photos
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 📷 Property Photos (34 from MLS)                                 [Refresh] │
+│                                                                             │
+│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐          │
+│  │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ +27 │          │
+│  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘          │
+│                                                                             │
+│  Photos synced from MLS • Click to view full size                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 📤 Your Uploaded Photos (3)                                    [+ Add More] │
+│                                                                             │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────────────────────────┐    │
+│  │ 📷      │  │ 📷      │  │ 📷      │  │     ┌─────────────────┐     │    │
+│  │ Photo 1 │  │ Photo 2 │  │ Photo 3 │  │     │  ＋ Add Photos  │     │    │
+│  │ ⭐ [🗑️] │  │    [🗑️] │  │    [🗑️] │  │     │  Drag or click  │     │    │
+│  └─────────┘  └─────────┘  └─────────┘  │     └─────────────────┘     │    │
+│   Primary                               └─────────────────────────────┘    │
+│                                                                             │
+│  ⭐ = Primary photo for your materials • Click star to change              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Off Market Property (No MLS Photos)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 📷 Property Photos (0)                                                      │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                                                                     │   │
+│  │                          📷                                         │   │
+│  │                                                                     │   │
+│  │                   Drag photos here                                  │   │
+│  │                   or click to browse                                │   │
+│  │                                                                     │   │
+│  │              Supports JPG, PNG • Max 10MB per file                  │   │
+│  │                                                                     │   │
+│  │                     [📁 Browse Files]                               │   │
+│  │                                                                     │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ℹ️ Upload photos to create marketing materials for this property.         │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Off Market Property WITH Uploaded Photos
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 📷 Property Photos (4)                                         [+ Add More] │
+│                                                                             │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐           │
+│  │ 📷      │  │ 📷      │  │ 📷      │  │ 📷      │  │   ＋    │           │
+│  │ Front   │  │ Kitchen │  │ Living  │  │ Backyard│  │  Add    │           │
+│  │ ⭐ [🗑️] │  │    [🗑️] │  │    [🗑️] │  │    [🗑️] │  │  Photo  │           │
+│  └─────────┘  └─────────┘  └─────────┘  └─────────┘  └─────────┘           │
+│   Primary                                                                   │
+│                                                                             │
+│  ⭐ = Primary photo • Click star on any photo to set as primary            │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Summary of Changes
+
+### Photo Gallery Modal
+```diff
+- Two X buttons (Dialog's + manual)
++ Single X button (keep Dialog's default)
+```
+
+### Property Photos Section - ALL Statuses
+
+| Status | MLS Photos | User Upload |
+|--------|------------|-------------|
+| Active | ✅ Show | ✅ Add below |
+| Closed | ✅ Show | ✅ Add below |
+| Under Contract | ✅ Show | ✅ Add below |
+| Off Market | ❌ None | ✅ Show upload area |
+
+---
+
+## Implementation Approach
+
+### Option A: Compact Upload (Recommended)
+
+Add a small upload area/button below MLS photos:
+
+```tsx
+{/* MLS Photos Grid */}
+<div className="grid grid-cols-8 gap-2">
+  {mlsPhotos.slice(0, 7).map(...)}
+  {mlsPhotos.length > 7 && <div>+{mlsPhotos.length - 7}</div>}
+</div>
+
+<p className="text-xs text-muted-foreground mt-3">
+  Photos synced from MLS • Click to view full size
+</p>
+
+{/* NEW: Compact upload option for all statuses */}
+<div className="mt-4 pt-4 border-t border-dashed">
+  <div 
+    className="flex items-center gap-3 p-3 border border-dashed rounded-lg 
+               hover:bg-muted/50 cursor-pointer transition-colors"
+    onClick={() => fileInputRef.current?.click()}
+  >
+    <div className="p-2 bg-muted rounded-lg">
+      <Plus className="w-5 h-5 text-muted-foreground" />
+    </div>
+    <div>
+      <p className="text-sm font-medium">Add your own photos</p>
+      <p className="text-xs text-muted-foreground">
+        Drag photos here or click to browse
+      </p>
+    </div>
+  </div>
+  <input type="file" ref={fileInputRef} className="hidden" multiple accept="image/*" />
+</div>
+```
+
+### Option B: Separate Section
+
+Show uploaded photos in a separate section below MLS photos:
+
+```tsx
+{/* MLS Photos */}
+<Card>
+  <CardContent>
+    <h3>Property Photos ({mlsPhotos.length} from MLS)</h3>
+    {/* MLS photo grid */}
+  </CardContent>
+</Card>
+
+{/* User Uploaded Photos - NEW */}
+<Card>
+  <CardContent>
+    <h3>Your Uploaded Photos ({uploadedPhotos.length})</h3>
+    {uploadedPhotos.length > 0 ? (
+      {/* Show uploaded photos grid + add more button */}
+    ) : (
+      {/* Show dropzone */}
+    )}
+  </CardContent>
+</Card>
+```
+
+---
+
+## Which do you prefer?
+
+**Option A (Compact):** Single card, upload area below MLS photos
+**Option B (Separate):** Two cards - MLS Photos + Your Photos
+
+Let me know and I'll create the detailed implementation prompt!
