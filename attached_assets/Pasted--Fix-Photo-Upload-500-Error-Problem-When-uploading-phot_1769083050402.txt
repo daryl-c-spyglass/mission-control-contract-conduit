@@ -1,0 +1,469 @@
+# Fix: Photo Upload 500 Error
+
+## Problem
+
+When uploading photos on the Marketing tab, the server returns:
+```
+500: {"message":"Failed to upload photo"}
+```
+
+This indicates the backend photo upload endpoint is either missing, misconfigured, or failing.
+
+---
+
+## Root Causes (Check Each)
+
+1. **Missing API endpoint** - `/api/transactions/:id/photos` doesn't exist
+2. **Missing database table** - `transaction_photos` table not created
+3. **Missing file upload middleware** - Multer not configured
+4. **File storage not set up** - No destination for uploaded files
+5. **Missing environment variables** - Cloud storage keys not set
+
+---
+
+## Solution: Complete Photo Upload Implementation
+
+### 1. Database Schema
+
+**Add to `shared/schema.ts`:**
+
+```typescript
+import { pgTable, serial, integer, text, boolean, timestamp } from 'drizzle-orm/pg-core';
+
+// Transaction photos table for user-uploaded photos
+export const transactionPhotos = pgTable('transaction_photos', {
+  id: serial('id').primaryKey(),
+  transactionId: integer('transaction_id')
+    .notNull()
+    .references(() => transactions.id, { onDelete: 'cascade' }),
+  url: text('url').notNull(),
+  filename: text('filename'),
+  isPrimary: boolean('is_primary').default(false),
+  sortOrder: integer('sort_order').default(0),
+  uploadedAt: timestamp('uploaded_at').defaultNow(),
+});
+
+export type TransactionPhoto = typeof transactionPhotos.$inferSelect;
+export type InsertTransactionPhoto = typeof transactionPhotos.$inferInsert;
+```
+
+**Run migration:**
+```bash
+npx drizzle-kit generate
+npx drizzle-kit push
+```
+
+---
+
+### 2. Install Required Packages
+
+```bash
+npm install multer @types/multer
+# If using cloud storage:
+npm install @aws-sdk/client-s3  # For AWS S3
+# OR
+npm install @google-cloud/storage  # For Google Cloud Storage
+```
+
+---
+
+### 3. File Upload Middleware
+
+**Create `server/upload.ts`:**
+
+```typescript
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+
+// Ensure upload directory exists
+const uploadDir = './uploads/photos';
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Configure multer for local storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, `photo-${uniqueSuffix}${ext}`);
+  }
+});
+
+// File filter - only allow images
+const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.'));
+  }
+};
+
+// Configure multer
+export const photoUpload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB max
+    files: 10, // Max 10 files at once
+  }
+});
+```
+
+---
+
+### 4. API Routes
+
+**Add to `server/routes.ts`:**
+
+```typescript
+import { photoUpload } from './upload';
+import { transactionPhotos } from '../shared/schema';
+import { eq, and, desc } from 'drizzle-orm';
+
+// Serve uploaded files statically
+app.use('/uploads', express.static('uploads'));
+
+// GET - Get all photos for a transaction
+app.get('/api/transactions/:id/photos', async (req, res) => {
+  try {
+    const transactionId = parseInt(req.params.id);
+    
+    const photos = await db
+      .select()
+      .from(transactionPhotos)
+      .where(eq(transactionPhotos.transactionId, transactionId))
+      .orderBy(transactionPhotos.sortOrder);
+    
+    res.json(photos);
+  } catch (error) {
+    console.error('Error fetching photos:', error);
+    res.status(500).json({ message: 'Failed to fetch photos' });
+  }
+});
+
+// POST - Upload photos
+app.post('/api/transactions/:id/photos', photoUpload.array('photos', 10), async (req, res) => {
+  try {
+    const transactionId = parseInt(req.params.id);
+    const files = req.files as Express.Multer.File[];
+    
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: 'No files uploaded' });
+    }
+
+    // Check if transaction exists
+    const transaction = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, transactionId))
+      .limit(1);
+
+    if (transaction.length === 0) {
+      return res.status(404).json({ message: 'Transaction not found' });
+    }
+
+    // Check if there are existing photos (to determine isPrimary)
+    const existingPhotos = await db
+      .select()
+      .from(transactionPhotos)
+      .where(eq(transactionPhotos.transactionId, transactionId));
+
+    const isFirstUpload = existingPhotos.length === 0;
+
+    // Insert photo records
+    const insertedPhotos = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const url = `/uploads/photos/${file.filename}`;
+      
+      const [photo] = await db
+        .insert(transactionPhotos)
+        .values({
+          transactionId,
+          url,
+          filename: file.originalname,
+          isPrimary: isFirstUpload && i === 0, // First photo of first upload is primary
+          sortOrder: existingPhotos.length + i,
+        })
+        .returning();
+      
+      insertedPhotos.push(photo);
+    }
+
+    res.json({ 
+      message: 'Photos uploaded successfully',
+      photos: insertedPhotos 
+    });
+  } catch (error) {
+    console.error('Error uploading photos:', error);
+    res.status(500).json({ message: 'Failed to upload photo' });
+  }
+});
+
+// PATCH - Set primary photo
+app.patch('/api/transactions/:id/photos/:photoId/primary', async (req, res) => {
+  try {
+    const transactionId = parseInt(req.params.id);
+    const photoId = parseInt(req.params.photoId);
+
+    // Remove primary from all photos for this transaction
+    await db
+      .update(transactionPhotos)
+      .set({ isPrimary: false })
+      .where(eq(transactionPhotos.transactionId, transactionId));
+
+    // Set the selected photo as primary
+    const [updatedPhoto] = await db
+      .update(transactionPhotos)
+      .set({ isPrimary: true })
+      .where(
+        and(
+          eq(transactionPhotos.id, photoId),
+          eq(transactionPhotos.transactionId, transactionId)
+        )
+      )
+      .returning();
+
+    if (!updatedPhoto) {
+      return res.status(404).json({ message: 'Photo not found' });
+    }
+
+    res.json({ message: 'Primary photo updated', photo: updatedPhoto });
+  } catch (error) {
+    console.error('Error setting primary photo:', error);
+    res.status(500).json({ message: 'Failed to update primary photo' });
+  }
+});
+
+// DELETE - Delete a photo
+app.delete('/api/transactions/:id/photos/:photoId', async (req, res) => {
+  try {
+    const transactionId = parseInt(req.params.id);
+    const photoId = parseInt(req.params.photoId);
+
+    // Get photo to delete file from disk
+    const [photo] = await db
+      .select()
+      .from(transactionPhotos)
+      .where(
+        and(
+          eq(transactionPhotos.id, photoId),
+          eq(transactionPhotos.transactionId, transactionId)
+        )
+      );
+
+    if (!photo) {
+      return res.status(404).json({ message: 'Photo not found' });
+    }
+
+    // Delete from database
+    await db
+      .delete(transactionPhotos)
+      .where(eq(transactionPhotos.id, photoId));
+
+    // Delete file from disk (optional - comment out if you want to keep files)
+    const filePath = `.${photo.url}`;
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    // If deleted photo was primary, make the first remaining photo primary
+    if (photo.isPrimary) {
+      const remainingPhotos = await db
+        .select()
+        .from(transactionPhotos)
+        .where(eq(transactionPhotos.transactionId, transactionId))
+        .orderBy(transactionPhotos.sortOrder)
+        .limit(1);
+
+      if (remainingPhotos.length > 0) {
+        await db
+          .update(transactionPhotos)
+          .set({ isPrimary: true })
+          .where(eq(transactionPhotos.id, remainingPhotos[0].id));
+      }
+    }
+
+    res.json({ message: 'Photo deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting photo:', error);
+    res.status(500).json({ message: 'Failed to delete photo' });
+  }
+});
+```
+
+---
+
+### 5. Frontend - Update Upload Handler
+
+**In your Marketing tab component:**
+
+```typescript
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+const fileInputRef = useRef<HTMLInputElement>(null);
+const queryClient = useQueryClient();
+
+// Fetch uploaded photos
+const { data: uploadedPhotos = [] } = useQuery({
+  queryKey: [`/api/transactions/${transaction.id}/photos`],
+});
+
+// Upload mutation
+const uploadMutation = useMutation({
+  mutationFn: async (files: FileList) => {
+    const formData = new FormData();
+    
+    // Append all files
+    Array.from(files).forEach((file) => {
+      formData.append('photos', file);
+    });
+
+    const response = await fetch(`/api/transactions/${transaction.id}/photos`, {
+      method: 'POST',
+      body: formData,
+      // Don't set Content-Type header - browser will set it with boundary
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to upload photos');
+    }
+
+    return response.json();
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ 
+      queryKey: [`/api/transactions/${transaction.id}/photos`] 
+    });
+    toast({
+      title: 'Photos uploaded',
+      description: 'Your photos have been uploaded successfully.',
+    });
+  },
+  onError: (error: Error) => {
+    toast({
+      title: 'Upload failed',
+      description: error.message,
+      variant: 'destructive',
+    });
+  },
+});
+
+// Handle file selection
+const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = e.target.files;
+  if (files && files.length > 0) {
+    uploadMutation.mutate(files);
+  }
+  // Reset input so same file can be selected again
+  e.target.value = '';
+};
+
+// Handle drag and drop
+const handleDrop = (e: React.DragEvent) => {
+  e.preventDefault();
+  const files = e.dataTransfer.files;
+  if (files && files.length > 0) {
+    uploadMutation.mutate(files);
+  }
+};
+
+const handleDragOver = (e: React.DragEvent) => {
+  e.preventDefault();
+};
+```
+
+**JSX for dropzone:**
+
+```tsx
+<div
+  onDrop={handleDrop}
+  onDragOver={handleDragOver}
+  onClick={() => fileInputRef.current?.click()}
+  className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
+    transition-colors hover:border-primary/50 hover:bg-muted/50
+    ${uploadMutation.isPending ? 'opacity-50 pointer-events-none' : ''}`}
+>
+  {uploadMutation.isPending ? (
+    <>
+      <Loader2 className="w-10 h-10 mx-auto text-muted-foreground mb-3 animate-spin" />
+      <p className="font-medium">Uploading...</p>
+    </>
+  ) : (
+    <>
+      <Camera className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+      <p className="font-medium">Drag photos here</p>
+      <p className="text-sm text-muted-foreground">or click to browse</p>
+      <p className="text-xs text-muted-foreground mt-2">
+        Supports JPG, PNG • Max 10MB per file
+      </p>
+      <Button variant="outline" size="sm" className="mt-4">
+        <Upload className="w-4 h-4 mr-1" />
+        Browse Files
+      </Button>
+    </>
+  )}
+</div>
+
+<input
+  type="file"
+  ref={fileInputRef}
+  className="hidden"
+  multiple
+  accept="image/jpeg,image/png,image/webp"
+  onChange={handleFileChange}
+/>
+```
+
+---
+
+## Quick Debugging Steps
+
+If you still get errors, check:
+
+1. **Does the endpoint exist?**
+   ```bash
+   curl -X POST http://localhost:5000/api/transactions/1/photos
+   # Should return 400 "No files uploaded", not 404
+   ```
+
+2. **Is multer installed?**
+   ```bash
+   npm list multer
+   ```
+
+3. **Does uploads directory exist?**
+   ```bash
+   ls -la ./uploads/photos
+   ```
+
+4. **Check server logs** for the actual error
+
+5. **Database table exists?**
+   ```sql
+   SELECT * FROM transaction_photos LIMIT 1;
+   ```
+
+---
+
+## Testing Checklist
+
+- [ ] Upload single photo works
+- [ ] Upload multiple photos works
+- [ ] Drag and drop works
+- [ ] Browse Files button works
+- [ ] First uploaded photo becomes primary
+- [ ] Photos display after upload
+- [ ] Delete photo works
+- [ ] Set primary photo works
+- [ ] File size limit enforced (10MB)
+- [ ] Invalid file types rejected
+- [ ] Error messages display properly
