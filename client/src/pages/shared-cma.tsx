@@ -185,27 +185,32 @@ export default function SharedCMAPage() {
                     </div>
                   )}
                   <CardContent className="pt-4 space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{comp.address}</p>
-                        <p className="text-lg font-semibold">{formatPrice(comp.price)}</p>
-                      </div>
+                    {/* Row 1: Distance Badge */}
+                    <div className="flex items-center gap-2">
                       <Badge variant="outline" className="shrink-0">
                         {comp.distance.toFixed(1)} mi
                       </Badge>
                     </div>
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                    
+                    {/* Row 2: Address */}
+                    <p className="font-medium text-sm truncate">{comp.address}</p>
+                    
+                    {/* Row 3: Price */}
+                    <p className="text-lg font-semibold">{formatPrice(comp.price)}</p>
+                    
+                    {/* Row 4: Property Stats */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Bed className="h-3.5 w-3.5" />
-                        {comp.bedrooms}
+                        {comp.bedrooms} beds
                       </div>
                       <div className="flex items-center gap-1">
                         <Bath className="h-3.5 w-3.5" />
-                        {comp.bathrooms}
+                        {comp.bathrooms} baths
                       </div>
                       <div className="flex items-center gap-1">
                         <Square className="h-3.5 w-3.5" />
-                        {typeof comp.sqft === 'number' ? comp.sqft.toLocaleString() : comp.sqft}
+                        {typeof comp.sqft === 'number' ? comp.sqft.toLocaleString() : comp.sqft} sqft
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">

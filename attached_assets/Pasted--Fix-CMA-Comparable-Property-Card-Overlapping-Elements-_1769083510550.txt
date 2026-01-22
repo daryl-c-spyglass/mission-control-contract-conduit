@@ -1,0 +1,215 @@
+# Fix: CMA Comparable Property Card - Overlapping Elements
+
+## Problem
+
+On the CMA Comparable Properties grid view, the card footer has overlapping elements:
+- Status badge ("Active Listing")
+- Distance badge ("0.4 mi") 
+- Price ("$500,000")
+
+These are cramped together and overlapping, especially the price getting cut off.
+
+---
+
+## Current State (Broken)
+
+```
+┌─────────────────────────────────┐
+│                                 │
+│         [Property Photo]        │
+│                                 │
+├─────────────────────────────────┤
+│ [Active Listi][0.4 mi]$409/sqft │  ← Overlapping! Price cut off
+│                                 │
+│ 🛏️ 2 beds  🛁 3 baths  📐 1,538 │
+│ ⏱️ 1 days on market             │
+└─────────────────────────────────┘
+```
+
+---
+
+## Fixed Layout
+
+### Option A: Stack badges above price (Recommended)
+
+```
+┌─────────────────────────────────┐
+│                                 │
+│         [Property Photo]        │
+│                                 │
+├─────────────────────────────────┤
+│ [Active Listing] [0.4 mi]       │  ← Badges on their own line
+│ $500,000              $409/sqft │  ← Price + price per sqft
+│                                 │
+│ 🛏️ 2 beds  🛁 3 baths  📐 1,538 │
+│ ⏱️ 1 days on market             │
+└─────────────────────────────────┘
+```
+
+### Option B: Badges on photo, price below
+
+```
+┌─────────────────────────────────┐
+│ [Active Listing] [0.4 mi]       │  ← Badges overlaid on photo
+│                                 │
+│         [Property Photo]        │
+│                                 │
+├─────────────────────────────────┤
+│ $500,000              $409/sqft │  ← Price row with space
+│                                 │
+│ 🛏️ 2 beds  🛁 3 baths  📐 1,538 │
+│ ⏱️ 1 days on market             │
+└─────────────────────────────────┘
+```
+
+---
+
+## Implementation Fix
+
+Find your CMA comparable property card component and update the layout:
+
+### Before (Cramped/Overlapping)
+
+```tsx
+<div className="flex items-center gap-1">
+  <span className="bg-green-500 text-white text-xs px-2 py-0.5 rounded">
+    Active Listing
+  </span>
+  <span className="bg-gray-700 text-white text-xs px-2 py-0.5 rounded">
+    0.4 mi
+  </span>
+  <span className="text-sm">${pricePerSqft}/sqft</span>
+</div>
+```
+
+### After (Fixed - Stacked Layout)
+
+```tsx
+{/* Card Footer */}
+<div className="p-3 space-y-2">
+  
+  {/* Row 1: Status Badge + Distance Badge */}
+  <div className="flex items-center gap-2">
+    <span className={`text-xs px-2 py-0.5 rounded text-white
+      ${status === 'Active' ? 'bg-green-500' : 
+        status === 'Closed' ? 'bg-red-500' : 
+        status === 'Pending' ? 'bg-yellow-500' : 'bg-gray-500'}`}
+    >
+      {status === 'Active' ? 'Active Listing' : status}
+    </span>
+    <span className="bg-zinc-700 text-white text-xs px-2 py-0.5 rounded">
+      {distance} mi
+    </span>
+  </div>
+  
+  {/* Row 2: Price + Price per Sqft */}
+  <div className="flex items-center justify-between">
+    <span className="text-lg font-semibold">
+      ${price.toLocaleString()}
+    </span>
+    <span className="text-sm text-muted-foreground">
+      ${pricePerSqft}/sqft
+    </span>
+  </div>
+  
+  {/* Row 3: Beds, Baths, Sqft */}
+  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+    <span className="flex items-center gap-1">
+      <Bed className="w-4 h-4" />
+      {beds} beds
+    </span>
+    <span className="flex items-center gap-1">
+      <Bath className="w-4 h-4" />
+      {baths} baths
+    </span>
+    <span className="flex items-center gap-1">
+      <Square className="w-4 h-4" />
+      {sqft.toLocaleString()} sqft
+    </span>
+  </div>
+  
+  {/* Row 4: Days on Market */}
+  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+    <Clock className="w-4 h-4" />
+    {daysOnMarket} days on market
+  </div>
+  
+</div>
+```
+
+---
+
+## Alternative: Badges Overlaid on Photo
+
+If you prefer badges on the photo (like many real estate sites):
+
+```tsx
+<div className="relative">
+  {/* Photo */}
+  <img src={photo} className="w-full aspect-[4/3] object-cover" />
+  
+  {/* Badges overlaid on bottom of photo */}
+  <div className="absolute bottom-2 left-2 flex items-center gap-2">
+    <span className={`text-xs px-2 py-1 rounded text-white shadow
+      ${status === 'Active' ? 'bg-green-500' : 
+        status === 'Closed' ? 'bg-red-500' : 'bg-gray-500'}`}
+    >
+      {status === 'Active' ? 'Active Listing' : status}
+    </span>
+    <span className="bg-zinc-800/80 text-white text-xs px-2 py-1 rounded shadow">
+      {distance} mi
+    </span>
+  </div>
+</div>
+
+{/* Card Content - No overlap issues */}
+<div className="p-3 space-y-2">
+  <div className="flex items-center justify-between">
+    <span className="text-lg font-semibold">${price.toLocaleString()}</span>
+    <span className="text-sm text-muted-foreground">${pricePerSqft}/sqft</span>
+  </div>
+  {/* ... rest of content */}
+</div>
+```
+
+---
+
+## Visual Comparison
+
+### Before (Overlapping)
+```
+[Active Listi[0.4 mi]$409/sqft   ← Cramped, cut off
+```
+
+### After (Fixed)
+```
+[Active Listing] [0.4 mi]        ← Row 1: Badges
+$500,000              $409/sqft  ← Row 2: Prices with space
+```
+
+---
+
+## CSS Tip
+
+If you need a quick fix without restructuring, add `flex-wrap`:
+
+```tsx
+<div className="flex flex-wrap items-center gap-2">
+  <span className="...">Active Listing</span>
+  <span className="...">0.4 mi</span>
+  <span className="ml-auto">$409/sqft</span>
+</div>
+```
+
+This allows items to wrap to the next line if they don't fit.
+
+---
+
+## Testing Checklist
+
+- [ ] Badges don't overlap with price
+- [ ] Price is fully visible
+- [ ] Layout looks good on narrow cards
+- [ ] Works for all statuses (Active, Closed, Pending)
+- [ ] Distance badge fully visible
+- [ ] Price per sqft aligned properly
