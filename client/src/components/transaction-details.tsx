@@ -656,6 +656,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [isEditingDates, setIsEditingDates] = useState(false);
   const [editContractDate, setEditContractDate] = useState(transaction.contractDate || '');
   const [editClosingDate, setEditClosingDate] = useState(transaction.closingDate || '');
+  const [editGoLiveDate, setEditGoLiveDate] = useState(transaction.goLiveDate || '');
   
   // Coordinators editing state
   const [isAddingCoordinator, setIsAddingCoordinator] = useState(false);
@@ -1090,10 +1091,17 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   };
 
   const handleSaveDates = async () => {
-    await updateTransactionMutation.mutateAsync({
-      contractDate: editContractDate || null,
-      closingDate: editClosingDate || null,
-    });
+    // For off-market listings, save goLiveDate; for others, save contract/closing dates
+    if (isOffMarket) {
+      await updateTransactionMutation.mutateAsync({
+        goLiveDate: editGoLiveDate || null,
+      });
+    } else {
+      await updateTransactionMutation.mutateAsync({
+        contractDate: editContractDate || null,
+        closingDate: editClosingDate || null,
+      });
+    }
     setIsEditingDates(false);
     toast({ title: "Key dates updated" });
   };
@@ -1670,6 +1678,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                     onClick={() => {
                       setEditContractDate(transaction.contractDate || '');
                       setEditClosingDate(transaction.closingDate || '');
+                      setEditGoLiveDate(transaction.goLiveDate || '');
                       setIsEditingDates(true);
                     }}
                     data-testid="button-edit-dates"
@@ -1714,46 +1723,96 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 )}
               </CardHeader>
               <CardContent className="space-y-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Contract Date</p>
-                  {isEditingDates ? (
-                    <Input
-                      type="date"
-                      value={editContractDate}
-                      onChange={(e) => setEditContractDate(e.target.value)}
-                      className="mt-1"
-                      data-testid="input-contract-date"
-                    />
-                  ) : (
-                    <p className="font-medium">{formatDate(transaction.contractDate)}</p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Expected Closing</p>
-                  {isEditingDates ? (
-                    <Input
-                      type="date"
-                      value={editClosingDate}
-                      onChange={(e) => setEditClosingDate(e.target.value)}
-                      className="mt-1"
-                      data-testid="input-closing-date"
-                    />
-                  ) : (
+                {isOffMarket ? (
+                  /* Off-market: Show Date Going Live */
+                  <div>
+                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5 text-purple-500" />
+                      Date Going Live
+                    </p>
+                    {isEditingDates ? (
+                      <Input
+                        type="date"
+                        value={editGoLiveDate}
+                        onChange={(e) => setEditGoLiveDate(e.target.value)}
+                        className="mt-1"
+                        data-testid="input-go-live-date"
+                      />
+                    ) : (
+                      <div>
+                        <p className={`font-medium ${transaction.goLiveDate ? '' : 'text-muted-foreground'}`}>
+                          {formatDate(transaction.goLiveDate)}
+                        </p>
+                        {transaction.goLiveDate && (() => {
+                          const goLive = new Date(transaction.goLiveDate);
+                          const today = new Date();
+                          const daysUntil = Math.ceil((goLive.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                          if (daysUntil > 0) {
+                            return (
+                              <Badge variant="outline" className="mt-1">
+                                {daysUntil === 1 ? 'Going live tomorrow!' : `${daysUntil} days until live`}
+                              </Badge>
+                            );
+                          } else if (daysUntil === 0) {
+                            return (
+                              <Badge className="mt-1 bg-green-500 hover:bg-green-600">
+                                Going live today!
+                              </Badge>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-2">
+                      When this listing will be published to MLS
+                    </p>
+                  </div>
+                ) : (
+                  /* Standard: Show Contract Date & Expected Closing */
+                  <>
                     <div>
-                      <p className="font-medium">{formatDate(transaction.closingDate)}</p>
-                      {daysUntilClosing !== null && daysUntilClosing >= 0 && (
-                        <Badge variant="outline" className="mt-1">
-                          {daysUntilClosing === 0 ? 'Closing today!' : `${daysUntilClosing} days remaining`}
-                        </Badge>
-                      )}
-                      {daysUntilClosing !== null && daysUntilClosing <= 7 && daysUntilClosing >= 0 && (
-                        <Badge variant="destructive" className="mt-1 ml-1">
-                          Closing soon!
-                        </Badge>
+                      <p className="text-sm text-muted-foreground">Contract Date</p>
+                      {isEditingDates ? (
+                        <Input
+                          type="date"
+                          value={editContractDate}
+                          onChange={(e) => setEditContractDate(e.target.value)}
+                          className="mt-1"
+                          data-testid="input-contract-date"
+                        />
+                      ) : (
+                        <p className="font-medium">{formatDate(transaction.contractDate)}</p>
                       )}
                     </div>
-                  )}
-                </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Expected Closing</p>
+                      {isEditingDates ? (
+                        <Input
+                          type="date"
+                          value={editClosingDate}
+                          onChange={(e) => setEditClosingDate(e.target.value)}
+                          className="mt-1"
+                          data-testid="input-closing-date"
+                        />
+                      ) : (
+                        <div>
+                          <p className="font-medium">{formatDate(transaction.closingDate)}</p>
+                          {daysUntilClosing !== null && daysUntilClosing >= 0 && (
+                            <Badge variant="outline" className="mt-1">
+                              {daysUntilClosing === 0 ? 'Closing today!' : `${daysUntilClosing} days remaining`}
+                            </Badge>
+                          )}
+                          {daysUntilClosing !== null && daysUntilClosing <= 7 && daysUntilClosing >= 0 && (
+                            <Badge variant="destructive" className="mt-1 ml-1">
+                              Closing soon!
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
 

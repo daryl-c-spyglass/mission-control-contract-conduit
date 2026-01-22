@@ -1,0 +1,939 @@
+# Off Market Listings - "Date Going Live" Enhancement
+
+## Overview
+For Off Market listings, replace "Contract Date / Closing Date" with "Date Going Live" throughout the application. Off Market properties aren't under contract yet, so contract/closing dates don't apply. Instead, agents need to track when the listing will go live on MLS.
+
+**Based on feedback from Caleb Nelson:**
+> "For off market listings, we would want a 'date listing goes live' option instead of contract date... When are they going to put it on market? Because usually they'll say, 'Okay, this listing is not live, but we're going live on MLS on January 30th.'"
+
+---
+
+## Conditional Logic
+
+```
+IF transaction.status === "Off Market"
+  THEN show "Date Going Live" field
+  HIDE "Contract Date" and "Closing Date"
+
+ELSE (Active, In Contract, Closed, etc.)
+  THEN show "Contract Date" and "Expected Closing"
+  HIDE "Date Going Live"
+```
+
+---
+
+## 1. Database Schema Update
+
+### Add new field to transactions table
+
+```typescript
+// shared/schema.ts or server/db/schema.ts
+
+export const transactions = pgTable("transactions", {
+  id: serial("id").primaryKey(),
+  // ... existing fields ...
+  
+  contractDate: timestamp("contract_date"),
+  closingDate: timestamp("closing_date"),
+  
+  // NEW: For Off Market listings - when listing will go live on MLS
+  goLiveDate: timestamp("go_live_date"),
+  
+  // ... rest of fields ...
+});
+```
+
+### Generate and run migration
+
+```bash
+npm run db:generate
+npm run db:migrate
+```
+
+### Migration SQL (if manual)
+
+```sql
+ALTER TABLE transactions 
+ADD COLUMN go_live_date TIMESTAMP;
+```
+
+---
+
+## 2. Update Create Transaction Modal
+
+When "Off Market" checkbox is checked, show "Date Going Live" field instead of contract/closing dates in the Off Market Property Details section.
+
+### File: `client/src/components/transactions/CreateTransactionModal.tsx`
+
+```tsx
+import { useState } from "react";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon, Home } from "lucide-react";
+
+interface CreateTransactionModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: TransactionFormData) => void;
+}
+
+export function CreateTransactionModal({ isOpen, onClose, onSubmit }: CreateTransactionModalProps) {
+  // Existing state
+  const [agentRepresents, setAgentRepresents] = useState("Seller");
+  const [isCompanyLead, setIsCompanyLead] = useState(false);
+  const [mlsNumber, setMlsNumber] = useState("");
+  const [propertyAddress, setPropertyAddress] = useState("");
+  const [isOffMarket, setIsOffMarket] = useState(false);
+  
+  // Off Market property details
+  const [listingDescription, setListingDescription] = useState("");
+  const [listingPrice, setListingPrice] = useState("");
+  const [propertyType, setPropertyType] = useState("Residential");
+  const [squareFeet, setSquareFeet] = useState("");
+  const [lotSize, setLotSize] = useState("");
+  const [bedrooms, setBedrooms] = useState("");
+  const [fullBaths, setFullBaths] = useState("");
+  const [halfBaths, setHalfBaths] = useState("");
+  
+  // NEW: Date Going Live for Off Market listings
+  const [goLiveDate, setGoLiveDate] = useState<Date | undefined>(undefined);
+
+  const handleSubmit = () => {
+    onSubmit({
+      agentRepresents,
+      isCompanyLead,
+      mlsNumber: isOffMarket ? null : mlsNumber,
+      propertyAddress,
+      isOffMarket,
+      // Off Market fields
+      listingDescription: isOffMarket ? listingDescription : null,
+      listingPrice: isOffMarket ? parseFloat(listingPrice) : null,
+      propertyType: isOffMarket ? propertyType : null,
+      squareFeet: isOffMarket ? parseInt(squareFeet) : null,
+      lotSize: isOffMarket ? parseFloat(lotSize) : null,
+      bedrooms: isOffMarket ? parseInt(bedrooms) : null,
+      fullBaths: isOffMarket ? parseInt(fullBaths) : null,
+      halfBaths: isOffMarket ? parseInt(halfBaths) : null,
+      // NEW: Include go live date
+      goLiveDate: isOffMarket ? goLiveDate : null,
+    });
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create New Transaction</DialogTitle>
+          <DialogDescription>
+            Enter the property details to start a new transaction. This will
+            automatically set up integrations based on your preferences.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          {/* Agent Represents */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Our Agent Represents
+            </label>
+            <Select value={agentRepresents} onValueChange={setAgentRepresents}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Seller">Seller</SelectItem>
+                <SelectItem value="Buyer">Buyer</SelectItem>
+                <SelectItem value="Both">Both (Dual Agency)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Is Company Lead */}
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="companyLead"
+              checked={isCompanyLead}
+              onCheckedChange={(checked) => setIsCompanyLead(checked as boolean)}
+            />
+            <label htmlFor="companyLead" className="text-sm text-gray-700">
+              Is Company Lead
+            </label>
+          </div>
+
+          {/* MLS Number */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              MLS Number
+            </label>
+            <Input
+              value={mlsNumber}
+              onChange={(e) => setMlsNumber(e.target.value)}
+              placeholder="ACT2572987 or 2572987"
+              disabled={isOffMarket}
+            />
+            <p className="text-xs text-gray-500 mt-1">Enter with or without ACT prefix</p>
+          </div>
+
+          {/* Property Address */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Property Address
+            </label>
+            <Input
+              value={propertyAddress}
+              onChange={(e) => setPropertyAddress(e.target.value)}
+              placeholder="Start typing address..."
+            />
+          </div>
+
+          {/* Off Market Checkbox */}
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="offMarket"
+              checked={isOffMarket}
+              onCheckedChange={(checked) => setIsOffMarket(checked as boolean)}
+            />
+            <div>
+              <label htmlFor="offMarket" className="text-sm font-medium text-gray-700">
+                Off Market
+              </label>
+              <p className="text-xs text-gray-500">Check if this property is not listed in MLS</p>
+            </div>
+          </div>
+
+          {/* Off Market Property Details - Show when isOffMarket is true */}
+          {isOffMarket && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-4">
+              <div className="flex items-center gap-2 text-purple-700">
+                <Home className="h-4 w-4" />
+                <span className="font-medium text-sm">Off Market Property Details</span>
+              </div>
+
+              {/* Listing Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Listing Description
+                </label>
+                <Textarea
+                  value={listingDescription}
+                  onChange={(e) => setListingDescription(e.target.value)}
+                  placeholder="Describe the property..."
+                  rows={3}
+                />
+              </div>
+
+              {/* Price and Type Row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Listing Price
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                    <Input
+                      value={listingPrice}
+                      onChange={(e) => setListingPrice(e.target.value)}
+                      placeholder="450000"
+                      className="pl-7"
+                      type="number"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Property Type
+                  </label>
+                  <Select value={propertyType} onValueChange={setPropertyType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Residential">Residential</SelectItem>
+                      <SelectItem value="Condo">Condo/Townhouse</SelectItem>
+                      <SelectItem value="Multi-Family">Multi-Family</SelectItem>
+                      <SelectItem value="Land">Land/Lots</SelectItem>
+                      <SelectItem value="Commercial">Commercial</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Square Feet and Lot Size Row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Square Feet
+                  </label>
+                  <Input
+                    value={squareFeet}
+                    onChange={(e) => setSquareFeet(e.target.value)}
+                    placeholder="2500"
+                    type="number"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Lot Size (Acres)
+                  </label>
+                  <Input
+                    value={lotSize}
+                    onChange={(e) => setLotSize(e.target.value)}
+                    placeholder="0.25"
+                    type="number"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+
+              {/* Beds/Baths Row */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Bedrooms
+                  </label>
+                  <Input
+                    value={bedrooms}
+                    onChange={(e) => setBedrooms(e.target.value)}
+                    placeholder="4"
+                    type="number"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Full Baths
+                  </label>
+                  <Input
+                    value={fullBaths}
+                    onChange={(e) => setFullBaths(e.target.value)}
+                    placeholder="2"
+                    type="number"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Half Baths
+                  </label>
+                  <Input
+                    value={halfBaths}
+                    onChange={(e) => setHalfBaths(e.target.value)}
+                    placeholder="1"
+                    type="number"
+                  />
+                </div>
+              </div>
+
+              {/* ============================================ */}
+              {/* NEW: Date Going Live Field                   */}
+              {/* ============================================ */}
+              <div className="pt-2 border-t border-purple-200">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Date Going Live
+                  <span className="text-gray-400 font-normal ml-1">(optional)</span>
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  When will this listing be published to MLS?
+                </p>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={`w-full justify-start text-left font-normal ${
+                        !goLiveDate && "text-gray-400"
+                      }`}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {goLiveDate ? format(goLiveDate, "MMMM d, yyyy") : "Select date..."}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={goLiveDate}
+                      onSelect={setGoLiveDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} className="bg-orange-500 hover:bg-orange-600">
+            Create Transaction
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+---
+
+## 3. Update Transaction Card Component
+
+Show "Date Going Live" for Off Market listings, "Contract Date / Closing Date" for others.
+
+### File: `client/src/components/transactions/TransactionCard.tsx`
+
+```tsx
+import { format } from "date-fns";
+import { Calendar, Clock } from "lucide-react";
+
+interface TransactionCardProps {
+  transaction: Transaction;
+  onClick: () => void;
+}
+
+export function TransactionCard({ transaction, onClick }: TransactionCardProps) {
+  const isOffMarket = transaction.status === "Off Market";
+
+  // Format dates safely
+  const formatDate = (date: string | Date | null | undefined) => {
+    if (!date) return "—";
+    try {
+      return format(new Date(date), "MMM d, yyyy");
+    } catch {
+      return "—";
+    }
+  };
+
+  return (
+    <div 
+      onClick={onClick}
+      className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md 
+                 transition-shadow cursor-pointer"
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <h3 className="font-semibold text-gray-900">{transaction.address}</h3>
+          {transaction.mlsNumber ? (
+            <p className="text-sm text-gray-500"># {transaction.mlsNumber}</p>
+          ) : (
+            <p className="text-sm text-gray-500">(Off Market)</p>
+          )}
+        </div>
+        <StatusBadge status={transaction.status} />
+      </div>
+
+      {/* ============================================ */}
+      {/* CONDITIONAL KEY DATES                        */}
+      {/* ============================================ */}
+      <div className="mt-4 pt-4 border-t border-gray-100">
+        {isOffMarket ? (
+          /* OFF MARKET: Show "Date Going Live" */
+          <div>
+            <p className="text-xs text-gray-500 uppercase tracking-wide flex items-center gap-1">
+              <Clock className="h-3 w-3 text-purple-500" />
+              Date Going Live
+            </p>
+            <p className={`text-sm mt-1 ${
+              transaction.goLiveDate ? "text-gray-900 font-medium" : "text-gray-400"
+            }`}>
+              {formatDate(transaction.goLiveDate)}
+            </p>
+          </div>
+        ) : (
+          /* ACTIVE/IN CONTRACT/CLOSED: Show Contract & Closing Dates */
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Contract Date</p>
+              <p className={`text-sm mt-1 flex items-center gap-1 ${
+                transaction.contractDate ? "text-gray-900" : "text-gray-400"
+              }`}>
+                <Calendar className="h-3.5 w-3.5" />
+                {formatDate(transaction.contractDate)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Closing Date</p>
+              <p className={`text-sm mt-1 flex items-center gap-1 ${
+                transaction.closingDate ? "text-gray-900" : "text-gray-400"
+              }`}>
+                <Calendar className="h-3.5 w-3.5" />
+                {formatDate(transaction.closingDate)}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Coordinators */}
+      {transaction.coordinators && transaction.coordinators.length > 0 && (
+        <div className="flex items-center gap-2 mt-3">
+          {transaction.coordinators.slice(0, 3).map((coordinator, index) => (
+            <div
+              key={index}
+              className="w-6 h-6 bg-purple-600 rounded-full flex items-center 
+                       justify-center text-white text-xs font-medium"
+              title={coordinator.name}
+            >
+              {coordinator.name.charAt(0)}
+            </div>
+          ))}
+          {transaction.coordinators.length > 3 && (
+            <span className="text-xs text-gray-500">
+              +{transaction.coordinators.length - 3}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <div className="flex flex-wrap gap-2 mt-3">
+        {transaction.mlsNumber && (
+          <button className="px-2 py-1 text-xs border border-gray-200 rounded 
+                           hover:bg-gray-50 transition-colors">
+            MLS Sheet
+          </button>
+        )}
+        <button className="px-2 py-1 text-xs border border-gray-200 rounded 
+                         hover:bg-gray-50 transition-colors">
+          Marketing
+        </button>
+        <button className="px-2 py-1 text-xs border border-gray-200 rounded 
+                         hover:bg-gray-50 transition-colors">
+          Docs
+        </button>
+        <button className="px-2 py-1 text-xs border border-gray-200 rounded 
+                         hover:bg-gray-50 transition-colors">
+          Slack
+        </button>
+      </div>
+
+      {/* Add MLS Number link for Off Market */}
+      {isOffMarket && !transaction.mlsNumber && (
+        <button className="flex items-center gap-1 text-xs text-orange-500 mt-3 
+                         hover:text-orange-600 transition-colors">
+          <span>+</span> Add MLS Number
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## 4. Update Transaction Detail View - Key Dates Section
+
+### File: `client/src/components/transactions/TransactionOverview.tsx` (or KeyDatesCard.tsx)
+
+```tsx
+import { useState } from "react";
+import { format } from "date-fns";
+import { Calendar, Clock, Pencil, X, Check } from "lucide-react";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+
+interface KeyDatesCardProps {
+  transaction: Transaction;
+}
+
+export function KeyDatesCard({ transaction }: KeyDatesCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [goLiveDate, setGoLiveDate] = useState<Date | undefined>(
+    transaction.goLiveDate ? new Date(transaction.goLiveDate) : undefined
+  );
+  const [contractDate, setContractDate] = useState<Date | undefined>(
+    transaction.contractDate ? new Date(transaction.contractDate) : undefined
+  );
+  const [closingDate, setClosingDate] = useState<Date | undefined>(
+    transaction.closingDate ? new Date(transaction.closingDate) : undefined
+  );
+
+  const queryClient = useQueryClient();
+  const isOffMarket = transaction.status === "Off Market";
+
+  // Mutation to save dates
+  const saveDatesMutation = useMutation({
+    mutationFn: async (dates: { 
+      goLiveDate?: Date | null; 
+      contractDate?: Date | null; 
+      closingDate?: Date | null;
+    }) => {
+      const response = await fetch(`/api/transactions/${transaction.id}/dates`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          goLiveDate: dates.goLiveDate?.toISOString() || null,
+          contractDate: dates.contractDate?.toISOString() || null,
+          closingDate: dates.closingDate?.toISOString() || null,
+        }),
+      });
+      if (!response.ok) throw new Error("Failed to update dates");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transaction", transaction.id] });
+      setIsEditing(false);
+    },
+  });
+
+  const handleSave = () => {
+    saveDatesMutation.mutate({
+      goLiveDate: isOffMarket ? goLiveDate : null,
+      contractDate: isOffMarket ? null : contractDate,
+      closingDate: isOffMarket ? null : closingDate,
+    });
+  };
+
+  const handleCancel = () => {
+    // Reset to original values
+    setGoLiveDate(transaction.goLiveDate ? new Date(transaction.goLiveDate) : undefined);
+    setContractDate(transaction.contractDate ? new Date(transaction.contractDate) : undefined);
+    setClosingDate(transaction.closingDate ? new Date(transaction.closingDate) : undefined);
+    setIsEditing(false);
+  };
+
+  const formatDate = (date: Date | undefined | null) => {
+    if (!date) return "—";
+    try {
+      return format(new Date(date), "MMM d, yyyy");
+    } catch {
+      return "—";
+    }
+  };
+
+  return (
+    <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-gray-500" />
+          <span className="font-medium text-gray-900 text-sm">Key Dates</span>
+        </div>
+        
+        {!isEditing ? (
+          <button
+            onClick={() => setIsEditing(true)}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+            title="Edit dates"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+        ) : (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleCancel}
+              className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+              title="Cancel"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <button
+              onClick={handleSave}
+              className="p-1 text-green-500 hover:text-green-600 transition-colors"
+              title="Save"
+              disabled={saveDatesMutation.isPending}
+            >
+              <Check className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ============================================ */}
+      {/* CONDITIONAL DATE FIELDS                      */}
+      {/* ============================================ */}
+      <div className="space-y-4">
+        {isOffMarket ? (
+          /* OFF MARKET: Show "Date Going Live" */
+          <div>
+            <label className="text-xs text-gray-500 flex items-center gap-1.5 mb-1">
+              <Clock className="h-3 w-3 text-purple-500" />
+              Date Going Live
+            </label>
+            
+            {isEditing ? (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    className={`w-full text-left px-3 py-2 text-sm border rounded-lg 
+                              hover:border-purple-300 transition-colors ${
+                      goLiveDate 
+                        ? "text-gray-900 border-gray-300" 
+                        : "text-gray-400 border-gray-200"
+                    }`}
+                  >
+                    {goLiveDate ? format(goLiveDate, "MMMM d, yyyy") : "Select date..."}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarPicker
+                    mode="single"
+                    selected={goLiveDate}
+                    onSelect={setGoLiveDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <p className={`text-sm font-medium ${
+                transaction.goLiveDate ? "text-gray-900" : "text-gray-400"
+              }`}>
+                {formatDate(transaction.goLiveDate)}
+              </p>
+            )}
+            
+            <p className="text-xs text-gray-400 mt-1">
+              When listing will be published to MLS
+            </p>
+          </div>
+        ) : (
+          /* ACTIVE/IN CONTRACT/CLOSED: Show Contract & Closing Dates */
+          <>
+            {/* Contract Date */}
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Contract Date</label>
+              
+              {isEditing ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      className={`w-full text-left px-3 py-2 text-sm border rounded-lg 
+                                hover:border-orange-300 transition-colors ${
+                        contractDate 
+                          ? "text-gray-900 border-gray-300" 
+                          : "text-gray-400 border-gray-200"
+                      }`}
+                    >
+                      {contractDate ? format(contractDate, "MMMM d, yyyy") : "Select date..."}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarPicker
+                      mode="single"
+                      selected={contractDate}
+                      onSelect={setContractDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <p className={`text-sm ${
+                  transaction.contractDate ? "text-gray-900" : "text-gray-400"
+                }`}>
+                  {formatDate(transaction.contractDate)}
+                </p>
+              )}
+            </div>
+
+            {/* Expected Closing */}
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Expected Closing</label>
+              
+              {isEditing ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      className={`w-full text-left px-3 py-2 text-sm border rounded-lg 
+                                hover:border-orange-300 transition-colors ${
+                        closingDate 
+                          ? "text-gray-900 border-gray-300" 
+                          : "text-gray-400 border-gray-200"
+                      }`}
+                    >
+                      {closingDate ? format(closingDate, "MMMM d, yyyy") : "Select date..."}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarPicker
+                      mode="single"
+                      selected={closingDate}
+                      onSelect={setClosingDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <p className={`text-sm ${
+                  transaction.closingDate ? "text-gray-900" : "text-gray-400"
+                }`}>
+                  {formatDate(transaction.closingDate)}
+                </p>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 5. API Endpoint for Updating Dates
+
+### File: `server/routes.ts`
+
+```typescript
+// PATCH /api/transactions/:id/dates - Update transaction dates
+app.patch("/api/transactions/:id/dates", async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const transactionId = parseInt(req.params.id);
+    const { goLiveDate, contractDate, closingDate } = req.body;
+
+    // Verify user has access to this transaction
+    const transaction = await db.query.transactions.findFirst({
+      where: eq(transactions.id, transactionId)
+    });
+
+    if (!transaction) {
+      return res.status(404).json({ error: "Transaction not found" });
+    }
+
+    // Update the dates
+    const updated = await db
+      .update(transactions)
+      .set({
+        goLiveDate: goLiveDate ? new Date(goLiveDate) : null,
+        contractDate: contractDate ? new Date(contractDate) : null,
+        closingDate: closingDate ? new Date(closingDate) : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(transactions.id, transactionId))
+      .returning();
+
+    // Log to timeline
+    await db.insert(timelineEvents).values({
+      transactionId,
+      type: "dates_updated",
+      title: "Key dates updated",
+      description: transaction.status === "Off Market" 
+        ? `Date going live ${goLiveDate ? `set to ${format(new Date(goLiveDate), "MMM d, yyyy")}` : "cleared"}`
+        : `Contract/closing dates updated`,
+      createdAt: new Date(),
+    });
+
+    res.json(updated[0]);
+  } catch (error) {
+    console.error("Error updating transaction dates:", error);
+    res.status(500).json({ error: "Failed to update dates" });
+  }
+});
+```
+
+---
+
+## 6. Update TypeScript Types
+
+### File: `shared/types.ts` or inline
+
+```typescript
+export interface Transaction {
+  id: number;
+  address: string;
+  mlsNumber: string | null;
+  status: "Off Market" | "Active Listing" | "In Contract" | "Closed" | "Closing Soon";
+  
+  // Standard dates (for Active/In Contract/Closed)
+  contractDate: string | null;
+  closingDate: string | null;
+  
+  // NEW: For Off Market listings
+  goLiveDate: string | null;
+  
+  // Property details
+  listPrice: number | null;
+  salePrice: number | null;
+  beds: number | null;
+  baths: number | null;
+  sqft: number | null;
+  
+  // Off Market specific fields
+  isOffMarket: boolean;
+  listingDescription: string | null;
+  propertyType: string | null;
+  lotSize: number | null;
+  
+  // Relations
+  coordinators: Coordinator[];
+  
+  // Timestamps
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+---
+
+## Visual Summary
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     TRANSACTION CARD                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  IF status === "Off Market":                                    │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  🕐 DATE GOING LIVE                                      │   │
+│  │     Jan 30, 2026                                         │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ELSE (Active, In Contract, Closed):                           │
+│  ┌──────────────────────┬──────────────────────────────────┐   │
+│  │  CONTRACT DATE       │  CLOSING DATE                    │   │
+│  │  Dec 23, 2025        │  Jan 23, 2026                    │   │
+│  └──────────────────────┴──────────────────────────────────┘   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Verification Checklist
+
+### Database
+- [ ] New `go_live_date` column added to transactions table
+- [ ] Migration runs successfully
+
+### Create Transaction Modal
+- [ ] "Date Going Live" field appears when "Off Market" is checked
+- [ ] Field has date picker with calendar popup
+- [ ] Date is saved to database when transaction created
+- [ ] Field is hidden when "Off Market" is unchecked
+
+### Transaction Card
+- [ ] Off Market cards show "Date Going Live" instead of Contract/Closing
+- [ ] Active/In Contract/Closed cards show Contract Date & Closing Date
+- [ ] Purple clock icon appears next to "Date Going Live" label
+- [ ] Empty dates show "—" placeholder
+
+### Transaction Detail View (Overview)
+- [ ] Key Dates section shows "Date Going Live" for Off Market
+- [ ] Key Dates section shows Contract/Closing for other statuses
+- [ ] Edit button (pencil icon) opens date picker
+- [ ] Save/Cancel buttons work correctly
+- [ ] Changes persist after page refresh
+- [ ] Timeline logs date updates
+
+### Edge Cases
+- [ ] Transitioning from Off Market to Active clears goLiveDate, allows contractDate
+- [ ] Existing Off Market transactions without goLiveDate show "—"
+- [ ] Date format consistent across all views (e.g., "Jan 30, 2026")
+
+---
+
+## Files to Modify
+
+1. **`shared/schema.ts`** - Add `goLiveDate` column
+2. **`server/routes.ts`** - Add/update dates endpoint
+3. **`client/src/components/transactions/CreateTransactionModal.tsx`** - Add Date Going Live field
+4. **`client/src/components/transactions/TransactionCard.tsx`** - Conditional date display
+5. **`client/src/components/transactions/KeyDatesCard.tsx`** - Conditional date editing
+6. **`shared/types.ts`** - Update Transaction interface

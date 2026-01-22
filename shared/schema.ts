@@ -33,6 +33,7 @@ export const transactions = pgTable("transactions", {
   isCompanyLead: boolean("is_company_lead").default(false),
   isOffMarket: boolean("is_off_market").default(false),
   offMarketListingDate: timestamp("off_market_listing_date"),
+  goLiveDate: text("go_live_date"), // When off-market listing will go live on MLS
   slackChannelId: text("slack_channel_id"),
   slackChannelName: text("slack_channel_name"),
   gmailFilterId: text("gmail_filter_id"),

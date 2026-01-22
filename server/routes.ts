@@ -126,6 +126,7 @@ export async function registerRoutes(
         bedrooms,
         bathrooms,
         halfBaths,
+        goLiveDate,
         ...transactionData 
       } = req.body;
       
@@ -141,11 +142,16 @@ export async function registerRoutes(
         transactionData.bedrooms = bedrooms ? parseInt(bedrooms) : null;
         transactionData.bathrooms = bathrooms ? parseInt(bathrooms) : null;
         transactionData.halfBaths = halfBaths ? parseInt(halfBaths) : null;
+        transactionData.goLiveDate = goLiveDate || null; // When listing will go live on MLS
         transactionData.status = "active"; // Off-market listings are active, not in contract
         // Clear MLS number for off-market listings
         transactionData.mlsNumber = null;
+        // Clear contract/closing dates for off-market (they use goLiveDate instead)
+        transactionData.contractDate = null;
+        transactionData.closingDate = null;
       } else {
         transactionData.isOffMarket = false;
+        transactionData.goLiveDate = null; // Clear goLiveDate for non-off-market transactions
       }
       
       // Set company lead flag
@@ -531,6 +537,10 @@ export async function registerRoutes(
       if (req.body.closingDate !== undefined && req.body.closingDate !== currentTransaction.closingDate) {
         const newDate = req.body.closingDate ? new Date(req.body.closingDate).toLocaleDateString() : 'removed';
         dateChanges.push(`Expected Closing updated to ${newDate}`);
+      }
+      if (req.body.goLiveDate !== undefined && req.body.goLiveDate !== currentTransaction.goLiveDate) {
+        const newDate = req.body.goLiveDate ? new Date(req.body.goLiveDate).toLocaleDateString() : 'removed';
+        dateChanges.push(`Date Going Live updated to ${newDate}`);
       }
       
       if (dateChanges.length > 0) {

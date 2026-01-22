@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Loader2, ChevronDown, ChevronUp, User, Check, X, Bed, Bath, Square, DollarSign, Home, Ruler } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, User, Check, X, Bed, Bath, Square, DollarSign, Home, Ruler, Calendar } from "lucide-react";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePropertySearch, type PropertySearchResult, type PlacePrediction } from "@/hooks/usePropertySearch";
 import { PropertyAutocomplete } from "@/components/ui/property-autocomplete";
@@ -67,6 +67,7 @@ const formSchema = z.object({
   // Dates and other fields
   contractDate: z.string().optional(),
   closingDate: z.string().optional(),
+  goLiveDate: z.string().optional(), // When off-market listing will go live on MLS
   coordinatorIds: z.array(z.string()).default([]),
   fubClientId: z.string().optional(),
   fubClientName: z.string().optional(),
@@ -727,6 +728,37 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                               placeholder="1"
                               className="pl-9"
                               data-testid="input-half-baths"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Date Going Live */}
+                <div className="pt-3 border-t border-purple-200 dark:border-purple-700">
+                  <FormField
+                    control={form.control}
+                    name="goLiveDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">
+                          Date Going Live
+                          <span className="text-muted-foreground font-normal ml-1">(optional)</span>
+                        </FormLabel>
+                        <FormDescription className="text-xs">
+                          When will this listing be published to MLS?
+                        </FormDescription>
+                        <FormControl>
+                          <div className="relative">
+                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              type="date"
+                              className="pl-9"
+                              data-testid="input-go-live-date"
                             />
                           </div>
                         </FormControl>

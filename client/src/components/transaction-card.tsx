@@ -1,4 +1,4 @@
-import { Calendar, Hash, Mail, MessageSquare, Users, FileSpreadsheet, Image as ImageIcon, FileText, Plus, Link2 } from "lucide-react";
+import { Calendar, Hash, Mail, MessageSquare, Users, FileSpreadsheet, Image as ImageIcon, FileText, Plus, Link2, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -123,26 +123,43 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
       </CardHeader>
 
       <CardContent className="space-y-3 sm:space-y-4">
-        <div className="grid grid-cols-2 gap-2 sm:gap-4 text-xs sm:text-sm">
-          <div>
-            <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide mb-1">Contract Date</p>
-            <div className="flex items-center gap-1 sm:gap-1.5">
-              <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground flex-shrink-0" />
-              <span data-testid={`text-contract-date-${transaction.id}`}>
-                {formatDate(transaction.contractDate)}
-              </span>
+        {/* Conditional dates section: Off-market shows Date Going Live, others show Contract/Closing */}
+        {isOffMarket ? (
+          <div className="text-xs sm:text-sm">
+            <div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
+                <Clock className="h-3 w-3 text-purple-500" />
+                Date Going Live
+              </p>
+              <div className={`flex items-center gap-1 sm:gap-1.5 ${transaction.goLiveDate ? "font-medium" : "text-muted-foreground"}`}>
+                <span data-testid={`text-go-live-date-${transaction.id}`}>
+                  {formatDate(transaction.goLiveDate)}
+                </span>
+              </div>
             </div>
           </div>
-          <div>
-            <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide mb-1">Closing Date</p>
-            <div className="flex items-center gap-1 sm:gap-1.5">
-              <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground flex-shrink-0" />
-              <span data-testid={`text-closing-date-${transaction.id}`}>
-                {formatDate(transaction.closingDate)}
-              </span>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 sm:gap-4 text-xs sm:text-sm">
+            <div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide mb-1">Contract Date</p>
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground flex-shrink-0" />
+                <span data-testid={`text-contract-date-${transaction.id}`}>
+                  {formatDate(transaction.contractDate)}
+                </span>
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide mb-1">Closing Date</p>
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground flex-shrink-0" />
+                <span data-testid={`text-closing-date-${transaction.id}`}>
+                  {formatDate(transaction.closingDate)}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {daysRemaining !== null && !displayStatus.toLowerCase().includes('closed') && !displayStatus.toLowerCase().includes('sold') && !displayStatus.toLowerCase().includes('cancel') && (
           <div className={`text-xs sm:text-sm ${getDaysRemainingStyle(daysRemaining)}`}>
