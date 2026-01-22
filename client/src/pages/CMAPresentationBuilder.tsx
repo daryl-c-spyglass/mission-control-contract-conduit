@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRoute, useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -211,24 +211,25 @@ export default function CMAPresentationBuilder() {
     },
   });
 
-  // Transform CMAComparable[] into Property-compatible objects
-  // Try cma.propertiesData first, fall back to transaction.cmaData if empty
-  const rawComparables = (cma?.propertiesData && (cma.propertiesData as any[]).length > 0)
-    ? (cma.propertiesData as any[])
-    : (linkedTransaction?.cmaData || []) as any[];
-  
-  // Helper to normalize MLS status codes to human-readable status
-  const normalizeStatus = (status: string | undefined | null): string => {
+  // Helper to normalize MLS status codes to human-readable status (stable reference)
+  const normalizeStatus = useCallback((status: string | undefined | null): string => {
     if (!status) return 'Active';
     const s = status.toLowerCase();
     if (s === 'u' || s === 'sc' || s.includes('pending') || s.includes('contract')) return 'Pending';
     if (s === 'a' || s.includes('active')) return 'Active';
     if (s === 'c' || s === 's' || s.includes('sold') || s.includes('closed')) return 'Closed';
     if (s.includes('expired') || s.includes('withdrawn') || s.includes('cancel')) return 'Off Market';
-    return status; // Return original if unknown
-  };
+    return status;
+  }, []);
 
-  const properties = rawComparables.map((comp: any, index: number) => {
+  // Transform CMAComparable[] into Property-compatible objects (memoized)
+  // Try cma.propertiesData first, fall back to transaction.cmaData if empty
+  const properties = useMemo(() => {
+    const rawComparables = (cma?.propertiesData && (cma.propertiesData as any[]).length > 0)
+      ? (cma.propertiesData as any[])
+      : (linkedTransaction?.cmaData || []) as any[];
+    
+    return rawComparables.map((comp: any, index: number) => {
     const resolvedAddress = comp.unparsedAddress || comp.streetAddress || comp.address || 
       comp.fullAddress || comp.addressLine1 || comp.location?.address || '';
     
@@ -284,10 +285,14 @@ export default function CMAPresentationBuilder() {
       coordinates: lat && lng ? { latitude: lat, longitude: lng, lat, lng } : null,
     };
   }) as unknown as Property[];
+  }, [cma?.propertiesData, linkedTransaction?.cmaData, normalizeStatus]);
 
-  // Get subject property from linked transaction's mlsData and normalize fields
-  const rawSubject = linkedTransaction?.mlsData as any;
-  const subjectFromTransaction: Property | null = rawSubject ? {
+  // Get subject property from linked transaction's mlsData and normalize fields (memoized)
+  const subjectFromTransaction = useMemo((): Property | null => {
+    const rawSubject = linkedTransaction?.mlsData as any;
+    if (!rawSubject) return null;
+    
+    return {
     ...rawSubject,
     // Address aliases
     unparsedAddress: rawSubject.address || rawSubject.unparsedAddress || rawSubject.streetAddress || '',
@@ -310,7 +315,8 @@ export default function CMAPresentationBuilder() {
     longitude: rawSubject.longitude || rawSubject.coordinates?.longitude,
     map: rawSubject.map || (rawSubject.coordinates?.latitude && rawSubject.coordinates?.longitude ? 
       { latitude: rawSubject.coordinates.latitude, longitude: rawSubject.coordinates.longitude } : null),
-  } as unknown as Property : null;
+    } as unknown as Property;
+  }, [linkedTransaction?.mlsData, normalizeStatus]);
 
   const { data: statistics } = useQuery<PropertyStatistics>({
     queryKey: ['/api/cmas', id, 'statistics'],
