@@ -1,0 +1,631 @@
+# Create Graphics Modal - Graphic Generator iFrame Integration
+
+## Overview
+
+When user clicks "Create Graphics" button on the Marketing tab, open a full-screen modal that embeds the Graphic Generator app via iframe. This applies to **ALL transaction statuses** (Active, Closed, Off Market, Under Contract, etc.).
+
+**Graphic Generator URL:** `https://graphic-1-generator-black--caleb254.replit.app`
+
+---
+
+## Current State
+
+The Marketing tab has "Create Graphics" button but clicking it doesn't do anything yet. We need to:
+1. Open a modal when clicked
+2. Embed the Graphic Generator iframe
+3. Pass property and agent data to pre-populate the generator
+4. Handle the modal close
+
+---
+
+## Implementation
+
+### 1. Create the Graphic Generator Modal Component
+
+**File: `client/src/components/graphic-generator-modal.tsx`**
+
+```tsx
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { X, Loader2, ExternalLink } from 'lucide-react';
+import { useMemo, useState } from 'react';
+
+interface GraphicGeneratorModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  transaction: {
+    id: number;
+    address: string;
+    mlsNumber?: string;
+    status?: string;
+    isOffMarket?: boolean;
+    mlsData?: {
+      photos?: string[];
+    };
+    offMarketPhotos?: Array<{ url: string; isPrimary?: boolean }>;
+  };
+  userSettings?: {
+    agentName?: string;
+    phoneNumber?: string;
+    profilePhotoUrl?: string;
+  };
+}
+
+export function GraphicGeneratorModal({ 
+  isOpen, 
+  onClose, 
+  transaction,
+  userSettings 
+}: GraphicGeneratorModalProps) {
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Determine listing status text
+  const getListingStatus = () => {
+    if (transaction.isOffMarket) return 'OFF MARKET';
+    
+    const status = transaction.status?.toLowerCase();
+    if (status === 'active') return 'JUST LISTED';
+    if (status === 'under contract' || status === 'pending') return 'UNDER CONTRACT';
+    if (status === 'closed' || status === 'sold') return 'SOLD';
+    return 'JUST LISTED'; // default
+  };
+
+  // Get primary photo URL
+  const getPrimaryPhotoUrl = () => {
+    // For Off Market - use uploaded photos
+    if (transaction.isOffMarket && transaction.offMarketPhotos?.length) {
+      const primary = transaction.offMarketPhotos.find(p => p.isPrimary);
+      return primary?.url || transaction.offMarketPhotos[0]?.url || '';
+    }
+    
+    // For MLS connected - use first MLS photo
+    if (transaction.mlsData?.photos?.length) {
+      return transaction.mlsData.photos[0];
+    }
+    
+    return '';
+  };
+
+  // Build iframe URL with query parameters
+  const iframeUrl = useMemo(() => {
+    const baseUrl = 'https://graphic-1-generator-black--caleb254.replit.app';
+    const params = new URLSearchParams();
+    
+    // Embed mode (optional - if Graphic Generator supports it)
+    params.set('embed', 'true');
+    
+    // Property data
+    params.set('address', transaction.address || '');
+    params.set('status', getListingStatus());
+    
+    // Property photo
+    const photoUrl = getPrimaryPhotoUrl();
+    if (photoUrl) {
+      params.set('propertyPhoto', photoUrl);
+    }
+    
+    // Agent data from settings
+    if (userSettings?.agentName) {
+      params.set('agentName', userSettings.agentName);
+    }
+    if (userSettings?.phoneNumber) {
+      params.set('agentPhone', userSettings.phoneNumber);
+    }
+    if (userSettings?.profilePhotoUrl) {
+      params.set('agentPhoto', userSettings.profilePhotoUrl);
+    }
+    
+    // Transaction ID for reference
+    params.set('transactionId', String(transaction.id));
+    
+    return `${baseUrl}?${params.toString()}`;
+  }, [transaction, userSettings]);
+
+  const handleIframeLoad = () => {
+    setIsLoading(false);
+  };
+
+  const handleOpenInNewTab = () => {
+    window.open(iframeUrl, '_blank');
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] p-0 gap-0">
+        {/* Header */}
+        <DialogHeader className="px-6 py-4 border-b flex flex-row items-center justify-between">
+          <div>
+            <DialogTitle className="text-lg font-semibold">
+              Create Marketing Graphics
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              {transaction.address}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleOpenInNewTab}
+              className="text-muted-foreground"
+            >
+              <ExternalLink className="w-4 h-4 mr-1" />
+              Open in new tab
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+        </DialogHeader>
+        
+        {/* iFrame Container */}
+        <div className="flex-1 relative overflow-hidden">
+          {/* Loading State */}
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-background z-10">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Loading Graphic Generator...</p>
+              </div>
+            </div>
+          )}
+          
+          {/* iFrame */}
+          <iframe
+            src={iframeUrl}
+            className="w-full h-full border-0"
+            onLoad={handleIframeLoad}
+            allow="clipboard-write; clipboard-read"
+            title="Graphic Generator"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+---
+
+### 2. Update Marketing Tab to Use the Modal
+
+**File: `client/src/components/marketing-tab.tsx`** (or wherever your Marketing tab is)
+
+Add the modal state and import:
+
+```tsx
+import { useState } from 'react';
+import { GraphicGeneratorModal } from './graphic-generator-modal';
+
+// ... inside your MarketingTab component
+
+const [showGraphicGenerator, setShowGraphicGenerator] = useState(false);
+
+// Get user settings (you may already have this from context or query)
+const { data: userSettings } = useQuery({
+  queryKey: ['/api/user/settings'],
+});
+
+// Determine if Create Graphics should be enabled
+const hasPhotos = transaction.isOffMarket 
+  ? (transaction.offMarketPhotos?.length || 0) > 0
+  : (transaction.mlsData?.photos?.length || 0) > 0;
+
+// ... in your JSX, update the Create Graphics button:
+
+<button
+  onClick={() => setShowGraphicGenerator(true)}
+  disabled={!hasPhotos}
+  className={`flex items-center gap-3 p-4 border rounded-lg text-left transition-colors
+    ${hasPhotos 
+      ? 'hover:bg-muted cursor-pointer' 
+      : 'opacity-50 cursor-not-allowed'
+    }`}
+>
+  <div className={`p-2 rounded-lg ${hasPhotos ? 'bg-red-100 dark:bg-red-900/30' : 'bg-gray-100 dark:bg-gray-800'}`}>
+    <Image className={`w-5 h-5 ${hasPhotos ? 'text-red-600 dark:text-red-400' : 'text-gray-400'}`} />
+  </div>
+  <div>
+    <p className="font-medium">Create Graphics</p>
+    <p className="text-xs text-muted-foreground">
+      {hasPhotos ? 'Social media posts & stories' : 'Upload photos first to create marketing materials'}
+    </p>
+  </div>
+</button>
+
+{/* Also update the button in the empty state */}
+<Button 
+  onClick={() => setShowGraphicGenerator(true)}
+  disabled={!hasPhotos}
+  className="bg-orange-500 hover:bg-orange-600"
+>
+  <Image className="w-4 h-4 mr-2" />
+  Create Graphics
+</Button>
+
+{/* Add the modal at the end of the component */}
+<GraphicGeneratorModal
+  isOpen={showGraphicGenerator}
+  onClose={() => setShowGraphicGenerator(false)}
+  transaction={transaction}
+  userSettings={userSettings}
+/>
+```
+
+---
+
+### 3. Full Marketing Tab Example with Modal Integration
+
+Here's the complete updated Marketing tab:
+
+```tsx
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Image, FileText, RefreshCw, Upload, Camera, Plus, Star, X, Download, Trash2 } from 'lucide-react';
+import { GraphicGeneratorModal } from './graphic-generator-modal';
+
+interface MarketingTabProps {
+  transaction: any;
+}
+
+export function MarketingTab({ transaction }: MarketingTabProps) {
+  const [showGraphicGenerator, setShowGraphicGenerator] = useState(false);
+  const [showFlyerGenerator, setShowFlyerGenerator] = useState(false);
+
+  // Get user settings for agent info
+  const { data: userSettings } = useQuery({
+    queryKey: ['/api/user/settings'],
+  });
+
+  const isOffMarket = transaction.isOffMarket;
+  const mlsPhotos = transaction.mlsData?.photos || [];
+  const offMarketPhotos = transaction.offMarketPhotos || [];
+  
+  // Determine which photos to use and if we have any
+  const photos = isOffMarket ? offMarketPhotos : mlsPhotos;
+  const hasPhotos = photos.length > 0;
+  
+  const assets = transaction.marketingAssets || [];
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h2 className="text-xl font-semibold">Marketing</h2>
+        <p className="text-sm text-muted-foreground">
+          Create and manage marketing materials for {transaction.address}
+        </p>
+      </div>
+
+      {/* Property Photos Section */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium flex items-center gap-2">
+              <Camera className="w-4 h-4" />
+              Property Photos ({isOffMarket ? offMarketPhotos.length : `${mlsPhotos.length} from MLS`})
+            </h3>
+            {!isOffMarket && mlsPhotos.length > 0 && (
+              <Button variant="outline" size="sm">
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Refresh
+              </Button>
+            )}
+            {isOffMarket && offMarketPhotos.length > 0 && (
+              <Button variant="outline" size="sm">
+                <Plus className="w-4 h-4 mr-1" />
+                Add More
+              </Button>
+            )}
+          </div>
+
+          {/* MLS Photos (read-only) */}
+          {!isOffMarket && mlsPhotos.length > 0 && (
+            <>
+              <div className="grid grid-cols-8 gap-2">
+                {mlsPhotos.slice(0, 7).map((photo: string, index: number) => (
+                  <div key={index} className="aspect-square rounded-lg overflow-hidden border">
+                    <img src={photo} alt="" className="w-full h-full object-cover" />
+                  </div>
+                ))}
+                {mlsPhotos.length > 7 && (
+                  <div className="aspect-square rounded-lg bg-muted flex items-center justify-center text-sm font-medium border">
+                    +{mlsPhotos.length - 7}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                Photos synced from MLS • Select a photo when creating graphics
+              </p>
+            </>
+          )}
+
+          {/* Off Market - Upload Area */}
+          {isOffMarket && offMarketPhotos.length === 0 && (
+            <div className="border-2 border-dashed rounded-lg p-8 text-center">
+              <Camera className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+              <p className="font-medium">Drag photos here</p>
+              <p className="text-sm text-muted-foreground">or click to browse</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Supports JPG, PNG • Max 10MB per file
+              </p>
+              <Button variant="outline" size="sm" className="mt-4">
+                <Upload className="w-4 h-4 mr-1" />
+                Browse Files
+              </Button>
+            </div>
+          )}
+
+          {/* Off Market - Photos Grid */}
+          {isOffMarket && offMarketPhotos.length > 0 && (
+            <>
+              <div className="grid grid-cols-6 gap-3">
+                {offMarketPhotos.map((photo: any) => (
+                  <div key={photo.id} className="relative aspect-square rounded-lg overflow-hidden border group">
+                    <img src={photo.url} alt="" className="w-full h-full object-cover" />
+                    {photo.isPrimary && (
+                      <div className="absolute top-1 left-1 bg-yellow-500 text-white p-1 rounded">
+                        <Star className="w-3 h-3 fill-current" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      {!photo.isPrimary && (
+                        <Button variant="secondary" size="icon" className="h-8 w-8">
+                          <Star className="w-4 h-4" />
+                        </Button>
+                      )}
+                      <Button variant="destructive" size="icon" className="h-8 w-8">
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                <div className="aspect-square rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors">
+                  <Plus className="w-6 h-6 text-muted-foreground" />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                <Star className="w-3 h-3 inline fill-yellow-500 text-yellow-500 mr-1" />
+                Primary photo is used as default • Click star on any photo to set
+              </p>
+            </>
+          )}
+
+          {isOffMarket && offMarketPhotos.length === 0 && (
+            <p className="text-xs text-muted-foreground mt-3">
+              ℹ️ Upload photos to create marketing materials for this property.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Quick Actions */}
+      <div>
+        <h3 className="text-sm font-medium mb-3">Quick Actions</h3>
+        <div className="grid grid-cols-2 gap-4">
+          {/* Create Graphics Button */}
+          <button
+            onClick={() => hasPhotos && setShowGraphicGenerator(true)}
+            disabled={!hasPhotos}
+            className={`flex items-center gap-3 p-4 border rounded-lg text-left transition-colors
+              ${hasPhotos 
+                ? 'hover:bg-muted cursor-pointer' 
+                : 'opacity-60 cursor-not-allowed'
+              }`}
+          >
+            <div className={`p-2 rounded-lg ${hasPhotos ? 'bg-red-100 dark:bg-red-900/30' : 'bg-gray-100 dark:bg-gray-800'}`}>
+              <Image className={`w-5 h-5 ${hasPhotos ? 'text-red-600 dark:text-red-400' : 'text-gray-400'}`} />
+            </div>
+            <div>
+              <p className={`font-medium ${!hasPhotos && 'text-muted-foreground'}`}>Create Graphics</p>
+              <p className="text-xs text-muted-foreground">
+                {hasPhotos ? 'Social media posts & stories' : 'Upload photos first to create marketing materials'}
+              </p>
+            </div>
+          </button>
+          
+          {/* Create Flyer Button */}
+          <button
+            onClick={() => hasPhotos && setShowFlyerGenerator(true)}
+            disabled={!hasPhotos}
+            className={`flex items-center gap-3 p-4 border rounded-lg text-left transition-colors
+              ${hasPhotos 
+                ? 'hover:bg-muted cursor-pointer' 
+                : 'opacity-60 cursor-not-allowed'
+              }`}
+          >
+            <div className={`p-2 rounded-lg ${hasPhotos ? 'bg-orange-100 dark:bg-orange-900/30' : 'bg-gray-100 dark:bg-gray-800'}`}>
+              <FileText className={`w-5 h-5 ${hasPhotos ? 'text-orange-600 dark:text-orange-400' : 'text-gray-400'}`} />
+            </div>
+            <div>
+              <p className={`font-medium ${!hasPhotos && 'text-muted-foreground'}`}>Create Flyer</p>
+              <p className="text-xs text-muted-foreground">
+                {hasPhotos ? 'PNG flyer (8.5" × 11")' : 'Upload photos first to create marketing materials'}
+              </p>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* My Assets */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium">My Assets ({assets.length})</h3>
+          {assets.length > 0 && (
+            <Button variant="link" size="sm" className="text-primary">View All</Button>
+          )}
+        </div>
+        
+        {assets.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Image className="w-10 h-10 text-muted-foreground mb-3" />
+              <p className="font-medium">No Marketing Assets Yet</p>
+              <p className="text-sm text-muted-foreground text-center mt-1 mb-4">
+                Use the Quick Actions above to create social media graphics or print flyers.
+              </p>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => setShowGraphicGenerator(true)}
+                  disabled={!hasPhotos}
+                  className="bg-orange-500 hover:bg-orange-600"
+                >
+                  <Image className="w-4 h-4 mr-2" />
+                  Create Graphics
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowFlyerGenerator(true)}
+                  disabled={!hasPhotos}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Create Flyer
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-4 gap-4">
+            {assets.map((asset: any) => (
+              <Card key={asset.id} className="overflow-hidden">
+                <div className="aspect-square relative">
+                  <img 
+                    src={asset.thumbnailUrl} 
+                    alt={asset.name}
+                    className="w-full h-full object-cover"
+                  />
+                  <span className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-0.5 rounded">
+                    {asset.type}
+                  </span>
+                </div>
+                <CardContent className="p-3">
+                  <p className="text-sm font-medium truncate">{asset.name}</p>
+                  <p className="text-xs text-muted-foreground">{asset.createdAt}</p>
+                  <div className="flex gap-1 mt-2">
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Download className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Graphic Generator Modal */}
+      <GraphicGeneratorModal
+        isOpen={showGraphicGenerator}
+        onClose={() => setShowGraphicGenerator(false)}
+        transaction={transaction}
+        userSettings={userSettings}
+      />
+    </div>
+  );
+}
+```
+
+---
+
+## Visual Result
+
+When user clicks "Create Graphics":
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Create Marketing Graphics                        [Open in new tab]    [✕]  │
+│ 612 Twelve Oaks LN, Austin, TX                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │                                                                       │ │
+│  │                    GRAPHIC GENERATOR (iFrame)                         │ │
+│  │          https://graphic-1-generator-black--caleb254.replit.app       │ │
+│  │                                                                       │ │
+│  │  ┌─────────────────────┐        ┌─────────────────────────────────┐  │ │
+│  │  │ Logos               │        │                                 │  │ │
+│  │  │ • Spyglass ✓        │        │      SPYGLASS │ MLS GRID        │  │ │
+│  │  │ • MLS Grid ✓        │        │                                 │  │ │
+│  │  │                     │        │    ┌───────────────────────┐    │  │ │
+│  │  │ Property Image      │        │    │   [Property Photo]    │    │  │ │
+│  │  │ [Select photo ▼]    │        │    │                       │    │  │ │
+│  │  │                     │        │    └───────────────────────┘    │  │ │
+│  │  │ Property Details    │        │                                 │  │ │
+│  │  │ Status: [CLOSED ▼]  │        │         SOLD                    │  │ │
+│  │  │ Address: 612...     │        │  612 Twelve Oaks LN, Austin     │  │ │
+│  │  │                     │        │  Daryl Camingao | (512) 555...  │  │ │
+│  │  │ Agent Information   │        │                                 │  │ │
+│  │  │ Name: Daryl...      │        │    Live Preview (1080 × 1080)   │  │ │
+│  │  │ Phone: (512)...     │        └─────────────────────────────────┘  │ │
+│  │  │ Photo: ✓            │                                             │ │
+│  │  └─────────────────────┘                                             │ │
+│  │                                                                       │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## URL Parameters Passed to Graphic Generator
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `embed` | Embed mode flag | `true` |
+| `address` | Property address | `612 Twelve Oaks LN, Austin, TX` |
+| `status` | Listing status text | `JUST LISTED`, `SOLD`, `OFF MARKET`, `UNDER CONTRACT` |
+| `propertyPhoto` | Primary photo URL | `https://...` |
+| `agentName` | Agent name from settings | `Daryl Camingao` |
+| `agentPhone` | Agent phone from settings | `(512) 555-0123` |
+| `agentPhoto` | Agent headshot URL | `https://...` |
+| `transactionId` | Reference ID | `123` |
+
+---
+
+## Status Mapping
+
+| Transaction Status | Graphic Text |
+|--------------------|--------------|
+| `isOffMarket = true` | `OFF MARKET` |
+| `active` | `JUST LISTED` |
+| `under contract` / `pending` | `UNDER CONTRACT` |
+| `closed` / `sold` | `SOLD` |
+| Default | `JUST LISTED` |
+
+---
+
+## Files to Create/Modify
+
+1. **Create:** `client/src/components/graphic-generator-modal.tsx`
+2. **Modify:** `client/src/components/marketing-tab.tsx` (or equivalent)
+   - Add `useState` for modal visibility
+   - Add modal component at end of JSX
+   - Wire up onClick handlers
+
+---
+
+## Testing Checklist
+
+- [ ] Clicking "Create Graphics" opens modal (when photos available)
+- [ ] Modal shows loading spinner while iframe loads
+- [ ] iFrame loads Graphic Generator correctly
+- [ ] URL parameters are passed correctly
+- [ ] Agent data from Settings auto-populates
+- [ ] Property address and status auto-populate
+- [ ] "Open in new tab" button works
+- [ ] Close button (X) closes modal
+- [ ] Modal works for Active listings
+- [ ] Modal works for Closed listings
+- [ ] Modal works for Off Market listings
+- [ ] Modal works for Under Contract listings
+- [ ] Button is disabled when no photos available
