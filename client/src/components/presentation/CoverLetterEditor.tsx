@@ -18,6 +18,10 @@ interface CoverLetterEditorProps {
   defaultCoverLetter?: string;
   clientName?: string;
   onClientNameChange?: (name: string) => void;
+  salutationType?: string;
+  onSalutationTypeChange?: (type: string) => void;
+  customGreeting?: string;
+  onCustomGreetingChange?: (greeting: string) => void;
   subjectProperty?: any;
   properties?: any[];
   statistics?: any;
@@ -33,6 +37,10 @@ export function CoverLetterEditor({
   defaultCoverLetter = '',
   clientName = '',
   onClientNameChange,
+  salutationType = 'Dear',
+  onSalutationTypeChange,
+  customGreeting = '',
+  onCustomGreetingChange,
   subjectProperty,
   properties = [],
   statistics,
@@ -47,6 +55,25 @@ export function CoverLetterEditor({
 
   const handleClientNameChange = (name: string) => {
     onClientNameChange?.(name);
+  };
+
+  const handleSalutationChange = (type: string) => {
+    onSalutationTypeChange?.(type);
+  };
+
+  const handleCustomGreetingChange = (greeting: string) => {
+    onCustomGreetingChange?.(greeting);
+  };
+
+  const isCustom = salutationType === 'custom';
+  const isNoGreeting = salutationType === 'none';
+
+  const getFullGreeting = () => {
+    if (isNoGreeting) return '';
+    if (isCustom) return customGreeting ? `${customGreeting},` : '';
+    if (!salutationType && !clientName) return '';
+    if (!clientName) return `${salutationType},`;
+    return `${salutationType} ${clientName},`;
   };
 
   const displayedCoverLetter = coverLetter || defaultCoverLetter;
@@ -126,15 +153,55 @@ export function CoverLetterEditor({
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="space-y-2">
-          <Label htmlFor="clientName" className="text-sm">Client Name (Optional)</Label>
-          <Input
-            id="clientName"
-            value={clientName}
-            onChange={(e) => handleClientNameChange(e.target.value)}
-            placeholder="e.g., John and Jane Smith"
-            data-testid="input-client-name"
-          />
-          <p className="text-xs text-muted-foreground">Include client name for personalized cover letter greeting</p>
+          <Label className="text-sm">Greeting</Label>
+          <div className="flex gap-3">
+            <Select value={salutationType} onValueChange={handleSalutationChange}>
+              <SelectTrigger className="w-40" data-testid="select-salutation">
+                <SelectValue placeholder="Select..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Dear">Dear</SelectItem>
+                <SelectItem value="Hello">Hello</SelectItem>
+                <SelectItem value="Hi">Hi</SelectItem>
+                <SelectItem value="To">To</SelectItem>
+                <SelectItem value="none">No greeting</SelectItem>
+                <SelectItem value="custom">Custom...</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {!isNoGreeting && (
+              isCustom ? (
+                <Input
+                  className="flex-1"
+                  placeholder="Enter your custom greeting"
+                  value={customGreeting}
+                  onChange={(e) => handleCustomGreetingChange(e.target.value)}
+                  data-testid="input-custom-greeting"
+                />
+              ) : (
+                <Input
+                  className="flex-1"
+                  placeholder="e.g., John and Jane Smith"
+                  value={clientName}
+                  onChange={(e) => handleClientNameChange(e.target.value)}
+                  data-testid="input-client-name"
+                />
+              )
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {isCustom 
+              ? 'Enter your complete custom greeting (comma will be added automatically)'
+              : isNoGreeting
+              ? 'Cover letter will start without a greeting'
+              : 'Include client name for personalized greeting'
+            }
+          </p>
+          {getFullGreeting() && (
+            <div className="mt-2 p-2 bg-muted/50 rounded text-sm">
+              Preview: <span className="font-medium">"{getFullGreeting()}"</span>
+            </div>
+          )}
         </div>
 
         <div className="border rounded-lg p-4 bg-purple-50 dark:bg-purple-950/20 space-y-3">

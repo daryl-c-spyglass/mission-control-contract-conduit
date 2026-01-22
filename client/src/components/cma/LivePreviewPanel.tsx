@@ -22,6 +22,8 @@ interface LivePreviewPanelProps {
     showDate: boolean;
     showAgentPhoto: boolean;
     coverLetter?: string;
+    salutationType?: string;
+    customGreeting?: string;
   };
   layoutSettings: {
     coverPhotoUrl?: string | null;
@@ -109,10 +111,20 @@ export function LivePreviewPanel({
         );
 
       case 'cover_letter':
+        const getFullGreeting = () => {
+          const isNoGreeting = contentSettings.salutationType === 'none';
+          const isCustom = contentSettings.salutationType === 'custom';
+          if (isNoGreeting) return '';
+          if (isCustom) return contentSettings.customGreeting ? `${contentSettings.customGreeting},` : '';
+          if (!contentSettings.salutationType && !contentSettings.clientName) return '';
+          if (!contentSettings.clientName) return `${contentSettings.salutationType || 'Dear'},`;
+          return `${contentSettings.salutationType || 'Dear'} ${contentSettings.clientName},`;
+        };
+        const greeting = getFullGreeting();
         return contentSettings.coverLetter ? (
           <div className="text-sm text-muted-foreground line-clamp-4 whitespace-pre-wrap">
-            {contentSettings.clientName && (
-              <p className="font-medium text-foreground mb-2">Dear {contentSettings.clientName},</p>
+            {greeting && (
+              <p className="font-medium text-foreground mb-2">{greeting}</p>
             )}
             {contentSettings.coverLetter}
           </div>

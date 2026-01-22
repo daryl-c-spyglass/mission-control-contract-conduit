@@ -1,0 +1,260 @@
+# REPLIT PROMPT: Add Editable Salutation to Cover Letter
+
+## Task
+
+Add a salutation/greeting feature to the Cover Letter section in the CMA Presentation Builder Content tab. Users should be able to select a predefined greeting OR enter a custom one.
+
+---
+
+## Current State
+
+- Client Name field exists but greeting doesn't show in Live Preview
+- Cover letter body starts directly with content (no "Dear..." greeting)
+- No way to customize the salutation style
+
+---
+
+## Required Changes
+
+### 1. Add Salutation Dropdown with Custom Option
+
+Replace the current "Client Name (Optional)" single field with a greeting row:
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│ Greeting                                                           │
+│                                                                    │
+│ ┌──────────────────┐  ┌──────────────────────────────────────────┐│
+│ │ Dear          ▼  │  │ John and Jane Smith                      ││
+│ └──────────────────┘  └──────────────────────────────────────────┘│
+│   Salutation            Client Name (Optional)                     │
+│                                                                    │
+│ Preview: "Dear John and Jane Smith,"                               │
+└────────────────────────────────────────────────────────────────────┘
+
+When "Custom" is selected:
+┌────────────────────────────────────────────────────────────────────┐
+│ Greeting                                                           │
+│                                                                    │
+│ ┌──────────────────┐  ┌──────────────────────────────────────────┐│
+│ │ Custom        ▼  │  │ To the wonderful Smith family            ││
+│ └──────────────────┘  └──────────────────────────────────────────┘│
+│   Salutation            Enter your custom greeting                 │
+│                                                                    │
+│ Preview: "To the wonderful Smith family,"                          │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+### 2. Salutation Dropdown Options
+
+```typescript
+const salutationOptions = [
+  { value: 'Dear', label: 'Dear' },
+  { value: 'Hello', label: 'Hello' },
+  { value: 'Hi', label: 'Hi' },
+  { value: 'To', label: 'To' },
+  { value: 'none', label: 'No greeting' },
+  { value: 'custom', label: 'Custom...' },  // NEW: Custom option
+];
+```
+
+### 3. Implementation Code
+
+```tsx
+// State
+const [salutationType, setSalutationType] = useState('Dear');
+const [clientName, setClientName] = useState('');
+const [customGreeting, setCustomGreeting] = useState('');
+
+// Check if custom is selected
+const isCustom = salutationType === 'custom';
+const isNoGreeting = salutationType === 'none';
+
+// Build the full greeting for preview/export
+const getFullGreeting = () => {
+  if (isNoGreeting) return '';
+  if (isCustom) return customGreeting ? `${customGreeting},` : '';
+  if (!salutationType && !clientName) return '';
+  if (!clientName) return `${salutationType},`;
+  return `${salutationType} ${clientName},`;
+};
+
+// JSX
+<div className="space-y-4">
+  {/* Greeting Section */}
+  <div>
+    <Label>Greeting</Label>
+    <div className="flex gap-3 mt-1.5">
+      {/* Salutation Dropdown */}
+      <Select value={salutationType} onValueChange={setSalutationType}>
+        <SelectTrigger className="w-40">
+          <SelectValue placeholder="Select..." />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="Dear">Dear</SelectItem>
+          <SelectItem value="Hello">Hello</SelectItem>
+          <SelectItem value="Hi">Hi</SelectItem>
+          <SelectItem value="To">To</SelectItem>
+          <SelectItem value="none">No greeting</SelectItem>
+          <SelectItem value="custom">Custom...</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Conditional: Client Name OR Custom Greeting Input */}
+      {!isNoGreeting && (
+        isCustom ? (
+          <Input
+            className="flex-1"
+            placeholder="Enter your custom greeting"
+            value={customGreeting}
+            onChange={(e) => setCustomGreeting(e.target.value)}
+          />
+        ) : (
+          <Input
+            className="flex-1"
+            placeholder="e.g., John and Jane Smith"
+            value={clientName}
+            onChange={(e) => setClientName(e.target.value)}
+          />
+        )
+      )}
+    </div>
+    
+    {/* Helper text */}
+    <p className="text-xs text-muted-foreground mt-1.5">
+      {isCustom 
+        ? 'Enter your complete custom greeting (comma will be added automatically)'
+        : isNoGreeting
+        ? 'Cover letter will start without a greeting'
+        : 'Include client name for personalized greeting'
+      }
+    </p>
+
+    {/* Greeting Preview */}
+    {getFullGreeting() && (
+      <div className="mt-2 p-2 bg-muted/50 rounded text-sm">
+        Preview: <span className="font-medium">"{getFullGreeting()}"</span>
+      </div>
+    )}
+  </div>
+
+  {/* AI Assistant section (keep existing) */}
+  <div className="bg-purple-50 dark:bg-purple-950/20 rounded-lg p-4">
+    {/* ... existing AI assistant UI ... */}
+  </div>
+
+  {/* Cover Letter Body (keep existing) */}
+  <div>
+    <Textarea
+      value={coverLetterBody}
+      onChange={(e) => setCoverLetterBody(e.target.value)}
+      placeholder="Enter your cover letter content..."
+      className="min-h-[200px]"
+    />
+    <p className="text-xs text-muted-foreground mt-1.5">
+      ℹ️ Pre-filled from your default cover letter. Edit above to customize for this CMA.
+    </p>
+  </div>
+</div>
+```
+
+### 4. Update Live Preview
+
+In the Live Preview panel, show the greeting + body:
+
+```tsx
+// Cover Letter section in Live Preview
+<div className="border rounded-lg p-4">
+  <h4 className="flex items-center gap-2 font-medium text-sm mb-3">
+    <Mail className="w-4 h-4" />
+    Cover Letter
+  </h4>
+  
+  <div className="text-sm">
+    {/* Show Greeting if exists */}
+    {getFullGreeting() && (
+      <p className="font-medium mb-3">{getFullGreeting()}</p>
+    )}
+    
+    {/* Cover Letter Body - truncated for preview */}
+    <p className="text-muted-foreground line-clamp-4">
+      {coverLetterBody}
+    </p>
+    {coverLetterBody.length > 200 && (
+      <span className="text-muted-foreground">...</span>
+    )}
+  </div>
+</div>
+```
+
+---
+
+## Examples
+
+| Salutation | Input Field | Result |
+|------------|-------------|--------|
+| Dear | John and Jane Smith | "Dear John and Jane Smith," |
+| Hello | The Smith Family | "Hello The Smith Family," |
+| Hi | Sarah | "Hi Sarah," |
+| To | Whom It May Concern | "To Whom It May Concern," |
+| No greeting | (disabled) | (no greeting line) |
+| Custom | To my favorite clients | "To my favorite clients," |
+| Custom | Greetings from Spyglass Realty | "Greetings from Spyglass Realty," |
+
+---
+
+## Visual: Final Result
+
+### Content Tab
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Cover Letter                                                    │
+│ Customize the cover letter for this CMA report                  │
+│                                                                 │
+│ Greeting                                                        │
+│ ┌────────────────┐  ┌─────────────────────────────────────────┐│
+│ │ Dear        ▼  │  │ John and Jane Smith                     ││
+│ └────────────────┘  └─────────────────────────────────────────┘│
+│ Include client name for personalized greeting                   │
+│                                                                 │
+│ Preview: "Dear John and Jane Smith,"                            │
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐│
+│ │ ✨ AI Assistant                                             ││
+│ │ Tone: [Professional ▼]  [✨ Generate with AI]               ││
+│ └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐│
+│ │ I am pleased to present the Comparative Market Analysis...  ││
+│ │                                                             ││
+│ └─────────────────────────────────────────────────────────────┘│
+│ ℹ️ Pre-filled from your default cover letter.                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Live Preview
+```
+┌─────────────────────────────────────┐
+│ ✉️ Cover Letter                     │
+│                                     │
+│ Dear John and Jane Smith,           │
+│                                     │
+│ I am pleased to present the         │
+│ Comparative Market Analysis (CMA)   │
+│ report I have meticulously...       │
+└─────────────────────────────────────┘
+```
+
+---
+
+## Verification Checklist
+
+- [ ] Salutation dropdown with 6 options (Dear, Hello, Hi, To, No greeting, Custom)
+- [ ] Client Name input shows for standard salutations
+- [ ] Custom greeting input shows when "Custom" selected
+- [ ] "No greeting" hides the input field
+- [ ] Preview shows below the inputs
+- [ ] Live Preview shows greeting + body combined
+- [ ] PDF export includes the full greeting
+- [ ] Greeting persists when switching tabs
+- [ ] Default salutation is "Dear"

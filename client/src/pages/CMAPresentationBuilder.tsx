@@ -159,6 +159,8 @@ export default function CMAPresentationBuilder() {
   const [adjustments, setAdjustments] = useState<CmaAdjustmentsData | null>(null);
   const [customPhotoSelections, setCustomPhotoSelections] = useState<Record<string, string[]>>({});
   const [clientName, setClientName] = useState('');
+  const [salutationType, setSalutationType] = useState('Dear');
+  const [customGreeting, setCustomGreeting] = useState('');
 
   const [coverPhotoModal, setCoverPhotoModal] = useState<{
     isOpen: boolean;
@@ -647,6 +649,10 @@ export default function CMAPresentationBuilder() {
                 defaultCoverLetter={agentInfo.coverLetter || ''}
                 clientName={clientName}
                 onClientNameChange={setClientName}
+                salutationType={salutationType}
+                onSalutationTypeChange={setSalutationType}
+                customGreeting={customGreeting}
+                onCustomGreetingChange={setCustomGreeting}
                 subjectProperty={subjectProperty}
                 properties={properties}
                 statistics={statistics}
@@ -683,6 +689,8 @@ export default function CMAPresentationBuilder() {
               showDate: config.coverPageConfig?.showDate ?? true,
               showAgentPhoto: config.coverPageConfig?.showAgentPhoto ?? true,
               coverLetter: config.coverLetterOverride || agentInfo.coverLetter || '',
+              salutationType: salutationType,
+              customGreeting: customGreeting,
             }}
             layoutSettings={{
               coverPhotoUrl: config.coverPhotoUrl,
