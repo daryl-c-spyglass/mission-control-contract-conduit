@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FileUp, Trash2, FileText, Image, Loader2, Sparkles } from "lucide-react";
+import { FileUp, Trash2, FileText, Image, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { CmaBrochure } from "@shared/schema";
@@ -82,24 +82,6 @@ export function ListingBrochureContent({
     },
   });
 
-  const generateMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest('POST', `/api/cmas/${cmaId}/brochure/generate`);
-      return response.json();
-    },
-    onSuccess: (generatedBrochure) => {
-      onChange(generatedBrochure);
-      toast({ title: 'Brochure generated', description: 'AI-generated brochure is ready' });
-    },
-    onError: (error: any) => {
-      toast({ 
-        title: 'Generation failed', 
-        description: error.message || 'Failed to generate brochure',
-        variant: 'destructive' 
-      });
-    },
-  });
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -131,7 +113,7 @@ export function ListingBrochureContent({
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Listing Brochure</CardTitle>
-        <CardDescription>Upload or generate a property brochure for the presentation</CardDescription>
+        <CardDescription>Upload a property brochure for the presentation</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {brochure ? (
@@ -197,30 +179,6 @@ export function ListingBrochureContent({
                 <div className="font-medium">Upload Brochure</div>
                 <div className="text-sm text-muted-foreground">PDF, JPG, PNG up to 10MB</div>
               </div>
-            </Button>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">or</span>
-              </div>
-            </div>
-
-            <Button
-              variant="secondary"
-              className="w-full gap-2"
-              onClick={() => generateMutation.mutate()}
-              disabled={generateMutation.isPending || !subjectProperty}
-              data-testid="button-generate-brochure"
-            >
-              {generateMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Sparkles className="w-4 h-4" />
-              )}
-              Generate with AI
             </Button>
           </div>
         )}

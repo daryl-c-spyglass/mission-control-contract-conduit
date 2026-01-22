@@ -10,6 +10,7 @@ import { AdjustmentsPreview } from "./preview-sections/AdjustmentsPreview";
 import { PricePerSqftChartPreview } from "./preview-sections/PricePerSqftChartPreview";
 import { PropertyPhotosPreview } from "./preview-sections/PropertyPhotosPreview";
 import { PropertyDetailsPreview } from "./preview-sections/PropertyDetailsPreview";
+import { MapAllListingsPreview } from "./preview-sections/MapAllListingsPreview";
 import type { PropertyForAdjustment } from "@/lib/adjustmentCalculations";
 
 interface LivePreviewPanelProps {
@@ -108,9 +109,13 @@ export function LivePreviewPanel({
         );
 
       case 'cover_letter':
-        return (
-          <p className="text-sm text-muted-foreground line-clamp-3">
-            {contentSettings.coverLetter || "Your personalized cover letter will appear here..."}
+        return contentSettings.coverLetter ? (
+          <p className="text-sm text-muted-foreground line-clamp-4 whitespace-pre-wrap">
+            {contentSettings.coverLetter}
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground italic">
+            No cover letter set. Add one in Settings → Agent Profile → Default Cover Letter
           </p>
         );
 
@@ -160,25 +165,11 @@ export function LivePreviewPanel({
 
       case 'map_all_listings':
         return (
-          <div className="space-y-2">
-            <div className="bg-muted rounded-lg h-32 flex items-center justify-center text-muted-foreground text-sm">
-              Map Preview ({comparables.length} comparables + Subject)
-            </div>
-            <div className="flex gap-3 text-xs flex-wrap">
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-blue-500"></span> Subject
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-green-500"></span> Active
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-orange-500"></span> Under Contract
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-red-500"></span> Sold
-              </span>
-            </div>
-          </div>
+          <MapAllListingsPreview
+            subjectProperty={subjectProperty}
+            comparables={comparables}
+            compact={compact}
+          />
         );
 
       case 'listings_header':

@@ -214,11 +214,16 @@ export default function CMAPresentationBuilder() {
     ? (cma.propertiesData as any[])
     : (linkedTransaction?.cmaData || []) as any[];
   
-  const properties = rawComparables.map((comp: any, index: number) => ({
-    id: comp.mlsNumber || `comp-${index}`,
-    mlsNumber: comp.mlsNumber || '',
-    unparsedAddress: comp.address || '',
-    city: comp.city || '',
+  const properties = rawComparables.map((comp: any, index: number) => {
+    const resolvedAddress = comp.unparsedAddress || comp.streetAddress || comp.address || 
+      comp.fullAddress || comp.addressLine1 || comp.location?.address || '';
+    return {
+      id: comp.mlsNumber || `comp-${index}`,
+      mlsNumber: comp.mlsNumber || '',
+      unparsedAddress: resolvedAddress,
+      streetAddress: resolvedAddress,
+      address: resolvedAddress,
+      city: comp.city || comp.location?.city || '',
     postalCode: comp.postalCode || '',
     listPrice: comp.listPrice || comp.price || 0,
     closePrice: comp.closePrice || (comp.status === 'Closed' ? comp.price : null),
@@ -235,7 +240,8 @@ export default function CMAPresentationBuilder() {
     map: comp.map || (comp.latitude && comp.longitude ? { latitude: comp.latitude, longitude: comp.longitude } : null),
     latitude: comp.latitude || comp.map?.latitude,
     longitude: comp.longitude || comp.map?.longitude,
-  })) as unknown as Property[];
+  };
+  }) as unknown as Property[];
 
   // Get subject property from linked transaction's mlsData
   const subjectFromTransaction = linkedTransaction?.mlsData as Property | null;
@@ -671,7 +677,7 @@ export default function CMAPresentationBuilder() {
               subtitle: config.coverPageConfig?.subtitle || 'Prepared exclusively for you',
               showDate: config.coverPageConfig?.showDate ?? true,
               showAgentPhoto: config.coverPageConfig?.showAgentPhoto ?? true,
-              coverLetter: config.coverLetterOverride,
+              coverLetter: config.coverLetterOverride || agentInfo.coverLetter || '',
             }}
             layoutSettings={{
               coverPhotoUrl: config.coverPhotoUrl,
