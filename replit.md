@@ -39,11 +39,18 @@ Preferred communication style: Simple, everyday language.
 - **Automatic MLS Synchronization**: Background service for regular MLS data sync.
 - **CMA (Comparative Market Analysis) System**: Database-backed storage, public share links, property data visualization (grid, stats, map), and configurable filters for search radius, price, size, and age. Includes API endpoints for CMA management and sharing.
 - **CMA Data Flow**: 
-  - Subject property: `linkedTransaction.mlsData` with coordinates in `coordinates.latitude/longitude`
+  - Subject property: `linkedTransaction.mlsData` with coordinates in `coordinates.latitude/longitude`, normalized in CMAPresentationBuilder to include field aliases
   - Comparables: Primary source is `cma.propertiesData`, fallback to `linkedTransaction.cmaData` if empty
-  - Comparable coordinates: Located in `map.latitude/longitude` field
+  - Comparable coordinates: Located in `map.latitude/longitude` field (also supports lat/lng short form)
   - Statistics/Timeline endpoints use same fallback logic for data consistency
   - Property field mapping: CMA format (`price`, `sqft`, `status`) ↔ Normalized format (`listPrice`, `livingArea`, `standardStatus`)
+  - **Field Aliasing**: CMAPresentationBuilder normalizes both subject and comparables with multiple field aliases for preview components:
+    - Address: `address`, `unparsedAddress`, `streetAddress`
+    - Bedrooms: `bedroomsTotal`, `beds`
+    - Bathrooms: `bathroomsTotal`, `bathroomsTotalInteger`, `baths`
+    - Square footage: `livingArea`, `sqft` (parsed from string)
+    - Coordinates: `latitude/longitude`, `lat/lng`, `map.latitude/longitude`, `coordinates.latitude/longitude`
+  - **Status Normalization**: MLS status codes normalized to human-readable values (U/Sc → Pending, A → Active, C/S → Closed)
 - **Status Badges & Utilities**: Consistent styling and display logic for transaction statuses and days remaining.
 - **Shared Listing Utilities**: Predicates and helpers for rental exclusion, accurate Days on Market display, and filtering.
 - **MLS/IDX/VOW Compliance**: Multi-layer rental exclusion, prevention of external media redirects, and consistent DOM normalization.
