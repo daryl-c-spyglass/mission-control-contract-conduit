@@ -2,9 +2,10 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, X, Upload, Check, Download, Image, FileText, Bed, Bath, Square, ZoomIn, ChevronDown, ChevronUp, Maximize2, User, RotateCcw, Plus, Minus, Sparkles, Undo2 } from "lucide-react";
+import { Loader2, X, Upload, Check, Download, Image, FileText, Bed, Bath, Square, ZoomIn, ChevronDown, ChevronUp, Maximize2, User, RotateCcw, Plus, Minus, Sparkles, Undo2, Link2, AlertCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAgentProfile } from "@/hooks/useAgentProfile";
 import {
   Dialog,
   DialogContent,
@@ -420,6 +421,10 @@ export function CreateFlyerDialog({
 }: CreateFlyerDialogProps) {
   const isEditMode = Boolean(assetId && initialData);
   const { toast } = useToast();
+  
+  // Fetch agent marketing profile
+  const { data: agentProfile, isLoading: profileLoading } = useAgentProfile();
+  
   // Format is always "print" - social media graphics are handled by MarketingMaterialsDialog
   const format = "print" as const;
   const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
@@ -442,6 +447,10 @@ export function CreateFlyerDialog({
   const [hasGeneratedHeadline, setHasGeneratedHeadline] = useState(false);
   const [renderedPreviewUrl, setRenderedPreviewUrl] = useState<string | null>(null);
   const [isRenderingPreview, setIsRenderingPreview] = useState(false);
+  const [profileSynced, setProfileSynced] = useState(false);
+  
+  // Check if profile is incomplete
+  const isProfileIncomplete = !agentProfile?.firstName || !agentProfile?.phone;
 
   const handleZoomIn = useCallback(() => {
     setZoomLevel(prev => Math.min(prev + 25, 300));
@@ -507,6 +516,8 @@ export function CreateFlyerDialog({
 
   useEffect(() => {
     if (open) {
+      setProfileSynced(false);
+      
       // If editing, restore saved state from initialData
       if (isEditMode && initialData) {
         setSelectedPhotos(initialData.photoUrls || []);
@@ -616,6 +627,36 @@ export function CreateFlyerDialog({
       form.setValue('openHouseTimeEnd', '16:00');
     }
   }, [watchedValues.status, form]);
+  
+  // Sync agent profile data when it loads (for new flyers only, not edit mode)
+  useEffect(() => {
+    if (open && agentProfile && !isEditMode && !profileSynced) {
+      // Combine first and last name
+      const fullName = [agentProfile.firstName, agentProfile.lastName]
+        .filter(Boolean)
+        .join(" ");
+      
+      // Only set values if the form fields are empty (don't override user input)
+      const currentName = form.getValues("agentName");
+      const currentPhone = form.getValues("agentPhone");
+      const currentTitle = form.getValues("agentTitle");
+      
+      if (!currentName && fullName) {
+        form.setValue("agentName", fullName);
+      }
+      if (!currentPhone && agentProfile.phone) {
+        form.setValue("agentPhone", formatPhoneNumber(agentProfile.phone));
+      }
+      if ((!currentTitle || currentTitle === "REALTOR®") && agentProfile.title && agentProfile.title !== "REALTOR®") {
+        form.setValue("agentTitle", agentProfile.title);
+      }
+      if (!localAgentPhoto && agentProfile.profilePhoto) {
+        setLocalAgentPhoto(agentProfile.profilePhoto);
+      }
+      
+      setProfileSynced(true);
+    }
+  }, [open, agentProfile, isEditMode, profileSynced, form, localAgentPhoto]);
 
   const handleSummarize = useCallback(async () => {
     // Always use the FULL original MLS description as source
@@ -2175,8 +2216,49 @@ export function CreateFlyerDialog({
                   }}
                 />
 
-                <div className="border-t pt-3 mt-2">
-                  <FormLabel className="text-sm font-medium text-muted-foreground">Agent Information</FormLabel>
+                <div className="border-t pt-3 mt-2 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <FormLabel className="text-sm font-medium text-muted-foreground">Agent Information</FormLabel>
+                    
+                    {profileSynced && !isProfileIncomplete && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Link2 className="h-3.5 w-3.5" />
+                              <span>Synced from profile</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Agent info pulled from your Marketing Profile.</p>
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                              Update in Settings → Profile
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </div>
+                  
+                  {isProfileIncomplete && !isEditMode && (
+                    <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                      <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm">
+                        <p className="font-medium text-amber-800 dark:text-amber-200">Complete your profile</p>
+                        <p className="text-amber-600 dark:text-amber-400 mt-0.5">
+                          Set up your{" "}
+                          <a 
+                            href="/settings?tab=profile" 
+                            className="underline hover:text-amber-800 dark:hover:text-amber-200"
+                            data-testid="link-settings-profile"
+                          >
+                            Marketing Profile
+                          </a>
+                          {" "}to auto-fill your info on flyers.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                     <FormField

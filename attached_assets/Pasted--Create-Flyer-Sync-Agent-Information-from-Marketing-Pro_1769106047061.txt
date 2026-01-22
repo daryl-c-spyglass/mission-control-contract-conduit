@@ -1,0 +1,584 @@
+# Create Flyer - Sync Agent Information from Marketing Profile
+
+## Overview
+The Create Property Flyer modal (Marketing section > Quick Actions > Create Flyer) should automatically populate agent information from the Agent Marketing Profile saved in Settings. When the profile is updated, those changes should automatically reflect in the Create Flyer modal.
+
+---
+
+## Current State (from screenshots)
+
+### Create Property Flyer Modal
+- Agent Name: Empty input field with placeholder "Enter your name"
+- Agent Title: Shows "REALTOR®" 
+- Agent Phone: Empty with placeholder "(512) 555-1234"
+- Agent Photo: Empty placeholder with "Upload Photo" button
+
+### Agent Marketing Profile (Settings)
+- Profile Photo: Uploaded headshot
+- First Name: "Daryl"
+- Last Name: "Camingao"  
+- Email: "daryl@spyglassrealty.com"
+- Phone: "546-546-5123"
+- Title: "AI Web Developer"
+- Company: "Spyglass Realty"
+
+---
+
+## Target Behavior
+
+When opening Create Flyer modal:
+1. **Auto-populate** Agent Name from `firstName + lastName` → "Daryl Camingao"
+2. **Auto-populate** Agent Title from `title` → "AI Web Developer"
+3. **Auto-populate** Agent Phone from `phone` → "546-546-5123"
+4. **Auto-populate** Agent Photo from `profilePhoto` → Shows headshot image
+5. Show subtle indicator that data is synced from profile
+6. Fields remain editable for one-off overrides (not saved back to profile)
+
+---
+
+## Implementation
+
+### 1. API Endpoint to Fetch Agent Marketing Profile
+
+```typescript
+// server/routes.ts - Add or verify this endpoint exists
+
+// GET /api/agent-profile - Fetch current user's marketing profile
+app.get("/api/agent-profile", async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const userId = req.user.id;
+    
+    // Fetch from agent_profiles table (or users table if combined)
+    const profile = await db.query.agentProfiles.findFirst({
+      where: eq(agentProfiles.userId, userId)
+    });
+
+    if (!profile) {
+      // Return empty profile with defaults
+      return res.json({
+        firstName: "",
+        lastName: "",
+        email: req.user.email || "",
+        phone: "",
+        title: "REALTOR®",
+        company: "Spyglass Realty",
+        profilePhoto: null
+      });
+    }
+
+    res.json(profile);
+  } catch (error) {
+    console.error("Error fetching agent profile:", error);
+    res.status(500).json({ error: "Failed to fetch agent profile" });
+  }
+});
+```
+
+### 2. React Hook for Agent Profile
+
+```typescript
+// client/src/hooks/useAgentProfile.ts
+
+import { useQuery } from "@tanstack/react-query";
+
+export interface AgentProfile {
+  id?: number;
+  userId?: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  title: string;
+  company: string;
+  profilePhoto: string | null;
+}
+
+export function useAgentProfile() {
+  return useQuery<AgentProfile>({
+    queryKey: ["agent-profile"],
+    queryFn: async () => {
+      const response = await fetch("/api/agent-profile", {
+        credentials: "include"
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch agent profile");
+      }
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+}
+```
+
+### 3. Update Create Flyer Modal Component
+
+```tsx
+// client/src/components/marketing/CreateFlyerModal.tsx
+
+import { useState, useEffect } from "react";
+import { useAgentProfile } from "@/hooks/useAgentProfile";
+import { Link2, AlertCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+interface CreateFlyerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  transaction: Transaction;
+  onGenerate: (data: FlyerData) => void;
+}
+
+export function CreateFlyerModal({ 
+  isOpen, 
+  onClose, 
+  transaction,
+  onGenerate 
+}: CreateFlyerModalProps) {
+  // Fetch agent profile
+  const { data: agentProfile, isLoading: profileLoading } = useAgentProfile();
+  
+  // Form state - initialized from profile when loaded
+  const [agentName, setAgentName] = useState("");
+  const [agentTitle, setAgentTitle] = useState("REALTOR®");
+  const [agentPhone, setAgentPhone] = useState("");
+  const [agentPhoto, setAgentPhoto] = useState<string | null>(null);
+  const [isPhotoFromProfile, setIsPhotoFromProfile] = useState(false);
+  
+  // Property details (from transaction/MLS)
+  const [price, setPrice] = useState(transaction.listPrice?.toString() || "");
+  const [status, setStatus] = useState(transaction.status || "Just Listed");
+  const [beds, setBeds] = useState(transaction.beds?.toString() || "");
+  const [baths, setBaths] = useState(transaction.baths?.toString() || "");
+  const [sqft, setSqft] = useState(transaction.sqft?.toString() || "");
+  const [description, setDescription] = useState(transaction.description || "");
+  const [headline, setHeadline] = useState("");
+
+  // Sync agent info from profile when loaded
+  useEffect(() => {
+    if (agentProfile) {
+      // Combine first and last name
+      const fullName = [agentProfile.firstName, agentProfile.lastName]
+        .filter(Boolean)
+        .join(" ");
+      
+      if (fullName) setAgentName(fullName);
+      if (agentProfile.title) setAgentTitle(agentProfile.title);
+      if (agentProfile.phone) setAgentPhone(agentProfile.phone);
+      if (agentProfile.profilePhoto) {
+        setAgentPhoto(agentProfile.profilePhoto);
+        setIsPhotoFromProfile(true);
+      }
+    }
+  }, [agentProfile]);
+
+  // Handle custom photo upload (overrides profile photo)
+  const handlePhotoUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setAgentPhoto(e.target?.result as string);
+      setIsPhotoFromProfile(false); // Mark as custom upload
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Check if profile is incomplete
+  const isProfileIncomplete = !agentProfile?.firstName || !agentProfile?.phone;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create Property Flyer</DialogTitle>
+          <DialogDescription>
+            Select photos and customize details for your print flyer.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Photo Selection Section */}
+        <div className="space-y-4">
+          {/* ... existing photo carousel code ... */}
+        </div>
+
+        {/* Property Details Section */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* ... existing property fields ... */}
+        </div>
+
+        {/* Agent Information Section */}
+        <div className="space-y-4 pt-4 border-t">
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-gray-900">Agent Information</h3>
+            
+            {/* Sync indicator */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                    <Link2 className="h-3.5 w-3.5" />
+                    <span>Synced from profile</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Agent info is pulled from your Marketing Profile.</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Update in Settings → Marketing Profile
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+
+          {/* Profile incomplete warning */}
+          {isProfileIncomplete && (
+            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="font-medium text-amber-800">Complete your profile</p>
+                <p className="text-amber-600 mt-0.5">
+                  Set up your{" "}
+                  <a 
+                    href="/settings?tab=marketing-profile" 
+                    className="underline hover:text-amber-800"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onClose();
+                      // Navigate to settings
+                      window.location.href = "/settings?tab=marketing-profile";
+                    }}
+                  >
+                    Marketing Profile
+                  </a>
+                  {" "}to auto-fill your info on flyers.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Agent Name & Title Row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Agent Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={agentName}
+                onChange={(e) => setAgentName(e.target.value)}
+                placeholder="Enter your name"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg 
+                         focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Agent Title
+              </label>
+              <input
+                type="text"
+                value={agentTitle}
+                onChange={(e) => setAgentTitle(e.target.value)}
+                placeholder="REALTOR®"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg 
+                         focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              />
+            </div>
+          </div>
+
+          {/* Agent Phone */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Agent Phone <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="tel"
+              value={agentPhone}
+              onChange={(e) => setAgentPhone(e.target.value)}
+              placeholder="(512) 555-1234"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg 
+                       focus:ring-2 focus:ring-orange-500 focus:border-orange-500 max-w-xs"
+            />
+          </div>
+
+          {/* Agent Photo */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Agent Photo
+            </label>
+            <div className="flex items-center gap-4">
+              {/* Photo Preview */}
+              <div className="relative">
+                {agentPhoto ? (
+                  <div className="relative">
+                    <img
+                      src={agentPhoto}
+                      alt="Agent"
+                      className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+                    />
+                    {isPhotoFromProfile && (
+                      <div className="absolute -top-1 -right-1 bg-green-500 rounded-full p-0.5">
+                        <Link2 className="h-3 w-3 text-white" />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center border-2 border-dashed border-gray-300">
+                    <User className="h-8 w-8 text-gray-400" />
+                  </div>
+                )}
+              </div>
+
+              {/* Upload Button */}
+              <div>
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handlePhotoUpload(file);
+                    }}
+                    className="hidden"
+                  />
+                  <div className="flex items-center gap-2 px-3 py-2 border border-gray-300 
+                               rounded-lg hover:bg-gray-50 transition-colors">
+                    <Upload className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm text-gray-700">
+                      {agentPhoto ? "Change Photo" : "Upload Photo"}
+                    </span>
+                  </div>
+                </label>
+                <p className="text-xs text-gray-500 mt-1">
+                  {isPhotoFromProfile 
+                    ? "Using photo from your profile" 
+                    : "Optional - shows placeholder if not uploaded"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Actions */}
+        <DialogFooter className="mt-6">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={() => onGenerate({
+              // ... property data
+              agentName,
+              agentTitle,
+              agentPhone,
+              agentPhoto,
+            })}
+            className="bg-orange-500 hover:bg-orange-600 text-white"
+            disabled={!agentName || !agentPhone}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download Flyer
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+### 4. Invalidate Cache When Profile Updates
+
+```typescript
+// In the Settings page where Marketing Profile is saved
+// client/src/pages/Settings.tsx or similar
+
+import { useQueryClient } from "@tanstack/react-query";
+
+function MarketingProfileForm() {
+  const queryClient = useQueryClient();
+
+  const handleSave = async (profileData: AgentProfile) => {
+    try {
+      const response = await fetch("/api/agent-profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(profileData)
+      });
+
+      if (response.ok) {
+        // Invalidate the cache so Create Flyer gets fresh data
+        queryClient.invalidateQueries({ queryKey: ["agent-profile"] });
+        
+        toast.success("Marketing profile saved!");
+      }
+    } catch (error) {
+      toast.error("Failed to save profile");
+    }
+  };
+
+  // ... rest of form
+}
+```
+
+---
+
+## Visual Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Create Property Flyer                                      ✕   │
+│  Select photos and customize details for your print flyer.      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  [Photo 1] [Photo 2] [Photo 3] [Photo 4] [Photo 5] [Photo 6]   │
+│     ①         ②         ③                                      │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ Agent Information                    🔗 Synced from profile │ │  ← New indicator
+│  ├─────────────────────────────────────────────────────────┤   │
+│  │                                                          │   │
+│  │  ┌──────────────────────┐  ┌──────────────────────────┐ │   │
+│  │  │ Agent Name *         │  │ Agent Title              │ │   │
+│  │  │ Daryl Camingao  ←────│──│─ AI Web Developer  ←─────│─│───┼── Auto-filled
+│  │  └──────────────────────┘  └──────────────────────────┘ │   │   from profile
+│  │                                                          │   │
+│  │  ┌──────────────────────┐                               │   │
+│  │  │ Agent Phone *        │                               │   │
+│  │  │ 546-546-5123   ←─────│───────────────────────────────│───┼── Auto-filled
+│  │  └──────────────────────┘                               │   │
+│  │                                                          │   │
+│  │  Agent Photo                                             │   │
+│  │  ┌────┐                                                  │   │
+│  │  │ 🔗 │  [📤 Change Photo]                              │   │
+│  │  │ 👤 │  Using photo from your profile                  │   │  ← Shows profile photo
+│  │  └────┘                                                  │   │    with sync indicator
+│  │                                                          │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│                              [Cancel]  [🔽 Download Flyer]      │
+└─────────────────────────────────────────────────────────────────┘
+
+                              ▲
+                              │
+                   Data flows from
+                              │
+                              ▼
+
+┌─────────────────────────────────────────────────────────────────┐
+│  Agent Marketing Profile                                        │
+│  Your personal information displayed on CMA reports             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Profile Photo                                                  │
+│  ┌────┐  [📷 Change]                                           │
+│  │ 👤 │                                                         │
+│  └────┘                                                         │
+│                                                                 │
+│  First Name              Last Name                              │
+│  ┌─────────────────┐    ┌─────────────────┐                    │
+│  │ Daryl           │    │ Camingao        │                    │
+│  └─────────────────┘    └─────────────────┘                    │
+│                                                                 │
+│  Phone                                                          │
+│  ┌─────────────────────────────────────────┐                   │
+│  │ 546-546-5123                            │                   │
+│  └─────────────────────────────────────────┘                   │
+│                                                                 │
+│  Title                   Company                                │
+│  ┌─────────────────┐    ┌─────────────────┐                    │
+│  │ AI Web Developer│    │ Spyglass Realty │                    │
+│  └─────────────────┘    └─────────────────┘                    │
+│                                                                 │
+│                              [💾 Save Marketing Profile]        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Data Flow
+
+```
+Settings Page                    Create Flyer Modal
+     │                                  │
+     │  Save Profile                    │
+     ▼                                  │
+┌─────────────┐                        │
+│ PUT /api/   │                        │
+│ agent-      │──► DB Update           │
+│ profile     │         │              │
+└─────────────┘         │              │
+                        │              │
+                        ▼              │
+              invalidateQueries()      │
+                        │              │
+                        │    useAgentProfile()
+                        │              │
+                        └──────────────┼──► GET /api/agent-profile
+                                       │              │
+                                       │              ▼
+                                       │    ┌─────────────────┐
+                                       │    │ Auto-populate:  │
+                                       │    │ - Agent Name    │
+                                       │    │ - Agent Title   │
+                                       │    │ - Agent Phone   │
+                                       │    │ - Agent Photo   │
+                                       │    └─────────────────┘
+                                       │
+                                       ▼
+                               User can still edit
+                               (one-off override)
+```
+
+---
+
+## Verification Checklist
+
+### Profile Sync
+- [ ] Opening Create Flyer modal fetches agent profile
+- [ ] Agent Name auto-fills with "FirstName LastName" from profile
+- [ ] Agent Title auto-fills from profile title field
+- [ ] Agent Phone auto-fills from profile phone field
+- [ ] Agent Photo displays the profile headshot image
+- [ ] "Synced from profile" indicator shows in Agent Information header
+- [ ] Profile photo shows small link icon indicating it's from profile
+
+### Incomplete Profile Handling
+- [ ] Warning banner appears if profile is incomplete (no name or phone)
+- [ ] Warning includes link to Settings → Marketing Profile
+- [ ] Clicking link closes modal and navigates to settings
+
+### Override Capability
+- [ ] All agent fields remain editable
+- [ ] Uploading new photo replaces profile photo for this flyer only
+- [ ] Custom photo doesn't show "synced" indicator
+- [ ] Overrides don't save back to profile (one-time only)
+
+### Profile Updates
+- [ ] Saving Marketing Profile invalidates cached data
+- [ ] Next Create Flyer opening shows updated info
+- [ ] Changes reflect immediately without page refresh
+
+### Validation
+- [ ] Agent Name required for Download Flyer
+- [ ] Agent Phone required for Download Flyer
+- [ ] Download button disabled if required fields empty
+
+---
+
+## Files to Modify
+
+1. **`server/routes.ts`** - Ensure GET /api/agent-profile endpoint exists
+2. **`client/src/hooks/useAgentProfile.ts`** - Create or verify hook exists
+3. **`client/src/components/marketing/CreateFlyerModal.tsx`** - Add profile sync logic
+4. **`client/src/pages/Settings.tsx`** - Add cache invalidation on profile save
+
+---
+
+## Notes
+
+- Fields remain editable so agents can make one-off changes for specific flyers
+- Custom uploads for a single flyer don't modify the saved profile
+- The sync is one-directional: Profile → Flyer (not Flyer → Profile)
+- Cache invalidation ensures immediate updates when profile changes
+- Profile incomplete warning encourages proper setup for better UX
