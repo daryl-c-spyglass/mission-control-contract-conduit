@@ -1,0 +1,185 @@
+# DIAGNOSTIC: Gather Information About CMA Presentation Builder
+
+## Purpose
+Gather technical information about how the CMA Map and Presentation Builder are built BEFORE creating a fix. No changes needed - just information gathering.
+
+---
+
+## Questions to Answer
+
+### 1. Where is the WORKING CMA Map component?
+
+Find the map that works in: **CMA Tab → Comparable Properties → [Compare] [Map] tabs**
+
+```bash
+# Search for the map component file
+grep -r "Map" client/src/components/ --include="*.tsx" | grep -i cma
+grep -r "mapbox" client/src/components/ --include="*.tsx"
+grep -r "Marker" client/src/components/ --include="*.tsx" | head -20
+```
+
+**What file is it in?** (e.g., `cma-map.tsx`, `comparable-map.tsx`, etc.)
+
+---
+
+### 2. What props does the working CMA Map receive?
+
+Look at the working map component and list:
+- What props it accepts
+- How it gets comparables data
+- How it gets subject property coordinates
+
+```tsx
+// Example - what does your component signature look like?
+interface CMAMapProps {
+  comparables?: any[];
+  subjectProperty?: any;
+  // What other props?
+}
+```
+
+---
+
+### 3. Where is the Presentation Builder component?
+
+```bash
+# Search for presentation builder
+grep -r "PresentationBuilder\|Presentation Builder" client/src/ --include="*.tsx"
+grep -r "Live Preview" client/src/ --include="*.tsx"
+```
+
+**What file is it in?**
+
+---
+
+### 4. How does Presentation Builder fetch CMA data?
+
+Look in the Presentation Builder component for:
+- useQuery hooks
+- API calls to `/api/transactions/:id/cma`
+- How comparables array is accessed
+
+```tsx
+// What does your data fetching look like?
+const { data: cmaData } = useQuery({
+  queryKey: ['???'],
+  queryFn: ???
+});
+```
+
+---
+
+### 5. How is "Map of All Listings" currently rendered in Live Preview?
+
+Find where the Live Preview renders "Map of All Listings" section:
+
+```tsx
+// What component/code is rendering this section?
+{sections.mapOfAllListings && (
+  <div>
+    {/* What's here? */}
+  </div>
+)}
+```
+
+Is it:
+- Using the same CMAMap component?
+- Using a different component?
+- Just showing placeholder text?
+
+---
+
+### 6. What data is available in Presentation Builder?
+
+Add these console logs temporarily to see what data exists:
+
+```tsx
+// Add at top of Presentation Builder component
+console.log('=== PRESENTATION BUILDER DEBUG ===');
+console.log('Transaction:', transaction);
+console.log('Transaction ID:', transaction?.id);
+console.log('MLS Data:', transaction?.mlsData);
+console.log('Subject Coords:', {
+  lat: transaction?.mlsData?.latitude || transaction?.mlsData?.map?.latitude,
+  lng: transaction?.mlsData?.longitude || transaction?.mlsData?.map?.longitude,
+});
+
+// If there's a CMA data query
+console.log('CMA Data:', cmaData);
+console.log('Comparables:', cmaData?.comparables);
+console.log('Comparables Count:', cmaData?.comparables?.length);
+
+// If comparables exist, log first one's structure
+if (cmaData?.comparables?.[0]) {
+  console.log('First Comparable Keys:', Object.keys(cmaData.comparables[0]));
+  console.log('First Comparable:', cmaData.comparables[0]);
+}
+```
+
+**What does the console show?**
+
+---
+
+### 7. Why does the map show "Failed to load map"?
+
+Check:
+- Is Mapbox token configured? `import.meta.env.VITE_MAPBOX_TOKEN`
+- Is the map component receiving props?
+- Are there any errors in the browser console?
+
+---
+
+### 8. Can elements in Live Preview be clicked?
+
+You mentioned nothing is clickable. Check:
+- Is there an overlay blocking clicks?
+- Is pointer-events disabled?
+- Is the preview in an iframe or modal?
+
+```css
+/* Look for any CSS like: */
+pointer-events: none;
+```
+
+---
+
+## Summary Format
+
+Please provide answers in this format:
+
+```
+1. Working CMA Map file: [filename]
+
+2. CMA Map props: 
+   - prop1: type
+   - prop2: type
+
+3. Presentation Builder file: [filename]
+
+4. CMA data fetching:
+   - Endpoint: [url]
+   - Query key: [key]
+   - Returns: [structure]
+
+5. Map of All Listings render code:
+   [paste the relevant JSX]
+
+6. Console log output:
+   [paste the console output]
+
+7. Map error reason:
+   [error message or finding]
+
+8. Click issue:
+   [finding]
+```
+
+---
+
+## After Gathering Info
+
+Once you have this information, share it and I'll create a targeted fix that:
+1. Reuses the working CMA Map component
+2. Passes the correct props
+3. Fixes the "Failed to load map" error
+4. Fixes the click/interaction issue
