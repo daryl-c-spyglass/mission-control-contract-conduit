@@ -220,30 +220,55 @@ export default function CMAPresentationBuilder() {
   const properties = rawComparables.map((comp: any, index: number) => {
     const resolvedAddress = comp.unparsedAddress || comp.streetAddress || comp.address || 
       comp.fullAddress || comp.addressLine1 || comp.location?.address || '';
+    
+    // Parse numeric values from strings if needed
+    const parsedSqft = typeof comp.sqft === 'string' ? parseFloat(comp.sqft) : (comp.sqft || comp.livingArea || 0);
+    const parsedBeds = typeof comp.bedrooms === 'string' ? parseInt(comp.bedrooms) : (comp.bedrooms || comp.beds || 0);
+    const parsedBaths = typeof comp.bathrooms === 'string' ? parseFloat(comp.bathrooms) : (comp.bathrooms || comp.baths || 0);
+    const parsedPrice = comp.listPrice || comp.price || comp.closePrice || 0;
+    
+    // Resolve coordinates - check multiple possible locations
+    const lat = comp.latitude || comp.map?.latitude || comp.coordinates?.latitude || comp.geo?.lat;
+    const lng = comp.longitude || comp.map?.longitude || comp.coordinates?.longitude || comp.geo?.lng;
+    
     return {
       id: comp.mlsNumber || `comp-${index}`,
       mlsNumber: comp.mlsNumber || '',
+      // Address fields - multiple aliases for different components
       unparsedAddress: resolvedAddress,
       streetAddress: resolvedAddress,
       address: resolvedAddress,
       city: comp.city || comp.location?.city || '',
-    postalCode: comp.postalCode || '',
-    listPrice: comp.listPrice || comp.price || 0,
-    closePrice: comp.closePrice || (comp.status === 'Closed' ? comp.price : null),
-    standardStatus: comp.status || 'Active',
-    bedroomsTotal: comp.bedrooms || 0,
-    bathroomsTotalInteger: comp.bathrooms || 0,
-    livingArea: typeof comp.sqft === 'string' ? parseFloat(comp.sqft) : (comp.sqft || 0),
-    simpleDaysOnMarket: comp.daysOnMarket || 0,
-    yearBuilt: comp.yearBuilt || null,
-    photos: (comp.photos || (comp.imageUrl ? [comp.imageUrl] : []))
-      .map((url: string) => sanitizePhotoUrl(url))
-      .filter((url: string) => url.length > 0),
-    // Ensure coordinates are in the format extractCoordinates expects
-    map: comp.map || (comp.latitude && comp.longitude ? { latitude: comp.latitude, longitude: comp.longitude } : null),
-    latitude: comp.latitude || comp.map?.latitude,
-    longitude: comp.longitude || comp.map?.longitude,
-  };
+      postalCode: comp.postalCode || '',
+      // Price fields
+      listPrice: parsedPrice,
+      closePrice: comp.closePrice || (comp.status === 'Closed' || comp.standardStatus === 'Closed' ? parsedPrice : null),
+      soldPrice: comp.soldPrice || comp.closePrice,
+      // Status
+      standardStatus: comp.status || comp.standardStatus || 'Active',
+      status: comp.status || comp.standardStatus || 'Active',
+      // Bedroom/bathroom fields - multiple aliases for different components
+      bedroomsTotal: parsedBeds,
+      beds: parsedBeds,
+      bathroomsTotal: parsedBaths,
+      bathroomsTotalInteger: parsedBaths,
+      baths: parsedBaths,
+      // Square footage - multiple aliases
+      livingArea: parsedSqft,
+      sqft: parsedSqft,
+      // Other fields
+      simpleDaysOnMarket: comp.daysOnMarket || comp.dom || 0,
+      daysOnMarket: comp.daysOnMarket || comp.dom || 0,
+      yearBuilt: comp.yearBuilt || null,
+      photos: (comp.photos || (comp.imageUrl ? [comp.imageUrl] : []))
+        .map((url: string) => sanitizePhotoUrl(url))
+        .filter((url: string) => url.length > 0),
+      // Coordinates - multiple formats for map components
+      map: lat && lng ? { latitude: lat, longitude: lng } : null,
+      latitude: lat,
+      longitude: lng,
+      coordinates: lat && lng ? { latitude: lat, longitude: lng, lat, lng } : null,
+    };
   }) as unknown as Property[];
 
   // Get subject property from linked transaction's mlsData

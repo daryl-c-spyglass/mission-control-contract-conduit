@@ -1,0 +1,681 @@
+# CRITICAL FIX: CMA Presentation Builder Data Issues
+
+## Overview
+
+Multiple critical issues in CMA Presentation Builder where data from CMA comparables is not displaying correctly:
+
+1. **Map of All Listings** - Completely empty, no map rendering
+2. **Property Details** - Shows "Unknown" instead of addresses, "0 ba" for bathrooms
+3. **Average Price Per Sq. Ft. Chart** - X-axis shows "Comp 1, Comp 2..." instead of addresses
+4. **Summary of Comparable Properties** - Verify calculations are correct
+
+---
+
+## Data Flow (How It Should Work)
+
+```
+CMA Tab (Comparables Grid)
+    │
+    │ User selects comparables
+    ▼
+┌─────────────────────────────┐
+│ cmaData.comparables[]       │ ← Array of comparable properties
+│   - address                 │
+│   - latitude, longitude     │
+│   - listPrice               │
+│   - bedrooms, bathrooms     │
+│   - squareFeet              │
+│   - status                  │
+│   - pricePerSqFt            │
+│   - daysOnMarket            │
+└─────────────────────────────┘
+    │
+    │ Passed to Presentation Builder
+    ▼
+┌─────────────────────────────┐
+│ Presentation Builder        │
+│   - Map of All Listings     │ ← Uses lat/lng for markers
+│   - Property Details        │ ← Uses address, beds, baths, sqft
+│   - Price Chart             │ ← Uses address for X-axis labels
+│   - Summary Stats           │ ← Calculates avg price, avg $/sqft
+└─────────────────────────────┘
+```
+
+---
+
+## STEP 1: Debug - Log the Data
+
+First, add console logs to see what data is being passed:
+
+```tsx
+// In Presentation Builder component
+useEffect(() => {
+  console.log('=== CMA PRESENTATION BUILDER DEBUG ===');
+  console.log('Transaction:', transaction);
+  console.log('CMA Data:', cmaData);
+  console.log('Comparables:', cmaData?.comparables);
+  
+  if (cmaData?.comparables?.length > 0) {
+    console.log('First Comparable Full Object:', cmaData.comparables[0]);
+    console.log('First Comparable Keys:', Object.keys(cmaData.comparables[0]));
+    
+    // Check specific fields
+    const comp = cmaData.comparables[0];
+    console.log('Address fields:', {
+      address: comp.address,
+      streetAddress: comp.streetAddress,
+      fullAddress: comp.fullAddress,
+      unparsedAddress: comp.unparsedAddress,
+      streetNumber: comp.streetNumber,
+      streetName: comp.streetName,
+    });
+    console.log('Coordinate fields:', {
+      latitude: comp.latitude,
+      longitude: comp.longitude,
+      lat: comp.lat,
+      lng: comp.lng,
+      coordinates: comp.coordinates,
+      geo: comp.geo,
+    });
+    console.log('Property fields:', {
+      bedrooms: comp.bedrooms,
+      bedroomsTotal: comp.bedroomsTotal,
+      bathrooms: comp.bathrooms,
+      bathroomsTotalInteger: comp.bathroomsTotalInteger,
+      bathsFull: comp.bathsFull,
+      bathsHalf: comp.bathsHalf,
+    });
+  }
+  
+  // Subject property
+  console.log('Subject Property:', transaction?.mlsData);
+  console.log('Subject Coordinates:', {
+    lat: transaction?.mlsData?.latitude,
+    lng: transaction?.mlsData?.longitude,
+  });
+}, [transaction, cmaData]);
+```
+
+**Run this and check the console to see the actual field names in your data!**
+
+---
+
+## STEP 2: Create Data Helper Functions
+
+Based on the debug output, create helper functions to extract data correctly:
+
+```tsx
+// helpers/cmaDataHelpers.ts
+
+/**
+ * Get property address from comparable object
+ * Tries multiple possible field names
+ */
+export const getPropertyAddress = (comp: any): string => {
+  if (!comp) return 'Unknown';
+  
+  // Try direct address fields
+  if (comp.address && comp.address !== 'Unknown') return comp.address;
+  if (comp.streetAddress) return comp.streetAddress;
+  if (comp.fullAddress) return comp.fullAddress;
+  if (comp.unparsedAddress) return comp.unparsedAddress;
+  
+  // Try building from parts
+  if (comp.streetNumber && comp.streetName) {
+    const parts = [comp.streetNumber, comp.streetName];
+    if (comp.city) parts.push(comp.city);
+    if (comp.state) parts.push(comp.state);
+    return parts.join(' ');
+  }
+  
+  // Try location object
+  if (comp.location?.address) return comp.location.address;
+  
+  // Fallback
+  return comp.mlsNumber ? `MLS# ${comp.mlsNumber}` : 'Unknown';
+};
+
+/**
+ * Get short address for chart labels
+ */
+export const getShortAddress = (comp: any): string => {
+  const fullAddress = getPropertyAddress(comp);
+  if (fullAddress === 'Unknown') return 'N/A';
+  
+  // Extract street number and name only
+  // "1234 Oak Street, Austin, TX" → "1234 Oak St"
+  const beforeComma = fullAddress.split(',')[0].trim();
+  const words = beforeComma.split(' ');
+  
+  if (words.length > 3) {
+    return `${words[0]} ${words[1]}`;
+  }
+  
+  return beforeComma.length > 15 ? beforeComma.substring(0, 15) + '...' : beforeComma;
+};
+
+/**
+ * Get coordinates from comparable object
+ */
+export const getCoordinates = (comp: any): { lat: number; lng: number } | null => {
+  if (!comp) return null;
+  
+  // Direct fields
+  let lat = comp.latitude || comp.lat;
+  let lng = comp.longitude || comp.lng || comp.lon;
+  
+  // Nested in coordinates object
+  if (!lat && comp.coordinates) {
+    lat = comp.coordinates.lat || comp.coordinates.latitude;
+    lng = comp.coordinates.lng || comp.coordinates.longitude || comp.coordinates.lon;
+  }
+  
+  // Nested in geo object
+  if (!lat && comp.geo) {
+    lat = comp.geo.lat || comp.geo.latitude;
+    lng = comp.geo.lng || comp.geo.longitude;
+  }
+  
+  // Nested in location object
+  if (!lat && comp.location) {
+    lat = comp.location.lat || comp.location.latitude;
+    lng = comp.location.lng || comp.location.longitude;
+  }
+  
+  // Validate
+  if (lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng))) {
+    return { lat: parseFloat(lat), lng: parseFloat(lng) };
+  }
+  
+  return null;
+};
+
+/**
+ * Get bedroom count
+ */
+export const getBedrooms = (comp: any): number => {
+  return comp?.bedrooms || 
+         comp?.bedroomsTotal || 
+         comp?.beds || 
+         comp?.BedroomsTotal ||
+         0;
+};
+
+/**
+ * Get bathroom count
+ */
+export const getBathrooms = (comp: any): number => {
+  // Try direct bathroom field
+  if (comp?.bathrooms && comp.bathrooms > 0) return comp.bathrooms;
+  if (comp?.bathroomsTotalInteger && comp.bathroomsTotalInteger > 0) return comp.bathroomsTotalInteger;
+  if (comp?.baths && comp.baths > 0) return comp.baths;
+  if (comp?.BathroomsTotalInteger && comp.BathroomsTotalInteger > 0) return comp.BathroomsTotalInteger;
+  
+  // Try calculating from full + half
+  const full = comp?.bathsFull || comp?.bathroomsFull || 0;
+  const half = comp?.bathsHalf || comp?.bathroomsHalf || 0;
+  if (full > 0 || half > 0) {
+    return full + (half * 0.5);
+  }
+  
+  return 0;
+};
+
+/**
+ * Get square footage
+ */
+export const getSquareFeet = (comp: any): number => {
+  return comp?.squareFeet || 
+         comp?.sqft || 
+         comp?.livingArea || 
+         comp?.LivingArea ||
+         comp?.squareFootage ||
+         0;
+};
+
+/**
+ * Get list/sale price
+ */
+export const getPrice = (comp: any): number => {
+  return comp?.listPrice || 
+         comp?.price || 
+         comp?.closePrice || 
+         comp?.soldPrice ||
+         comp?.ListPrice ||
+         0;
+};
+
+/**
+ * Get price per square foot
+ */
+export const getPricePerSqFt = (comp: any): number => {
+  if (comp?.pricePerSqFt && comp.pricePerSqFt > 0) return comp.pricePerSqFt;
+  if (comp?.pricePerSquareFoot && comp.pricePerSquareFoot > 0) return comp.pricePerSquareFoot;
+  
+  // Calculate it
+  const price = getPrice(comp);
+  const sqft = getSquareFeet(comp);
+  if (price > 0 && sqft > 0) {
+    return Math.round(price / sqft);
+  }
+  
+  return 0;
+};
+
+/**
+ * Get property status
+ */
+export const getStatus = (comp: any): string => {
+  const status = comp?.status || comp?.Status || comp?.standardStatus || 'Unknown';
+  
+  // Normalize
+  const s = status.toLowerCase();
+  if (s.includes('active')) return 'Active';
+  if (s.includes('sold') || s.includes('closed')) return 'Closed';
+  if (s.includes('pending') || s.includes('contract')) return 'Pending';
+  
+  return status;
+};
+```
+
+---
+
+## STEP 3: Fix Map of All Listings
+
+```tsx
+import Map, { Marker, NavigationControl } from 'react-map-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { Home } from 'lucide-react';
+import { getCoordinates, getPropertyAddress, getStatus } from './cmaDataHelpers';
+
+interface MapOfAllListingsProps {
+  subjectProperty: any;
+  comparables: any[];
+}
+
+export function MapOfAllListings({ subjectProperty, comparables }: MapOfAllListingsProps) {
+  // Get subject coordinates
+  const subjectCoords = getCoordinates(subjectProperty);
+  
+  // Get valid comparables with coordinates
+  const compsWithCoords = comparables
+    .map(comp => ({
+      ...comp,
+      coords: getCoordinates(comp),
+      address: getPropertyAddress(comp),
+      status: getStatus(comp),
+    }))
+    .filter(comp => comp.coords !== null);
+
+  console.log('Map Debug:', {
+    subjectCoords,
+    totalComps: comparables.length,
+    compsWithCoords: compsWithCoords.length,
+  });
+
+  // Status color mapping
+  const getMarkerColor = (status: string) => {
+    switch (status) {
+      case 'Active': return '#22c55e';
+      case 'Closed': return '#ef4444';
+      case 'Pending': return '#eab308';
+      default: return '#6b7280';
+    }
+  };
+
+  // No coordinates available
+  if (!subjectCoords) {
+    return (
+      <div className="h-64 bg-muted rounded-lg flex items-center justify-center">
+        <div className="text-center text-muted-foreground">
+          <p className="font-medium">Map unavailable</p>
+          <p className="text-sm">Subject property coordinates not found</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* MAP CONTAINER - MUST HAVE HEIGHT! */}
+      <div className="h-64 rounded-lg overflow-hidden border" style={{ minHeight: '256px' }}>
+        <Map
+          initialViewState={{
+            latitude: subjectCoords.lat,
+            longitude: subjectCoords.lng,
+            zoom: 13,
+          }}
+          style={{ width: '100%', height: '100%' }}
+          mapStyle="mapbox://styles/mapbox/streets-v12"
+          mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN}
+        >
+          <NavigationControl position="top-right" showCompass={false} />
+
+          {/* Subject Marker - Blue */}
+          <Marker
+            latitude={subjectCoords.lat}
+            longitude={subjectCoords.lng}
+            anchor="center"
+          >
+            <div className="w-8 h-8 bg-blue-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+              <Home className="w-4 h-4 text-white" />
+            </div>
+          </Marker>
+
+          {/* Comparable Markers */}
+          {compsWithCoords.map((comp, index) => (
+            <Marker
+              key={comp.mlsNumber || index}
+              latitude={comp.coords!.lat}
+              longitude={comp.coords!.lng}
+              anchor="center"
+            >
+              <div
+                className="w-5 h-5 rounded-full border-2 border-white shadow-md"
+                style={{ backgroundColor: getMarkerColor(comp.status) }}
+                title={`${comp.address} - ${comp.status}`}
+              />
+            </Marker>
+          ))}
+        </Map>
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 text-xs">
+        <span className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-blue-500" /> Subject
+        </span>
+        <span className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-green-500" /> Active
+        </span>
+        <span className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-yellow-500" /> Pending
+        </span>
+        <span className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-red-500" /> Sold
+        </span>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## STEP 4: Fix Property Details
+
+```tsx
+import { getPropertyAddress, getBedrooms, getBathrooms, getSquareFeet, getPrice, getStatus } from './cmaDataHelpers';
+
+interface PropertyDetailsProps {
+  comparables: any[];
+  showAll?: boolean;
+}
+
+export function PropertyDetails({ comparables, showAll = false }: PropertyDetailsProps) {
+  const displayComps = showAll ? comparables : comparables.slice(0, 4);
+  const remaining = comparables.length - 4;
+
+  return (
+    <div className="space-y-3">
+      {displayComps.map((comp, index) => {
+        const address = getPropertyAddress(comp);
+        const price = getPrice(comp);
+        const beds = getBedrooms(comp);
+        const baths = getBathrooms(comp);
+        const sqft = getSquareFeet(comp);
+        const status = getStatus(comp);
+
+        return (
+          <div key={comp.mlsNumber || index} className="flex items-center justify-between py-2 border-b last:border-b-0">
+            <div>
+              <p className="font-medium text-sm">{address}</p>
+              <p className="text-xs text-muted-foreground">
+                ${price.toLocaleString()} · {beds} bd · {baths} ba · {sqft.toLocaleString()} sqft
+              </p>
+            </div>
+            <span className={`text-xs px-2 py-1 rounded text-white ${
+              status === 'Active' ? 'bg-green-500' :
+              status === 'Closed' ? 'bg-red-500' :
+              status === 'Pending' ? 'bg-yellow-500' : 'bg-gray-500'
+            }`}>
+              {status}
+            </span>
+          </div>
+        );
+      })}
+      
+      {!showAll && remaining > 0 && (
+        <p className="text-center text-sm text-muted-foreground">
+          +{remaining} more properties
+        </p>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## STEP 5: Fix Average Price Per Sq. Ft. Chart
+
+```tsx
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { getShortAddress, getPricePerSqFt, getPropertyAddress, getStatus } from './cmaDataHelpers';
+
+interface PricePerSqFtChartProps {
+  comparables: any[];
+}
+
+export function PricePerSqFtChart({ comparables }: PricePerSqFtChartProps) {
+  // Prepare chart data with ACTUAL ADDRESSES
+  const chartData = comparables.map((comp, index) => ({
+    // Use actual address, not "Comp 1"
+    name: getShortAddress(comp),
+    fullAddress: getPropertyAddress(comp),
+    pricePerSqFt: getPricePerSqFt(comp),
+    status: getStatus(comp),
+  }));
+
+  // Calculate average
+  const validPrices = chartData.filter(d => d.pricePerSqFt > 0);
+  const avgPricePerSqFt = validPrices.length > 0
+    ? Math.round(validPrices.reduce((sum, d) => sum + d.pricePerSqFt, 0) / validPrices.length)
+    : 0;
+
+  // Get bar color based on status
+  const getBarColor = (status: string) => {
+    switch (status) {
+      case 'Active': return '#22c55e';
+      case 'Closed': return '#ef4444';
+      case 'Pending': return '#eab308';
+      default: return '#f97316'; // Orange default
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="h-48">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 40 }}>
+            <XAxis 
+              dataKey="name"
+              tick={{ fontSize: 10 }}
+              angle={-45}
+              textAnchor="end"
+              interval={0}
+              height={60}
+            />
+            <YAxis 
+              tickFormatter={(value) => `$${value}`}
+              tick={{ fontSize: 10 }}
+              width={50}
+            />
+            <Tooltip 
+              formatter={(value: number) => [`$${value}/sqft`, 'Price per Sq Ft']}
+              labelFormatter={(label, payload) => {
+                const data = payload?.[0]?.payload;
+                return data?.fullAddress || label;
+              }}
+            />
+            <Bar dataKey="pricePerSqFt" radius={[4, 4, 0, 0]}>
+              {chartData.map((entry, index) => (
+                <Cell key={index} fill={getBarColor(entry.status)} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      
+      <p className="text-center text-sm text-muted-foreground">
+        Average: <span className="font-medium">${avgPricePerSqFt}/sqft</span>
+      </p>
+    </div>
+  );
+}
+```
+
+---
+
+## STEP 6: Fix Summary of Comparable Properties
+
+```tsx
+import { getPrice, getPricePerSqFt } from './cmaDataHelpers';
+
+interface SummaryStatsProps {
+  comparables: any[];
+}
+
+export function SummaryStats({ comparables }: SummaryStatsProps) {
+  // Calculate statistics
+  const prices = comparables.map(getPrice).filter(p => p > 0);
+  const pricesPerSqFt = comparables.map(getPricePerSqFt).filter(p => p > 0);
+
+  const avgPrice = prices.length > 0
+    ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
+    : 0;
+
+  const avgPricePerSqFt = pricesPerSqFt.length > 0
+    ? Math.round(pricesPerSqFt.reduce((a, b) => a + b, 0) / pricesPerSqFt.length)
+    : 0;
+
+  return (
+    <div className="grid grid-cols-3 gap-4">
+      <div className="text-center p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
+        <p className="text-xs text-muted-foreground">Avg Price</p>
+        <p className="text-lg font-semibold text-orange-500">
+          ${avgPrice.toLocaleString()}
+        </p>
+      </div>
+      <div className="text-center p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
+        <p className="text-xs text-muted-foreground">Avg $/SqFt</p>
+        <p className="text-lg font-semibold text-orange-500">
+          ${avgPricePerSqFt.toLocaleString()}
+        </p>
+      </div>
+      <div className="text-center p-3 bg-muted rounded-lg">
+        <p className="text-xs text-muted-foreground">Properties</p>
+        <p className="text-lg font-semibold text-orange-500">
+          {comparables.length}
+        </p>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## STEP 7: Wire Everything Together
+
+In the Presentation Builder preview component:
+
+```tsx
+// Ensure cmaData is being passed correctly
+const { data: cmaData } = useQuery({
+  queryKey: [`/api/transactions/${transactionId}/cma`],
+});
+
+// Or however you're fetching CMA data
+const comparables = cmaData?.comparables || [];
+const subjectProperty = transaction?.mlsData || {};
+
+// In the render
+{sections.mapOfAllListings && (
+  <div className="border rounded-lg p-4">
+    <h4 className="flex items-center gap-2 font-medium text-sm mb-3">
+      <MapIcon className="w-4 h-4" />
+      Map of All Listings
+    </h4>
+    <MapOfAllListings 
+      subjectProperty={subjectProperty}
+      comparables={comparables}
+    />
+  </div>
+)}
+
+{sections.summaryOfComparableProperties && (
+  <div className="border rounded-lg p-4">
+    <h4 className="flex items-center gap-2 font-medium text-sm mb-3">
+      <BarChart3 className="w-4 h-4" />
+      Summary of Comparable Properties
+    </h4>
+    <SummaryStats comparables={comparables} />
+  </div>
+)}
+
+{sections.propertyDetails && (
+  <div className="border rounded-lg p-4">
+    <h4 className="flex items-center gap-2 font-medium text-sm mb-3">
+      <Home className="w-4 h-4" />
+      Property Details
+    </h4>
+    <PropertyDetails comparables={comparables} />
+  </div>
+)}
+
+{sections.pricePerSqFtChart && (
+  <div className="border rounded-lg p-4">
+    <h4 className="flex items-center gap-2 font-medium text-sm mb-3">
+      <TrendingUp className="w-4 h-4" />
+      Average Price Per Sq. Ft.
+    </h4>
+    <PricePerSqFtChart comparables={comparables} />
+  </div>
+)}
+```
+
+---
+
+## Verification Checklist
+
+After implementing, verify:
+
+- [ ] Console shows comparable data with correct field names
+- [ ] Map renders with Mapbox tiles visible
+- [ ] Subject property has blue marker
+- [ ] Comparable properties have colored markers (green/yellow/red)
+- [ ] Property Details shows actual addresses (not "Unknown")
+- [ ] Property Details shows correct bathroom count (not "0 ba")
+- [ ] Chart X-axis shows street addresses (not "Comp 1, Comp 2")
+- [ ] Chart tooltip shows full address
+- [ ] Summary stats are calculated correctly
+- [ ] All data matches what's shown in CMA tab
+
+---
+
+## Environment Check
+
+Make sure these are set:
+
+```bash
+# In .env or Replit Secrets
+VITE_MAPBOX_TOKEN=pk.eyJ1...your_token
+```
+
+And CSS is imported:
+
+```tsx
+// In App.tsx or component
+import 'mapbox-gl/dist/mapbox-gl.css';
+```
