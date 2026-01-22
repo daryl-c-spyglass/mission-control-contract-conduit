@@ -1,0 +1,354 @@
+# Archive Section - Add "Delete All" with Confirmation Warning
+
+## Overview
+
+Add a "Delete All" button with a trash bin icon to the Archive section. When clicked, show a confirmation dialog warning users before permanently deleting all archived transactions.
+
+---
+
+## Visual Design
+
+### Archive Section Header
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  Archive                                                                    │
+│  View and manage your archived transactions                                 │
+│                                                       ┌─────────────────┐   │
+│                                                       │ 🗑️ Delete All   │   │
+│                                                       └─────────────────┘   │
+│                                                              ↑              │
+│                                                     Red/Destructive button  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │
+│  │ Archived    │  │ Archived    │  │ Archived    │  │ Archived    │       │
+│  │ Transaction │  │ Transaction │  │ Transaction │  │ Transaction │       │
+│  │     1       │  │     2       │  │     3       │  │     4       │       │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘       │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Empty Archive State
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  Archive                                                                    │
+│  View and manage your archived transactions                                 │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│                              📁                                             │
+│                                                                             │
+│                    No Archived Transactions                                 │
+│                                                                             │
+│         Transactions you archive will appear here.                          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+(No "Delete All" button when archive is empty)
+```
+
+---
+
+## Confirmation Dialog
+
+When user clicks "Delete All":
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│  ⚠️  Delete All Archived Transactions?                          │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  This will permanently delete all 12 archived transactions.     │
+│                                                                 │
+│  This action cannot be undone. All transaction data,            │
+│  documents, and associated files will be permanently removed.   │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  Type "DELETE" to confirm:                                      │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                                                         │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│                              [Cancel]  [🗑️ Delete All]          │
+│                                          ↑                      │
+│                               Disabled until "DELETE" typed     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Implementation
+
+### 1. Add Delete All Button to Archive Page
+
+```tsx
+import { useState } from 'react';
+import { Trash2, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+
+export function ArchivePage() {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  // Fetch archived transactions
+  const { data: archivedTransactions = [] } = useQuery({
+    queryKey: ['/api/transactions/archived'],
+  });
+
+  // Delete all mutation
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/transactions/archived/delete-all', {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to delete');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/transactions/archived'] });
+      setShowDeleteDialog(false);
+      setConfirmText('');
+      toast({
+        title: 'Archived transactions deleted',
+        description: 'All archived transactions have been permanently deleted.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete archived transactions. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleDeleteAll = () => {
+    if (confirmText === 'DELETE') {
+      deleteAllMutation.mutate();
+    }
+  };
+
+  const archivedCount = archivedTransactions.length;
+
+  return (
+    <div className="p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold">Archive</h1>
+          <p className="text-muted-foreground">
+            View and manage your archived transactions
+          </p>
+        </div>
+
+        {/* Delete All Button - Only show if there are archived transactions */}
+        {archivedCount > 0 && (
+          <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm">
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete All
+              </Button>
+            </AlertDialogTrigger>
+            
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-red-500" />
+                  Delete All Archived Transactions?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="space-y-3">
+                  <p>
+                    This will permanently delete all <strong>{archivedCount}</strong> archived 
+                    transaction{archivedCount !== 1 ? 's' : ''}.
+                  </p>
+                  <p className="text-red-600 dark:text-red-400 font-medium">
+                    This action cannot be undone. All transaction data, documents, 
+                    and associated files will be permanently removed.
+                  </p>
+                  <div className="pt-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Type "DELETE" to confirm:
+                    </label>
+                    <Input
+                      className="mt-2"
+                      placeholder="DELETE"
+                      value={confirmText}
+                      onChange={(e) => setConfirmText(e.target.value)}
+                      autoComplete="off"
+                    />
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setConfirmText('')}>
+                  Cancel
+                </AlertDialogCancel>
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteAll}
+                  disabled={confirmText !== 'DELETE' || deleteAllMutation.isPending}
+                >
+                  {deleteAllMutation.isPending ? (
+                    <>Deleting...</>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete All
+                    </>
+                  )}
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </div>
+
+      {/* Archived Transactions Grid */}
+      {archivedCount > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {archivedTransactions.map((transaction) => (
+            <TransactionCard key={transaction.id} transaction={transaction} />
+          ))}
+        </div>
+      ) : (
+        /* Empty State */
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+            <Folder className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-medium">No Archived Transactions</h3>
+          <p className="text-muted-foreground mt-1">
+            Transactions you archive will appear here.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+### 2. Backend API Endpoint
+
+```typescript
+// server/routes.ts
+
+// DELETE /api/transactions/archived/delete-all
+app.delete('/api/transactions/archived/delete-all', async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Get all archived transaction IDs for this user
+    const archivedTransactions = await db
+      .select({ id: transactions.id })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.userId, userId),
+          eq(transactions.isArchived, true)
+        )
+      );
+
+    const transactionIds = archivedTransactions.map(t => t.id);
+
+    if (transactionIds.length === 0) {
+      return res.json({ message: 'No archived transactions to delete', count: 0 });
+    }
+
+    // Delete associated data first (foreign key constraints)
+    // Delete documents
+    await db.delete(documents).where(inArray(documents.transactionId, transactionIds));
+    
+    // Delete uploaded photos
+    await db.delete(transactionPhotos).where(inArray(transactionPhotos.transactionId, transactionIds));
+    
+    // Delete marketing assets
+    await db.delete(marketingAssets).where(inArray(marketingAssets.transactionId, transactionIds));
+    
+    // Delete timeline events
+    await db.delete(timelineEvents).where(inArray(timelineEvents.transactionId, transactionIds));
+    
+    // Delete CMA data if stored separately
+    await db.delete(cmaComparables).where(inArray(cmaComparables.transactionId, transactionIds));
+
+    // Finally, delete the transactions
+    await db
+      .delete(transactions)
+      .where(inArray(transactions.id, transactionIds));
+
+    // Log the action
+    console.log(`User ${userId} deleted ${transactionIds.length} archived transactions`);
+
+    res.json({ 
+      message: 'All archived transactions deleted successfully',
+      count: transactionIds.length 
+    });
+
+  } catch (error) {
+    console.error('Error deleting archived transactions:', error);
+    res.status(500).json({ error: 'Failed to delete archived transactions' });
+  }
+});
+```
+
+---
+
+## Safety Features
+
+| Feature | Purpose |
+|---------|---------|
+| **Button only shows when archive has items** | Prevents confusion on empty archive |
+| **Confirmation dialog** | Prevents accidental clicks |
+| **Shows count of items to be deleted** | User knows impact |
+| **Type "DELETE" to confirm** | Extra safety step |
+| **Delete button disabled until confirmed** | Prevents premature action |
+| **Warning text in red** | Highlights irreversibility |
+
+---
+
+## Testing Checklist
+
+- [ ] "Delete All" button only appears when archive has transactions
+- [ ] Clicking button opens confirmation dialog
+- [ ] Dialog shows correct count of archived transactions
+- [ ] "Delete All" button is disabled until "DELETE" is typed
+- [ ] Typing "delete" (lowercase) does NOT enable button
+- [ ] Cancel button closes dialog and clears input
+- [ ] Confirming deletion removes all archived transactions
+- [ ] Success toast appears after deletion
+- [ ] Archive shows empty state after deletion
+- [ ] Associated data (documents, photos, etc.) is also deleted
+- [ ] Error handling works if deletion fails

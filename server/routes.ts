@@ -749,6 +749,48 @@ export async function registerRoutes(
     }
   });
 
+  // Delete all archived transactions permanently
+  app.delete("/api/transactions/archived/delete-all", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const allTransactions = await storage.getTransactions();
+      const archivedTransactions = allTransactions.filter(t => t.isArchived === true);
+      
+      if (archivedTransactions.length === 0) {
+        return res.json({ deleted: 0, message: "No archived transactions to delete" });
+      }
+
+      console.log(`[DeleteAllArchived] Deleting ${archivedTransactions.length} archived transactions for user ${userId}`);
+
+      let deletedCount = 0;
+      const errors: string[] = [];
+
+      for (const transaction of archivedTransactions) {
+        try {
+          // Delete the transaction - this cascades to activities, open houses, etc.
+          await storage.deleteTransaction(transaction.id);
+          deletedCount++;
+          console.log(`[DeleteAllArchived] Deleted transaction: ${transaction.propertyAddress}`);
+        } catch (err) {
+          console.error(`[DeleteAllArchived] Failed to delete transaction ${transaction.id}:`, err);
+          errors.push(transaction.propertyAddress);
+        }
+      }
+
+      console.log(`[DeleteAllArchived] Complete: ${deletedCount} deleted, ${errors.length} failed`);
+      
+      res.json({ 
+        deleted: deletedCount, 
+        failed: errors.length,
+        errors: errors.length > 0 ? errors : undefined,
+        message: `Successfully deleted ${deletedCount} archived transaction${deletedCount !== 1 ? 's' : ''}`
+      });
+    } catch (error) {
+      console.error('Error deleting all archived transactions:', error);
+      res.status(500).json({ message: "Failed to delete archived transactions" });
+    }
+  });
+
   // Connect Slack channel to an existing transaction
   app.post("/api/transactions/:id/connect-slack", isAuthenticated, async (req: any, res) => {
     try {

@@ -1,20 +1,67 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Search, Archive as ArchiveIcon } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Search, Archive as ArchiveIcon, Trash2, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TransactionCard } from "@/components/transaction-card";
 import { TransactionDetails } from "@/components/transaction-details";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import type { Transaction, Coordinator, Activity } from "@shared/schema";
 
 export default function Archive() {
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [initialTab, setInitialTab] = useState<string>("overview");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: transactions = [], isLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
   });
+
+  // Delete all archived transactions mutation
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("DELETE", "/api/transactions/archived/delete-all");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      setShowDeleteDialog(false);
+      setConfirmText("");
+      toast({
+        title: "Archived transactions deleted",
+        description: data.message || `Successfully deleted ${data.deleted} archived transactions.`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete archived transactions. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteAll = () => {
+    if (confirmText === "DELETE") {
+      deleteAllMutation.mutate();
+    }
+  };
 
   const { data: coordinators = [] } = useQuery<Coordinator[]>({
     queryKey: ["/api/coordinators"],
@@ -66,13 +113,87 @@ export default function Archive() {
     );
   }
 
+  const archivedCount = archivedTransactions.length;
+
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-semibold">Archive</h1>
-        <p className="text-xs sm:text-sm text-muted-foreground">
-          View archived transactions
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold">Archive</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            View and manage your archived transactions
+          </p>
+        </div>
+
+        {/* Delete All Button - Only show when there are archived transactions */}
+        {archivedCount > 0 && (
+          <AlertDialog open={showDeleteDialog} onOpenChange={(open) => {
+            setShowDeleteDialog(open);
+            if (!open) setConfirmText("");
+          }}>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" data-testid="button-delete-all-archived">
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete All
+              </Button>
+            </AlertDialogTrigger>
+            
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-red-500" />
+                  Delete All Archived Transactions?
+                </AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-3">
+                    <p>
+                      This will permanently delete all <strong>{archivedCount}</strong> archived 
+                      transaction{archivedCount !== 1 ? "s" : ""}.
+                    </p>
+                    <p className="text-red-600 dark:text-red-400 font-medium">
+                      This action cannot be undone. All transaction data, documents, 
+                      and associated files will be permanently removed.
+                    </p>
+                    <div className="pt-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Type "DELETE" to confirm:
+                      </label>
+                      <Input
+                        className="mt-2"
+                        placeholder="DELETE"
+                        value={confirmText}
+                        onChange={(e) => setConfirmText(e.target.value)}
+                        autoComplete="off"
+                        data-testid="input-confirm-delete"
+                      />
+                    </div>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setConfirmText("")} data-testid="button-cancel-delete">
+                  Cancel
+                </AlertDialogCancel>
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteAll}
+                  disabled={confirmText !== "DELETE" || deleteAllMutation.isPending}
+                  data-testid="button-confirm-delete-all"
+                >
+                  {deleteAllMutation.isPending ? (
+                    <>Deleting...</>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete All
+                    </>
+                  )}
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
 
       <div className="relative max-w-full sm:max-w-sm">
