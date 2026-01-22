@@ -10,7 +10,7 @@ import { AdjustmentsPreview } from "./preview-sections/AdjustmentsPreview";
 import { PricePerSqftChartPreview } from "./preview-sections/PricePerSqftChartPreview";
 import { PropertyPhotosPreview } from "./preview-sections/PropertyPhotosPreview";
 import { PropertyDetailsPreview } from "./preview-sections/PropertyDetailsPreview";
-import { MapAllListingsPreview } from "./preview-sections/MapAllListingsPreview";
+import { CMAMapPreview } from "@/components/presentation/CMAMapPreview";
 import type { PropertyForAdjustment } from "@/lib/adjustmentCalculations";
 
 interface LivePreviewPanelProps {
@@ -180,7 +180,7 @@ export function LivePreviewPanel({
 
       case 'map_all_listings':
         return (
-          <MapAllListingsPreview
+          <CMAMapPreview
             subjectProperty={subjectProperty}
             comparables={comparables}
             compact={compact}

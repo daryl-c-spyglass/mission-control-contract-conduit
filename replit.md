@@ -51,6 +51,7 @@ Preferred communication style: Simple, everyday language.
     - Square footage: `livingArea`, `sqft` (parsed from string)
     - Coordinates: `latitude/longitude`, `lat/lng`, `map.latitude/longitude`, `coordinates.latitude/longitude`
   - **Status Normalization**: MLS status codes normalized to human-readable values (U/Sc → Pending, A → Active, C/S → Closed)
+  - **CMAMapPreview**: Wrapper component for CMA Presentation Builder Live Preview that uses the working `CMAMap` component with coordinate normalization from various formats
 - **Status Badges & Utilities**: Consistent styling and display logic for transaction statuses and days remaining.
 - **Shared Listing Utilities**: Predicates and helpers for rental exclusion, accurate Days on Market display, and filtering.
 - **MLS/IDX/VOW Compliance**: Multi-layer rental exclusion, prevention of external media redirects, and consistent DOM normalization.

@@ -1,0 +1,252 @@
+# FIX: Replace MapAllListingsPreview with Working CMAMap Component
+
+## Problem Summary
+
+The `MapAllListingsPreview` component shows "Failed to load map" even though:
+- Token is available (`VITE_MAPBOX_TOKEN`)
+- Coordinate extraction logic looks correct
+- Data is being passed
+
+## Root Cause
+
+The working `CMAMap` component uses `buildCmaMapModel()` for data normalization, while `MapAllListingsPreview` has manual extraction that may be missing edge cases.
+
+## Solution: Use the Working CMAMap Component
+
+Instead of debugging `MapAllListingsPreview`, **reuse the working `CMAMap` component** from the CMA tab.
+
+---
+
+## Implementation
+
+### Step 1: Update LivePreviewPanel.tsx
+
+Find the `map_all_listings` case (around line 182-188) and replace it:
+
+**BEFORE:**
+```tsx
+case 'map_all_listings':
+  return (
+    <MapAllListingsPreview
+      subjectProperty={subjectProperty}
+      comparables={comparables}
+      compact={compact}
+    />
+  );
+```
+
+**AFTER:**
+```tsx
+case 'map_all_listings':
+  return (
+    <CMAMapPreview
+      subjectProperty={subjectProperty}
+      comparables={comparables}
+      compact={compact}
+    />
+  );
+```
+
+### Step 2: Create CMAMapPreview Wrapper Component
+
+Create a new component that wraps the working `CMAMap` for use in the preview:
+
+```tsx
+// client/src/components/presentation/CMAMapPreview.tsx
+
+import { CMAMap } from '@/components/cma-map';
+import { buildCmaMapModel } from '@/lib/cma-map-data';
+import { MapPin } from 'lucide-react';
+
+interface CMAMapPreviewProps {
+  subjectProperty: any;
+  comparables: any[];
+  compact?: boolean;
+}
+
+export function CMAMapPreview({ subjectProperty, comparables, compact }: CMAMapPreviewProps) {
+  // Normalize subject property for CMAMap
+  const normalizedSubject = subjectProperty ? {
+    ...subjectProperty,
+    // Ensure coordinates are accessible at expected locations
+    latitude: subjectProperty.latitude || 
+              subjectProperty.coordinates?.latitude || 
+              subjectProperty.map?.latitude,
+    longitude: subjectProperty.longitude || 
+               subjectProperty.coordinates?.longitude || 
+               subjectProperty.map?.longitude,
+  } : null;
+
+  // Normalize comparables for CMAMap using the working buildCmaMapModel
+  // Or manually ensure coords are at expected locations
+  const normalizedComparables = comparables.map(comp => ({
+    ...comp,
+    latitude: comp.latitude || comp.map?.latitude || comp.coordinates?.latitude,
+    longitude: comp.longitude || comp.map?.longitude || comp.coordinates?.longitude,
+  }));
+
+  // Check if we have valid data
+  const hasSubjectCoords = normalizedSubject?.latitude && normalizedSubject?.longitude;
+  const validComparables = normalizedComparables.filter(c => c.latitude && c.longitude);
+
+  console.log('[CMAMapPreview] Subject coords:', {
+    lat: normalizedSubject?.latitude,
+    lng: normalizedSubject?.longitude,
+  });
+  console.log('[CMAMapPreview] Valid comparables:', validComparables.length, '/', comparables.length);
+
+  // If no coordinates, show placeholder
+  if (!hasSubjectCoords && validComparables.length === 0) {
+    return (
+      <div className={`flex items-center justify-center bg-muted rounded-lg ${compact ? 'h-32' : 'h-48'}`}>
+        <div className="text-center text-muted-foreground">
+          <MapPin className="w-8 h-8 mx-auto mb-2 opacity-50" />
+          <p className="text-sm">Map unavailable</p>
+          <p className="text-xs">No coordinates found</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={compact ? 'h-32' : 'h-48'}>
+      <CMAMap
+        properties={normalizedComparables}
+        subjectProperty={normalizedSubject}
+        showPolygon={false}
+      />
+    </div>
+  );
+}
+```
+
+### Step 3: Import in LivePreviewPanel
+
+```tsx
+// At top of LivePreviewPanel.tsx
+import { CMAMapPreview } from '@/components/presentation/CMAMapPreview';
+```
+
+### Step 4: Alternative - Quick Fix in MapAllListingsPreview
+
+If you prefer to fix `MapAllListingsPreview` directly instead of creating a new component:
+
+```tsx
+// In MapAllListingsPreview.tsx
+
+// Add debug logging at component start
+useEffect(() => {
+  console.log('[MapAllListingsPreview] Received props:', {
+    subjectProperty,
+    comparablesCount: comparables?.length,
+    token: !!import.meta.env.VITE_MAPBOX_TOKEN,
+  });
+  
+  if (subjectProperty) {
+    console.log('[MapAllListingsPreview] Subject coords:', {
+      direct: { lat: subjectProperty.latitude, lng: subjectProperty.longitude },
+      coordinates: subjectProperty.coordinates,
+      map: subjectProperty.map,
+    });
+  }
+  
+  if (comparables?.[0]) {
+    console.log('[MapAllListingsPreview] First comparable coords:', {
+      direct: { lat: comparables[0].latitude, lng: comparables[0].longitude },
+      coordinates: comparables[0].coordinates,
+      map: comparables[0].map,
+    });
+  }
+}, [subjectProperty, comparables]);
+
+// Update coordinate extraction to be more robust
+const getCoordinates = (property: any) => {
+  if (!property) return null;
+  
+  const lat = property.latitude || 
+              property.lat || 
+              property.coordinates?.latitude ||
+              property.coordinates?.lat ||
+              property.map?.latitude;
+              
+  const lng = property.longitude || 
+              property.lng || 
+              property.lon ||
+              property.coordinates?.longitude ||
+              property.coordinates?.lng ||
+              property.map?.longitude;
+  
+  if (lat && lng && !isNaN(parseFloat(String(lat))) && !isNaN(parseFloat(String(lng)))) {
+    return { lat: parseFloat(String(lat)), lng: parseFloat(String(lng)) };
+  }
+  
+  return null;
+};
+```
+
+---
+
+## Data Flow Verification
+
+Make sure data is being passed correctly:
+
+```
+CMAPresentationBuilder.tsx
+    │
+    ├── Fetches: /api/transactions/${id}/cma
+    │   Returns: { propertiesData: [...], linkedTransaction: { mlsData: {...} } }
+    │
+    ├── subjectProperty = linkedTransaction.mlsData
+    │   Coords at: coordinates.latitude, coordinates.longitude
+    │
+    ├── comparables = cma.propertiesData
+    │   Coords at: map.latitude, map.longitude
+    │
+    └── Passes to LivePreviewPanel
+            │
+            └── Renders CMAMapPreview/MapAllListingsPreview
+                    │
+                    └── Needs coords normalized to: latitude, longitude (top-level)
+```
+
+---
+
+## Verification Checklist
+
+After implementing:
+
+- [ ] Check browser console for debug logs
+- [ ] Verify subject coordinates are found
+- [ ] Verify comparable coordinates are found
+- [ ] Map renders with Mapbox tiles
+- [ ] Blue marker for subject property
+- [ ] Colored markers for comparables
+- [ ] Legend shows correctly
+
+---
+
+## If Map Still Doesn't Render
+
+Check these:
+
+1. **Mapbox CSS imported?**
+   ```tsx
+   import 'mapbox-gl/dist/mapbox-gl.css';
+   ```
+
+2. **Container has height?**
+   ```tsx
+   <div className="h-48"> {/* Must have explicit height */}
+     <CMAMap ... />
+   </div>
+   ```
+
+3. **Token accessible?**
+   ```tsx
+   console.log('Token:', import.meta.env.VITE_MAPBOX_TOKEN?.substring(0, 10) + '...');
+   ```
+
+4. **Any console errors?**
+   - Check for Mapbox-specific errors
+   - Check for CORS issues
+   - Check for "Invalid token" messages
