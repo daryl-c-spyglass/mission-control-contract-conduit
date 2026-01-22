@@ -145,7 +145,7 @@ export function GraphicGeneratorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] p-0 gap-0 flex flex-col">
+      <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] p-0 gap-0 flex flex-col [&>button]:hidden">
         <DialogHeader className="px-6 py-4 border-b shrink-0">
           <div className="flex items-center justify-between gap-4">
             <div>

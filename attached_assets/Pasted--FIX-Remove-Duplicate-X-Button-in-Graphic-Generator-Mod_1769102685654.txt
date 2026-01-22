@@ -1,0 +1,92 @@
+# FIX: Remove Duplicate X Button in Graphic Generator Modal
+
+## Problem
+
+The "Create Marketing Graphics" modal has **two X buttons** in the upper right corner:
+1. Custom X button in the header (yours)
+2. Default X button from shadcn/ui Dialog component
+
+## Solution
+
+Hide the default Dialog close button since you already have a custom one.
+
+### Option 1: Add CSS to Hide Default Close Button
+
+In the `DialogContent` component, add a className to hide the default X:
+
+```tsx
+<DialogContent 
+  className="max-w-5xl h-[80vh] p-0 gap-0 [&>button]:hidden"
+>
+```
+
+The `[&>button]:hidden` targets the direct child button (the default close X) and hides it.
+
+---
+
+### Option 2: Use DialogPrimitive Without Default Close
+
+If using Radix UI Dialog primitives directly:
+
+```tsx
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+
+// Use DialogPrimitive.Content instead of DialogContent
+// This doesn't include the default X button
+<DialogPrimitive.Content className="...">
+  {/* Your custom header with X button */}
+</DialogPrimitive.Content>
+```
+
+---
+
+### Option 3: Override in Dialog Component (if you control it)
+
+If you have access to the Dialog component file (`components/ui/dialog.tsx`), you can remove the default close button from `DialogContent`:
+
+**Find and remove this from DialogContent:**
+```tsx
+<DialogPrimitive.Close className="absolute right-4 top-4 ...">
+  <X className="h-4 w-4" />
+  <span className="sr-only">Close</span>
+</DialogPrimitive.Close>
+```
+
+---
+
+## Recommended Fix (Option 1)
+
+The simplest fix is adding the CSS selector to hide the default button:
+
+```tsx
+<DialogContent 
+  className={`${isFullscreen ? 'max-w-[95vw] h-[95vh]' : 'max-w-5xl h-[80vh]'} p-0 gap-0 [&>button]:hidden`}
+>
+  {/* Header with your custom X button */}
+  <div className="px-4 py-3 border-b flex items-center justify-between">
+    <div>
+      <h3 className="font-semibold">Create Marketing Graphics</h3>
+      <p className="text-sm text-muted-foreground">612 Twelve Oaks LN, Austin, TX</p>
+    </div>
+    <div className="flex items-center gap-2">
+      <Button variant="ghost" size="sm" onClick={openInNewTab}>
+        <ExternalLink className="w-4 h-4 mr-1" />
+        Open in new tab
+      </Button>
+      <Button variant="ghost" size="icon" onClick={onClose}>
+        <X className="w-4 h-4" />
+      </Button>
+    </div>
+  </div>
+  
+  {/* Iframe */}
+  <iframe ... />
+</DialogContent>
+```
+
+## Verification
+
+After fix:
+- [ ] Only ONE X button visible in upper right
+- [ ] X button closes the modal
+- [ ] "Open in new tab" still works
