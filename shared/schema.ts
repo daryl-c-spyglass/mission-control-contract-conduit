@@ -48,6 +48,7 @@ export const transactions = pgTable("transactions", {
   cmaSource: varchar("cma_source", { length: 50 }),
   cmaGeneratedAt: timestamp("cma_generated_at"),
   propertyImages: text("property_images").array(),
+  primaryPhotoIndex: integer("primary_photo_index").default(0), // Index of primary photo for marketing materials
   propertyDescription: text("property_description"), // For brochure/marketing materials
   notes: text("notes"),
   mlsLastSyncedAt: timestamp("mls_last_synced_at"),

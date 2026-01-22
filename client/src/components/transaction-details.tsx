@@ -72,6 +72,8 @@ import {
   ZoomIn,
   AlertCircle,
   Check,
+  Star,
+  Camera,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from "@/components/ui/dialog";
 import {
@@ -99,6 +101,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CreateFlyerDialog, FlyerAssetConfig } from "./create-flyer-dialog";
 import { MarketingMaterialsDialog, SocialGraphicConfig } from "./marketing-materials-dialog";
+import { GraphicGeneratorDialog } from "./graphic-generator-dialog";
 import { CMATab } from "./cma-tab";
 import { TimelineTab } from "./timeline-tab";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -113,6 +116,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getStatusBadgeStyle, getStatusLabel } from "@/lib/utils/status-colors";
+import { cn } from "@/lib/utils";
 import type { Transaction, Coordinator, Activity as ActivityType, CMAComparable, MLSData, MarketingAsset, ContractDocument } from "@shared/schema";
 
 interface TransactionDetailsProps {
@@ -629,6 +633,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [editFlyerAsset, setEditFlyerAsset] = useState<{ id: string; config: FlyerAssetConfig } | null>(null);
   const [editGraphicsAsset, setEditGraphicsAsset] = useState<{ id: string; config: SocialGraphicConfig } | null>(null);
   const [graphicsDialogOpen, setGraphicsDialogOpen] = useState(false);
+  const [graphicGeneratorOpen, setGraphicGeneratorOpen] = useState(false);
   const [previewAsset, setPreviewAsset] = useState<MarketingAsset | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentPhoto, setCurrentPhoto] = useState(0);
@@ -658,6 +663,11 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   // Unarchive dialog state
   const [showUnarchiveDialog, setShowUnarchiveDialog] = useState(false);
   const [restoreNotificationsOnUnarchive, setRestoreNotificationsOnUnarchive] = useState(true);
+  
+  // Property photo upload state (for Off Market listings)
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isDraggingPhoto, setIsDraggingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   
   // Photo navigation for MLS gallery
   const photos = mlsData?.photos || mlsData?.images || [];
@@ -945,6 +955,135 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
     },
   });
 
+  // Photo upload mutation (for Off Market listings)
+  const uploadPhotoMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const reader = new FileReader();
+      return new Promise<{ photoUrl: string; propertyImages: string[] }>((resolve, reject) => {
+        reader.onload = async () => {
+          try {
+            const imageData = reader.result as string;
+            const res = await apiRequest("POST", `/api/transactions/${transaction.id}/photos`, {
+              imageData,
+              fileName: file.name,
+            });
+            const data = await res.json();
+            resolve(data);
+          } catch (error) {
+            reject(error);
+          }
+        };
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(file);
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Photo uploaded successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", transaction.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to upload photo", 
+        description: error.message || "Please try again.",
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Set primary photo mutation
+  const setPrimaryPhotoMutation = useMutation({
+    mutationFn: async (photoIndex: number) => {
+      const res = await apiRequest("PATCH", `/api/transactions/${transaction.id}/photos/primary`, {
+        primaryPhotoIndex: photoIndex,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Primary photo updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", transaction.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to set primary photo", 
+        description: error.message || "Please try again.",
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Delete photo mutation
+  const deletePhotoMutation = useMutation({
+    mutationFn: async (photoIndex: number) => {
+      const res = await apiRequest("DELETE", `/api/transactions/${transaction.id}/photos/${photoIndex}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Photo deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", transaction.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to delete photo", 
+        description: error.message || "Please try again.",
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Handle photo file selection
+  const handlePhotoUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    
+    setIsUploadingPhoto(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.size > 10 * 1024 * 1024) {
+          toast({ 
+            title: "File too large", 
+            description: `${file.name} exceeds 10MB limit`,
+            variant: "destructive" 
+          });
+          continue;
+        }
+        if (!file.type.startsWith('image/')) {
+          toast({ 
+            title: "Invalid file type", 
+            description: `${file.name} is not an image`,
+            variant: "destructive" 
+          });
+          continue;
+        }
+        await uploadPhotoMutation.mutateAsync(file);
+      }
+    } finally {
+      setIsUploadingPhoto(false);
+      if (photoInputRef.current) {
+        photoInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Handle drag and drop
+  const handlePhotoDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingPhoto(false);
+    handlePhotoUpload(e.dataTransfer.files);
+  };
+
+  const handlePhotoDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingPhoto(true);
+  };
+
+  const handlePhotoDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingPhoto(false);
+  };
+
   const handleSaveDates = async () => {
     await updateTransactionMutation.mutateAsync({
       contractDate: editContractDate || null,
@@ -1229,7 +1368,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         }}
       />
 
-      {/* Create Graphics Dialog */}
+      {/* Create Graphics Dialog (internal editor) */}
       <MarketingMaterialsDialog
         open={graphicsDialogOpen && !editGraphicsAsset}
         onOpenChange={setGraphicsDialogOpen}
@@ -1238,6 +1377,13 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           queryClient.invalidateQueries({ queryKey: [`/api/transactions/${transaction.id}/marketing-assets`] });
           setGraphicsDialogOpen(false);
         }}
+      />
+
+      {/* Graphic Generator iframe Dialog (external generator) */}
+      <GraphicGeneratorDialog
+        open={graphicGeneratorOpen}
+        onOpenChange={setGraphicGeneratorOpen}
+        transaction={transaction}
       />
 
       {/* Asset Preview Modal with Zoom */}
@@ -2690,64 +2836,313 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
             </p>
           </div>
 
-          {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Create Graphics Card */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Card 
-                  className="cursor-pointer hover:border-primary transition-colors hover-elevate"
-                  onClick={() => setGraphicsDialogOpen(true)}
-                  data-testid="card-create-graphics"
-                >
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-pink-500/10 rounded-lg">
-                        <ImageIcon className="h-6 w-6 text-pink-500" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">Create Graphics</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Social media posts & stories
+          {/* Property Photos Section */}
+          {(() => {
+            const uploadedPhotos = transaction.propertyImages || [];
+            const mlsPhotos = mlsData?.images || mlsData?.photos || [];
+            const allMarketingPhotos = [...uploadedPhotos, ...mlsPhotos];
+            const hasPhotos = allMarketingPhotos.length > 0;
+            const primaryIndex = transaction.primaryPhotoIndex || 0;
+            
+            return (
+              <Card data-testid="card-property-photos">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Camera className="h-4 w-4" />
+                      Property Photos ({isOffMarket ? uploadedPhotos.length : `${mlsPhotos.length} from MLS`})
+                    </CardTitle>
+                    {isOffMarket && hasPhotos && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => photoInputRef.current?.click()}
+                        data-testid="button-add-more-photos"
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add More
+                      </Button>
+                    )}
+                    {!isOffMarket && mlsPhotos.length > 0 && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => refreshMlsMutation.mutate()}
+                        disabled={refreshMlsMutation.isPending}
+                        data-testid="button-refresh-mls-photos"
+                      >
+                        {refreshMlsMutation.isPending ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3 w-3" />
+                        )}
+                        <span className="ml-1 hidden sm:inline">Refresh</span>
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {/* Off Market: Show upload area or photo grid */}
+                  {isOffMarket ? (
+                    <>
+                      {uploadedPhotos.length === 0 ? (
+                        /* Empty state with drag & drop */
+                        <div
+                          className={cn(
+                            "border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer",
+                            isDraggingPhoto ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+                          )}
+                          onDrop={handlePhotoDrop}
+                          onDragOver={handlePhotoDragOver}
+                          onDragLeave={handlePhotoDragLeave}
+                          onClick={() => photoInputRef.current?.click()}
+                          data-testid="dropzone-photos"
+                        >
+                          {isUploadingPhoto ? (
+                            <div className="flex flex-col items-center gap-2">
+                              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                              <p className="text-sm text-muted-foreground">Uploading...</p>
+                            </div>
+                          ) : (
+                            <>
+                              <Camera className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                              <p className="font-medium mb-1">Drag photos here</p>
+                              <p className="text-sm text-muted-foreground mb-3">or click to browse</p>
+                              <p className="text-xs text-muted-foreground">Supports JPG, PNG - Max 10MB per file</p>
+                              <Button variant="outline" size="sm" className="mt-4" data-testid="button-browse-photos">
+                                <Upload className="h-3 w-3 mr-1" />
+                                Browse Files
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        /* Photo grid with primary selection */
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+                            {uploadedPhotos.map((photo, index) => (
+                              <div 
+                                key={index} 
+                                className={cn(
+                                  "relative group aspect-square rounded-md overflow-hidden border-2",
+                                  primaryIndex === index ? "border-yellow-500" : "border-transparent hover:border-primary/50"
+                                )}
+                                data-testid={`photo-thumbnail-${index}`}
+                              >
+                                <img 
+                                  src={photo} 
+                                  alt={`Property photo ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                {/* Overlay with actions */}
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7 text-white hover:bg-white/20"
+                                    onClick={() => setPrimaryPhotoMutation.mutate(index)}
+                                    data-testid={`button-set-primary-${index}`}
+                                  >
+                                    <Star className={cn("h-4 w-4", primaryIndex === index && "fill-yellow-400 text-yellow-400")} />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7 text-white hover:bg-white/20"
+                                    onClick={() => deletePhotoMutation.mutate(index)}
+                                    data-testid={`button-delete-photo-${index}`}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                {/* Primary badge */}
+                                {primaryIndex === index && (
+                                  <div className="absolute bottom-1 left-1">
+                                    <Badge variant="secondary" className="bg-yellow-500 text-white text-[10px] px-1.5 py-0">
+                                      Primary
+                                    </Badge>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            {/* Add photo button in grid */}
+                            <div 
+                              className="aspect-square rounded-md border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 flex items-center justify-center cursor-pointer transition-colors"
+                              onClick={() => photoInputRef.current?.click()}
+                              data-testid="button-add-photo-grid"
+                            >
+                              <Plus className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            <Star className="h-3 w-3 inline text-yellow-500 mr-1" />
+                            Click star to set primary photo for marketing materials
+                          </p>
+                        </div>
+                      )}
+                      {/* Hidden file input */}
+                      <input
+                        ref={photoInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => handlePhotoUpload(e.target.files)}
+                        data-testid="input-photo-upload"
+                      />
+                      {uploadedPhotos.length === 0 && (
+                        <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
+                          <Info className="h-3 w-3" />
+                          Upload photos to create marketing materials for this property.
                         </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Create Instagram, Facebook, X, and TikTok graphics</p>
-              </TooltipContent>
-            </Tooltip>
+                      )}
+                    </>
+                  ) : (
+                    /* MLS-connected: Show synced photos (read-only) */
+                    <>
+                      {mlsPhotos.length > 0 ? (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                            {mlsPhotos.slice(0, 7).map((photo: string, index: number) => (
+                              <div 
+                                key={index} 
+                                className="relative aspect-square rounded-md overflow-hidden border"
+                                data-testid={`mls-photo-${index}`}
+                              >
+                                <img 
+                                  src={photo} 
+                                  alt={`MLS photo ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            ))}
+                            {mlsPhotos.length > 7 && (
+                              <div className="aspect-square rounded-md bg-muted flex items-center justify-center">
+                                <span className="text-sm font-medium text-muted-foreground">+{mlsPhotos.length - 7}</span>
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Photos synced from MLS - Select a photo when creating graphics
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-center py-4">
+                          <ImageIcon className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+                          <p className="text-sm text-muted-foreground">No photos synced from MLS</p>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="mt-2"
+                            onClick={() => refreshMlsMutation.mutate()}
+                            disabled={refreshMlsMutation.isPending}
+                          >
+                            {refreshMlsMutation.isPending && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                            Sync Photos
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
 
-            {/* Create Flyer Card */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Card 
-                  className="cursor-pointer hover:border-primary transition-colors hover-elevate"
-                  onClick={() => setFlyerDialogOpen(true)}
-                  data-testid="card-create-flyer"
-                >
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-orange-500/10 rounded-lg">
-                        <FileImage className="h-6 w-6 text-orange-500" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">Create Flyer</h3>
-                        <p className="text-sm text-muted-foreground">
-                          PNG flyer (8.5" × 11")
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Generate professional property flyers for print</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
+          {/* Quick Actions */}
+          {(() => {
+            const uploadedPhotos = transaction.propertyImages || [];
+            const mlsPhotos = mlsData?.images || mlsData?.photos || [];
+            const hasPhotosForMarketing = uploadedPhotos.length > 0 || mlsPhotos.length > 0;
+            const disabledMessage = isOffMarket 
+              ? "Upload photos first to create marketing materials" 
+              : "Sync MLS photos first to create marketing materials";
+            
+            return (
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">Quick Actions</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Create Graphics Card */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Card 
+                        className={cn(
+                          "transition-colors",
+                          hasPhotosForMarketing 
+                            ? "cursor-pointer hover:border-primary hover-elevate" 
+                            : "opacity-60 cursor-not-allowed"
+                        )}
+                        onClick={() => hasPhotosForMarketing && setGraphicGeneratorOpen(true)}
+                        data-testid="card-create-graphics"
+                      >
+                        <CardContent className="pt-6">
+                          <div className="flex items-center gap-4">
+                            <div className={cn(
+                              "p-3 rounded-lg",
+                              hasPhotosForMarketing ? "bg-pink-500/10" : "bg-muted"
+                            )}>
+                              <ImageIcon className={cn(
+                                "h-6 w-6",
+                                hasPhotosForMarketing ? "text-pink-500" : "text-muted-foreground"
+                              )} />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold">Create Graphics</h3>
+                              <p className="text-sm text-muted-foreground">
+                                {hasPhotosForMarketing ? "Social media posts & stories" : disabledMessage}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{hasPhotosForMarketing ? "Create Instagram, Facebook, X, and TikTok graphics" : disabledMessage}</p>
+                    </TooltipContent>
+                  </Tooltip>
+
+                  {/* Create Flyer Card */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Card 
+                        className={cn(
+                          "transition-colors",
+                          hasPhotosForMarketing 
+                            ? "cursor-pointer hover:border-primary hover-elevate" 
+                            : "opacity-60 cursor-not-allowed"
+                        )}
+                        onClick={() => hasPhotosForMarketing && setFlyerDialogOpen(true)}
+                        data-testid="card-create-flyer"
+                      >
+                        <CardContent className="pt-6">
+                          <div className="flex items-center gap-4">
+                            <div className={cn(
+                              "p-3 rounded-lg",
+                              hasPhotosForMarketing ? "bg-orange-500/10" : "bg-muted"
+                            )}>
+                              <FileImage className={cn(
+                                "h-6 w-6",
+                                hasPhotosForMarketing ? "text-orange-500" : "text-muted-foreground"
+                              )} />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold">Create Flyer</h3>
+                              <p className="text-sm text-muted-foreground">
+                                {hasPhotosForMarketing ? "PNG flyer (8.5\" × 11\")" : disabledMessage}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{hasPhotosForMarketing ? "Generate professional property flyers for print" : disabledMessage}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* My Assets Header */}
           <div className="flex items-center justify-between gap-4 flex-wrap">

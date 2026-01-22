@@ -1817,6 +1817,173 @@ export async function registerRoutes(
     }
   });
 
+  // ============ Property Photos (Off Market) ============
+
+  // Upload property photos for off-market listings
+  app.post("/api/transactions/:id/photos", isAuthenticated, async (req: any, res) => {
+    try {
+      const transaction = await storage.getTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      // Get the private object directory for uploads
+      const privateDir = process.env.PRIVATE_OBJECT_DIR;
+      if (!privateDir) {
+        return res.status(500).json({ message: "Object storage not configured" });
+      }
+
+      const { imageData, fileName } = req.body;
+      if (!imageData) {
+        return res.status(400).json({ message: "Missing image data" });
+      }
+
+      // Server-side validation for file type
+      const validImagePrefixes = ['data:image/jpeg', 'data:image/png', 'data:image/gif', 'data:image/webp', 'data:image/jpg'];
+      if (!validImagePrefixes.some(prefix => imageData.startsWith(prefix))) {
+        return res.status(400).json({ message: "Invalid file type. Only images (JPG, PNG, GIF, WebP) are allowed." });
+      }
+
+      // Server-side validation for file size (max 10MB)
+      const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+      const fileSizeBytes = Buffer.byteLength(base64Data, 'base64');
+      const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+      if (fileSizeBytes > maxSizeBytes) {
+        return res.status(400).json({ message: `File too large. Maximum size is 10MB. Your file is ${(fileSizeBytes / (1024 * 1024)).toFixed(2)}MB.` });
+      }
+
+      // Parse bucket name from private dir path
+      const pathParts = privateDir.split('/').filter(Boolean);
+      const bucketName = pathParts[0];
+      
+      // Create unique filename
+      const timestamp = Date.now();
+      const uniqueFileName = `property-photos/${transaction.id}/${timestamp}-${fileName || 'photo.jpg'}`;
+      
+      // Upload to object storage using signed URL
+      const { objectStorageClient } = await import("./replit_integrations/object_storage/objectStorage");
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(`${pathParts.slice(1).join('/')}/${uniqueFileName}`);
+      
+      // Convert base64 to buffer (reuse base64Data from validation above)
+      const buffer = Buffer.from(base64Data, 'base64');
+      
+      // Determine content type
+      const contentType = imageData.startsWith('data:image/png') ? 'image/png' : 
+                         imageData.startsWith('data:image/gif') ? 'image/gif' : 'image/jpeg';
+      
+      await file.save(buffer, {
+        contentType,
+        metadata: {
+          cacheControl: 'public, max-age=31536000',
+        },
+      });
+
+      // Get signed URL for viewing the uploaded photo
+      const [signedUrl] = await file.getSignedUrl({
+        action: 'read',
+        expires: Date.now() + 365 * 24 * 60 * 60 * 1000, // 1 year
+      });
+
+      // Update transaction with new photo URL
+      const currentImages = transaction.propertyImages || [];
+      const updatedImages = [...currentImages, signedUrl];
+      
+      await storage.updateTransaction(transaction.id, {
+        propertyImages: updatedImages,
+      });
+
+      await storage.createActivity({
+        transactionId: transaction.id,
+        type: "photo_uploaded",
+        description: `Property photo uploaded`,
+        category: "marketing",
+      });
+
+      res.json({ 
+        success: true, 
+        photoUrl: signedUrl,
+        propertyImages: updatedImages,
+      });
+    } catch (error) {
+      console.error("Error uploading photo:", error);
+      res.status(500).json({ message: "Failed to upload photo" });
+    }
+  });
+
+  // Set primary photo index
+  app.patch("/api/transactions/:id/photos/primary", isAuthenticated, async (req: any, res) => {
+    try {
+      const transaction = await storage.getTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      const { primaryPhotoIndex } = req.body;
+      if (typeof primaryPhotoIndex !== 'number' || primaryPhotoIndex < 0) {
+        return res.status(400).json({ message: "Invalid photo index" });
+      }
+
+      await storage.updateTransaction(transaction.id, {
+        primaryPhotoIndex,
+      });
+
+      res.json({ success: true, primaryPhotoIndex });
+    } catch (error) {
+      console.error("Error setting primary photo:", error);
+      res.status(500).json({ message: "Failed to set primary photo" });
+    }
+  });
+
+  // Delete a property photo
+  app.delete("/api/transactions/:id/photos/:photoIndex", isAuthenticated, async (req: any, res) => {
+    try {
+      const transaction = await storage.getTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      const photoIndex = parseInt(req.params.photoIndex);
+      const currentImages = transaction.propertyImages || [];
+      
+      if (photoIndex < 0 || photoIndex >= currentImages.length) {
+        return res.status(400).json({ message: "Invalid photo index" });
+      }
+
+      // Remove the photo at the specified index
+      const updatedImages = currentImages.filter((_, i) => i !== photoIndex);
+      
+      // Adjust primary photo index if needed
+      let newPrimaryIndex = transaction.primaryPhotoIndex || 0;
+      if (photoIndex === newPrimaryIndex) {
+        newPrimaryIndex = 0; // Reset to first photo
+      } else if (photoIndex < newPrimaryIndex) {
+        newPrimaryIndex = Math.max(0, newPrimaryIndex - 1); // Shift down
+      }
+
+      await storage.updateTransaction(transaction.id, {
+        propertyImages: updatedImages,
+        primaryPhotoIndex: Math.min(newPrimaryIndex, Math.max(0, updatedImages.length - 1)),
+      });
+
+      await storage.createActivity({
+        transactionId: transaction.id,
+        type: "photo_deleted",
+        description: `Property photo deleted`,
+        category: "marketing",
+      });
+
+      res.json({ 
+        success: true, 
+        propertyImages: updatedImages,
+        primaryPhotoIndex: newPrimaryIndex,
+      });
+    } catch (error) {
+      console.error("Error deleting photo:", error);
+      res.status(500).json({ message: "Failed to delete photo" });
+    }
+  });
+
   // ============ Contract Documents ============
 
   app.get("/api/transactions/:id/documents", isAuthenticated, async (req, res) => {
