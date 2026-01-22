@@ -442,7 +442,7 @@ export async function registerRoutes(
             await storage.updateTransaction(transaction.id, {
               mlsData: mlsData,
               cmaData: cmaData,
-              propertyImages: mlsData.images || [],
+              // Note: propertyImages is for user uploads only, MLS photos come from mlsData
               bedrooms: mlsData.bedrooms || transaction.bedrooms,
               bathrooms: mlsData.bathrooms || transaction.bathrooms,
               sqft: mlsData.sqft || transaction.sqft,
@@ -600,7 +600,7 @@ export async function registerRoutes(
             sqft: mlsData.sqft || undefined,
             yearBuilt: mlsData.yearBuilt || undefined,
             propertyType: mlsData.propertyType || undefined,
-            propertyImages: mlsData.photos || undefined,
+            // Note: propertyImages is for user uploads only, MLS photos come from mlsData
           });
           
           // Log activity
@@ -926,7 +926,7 @@ export async function registerRoutes(
       
       if (mlsData) {
         updateData.mlsData = mlsData;
-        updateData.propertyImages = mlsData.photos || mlsData.images || [];
+        // Note: propertyImages is for user uploads only, MLS photos come from mlsData
         updateData.propertyDescription = mlsData.description || "";
         if (mlsData.bedrooms) updateData.bedrooms = mlsData.bedrooms;
         if (mlsData.bathrooms) updateData.bathrooms = mlsData.bathrooms;

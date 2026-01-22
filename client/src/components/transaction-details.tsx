@@ -2852,46 +2852,23 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
             </p>
           </div>
 
-          {/* Property Photos Section */}
+          {/* Property Photos Section - Two Separate Cards */}
           {(() => {
             const uploadedPhotos = transaction.propertyImages || [];
             const mlsPhotos = mlsData?.images || mlsData?.photos || [];
-            const allMarketingPhotos = [...uploadedPhotos, ...mlsPhotos];
-            const hasPhotos = allMarketingPhotos.length > 0;
             const primaryIndex = transaction.primaryPhotoIndex || 0;
             
             return (
-              <Card data-testid="card-property-photos">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Camera className="h-4 w-4" />
-                      Property Photos ({isOffMarket ? uploadedPhotos.length : `${mlsPhotos.length} from MLS`})
-                    </CardTitle>
-                    {isOffMarket && hasPhotos && (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => photoInputRef.current?.click()}
-                        data-testid="button-add-more-photos"
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Add More
-                      </Button>
-                    )}
-                    {!isOffMarket && (
-                      <div className="flex items-center gap-2">
-                        {uploadedPhotos.length > 0 && (
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => photoInputRef.current?.click()}
-                            data-testid="button-add-more-photos-mls"
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Add More
-                          </Button>
-                        )}
+              <div className="space-y-4">
+                {/* MLS Photos Card - Only show for MLS-connected properties */}
+                {!isOffMarket && (
+                  <Card data-testid="card-mls-photos">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <Camera className="h-4 w-4" />
+                          Property Photos ({mlsPhotos.length} from MLS)
+                        </CardTitle>
                         {mlsPhotos.length > 0 && (
                           <Button 
                             variant="outline" 
@@ -2909,129 +2886,8 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                           </Button>
                         )}
                       </div>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {/* Off Market: Show upload area or photo grid */}
-                  {isOffMarket ? (
-                    <>
-                      {uploadedPhotos.length === 0 ? (
-                        /* Empty state with drag & drop */
-                        <div
-                          className={cn(
-                            "border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer",
-                            isDraggingPhoto ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
-                          )}
-                          onDrop={handlePhotoDrop}
-                          onDragOver={handlePhotoDragOver}
-                          onDragLeave={handlePhotoDragLeave}
-                          onClick={() => photoInputRef.current?.click()}
-                          data-testid="dropzone-photos"
-                        >
-                          {isUploadingPhoto ? (
-                            <div className="flex flex-col items-center gap-2">
-                              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                              <p className="text-sm text-muted-foreground">Uploading...</p>
-                            </div>
-                          ) : (
-                            <>
-                              <Camera className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                              <p className="font-medium mb-1">Drag photos here</p>
-                              <p className="text-sm text-muted-foreground mb-3">or click to browse</p>
-                              <p className="text-xs text-muted-foreground">Supports JPG, PNG - Max 10MB per file</p>
-                              <Button variant="outline" size="sm" className="mt-4" data-testid="button-browse-photos">
-                                <Upload className="h-3 w-3 mr-1" />
-                                Browse Files
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      ) : (
-                        /* Photo grid with primary selection */
-                        <div className="space-y-3">
-                          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
-                            {uploadedPhotos.map((photo, index) => (
-                              <div 
-                                key={index} 
-                                className={cn(
-                                  "relative group aspect-square rounded-md overflow-hidden border-2",
-                                  primaryIndex === index ? "border-yellow-500" : "border-transparent hover:border-primary/50"
-                                )}
-                                data-testid={`photo-thumbnail-${index}`}
-                              >
-                                <img 
-                                  src={photo} 
-                                  alt={`Property photo ${index + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-                                {/* Overlay with actions */}
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-7 w-7 text-white hover:bg-white/20"
-                                    onClick={() => setPrimaryPhotoMutation.mutate(index)}
-                                    data-testid={`button-set-primary-${index}`}
-                                  >
-                                    <Star className={cn("h-4 w-4", primaryIndex === index && "fill-yellow-400 text-yellow-400")} />
-                                  </Button>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-7 w-7 text-white hover:bg-white/20"
-                                    onClick={() => deletePhotoMutation.mutate(index)}
-                                    data-testid={`button-delete-photo-${index}`}
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                                {/* Primary badge */}
-                                {primaryIndex === index && (
-                                  <div className="absolute bottom-1 left-1">
-                                    <Badge variant="secondary" className="bg-yellow-500 text-white text-[10px] px-1.5 py-0">
-                                      Primary
-                                    </Badge>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                            {/* Add photo button in grid */}
-                            <div 
-                              className="aspect-square rounded-md border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 flex items-center justify-center cursor-pointer transition-colors"
-                              onClick={() => photoInputRef.current?.click()}
-                              data-testid="button-add-photo-grid"
-                            >
-                              <Plus className="h-6 w-6 text-muted-foreground" />
-                            </div>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            <Star className="h-3 w-3 inline text-yellow-500 mr-1" />
-                            Click star to set primary photo for marketing materials
-                          </p>
-                        </div>
-                      )}
-                      {/* Hidden file input */}
-                      <input
-                        ref={photoInputRef}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => handlePhotoUpload(e.target.files)}
-                        data-testid="input-photo-upload"
-                      />
-                      {uploadedPhotos.length === 0 && (
-                        <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
-                          <Info className="h-3 w-3" />
-                          Upload photos to create marketing materials for this property.
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    /* MLS-connected: Show synced photos + upload option */
-                    <div className="space-y-4">
-                      {/* MLS Photos Section */}
+                    </CardHeader>
+                    <CardContent>
                       {mlsPhotos.length > 0 ? (
                         <div className="space-y-3">
                           <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
@@ -3085,120 +2941,160 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                           </Button>
                         </div>
                       )}
+                    </CardContent>
+                  </Card>
+                )}
 
-                      {/* User Uploaded Photos Section */}
+                {/* Your Uploaded Photos Card - Show for all statuses */}
+                <Card data-testid="card-uploaded-photos">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        {isOffMarket ? (
+                          <>
+                            <Camera className="h-4 w-4" />
+                            Property Photos ({uploadedPhotos.length})
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4" />
+                            Your Uploaded Photos ({uploadedPhotos.length})
+                          </>
+                        )}
+                      </CardTitle>
                       {uploadedPhotos.length > 0 && (
-                        <div className="border-t border-dashed pt-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="text-sm font-medium flex items-center gap-2">
-                              <Upload className="h-4 w-4" />
-                              Your Uploaded Photos ({uploadedPhotos.length})
-                            </h4>
-                          </div>
-                          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
-                            {uploadedPhotos.map((photo, index) => (
-                              <div 
-                                key={index} 
-                                className={cn(
-                                  "relative group aspect-square rounded-md overflow-hidden border-2",
-                                  primaryIndex === index ? "border-yellow-500" : "border-transparent hover:border-primary/50"
-                                )}
-                                data-testid={`uploaded-photo-${index}`}
-                              >
-                                <img 
-                                  src={photo} 
-                                  alt={`Uploaded photo ${index + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-7 w-7 text-white hover:bg-white/20"
-                                    onClick={() => setPrimaryPhotoMutation.mutate(index)}
-                                    data-testid={`button-set-primary-uploaded-${index}`}
-                                  >
-                                    <Star className={cn("h-4 w-4", primaryIndex === index && "fill-yellow-400 text-yellow-400")} />
-                                  </Button>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-7 w-7 text-white hover:bg-white/20"
-                                    onClick={() => deletePhotoMutation.mutate(index)}
-                                    data-testid={`button-delete-uploaded-${index}`}
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                                {primaryIndex === index && (
-                                  <div className="absolute bottom-1 left-1">
-                                    <Badge variant="secondary" className="bg-yellow-500 text-white text-[10px] px-1.5 py-0">
-                                      Primary
-                                    </Badge>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                            <div 
-                              className="aspect-square rounded-md border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 flex items-center justify-center cursor-pointer transition-colors"
-                              onClick={() => photoInputRef.current?.click()}
-                              data-testid="button-add-photo-grid-mls"
-                            >
-                              <Plus className="h-6 w-6 text-muted-foreground" />
-                            </div>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            <Star className="h-3 w-3 inline text-yellow-500 mr-1" />
-                            Click star to set primary photo for marketing materials
-                          </p>
-                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => photoInputRef.current?.click()}
+                          data-testid="button-add-more-photos"
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Add More
+                        </Button>
                       )}
-
-                      {/* Compact upload area for MLS properties */}
-                      {uploadedPhotos.length === 0 && (
-                        <div className="border-t border-dashed pt-4">
-                          <div 
-                            className={cn(
-                              "flex items-center gap-3 p-3 border border-dashed rounded-lg cursor-pointer transition-colors",
-                              isDraggingPhoto ? "border-primary bg-primary/5" : "hover:bg-muted/50"
-                            )}
-                            onClick={() => photoInputRef.current?.click()}
-                            onDrop={handlePhotoDrop}
-                            onDragOver={handlePhotoDragOver}
-                            onDragLeave={handlePhotoDragLeave}
-                            data-testid="dropzone-photos-mls"
-                          >
-                            <div className="p-2 bg-muted rounded-lg">
-                              {isUploadingPhoto ? (
-                                <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
-                              ) : (
-                                <Plus className="w-5 h-5 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {uploadedPhotos.length === 0 ? (
+                      /* Empty state with drag & drop */
+                      <div
+                        className={cn(
+                          "border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer",
+                          isDraggingPhoto ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+                        )}
+                        onDrop={handlePhotoDrop}
+                        onDragOver={handlePhotoDragOver}
+                        onDragLeave={handlePhotoDragLeave}
+                        onClick={() => photoInputRef.current?.click()}
+                        data-testid="dropzone-photos"
+                      >
+                        {isUploadingPhoto ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            <p className="text-sm text-muted-foreground">Uploading...</p>
+                          </div>
+                        ) : (
+                          <>
+                            <Camera className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                            <p className="font-medium mb-1">Drag photos here</p>
+                            <p className="text-sm text-muted-foreground mb-3">or click to browse</p>
+                            <p className="text-xs text-muted-foreground">Supports JPG, PNG - Max 10MB per file</p>
+                            <Button variant="outline" size="sm" className="mt-4" data-testid="button-browse-photos">
+                              <Upload className="h-3 w-3 mr-1" />
+                              Browse Files
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      /* Photo grid with primary selection */
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+                          {uploadedPhotos.map((photo, index) => (
+                            <div 
+                              key={index} 
+                              className={cn(
+                                "relative group aspect-square rounded-md overflow-hidden border-2",
+                                primaryIndex === index ? "border-yellow-500" : "border-transparent hover:border-primary/50"
+                              )}
+                              data-testid={`photo-thumbnail-${index}`}
+                            >
+                              <img 
+                                src={photo} 
+                                alt={`Property photo ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              {/* Overlay with actions */}
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-white hover:bg-white/20"
+                                  onClick={() => setPrimaryPhotoMutation.mutate(index)}
+                                  data-testid={`button-set-primary-${index}`}
+                                >
+                                  <Star className={cn("h-4 w-4", primaryIndex === index && "fill-yellow-400 text-yellow-400")} />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-white hover:bg-white/20"
+                                  onClick={() => deletePhotoMutation.mutate(index)}
+                                  data-testid={`button-delete-photo-${index}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                              {/* Primary badge */}
+                              {primaryIndex === index && (
+                                <div className="absolute bottom-1 left-1">
+                                  <Badge variant="secondary" className="bg-yellow-500 text-white text-[10px] px-1.5 py-0">
+                                    Primary
+                                  </Badge>
+                                </div>
                               )}
                             </div>
-                            <div>
-                              <p className="text-sm font-medium">Add your own photos</p>
-                              <p className="text-xs text-muted-foreground">
-                                Drag photos here or click to browse
-                              </p>
-                            </div>
+                          ))}
+                          {/* Add photo button in grid */}
+                          <div 
+                            className="aspect-square rounded-md border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 flex items-center justify-center cursor-pointer transition-colors"
+                            onClick={() => photoInputRef.current?.click()}
+                            data-testid="button-add-photo-grid"
+                          >
+                            <Plus className="h-6 w-6 text-muted-foreground" />
                           </div>
                         </div>
-                      )}
-
-                      {/* Hidden file input */}
-                      <input
-                        ref={photoInputRef}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => handlePhotoUpload(e.target.files)}
-                        data-testid="input-photo-upload-mls"
-                      />
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                        <p className="text-xs text-muted-foreground">
+                          <Star className="h-3 w-3 inline text-yellow-500 mr-1" />
+                          Click star to set primary photo for marketing materials
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Hidden file input */}
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => handlePhotoUpload(e.target.files)}
+                      data-testid="input-photo-upload"
+                    />
+                    
+                    {uploadedPhotos.length === 0 && (
+                      <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
+                        <Info className="h-3 w-3" />
+                        {isOffMarket 
+                          ? "Upload photos to create marketing materials for this property."
+                          : "Upload your own photos for custom marketing materials."
+                        }
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             );
           })()}
 
