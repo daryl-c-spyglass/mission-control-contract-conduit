@@ -1,0 +1,284 @@
+# Fix: Don't Auto-Populate Uploaded Photos from MLS
+
+## Problem
+
+The "Your Uploaded Photos" section is automatically showing all 34 MLS photos. This is wrong - it should be empty until the user manually uploads their own photos.
+
+## Expected Behavior
+
+| Status | MLS Photos Section | Your Uploaded Photos Section |
+|--------|-------------------|------------------------------|
+| Active/Closed/Under Contract | Show MLS photos (read-only) | Empty dropzone (user uploads manually) |
+| Off Market | Hidden (no MLS) | Empty dropzone (user uploads manually) |
+
+---
+
+## Correct Layout
+
+### MLS Property - No User Uploads Yet
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 📷 Property Photos (34 from MLS)                      [+ Add More] [Refresh]│
+│                                                                             │
+│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐          │
+│  │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ +27 │          │
+│  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘          │
+│                                                                             │
+│  Photos synced from MLS • Click to view full size                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 📤 Your Uploaded Photos (0)                                                 │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                            📷                                       │   │
+│  │                                                                     │   │
+│  │                    Drag photos here                                 │   │
+│  │                    or click to browse                               │   │
+│  │                                                                     │   │
+│  │               Supports JPG, PNG • Max 10MB per file                 │   │
+│  │                                                                     │   │
+│  │                      [📁 Browse Files]                              │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ℹ️ Upload your own photos for custom marketing materials.                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### MLS Property - WITH User Uploads
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 📷 Property Photos (34 from MLS)                      [+ Add More] [Refresh]│
+│                                                                             │
+│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐          │
+│  │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ +27 │          │
+│  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘          │
+│                                                                             │
+│  Photos synced from MLS • Click to view full size                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 📤 Your Uploaded Photos (3)                                    [+ Add More] │
+│                                                                             │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐                        │
+│  │ 📷      │  │ 📷      │  │ 📷      │  │   ＋    │                        │
+│  │ Photo 1 │  │ Photo 2 │  │ Photo 3 │  │  Add    │                        │
+│  │ ⭐ [🗑️] │  │    [🗑️] │  │    [🗑️] │  │  More   │                        │
+│  └─────────┘  └─────────┘  └─────────┘  └─────────┘                        │
+│   Primary                                                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Off Market - No Photos Yet (Same as current - correct!)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 📷 Property Photos (0)                                                      │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                            📷                                       │   │
+│  │                                                                     │   │
+│  │                    Drag photos here                                 │   │
+│  │                    or click to browse                               │   │
+│  │                                                                     │   │
+│  │               Supports JPG, PNG • Max 10MB per file                 │   │
+│  │                                                                     │   │
+│  │                      [📁 Browse Files]                              │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ℹ️ Upload photos to create marketing materials for this property.         │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Implementation Fix
+
+The key is to keep MLS photos and user-uploaded photos **completely separate**:
+
+```tsx
+// These should be SEPARATE data sources - never mix them
+const mlsPhotos = transaction.mlsData?.photos || [];  // From Repliers API
+const userUploadedPhotos = transaction.uploadedPhotos || [];  // User's own uploads (stored in DB)
+
+// MLS Properties: Show both sections
+// Off Market: Show only upload section
+
+return (
+  <div className="space-y-6">
+    
+    {/* MLS Photos Section - Only show if has MLS photos */}
+    {mlsPhotos.length > 0 && (
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium flex items-center gap-2">
+              <Camera className="w-4 h-4" />
+              Property Photos ({mlsPhotos.length} from MLS)
+            </h3>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm">
+                <Plus className="w-4 h-4 mr-1" />
+                Add More
+              </Button>
+              <Button variant="outline" size="sm">
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* MLS Photo Grid - Read Only, Clickable */}
+          <div className="grid grid-cols-8 gap-2">
+            {mlsPhotos.slice(0, 7).map((photo, index) => (
+              <button
+                key={index}
+                onClick={() => openPhotoGallery(index)}
+                className="aspect-square rounded-lg overflow-hidden border hover:ring-2 hover:ring-orange-500"
+              >
+                <img src={photo} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
+            {mlsPhotos.length > 7 && (
+              <button
+                onClick={() => openPhotoGallery(7)}
+                className="aspect-square rounded-lg bg-muted flex items-center justify-center border"
+              >
+                +{mlsPhotos.length - 7}
+              </button>
+            )}
+          </div>
+
+          <p className="text-xs text-muted-foreground mt-3">
+            Photos synced from MLS • Click to view full size
+          </p>
+        </CardContent>
+      </Card>
+    )}
+
+    {/* User Uploaded Photos Section - Always show for manual uploads */}
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-medium flex items-center gap-2">
+            {mlsPhotos.length > 0 ? (
+              <>
+                <Upload className="w-4 h-4" />
+                Your Uploaded Photos ({userUploadedPhotos.length})
+              </>
+            ) : (
+              <>
+                <Camera className="w-4 h-4" />
+                Property Photos ({userUploadedPhotos.length})
+              </>
+            )}
+          </h3>
+          {userUploadedPhotos.length > 0 && (
+            <Button variant="outline" size="sm">
+              <Plus className="w-4 h-4 mr-1" />
+              Add More
+            </Button>
+          )}
+        </div>
+
+        {userUploadedPhotos.length === 0 ? (
+          /* Empty State - Dropzone */
+          <div
+            className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
+                       hover:border-primary/50 hover:bg-muted/50 transition-colors"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Camera className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+            <p className="font-medium">Drag photos here</p>
+            <p className="text-sm text-muted-foreground">or click to browse</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Supports JPG, PNG • Max 10MB per file
+            </p>
+            <Button variant="outline" size="sm" className="mt-4">
+              <Upload className="w-4 h-4 mr-1" />
+              Browse Files
+            </Button>
+          </div>
+        ) : (
+          /* User's Uploaded Photos Grid */
+          <div className="grid grid-cols-6 gap-3">
+            {userUploadedPhotos.map((photo) => (
+              <div key={photo.id} className="relative aspect-square rounded-lg overflow-hidden border group">
+                <img src={photo.url} alt="" className="w-full h-full object-cover" />
+                {photo.isPrimary && (
+                  <span className="absolute top-1 left-1 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded">
+                    Primary
+                  </span>
+                )}
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <Button variant="secondary" size="icon" className="h-8 w-8">
+                    <Star className="w-4 h-4" />
+                  </Button>
+                  <Button variant="destructive" size="icon" className="h-8 w-8">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {/* Add More Tile */}
+            <div
+              className="aspect-square rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer hover:border-primary/50"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Plus className="w-6 h-6 text-muted-foreground" />
+            </div>
+          </div>
+        )}
+
+        <p className="text-xs text-muted-foreground mt-3">
+          {mlsPhotos.length > 0
+            ? "ℹ️ Upload your own photos for custom marketing materials."
+            : "ℹ️ Upload photos to create marketing materials for this property."
+          }
+        </p>
+
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
+          multiple
+          accept="image/jpeg,image/png"
+          onChange={handleFileUpload}
+        />
+      </CardContent>
+    </Card>
+  </div>
+);
+```
+
+---
+
+## Key Points
+
+1. **DO NOT** copy MLS photos into user uploads
+2. `mlsPhotos` = from Repliers API (read-only, synced)
+3. `userUploadedPhotos` = user's own uploads (stored in your DB)
+4. These are **two separate data sources**
+5. User upload section always starts empty
+6. User manually drags/drops their own photos
+
+---
+
+## Database Schema Note
+
+Make sure you have a separate table/field for user-uploaded photos:
+
+```typescript
+// User uploaded photos - separate from MLS
+export const transactionPhotos = pgTable('transaction_photos', {
+  id: serial('id').primaryKey(),
+  transactionId: integer('transaction_id').references(() => transactions.id),
+  url: text('url').notNull(),
+  isPrimary: boolean('is_primary').default(false),
+  uploadedAt: timestamp('uploaded_at').defaultNow(),
+});
+```
+
+This is SEPARATE from `transaction.mlsData.photos` which comes from Repliers.

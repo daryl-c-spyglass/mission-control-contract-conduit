@@ -1902,17 +1902,19 @@ export async function registerRoutes(
       const timestamp = Date.now();
       const uniqueFileName = `property-photos/${transaction.id}/${timestamp}-${fileName || 'photo.jpg'}`;
       
-      // Upload to object storage using signed URL
+      // Upload to object storage using Replit sidecar
       const { objectStorageClient } = await import("./replit_integrations/object_storage/objectStorage");
       const bucket = objectStorageClient.bucket(bucketName);
-      const file = bucket.file(`${pathParts.slice(1).join('/')}/${uniqueFileName}`);
+      const objectName = `${pathParts.slice(1).join('/')}/${uniqueFileName}`;
+      const file = bucket.file(objectName);
       
       // Convert base64 to buffer (reuse base64Data from validation above)
       const buffer = Buffer.from(base64Data, 'base64');
       
       // Determine content type
       const contentType = imageData.startsWith('data:image/png') ? 'image/png' : 
-                         imageData.startsWith('data:image/gif') ? 'image/gif' : 'image/jpeg';
+                         imageData.startsWith('data:image/gif') ? 'image/gif' : 
+                         imageData.startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg';
       
       await file.save(buffer, {
         contentType,
@@ -1921,11 +1923,27 @@ export async function registerRoutes(
         },
       });
 
-      // Get signed URL for viewing the uploaded photo
-      const [signedUrl] = await file.getSignedUrl({
-        action: 'read',
-        expires: Date.now() + 365 * 24 * 60 * 60 * 1000, // 1 year
-      });
+      // Get signed URL for viewing the uploaded photo using Replit sidecar
+      const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
+      const signedUrlResponse = await fetch(
+        `${REPLIT_SIDECAR_ENDPOINT}/object-storage/signed-object-url`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            bucket_name: bucketName,
+            object_name: objectName,
+            method: "GET",
+            expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year
+          }),
+        }
+      );
+      
+      if (!signedUrlResponse.ok) {
+        throw new Error(`Failed to get signed URL: ${signedUrlResponse.status}`);
+      }
+      
+      const { signed_url: signedUrl } = await signedUrlResponse.json();
 
       // Update transaction with new photo URL
       const currentImages = transaction.propertyImages || [];
@@ -1947,9 +1965,11 @@ export async function registerRoutes(
         photoUrl: signedUrl,
         propertyImages: updatedImages,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error uploading photo:", error);
-      res.status(500).json({ message: "Failed to upload photo" });
+      console.error("Error stack:", error?.stack);
+      console.error("Error message:", error?.message);
+      res.status(500).json({ message: "Failed to upload photo", error: error?.message });
     }
   });
 
