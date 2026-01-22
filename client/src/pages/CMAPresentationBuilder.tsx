@@ -186,7 +186,7 @@ export default function CMAPresentationBuilder() {
 
   // Fetch agent profile for cover page
   const { data: agentProfileData } = useQuery<{
-    profile: { name: string; title: string; email: string; phone: string; company: string; bio?: string; coverLetter?: string } | null;
+    profile: { name: string; title: string; email: string; phone: string; company: string; bio?: string; defaultCoverLetter?: string } | null;
     user: { marketingDisplayName?: string; marketingTitle?: string; marketingHeadshotUrl?: string; marketingPhone?: string; marketingEmail?: string } | null;
   }>({
     queryKey: ['/api/agent/profile'],
@@ -314,7 +314,7 @@ export default function CMAPresentationBuilder() {
            '',
     company: agentProfileData?.profile?.company || 'Spyglass Realty',
     bio: agentProfileData?.profile?.bio,
-    coverLetter: agentProfileData?.profile?.coverLetter,
+    coverLetter: agentProfileData?.profile?.defaultCoverLetter,
     photo: agentProfileData?.user?.marketingHeadshotUrl || '',
   };
 
