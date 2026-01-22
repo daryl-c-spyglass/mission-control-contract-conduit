@@ -1,0 +1,275 @@
+# Embed Graphic Generator as Iframe in Contract Conduit
+
+## Overview
+
+Embed the Graphic Generator app (`https://graphic-1-generator-black--caleb254.replit.app`) in Contract Conduit's Marketing section.
+
+## Diagnostic Findings
+
+| Check | Status | Notes |
+|-------|--------|-------|
+| Iframe blocking | ✅ None | No X-Frame-Options or CSP blocking |
+| Authentication | ✅ None | No login required |
+| URL Parameters | ❌ None | Can't pre-fill data via URL (yet) |
+| PostMessage | ❌ None | No parent-child communication (yet) |
+| CORS | ✅ OK | Default Vite config allows embedding |
+
+**Current capability:** Basic iframe embedding works. Data must be entered manually in the Graphic Generator.
+
+---
+
+## Implementation
+
+### Location in Contract Conduit
+
+The Graphic Generator button already exists in the Marketing tab under Quick Actions. When clicked, it should open the iframe either:
+- **Option A:** In a modal/dialog (recommended for seamless experience)
+- **Option B:** In a new tab (current behavior - keep as fallback)
+- **Option C:** As embedded section in Marketing tab
+
+---
+
+### Option A: Modal/Dialog with Iframe (Recommended)
+
+Create a modal that contains the Graphic Generator iframe:
+
+```tsx
+// client/src/components/marketing/GraphicGeneratorModal.tsx
+
+import { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Maximize2, Minimize2, ExternalLink, X } from 'lucide-react';
+
+interface GraphicGeneratorModalProps {
+  open: boolean;
+  onClose: () => void;
+  propertyData?: {
+    address?: string;
+    agentName?: string;
+    agentPhone?: string;
+    status?: string;
+  };
+}
+
+export function GraphicGeneratorModal({ open, onClose, propertyData }: GraphicGeneratorModalProps) {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  const GRAPHIC_GENERATOR_URL = 'https://graphic-1-generator-black--caleb254.replit.app';
+  
+  // For future: Build URL with params when Graphic Generator supports them
+  // const urlWithParams = `${GRAPHIC_GENERATOR_URL}?address=${encodeURIComponent(propertyData?.address || '')}`;
+  
+  const openInNewTab = () => {
+    window.open(GRAPHIC_GENERATOR_URL, '_blank');
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent 
+        className={`${isFullscreen ? 'max-w-[95vw] h-[95vh]' : 'max-w-5xl h-[80vh]'} p-0 gap-0`}
+      >
+        {/* Header */}
+        <DialogHeader className="px-4 py-3 border-b flex flex-row items-center justify-between">
+          <DialogTitle className="text-lg font-semibold">
+            Graphic Generator
+          </DialogTitle>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            >
+              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={openInNewTab}
+              title="Open in new tab"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </DialogHeader>
+        
+        {/* Iframe */}
+        <div className="flex-1 overflow-hidden">
+          <iframe
+            src={GRAPHIC_GENERATOR_URL}
+            className="w-full h-full border-0"
+            title="Graphic Generator"
+            allow="clipboard-read; clipboard-write"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads"
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+---
+
+### Update Marketing Tab to Use Modal
+
+Find where the "Graphic Generator" button is rendered in Marketing tab and add the modal:
+
+```tsx
+// In the Marketing tab component (likely client/src/components/marketing-tab.tsx or similar)
+
+import { useState } from 'react';
+import { GraphicGeneratorModal } from '@/components/marketing/GraphicGeneratorModal';
+
+export function MarketingTab({ transaction }) {
+  const [isGraphicGeneratorOpen, setIsGraphicGeneratorOpen] = useState(false);
+  
+  // Property data to pass (for future use when Graphic Generator supports URL params)
+  const propertyData = {
+    address: transaction?.address || transaction?.mlsData?.address,
+    agentName: transaction?.agentName || 'Agent Name',
+    agentPhone: transaction?.agentPhone || '',
+    status: transaction?.status || 'Just Listed',
+  };
+
+  return (
+    <div>
+      {/* Quick Actions */}
+      <div className="flex gap-3">
+        {/* Existing buttons... */}
+        
+        {/* Graphic Generator Button - Update onClick */}
+        <Button
+          variant="outline"
+          onClick={() => setIsGraphicGeneratorOpen(true)}
+          className="flex items-center gap-2"
+        >
+          <Palette className="w-4 h-4" />
+          Graphic Generator
+        </Button>
+      </div>
+      
+      {/* Graphic Generator Modal */}
+      <GraphicGeneratorModal
+        open={isGraphicGeneratorOpen}
+        onClose={() => setIsGraphicGeneratorOpen(false)}
+        propertyData={propertyData}
+      />
+      
+      {/* Rest of Marketing tab content... */}
+    </div>
+  );
+}
+```
+
+---
+
+### Option B: Embedded Section (Alternative)
+
+If you prefer to show the Graphic Generator as a section within the Marketing tab:
+
+```tsx
+// Embedded iframe section in Marketing tab
+
+<div className="border rounded-lg overflow-hidden">
+  <div className="bg-muted px-4 py-2 border-b flex items-center justify-between">
+    <h3 className="font-medium">Graphic Generator</h3>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => window.open('https://graphic-1-generator-black--caleb254.replit.app', '_blank')}
+    >
+      <ExternalLink className="w-4 h-4 mr-2" />
+      Open in New Tab
+    </Button>
+  </div>
+  <iframe
+    src="https://graphic-1-generator-black--caleb254.replit.app"
+    className="w-full h-[600px] border-0"
+    title="Graphic Generator"
+    allow="clipboard-read; clipboard-write"
+    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads"
+  />
+</div>
+```
+
+---
+
+## Important Notes
+
+### Current Limitations
+
+1. **No data pre-filling** - User must manually enter property info in Graphic Generator
+2. **No communication** - Contract Conduit can't send/receive data from the iframe
+3. **Separate localStorage** - Graphic Generator saves to its own localStorage, not Contract Conduit's
+
+### Future Enhancements (Requires Graphic Generator Changes)
+
+To enable full integration, the Graphic Generator would need:
+
+1. **URL Parameter Support**
+   ```
+   ?address=123+Main+St&agentName=John+Doe&status=JUST+LISTED
+   ```
+
+2. **PostMessage API**
+   ```javascript
+   // Contract Conduit sends data
+   iframe.contentWindow.postMessage({
+     type: 'SET_PROPERTY_DATA',
+     payload: { address: '123 Main St', ... }
+   }, '*');
+   
+   // Graphic Generator receives and uses data
+   window.addEventListener('message', (event) => {
+     if (event.data.type === 'SET_PROPERTY_DATA') {
+       setFormData(event.data.payload);
+     }
+   });
+   ```
+
+---
+
+## Verification Checklist
+
+After implementing:
+
+- [ ] Graphic Generator button opens modal (not new tab)
+- [ ] Iframe loads correctly inside modal
+- [ ] Fullscreen toggle works
+- [ ] "Open in new tab" button works
+- [ ] Close button works
+- [ ] Graphic Generator app functions normally inside iframe
+- [ ] User can create and download graphics
+- [ ] No console errors about iframe blocking
+
+---
+
+## Sandbox Attributes Explained
+
+```html
+<iframe
+  sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads"
+/>
+```
+
+| Attribute | Purpose |
+|-----------|---------|
+| `allow-same-origin` | Required for app to function |
+| `allow-scripts` | Required for React to run |
+| `allow-forms` | Required for form inputs |
+| `allow-popups` | Required for download dialogs |
+| `allow-downloads` | Required for graphic downloads |

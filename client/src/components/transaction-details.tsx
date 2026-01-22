@@ -3122,16 +3122,6 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
               ? "Upload photos first to create marketing materials" 
               : "Sync MLS photos first to create marketing materials";
             
-            const openGraphicGenerator = () => {
-              const baseUrl = 'https://graphic-1-generator-black--caleb254.replit.app';
-              const params = new URLSearchParams();
-              params.set('address', transaction.propertyAddress || '');
-              if (transaction.mlsNumber) params.set('mlsNumber', transaction.mlsNumber);
-              const price = mlsData?.listPrice || transaction.listPrice;
-              if (price) params.set('price', price.toString());
-              window.open(`${baseUrl}?${params.toString()}`, '_blank');
-            };
-            
             return (
               <div className="space-y-2">
                 <h3 className="text-base font-semibold">Quick Actions</h3>
@@ -3214,12 +3204,12 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                     </TooltipContent>
                   </Tooltip>
 
-                  {/* Graphic Generator Card - Opens in new tab */}
+                  {/* Graphic Generator Card - Opens in iframe modal */}
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Card 
                         className="cursor-pointer hover:border-primary hover-elevate transition-colors"
-                        onClick={openGraphicGenerator}
+                        onClick={() => setGraphicGeneratorOpen(true)}
                         data-testid="card-graphic-generator"
                       >
                         <CardContent className="pt-6">
@@ -3228,9 +3218,8 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                               <Palette className="h-6 w-6 text-purple-500" />
                             </div>
                             <div>
-                              <h3 className="font-semibold flex items-center gap-1">
+                              <h3 className="font-semibold">
                                 Graphic Generator
-                                <ExternalLink className="h-3 w-3" />
                               </h3>
                               <p className="text-sm text-muted-foreground">
                                 Advanced design tool
@@ -3241,7 +3230,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                       </Card>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Open advanced graphic design tool in new tab</p>
+                      <p>Create professional marketing graphics</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
