@@ -1,0 +1,151 @@
+# REPLIT PROMPT: Copy Working CMA Map to Presentation Builder
+
+## Problem
+
+The "Map of All Listings" in Presentation Builder Live Preview is empty/not rendering.
+
+## Solution
+
+There is already a **working map** in:
+- **CMA Tab → Comparable Properties → Map tab** (next to "Compare" tab)
+
+This map already works correctly with:
+- Mapbox tiles rendering
+- Subject property marker
+- Comparable property markers
+- Correct colors for status (Active/Pending/Sold)
+- Proper coordinates
+
+**Simply reuse this exact same map component in the Presentation Builder Live Preview.**
+
+---
+
+## Task
+
+1. **Find** the working map component used in CMA Tab → Comparable Properties → Map tab
+   - Look for files like: `cma-map.tsx`, `comparable-map.tsx`, `cma-tab.tsx`, or similar
+   - Search for: `Map of All Listings` or `react-map-gl` or `mapbox`
+
+2. **Import and use** that same component in the Presentation Builder Live Preview section for "Map of All Listings"
+
+3. **Pass the same props** (subject property + comparables array)
+
+---
+
+## Implementation
+
+### Step 1: Find the working map component
+
+```bash
+# Search for the map component in your codebase
+grep -r "Map" client/src/components/ --include="*.tsx" | grep -i "cma\|comparable"
+grep -r "mapbox" client/src/components/ --include="*.tsx"
+grep -r "Marker" client/src/components/ --include="*.tsx"
+```
+
+### Step 2: Export the component if not already exported
+
+If the map is embedded directly in the CMA tab, extract it into its own component:
+
+```tsx
+// components/cma-comparables-map.tsx (or wherever it currently lives)
+
+export function CMAComparablesMap({ 
+  subjectProperty, 
+  comparables 
+}: { 
+  subjectProperty: any; 
+  comparables: any[];
+}) {
+  // ... existing working map code ...
+}
+```
+
+### Step 3: Import in Presentation Builder
+
+```tsx
+// In presentation-builder.tsx or cma-presentation-preview.tsx
+
+import { CMAComparablesMap } from '@/components/cma-comparables-map';
+
+// In the Live Preview render for "Map of All Listings" section:
+{sections.mapOfAllListings && (
+  <div className="border rounded-lg p-4">
+    <h4 className="flex items-center gap-2 font-medium text-sm mb-3">
+      <MapIcon className="w-4 h-4" />
+      Map of All Listings
+    </h4>
+    
+    {/* USE THE SAME COMPONENT FROM CMA TAB */}
+    <CMAComparablesMap
+      subjectProperty={transaction?.mlsData}
+      comparables={cmaData?.comparables || []}
+    />
+  </div>
+)}
+```
+
+---
+
+## Data Flow
+
+```
+CMA Tab                          Presentation Builder
+    │                                    │
+    ▼                                    ▼
+┌─────────────────┐              ┌─────────────────┐
+│ Comparable      │              │ Live Preview    │
+│ Properties      │              │                 │
+│                 │              │ Map of All      │
+│ [Compare] [Map] │              │ Listings        │
+│           ───── │              │                 │
+│    ┌──────────┐ │              │  ┌──────────┐  │
+│    │ 🗺️ MAP   │ │  ──SAME──►  │  │ 🗺️ MAP   │  │
+│    │ (works!) │ │  COMPONENT   │  │ (reused) │  │
+│    └──────────┘ │              │  └──────────┘  │
+└─────────────────┘              └─────────────────┘
+```
+
+---
+
+## Props to Pass
+
+The Presentation Builder should pass the same data the CMA tab map uses:
+
+| Prop | Source | Description |
+|------|--------|-------------|
+| `subjectProperty` | `transaction.mlsData` | The main property with lat/lng |
+| `comparables` | `cmaData.comparables` | Array of comparable properties |
+
+Both should already be available in the Presentation Builder context since it's part of the same transaction/CMA flow.
+
+---
+
+## If Component Needs Minor Adjustments
+
+The map in CMA tab might have specific sizing. For Presentation Builder preview, you may need to:
+
+```tsx
+// Add a container height prop or wrapper
+<div className="h-64"> {/* Fixed height for preview */}
+  <CMAComparablesMap
+    subjectProperty={transaction?.mlsData}
+    comparables={cmaData?.comparables || []}
+    // Optional: Add a compact/preview mode prop if needed
+    previewMode={true}
+  />
+</div>
+```
+
+---
+
+## Verification
+
+After implementing:
+
+- [ ] Map renders in Presentation Builder Live Preview
+- [ ] Same Mapbox tiles visible as in CMA tab
+- [ ] Subject marker (blue) appears
+- [ ] Comparable markers appear with correct colors
+- [ ] Legend shows (Subject, Active, Pending, Sold)
+- [ ] Map behaves identically to CMA tab map

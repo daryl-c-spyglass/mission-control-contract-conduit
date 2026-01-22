@@ -64,7 +64,6 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const { theme } = useTheme();
-  const initRef = useRef(false);
 
   const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -77,12 +76,37 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
   const centerCoords = subjectCoords || (validComparables.length > 0 ? getCoordinates(validComparables[0]) : null);
   const mapHeight = compact ? 150 : 200;
 
-  // Initialize map
+  // Debug logging
   useEffect(() => {
-    if (!mapContainer.current || !mapboxToken || !centerCoords || initRef.current) return;
+    console.log('[MapAllListingsPreview] Data:', {
+      hasSubject: !!subjectProperty,
+      subjectCoords,
+      comparablesCount: comparables.length,
+      validComparablesCount: validComparables.length,
+      centerCoords,
+      hasToken: !!mapboxToken,
+    });
+  }, [subjectProperty, subjectCoords, comparables.length, validComparables.length, centerCoords, mapboxToken]);
+
+  // Initialize map when center coordinates become available
+  useEffect(() => {
+    if (!mapContainer.current || !mapboxToken || !centerCoords) {
+      console.log('[MapAllListingsPreview] Cannot init map:', { 
+        hasContainer: !!mapContainer.current, 
+        hasToken: !!mapboxToken, 
+        hasCenter: !!centerCoords 
+      });
+      return;
+    }
     
+    // If already have a map, don't reinitialize
+    if (mapRef.current) {
+      console.log('[MapAllListingsPreview] Map already initialized');
+      return;
+    }
+    
+    console.log('[MapAllListingsPreview] Initializing map at:', centerCoords);
     mapboxgl.accessToken = mapboxToken;
-    initRef.current = true;
 
     const cleanup = () => {
       markersRef.current.forEach(m => m.remove());
@@ -224,7 +248,6 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
         mapRef.current.remove();
         mapRef.current = null;
       }
-      initRef.current = false;
     };
   }, []);
 
