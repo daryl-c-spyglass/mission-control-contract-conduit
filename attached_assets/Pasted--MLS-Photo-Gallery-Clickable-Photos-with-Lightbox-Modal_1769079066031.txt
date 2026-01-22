@@ -1,0 +1,493 @@
+# MLS Photo Gallery - Clickable Photos with Lightbox Modal
+
+## Overview
+
+Make the MLS photos in the Marketing tab clickable. When clicked, open a full-screen lightbox modal that allows users to:
+- View the clicked photo in full size
+- Navigate through all photos (including the +27 hidden ones)
+- Zoom in/out, rotate, reset, and download
+
+---
+
+## Current State
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 📷 Property Photos (34 from MLS)                                 [Refresh] │
+│                                                                             │
+│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐          │
+│  │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ +27 │          │
+│  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘          │
+│                                                                             │
+│  Photos synced from MLS • Select a photo when creating graphics            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Currently: Photos are NOT clickable
+```
+
+---
+
+## New Behavior
+
+```
+User clicks any photo or "+27"
+         ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Back of Structure                                                      [✕] │
+│ Zoom: 100%                                                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│                     ┌─────────────────────────────────┐                     │
+│       [←]          │                                 │          [→]        │
+│                     │                                 │                     │
+│                     │        [Large Photo View]       │                     │
+│                     │                                 │                     │
+│                     │                                 │                     │
+│                     └─────────────────────────────────┘                     │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│    [🔍- Zoom Out]  [🔍+ Zoom In]  [🔄 Rotate]  [↩️ Reset]  [⬇️ Download]   │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌───┐ ┌───┐ ┌───┐ ┌───┐ ┌───┐ ┌───┐ ┌───┐ ┌───┐ ┌───┐ ┌───┐  ...       │
+│  │ 1 │ │ 2 │ │ 3 │ │ 4 │ │ 5 │ │ 6 │ │ 7 │ │ 8 │ │ 9 │ │10 │             │
+│  └───┘ └───┘ └───┘ └───┘ └───┘ └───┘ └───┘ └───┘ └───┘ └───┘             │
+│    ↑                                                                        │
+│  Thumbnail strip (optional - shows all 34 photos)                          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Implementation
+
+### 1. Create Photo Gallery Modal Component
+
+**File: `client/src/components/photo-gallery-modal.tsx`**
+
+```tsx
+import { useState, useEffect, useCallback } from 'react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { 
+  X, 
+  ZoomIn, 
+  ZoomOut, 
+  RotateCw, 
+  Maximize2, 
+  Download,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
+
+interface PhotoGalleryModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  photos: Array<{
+    url: string;
+    caption?: string;
+  }>;
+  initialIndex?: number;
+}
+
+export function PhotoGalleryModal({ 
+  isOpen, 
+  onClose, 
+  photos, 
+  initialIndex = 0 
+}: PhotoGalleryModalProps) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [zoom, setZoom] = useState(100);
+  const [rotation, setRotation] = useState(0);
+
+  // Reset state when modal opens with new initial index
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentIndex(initialIndex);
+      setZoom(100);
+      setRotation(0);
+    }
+  }, [isOpen, initialIndex]);
+
+  const currentPhoto = photos[currentIndex];
+  const hasMultiplePhotos = photos.length > 1;
+
+  // Navigation
+  const goToPrevious = useCallback(() => {
+    setCurrentIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1));
+    resetTransforms();
+  }, [photos.length]);
+
+  const goToNext = useCallback(() => {
+    setCurrentIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1));
+    resetTransforms();
+  }, [photos.length]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+      
+      switch (e.key) {
+        case 'ArrowLeft':
+          goToPrevious();
+          break;
+        case 'ArrowRight':
+          goToNext();
+          break;
+        case 'Escape':
+          onClose();
+          break;
+        case '+':
+        case '=':
+          handleZoomIn();
+          break;
+        case '-':
+          handleZoomOut();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, goToPrevious, goToNext, onClose]);
+
+  // Zoom controls
+  const handleZoomIn = () => {
+    setZoom((prev) => Math.min(prev + 25, 300));
+  };
+
+  const handleZoomOut = () => {
+    setZoom((prev) => Math.max(prev - 25, 25));
+  };
+
+  // Rotate
+  const handleRotate = () => {
+    setRotation((prev) => (prev + 90) % 360);
+  };
+
+  // Reset
+  const resetTransforms = () => {
+    setZoom(100);
+    setRotation(0);
+  };
+
+  // Download
+  const handleDownload = async () => {
+    try {
+      const response = await fetch(currentPhoto.url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `photo-${currentIndex + 1}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      // Fallback: open in new tab
+      window.open(currentPhoto.url, '_blank');
+    }
+  };
+
+  if (!currentPhoto) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-[95vw] w-full h-[95vh] p-0 gap-0 bg-zinc-900 border-zinc-800">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+          <div>
+            <h3 className="text-white font-medium">
+              {currentPhoto.caption || `Photo ${currentIndex + 1} of ${photos.length}`}
+            </h3>
+            <p className="text-zinc-400 text-sm">Zoom: {zoom}%</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="text-zinc-400 hover:text-white hover:bg-zinc-800"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+
+        {/* Main Image Area */}
+        <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-zinc-950">
+          {/* Previous Button */}
+          {hasMultiplePhotos && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={goToPrevious}
+              className="absolute left-4 z-10 h-12 w-12 rounded-full bg-black/50 text-white hover:bg-black/70"
+            >
+              <ChevronLeft className="w-8 h-8" />
+            </Button>
+          )}
+
+          {/* Image */}
+          <div className="overflow-auto max-w-full max-h-full p-4">
+            <img
+              src={currentPhoto.url}
+              alt={currentPhoto.caption || `Photo ${currentIndex + 1}`}
+              className="max-w-none transition-transform duration-200"
+              style={{
+                transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
+                transformOrigin: 'center center',
+              }}
+              draggable={false}
+            />
+          </div>
+
+          {/* Next Button */}
+          {hasMultiplePhotos && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={goToNext}
+              className="absolute right-4 z-10 h-12 w-12 rounded-full bg-black/50 text-white hover:bg-black/70"
+            >
+              <ChevronRight className="w-8 h-8" />
+            </Button>
+          )}
+        </div>
+
+        {/* Toolbar */}
+        <div className="flex items-center justify-center gap-2 px-4 py-3 border-t border-zinc-800 bg-zinc-900">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleZoomOut}
+            disabled={zoom <= 25}
+            className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700"
+          >
+            <ZoomOut className="w-4 h-4 mr-1" />
+            Zoom Out
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleZoomIn}
+            disabled={zoom >= 300}
+            className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700"
+          >
+            <ZoomIn className="w-4 h-4 mr-1" />
+            Zoom In
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRotate}
+            className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700"
+          >
+            <RotateCw className="w-4 h-4 mr-1" />
+            Rotate
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={resetTransforms}
+            className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700"
+          >
+            <Maximize2 className="w-4 h-4 mr-1" />
+            Reset
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownload}
+            className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700"
+          >
+            <Download className="w-4 h-4 mr-1" />
+            Download
+          </Button>
+        </div>
+
+        {/* Thumbnail Strip (optional - for many photos) */}
+        {photos.length > 1 && (
+          <div className="px-4 py-3 border-t border-zinc-800 bg-zinc-900">
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {photos.map((photo, index) => (
+                <button
+                  key={index}
+                  onClick={() => {
+                    setCurrentIndex(index);
+                    resetTransforms();
+                  }}
+                  className={`flex-shrink-0 w-16 h-16 rounded overflow-hidden border-2 transition-all
+                    ${index === currentIndex 
+                      ? 'border-orange-500 opacity-100' 
+                      : 'border-transparent opacity-60 hover:opacity-100'
+                    }`}
+                >
+                  <img
+                    src={photo.url}
+                    alt={`Thumbnail ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-zinc-500 text-center mt-2">
+              {currentIndex + 1} of {photos.length} • Use arrow keys to navigate
+            </p>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+---
+
+### 2. Update Marketing Tab - Make Photos Clickable
+
+**In your Marketing tab component:**
+
+```tsx
+import { useState } from 'react';
+import { PhotoGalleryModal } from './photo-gallery-modal';
+
+// Add state for gallery modal
+const [showPhotoGallery, setShowPhotoGallery] = useState(false);
+const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+
+// Handler to open gallery at specific photo
+const openPhotoGallery = (index: number) => {
+  setSelectedPhotoIndex(index);
+  setShowPhotoGallery(true);
+};
+
+// Prepare photos array for gallery
+const galleryPhotos = mlsPhotos.map((url: string, index: number) => ({
+  url,
+  caption: `Photo ${index + 1} of ${mlsPhotos.length}`,
+}));
+```
+
+**Update the photos grid to be clickable:**
+
+```tsx
+{/* Property Photos Section */}
+<Card>
+  <CardContent className="p-4">
+    <div className="flex items-center justify-between mb-4">
+      <h3 className="text-sm font-medium flex items-center gap-2">
+        <Camera className="w-4 h-4" />
+        Property Photos ({mlsPhotos.length} from MLS)
+      </h3>
+      <Button variant="outline" size="sm">
+        <RefreshCw className="w-4 h-4 mr-1" />
+        Refresh
+      </Button>
+    </div>
+
+    {/* Clickable Photos Grid */}
+    <div className="grid grid-cols-8 gap-2">
+      {mlsPhotos.slice(0, 7).map((photo: string, index: number) => (
+        <button
+          key={index}
+          onClick={() => openPhotoGallery(index)}
+          className="aspect-square rounded-lg overflow-hidden border hover:ring-2 hover:ring-orange-500 
+                     transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500"
+        >
+          <img 
+            src={photo} 
+            alt={`Property photo ${index + 1}`} 
+            className="w-full h-full object-cover"
+          />
+        </button>
+      ))}
+      
+      {/* "+N more" button */}
+      {mlsPhotos.length > 7 && (
+        <button
+          onClick={() => openPhotoGallery(7)}
+          className="aspect-square rounded-lg bg-muted flex items-center justify-center 
+                     text-sm font-medium border hover:bg-muted/80 hover:ring-2 hover:ring-orange-500
+                     transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500"
+        >
+          +{mlsPhotos.length - 7}
+        </button>
+      )}
+    </div>
+
+    <p className="text-xs text-muted-foreground mt-3">
+      Photos synced from MLS • Click to view full size
+    </p>
+  </CardContent>
+</Card>
+
+{/* Photo Gallery Modal */}
+<PhotoGalleryModal
+  isOpen={showPhotoGallery}
+  onClose={() => setShowPhotoGallery(false)}
+  photos={galleryPhotos}
+  initialIndex={selectedPhotoIndex}
+/>
+```
+
+---
+
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| **Click to Open** | Click any photo or "+N" to open gallery |
+| **Navigation** | Left/Right arrows, keyboard arrows, thumbnail strip |
+| **Zoom** | Zoom In (up to 300%), Zoom Out (down to 25%) |
+| **Rotate** | Rotate 90° clockwise |
+| **Reset** | Reset zoom and rotation |
+| **Download** | Download current photo |
+| **Keyboard** | Arrow keys, +/- for zoom, Esc to close |
+
+---
+
+## Visual Flow
+
+```
+Marketing Tab                          Photo Gallery Modal
+┌─────────────────────┐               ┌─────────────────────────────┐
+│ Property Photos     │               │ Photo 5 of 34          [✕] │
+│                     │               │ Zoom: 100%                  │
+│ ┌───┐ ┌───┐ ┌───┐  │    Click      ├─────────────────────────────┤
+│ │ 1 │ │ 2 │ │ 3 │  │  ────────►   │                             │
+│ └───┘ └───┘ └───┘  │               │    [←]  [LARGE PHOTO]  [→]  │
+│ ┌───┐ ┌───┐ ┌───┐  │               │                             │
+│ │ 4 │ │ 5 │ │+27│  │               ├─────────────────────────────┤
+│ └───┘ └───┘ └───┘  │               │ [Zoom-][Zoom+][Rotate][⬇️]  │
+│       ↑            │               ├─────────────────────────────┤
+│    Clickable       │               │ [1][2][3][4][5][6][7]...    │
+└─────────────────────┘               └─────────────────────────────┘
+```
+
+---
+
+## Testing Checklist
+
+- [ ] Clicking a photo opens the gallery modal
+- [ ] Clicking "+27" opens the gallery at photo #8
+- [ ] Left/Right arrows navigate between photos
+- [ ] Keyboard arrow keys work for navigation
+- [ ] Zoom In/Out buttons work
+- [ ] Zoom percentage displays correctly
+- [ ] Rotate button rotates image 90°
+- [ ] Reset button resets zoom and rotation
+- [ ] Download button downloads the photo
+- [ ] Thumbnail strip shows all photos
+- [ ] Clicking thumbnail jumps to that photo
+- [ ] Current photo highlighted in thumbnail strip
+- [ ] ESC key closes the modal
+- [ ] X button closes the modal
+- [ ] Photo caption/title displays correctly

@@ -103,6 +103,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CreateFlyerDialog, FlyerAssetConfig } from "./create-flyer-dialog";
 import { MarketingMaterialsDialog, SocialGraphicConfig } from "./marketing-materials-dialog";
 import { GraphicGeneratorDialog } from "./graphic-generator-dialog";
+import { PhotoGalleryModal } from "./photo-gallery-modal";
 import { CMATab } from "./cma-tab";
 import { TimelineTab } from "./timeline-tab";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -635,11 +636,14 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [editGraphicsAsset, setEditGraphicsAsset] = useState<{ id: string; config: SocialGraphicConfig } | null>(null);
   const [graphicsDialogOpen, setGraphicsDialogOpen] = useState(false);
   const [graphicGeneratorOpen, setGraphicGeneratorOpen] = useState(false);
+  const [photoGalleryOpen, setPhotoGalleryOpen] = useState(false);
+  const [photoGalleryIndex, setPhotoGalleryIndex] = useState(0);
   const [previewAsset, setPreviewAsset] = useState<MarketingAsset | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentPhoto, setCurrentPhoto] = useState(0);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const mlsData = transaction.mlsData as MLSData | null;
+  const mlsPhotos = mlsData?.images || mlsData?.photos || [];
   // Check if this is an off-market listing (has isOffMarket flag and no MLS number)
   const isOffMarket = transaction.isOffMarket && !transaction.mlsNumber;
   // Use Off Market status first, then MLS status, then transaction status
@@ -1385,6 +1389,17 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         open={graphicGeneratorOpen}
         onOpenChange={setGraphicGeneratorOpen}
         transaction={transaction}
+      />
+
+      {/* MLS Photo Gallery Modal */}
+      <PhotoGalleryModal
+        isOpen={photoGalleryOpen}
+        onClose={() => setPhotoGalleryOpen(false)}
+        photos={mlsPhotos.map((url: string, index: number) => ({
+          url,
+          caption: `Photo ${index + 1} of ${mlsPhotos.length}`,
+        }))}
+        initialIndex={photoGalleryIndex}
       />
 
       {/* Asset Preview Modal with Zoom */}
@@ -3005,9 +3020,13 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                         <div className="space-y-3">
                           <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
                             {mlsPhotos.slice(0, 7).map((photo: string, index: number) => (
-                              <div 
+                              <button 
                                 key={index} 
-                                className="relative aspect-square rounded-md overflow-hidden border"
+                                onClick={() => {
+                                  setPhotoGalleryIndex(index);
+                                  setPhotoGalleryOpen(true);
+                                }}
+                                className="relative aspect-square rounded-md overflow-hidden border hover:ring-2 hover:ring-orange-500 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500"
                                 data-testid={`mls-photo-${index}`}
                               >
                                 <img 
@@ -3015,16 +3034,23 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                                   alt={`MLS photo ${index + 1}`}
                                   className="w-full h-full object-cover"
                                 />
-                              </div>
+                              </button>
                             ))}
                             {mlsPhotos.length > 7 && (
-                              <div className="aspect-square rounded-md bg-muted flex items-center justify-center">
+                              <button
+                                onClick={() => {
+                                  setPhotoGalleryIndex(7);
+                                  setPhotoGalleryOpen(true);
+                                }}
+                                className="aspect-square rounded-md bg-muted flex items-center justify-center hover:bg-muted/80 hover:ring-2 hover:ring-orange-500 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                data-testid="mls-photo-more"
+                              >
                                 <span className="text-sm font-medium text-muted-foreground">+{mlsPhotos.length - 7}</span>
-                              </div>
+                              </button>
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            Photos synced from MLS - Select a photo when creating graphics
+                            Photos synced from MLS • Click to view full size
                           </p>
                         </div>
                       ) : (
