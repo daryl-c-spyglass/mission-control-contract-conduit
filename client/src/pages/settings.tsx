@@ -433,10 +433,10 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Settings</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-xl sm:text-2xl font-semibold">Settings</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground">
           Manage your team and preferences
         </p>
       </div>
@@ -944,7 +944,7 @@ export default function Settings() {
                 <p className="text-xs text-muted-foreground">
                   Choose which closing date reminders to receive
                 </p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="flex items-center justify-between gap-2">
                     <Label htmlFor="reminder14Days" className="text-sm">14 days before</Label>
                     <Switch
@@ -990,16 +990,16 @@ export default function Settings() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <CardTitle>Transaction Coordinators</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-base sm:text-lg">Transaction Coordinators</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
                 Add team members who help manage transactions
               </CardDescription>
             </div>
             <Button
               onClick={() => setAddDialogOpen(true)}
-              className="gap-2"
+              className="gap-2 w-full sm:w-auto"
               data-testid="button-add-coordinator"
             >
               <UserPlus className="h-4 w-4" />
@@ -1073,10 +1073,10 @@ export default function Settings() {
       </Card>
 
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent>
+        <DialogContent className="w-[95vw] max-w-md p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>Add Transaction Coordinator</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-base sm:text-lg">Add Transaction Coordinator</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
               Add a team member to help manage transactions
             </DialogDescription>
           </DialogHeader>
@@ -1147,10 +1147,10 @@ export default function Settings() {
       </Dialog>
 
       <AlertDialog open={!!deleteCoordinator} onOpenChange={() => setDeleteCoordinator(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="w-[95vw] max-w-md p-4 sm:p-6">
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove Coordinator</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-base sm:text-lg">Remove Coordinator</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs sm:text-sm">
               Are you sure you want to remove {deleteCoordinator?.name}? They will no longer be available to assign to new transactions.
             </AlertDialogDescription>
           </AlertDialogHeader>
