@@ -1,0 +1,151 @@
+# RESOLVED: Address Data Pipeline Fix
+
+## Root Cause Identified ✅
+
+**Location:** `server/repliers.ts` - lines 1276 and similar in `fetchSimilarListings`
+
+**Problem:** Repliers API returns address as separate components, not as `full` or `streetAddress`:
+
+```javascript
+// What Repliers API actually returns:
+{
+  "address": {
+    "streetNumber": "612",
+    "streetName": "Twelve Oaks",
+    "streetSuffix": "LN",
+    "city": "Austin",
+    "state": "Texas",
+    "zip": "78748"
+  }
+}
+
+// What the code was looking for (WRONG):
+listing.address?.full         // undefined!
+listing.address?.streetAddress // undefined!
+
+// Result: Empty string saved to database
+address: listing.address?.full || listing.address?.streetAddress || ''  // = ""
+```
+
+---
+
+## Fix Applied ✅
+
+**Updated code in `searchNearbyComparables` and `fetchSimilarListings`:**
+
+```javascript
+// Build address from component parts
+address: [
+  listing.address?.streetNumber,
+  listing.address?.streetName,
+  listing.address?.streetSuffix
+].filter(Boolean).join(' ') + 
+(listing.address?.city ? `, ${listing.address.city}` : '') +
+(listing.address?.state ? `, ${listing.address.state}` : '') || '',
+
+// Result: "612 Twelve Oaks LN, Austin, TX"
+```
+
+---
+
+## Action Required: Refresh Existing Data
+
+The fix only affects **new** CMA data. Existing data in the database still has empty addresses.
+
+### To Get Proper Addresses:
+
+**Option 1: Clear and Refresh CMA**
+1. Go to CMA Tab
+2. Click **"Clear CMA Data"** button
+3. Page will refresh and regenerate comparables with proper addresses
+
+**Option 2: Refresh MLS Data**
+1. Go to transaction
+2. Click **"Refresh MLS"** button
+3. CMA data will be regenerated
+
+---
+
+## Verification Checklist
+
+After refreshing data, verify:
+
+### CMA Tab
+- [ ] Grid view shows actual addresses (not "Address unavailable")
+- [ ] List view shows actual addresses
+- [ ] Table view shows actual addresses in Address column
+- [ ] Address format: "123 Street Name, City, State"
+
+### Presentation Builder
+- [ ] Property Details shows actual addresses (not "Unknown")
+- [ ] All 10 comparables have addresses
+- [ ] PDF export includes addresses
+
+### Console Logs (for debugging)
+- [ ] No empty address strings in server logs
+- [ ] Address transformation shows proper values
+
+---
+
+## Technical Details
+
+### Files Modified
+- `server/repliers.ts` - `searchNearbyComparables()` function
+- `server/repliers.ts` - `fetchSimilarListings()` function
+
+### Repliers Address Field Mapping
+
+| Repliers Field | Description | Example |
+|----------------|-------------|---------|
+| `address.streetNumber` | House number | "612" |
+| `address.streetName` | Street name | "Twelve Oaks" |
+| `address.streetSuffix` | Street type | "LN" |
+| `address.city` | City | "Austin" |
+| `address.state` | State | "Texas" |
+| `address.zip` | ZIP code | "78748" |
+
+### Combined Address Format
+```
+{streetNumber} {streetName} {streetSuffix}, {city}, {state}
+→ "612 Twelve Oaks LN, Austin, TX"
+```
+
+---
+
+## Future Reference
+
+When working with Repliers API address data:
+
+```javascript
+// CORRECT way to get full address from Repliers
+const buildAddress = (listing) => {
+  const parts = [
+    listing.address?.streetNumber,
+    listing.address?.streetName,
+    listing.address?.streetSuffix
+  ].filter(Boolean).join(' ');
+  
+  const city = listing.address?.city;
+  const state = listing.address?.state;
+  
+  let fullAddress = parts;
+  if (city) fullAddress += `, ${city}`;
+  if (state) fullAddress += `, ${state}`;
+  
+  return fullAddress || 'Address unavailable';
+};
+
+// DON'T rely on these (they don't exist):
+// listing.address?.full
+// listing.address?.streetAddress
+// listing.unparsedAddress (sometimes exists, sometimes doesn't)
+```
+
+---
+
+## Status: RESOLVED ✅
+
+- Root cause: Identified
+- Fix: Applied to `server/repliers.ts`
+- Existing data: Requires refresh
+- New data: Will have proper addresses

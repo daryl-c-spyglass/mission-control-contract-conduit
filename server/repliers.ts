@@ -670,8 +670,9 @@ export async function enrichCMAWithCoordinates(comparables: CMAComparable[]): Pr
   const enrichmentResults = await Promise.all(
     needsEnrichment.map(comp => 
       limit(async () => {
-        const enrichment = await fetchListingCoordinates(comp.mlsNumber);
-        return { mlsNumber: comp.mlsNumber, enrichment };
+        const mlsNum = comp.mlsNumber || '';
+        const enrichment = await fetchListingCoordinates(mlsNum);
+        return { mlsNumber: mlsNum, enrichment };
       })
     )
   );
@@ -680,7 +681,7 @@ export async function enrichCMAWithCoordinates(comparables: CMAComparable[]): Pr
   const enrichmentMap = new Map<string, ListingEnrichment>();
   let successCount = 0;
   for (const result of enrichmentResults) {
-    if (result.enrichment) {
+    if (result.enrichment && result.mlsNumber) {
       enrichmentMap.set(result.mlsNumber, result.enrichment);
       successCount++;
     }
