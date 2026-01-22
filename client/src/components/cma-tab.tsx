@@ -957,7 +957,7 @@ export function CMATab({ transaction }: CMATabProps) {
                       data-testid={`card-cma-${index}`}
                     >
                       {/* Property Image */}
-                      <div className="relative h-44 bg-muted">
+                      <div className="relative h-44 bg-muted overflow-hidden">
                         {(comp.imageUrl || (comp.photos && comp.photos.length > 0)) ? (
                           <img
                             src={comp.photos?.[0] || comp.imageUrl}
@@ -969,50 +969,47 @@ export function CMATab({ transaction }: CMATabProps) {
                             <Home className="w-12 h-12" />
                           </div>
                         )}
-                        {/* Status Badge */}
-                        <Badge 
-                          className={`absolute top-3 left-3 whitespace-nowrap ${getStatusBadgeStyle(comp.status || '')}`}
-                        >
-                          {getStatusLabel(comp.status || '')}
-                        </Badge>
-                        {/* Distance Badge */}
-                        <Badge variant="secondary" className="absolute top-3 right-3 bg-black/60 text-white backdrop-blur-sm border-0 whitespace-nowrap">
-                          {comp.distance.toFixed(1)} mi
-                        </Badge>
                       </div>
                       
                       {/* Property Details */}
-                      <div className="p-4 space-y-3">
-                        {/* Price */}
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-xl font-bold">{formatPrice(comp.price)}</p>
-                          <p className="text-sm text-muted-foreground">${Math.round(pricePerSqft)}/sqft</p>
+                      <div className="p-3 space-y-2">
+                        {/* Row 1: Status + Distance badges */}
+                        <div className="flex items-center gap-2">
+                          <Badge 
+                            className={`whitespace-nowrap text-xs ${getStatusBadgeStyle(comp.status || '')}`}
+                          >
+                            {getStatusLabel(comp.status || '')}
+                          </Badge>
+                          <Badge variant="secondary" className="whitespace-nowrap text-xs">
+                            {comp.distance.toFixed(1)} mi
+                          </Badge>
                         </div>
                         
-                        {/* Address */}
-                        <p className="font-medium truncate">
-                          {comp.address?.split(',')[0] || comp.address}
-                        </p>
+                        {/* Row 2: Price + Price per sqft */}
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-lg font-bold">{formatPrice(comp.price)}</p>
+                          <p className="text-sm text-muted-foreground whitespace-nowrap">${Math.round(pricePerSqft)}/sqft</p>
+                        </div>
                         
-                        {/* Property Stats */}
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1.5">
-                            <Bed className="h-4 w-4" />
+                        {/* Row 3: Property Stats */}
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Bed className="h-3.5 w-3.5" />
                             <span>{comp.bedrooms} beds</span>
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            <Bath className="h-4 w-4" />
+                          <div className="flex items-center gap-1">
+                            <Bath className="h-3.5 w-3.5" />
                             <span>{comp.bathrooms} baths</span>
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            <Square className="h-4 w-4" />
+                          <div className="flex items-center gap-1">
+                            <Square className="h-3.5 w-3.5" />
                             <span>{sqft > 0 ? sqft.toLocaleString() : '-'} sqft</span>
                           </div>
                         </div>
                         
-                        {/* DOM */}
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <Clock className="h-4 w-4" />
+                        {/* Row 4: DOM */}
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Clock className="h-3.5 w-3.5" />
                           <span>{comp.daysOnMarket} days on market</span>
                         </div>
                       </div>
