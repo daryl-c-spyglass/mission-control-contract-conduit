@@ -985,6 +985,21 @@ export async function registerRoutes(
       console.log("Updating transaction with:", Object.keys(updateData));
       const updated = await storage.updateTransaction(req.params.id, updateData);
 
+      // Sync CMA record's propertiesData if it exists (keep Presentation Builder in sync)
+      if (cmaData && cmaData.length > 0) {
+        try {
+          const existingCma = await storage.getCmaByTransaction(req.params.id);
+          if (existingCma) {
+            await storage.updateCma(existingCma.id, {
+              propertiesData: cmaData,
+            });
+            console.log(`[MLS Refresh] Synced ${cmaData.length} comparables to CMA propertiesData`);
+          }
+        } catch (syncError) {
+          console.warn("[MLS Refresh] Failed to sync CMA propertiesData:", syncError);
+        }
+      }
+
       await storage.createActivity({
         transactionId: transaction.id,
         type: "mls_refreshed",
