@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useTheme } from '@/hooks/use-theme';
@@ -62,9 +62,9 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [mapReady, setMapReady] = useState(false);
-  const [containerReady, setContainerReady] = useState(false);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
   const { theme } = useTheme();
+  const initAttempts = useRef(0);
 
   const subjectCoords = getCoordinates(subjectProperty);
   const validComparables = useMemo(() => 
@@ -80,15 +80,11 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
     [validComparables]
   );
 
-  const initializeMap = useCallback(() => {
-    if (!mapContainer.current) return;
-    
+  const mapHeight = compact ? 150 : 200;
+
+  useEffect(() => {
     const container = mapContainer.current;
-    const { clientWidth, clientHeight } = container;
-    
-    if (clientWidth < 10 || clientHeight < 10) {
-      return;
-    }
+    if (!container) return;
 
     const token = import.meta.env.VITE_MAPBOX_TOKEN;
     if (!token) {
@@ -105,79 +101,62 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
       return;
     }
 
-    setMapError(null);
-    
-    if (map.current) {
-      map.current.remove();
-      map.current = null;
-    }
-    markersRef.current.forEach(m => m.remove());
-    markersRef.current = [];
-    setMapReady(false);
-
-    try {
-      const isDark = theme === 'dark';
-      const mapStyle = isDark ? 'mapbox://styles/mapbox/dark-v10' : 'mapbox://styles/mapbox/streets-v11';
-      
-      map.current = new mapboxgl.Map({
-        container: container,
-        style: mapStyle,
-        center: [centerCoords?.lng || -97.7431, centerCoords?.lat || 30.2672],
-        zoom: 12,
-        attributionControl: false,
-      });
-
-      map.current.on('load', () => {
-        setMapReady(true);
-      });
-
-      map.current.on('error', (e) => {
-        console.error('Mapbox error:', e);
-      });
-    } catch (err: any) {
-      setMapError(err.message || 'Failed to load map');
-    }
-  }, [theme, subjectCoords, validComparables]);
-
-  useEffect(() => {
-    if (!mapContainer.current) return;
-
-    const container = mapContainer.current;
-    
-    const checkSize = () => {
-      const { clientWidth, clientHeight } = container;
-      if (clientWidth > 10 && clientHeight > 10) {
-        setContainerReady(true);
-      }
-    };
-
-    checkSize();
-
-    const resizeObserver = new ResizeObserver(() => {
-      checkSize();
+    const initMap = () => {
       if (map.current) {
-        map.current.resize();
+        map.current.remove();
+        map.current = null;
       }
-    });
+      markersRef.current.forEach(m => m.remove());
+      markersRef.current = [];
+      setIsMapLoaded(false);
+      setMapError(null);
 
-    resizeObserver.observe(container);
+      try {
+        const isDark = theme === 'dark';
+        const mapStyle = isDark 
+          ? 'mapbox://styles/mapbox/dark-v11' 
+          : 'mapbox://styles/mapbox/streets-v12';
+        
+        const newMap = new mapboxgl.Map({
+          container: container,
+          style: mapStyle,
+          center: [centerCoords?.lng || -97.7431, centerCoords?.lat || 30.2672],
+          zoom: 11,
+          attributionControl: true,
+          interactive: true,
+        });
 
-    const timeoutId = setTimeout(checkSize, 100);
-    const timeoutId2 = setTimeout(checkSize, 300);
-    const timeoutId3 = setTimeout(checkSize, 500);
+        newMap.on('load', () => {
+          setIsMapLoaded(true);
+          newMap.resize();
+        });
 
-    return () => {
-      resizeObserver.disconnect();
-      clearTimeout(timeoutId);
-      clearTimeout(timeoutId2);
-      clearTimeout(timeoutId3);
+        newMap.on('error', (e) => {
+          console.error('Mapbox error:', e);
+        });
+
+        map.current = newMap;
+      } catch (err: any) {
+        console.error('Map init error:', err);
+        setMapError(err.message || 'Failed to load map');
+      }
     };
-  }, []);
 
-  useEffect(() => {
-    if (containerReady) {
-      initializeMap();
-    }
+    const attemptInit = () => {
+      const { clientWidth, clientHeight } = container;
+      if (clientWidth > 50 && clientHeight > 50) {
+        initMap();
+      } else if (initAttempts.current < 10) {
+        initAttempts.current++;
+        setTimeout(attemptInit, 100);
+      }
+    };
+
+    initAttempts.current = 0;
+    
+    requestAnimationFrame(() => {
+      setTimeout(attemptInit, 50);
+    });
 
     return () => {
       markersRef.current.forEach(m => m.remove());
@@ -187,24 +166,23 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
         map.current = null;
       }
     };
-  }, [containerReady, theme, initializeMap]);
+  }, [theme, subjectCoords?.lat, subjectCoords?.lng, validComparables.length]);
 
   useEffect(() => {
-    if (!mapReady || !map.current) return;
+    if (!isMapLoaded || !map.current) return;
 
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
-    if (subjectCoords) {
+    if (subjectCoords && map.current) {
       const el = document.createElement('div');
-      el.className = 'subject-marker';
       el.style.cssText = `
         width: 28px;
         height: 28px;
         background-color: #3b82f6;
         border: 3px solid white;
         border-radius: 50%;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
         cursor: pointer;
       `;
       
@@ -222,7 +200,6 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
       const color = getStatusColor(status);
       
       const el = document.createElement('div');
-      el.className = 'comp-marker';
       el.style.cssText = `
         width: 18px;
         height: 18px;
@@ -251,18 +228,28 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
         }
       });
       if (markersRef.current.length > 1) {
-        map.current.fitBounds(bounds, { padding: 50, maxZoom: 14 });
+        map.current.fitBounds(bounds, { padding: 40, maxZoom: 13 });
       }
     }
-  }, [mapReady, subjectCoords?.lat, subjectCoords?.lng, comparablesKey]);
+  }, [isMapLoaded, subjectCoords?.lat, subjectCoords?.lng, comparablesKey]);
 
-  const mapHeight = compact ? 'h-32' : 'h-48';
-  const minHeight = compact ? '128px' : '192px';
+  useEffect(() => {
+    if (map.current && isMapLoaded) {
+      const isDark = theme === 'dark';
+      const mapStyle = isDark 
+        ? 'mapbox://styles/mapbox/dark-v11' 
+        : 'mapbox://styles/mapbox/streets-v12';
+      map.current.setStyle(mapStyle);
+    }
+  }, [theme, isMapLoaded]);
 
   if (mapError) {
     return (
       <div className="space-y-2">
-        <div className={`bg-muted rounded-lg ${mapHeight} flex items-center justify-center text-muted-foreground text-sm`} style={{ minHeight }}>
+        <div 
+          className="bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-sm"
+          style={{ height: mapHeight }}
+        >
           <div className="text-center">
             <MapPin className="w-6 h-6 mx-auto mb-2 opacity-50" />
             <p>{mapError}</p>
@@ -290,8 +277,12 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
     <div className="space-y-2">
       <div 
         ref={mapContainer} 
-        className={`rounded-lg overflow-hidden border ${mapHeight}`}
-        style={{ minHeight, width: '100%' }}
+        className="rounded-lg overflow-hidden border"
+        style={{ 
+          height: `${mapHeight}px`,
+          width: '100%',
+          position: 'relative',
+        }}
       />
       <div className="flex gap-3 text-xs flex-wrap justify-center">
         <span className="flex items-center gap-1">
