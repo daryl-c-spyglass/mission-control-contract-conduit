@@ -4173,7 +4173,7 @@ export function CMAReport({
                             <div className="flex-1 min-w-0">
                               <p className="font-semibold text-sm truncate">{property.unparsedAddress}</p>
                               <p className="text-lg font-bold text-primary">${price.toLocaleString()}</p>
-                              <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                 <span>{property.bedroomsTotal || 0} beds</span>
                                 <span>{property.bathroomsTotalInteger || 0} baths</span>
                                 {property.livingArea && <span>{Number(property.livingArea).toLocaleString()} sqft</span>}
