@@ -217,19 +217,32 @@ export default function CMAPresentationBuilder() {
     ? (cma.propertiesData as any[])
     : (linkedTransaction?.cmaData || []) as any[];
   
+  // Helper to normalize MLS status codes to human-readable status
+  const normalizeStatus = (status: string | undefined | null): string => {
+    if (!status) return 'Active';
+    const s = status.toLowerCase();
+    if (s === 'u' || s === 'sc' || s.includes('pending') || s.includes('contract')) return 'Pending';
+    if (s === 'a' || s.includes('active')) return 'Active';
+    if (s === 'c' || s === 's' || s.includes('sold') || s.includes('closed')) return 'Closed';
+    if (s.includes('expired') || s.includes('withdrawn') || s.includes('cancel')) return 'Off Market';
+    return status; // Return original if unknown
+  };
+
   const properties = rawComparables.map((comp: any, index: number) => {
     const resolvedAddress = comp.unparsedAddress || comp.streetAddress || comp.address || 
       comp.fullAddress || comp.addressLine1 || comp.location?.address || '';
     
     // Parse numeric values from strings if needed
     const parsedSqft = typeof comp.sqft === 'string' ? parseFloat(comp.sqft) : (comp.sqft || comp.livingArea || 0);
-    const parsedBeds = typeof comp.bedrooms === 'string' ? parseInt(comp.bedrooms) : (comp.bedrooms || comp.beds || 0);
-    const parsedBaths = typeof comp.bathrooms === 'string' ? parseFloat(comp.bathrooms) : (comp.bathrooms || comp.baths || 0);
+    const parsedBeds = typeof comp.bedrooms === 'string' ? parseInt(comp.bedrooms) : (comp.bedrooms || comp.beds || comp.bedroomsTotal || 0);
+    const parsedBaths = typeof comp.bathrooms === 'string' ? parseFloat(comp.bathrooms) : (comp.bathrooms || comp.baths || comp.bathroomsTotal || 0);
     const parsedPrice = comp.listPrice || comp.price || comp.closePrice || 0;
     
-    // Resolve coordinates - check multiple possible locations
-    const lat = comp.latitude || comp.map?.latitude || comp.coordinates?.latitude || comp.geo?.lat;
-    const lng = comp.longitude || comp.map?.longitude || comp.coordinates?.longitude || comp.geo?.lng;
+    // Resolve coordinates - check multiple possible locations (including short form lat/lng)
+    const lat = comp.latitude || comp.lat || comp.map?.latitude || comp.map?.lat || 
+      comp.coordinates?.latitude || comp.coordinates?.lat || comp.geo?.lat;
+    const lng = comp.longitude || comp.lng || comp.map?.longitude || comp.map?.lng || 
+      comp.coordinates?.longitude || comp.coordinates?.lng || comp.geo?.lng;
     
     return {
       id: comp.mlsNumber || `comp-${index}`,
@@ -242,11 +255,12 @@ export default function CMAPresentationBuilder() {
       postalCode: comp.postalCode || '',
       // Price fields
       listPrice: parsedPrice,
-      closePrice: comp.closePrice || (comp.status === 'Closed' || comp.standardStatus === 'Closed' ? parsedPrice : null),
+      closePrice: comp.closePrice || comp.soldPrice || 
+        (normalizeStatus(comp.status) === 'Closed' || normalizeStatus(comp.standardStatus) === 'Closed' ? parsedPrice : null),
       soldPrice: comp.soldPrice || comp.closePrice,
-      // Status
-      standardStatus: comp.status || comp.standardStatus || 'Active',
-      status: comp.status || comp.standardStatus || 'Active',
+      // Status - normalized to human-readable format
+      standardStatus: normalizeStatus(comp.standardStatus || comp.status),
+      status: normalizeStatus(comp.status || comp.standardStatus),
       // Bedroom/bathroom fields - multiple aliases for different components
       bedroomsTotal: parsedBeds,
       beds: parsedBeds,
@@ -271,8 +285,32 @@ export default function CMAPresentationBuilder() {
     };
   }) as unknown as Property[];
 
-  // Get subject property from linked transaction's mlsData
-  const subjectFromTransaction = linkedTransaction?.mlsData as Property | null;
+  // Get subject property from linked transaction's mlsData and normalize fields
+  const rawSubject = linkedTransaction?.mlsData as any;
+  const subjectFromTransaction: Property | null = rawSubject ? {
+    ...rawSubject,
+    // Address aliases
+    unparsedAddress: rawSubject.address || rawSubject.unparsedAddress || rawSubject.streetAddress || '',
+    streetAddress: rawSubject.address || rawSubject.streetAddress || rawSubject.unparsedAddress || '',
+    address: rawSubject.address || rawSubject.unparsedAddress || rawSubject.streetAddress || '',
+    // Bedroom/bathroom aliases (mlsData uses bedrooms/bathrooms, not bedroomsTotal/bathroomsTotal)
+    bedroomsTotal: rawSubject.bedroomsTotal || rawSubject.bedrooms || 0,
+    beds: rawSubject.bedroomsTotal || rawSubject.bedrooms || 0,
+    bathroomsTotal: rawSubject.bathroomsTotal || rawSubject.bathrooms || 0,
+    bathroomsTotalInteger: rawSubject.bathroomsTotalInteger || rawSubject.bathrooms || 0,
+    baths: rawSubject.bathroomsTotal || rawSubject.bathrooms || 0,
+    // Sqft aliases (mlsData uses sqft as string)
+    livingArea: typeof rawSubject.sqft === 'string' ? parseFloat(rawSubject.sqft) : (rawSubject.sqft || rawSubject.livingArea || 0),
+    sqft: typeof rawSubject.sqft === 'string' ? parseFloat(rawSubject.sqft) : (rawSubject.sqft || rawSubject.livingArea || 0),
+    // Status normalization
+    standardStatus: normalizeStatus(rawSubject.standardStatus || rawSubject.status),
+    status: normalizeStatus(rawSubject.status || rawSubject.standardStatus),
+    // Coordinate aliases (mlsData uses coordinates.latitude/longitude)
+    latitude: rawSubject.latitude || rawSubject.coordinates?.latitude,
+    longitude: rawSubject.longitude || rawSubject.coordinates?.longitude,
+    map: rawSubject.map || (rawSubject.coordinates?.latitude && rawSubject.coordinates?.longitude ? 
+      { latitude: rawSubject.coordinates.latitude, longitude: rawSubject.coordinates.longitude } : null),
+  } as unknown as Property : null;
 
   const { data: statistics } = useQuery<PropertyStatistics>({
     queryKey: ['/api/cmas', id, 'statistics'],
