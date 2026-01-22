@@ -73,26 +73,26 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
       onClick={onClick}
       data-testid={`card-transaction-${transaction.id}`}
     >
-      <CardHeader className="flex flex-row items-start justify-between gap-4 pb-3">
+      <CardHeader className="flex flex-row items-start justify-between gap-2 sm:gap-4 pb-3">
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-lg leading-tight truncate" data-testid={`text-address-${transaction.id}`}>
+          <h3 className="font-medium text-base sm:text-lg leading-tight truncate" data-testid={`text-address-${transaction.id}`}>
             {transaction.propertyAddress}
           </h3>
           {transaction.mlsNumber ? (
             <div className="flex items-center gap-1.5 mt-1 text-muted-foreground">
-              <Hash className="h-3 w-3" />
-              <span className="font-mono text-sm" data-testid={`text-mls-${transaction.id}`}>
+              <Hash className="h-3 w-3 flex-shrink-0" />
+              <span className="font-mono text-xs sm:text-sm truncate" data-testid={`text-mls-${transaction.id}`}>
                 {transaction.mlsNumber}
               </span>
             </div>
           ) : isOffMarket ? (
-            <span className="text-sm text-muted-foreground" data-testid={`text-off-market-${transaction.id}`}>
+            <span className="text-xs sm:text-sm text-muted-foreground" data-testid={`text-off-market-${transaction.id}`}>
               (Off Market)
             </span>
           ) : null}
         </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <Badge className={getStatusBadgeStyle(displayStatus)} data-testid={`badge-status-${transaction.id}`}>
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+          <Badge className={`${getStatusBadgeStyle(displayStatus)} text-[10px] sm:text-xs`} data-testid={`badge-status-${transaction.id}`}>
             {statusLabel}
           </Badge>
           
@@ -122,21 +122,21 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4 text-sm">
+      <CardContent className="space-y-3 sm:space-y-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-4 text-xs sm:text-sm">
           <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Contract Date</p>
-            <div className="flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+            <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide mb-1">Contract Date</p>
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground flex-shrink-0" />
               <span data-testid={`text-contract-date-${transaction.id}`}>
                 {formatDate(transaction.contractDate)}
               </span>
             </div>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Closing Date</p>
-            <div className="flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+            <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide mb-1">Closing Date</p>
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground flex-shrink-0" />
               <span data-testid={`text-closing-date-${transaction.id}`}>
                 {formatDate(transaction.closingDate)}
               </span>
@@ -145,70 +145,71 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
         </div>
 
         {daysRemaining !== null && !displayStatus.toLowerCase().includes('closed') && !displayStatus.toLowerCase().includes('sold') && !displayStatus.toLowerCase().includes('cancel') && (
-          <div className={`text-sm ${getDaysRemainingStyle(daysRemaining)}`}>
+          <div className={`text-xs sm:text-sm ${getDaysRemainingStyle(daysRemaining)}`}>
             {daysRemaining > 0 ? `${daysRemaining} days remaining` : daysRemaining === 0 ? "Closing today" : `${Math.abs(daysRemaining)} days overdue`}
           </div>
         )}
 
         {transactionCoordinators.length > 0 && (
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
             <div className="flex -space-x-2">
               {transactionCoordinators.slice(0, 3).map((coord) => (
-                <Avatar key={coord.id} className="h-7 w-7 border-2 border-card">
-                  <AvatarFallback className="text-xs">
+                <Avatar key={coord.id} className="h-6 w-6 sm:h-7 sm:w-7 border-2 border-card">
+                  <AvatarFallback className="text-[10px] sm:text-xs">
                     {coord.name.split(" ").map((n) => n[0]).join("").toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               ))}
               {transactionCoordinators.length > 3 && (
-                <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-card bg-muted text-xs font-medium">
+                <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full border-2 border-card bg-muted text-[10px] sm:text-xs font-medium">
                   +{transactionCoordinators.length - 3}
                 </div>
               )}
             </div>
-            <span className="text-sm text-muted-foreground ml-1">
+            <span className="text-xs sm:text-sm text-muted-foreground ml-1 truncate">
               {transactionCoordinators.map((c) => c.name.split(" ")[0]).slice(0, 2).join(", ")}
               {transactionCoordinators.length > 2 && ` +${transactionCoordinators.length - 2}`}
             </span>
           </div>
         )}
 
-        <div className="flex items-center gap-2 pt-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
-          {/* Only show MLS Data button for listings with MLS data (not off-market) */}
+        <div className="flex items-center gap-1 sm:gap-2 pt-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
           {onMLSClick && !isOffMarket && (
             <Button
               size="sm"
               variant="outline"
-              className="gap-1.5"
+              className="gap-1 sm:gap-1.5 text-[11px] sm:text-xs px-2 sm:px-3"
               onClick={onMLSClick}
               data-testid={`button-mls-${transaction.id}`}
             >
-              <FileSpreadsheet className="h-3.5 w-3.5" />
-              MLS Data
+              <FileSpreadsheet className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
+              <span className="hidden xs:inline">MLS</span>
+              <span className="xs:hidden">MLS</span>
             </Button>
           )}
           {onMarketingClick && (
             <Button
               size="sm"
               variant="outline"
-              className="gap-1.5"
+              className="gap-1 sm:gap-1.5 text-[11px] sm:text-xs px-2 sm:px-3"
               onClick={onMarketingClick}
               data-testid={`button-marketing-${transaction.id}`}
             >
-              <ImageIcon className="h-3.5 w-3.5" />
-              Marketing
+              <ImageIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
+              <span className="hidden sm:inline">Marketing</span>
+              <span className="sm:hidden">Mkt</span>
             </Button>
           )}
           {onDocsClick && (
             <Button
               size="sm"
               variant="outline"
-              className="gap-1.5"
+              className="gap-1 sm:gap-1.5 text-[11px] sm:text-xs px-2 sm:px-3"
               onClick={onDocsClick}
               data-testid={`button-docs-${transaction.id}`}
             >
-              <FileText className="h-3.5 w-3.5" />
+              <FileText className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
               Docs
             </Button>
           )}
@@ -216,40 +217,39 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
             <Button
               size="sm"
               variant="outline"
-              className="gap-1.5"
+              className="gap-1 sm:gap-1.5 text-[11px] sm:text-xs px-2 sm:px-3"
               onClick={() => window.open(`https://slack.com/app_redirect?channel=${transaction.slackChannelId}`, '_blank')}
               data-testid={`button-slack-${transaction.id}`}
             >
-              <MessageSquare className="h-3.5 w-3.5" />
-              Slack
+              <MessageSquare className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
+              <span className="hidden sm:inline">Slack</span>
             </Button>
           )}
           {transaction.gmailFilterId && (
             <Button
               size="sm"
               variant="outline"
-              className="gap-1.5"
+              className="gap-1 sm:gap-1.5 text-[11px] sm:text-xs px-2 sm:px-3"
               data-testid={`button-emails-${transaction.id}`}
             >
-              <Mail className="h-3.5 w-3.5" />
-              Emails
+              <Mail className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
+              <span className="hidden sm:inline">Emails</span>
             </Button>
           )}
         </div>
         
-        {/* Add MLS Number button for off-market listings */}
         {isOffMarket && onAddMLSClick && (
           <Button
             size="sm"
             variant="ghost"
-            className="gap-1.5 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/30 mt-2"
+            className="gap-1 sm:gap-1.5 text-[11px] sm:text-xs text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/30 mt-2"
             onClick={(e) => {
               e.stopPropagation();
               onAddMLSClick();
             }}
             data-testid={`button-add-mls-${transaction.id}`}
           >
-            <Plus className="h-3.5 w-3.5" />
+            <Plus className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
             Add MLS Number
           </Button>
         )}

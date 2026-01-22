@@ -84,7 +84,7 @@ export function PropertyDetailModal({ isOpen, onClose, property }: PropertyDetai
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl p-0 overflow-hidden bg-zinc-900 border-zinc-700 [&>button]:hidden">
+      <DialogContent className="w-[95vw] max-w-2xl p-0 overflow-hidden bg-zinc-900 border-zinc-700 [&>button]:hidden">
         <div className="relative">
           <button
             onClick={onClose}

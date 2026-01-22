@@ -779,21 +779,21 @@ export function CMATab({ transaction }: CMATabProps) {
               : null;
             
             return (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 sm:p-4">
                 {/* LOW PRICE */}
                 <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Low Price</p>
-                  <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">{formatPrice(statistics.price.range.min)}</p>
+                  <p className="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Low Price</p>
+                  <p className="text-base sm:text-xl font-semibold text-gray-900 dark:text-white mt-0.5 sm:mt-1">{formatPrice(statistics.price.range.min)}</p>
                 </div>
                 {/* HIGH PRICE */}
                 <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">High Price</p>
-                  <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">{formatPrice(statistics.price.range.max)}</p>
+                  <p className="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">High Price</p>
+                  <p className="text-base sm:text-xl font-semibold text-gray-900 dark:text-white mt-0.5 sm:mt-1">{formatPrice(statistics.price.range.max)}</p>
                 </div>
                 {/* AVG PRICE */}
                 <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Avg Price</p>
-                  <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">{formatPrice(Math.round(statistics.price.average))}</p>
+                  <p className="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Avg Price</p>
+                  <p className="text-base sm:text-xl font-semibold text-gray-900 dark:text-white mt-0.5 sm:mt-1">{formatPrice(Math.round(statistics.price.average))}</p>
                   {priceVsMarket !== null && (
                     <p className={`text-xs mt-0.5 flex items-center gap-1 ${priceVsMarket > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                       {priceVsMarket > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
@@ -803,18 +803,18 @@ export function CMATab({ transaction }: CMATabProps) {
                 </div>
                 {/* MEDIAN */}
                 <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Median</p>
-                  <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">{formatPrice(Math.round(statistics.price.median))}</p>
+                  <p className="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Median</p>
+                  <p className="text-base sm:text-xl font-semibold text-gray-900 dark:text-white mt-0.5 sm:mt-1">{formatPrice(Math.round(statistics.price.median))}</p>
                 </div>
                 {/* AVG $/SQFT */}
                 <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Avg $/SqFt</p>
-                  <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">${Math.round(statistics.pricePerSqFt.average)}</p>
+                  <p className="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Avg $/SqFt</p>
+                  <p className="text-base sm:text-xl font-semibold text-gray-900 dark:text-white mt-0.5 sm:mt-1">${Math.round(statistics.pricePerSqFt.average)}</p>
                 </div>
                 {/* AVG DOM */}
                 <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Avg DOM</p>
-                  <p className="text-xl font-semibold text-gray-900 dark:text-white mt-1">{Math.round(statistics.daysOnMarket.average)} days</p>
+                  <p className="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Avg DOM</p>
+                  <p className="text-base sm:text-xl font-semibold text-gray-900 dark:text-white mt-0.5 sm:mt-1">{Math.round(statistics.daysOnMarket.average)} days</p>
                 </div>
               </div>
             );
@@ -822,9 +822,9 @@ export function CMATab({ transaction }: CMATabProps) {
 
           {/* VIEW TOGGLES - Segment control style for Compare tab */}
           {mainView === 'compare' && (
-            <div className="flex items-center gap-3">
-              <span className="text-gray-500 dark:text-gray-400 text-sm">View:</span>
-              <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+              <span className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm">View:</span>
+              <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1 overflow-x-auto">
                 {[
                   { id: 'grid' as SubView, label: 'Grid', icon: LayoutGrid },
                   { id: 'list' as SubView, label: 'List', icon: List },
@@ -833,14 +833,14 @@ export function CMATab({ transaction }: CMATabProps) {
                   <button
                     key={view.id}
                     onClick={() => setSubView(view.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
                       subView === view.id
                         ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                     }`}
                     data-testid={`button-subview-${view.id}`}
                   >
-                    <view.icon className="w-4 h-4" />
+                    <view.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     {view.label}
                   </button>
                 ))}
@@ -941,7 +941,7 @@ export function CMATab({ transaction }: CMATabProps) {
             
             {/* Grid Sub-View - Clean Dashboard style */}
             {subView === 'grid' && (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredComparables.map((comp, index) => {
                   const sqft = typeof comp.sqft === 'number' ? comp.sqft : parseFloat(comp.sqft as string) || 0;
                   const pricePerSqft = sqft > 0 ? comp.price / sqft : 0;
@@ -1113,11 +1113,11 @@ export function CMATab({ transaction }: CMATabProps) {
           setPhotoIndex(0);
         }
       }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <div className="flex items-start justify-between gap-2">
               <div>
-                <DialogTitle>{selectedProperty?.address}</DialogTitle>
+                <DialogTitle className="text-base sm:text-lg">{selectedProperty?.address}</DialogTitle>
                 {selectedProperty?.mlsNumber && (
                   <DialogDescription>
                     MLS# {selectedProperty.mlsNumber}

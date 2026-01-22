@@ -4199,7 +4199,7 @@ export function CMAReport({
       
       {/* Floating Property Card Modal (Centered) */}
       <Dialog open={floatingCardOpen} onOpenChange={setFloatingCardOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           {floatingCardProperty && (
             <>
               <DialogHeader className="sr-only">
@@ -4208,7 +4208,7 @@ export function CMAReport({
               </DialogHeader>
               
               {/* Image Carousel */}
-              <div className="relative aspect-[16/9] bg-muted rounded-lg overflow-hidden mb-4 -mx-6 -mt-6">
+              <div className="relative aspect-[16/9] bg-muted rounded-lg overflow-hidden mb-4 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6">
                 {(() => {
                   const photos = getPropertyPhotos(floatingCardProperty);
                   return photos.length > 0 ? (

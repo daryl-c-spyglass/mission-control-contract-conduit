@@ -253,9 +253,9 @@ function DocumentUploadDialog({ isOpen, onClose, onUpload, isUploading }: Docume
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[95vw] max-w-md p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle>Upload Document</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg">Upload Document</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4">
@@ -587,10 +587,10 @@ function DocumentPreviewModal({ document, isOpen, onClose, onDownload }: Documen
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle>{document.name || document.fileName}</DialogTitle>
-          <p className="text-sm text-muted-foreground">
+          <DialogTitle className="text-base sm:text-lg">{document.name || document.fileName}</DialogTitle>
+          <p className="text-xs sm:text-sm text-muted-foreground">
             {typeLabel} • {document.fileName} ({formatFileSize(document.fileSize)})
           </p>
         </DialogHeader>

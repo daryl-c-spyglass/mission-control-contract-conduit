@@ -139,36 +139,38 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen, trans
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex items-center justify-between gap-2 sm:gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold">Transactions</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-xl sm:text-2xl font-semibold">Transactions</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Manage your active real estate transactions
           </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        <div className="relative flex-1 min-w-0 max-w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by address or MLS#..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="pl-9 text-sm"
             data-testid="input-search-transactions"
           />
         </div>
 
-        <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-          <TabsList>
-            <TabsTrigger value="all" data-testid="filter-all">All</TabsTrigger>
-            <TabsTrigger value="active" data-testid="filter-active">Active</TabsTrigger>
-            <TabsTrigger value="closing_soon" data-testid="filter-closing-soon">Closing Soon</TabsTrigger>
-            <TabsTrigger value="closed" data-testid="filter-closed">Closed</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 sm:pb-0">
+          <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+            <TabsList className="inline-flex w-auto min-w-full sm:w-auto">
+              <TabsTrigger value="all" className="text-xs sm:text-sm" data-testid="filter-all">All</TabsTrigger>
+              <TabsTrigger value="active" className="text-xs sm:text-sm" data-testid="filter-active">Active</TabsTrigger>
+              <TabsTrigger value="closing_soon" className="text-xs sm:text-sm whitespace-nowrap" data-testid="filter-closing-soon">Closing Soon</TabsTrigger>
+              <TabsTrigger value="closed" className="text-xs sm:text-sm" data-testid="filter-closed">Closed</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
 
       {transactionsLoading ? (

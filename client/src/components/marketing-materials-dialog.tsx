@@ -950,10 +950,10 @@ export function MarketingMaterialsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="w-[95vw] max-w-5xl max-h-[90vh] overflow-hidden flex flex-col p-4 sm:p-6">
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle>{isEditMode ? 'Edit Marketing Graphic' : 'Create Marketing Graphic'}</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-base sm:text-lg">{isEditMode ? 'Edit Marketing Graphic' : 'Create Marketing Graphic'}</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
             {isEditMode 
               ? 'Update your marketing graphic with new settings.' 
               : `Generate professional marketing graphics for ${transaction.propertyAddress}`}

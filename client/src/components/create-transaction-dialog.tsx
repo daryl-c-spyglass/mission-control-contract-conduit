@@ -304,10 +304,10 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-lg max-h-[85vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle>Create New Transaction</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-lg sm:text-xl">Create New Transaction</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
             Enter the property details to start a new transaction. This will automatically set up integrations based on your preferences.
           </DialogDescription>
         </DialogHeader>

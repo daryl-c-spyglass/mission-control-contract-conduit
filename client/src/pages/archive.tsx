@@ -67,40 +67,40 @@ export default function Archive() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Archive</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-xl sm:text-2xl font-semibold">Archive</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground">
           View archived transactions
         </p>
       </div>
 
-      <div className="relative max-w-sm">
+      <div className="relative max-w-full sm:max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search archived transactions..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
+          className="pl-9 text-sm"
           data-testid="input-search-archive"
         />
       </div>
 
       {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="rounded-md border p-4 space-y-4">
-              <Skeleton className="h-6 w-3/4" />
+            <div key={i} className="rounded-md border p-3 sm:p-4 space-y-3 sm:space-y-4">
+              <Skeleton className="h-5 sm:h-6 w-3/4" />
               <Skeleton className="h-4 w-1/2" />
               <div className="flex gap-2">
-                <Skeleton className="h-8 w-20" />
-                <Skeleton className="h-8 w-20" />
+                <Skeleton className="h-7 sm:h-8 w-16 sm:w-20" />
+                <Skeleton className="h-7 sm:h-8 w-16 sm:w-20" />
               </div>
             </div>
           ))}
         </div>
       ) : filteredTransactions.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {filteredTransactions.map((transaction) => (
             <TransactionCard
               key={transaction.id}

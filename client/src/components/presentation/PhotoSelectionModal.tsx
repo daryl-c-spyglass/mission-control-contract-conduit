@@ -61,24 +61,24 @@ export function PhotoSelectionModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh]">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[80vh] p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle>Select Photos</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-base sm:text-lg">Select Photos</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
             {propertyAddress} - Select up to {maxPhotos} photos for the presentation
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center justify-between pb-2 border-b">
-          <span className="text-sm text-muted-foreground">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between pb-2 border-b">
+          <span className="text-xs sm:text-sm text-muted-foreground">
             {selected.length} of {maxPhotos} selected
           </span>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={selectAll} data-testid="button-select-all">
-              Select First {Math.min(maxPhotos, photos.length)}
+            <Button variant="outline" size="sm" onClick={selectAll} data-testid="button-select-all" className="text-xs sm:text-sm">
+              Select {Math.min(maxPhotos, photos.length)}
             </Button>
-            <Button variant="outline" size="sm" onClick={clearAll} data-testid="button-clear-all">
-              Clear All
+            <Button variant="outline" size="sm" onClick={clearAll} data-testid="button-clear-all" className="text-xs sm:text-sm">
+              Clear
             </Button>
           </div>
         </div>

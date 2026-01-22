@@ -2557,7 +2557,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
       
       {/* Property Detail Dialog */}
       <Dialog open={!!selectedProperty} onOpenChange={(open) => !open && setSelectedProperty(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           {selectedProperty && (() => {
             // Photos are returned directly from Repliers API
             const photos = ((selectedProperty as any).photos as string[] | undefined) || [];
