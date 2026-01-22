@@ -6,14 +6,15 @@
 
 /* Mapbox Map Fixes - Ensure canvas renders with proper dimensions */
 .mapboxgl-map {
-  position: absolute !important;
-  top: 0;
-  left: 0;
   width: 100% !important;
   height: 100% !important;
 }
 
-.mapboxgl-canvas-container,
+.mapboxgl-canvas-container {
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .mapboxgl-canvas {
   width: 100% !important;
   height: 100% !important;

@@ -54,6 +54,7 @@
     "@types/mapbox-gl": "^3.4.1",
     "@types/memoizee": "^0.4.12",
     "@types/passport-google-oauth20": "^2.0.17",
+    "@types/react-map-gl": "^6.1.7",
     "@uppy/aws-s3": "^5.1.0",
     "@uppy/core": "^5.2.0",
     "@uppy/dashboard": "^5.1.0",
