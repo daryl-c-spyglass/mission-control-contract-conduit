@@ -548,16 +548,25 @@ export async function fetchSimilarListings(mlsNumber: string, radius: number = 5
     const filteredListings = data.listings.filter((listing: any) => !isRentalOrLease(listing));
 
     return filteredListings.slice(0, 10).map((listing: any) => {
-      const addressParts = [];
+      // Build address from component parts if full/streetAddress not available
+      const addressParts: string[] = [];
       if (listing.address?.streetNumber) addressParts.push(listing.address.streetNumber);
       if (listing.address?.streetName) addressParts.push(listing.address.streetName);
-      const streetAddress = addressParts.join(" ");
+      if (listing.address?.streetSuffix) addressParts.push(listing.address.streetSuffix);
+      const builtAddress = addressParts.join(" ");
+      const fullAddress = listing.address?.full || listing.address?.streetAddress || builtAddress;
+      // Add city/state if we have them
+      const city = listing.address?.city;
+      const state = listing.address?.state;
+      const displayAddress = fullAddress && city && state 
+        ? `${fullAddress}, ${city}, ${state}`
+        : fullAddress || '';
       
       const listingPhotos = normalizeImageUrls(listing.media || listing.images || listing.photos);
       const listingLat = listing.map?.latitude || listing.address?.latitude || listing.latitude;
       const listingLng = listing.map?.longitude || listing.address?.longitude || listing.longitude;
       return {
-        address: listing.address?.full || streetAddress || "",
+        address: displayAddress,
         price: parseFloat(listing.listPrice) || parseFloat(listing.soldPrice) || 0,
         bedrooms: listing.bedroomsTotal || listing.details?.numBedrooms || listing.beds || 0,
         bathrooms: listing.bathroomsFull || listing.details?.numBathrooms || listing.baths || 0,
@@ -1271,9 +1280,23 @@ export async function searchNearbyComparables(
       const sqft = listing.details?.sqft || listing.sqft || 0;
       const dom = listing.daysOnMarket ? parseInt(listing.daysOnMarket) : 0;
 
+      // Build address from component parts if full/streetAddress not available
+      const addressParts: string[] = [];
+      if (listing.address?.streetNumber) addressParts.push(listing.address.streetNumber);
+      if (listing.address?.streetName) addressParts.push(listing.address.streetName);
+      if (listing.address?.streetSuffix) addressParts.push(listing.address.streetSuffix);
+      const builtAddress = addressParts.join(' ');
+      const fullAddress = listing.address?.full || listing.address?.streetAddress || builtAddress;
+      // Add city/state if we have them
+      const city = listing.address?.city;
+      const state = listing.address?.state;
+      const displayAddress = fullAddress && city && state 
+        ? `${fullAddress}, ${city}, ${state}`
+        : fullAddress || '';
+
       return {
         mlsNumber: listing.mlsNumber,
-        address: listing.address?.full || listing.address?.streetAddress || '',
+        address: displayAddress,
         price: parseFloat(listing.listPrice) || 0,
         bedrooms: parseInt(listing.details?.numBedrooms || listing.numBedrooms || '0'),
         bathrooms: parseInt(listing.details?.numBathrooms || listing.numBathrooms || '0'),

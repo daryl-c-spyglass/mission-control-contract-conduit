@@ -1,0 +1,190 @@
+# CRITICAL BUG: Address Data Not Displaying - Debug Investigation
+
+## Problem (See Attached Screenshots)
+
+**Screenshot 1 - CMA Tab Grid View:**
+- All property cards show **"Address unavailable"**
+- Price, beds, baths, sqft all display correctly
+- Only address field is missing
+
+**Screenshot 2 - Presentation Builder Property Details:**
+- All properties show **"Unknown"** for address
+- Same data source, same problem
+
+## This is a DATA issue, not UI
+
+The UI code is working correctly:
+```tsx
+comp.address || 'Address unavailable'  // Returns fallback because address is empty
+```
+
+The `address` field is **empty/undefined** when it reaches the components.
+
+---
+
+## Task: Debug the Data Pipeline
+
+Trace where the address data is being lost:
+
+```
+Repliers API → Server Transform → Database/State → CMA Tab → Display
+```
+
+---
+
+## Step 1: Check Repliers API Raw Response
+
+Find where comparables are fetched from Repliers (likely `server/repliers.ts`) and log the raw response:
+
+```typescript
+// Add this logging where Repliers comparables are fetched
+console.log('=== REPLIERS RAW COMPARABLE ===');
+const firstComp = repliersResponse.listings?.[0] || repliersResponse[0];
+console.log('Raw address data:', {
+  address: firstComp?.address,
+  'address.full': firstComp?.address?.full,
+  'address.streetAddress': firstComp?.address?.streetAddress,
+  'address.streetNumber': firstComp?.address?.streetNumber,
+  'address.streetName': firstComp?.address?.streetName,
+  'address.city': firstComp?.address?.city,
+  unparsedAddress: firstComp?.unparsedAddress,
+});
+```
+
+**Question: What does the Repliers API actually return for address?**
+
+---
+
+## Step 2: Check How Comparables are Transformed
+
+Find the code that transforms Repliers data into CMA comparables (around line 502 in `server/repliers.ts` or similar):
+
+```typescript
+// Current code might be:
+address: comp.address?.full || compStreetAddress || "",
+
+// Log what's happening:
+console.log('=== ADDRESS TRANSFORMATION ===');
+console.log('comp.address:', comp.address);
+console.log('typeof comp.address:', typeof comp.address);
+console.log('comp.address?.full:', comp.address?.full);
+console.log('compStreetAddress:', compStreetAddress);
+```
+
+**Question: Is the address being extracted correctly from the Repliers response?**
+
+---
+
+## Step 3: Check CMA API Response
+
+Find the API endpoint `/api/transactions/:id/cma` and log what's being returned:
+
+```typescript
+// Before sending response
+console.log('=== CMA API RESPONSE ===');
+const comparables = cmaData.comparables || cmaData.propertiesData || [];
+console.log('First comparable in API response:', comparables[0]);
+console.log('Address in response:', comparables[0]?.address);
+```
+
+**Question: Does the API response include the address field?**
+
+---
+
+## Step 4: Check Frontend Data
+
+In `client/src/components/cma-tab.tsx`, add logging:
+
+```tsx
+useEffect(() => {
+  console.log('=== CMA TAB FRONTEND ===');
+  console.log('Comparables received:', comparables?.length);
+  if (comparables?.[0]) {
+    console.log('First comparable:', comparables[0]);
+    console.log('Address field:', comparables[0].address);
+    console.log('All keys:', Object.keys(comparables[0]));
+  }
+}, [comparables]);
+```
+
+**Question: What data does the frontend component receive?**
+
+---
+
+## Report Findings
+
+After adding the logging, check the server console and browser console. Report back:
+
+### 1. Repliers Raw Response
+```
+What does address look like in raw API response?
+- Is it a string? Object? Undefined?
+- What field name contains the address?
+```
+
+### 2. After Server Transformation
+```
+What does address look like after transformation?
+- Is it being mapped correctly?
+- Is the field name correct?
+```
+
+### 3. API Response
+```
+What does the /api/transactions/:id/cma endpoint return?
+- Is address included in the response?
+```
+
+### 4. Frontend Component
+```
+What does the CMA Tab component receive?
+- Is address in the props?
+- Is it empty string, undefined, or missing entirely?
+```
+
+---
+
+## Likely Root Causes
+
+### A. Repliers returns nested object, code expects string
+```javascript
+// Repliers returns:
+{ address: { full: "123 Main St", city: "Austin" } }
+
+// Code does:
+comp.address  // Gets object, not string!
+
+// Fix:
+comp.address?.full || comp.address?.streetAddress
+```
+
+### B. Address field not mapped in transformation
+```javascript
+// Transformation is missing address:
+return {
+  price: comp.listPrice,
+  bedrooms: comp.bedrooms,
+  // address is not being set!
+};
+```
+
+### C. Wrong field name from Repliers
+```javascript
+// Repliers uses unparsedAddress, not address
+comp.unparsedAddress  // Has the value
+comp.address          // undefined
+```
+
+### D. Data lost when saving/retrieving CMA
+```javascript
+// When CMA is saved to database, address might not be included
+// Or database column doesn't exist
+```
+
+---
+
+## DO NOT FIX YET
+
+Just investigate and report the findings. Once we know exactly where the address data is lost, we can create the correct fix.
+
+**Provide the console output for each step so we can identify the exact point of failure.**
