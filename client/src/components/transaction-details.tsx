@@ -1114,12 +1114,18 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   };
 
   // Collect all photos for overview gallery
+  // MLS photos should come from mlsData only, not from propertyImages
   const overviewPhotos: string[] = [];
-  if (transaction.propertyImages && Array.isArray(transaction.propertyImages)) {
-    overviewPhotos.push(...transaction.propertyImages as string[]);
-  }
+  // First add MLS photos
   if (mlsData?.images && Array.isArray(mlsData.images)) {
     overviewPhotos.push(...mlsData.images);
+  }
+  // Then add user uploaded photos (filtering out any MLS URLs that may have been incorrectly stored)
+  if (transaction.propertyImages && Array.isArray(transaction.propertyImages)) {
+    const userUploadedPhotos = (transaction.propertyImages as string[]).filter((url: string) => 
+      url && !url.includes('cdn.repliers.io') && !url.includes('repliers.io')
+    );
+    overviewPhotos.push(...userUploadedPhotos);
   }
 
   // Calculate days until closing
@@ -2854,7 +2860,12 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
 
           {/* Property Photos Section - Two Separate Cards */}
           {(() => {
-            const uploadedPhotos = transaction.propertyImages || [];
+            // Filter out MLS photos that may have been incorrectly stored in propertyImages
+            // User uploads have paths like /objects/uploads/... while MLS photos are cdn.repliers.io URLs
+            const allPropertyImages = transaction.propertyImages || [];
+            const uploadedPhotos = (allPropertyImages as string[]).filter((url: string) => 
+              url && !url.includes('cdn.repliers.io') && !url.includes('repliers.io')
+            );
             const mlsPhotos = mlsData?.images || mlsData?.photos || [];
             const primaryIndex = transaction.primaryPhotoIndex || 0;
             
@@ -3100,7 +3111,11 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
 
           {/* Quick Actions */}
           {(() => {
-            const uploadedPhotos = transaction.propertyImages || [];
+            // Filter out MLS photos from propertyImages (user uploads only)
+            const allPropertyImages = transaction.propertyImages || [];
+            const uploadedPhotos = (allPropertyImages as string[]).filter((url: string) => 
+              url && !url.includes('cdn.repliers.io') && !url.includes('repliers.io')
+            );
             const mlsPhotos = mlsData?.images || mlsData?.photos || [];
             const hasPhotosForMarketing = uploadedPhotos.length > 0 || mlsPhotos.length > 0;
             const disabledMessage = isOffMarket 

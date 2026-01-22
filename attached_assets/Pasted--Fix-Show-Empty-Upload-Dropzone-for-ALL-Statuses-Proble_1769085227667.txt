@@ -1,0 +1,366 @@
+# Fix: Show Empty Upload Dropzone for ALL Statuses
+
+## Problem
+
+**Current (Wrong):**
+- Closed/Active/Under Contract: "Your Uploaded Photos (34)" - auto-populated with MLS photos ❌
+- Off Market: "Property Photos (0)" - empty dropzone ✅
+
+**Expected (Correct):**
+- ALL statuses should show empty dropzone for user uploads
+- MLS photos should ONLY appear in the "Property Photos (from MLS)" section
+- User uploads are OPTIONAL - user chooses if/when to upload
+
+---
+
+## Visual: What It Should Look Like
+
+### MLS Property (Closed, Active, Under Contract)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 📷 Property Photos (34 from MLS)                      [Refresh] │
+│                                                                 │
+│ [📷][📷][📷][📷][📷][📷][📷][📷][+27]                          │
+│                                                                 │
+│ Photos synced from MLS • Click to view full size               │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 📤 Your Uploaded Photos (0)                                     │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                         📷                              │   │
+│  │                                                         │   │
+│  │                  Drag photos here                       │   │
+│  │                  or click to browse                     │   │
+│  │                                                         │   │
+│  │            Supports JPG, PNG • Max 10MB per file        │   │
+│  │                                                         │   │
+│  │                   [📁 Browse Files]                     │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│ ℹ️ Upload your own photos for custom marketing materials.       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Off Market (No MLS)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 📷 Property Photos (0)                                          │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                         📷                              │   │
+│  │                                                         │   │
+│  │                  Drag photos here                       │   │
+│  │                  or click to browse                     │   │
+│  │                                                         │   │
+│  │            Supports JPG, PNG • Max 10MB per file        │   │
+│  │                                                         │   │
+│  │                   [📁 Browse Files]                     │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│ ℹ️ Upload photos to create marketing materials for this property│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## The Fix
+
+Find your Marketing tab component and look for where `uploadedPhotos` or "Your Uploaded Photos" is set.
+
+### Find and Remove This Pattern:
+
+```tsx
+// ❌ WRONG - This is auto-populating MLS photos
+const uploadedPhotos = transaction.mlsData?.photos || [];
+
+// ❌ WRONG - This is also auto-populating
+const uploadedPhotos = mlsPhotos;
+
+// ❌ WRONG - Initializing state with MLS photos
+const [uploadedPhotos, setUploadedPhotos] = useState(
+  transaction.mlsData?.photos || []
+);
+```
+
+### Replace With:
+
+```tsx
+// ✅ CORRECT - Fetch ONLY user uploads from database
+// This should return [] (empty) until user manually uploads
+const { data: uploadedPhotos = [] } = useQuery<TransactionPhoto[]>({
+  queryKey: [`/api/transactions/${transaction.id}/photos`],
+});
+```
+
+---
+
+## Complete Component Fix
+
+```tsx
+// marketing-tab.tsx
+
+export function MarketingTab({ transaction }: { transaction: Transaction }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  // =============================================
+  // MLS PHOTOS - From Repliers API (read-only)
+  // =============================================
+  const mlsPhotos: string[] = transaction.mlsData?.photos || [];
+  const hasMlsPhotos = mlsPhotos.length > 0;
+
+  // =============================================
+  // USER UPLOADED PHOTOS - From our database
+  // This should be EMPTY until user uploads!
+  // =============================================
+  const { data: userUploadedPhotos = [] } = useQuery<TransactionPhoto[]>({
+    queryKey: [`/api/transactions/${transaction.id}/photos`],
+  });
+
+  // Upload mutation
+  const uploadMutation = useMutation({
+    mutationFn: async (files: FileList) => {
+      const formData = new FormData();
+      Array.from(files).forEach(file => formData.append('photos', file));
+      
+      const response = await fetch(`/api/transactions/${transaction.id}/photos`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) throw new Error('Failed to upload');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: [`/api/transactions/${transaction.id}/photos`] 
+      });
+      toast({ title: 'Photos uploaded successfully' });
+    },
+    onError: () => {
+      toast({ 
+        title: 'Upload failed', 
+        description: 'Please try again',
+        variant: 'destructive' 
+      });
+    },
+  });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.length) {
+      uploadMutation.mutate(e.target.files);
+      e.target.value = '';
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.files?.length) {
+      uploadMutation.mutate(e.dataTransfer.files);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h2 className="text-xl font-semibold">Marketing</h2>
+        <p className="text-sm text-muted-foreground">
+          Create and manage marketing materials for {transaction.address}
+        </p>
+      </div>
+
+      {/* ============================================ */}
+      {/* MLS PHOTOS SECTION - Only show if has MLS photos */}
+      {/* ============================================ */}
+      {hasMlsPhotos && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium flex items-center gap-2">
+                <Camera className="w-4 h-4" />
+                Property Photos ({mlsPhotos.length} from MLS)
+              </h3>
+              <Button variant="outline" size="sm">
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Refresh
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-9 gap-2">
+              {mlsPhotos.slice(0, 8).map((url, i) => (
+                <button
+                  key={`mls-${i}`}
+                  className="aspect-square rounded-lg overflow-hidden border hover:ring-2 hover:ring-orange-500"
+                  onClick={() => {/* open gallery */}}
+                >
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+              {mlsPhotos.length > 8 && (
+                <button className="aspect-square rounded-lg bg-muted flex items-center justify-center border">
+                  +{mlsPhotos.length - 8}
+                </button>
+              )}
+            </div>
+
+            <p className="text-xs text-muted-foreground mt-3">
+              Photos synced from MLS • Click to view full size
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ============================================ */}
+      {/* USER UPLOADS SECTION - Always show dropzone */}
+      {/* This should be EMPTY by default for ALL statuses */}
+      {/* ============================================ */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium flex items-center gap-2">
+              {hasMlsPhotos ? (
+                <>
+                  <Upload className="w-4 h-4" />
+                  Your Uploaded Photos ({userUploadedPhotos.length})
+                </>
+              ) : (
+                <>
+                  <Camera className="w-4 h-4" />
+                  Property Photos ({userUploadedPhotos.length})
+                </>
+              )}
+            </h3>
+            {userUploadedPhotos.length > 0 && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add More
+              </Button>
+            )}
+          </div>
+
+          {/* ======================================== */}
+          {/* ALWAYS show dropzone if no user uploads */}
+          {/* This is the key fix! */}
+          {/* ======================================== */}
+          {userUploadedPhotos.length === 0 ? (
+            <div
+              onDrop={handleDrop}
+              onDragOver={(e) => e.preventDefault()}
+              onClick={() => fileInputRef.current?.click()}
+              className={`
+                border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
+                transition-colors hover:border-primary/50 hover:bg-muted/50
+                ${uploadMutation.isPending ? 'opacity-50 pointer-events-none' : ''}
+              `}
+            >
+              {uploadMutation.isPending ? (
+                <>
+                  <Loader2 className="w-10 h-10 mx-auto text-muted-foreground mb-3 animate-spin" />
+                  <p className="font-medium">Uploading...</p>
+                </>
+              ) : (
+                <>
+                  <Camera className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+                  <p className="font-medium">Drag photos here</p>
+                  <p className="text-sm text-muted-foreground">or click to browse</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Supports JPG, PNG • Max 10MB per file
+                  </p>
+                  <Button variant="outline" size="sm" className="mt-4">
+                    <Upload className="w-4 h-4 mr-1" />
+                    Browse Files
+                  </Button>
+                </>
+              )}
+            </div>
+          ) : (
+            /* Show user's uploaded photos */
+            <div className="grid grid-cols-6 gap-3">
+              {userUploadedPhotos.map((photo) => (
+                <div key={photo.id} className="relative aspect-square rounded-lg overflow-hidden border group">
+                  <img src={photo.url} alt="" className="w-full h-full object-cover" />
+                  {photo.isPrimary && (
+                    <span className="absolute top-1 left-1 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded">
+                      Primary
+                    </span>
+                  )}
+                  {/* Hover actions */}
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <Button variant="secondary" size="icon" className="h-8 w-8">
+                      <Star className="w-4 h-4" />
+                    </Button>
+                    <Button variant="destructive" size="icon" className="h-8 w-8">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {/* Add more tile */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="aspect-square rounded-lg border-2 border-dashed flex items-center justify-center hover:border-primary/50"
+              >
+                <Plus className="w-6 h-6 text-muted-foreground" />
+              </button>
+            </div>
+          )}
+
+          <p className="text-xs text-muted-foreground mt-3">
+            {hasMlsPhotos
+              ? "ℹ️ Upload your own photos for custom marketing materials."
+              : "ℹ️ Upload photos to create marketing materials for this property."
+            }
+          </p>
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            multiple
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleFileChange}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Quick Actions section... */}
+    </div>
+  );
+}
+```
+
+---
+
+## Key Changes Summary
+
+| What | Before (Wrong) | After (Correct) |
+|------|----------------|-----------------|
+| `userUploadedPhotos` source | `transaction.mlsData?.photos` | `useQuery(['/api/.../photos'])` |
+| Initial count for MLS properties | 34 (MLS photos) | 0 (empty) |
+| Shows dropzone for Closed | No | Yes |
+| Shows dropzone for Active | No | Yes |
+| Shows dropzone for Under Contract | No | Yes |
+| Shows dropzone for Off Market | Yes | Yes |
+
+---
+
+## Verification Checklist
+
+After fix, verify ALL statuses show:
+
+- [ ] **Closed**: MLS section + EMPTY upload dropzone
+- [ ] **Active**: MLS section + EMPTY upload dropzone  
+- [ ] **Under Contract**: MLS section + EMPTY upload dropzone
+- [ ] **Off Market**: EMPTY upload dropzone (no MLS section)
+
+The upload section should say "(0)" and show the dropzone until users manually upload photos.

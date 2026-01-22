@@ -93,7 +93,7 @@ async function syncTransactionMLS(transaction: Transaction): Promise<SyncResult>
 
     const updateData: Partial<InsertTransaction> & { mlsLastSyncedAt?: Date } = {
       mlsData: mlsData,
-      propertyImages: mlsData.photos || mlsData.images || [],
+      // Note: propertyImages is for user uploads ONLY - MLS photos are accessed via mlsData.images
       propertyDescription: mlsData.description || transaction.propertyDescription || undefined,
       mlsLastSyncedAt: new Date(),
     };
