@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { Button } from '@/components/ui/button';
 import { 
   X, 
@@ -120,32 +121,35 @@ export function PhotoGalleryModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] w-full h-[95vh] p-0 gap-0 bg-zinc-900 border-zinc-800 flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+      <DialogContent className="max-w-[95vw] w-full h-[95vh] p-0 gap-0 bg-background border-border flex flex-col" aria-describedby={undefined}>
+        <VisuallyHidden>
+          <DialogTitle>Photo Gallery</DialogTitle>
+        </VisuallyHidden>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div>
-            <h3 className="text-white font-medium">
+            <h3 className="text-foreground font-medium">
               {currentPhoto.caption || `Photo ${currentIndex + 1} of ${photos.length}`}
             </h3>
-            <p className="text-zinc-400 text-sm">Zoom: {zoom}%</p>
+            <p className="text-muted-foreground text-sm">Zoom: {zoom}%</p>
           </div>
           <Button
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="text-zinc-400 hover:text-white hover:bg-zinc-800"
+            className="text-muted-foreground hover:text-foreground"
             data-testid="button-gallery-close"
           >
             <X className="w-5 h-5" />
           </Button>
         </div>
 
-        <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-zinc-950">
+        <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-muted/30">
           {hasMultiplePhotos && (
             <Button
-              variant="ghost"
+              variant="secondary"
               size="icon"
               onClick={goToPrevious}
-              className="absolute left-4 z-10 h-12 w-12 rounded-full bg-black/50 text-white hover:bg-black/70"
+              className="absolute left-4 z-10 h-12 w-12 rounded-full shadow-lg"
               data-testid="button-gallery-prev"
             >
               <ChevronLeft className="w-8 h-8" />
@@ -156,7 +160,7 @@ export function PhotoGalleryModal({
             <img
               src={currentPhoto.url}
               alt={currentPhoto.caption || `Photo ${currentIndex + 1}`}
-              className="max-w-none transition-transform duration-200"
+              className="max-w-none transition-transform duration-200 rounded-lg shadow-lg"
               style={{
                 transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
                 transformOrigin: 'center center',
@@ -168,10 +172,10 @@ export function PhotoGalleryModal({
 
           {hasMultiplePhotos && (
             <Button
-              variant="ghost"
+              variant="secondary"
               size="icon"
               onClick={goToNext}
-              className="absolute right-4 z-10 h-12 w-12 rounded-full bg-black/50 text-white hover:bg-black/70"
+              className="absolute right-4 z-10 h-12 w-12 rounded-full shadow-lg"
               data-testid="button-gallery-next"
             >
               <ChevronRight className="w-8 h-8" />
@@ -179,13 +183,12 @@ export function PhotoGalleryModal({
           )}
         </div>
 
-        <div className="flex items-center justify-center gap-2 px-4 py-3 border-t border-zinc-800 bg-zinc-900 flex-wrap">
+        <div className="flex items-center justify-center gap-2 px-4 py-3 border-t border-border bg-background flex-wrap">
           <Button
             variant="outline"
             size="sm"
             onClick={handleZoomOut}
             disabled={zoom <= 25}
-            className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700"
             data-testid="button-gallery-zoom-out"
           >
             <ZoomOut className="w-4 h-4 mr-1" />
@@ -197,7 +200,6 @@ export function PhotoGalleryModal({
             size="sm"
             onClick={handleZoomIn}
             disabled={zoom >= 300}
-            className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700"
             data-testid="button-gallery-zoom-in"
           >
             <ZoomIn className="w-4 h-4 mr-1" />
@@ -208,7 +210,6 @@ export function PhotoGalleryModal({
             variant="outline"
             size="sm"
             onClick={handleRotate}
-            className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700"
             data-testid="button-gallery-rotate"
           >
             <RotateCw className="w-4 h-4 mr-1" />
@@ -219,7 +220,6 @@ export function PhotoGalleryModal({
             variant="outline"
             size="sm"
             onClick={resetTransforms}
-            className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700"
             data-testid="button-gallery-reset"
           >
             <Maximize2 className="w-4 h-4 mr-1" />
@@ -230,7 +230,6 @@ export function PhotoGalleryModal({
             variant="outline"
             size="sm"
             onClick={handleDownload}
-            className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700"
             data-testid="button-gallery-download"
           >
             <Download className="w-4 h-4 mr-1" />
@@ -239,7 +238,7 @@ export function PhotoGalleryModal({
         </div>
 
         {photos.length > 1 && (
-          <div className="px-4 py-3 border-t border-zinc-800 bg-zinc-900">
+          <div className="px-4 py-3 border-t border-border bg-muted/30">
             <div className="flex gap-2 overflow-x-auto pb-2">
               {photos.map((photo, index) => (
                 <button
@@ -248,10 +247,10 @@ export function PhotoGalleryModal({
                     setCurrentIndex(index);
                     resetTransforms();
                   }}
-                  className={`flex-shrink-0 w-16 h-16 rounded overflow-hidden border-2 transition-all
+                  className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all
                     ${index === currentIndex 
-                      ? 'border-orange-500 opacity-100' 
-                      : 'border-transparent opacity-60 hover:opacity-100'
+                      ? 'border-orange-500 ring-2 ring-orange-500/20' 
+                      : 'border-border opacity-70 hover:opacity-100 hover:border-muted-foreground'
                     }`}
                   data-testid={`button-gallery-thumb-${index}`}
                 >
@@ -263,7 +262,7 @@ export function PhotoGalleryModal({
                 </button>
               ))}
             </div>
-            <p className="text-xs text-zinc-500 text-center mt-2">
+            <p className="text-xs text-muted-foreground text-center mt-2">
               {currentIndex + 1} of {photos.length} • Use arrow keys to navigate
             </p>
           </div>

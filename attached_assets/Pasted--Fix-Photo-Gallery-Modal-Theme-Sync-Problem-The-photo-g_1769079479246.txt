@@ -1,0 +1,389 @@
+# Fix: Photo Gallery Modal Theme Sync
+
+## Problem
+
+The photo gallery modal has hardcoded dark mode colors (`bg-zinc-900`, `bg-zinc-950`, `border-zinc-800`, etc.) that don't respect the app's light/dark mode setting.
+
+## Solution
+
+Replace hardcoded dark colors with theme-aware Tailwind classes that work in both light and dark modes.
+
+---
+
+## Before (Hardcoded Dark)
+
+```tsx
+<DialogContent className="... bg-zinc-900 border-zinc-800">
+  <div className="... border-b border-zinc-800">
+    <h3 className="text-white ...">
+    <p className="text-zinc-400 ...">
+  </div>
+  <div className="... bg-zinc-950">
+  <div className="... border-t border-zinc-800 bg-zinc-900">
+    <Button className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700">
+```
+
+---
+
+## After (Theme-Aware)
+
+```tsx
+<DialogContent className="... bg-background border-border">
+  <div className="... border-b border-border">
+    <h3 className="text-foreground ...">
+    <p className="text-muted-foreground ...">
+  </div>
+  <div className="... bg-muted/50">
+  <div className="... border-t border-border bg-background">
+    <Button variant="outline">
+```
+
+---
+
+## Updated Photo Gallery Modal Component
+
+**File: `client/src/components/photo-gallery-modal.tsx`**
+
+```tsx
+import { useState, useEffect, useCallback } from 'react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { 
+  X, 
+  ZoomIn, 
+  ZoomOut, 
+  RotateCw, 
+  Maximize2, 
+  Download,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
+
+interface PhotoGalleryModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  photos: Array<{
+    url: string;
+    caption?: string;
+  }>;
+  initialIndex?: number;
+}
+
+export function PhotoGalleryModal({ 
+  isOpen, 
+  onClose, 
+  photos, 
+  initialIndex = 0 
+}: PhotoGalleryModalProps) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [zoom, setZoom] = useState(100);
+  const [rotation, setRotation] = useState(0);
+
+  // Reset state when modal opens with new initial index
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentIndex(initialIndex);
+      setZoom(100);
+      setRotation(0);
+    }
+  }, [isOpen, initialIndex]);
+
+  const currentPhoto = photos[currentIndex];
+  const hasMultiplePhotos = photos.length > 1;
+
+  // Navigation
+  const goToPrevious = useCallback(() => {
+    setCurrentIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1));
+    resetTransforms();
+  }, [photos.length]);
+
+  const goToNext = useCallback(() => {
+    setCurrentIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1));
+    resetTransforms();
+  }, [photos.length]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+      
+      switch (e.key) {
+        case 'ArrowLeft':
+          goToPrevious();
+          break;
+        case 'ArrowRight':
+          goToNext();
+          break;
+        case 'Escape':
+          onClose();
+          break;
+        case '+':
+        case '=':
+          handleZoomIn();
+          break;
+        case '-':
+          handleZoomOut();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, goToPrevious, goToNext, onClose]);
+
+  // Zoom controls
+  const handleZoomIn = () => {
+    setZoom((prev) => Math.min(prev + 25, 300));
+  };
+
+  const handleZoomOut = () => {
+    setZoom((prev) => Math.max(prev - 25, 25));
+  };
+
+  // Rotate
+  const handleRotate = () => {
+    setRotation((prev) => (prev + 90) % 360);
+  };
+
+  // Reset
+  const resetTransforms = () => {
+    setZoom(100);
+    setRotation(0);
+  };
+
+  // Download
+  const handleDownload = async () => {
+    try {
+      const response = await fetch(currentPhoto.url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `photo-${currentIndex + 1}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      // Fallback: open in new tab
+      window.open(currentPhoto.url, '_blank');
+    }
+  };
+
+  if (!currentPhoto) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      {/* THEME-AWARE: Use bg-background instead of bg-zinc-900 */}
+      <DialogContent className="max-w-[95vw] w-full h-[95vh] p-0 gap-0 bg-background border-border">
+        
+        {/* Header - THEME-AWARE */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div>
+            <h3 className="text-foreground font-medium">
+              {currentPhoto.caption || `Photo ${currentIndex + 1} of ${photos.length}`}
+            </h3>
+            <p className="text-muted-foreground text-sm">Zoom: {zoom}%</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+
+        {/* Main Image Area - THEME-AWARE */}
+        <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-muted/30">
+          {/* Previous Button */}
+          {hasMultiplePhotos && (
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={goToPrevious}
+              className="absolute left-4 z-10 h-12 w-12 rounded-full shadow-lg"
+            >
+              <ChevronLeft className="w-8 h-8" />
+            </Button>
+          )}
+
+          {/* Image */}
+          <div className="overflow-auto max-w-full max-h-full p-4">
+            <img
+              src={currentPhoto.url}
+              alt={currentPhoto.caption || `Photo ${currentIndex + 1}`}
+              className="max-w-none transition-transform duration-200 rounded-lg shadow-lg"
+              style={{
+                transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
+                transformOrigin: 'center center',
+              }}
+              draggable={false}
+            />
+          </div>
+
+          {/* Next Button */}
+          {hasMultiplePhotos && (
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={goToNext}
+              className="absolute right-4 z-10 h-12 w-12 rounded-full shadow-lg"
+            >
+              <ChevronRight className="w-8 h-8" />
+            </Button>
+          )}
+        </div>
+
+        {/* Toolbar - THEME-AWARE */}
+        <div className="flex items-center justify-center gap-2 px-4 py-3 border-t border-border bg-background">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleZoomOut}
+            disabled={zoom <= 25}
+          >
+            <ZoomOut className="w-4 h-4 mr-1" />
+            Zoom Out
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleZoomIn}
+            disabled={zoom >= 300}
+          >
+            <ZoomIn className="w-4 h-4 mr-1" />
+            Zoom In
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRotate}
+          >
+            <RotateCw className="w-4 h-4 mr-1" />
+            Rotate
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={resetTransforms}
+          >
+            <Maximize2 className="w-4 h-4 mr-1" />
+            Reset
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownload}
+          >
+            <Download className="w-4 h-4 mr-1" />
+            Download
+          </Button>
+        </div>
+
+        {/* Thumbnail Strip - THEME-AWARE */}
+        {photos.length > 1 && (
+          <div className="px-4 py-3 border-t border-border bg-muted/30">
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {photos.map((photo, index) => (
+                <button
+                  key={index}
+                  onClick={() => {
+                    setCurrentIndex(index);
+                    resetTransforms();
+                  }}
+                  className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all
+                    ${index === currentIndex 
+                      ? 'border-orange-500 ring-2 ring-orange-500/20' 
+                      : 'border-border opacity-70 hover:opacity-100 hover:border-muted-foreground'
+                    }`}
+                >
+                  <img
+                    src={photo.url}
+                    alt={`Thumbnail ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              {currentIndex + 1} of {photos.length} • Use arrow keys to navigate
+            </p>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+---
+
+## Color Mapping Reference
+
+| Hardcoded Dark | Theme-Aware Replacement |
+|----------------|------------------------|
+| `bg-zinc-900` | `bg-background` |
+| `bg-zinc-950` | `bg-muted/30` |
+| `border-zinc-800` | `border-border` |
+| `text-white` | `text-foreground` |
+| `text-zinc-400` | `text-muted-foreground` |
+| `text-zinc-500` | `text-muted-foreground` |
+| `bg-zinc-800` | Use `variant="outline"` or `variant="secondary"` |
+| `hover:bg-zinc-700` | Handled by Button variants |
+| `bg-black/50` | `variant="secondary"` with shadow |
+
+---
+
+## Result
+
+### Light Mode
+```
+┌─────────────────────────────────────────┐
+│ Photo 8 of 34                       [✕] │  ← White/light background
+│ Zoom: 100%                              │  ← Dark text
+├─────────────────────────────────────────┤
+│                                         │
+│        [Photo with light bg]            │  ← Light gray background
+│                                         │
+├─────────────────────────────────────────┤
+│ [Zoom Out] [Zoom In] [Rotate] [Download]│  ← Light buttons
+├─────────────────────────────────────────┤
+│ [thumbnails with light borders]         │
+└─────────────────────────────────────────┘
+```
+
+### Dark Mode
+```
+┌─────────────────────────────────────────┐
+│ Photo 8 of 34                       [✕] │  ← Dark background
+│ Zoom: 100%                              │  ← Light text
+├─────────────────────────────────────────┤
+│                                         │
+│        [Photo with dark bg]             │  ← Dark gray background
+│                                         │
+├─────────────────────────────────────────┤
+│ [Zoom Out] [Zoom In] [Rotate] [Download]│  ← Dark buttons
+├─────────────────────────────────────────┤
+│ [thumbnails with dark borders]          │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## Testing Checklist
+
+- [ ] Modal background matches app theme in light mode
+- [ ] Modal background matches app theme in dark mode
+- [ ] Text is readable in light mode
+- [ ] Text is readable in dark mode
+- [ ] Buttons use proper theme colors
+- [ ] Borders use proper theme colors
+- [ ] Thumbnail strip matches theme
+- [ ] Selected thumbnail highlight (orange) visible in both modes
+- [ ] Navigation arrows visible in both modes
