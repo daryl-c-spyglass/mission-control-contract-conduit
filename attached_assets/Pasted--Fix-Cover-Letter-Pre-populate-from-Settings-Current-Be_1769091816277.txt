@@ -1,0 +1,303 @@
+# Fix: Cover Letter Pre-populate from Settings
+
+## Current Behavior (Wrong)
+- Cover Letter textarea is **empty** by default
+- User has to manually type or generate with AI
+- Settings default cover letter is not being used
+
+## Expected Behavior
+- Cover Letter textarea **pre-populates** with Settings → Default Cover Letter
+- User can edit it in Presentation Builder (doesn't affect Settings)
+- If Settings default is updated, it updates in Presentation Builder
+- "Client Name" field remains separate and optional
+
+---
+
+## Visual: Current vs Expected
+
+### Current (Empty)
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Cover Letter                                                │
+│ Customize the cover letter for this CMA report              │
+│                                                             │
+│ Client Name (Optional)                                      │
+│ ┌─────────────────────────────────────────────────────────┐│
+│ │ e.g., John and Jane Smith                               ││
+│ └─────────────────────────────────────────────────────────┘│
+│                                                             │
+│ ┌─────────────────────────────────────────────────────────┐│
+│ │ ✨ AI Assistant                                         ││
+│ │ Tone: [Professional ▼]  [✨ Generate with AI]           ││
+│ └─────────────────────────────────────────────────────────┘│
+│                                                             │
+│ ┌─────────────────────────────────────────────────────────┐│
+│ │                                                         ││
+│ │ Enter your cover letter content, or use AI to generate  ││  ← EMPTY!
+│ │ one based on your CMA data...                           ││
+│ │                                                         ││
+│ └─────────────────────────────────────────────────────────┘│
+│                                                             │
+│ Leave blank to use your default cover letter from agent    │
+│ settings.                                                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Expected (Pre-populated)
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Cover Letter                                                │
+│ Customize the cover letter for this CMA report              │
+│                                                             │
+│ Client Name (Optional)                                      │
+│ ┌─────────────────────────────────────────────────────────┐│
+│ │ e.g., John and Jane Smith                               ││
+│ └─────────────────────────────────────────────────────────┘│
+│                                                             │
+│ ┌─────────────────────────────────────────────────────────┐│
+│ │ ✨ AI Assistant                                         ││
+│ │ Tone: [Professional ▼]  [✨ Generate with AI]           ││
+│ └─────────────────────────────────────────────────────────┘│
+│                                                             │
+│ ┌─────────────────────────────────────────────────────────┐│
+│ │ Dear Homeowner,                                         ││
+│ │                                                         ││  ← PRE-POPULATED
+│ │ Thank you for the opportunity to present this           ││    from Settings!
+│ │ Comparative Market Analysis. I've carefully analyzed    ││
+│ │ recent sales and current listings in your neighborhood  ││
+│ │ to provide you with an accurate picture of your home's  ││
+│ │ market value...                                         ││
+│ │                                                         ││
+│ └─────────────────────────────────────────────────────────┘│
+│                                                             │
+│ ℹ️ Pre-filled from your default cover letter. Edit above   │
+│    to customize for this CMA.                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Data Flow Logic
+
+```
+┌─────────────────────┐
+│  Settings Page      │
+│  Default Cover      │
+│  Letter             │
+└─────────┬───────────┘
+          │
+          │ Sync DOWN (one-way)
+          ▼
+┌─────────────────────┐
+│ Presentation Builder│
+│ Cover Letter        │──────► User can edit locally
+│ (Pre-populated)     │        (doesn't affect Settings)
+└─────────────────────┘
+```
+
+### Rules:
+1. **On Load**: Cover Letter = Settings Default Cover Letter
+2. **User Edits**: Only affects this CMA, not Settings
+3. **Settings Updated**: Presentation Builder gets new default (if not customized for this CMA)
+4. **AI Generate**: Replaces content in Presentation Builder only
+
+---
+
+## Implementation
+
+### Step 1: Fetch Settings Default
+
+```tsx
+// In Presentation Builder component
+
+// Fetch user settings including default cover letter
+const { data: userSettings } = useQuery({
+  queryKey: ['/api/user/settings'],
+});
+
+const defaultCoverLetter = userSettings?.defaultCoverLetter || '';
+```
+
+### Step 2: Initialize Cover Letter State
+
+```tsx
+// State for the cover letter content in this CMA
+const [coverLetterContent, setCoverLetterContent] = useState<string>('');
+const [isInitialized, setIsInitialized] = useState(false);
+
+// Initialize with settings default when loaded
+useEffect(() => {
+  if (defaultCoverLetter && !isInitialized) {
+    // Check if this CMA has a saved custom cover letter
+    const savedCoverLetter = cmaData?.coverLetter;
+    
+    if (savedCoverLetter) {
+      // Use the saved custom cover letter for this CMA
+      setCoverLetterContent(savedCoverLetter);
+    } else {
+      // Use the default from settings
+      setCoverLetterContent(defaultCoverLetter);
+    }
+    setIsInitialized(true);
+  }
+}, [defaultCoverLetter, cmaData, isInitialized]);
+
+// Also update if settings default changes (and user hasn't customized this CMA)
+useEffect(() => {
+  if (defaultCoverLetter && !cmaData?.coverLetter) {
+    setCoverLetterContent(defaultCoverLetter);
+  }
+}, [defaultCoverLetter]);
+```
+
+### Step 3: Cover Letter Textarea
+
+```tsx
+<div className="space-y-4">
+  <div>
+    <Label>Client Name (Optional)</Label>
+    <Input
+      placeholder="e.g., John and Jane Smith"
+      value={clientName}
+      onChange={(e) => setClientName(e.target.value)}
+    />
+    <p className="text-xs text-muted-foreground mt-1">
+      Include client name for personalized cover letter greeting
+    </p>
+  </div>
+
+  {/* AI Assistant */}
+  <div className="bg-purple-50 dark:bg-purple-950/20 rounded-lg p-4">
+    <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 mb-2">
+      <Sparkles className="w-4 h-4" />
+      <span className="font-medium">AI Assistant</span>
+    </div>
+    <div className="flex items-center gap-3">
+      <span className="text-sm">Tone:</span>
+      <Select value={tone} onValueChange={setTone}>
+        <SelectTrigger className="w-32">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="professional">Professional</SelectItem>
+          <SelectItem value="friendly">Friendly</SelectItem>
+          <SelectItem value="formal">Formal</SelectItem>
+        </SelectContent>
+      </Select>
+      <Button 
+        onClick={generateWithAI}
+        className="bg-purple-600 hover:bg-purple-700"
+      >
+        <Sparkles className="w-4 h-4 mr-2" />
+        Generate with AI
+      </Button>
+    </div>
+    <p className="text-xs text-muted-foreground mt-2">
+      AI will create a cover letter based on your CMA data, comparables, and market statistics.
+    </p>
+  </div>
+
+  {/* Cover Letter Content - PRE-POPULATED */}
+  <div>
+    <Textarea
+      value={coverLetterContent}
+      onChange={(e) => setCoverLetterContent(e.target.value)}
+      placeholder="Enter your cover letter content..."
+      className="min-h-[200px]"
+    />
+    <p className="text-xs text-muted-foreground mt-2">
+      {coverLetterContent === defaultCoverLetter ? (
+        <>ℹ️ Using your default cover letter from Settings. Edit above to customize for this CMA.</>
+      ) : (
+        <>✏️ Custom cover letter for this CMA. <button 
+          className="text-primary hover:underline"
+          onClick={() => setCoverLetterContent(defaultCoverLetter)}
+        >
+          Reset to default
+        </button></>
+      )}
+    </p>
+  </div>
+</div>
+```
+
+### Step 4: Save Cover Letter with CMA
+
+When saving the CMA presentation, include the cover letter:
+
+```tsx
+const saveCMAPresentation = async () => {
+  await fetch(`/api/transactions/${transactionId}/cma-presentation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sections: enabledSections,
+      coverLetter: coverLetterContent,
+      clientName: clientName,
+      // ... other CMA data
+    }),
+  });
+};
+```
+
+---
+
+## Helper Text Update
+
+Change the helper text from:
+```
+"Leave blank to use your default cover letter from agent settings."
+```
+
+To:
+```
+"ℹ️ Pre-filled from your default cover letter. Edit above to customize for this CMA."
+```
+
+Or when customized:
+```
+"✏️ Custom cover letter for this CMA. [Reset to default]"
+```
+
+---
+
+## Preview Integration
+
+The Live Preview should show the actual cover letter content:
+
+```tsx
+// In Live Preview Cover Letter section
+<div className="cover-letter-preview">
+  <h4 className="flex items-center gap-2 font-medium mb-2">
+    <Mail className="w-4 h-4" />
+    Cover Letter
+  </h4>
+  
+  {clientName && (
+    <p className="mb-2">Dear {clientName},</p>
+  )}
+  
+  <div className="whitespace-pre-wrap text-sm">
+    {coverLetterContent || (
+      <span className="text-muted-foreground italic">
+        No cover letter content
+      </span>
+    )}
+  </div>
+</div>
+```
+
+---
+
+## Verification Checklist
+
+- [ ] Cover Letter textarea shows Settings default on first load
+- [ ] User can edit cover letter (doesn't affect Settings)
+- [ ] Changes persist when switching tabs in Presentation Builder
+- [ ] "Reset to default" link appears when content differs from Settings
+- [ ] Clicking "Reset to default" restores Settings cover letter
+- [ ] Live Preview shows actual cover letter content
+- [ ] AI Generate replaces content in textarea
+- [ ] Client name integrates with cover letter greeting
+- [ ] Saved CMA retains custom cover letter
+- [ ] New CMAs get fresh Settings default

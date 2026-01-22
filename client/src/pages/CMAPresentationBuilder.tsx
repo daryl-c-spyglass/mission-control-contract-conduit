@@ -643,6 +643,7 @@ export default function CMAPresentationBuilder() {
               <CoverLetterEditor
                 coverLetter={config.coverLetterOverride || ""}
                 onChange={(coverLetterOverride) => setConfig({ ...config, coverLetterOverride })}
+                defaultCoverLetter={agentInfo.coverLetter || ''}
                 subjectProperty={subjectProperty}
                 properties={properties}
                 statistics={statistics}

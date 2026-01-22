@@ -15,6 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 interface CoverLetterEditorProps {
   coverLetter: string;
   onChange: (coverLetter: string) => void;
+  defaultCoverLetter?: string;
   subjectProperty?: any;
   properties?: any[];
   statistics?: any;
@@ -27,6 +28,7 @@ interface CoverLetterEditorProps {
 export function CoverLetterEditor({
   coverLetter,
   onChange,
+  defaultCoverLetter = '',
   subjectProperty,
   properties = [],
   statistics,
@@ -39,6 +41,14 @@ export function CoverLetterEditor({
   const [clientName, setClientName] = useState('');
   const [tone, setTone] = useState<'professional' | 'friendly' | 'confident'>('professional');
   const [copied, setCopied] = useState(false);
+
+  const displayedCoverLetter = coverLetter || defaultCoverLetter;
+  const isUsingDefault = !coverLetter && !!defaultCoverLetter;
+  const isCustomized = coverLetter && coverLetter !== defaultCoverLetter;
+
+  const handleResetToDefault = () => {
+    onChange('');
+  };
 
   const generateMutation = useMutation({
     mutationFn: async () => {
@@ -164,14 +174,30 @@ export function CoverLetterEditor({
         <div className="space-y-2">
           <Textarea
             id="coverLetterText"
-            value={coverLetter}
+            value={displayedCoverLetter}
             onChange={(e) => onChange(e.target.value)}
             placeholder="Enter your cover letter content, or use AI to generate one based on your CMA data..."
             className="min-h-[180px]"
             data-testid="textarea-cover-letter"
           />
           <p className="text-xs text-muted-foreground">
-            Leave blank to use your default cover letter from agent settings.
+            {isUsingDefault ? (
+              <>ℹ️ Pre-filled from your default cover letter. Edit above to customize for this CMA.</>
+            ) : isCustomized ? (
+              <>
+                ✏️ Custom cover letter for this CMA.{' '}
+                <button
+                  type="button"
+                  className="text-primary hover:underline"
+                  onClick={handleResetToDefault}
+                  data-testid="button-reset-cover-letter"
+                >
+                  Reset to default
+                </button>
+              </>
+            ) : (
+              <>Enter your cover letter content, or set a default in Settings → Agent Profile.</>
+            )}
           </p>
         </div>
 
