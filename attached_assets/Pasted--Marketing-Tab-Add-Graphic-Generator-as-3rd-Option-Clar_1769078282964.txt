@@ -1,0 +1,200 @@
+# Marketing Tab - Add Graphic Generator as 3rd Option
+
+## Clarification
+
+- **Create Graphics** = Existing feature (keep as-is)
+- **Create Flyer** = Existing feature (keep as-is)  
+- **Graphic Generator** = NEW 3rd option (Caleb's iframe tool)
+
+The Graphic Generator iframe is an **additional** option, NOT a replacement.
+
+---
+
+## Updated Quick Actions Layout
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Quick Actions                                                               │
+│                                                                             │
+│  ┌────────────────────────┐  ┌────────────────────────┐  ┌────────────────────────┐
+│  │ 🖼️                      │  │ 📄                      │  │ 🎨                      │
+│  │ Create Graphics        │  │ Create Flyer           │  │ Graphic Generator      │
+│  │ Social media posts &   │  │ PNG flyer (8.5" × 11") │  │ Advanced design tool   │
+│  │ stories                │  │                        │  │ (Opens in new tab)     │
+│  │                        │  │                        │  │                        │
+│  │ [YOUR EXISTING FEATURE]│  │ [YOUR EXISTING FEATURE]│  │ [CALEB'S IFRAME TOOL]  │
+│  └────────────────────────┘  └────────────────────────┘  └────────────────────────┘
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Full Marketing Tab Layout
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ← 612 Twelve Oaks LN, Austin, TX  [Closed]                    [Slack] [⋮]  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│      Overview    MLS Data    Docs    [Marketing]    CMA    Timeline        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│ Marketing                                                                   │
+│ Create and manage marketing materials for 612 Twelve Oaks LN, Austin, TX   │
+│                                                                             │
+│ ┌─────────────────────────────────────────────────────────────────────────┐ │
+│ │ 📷 Property Photos (34 from MLS)                           [🔄 Refresh] │ │
+│ │                                                                         │ │
+│ │  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐      │ │
+│ │  │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ 📷  │ │ +27 │      │ │
+│ │  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘      │ │
+│ │                                                                         │ │
+│ │  Photos synced from MLS • Select a photo when creating graphics         │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│ Quick Actions                                                               │
+│ ┌─────────────────────────────────────────────────────────────────────────┐ │
+│ │                                                                         │ │
+│ │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐      │ │
+│ │  │ 🖼️                │  │ 📄                │  │ 🎨                │      │ │
+│ │  │ Create Graphics  │  │ Create Flyer     │  │ Graphic Generator│      │ │
+│ │  │ Social media     │  │ PNG flyer        │  │ Advanced design  │      │ │
+│ │  │ posts & stories  │  │ (8.5" × 11")     │  │ tool ↗           │      │ │
+│ │  └──────────────────┘  └──────────────────┘  └──────────────────┘      │ │
+│ │       ↑                      ↑                      ↑                   │ │
+│ │  [EXISTING]             [EXISTING]             [NEW - CALEB'S]         │ │
+│ │                                                                         │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│ My Assets (0)                                                               │
+│ ┌─────────────────────────────────────────────────────────────────────────┐ │
+│ │                              🖼️                                         │ │
+│ │                    No Marketing Assets Yet                              │ │
+│ │     Use the Quick Actions above to create social media graphics         │ │
+│ │                         or print flyers.                                │ │
+│ │                                                                         │ │
+│ │            [Create Graphics]  [Create Flyer]                            │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Graphic Generator - Opens in New Tab (Not iFrame)
+
+Since there's no OAuth setup for the iframe, the Graphic Generator should **open in a new tab** instead of embedding as an iframe. This avoids the login issue.
+
+**When user clicks "Graphic Generator":**
+
+```javascript
+// Simply open in new tab - no iframe, no login issues
+const openGraphicGenerator = () => {
+  const baseUrl = 'https://graphic-1-generator-black--caleb254.replit.app';
+  
+  // Optionally pass data via URL params (if the tool supports it)
+  const params = new URLSearchParams({
+    address: transaction.address || '',
+    // ... other params if supported
+  });
+  
+  window.open(`${baseUrl}?${params.toString()}`, '_blank');
+};
+```
+
+---
+
+## Implementation - Add 3rd Quick Action Button
+
+**Update the Quick Actions section to include Graphic Generator:**
+
+```tsx
+{/* Quick Actions */}
+<div>
+  <h3 className="text-sm font-medium mb-3">Quick Actions</h3>
+  <div className="grid grid-cols-3 gap-4">
+    
+    {/* 1. Create Graphics - YOUR EXISTING FEATURE */}
+    <button
+      onClick={() => setShowCreateGraphics(true)}
+      className="flex items-center gap-3 p-4 border rounded-lg hover:bg-muted transition-colors text-left"
+    >
+      <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+        <Image className="w-5 h-5 text-red-600 dark:text-red-400" />
+      </div>
+      <div>
+        <p className="font-medium">Create Graphics</p>
+        <p className="text-xs text-muted-foreground">Social media posts & stories</p>
+      </div>
+    </button>
+    
+    {/* 2. Create Flyer - YOUR EXISTING FEATURE */}
+    <button
+      onClick={() => setShowCreateFlyer(true)}
+      className="flex items-center gap-3 p-4 border rounded-lg hover:bg-muted transition-colors text-left"
+    >
+      <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+        <FileText className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+      </div>
+      <div>
+        <p className="font-medium">Create Flyer</p>
+        <p className="text-xs text-muted-foreground">PNG flyer (8.5" × 11")</p>
+      </div>
+    </button>
+    
+    {/* 3. Graphic Generator - NEW (CALEB'S TOOL) - Opens in new tab */}
+    <button
+      onClick={() => {
+        window.open('https://graphic-1-generator-black--caleb254.replit.app', '_blank');
+      }}
+      className="flex items-center gap-3 p-4 border rounded-lg hover:bg-muted transition-colors text-left"
+    >
+      <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+        <Palette className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+      </div>
+      <div>
+        <p className="font-medium flex items-center gap-1">
+          Graphic Generator
+          <ExternalLink className="w-3 h-3" />
+        </p>
+        <p className="text-xs text-muted-foreground">Advanced design tool</p>
+      </div>
+    </button>
+    
+  </div>
+</div>
+```
+
+---
+
+## Summary
+
+| Option | Type | Action | Notes |
+|--------|------|--------|-------|
+| **Create Graphics** | Existing | Opens your modal | Keep as-is |
+| **Create Flyer** | Existing | Opens your modal | Keep as-is |
+| **Graphic Generator** | NEW | Opens in new tab | Caleb's tool, no iframe (avoids login issue) |
+
+---
+
+## About the iFrame Login Issue
+
+The Graphic Generator at `https://graphic-1-generator-black--caleb254.replit.app` requires authentication, and since it's on a different domain, cookies/sessions don't transfer.
+
+**Options to fix (coordinate with Caleb):**
+
+1. **Open in new tab** (simplest) - User logs in once, stays logged in
+2. **Add OAuth/SSO** - Complex, requires Caleb to implement
+3. **Public mode** - Caleb adds a `?public=true` mode that skips auth
+4. **Token-based** - Pass a temporary token from Contract Conduit
+
+**Recommendation:** For now, just open in new tab. Revisit iframe embedding later if needed.
+
+---
+
+## Testing Checklist
+
+- [ ] Create Graphics button still works (existing feature)
+- [ ] Create Flyer button still works (existing feature)
+- [ ] Graphic Generator opens in new tab
+- [ ] Grid layout shows all 3 options properly
+- [ ] Works on all transaction statuses
