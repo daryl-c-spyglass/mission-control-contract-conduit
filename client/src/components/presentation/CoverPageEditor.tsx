@@ -3,16 +3,18 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check } from "lucide-react";
+import { Check, User } from "lucide-react";
 import type { CoverPageConfig } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
 interface CoverPageEditorProps {
   config: CoverPageConfig;
   onChange: (config: CoverPageConfig) => void;
+  agentName?: string;
+  agentPhoto?: string;
 }
 
-export function CoverPageEditor({ config, onChange }: CoverPageEditorProps) {
+export function CoverPageEditor({ config, onChange, agentName, agentPhoto }: CoverPageEditorProps) {
   const handleChange = (key: keyof CoverPageConfig, value: string | boolean) => {
     onChange({ ...config, [key]: value });
   };
@@ -133,10 +135,21 @@ export function CoverPageEditor({ config, onChange }: CoverPageEditorProps) {
                 <p className="text-xs text-muted-foreground">{new Date().toLocaleDateString()}</p>
               )}
               {config.showAgentPhoto && (
-                <div className="flex justify-center mt-2">
-                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
-                    D
-                  </div>
+                <div className="flex flex-col items-center gap-1 mt-2">
+                  {agentPhoto ? (
+                    <img 
+                      src={agentPhoto} 
+                      alt={agentName || 'Agent'}
+                      className="w-10 h-10 rounded-full object-cover border border-border"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                      <User className="w-5 h-5 text-muted-foreground" />
+                    </div>
+                  )}
+                  {agentName && (
+                    <p className="text-xs font-medium">{agentName}</p>
+                  )}
                 </div>
               )}
             </div>

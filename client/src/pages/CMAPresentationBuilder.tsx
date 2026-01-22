@@ -184,6 +184,19 @@ export default function CMAPresentationBuilder() {
     },
   });
 
+  // Fetch agent profile for cover page
+  const { data: agentProfileData } = useQuery<{
+    profile: { name: string; title: string; email: string; phone: string; company: string; bio?: string; coverLetter?: string } | null;
+    user: { marketingDisplayName?: string; marketingTitle?: string; marketingHeadshotUrl?: string; marketingPhone?: string; marketingEmail?: string } | null;
+  }>({
+    queryKey: ['/api/agent/profile'],
+    queryFn: async () => {
+      const response = await fetch('/api/agent/profile');
+      if (!response.ok) return { profile: null, user: null };
+      return response.json();
+    },
+  });
+
   // Fetch the linked transaction to get subject property from mlsData and cmaData fallback
   const { data: linkedTransaction } = useQuery<any>({
     queryKey: ['/api/transactions', cma?.transactionId],
@@ -276,6 +289,29 @@ export default function CMAPresentationBuilder() {
     }
   }, [existingConfig, cma]);
 
+  // Build agent info from profile data for CMA reports
+  const agentInfo = {
+    firstName: agentProfileData?.profile?.name?.split(' ')[0] || 
+               agentProfileData?.user?.marketingDisplayName?.split(' ')[0] || 
+               'Agent',
+    lastName: agentProfileData?.profile?.name?.split(' ').slice(1).join(' ') || 
+              agentProfileData?.user?.marketingDisplayName?.split(' ').slice(1).join(' ') || 
+              '',
+    title: agentProfileData?.profile?.title || 
+           agentProfileData?.user?.marketingTitle || 
+           'Real Estate Professional',
+    email: agentProfileData?.profile?.email || 
+           agentProfileData?.user?.marketingEmail || 
+           '',
+    phone: agentProfileData?.profile?.phone || 
+           agentProfileData?.user?.marketingPhone || 
+           '',
+    company: agentProfileData?.profile?.company || 'Spyglass Realty',
+    bio: agentProfileData?.profile?.bio,
+    coverLetter: agentProfileData?.profile?.coverLetter,
+    photo: agentProfileData?.user?.marketingHeadshotUrl || '',
+  };
+
   const saveConfigMutation = useMutation({
     mutationFn: async () => {
       const payload = { ...config, customPhotoSelections };
@@ -299,12 +335,7 @@ export default function CMAPresentationBuilder() {
         cma,
         subjectProperty,
         comparables,
-        {
-          firstName: 'Agent',
-          lastName: '',
-          title: 'Real Estate Professional',
-          company: 'Spyglass Realty',
-        },
+        agentInfo,
         statistics
       );
 
@@ -599,6 +630,8 @@ export default function CMAPresentationBuilder() {
               <CoverPageEditor
                 config={config.coverPageConfig || DEFAULT_COVER_PAGE_CONFIG}
                 onChange={(coverPageConfig) => setConfig({ ...config, coverPageConfig })}
+                agentName={`${agentInfo.firstName} ${agentInfo.lastName}`.trim() || 'Agent'}
+                agentPhoto={agentInfo.photo}
               />
 
               <CoverLetterEditor
@@ -649,9 +682,11 @@ export default function CMAPresentationBuilder() {
             subjectProperty={subjectProperty}
             comparables={comparables}
             agentProfile={{
-              name: 'Daryl Camingao',
-              title: 'Real Estate Professional',
-              email: 'daryl@spyglassrealty.com',
+              name: `${agentInfo.firstName} ${agentInfo.lastName}`.trim() || 'Agent',
+              title: agentInfo.title,
+              email: agentInfo.email,
+              phone: agentInfo.phone,
+              photo: agentInfo.photo,
             }}
             onSectionClick={(sectionId) => {
               // Content tab: cover page, cover letter, agent resume
@@ -694,12 +729,7 @@ export default function CMAPresentationBuilder() {
               cma,
               subjectProperty,
               comparables,
-              {
-                firstName: 'Agent',
-                lastName: '',
-                title: 'Real Estate Professional',
-                company: 'Spyglass Realty',
-              },
+              agentInfo,
               statistics
             )}
             includedSections={config.includedSections}

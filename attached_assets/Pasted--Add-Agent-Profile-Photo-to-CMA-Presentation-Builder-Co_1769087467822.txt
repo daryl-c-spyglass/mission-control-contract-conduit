@@ -1,0 +1,322 @@
+# Add Agent Profile Photo to CMA Presentation Builder Cover Page
+
+## Current State vs Desired State
+
+### Current (Screenshot 1 & 2)
+```
+┌─────────────────────────────────────────┐
+│              Cover Page                 │
+│                                         │
+│          Spyglass Realty                │  ← Orange text
+│                                         │
+│   Comparative Market Analysis           │  ← Bold title
+│                                         │
+│      Prepared exclusively for you       │
+│            1/22/2026                    │
+│                                         │
+│         Daryl Camingao                  │  ← Name only (no photo)
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+### Desired (Like Client Data Portal - Screenshot 3)
+```
+┌─────────────────────────────────────────┐
+│              Cover Page                 │
+│                                         │
+│          Spyglass Realty                │  ← Orange text
+│                                         │
+│   Comparative Market Analysis           │  ← Bold title
+│                                         │
+│      Prepared exclusively for you       │
+│                                         │
+│           [Client Name]                 │  ← Optional: Recipient name
+│                                         │
+│            1/22/2026                    │
+│                                         │
+│            ┌───────┐                    │
+│            │  👤   │                    │  ← Agent profile photo
+│            │ Photo │                    │
+│            └───────┘                    │
+│         Daryl Camingao                  │  ← Agent name
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## Implementation
+
+### 1. Get Agent Profile Photo from Settings/User
+
+The profile photo should come from the user's settings (same source as Graphics Settings):
+
+```tsx
+// Fetch user settings which includes headshot
+const { data: userSettings } = useQuery({
+  queryKey: ['/api/user/settings'],
+});
+
+// Or from the current user context
+const { user } = useAuth();
+
+const agentPhoto = userSettings?.headshot || user?.profilePhoto;
+const agentName = userSettings?.name || user?.name || 'Agent Name';
+```
+
+### 2. Update Cover Page Component
+
+```tsx
+// In the Cover Page preview/render component
+
+interface CoverPageProps {
+  title?: string;
+  subtitle?: string;
+  preparedFor?: string;  // Optional recipient name
+  date: string;
+  agentName: string;
+  agentPhoto?: string;   // NEW: Agent headshot URL
+}
+
+function CoverPagePreview({ 
+  title = "Comparative Market Analysis",
+  subtitle = "Prepared exclusively for you",
+  preparedFor,
+  date,
+  agentName,
+  agentPhoto 
+}: CoverPageProps) {
+  return (
+    <div className="p-8 text-center space-y-4">
+      {/* Company Name */}
+      <h2 className="text-orange-500 text-xl font-medium">
+        Spyglass Realty
+      </h2>
+      
+      {/* Title */}
+      <h1 className="text-2xl font-bold text-foreground">
+        {title}
+      </h1>
+      
+      {/* Subtitle */}
+      <p className="text-muted-foreground">
+        {subtitle}
+      </p>
+      
+      {/* Prepared For (Optional) */}
+      {preparedFor && (
+        <p className="text-lg font-medium text-foreground">
+          {preparedFor}
+        </p>
+      )}
+      
+      {/* Date */}
+      <p className="text-muted-foreground">
+        {date}
+      </p>
+      
+      {/* Agent Photo + Name */}
+      <div className="flex flex-col items-center gap-2 pt-4">
+        {agentPhoto ? (
+          <img 
+            src={agentPhoto} 
+            alt={agentName}
+            className="w-16 h-16 rounded-full object-cover border-2 border-border"
+          />
+        ) : (
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+            <User className="w-8 h-8 text-muted-foreground" />
+          </div>
+        )}
+        <p className="font-medium text-foreground">
+          {agentName}
+        </p>
+      </div>
+    </div>
+  );
+}
+```
+
+### 3. Update Content Tab (if editable)
+
+If the Cover Page has editable fields in the Content tab, add "Prepared For" field:
+
+```tsx
+// In Content tab for Cover Page section
+<div className="space-y-4">
+  <div>
+    <Label>Title</Label>
+    <Input 
+      value={coverPageData.title}
+      onChange={(e) => updateCoverPage({ title: e.target.value })}
+      placeholder="Comparative Market Analysis"
+    />
+  </div>
+  
+  <div>
+    <Label>Subtitle</Label>
+    <Input 
+      value={coverPageData.subtitle}
+      onChange={(e) => updateCoverPage({ subtitle: e.target.value })}
+      placeholder="Prepared exclusively for you"
+    />
+  </div>
+  
+  {/* NEW: Prepared For field */}
+  <div>
+    <Label>Prepared For (Client Name)</Label>
+    <Input 
+      value={coverPageData.preparedFor}
+      onChange={(e) => updateCoverPage({ preparedFor: e.target.value })}
+      placeholder="e.g., John & Jane Smith"
+    />
+    <p className="text-xs text-muted-foreground mt-1">
+      Optional: Enter the client's name
+    </p>
+  </div>
+  
+  {/* Agent info is auto-filled from settings */}
+  <div className="pt-4 border-t">
+    <Label>Agent Information</Label>
+    <div className="flex items-center gap-3 mt-2 p-3 bg-muted/50 rounded-lg">
+      {agentPhoto ? (
+        <img src={agentPhoto} className="w-12 h-12 rounded-full object-cover" />
+      ) : (
+        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+          <User className="w-6 h-6" />
+        </div>
+      )}
+      <div>
+        <p className="font-medium">{agentName}</p>
+        <p className="text-xs text-muted-foreground">
+          From your profile settings
+        </p>
+      </div>
+    </div>
+    <p className="text-xs text-muted-foreground mt-2">
+      ℹ️ Update your photo in Settings → Graphics Settings
+    </p>
+  </div>
+</div>
+```
+
+---
+
+## Visual Comparison
+
+### Live Preview Card (With Photo)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 👁️ Live Preview                           7 sections    ↗️  │
+│    Preview how your CMA will appear                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ ┌─────────────────────────────────────────────────────────┐│
+│ │ 📄 Cover Page                                           ││
+│ │                                                         ││
+│ │              Spyglass Realty                            ││
+│ │                                                         ││
+│ │       Comparative Market Analysis                       ││
+│ │                                                         ││
+│ │         Prepared exclusively for you                    ││
+│ │                                                         ││
+│ │               The Smith Family                          ││
+│ │                                                         ││
+│ │                 1/22/2026                               ││
+│ │                                                         ││
+│ │                 ┌───────┐                               ││
+│ │                 │  🧑   │                               ││
+│ │                 │ Photo │                               ││
+│ │                 └───────┘                               ││
+│ │              Daryl Camingao                             ││
+│ │                                                         ││
+│ └─────────────────────────────────────────────────────────┘│
+│                                                             │
+│ ┌─────────────────────────────────────────────────────────┐│
+│ │ ✉️ Cover Letter                                         ││
+│ │ Your personalized cover letter will appear here...      ││
+│ └─────────────────────────────────────────────────────────┘│
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Expanded Preview Modal (With Photo)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ CMA Presentation Preview                    17 sections enabled │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │ 📄 Cover Page                                             │ │
+│  │                                                           │ │
+│  │                    Spyglass Realty                        │ │
+│  │                                                           │ │
+│  │            Comparative Market Analysis                    │ │
+│  │                                                           │ │
+│  │              Prepared exclusively for you                 │ │
+│  │                                                           │ │
+│  │                   The Smith Family                        │ │
+│  │                                                           │ │
+│  │                      1/22/2026                            │ │
+│  │                                                           │ │
+│  │                      ┌───────┐                            │ │
+│  │                      │  🧑   │                            │ │
+│  │                      │ Photo │                            │ │
+│  │                      └───────┘                            │ │
+│  │                   Daryl Camingao                          │ │
+│  │                                                           │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │ ✉️ Cover Letter                                           │ │
+│  │ ...                                                       │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Data Flow
+
+```
+Settings (Graphics Settings)
+    │
+    ├── headshot (photo URL)
+    ├── name
+    ├── phone
+    └── email
+           │
+           ▼
+Presentation Builder
+    │
+    ├── Cover Page Component
+    │       ├── Uses: agentPhoto, agentName
+    │       └── Plus: preparedFor (user input)
+    │
+    └── PDF Export
+            └── Includes agent photo in Cover Page
+```
+
+---
+
+## Files to Modify
+
+1. **Cover Page preview component** - Add photo display
+2. **Content tab** - Add "Prepared For" input field
+3. **PDF export template** - Include photo in generated PDF
+4. **Fetch user settings** - Get headshot URL
+
+---
+
+## Verification Checklist
+
+- [ ] Agent photo displays on Cover Page in Live Preview
+- [ ] Agent photo displays in expanded Preview modal
+- [ ] Photo falls back to placeholder if not set
+- [ ] "Prepared For" field is optional and editable
+- [ ] Photo syncs from Settings (same as Create Flyer)
+- [ ] Photo included in exported PDF
+- [ ] Works in both light and dark mode
