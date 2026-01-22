@@ -1,0 +1,299 @@
+# REPLIT PROMPT: Fix Empty Map in CMA Presentation Preview
+
+## Problem
+
+In the CMA Presentation Preview modal, the "Map of All Listings" section shows:
+- The Mapbox logo at the bottom
+- The legend (● Subject ● Active ● Pending ● Sold)
+- **BUT NO ACTUAL MAP OR MARKERS**
+
+The map container is empty/blank.
+
+## Screenshot Reference
+See attached screenshot - the Map of All Listings section shows only the Mapbox attribution and legend, but the map tiles and property markers are not rendering.
+
+---
+
+## Root Cause Investigation
+
+Check these possible issues:
+
+### 1. Map container has no height
+```tsx
+// WRONG - Map won't render without explicit height
+<div className="map-container">
+  <Map ... />
+</div>
+
+// CORRECT - Must have explicit height
+<div className="map-container h-64"> {/* or style={{ height: '300px' }} */}
+  <Map ... />
+</div>
+```
+
+### 2. Mapbox token not being passed
+```tsx
+// WRONG - Missing or undefined token
+<Map mapboxAccessToken={undefined} />
+
+// CORRECT - Token from environment
+<Map mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN} />
+```
+
+### 3. Map not imported correctly
+```tsx
+// Make sure react-map-gl is imported
+import Map, { Marker } from 'react-map-gl';
+import 'mapbox-gl/dist/mapbox-gl.css'; // CSS is required!
+```
+
+### 4. Coordinates are missing/invalid
+```tsx
+// Check that subject and comparables have valid lat/lng
+console.log('Subject coords:', subjectProperty?.latitude, subjectProperty?.longitude);
+console.log('Comparables:', comparables.map(c => ({ lat: c.latitude, lng: c.longitude })));
+```
+
+### 5. Map is conditionally not rendering
+```tsx
+// Check if there's a condition preventing render
+{hasCoordinates && <MapComponent />}  // Is hasCoordinates false?
+```
+
+---
+
+## Complete Fix Implementation
+
+Find the component that renders the "Map of All Listings" preview section and replace with:
+
+```tsx
+import Map, { Marker, NavigationControl } from 'react-map-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { Home, MapPin } from 'lucide-react';
+
+interface MapOfAllListingsProps {
+  subjectProperty: {
+    latitude: number;
+    longitude: number;
+    address?: string;
+  };
+  comparables: Array<{
+    latitude: number;
+    longitude: number;
+    status: string;
+    address?: string;
+    listPrice?: number;
+  }>;
+}
+
+function MapOfAllListings({ subjectProperty, comparables }: MapOfAllListingsProps) {
+  // Get subject coordinates
+  const subjectLat = subjectProperty?.latitude || 
+                     subjectProperty?.coordinates?.lat ||
+                     subjectProperty?.geo?.lat;
+  const subjectLng = subjectProperty?.longitude || 
+                     subjectProperty?.coordinates?.lng ||
+                     subjectProperty?.geo?.lng;
+
+  // Check if we have valid coordinates
+  const hasValidCoords = subjectLat && subjectLng && 
+                         !isNaN(subjectLat) && !isNaN(subjectLng);
+
+  // Filter comparables with valid coordinates
+  const validComparables = comparables.filter(comp => {
+    const lat = comp.latitude || comp.coordinates?.lat || comp.geo?.lat;
+    const lng = comp.longitude || comp.coordinates?.lng || comp.geo?.lng;
+    return lat && lng && !isNaN(lat) && !isNaN(lng);
+  });
+
+  // Status to color mapping
+  const getMarkerColor = (status: string) => {
+    const s = status?.toLowerCase();
+    if (s === 'active') return '#22c55e';           // Green
+    if (s === 'sold' || s === 'closed') return '#ef4444';  // Red
+    if (s === 'pending' || s === 'under contract') return '#eab308'; // Yellow
+    return '#6b7280'; // Gray default
+  };
+
+  // If no valid coordinates, show message
+  if (!hasValidCoords) {
+    return (
+      <div className="h-64 bg-muted rounded-lg flex items-center justify-center">
+        <div className="text-center text-muted-foreground">
+          <MapPin className="w-8 h-8 mx-auto mb-2 opacity-50" />
+          <p>Map unavailable - no coordinates found</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Map Container - MUST HAVE EXPLICIT HEIGHT */}
+      <div className="h-64 rounded-lg overflow-hidden border">
+        <Map
+          initialViewState={{
+            latitude: subjectLat,
+            longitude: subjectLng,
+            zoom: 12,
+          }}
+          style={{ width: '100%', height: '100%' }}
+          mapStyle="mapbox://styles/mapbox/streets-v12"
+          mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN || process.env.MAPBOX_TOKEN}
+        >
+          <NavigationControl position="top-right" />
+
+          {/* Subject Property Marker - BLUE */}
+          <Marker
+            latitude={subjectLat}
+            longitude={subjectLng}
+            anchor="center"
+          >
+            <div className="relative">
+              <div className="w-8 h-8 bg-blue-500 rounded-full border-3 border-white shadow-lg flex items-center justify-center">
+                <Home className="w-4 h-4 text-white" />
+              </div>
+              {/* Optional: Label */}
+              <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs px-2 py-0.5 rounded whitespace-nowrap">
+                Subject
+              </div>
+            </div>
+          </Marker>
+
+          {/* Comparable Property Markers */}
+          {validComparables.map((comp, index) => {
+            const lat = comp.latitude || comp.coordinates?.lat || comp.geo?.lat;
+            const lng = comp.longitude || comp.coordinates?.lng || comp.geo?.lng;
+            const color = getMarkerColor(comp.status);
+
+            return (
+              <Marker
+                key={comp.mlsNumber || comp.listingId || index}
+                latitude={lat}
+                longitude={lng}
+                anchor="center"
+              >
+                <div
+                  className="w-6 h-6 rounded-full border-2 border-white shadow-md cursor-pointer hover:scale-110 transition-transform"
+                  style={{ backgroundColor: color }}
+                  title={`${comp.address || 'Comparable'} - ${comp.status}`}
+                />
+              </Marker>
+            );
+          })}
+        </Map>
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-blue-500" />
+          Subject
+        </span>
+        <span className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-green-500" />
+          Active
+        </span>
+        <span className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-yellow-500" />
+          Pending
+        </span>
+        <span className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-red-500" />
+          Sold
+        </span>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## Where to Use This Component
+
+In the CMA Presentation Preview, find where "Map of All Listings" is rendered:
+
+```tsx
+// In the preview sections loop or direct render
+{sections.mapOfAllListings && (
+  <div className="border rounded-lg p-4">
+    <h4 className="flex items-center gap-2 font-medium mb-3">
+      <Map className="w-4 h-4" />
+      Map of All Listings
+    </h4>
+    
+    {/* Replace placeholder with actual map */}
+    <MapOfAllListings
+      subjectProperty={{
+        latitude: transaction.mlsData?.latitude || transaction.mlsData?.coordinates?.lat,
+        longitude: transaction.mlsData?.longitude || transaction.mlsData?.coordinates?.lng,
+        address: transaction.address,
+      }}
+      comparables={cmaData?.comparables || []}
+    />
+  </div>
+)}
+```
+
+---
+
+## Data Source Check
+
+Make sure you're passing the correct data. Log to verify:
+
+```tsx
+// Add this temporarily to debug
+useEffect(() => {
+  console.log('=== MAP DEBUG ===');
+  console.log('Subject Property:', transaction.mlsData);
+  console.log('Subject Lat:', transaction.mlsData?.latitude);
+  console.log('Subject Lng:', transaction.mlsData?.longitude);
+  console.log('Comparables:', cmaData?.comparables);
+  console.log('Comparables with coords:', cmaData?.comparables?.filter(c => c.latitude && c.longitude));
+}, [transaction, cmaData]);
+```
+
+---
+
+## Environment Variable Check
+
+Make sure Mapbox token is set:
+
+```bash
+# In .env file
+VITE_MAPBOX_TOKEN=pk.eyJ1Ijoi...your_token_here
+
+# Or in Replit Secrets
+MAPBOX_TOKEN=pk.eyJ1Ijoi...your_token_here
+```
+
+---
+
+## CSS Import Check
+
+Make sure the Mapbox CSS is imported somewhere in your app:
+
+```tsx
+// In your main App.tsx or the component file
+import 'mapbox-gl/dist/mapbox-gl.css';
+```
+
+Without this CSS import, the map may not render correctly.
+
+---
+
+## Verification Checklist
+
+After implementing:
+
+- [ ] Map container has explicit height (h-64 or similar)
+- [ ] Mapbox CSS is imported
+- [ ] Mapbox token is passed correctly
+- [ ] Subject property coordinates are valid numbers
+- [ ] Comparable coordinates are valid numbers
+- [ ] Blue marker appears for subject property
+- [ ] Colored markers appear for comparables (green/yellow/red)
+- [ ] Map is centered on subject property
+- [ ] Legend displays below map
+- [ ] Map works in both Live Preview and expanded Preview modal

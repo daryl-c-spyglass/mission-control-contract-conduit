@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useTheme } from '@/hooks/use-theme';
+import { MapPin } from 'lucide-react';
 
 interface Property {
   latitude?: number;
@@ -62,6 +63,7 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [containerReady, setContainerReady] = useState(false);
   const { theme } = useTheme();
 
   const subjectCoords = getCoordinates(subjectProperty);
@@ -78,9 +80,16 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
     [validComparables]
   );
 
-  useEffect(() => {
+  const initializeMap = useCallback(() => {
     if (!mapContainer.current) return;
     
+    const container = mapContainer.current;
+    const { clientWidth, clientHeight } = container;
+    
+    if (clientWidth < 10 || clientHeight < 10) {
+      return;
+    }
+
     const token = import.meta.env.VITE_MAPBOX_TOKEN;
     if (!token) {
       setMapError('Mapbox token not configured');
@@ -111,7 +120,7 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
       const mapStyle = isDark ? 'mapbox://styles/mapbox/dark-v10' : 'mapbox://styles/mapbox/streets-v11';
       
       map.current = new mapboxgl.Map({
-        container: mapContainer.current,
+        container: container,
         style: mapStyle,
         center: [centerCoords?.lng || -97.7431, centerCoords?.lat || 30.2672],
         zoom: 12,
@@ -121,8 +130,53 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
       map.current.on('load', () => {
         setMapReady(true);
       });
+
+      map.current.on('error', (e) => {
+        console.error('Mapbox error:', e);
+      });
     } catch (err: any) {
       setMapError(err.message || 'Failed to load map');
+    }
+  }, [theme, subjectCoords, validComparables]);
+
+  useEffect(() => {
+    if (!mapContainer.current) return;
+
+    const container = mapContainer.current;
+    
+    const checkSize = () => {
+      const { clientWidth, clientHeight } = container;
+      if (clientWidth > 10 && clientHeight > 10) {
+        setContainerReady(true);
+      }
+    };
+
+    checkSize();
+
+    const resizeObserver = new ResizeObserver(() => {
+      checkSize();
+      if (map.current) {
+        map.current.resize();
+      }
+    });
+
+    resizeObserver.observe(container);
+
+    const timeoutId = setTimeout(checkSize, 100);
+    const timeoutId2 = setTimeout(checkSize, 300);
+    const timeoutId3 = setTimeout(checkSize, 500);
+
+    return () => {
+      resizeObserver.disconnect();
+      clearTimeout(timeoutId);
+      clearTimeout(timeoutId2);
+      clearTimeout(timeoutId3);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (containerReady) {
+      initializeMap();
     }
 
     return () => {
@@ -133,7 +187,7 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
         map.current = null;
       }
     };
-  }, [theme]);
+  }, [containerReady, theme, initializeMap]);
 
   useEffect(() => {
     if (!mapReady || !map.current) return;
@@ -145,8 +199,8 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
       const el = document.createElement('div');
       el.className = 'subject-marker';
       el.style.cssText = `
-        width: 24px;
-        height: 24px;
+        width: 28px;
+        height: 28px;
         background-color: #3b82f6;
         border: 3px solid white;
         border-radius: 50%;
@@ -170,8 +224,8 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
       const el = document.createElement('div');
       el.className = 'comp-marker';
       el.style.cssText = `
-        width: 16px;
-        height: 16px;
+        width: 18px;
+        height: 18px;
         background-color: ${color};
         border: 2px solid white;
         border-radius: 50%;
@@ -197,29 +251,35 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
         }
       });
       if (markersRef.current.length > 1) {
-        map.current.fitBounds(bounds, { padding: 40, maxZoom: 14 });
+        map.current.fitBounds(bounds, { padding: 50, maxZoom: 14 });
       }
     }
   }, [mapReady, subjectCoords?.lat, subjectCoords?.lng, comparablesKey]);
 
+  const mapHeight = compact ? 'h-32' : 'h-48';
+  const minHeight = compact ? '128px' : '192px';
+
   if (mapError) {
     return (
       <div className="space-y-2">
-        <div className={`bg-muted rounded-lg ${compact ? 'h-24' : 'h-32'} flex items-center justify-center text-muted-foreground text-sm`}>
-          {mapError}
+        <div className={`bg-muted rounded-lg ${mapHeight} flex items-center justify-center text-muted-foreground text-sm`} style={{ minHeight }}>
+          <div className="text-center">
+            <MapPin className="w-6 h-6 mx-auto mb-2 opacity-50" />
+            <p>{mapError}</p>
+          </div>
         </div>
-        <div className="flex gap-3 text-xs flex-wrap">
+        <div className="flex gap-3 text-xs flex-wrap justify-center">
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-blue-500"></span> Subject
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Subject
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-green-500"></span> Active
+            <span className="w-2.5 h-2.5 rounded-full bg-green-500"></span> Active
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-yellow-500"></span> Pending
+            <span className="w-2.5 h-2.5 rounded-full bg-yellow-500"></span> Pending
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-red-500"></span> Sold
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span> Sold
           </span>
         </div>
       </div>
@@ -230,21 +290,21 @@ export function MapAllListingsPreview({ subjectProperty, comparables, compact }:
     <div className="space-y-2">
       <div 
         ref={mapContainer} 
-        className={`rounded-lg overflow-hidden ${compact ? 'h-24' : 'h-32'}`}
-        style={{ minHeight: compact ? '96px' : '128px' }}
+        className={`rounded-lg overflow-hidden border ${mapHeight}`}
+        style={{ minHeight, width: '100%' }}
       />
-      <div className="flex gap-3 text-xs flex-wrap">
+      <div className="flex gap-3 text-xs flex-wrap justify-center">
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-blue-500"></span> Subject
+          <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Subject
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-green-500"></span> Active
+          <span className="w-2.5 h-2.5 rounded-full bg-green-500"></span> Active
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-yellow-500"></span> Pending
+          <span className="w-2.5 h-2.5 rounded-full bg-yellow-500"></span> Pending
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-red-500"></span> Sold
+          <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span> Sold
         </span>
       </div>
     </div>
