@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Slider } from "@/components/ui/slider";
+import { ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 
 interface ExpandedPreviewModalProps {
   isOpen: boolean;
@@ -10,6 +12,10 @@ interface ExpandedPreviewModalProps {
   sectionsEnabled: number;
 }
 
+const MIN_ZOOM = 50;
+const MAX_ZOOM = 200;
+const ZOOM_STEP = 10;
+
 export function ExpandedPreviewModal({
   isOpen,
   onClose,
@@ -17,6 +23,18 @@ export function ExpandedPreviewModal({
   sectionsEnabled,
 }: ExpandedPreviewModalProps) {
   const [zoom, setZoom] = useState(100);
+
+  const handleZoomIn = () => {
+    setZoom(prev => Math.min(prev + ZOOM_STEP, MAX_ZOOM));
+  };
+
+  const handleZoomOut = () => {
+    setZoom(prev => Math.max(prev - ZOOM_STEP, MIN_ZOOM));
+  };
+
+  const handleReset = () => {
+    setZoom(100);
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -41,30 +59,56 @@ export function ExpandedPreviewModal({
           </div>
         </ScrollArea>
 
-        <div className="flex-shrink-0 flex justify-center gap-2 px-6 py-4 border-t bg-background">
+        <div className="flex-shrink-0 flex items-center justify-center gap-2 px-6 py-3 border-t bg-background">
           <Button
-            variant={zoom === 50 ? "secondary" : "outline"}
-            size="sm"
-            onClick={() => setZoom(50)}
-            data-testid="button-zoom-50"
+            variant="outline"
+            size="icon"
+            onClick={handleZoomOut}
+            disabled={zoom <= MIN_ZOOM}
+            title="Zoom Out"
+            data-testid="button-zoom-out"
           >
-            50%
+            <ZoomOut className="h-4 w-4" />
           </Button>
+
+          <div className="flex items-center gap-3 w-36">
+            <Slider
+              value={[zoom]}
+              min={MIN_ZOOM}
+              max={MAX_ZOOM}
+              step={ZOOM_STEP}
+              onValueChange={([value]) => setZoom(value)}
+              className="w-full"
+              data-testid="slider-zoom"
+            />
+          </div>
+
+          <span className="text-sm font-medium text-muted-foreground w-12 text-center">
+            {zoom}%
+          </span>
+
           <Button
-            variant={zoom === 100 ? "secondary" : "outline"}
-            size="sm"
-            onClick={() => setZoom(100)}
-            data-testid="button-zoom-100"
+            variant="outline"
+            size="icon"
+            onClick={handleZoomIn}
+            disabled={zoom >= MAX_ZOOM}
+            title="Zoom In"
+            data-testid="button-zoom-in"
           >
-            100%
+            <ZoomIn className="h-4 w-4" />
           </Button>
+
+          <div className="w-px h-6 bg-border mx-2" />
+
           <Button
-            variant={zoom === 150 ? "secondary" : "outline"}
+            variant="outline"
             size="sm"
-            onClick={() => setZoom(150)}
-            data-testid="button-zoom-150"
+            onClick={handleReset}
+            title="Reset to 100%"
+            data-testid="button-zoom-reset"
           >
-            150%
+            <RotateCcw className="h-3 w-3 mr-1" />
+            Reset
           </Button>
         </div>
       </DialogContent>

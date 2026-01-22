@@ -790,6 +790,7 @@ export default function CMAPresentationBuilder() {
                 setActiveTab('sections');
               }
             }}
+            transactionId={cma?.transactionId || undefined}
           />
         </div>
       </div>

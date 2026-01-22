@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useLocation } from "wouter";
 import { Eye, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PreviewSection } from "./PreviewSection";
@@ -12,6 +13,32 @@ import { PropertyPhotosPreview } from "./preview-sections/PropertyPhotosPreview"
 import { PropertyDetailsPreview } from "./preview-sections/PropertyDetailsPreview";
 import { CMAMapPreview } from "@/components/presentation/CMAMapPreview";
 import type { PropertyForAdjustment } from "@/lib/adjustmentCalculations";
+
+interface SectionSource {
+  url: string;
+  label: string;
+}
+
+const getSectionSource = (sectionId: string, transactionId?: string): SectionSource | null => {
+  if (!transactionId) return null;
+  
+  const sources: Record<string, SectionSource> = {
+    'cover_page': { url: `/transactions/${transactionId}?tab=mls-data`, label: 'MLS Data' },
+    'listing_brochure': { url: `/transactions/${transactionId}?tab=mls-data`, label: 'MLS Data' },
+    'agent_resume': { url: '/settings?tab=profile', label: 'Agent Profile' },
+    'our_company': { url: '/settings?tab=profile', label: 'Company Profile' },
+    'contact_me': { url: '/settings?tab=profile', label: 'Agent Profile' },
+    'map_all_listings': { url: `/transactions/${transactionId}?tab=cma`, label: 'CMA Data' },
+    'summary_comparables': { url: `/transactions/${transactionId}?tab=cma`, label: 'Comparables' },
+    'property_details': { url: `/transactions/${transactionId}?tab=cma`, label: 'Comparables' },
+    'property_photos': { url: `/transactions/${transactionId}?tab=mls-data`, label: 'MLS Photos' },
+    'adjustments': { url: `/transactions/${transactionId}?tab=cma`, label: 'Adjustments' },
+    'price_per_sqft': { url: `/transactions/${transactionId}?tab=cma`, label: 'Market Data' },
+    'comparable_stats': { url: `/transactions/${transactionId}?tab=cma`, label: 'Market Data' },
+  };
+  
+  return sources[sectionId] || null;
+};
 
 interface LivePreviewPanelProps {
   includedSections: string[];
@@ -41,6 +68,7 @@ interface LivePreviewPanelProps {
     phone?: string;
   };
   onSectionClick?: (sectionId: string) => void;
+  transactionId?: string;
 }
 
 export function LivePreviewPanel({
@@ -51,10 +79,16 @@ export function LivePreviewPanel({
   comparables,
   agentProfile,
   onSectionClick,
+  transactionId,
 }: LivePreviewPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [, navigate] = useLocation();
+  
+  const handleSourceClick = (url: string) => {
+    navigate(url);
+  };
 
   const enabledSections = CMA_REPORT_SECTIONS.filter(s => includedSections.includes(s.id));
   
@@ -274,18 +308,24 @@ export function LivePreviewPanel({
 
   const previewContent = (compact: boolean) => (
     <>
-      {enabledSections.map((section) => (
-        <PreviewSection
-          key={section.id}
-          title={section.name}
-          icon={section.icon}
-          sectionId={section.id}
-          onClick={onSectionClick}
-          compact={compact}
-        >
-          {renderSectionContent(section, compact)}
-        </PreviewSection>
-      ))}
+      {enabledSections.map((section) => {
+        const source = getSectionSource(section.id, transactionId);
+        return (
+          <PreviewSection
+            key={section.id}
+            title={section.name}
+            icon={section.icon}
+            sectionId={section.id}
+            onClick={onSectionClick}
+            compact={compact}
+            sourceUrl={source?.url}
+            sourceLabel={source?.label}
+            onSourceClick={handleSourceClick}
+          >
+            {renderSectionContent(section, compact)}
+          </PreviewSection>
+        );
+      })}
     </>
   );
 

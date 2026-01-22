@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { getAdjustmentColor, formatAdjustmentValue } from "@/lib/statusColors";
 import { calculateAdjustments, PropertyForAdjustment } from "@/lib/adjustmentCalculations";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface AdjustmentsPreviewProps {
   subjectProperty: PropertyForAdjustment;
@@ -8,8 +11,12 @@ interface AdjustmentsPreviewProps {
 }
 
 export function AdjustmentsPreview({ subjectProperty, comparables, compact }: AdjustmentsPreviewProps) {
+  const [showAll, setShowAll] = useState(false);
+  
   const displayCount = compact ? 4 : 6;
-  const displayComps = comparables.slice(0, displayCount);
+  const displayComps = showAll ? comparables : comparables.slice(0, displayCount);
+  const remainingCount = comparables.length - displayCount;
+  const hasMore = remainingCount > 0;
 
   const adjustments = displayComps.map(comp => calculateAdjustments(subjectProperty, comp));
 
@@ -37,10 +44,35 @@ export function AdjustmentsPreview({ subjectProperty, comparables, compact }: Ad
           ))}
         </tbody>
       </table>
-      {comparables.length > displayCount && (
-        <p className="text-xs text-muted-foreground mt-2 text-center">
-          +{comparables.length - displayCount} more comparables in full report
-        </p>
+      
+      {hasMore && !showAll && (
+        <div className="flex justify-center mt-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAll(true)}
+            className="text-xs"
+            data-testid="button-show-more-adjustments"
+          >
+            <span>+{remainingCount} more comparables</span>
+            <ChevronDown className="h-3 w-3 ml-1" />
+          </Button>
+        </div>
+      )}
+      
+      {showAll && comparables.length > displayCount && (
+        <div className="flex justify-center mt-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAll(false)}
+            className="text-xs text-muted-foreground"
+            data-testid="button-show-less-adjustments"
+          >
+            <ChevronUp className="h-3 w-3 mr-1" />
+            <span>Show less</span>
+          </Button>
+        </div>
       )}
     </div>
   );

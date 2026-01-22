@@ -1,0 +1,873 @@
+# CMA Presentation Preview - Interactive Enhancements
+
+## Overview
+Enhance the CMA Presentation Preview panel with three key improvements:
+1. **Clickable Section Sources** - Each section in Live Preview should link to its data source
+2. **Modern Zoom Controls** - Replace percentage buttons with zoom in/out icons
+3. **Expandable Content** - Make "+X more" links functional to show hidden content
+
+---
+
+## Current State (from screenshots)
+- Preview shows 17 sections: Cover Page, Listing Brochure, Cover Letter, Agent Resume, Our Company, What is a CMA?, Contact Me, Map of All Listings, Comparable Properties, Property Photos, Adjustments, Market Analysis, etc.
+- Bottom has static zoom buttons: 50%, 100%, 150%
+- Property Photos shows "+12 more photos in full report"
+- Property Details shows "+4 more properties"
+- Adjustments shows "+4 more comparables in full report"
+
+---
+
+## Enhancement 1: Clickable Section Sources
+
+### Requirement
+When data in a section is synced from an external source (MLS, agent profile, etc.), clicking that section's header or an info icon should direct the user to the source.
+
+### Implementation
+
+```typescript
+// Add to the section configuration type
+interface PreviewSection {
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  enabled: boolean;
+  sourceUrl?: string;  // URL to the data source
+  sourceType?: 'mls' | 'agent-profile' | 'cma-settings' | 'manual';
+  sourceLabel?: string; // e.g., "MLS #ACT2572987", "Agent Profile"
+}
+
+// Section source mapping
+const sectionSources: Record<string, { type: string; getUrl: (data: any) => string; label: string }> = {
+  'cover-page': {
+    type: 'mls',
+    getUrl: (data) => data.mlsNumber ? `/transactions/${data.transactionId}/mls-data` : '',
+    label: 'MLS Data'
+  },
+  'listing-brochure': {
+    type: 'mls',
+    getUrl: (data) => data.mlsNumber ? `/transactions/${data.transactionId}/mls-data` : '',
+    label: 'MLS Data'
+  },
+  'agent-resume': {
+    type: 'agent-profile',
+    getUrl: () => '/settings/profile',
+    label: 'Agent Profile'
+  },
+  'cover-letter': {
+    type: 'cma-settings',
+    getUrl: (data) => `/transactions/${data.transactionId}/cma?tab=content`,
+    label: 'CMA Content'
+  },
+  'our-company': {
+    type: 'agent-profile',
+    getUrl: () => '/settings/profile',
+    label: 'Company Profile'
+  },
+  'contact-me': {
+    type: 'agent-profile',
+    getUrl: () => '/settings/profile',
+    label: 'Agent Profile'
+  },
+  'map-of-listings': {
+    type: 'cma-settings',
+    getUrl: (data) => `/transactions/${data.transactionId}/cma`,
+    label: 'CMA Data'
+  },
+  'comparable-properties': {
+    type: 'mls',
+    getUrl: (data) => `/transactions/${data.transactionId}/cma`,
+    label: 'Comparables'
+  },
+  'property-photos': {
+    type: 'mls',
+    getUrl: (data) => data.mlsNumber ? `/transactions/${data.transactionId}/mls-data` : '',
+    label: 'MLS Photos'
+  },
+  'adjustments': {
+    type: 'cma-settings',
+    getUrl: (data) => `/transactions/${data.transactionId}/cma?tab=content`,
+    label: 'Adjustments'
+  },
+  'market-analysis': {
+    type: 'cma-settings',
+    getUrl: (data) => `/transactions/${data.transactionId}/cma`,
+    label: 'Market Data'
+  }
+};
+```
+
+### UI Component for Section Header
+
+```tsx
+// ClickableSectionHeader.tsx
+import { ExternalLink, Info } from 'lucide-react';
+import { useLocation } from 'wouter';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
+interface ClickableSectionHeaderProps {
+  icon: React.ReactNode;
+  title: string;
+  sourceUrl?: string;
+  sourceLabel?: string;
+  sourceType?: string;
+}
+
+export function ClickableSectionHeader({ 
+  icon, 
+  title, 
+  sourceUrl, 
+  sourceLabel,
+  sourceType 
+}: ClickableSectionHeaderProps) {
+  const [, navigate] = useLocation();
+
+  const handleClick = () => {
+    if (sourceUrl) {
+      navigate(sourceUrl);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50">
+      <div className="flex items-center gap-2">
+        <span className="text-gray-500">{icon}</span>
+        <span className="font-medium text-gray-700">{title}</span>
+      </div>
+      
+      {sourceUrl && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleClick}
+                className="flex items-center gap-1 text-xs text-orange-500 hover:text-orange-600 
+                         transition-colors px-2 py-1 rounded hover:bg-orange-50"
+              >
+                <span>View Source</span>
+                <ExternalLink className="h-3 w-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Data synced from: {sourceLabel || 'External Source'}</p>
+              <p className="text-xs text-gray-400">Click to view/edit source</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+    </div>
+  );
+}
+```
+
+### Update Preview Section Renderer
+
+```tsx
+// In CMAPreviewPanel.tsx or similar
+{enabledSections.map((section) => {
+  const source = sectionSources[section.id];
+  const sourceUrl = source?.getUrl({ transactionId, mlsNumber });
+  
+  return (
+    <div key={section.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-4">
+      <ClickableSectionHeader
+        icon={section.icon}
+        title={section.title}
+        sourceUrl={sourceUrl}
+        sourceLabel={source?.label}
+        sourceType={source?.type}
+      />
+      <div className="p-4">
+        {renderSectionContent(section.id)}
+      </div>
+    </div>
+  );
+})}
+```
+
+---
+
+## Enhancement 2: Modern Zoom Controls
+
+### Current State
+```
+[ 50% ] [ 100% ] [ 150% ]
+```
+
+### Target State
+```
+[ - ] [ Reset (100%) ] [ + ]  with slider or percentage display
+```
+
+### Implementation
+
+```tsx
+// ZoomControls.tsx
+import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
+
+interface ZoomControlsProps {
+  zoom: number;
+  onZoomChange: (zoom: number) => void;
+  minZoom?: number;
+  maxZoom?: number;
+  step?: number;
+}
+
+export function ZoomControls({
+  zoom,
+  onZoomChange,
+  minZoom = 50,
+  maxZoom = 200,
+  step = 10
+}: ZoomControlsProps) {
+  const handleZoomIn = () => {
+    const newZoom = Math.min(zoom + step, maxZoom);
+    onZoomChange(newZoom);
+  };
+
+  const handleZoomOut = () => {
+    const newZoom = Math.max(zoom - step, minZoom);
+    onZoomChange(newZoom);
+  };
+
+  const handleReset = () => {
+    onZoomChange(100);
+  };
+
+  return (
+    <div className="flex items-center justify-center gap-2 p-3 bg-gray-50 border-t border-gray-200">
+      {/* Zoom Out Button */}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleZoomOut}
+        disabled={zoom <= minZoom}
+        className="h-8 w-8 p-0"
+      >
+        <ZoomOut className="h-4 w-4" />
+      </Button>
+
+      {/* Zoom Slider */}
+      <div className="flex items-center gap-2 w-32">
+        <Slider
+          value={[zoom]}
+          min={minZoom}
+          max={maxZoom}
+          step={step}
+          onValueChange={([value]) => onZoomChange(value)}
+          className="w-full"
+        />
+      </div>
+
+      {/* Percentage Display */}
+      <span className="text-sm font-medium text-gray-600 w-12 text-center">
+        {zoom}%
+      </span>
+
+      {/* Zoom In Button */}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleZoomIn}
+        disabled={zoom >= maxZoom}
+        className="h-8 w-8 p-0"
+      >
+        <ZoomIn className="h-4 w-4" />
+      </Button>
+
+      {/* Reset Button */}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleReset}
+        className="h-8 px-2 ml-2"
+        title="Reset to 100%"
+      >
+        <RotateCcw className="h-3 w-3 mr-1" />
+        Reset
+      </Button>
+    </div>
+  );
+}
+```
+
+### Alternative Simpler Version (No Slider)
+
+```tsx
+// SimpleZoomControls.tsx
+import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+interface SimpleZoomControlsProps {
+  zoom: number;
+  onZoomChange: (zoom: number) => void;
+}
+
+export function SimpleZoomControls({ zoom, onZoomChange }: SimpleZoomControlsProps) {
+  const zoomLevels = [50, 75, 100, 125, 150, 200];
+  
+  const zoomIn = () => {
+    const currentIndex = zoomLevels.indexOf(zoom);
+    if (currentIndex < zoomLevels.length - 1) {
+      onZoomChange(zoomLevels[currentIndex + 1]);
+    }
+  };
+
+  const zoomOut = () => {
+    const currentIndex = zoomLevels.indexOf(zoom);
+    if (currentIndex > 0) {
+      onZoomChange(zoomLevels[currentIndex - 1]);
+    }
+  };
+
+  const fitToWidth = () => {
+    onZoomChange(100);
+  };
+
+  return (
+    <div className="flex items-center justify-center gap-1 p-2 bg-white border-t border-gray-200">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={zoomOut}
+        disabled={zoom <= 50}
+        className="h-8 w-8 p-0 hover:bg-gray-100"
+        title="Zoom Out"
+      >
+        <ZoomOut className="h-4 w-4 text-gray-600" />
+      </Button>
+
+      <div className="px-3 py-1 bg-gray-100 rounded text-sm font-medium text-gray-700 min-w-[60px] text-center">
+        {zoom}%
+      </div>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={zoomIn}
+        disabled={zoom >= 200}
+        className="h-8 w-8 p-0 hover:bg-gray-100"
+        title="Zoom In"
+      >
+        <ZoomIn className="h-4 w-4 text-gray-600" />
+      </Button>
+
+      <div className="w-px h-6 bg-gray-300 mx-2" />
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={fitToWidth}
+        className="h-8 px-2 hover:bg-gray-100"
+        title="Fit to Width"
+      >
+        <Maximize className="h-4 w-4 text-gray-600 mr-1" />
+        <span className="text-xs text-gray-600">Fit</span>
+      </Button>
+    </div>
+  );
+}
+```
+
+### State Management in Parent Component
+
+```tsx
+// In CMAPreviewPanel.tsx
+const [previewZoom, setPreviewZoom] = useState(100);
+
+// Apply zoom to preview container
+<div 
+  className="preview-content overflow-auto"
+  style={{ 
+    transform: `scale(${previewZoom / 100})`,
+    transformOrigin: 'top center',
+    width: `${10000 / previewZoom}%`  // Compensate for scale
+  }}
+>
+  {/* Preview sections */}
+</div>
+
+// Footer with zoom controls
+<SimpleZoomControls 
+  zoom={previewZoom} 
+  onZoomChange={setPreviewZoom} 
+/>
+```
+
+---
+
+## Enhancement 3: Expandable Content Links
+
+### Current State
+- "+4 more properties" (static text)
+- "+12 more photos in full report" (static text)
+- "+4 more comparables in full report" (static text)
+
+### Target State
+- Clickable links that expand to show all content inline
+
+### Implementation
+
+```tsx
+// ExpandableList.tsx
+import { useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+
+interface ExpandableListProps<T> {
+  items: T[];
+  initialCount: number;
+  renderItem: (item: T, index: number) => React.ReactNode;
+  itemLabel?: string; // "properties", "photos", "comparables"
+}
+
+export function ExpandableList<T>({
+  items,
+  initialCount,
+  renderItem,
+  itemLabel = 'items'
+}: ExpandableListProps<T>) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const visibleItems = isExpanded ? items : items.slice(0, initialCount);
+  const remainingCount = items.length - initialCount;
+  const hasMore = remainingCount > 0;
+
+  return (
+    <div>
+      {/* Visible Items */}
+      {visibleItems.map((item, index) => renderItem(item, index))}
+      
+      {/* Expand/Collapse Button */}
+      {hasMore && (
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex items-center gap-1 mt-3 text-sm font-medium text-orange-500 
+                   hover:text-orange-600 transition-colors mx-auto"
+        >
+          {isExpanded ? (
+            <>
+              <ChevronUp className="h-4 w-4" />
+              <span>Show less</span>
+            </>
+          ) : (
+            <>
+              <span>+{remainingCount} more {itemLabel}</span>
+              <ChevronDown className="h-4 w-4" />
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+### Property Details Implementation
+
+```tsx
+// PropertyDetailsList.tsx
+interface Property {
+  address: string;
+  price: number;
+  beds: number;
+  baths: number;
+  sqft: number;
+  status: 'Active' | 'Closed';
+}
+
+export function PropertyDetailsList({ properties }: { properties: Property[] }) {
+  return (
+    <ExpandableList
+      items={properties}
+      initialCount={6}
+      itemLabel="properties"
+      renderItem={(property, index) => (
+        <div 
+          key={index}
+          className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0"
+        >
+          <div>
+            <p className="font-medium text-gray-900">{property.address}</p>
+            <p className="text-sm text-gray-500">
+              ${property.price.toLocaleString()} · {property.beds} bd · {property.baths} ba · {property.sqft.toLocaleString()} sqft
+            </p>
+          </div>
+          <span className={`px-2 py-1 text-xs font-medium rounded ${
+            property.status === 'Active' 
+              ? 'bg-green-100 text-green-700' 
+              : 'bg-red-100 text-red-700'
+          }`}>
+            {property.status}
+          </span>
+        </div>
+      )}
+    />
+  );
+}
+```
+
+### Property Photos Grid Implementation
+
+```tsx
+// PropertyPhotosGrid.tsx
+interface PropertyPhoto {
+  url: string;
+  caption?: string;
+}
+
+export function PropertyPhotosGrid({ photos }: { photos: PropertyPhoto[] }) {
+  const [selectedPhoto, setSelectedPhoto] = useState<PropertyPhoto | null>(null);
+  
+  return (
+    <>
+      <ExpandableList
+        items={photos}
+        initialCount={8}  // Show 2 rows of 4
+        itemLabel="photos"
+        renderItem={(photo, index) => (
+          <div 
+            key={index}
+            className="aspect-square cursor-pointer overflow-hidden rounded-lg 
+                     hover:opacity-90 transition-opacity"
+            onClick={() => setSelectedPhoto(photo)}
+          >
+            <img 
+              src={photo.url} 
+              alt={photo.caption || `Property photo ${index + 1}`}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
+      />
+      
+      {/* Photo Modal */}
+      {selectedPhoto && (
+        <PhotoModal 
+          photo={selectedPhoto} 
+          onClose={() => setSelectedPhoto(null)} 
+        />
+      )}
+    </>
+  );
+}
+
+// Wrapper to render grid layout
+export function PropertyPhotosSection({ photos }: { photos: PropertyPhoto[] }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const initialCount = 8;
+  const visiblePhotos = isExpanded ? photos : photos.slice(0, initialCount);
+  const remainingCount = photos.length - initialCount;
+
+  return (
+    <div>
+      <div className="grid grid-cols-4 gap-2">
+        {visiblePhotos.map((photo, index) => (
+          <div 
+            key={index}
+            className="aspect-square overflow-hidden rounded-lg cursor-pointer 
+                     hover:opacity-90 transition-opacity"
+          >
+            <img 
+              src={photo.url} 
+              alt={`Property photo ${index + 1}`}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ))}
+      </div>
+      
+      {remainingCount > 0 && (
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex items-center gap-1 mt-3 text-sm font-medium text-orange-500 
+                   hover:text-orange-600 transition-colors mx-auto"
+        >
+          {isExpanded ? (
+            <>
+              <ChevronUp className="h-4 w-4" />
+              <span>Show fewer photos</span>
+            </>
+          ) : (
+            <>
+              <span>+{remainingCount} more photos in full report</span>
+              <ChevronDown className="h-4 w-4" />
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+### Adjustments Table Implementation
+
+```tsx
+// AdjustmentsTable.tsx
+interface Adjustment {
+  property: string;
+  salePrice: number;
+  totalAdj: number;
+  adjPrice: number;
+}
+
+export function AdjustmentsTable({ adjustments }: { adjustments: Adjustment[] }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const initialCount = 4;
+  const visibleAdjustments = isExpanded ? adjustments : adjustments.slice(0, initialCount);
+  const remainingCount = adjustments.length - initialCount;
+
+  const formatCurrency = (value: number) => {
+    if (value >= 1000000) return `$${(value / 1000).toFixed(0)}k`;
+    if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`;
+    return `$${value.toLocaleString()}`;
+  };
+
+  const formatAdjustment = (value: number) => {
+    const formatted = formatCurrency(Math.abs(value));
+    return value >= 0 ? `+${formatted}` : `-${formatted}`;
+  };
+
+  return (
+    <div>
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-gray-200">
+            <th className="text-left py-2 text-sm font-medium text-gray-600">Property</th>
+            <th className="text-right py-2 text-sm font-medium text-gray-600">Sale Price</th>
+            <th className="text-right py-2 text-sm font-medium text-gray-600">Total Adj</th>
+            <th className="text-right py-2 text-sm font-medium text-gray-600">Adj. Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visibleAdjustments.map((adj, index) => (
+            <tr key={index} className="border-b border-gray-100 last:border-0">
+              <td className="py-2 text-sm text-gray-900">{adj.property}</td>
+              <td className="py-2 text-sm text-gray-900 text-right">
+                {formatCurrency(adj.salePrice)}
+              </td>
+              <td className={`py-2 text-sm text-right font-medium ${
+                adj.totalAdj >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {formatAdjustment(adj.totalAdj)}
+              </td>
+              <td className="py-2 text-sm text-gray-900 text-right font-semibold">
+                {formatCurrency(adj.adjPrice)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      
+      {remainingCount > 0 && (
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex items-center gap-1 mt-3 text-sm font-medium text-orange-500 
+                   hover:text-orange-600 transition-colors mx-auto"
+        >
+          {isExpanded ? (
+            <>
+              <ChevronUp className="h-4 w-4" />
+              <span>Show fewer comparables</span>
+            </>
+          ) : (
+            <>
+              <span>+{remainingCount} more comparables in full report</span>
+              <ChevronDown className="h-4 w-4" />
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## Integration into CMA Preview Panel
+
+### Full Preview Panel Structure
+
+```tsx
+// CMAPreviewPanel.tsx
+import { useState } from 'react';
+import { X } from 'lucide-react';
+import { ClickableSectionHeader } from './ClickableSectionHeader';
+import { SimpleZoomControls } from './SimpleZoomControls';
+import { PropertyDetailsList } from './PropertyDetailsList';
+import { PropertyPhotosSection } from './PropertyPhotosSection';
+import { AdjustmentsTable } from './AdjustmentsTable';
+
+interface CMAPreviewPanelProps {
+  transactionId: number;
+  mlsNumber?: string;
+  sections: PreviewSection[];
+  cmaData: CMAData;
+  onClose: () => void;
+}
+
+export function CMAPreviewPanel({ 
+  transactionId, 
+  mlsNumber, 
+  sections, 
+  cmaData,
+  onClose 
+}: CMAPreviewPanelProps) {
+  const [zoom, setZoom] = useState(100);
+  
+  const enabledSections = sections.filter(s => s.enabled);
+  const enabledCount = enabledSections.length;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-gray-100 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 bg-white rounded-t-xl border-b">
+          <h2 className="text-lg font-semibold text-gray-900">CMA Presentation Preview</h2>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500">{enabledCount} sections enabled</span>
+            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
+              <X className="h-5 w-5 text-gray-500" />
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable Preview Content */}
+        <div className="flex-1 overflow-auto p-4">
+          <div 
+            className="transition-transform duration-200 origin-top"
+            style={{ 
+              transform: `scale(${zoom / 100})`,
+              width: zoom !== 100 ? `${10000 / zoom}%` : '100%'
+            }}
+          >
+            {enabledSections.map((section) => {
+              const source = sectionSources[section.id];
+              const sourceUrl = source?.getUrl({ transactionId, mlsNumber });
+              
+              return (
+                <div 
+                  key={section.id} 
+                  className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-4"
+                >
+                  <ClickableSectionHeader
+                    icon={section.icon}
+                    title={section.title}
+                    sourceUrl={sourceUrl}
+                    sourceLabel={source?.label}
+                  />
+                  <div className="p-4">
+                    {renderSectionContent(section.id, cmaData)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Footer with Zoom Controls */}
+        <SimpleZoomControls zoom={zoom} onZoomChange={setZoom} />
+      </div>
+    </div>
+  );
+}
+
+// Section content renderer
+function renderSectionContent(sectionId: string, cmaData: CMAData) {
+  switch (sectionId) {
+    case 'property-details':
+      return <PropertyDetailsList properties={cmaData.comparables} />;
+    case 'property-photos':
+      return <PropertyPhotosSection photos={cmaData.photos} />;
+    case 'adjustments':
+      return <AdjustmentsTable adjustments={cmaData.adjustments} />;
+    // ... other sections
+    default:
+      return null;
+  }
+}
+```
+
+---
+
+## Visual Diagram
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  CMA Presentation Preview                    17 sections enabled │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │ 📄 Cover Page                           [View Source →]    │ │ ← Clickable link
+│  ├────────────────────────────────────────────────────────────┤ │
+│  │                    Spyglass Realty                         │ │
+│  │            Comparative Market Analysis                      │ │
+│  │           612 Twelve Oaks LN, Austin, TX                   │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │ 📋 Property Details                     [View Source →]    │ │
+│  ├────────────────────────────────────────────────────────────┤ │
+│  │  2301 EAST SIDE DR    $1,199,000          [Closed]        │ │
+│  │  4361 Congress Ave    $380,000            [Active]        │ │
+│  │  1723 Fawn DR         $765,000            [Active]        │ │
+│  │  ...                                                       │ │
+│  │                                                            │ │
+│  │              ▼ +4 more properties                          │ │ ← Clickable expand
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │ 📷 Property Photos                      [View Source →]    │ │
+│  ├────────────────────────────────────────────────────────────┤ │
+│  │  [img] [img] [img] [img]                                   │ │
+│  │  [img] [img] [img] [img]                                   │ │
+│  │                                                            │ │
+│  │              ▼ +12 more photos in full report              │ │ ← Clickable expand
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+├──────────────────────────────────────────────────────────────────┤
+│         [ 🔍- ]  ═══●═══════════  85%  [ 🔍+ ]  │ ⟲ Fit │      │ ← New zoom controls
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Verification Checklist
+
+### Enhancement 1: Clickable Sources
+- [ ] Each section header shows "View Source →" link when source exists
+- [ ] Clicking link navigates to correct page (MLS Data, Settings, CMA tab)
+- [ ] Tooltip shows "Data synced from: [source name]"
+- [ ] Links use orange color (#F37216) matching Spyglass branding
+
+### Enhancement 2: Zoom Controls
+- [ ] Zoom out button (🔍-) decreases zoom by 10%
+- [ ] Zoom in button (🔍+) increases zoom by 10%
+- [ ] Current zoom percentage displayed between buttons
+- [ ] "Fit" or "Reset" button returns to 100%
+- [ ] Buttons disabled at min (50%) and max (200%) zoom levels
+- [ ] Preview content scales smoothly with zoom changes
+
+### Enhancement 3: Expandable Content
+- [ ] Property Details shows first 6 items, "+X more properties" is clickable
+- [ ] Property Photos shows first 8 images (4x2 grid), "+X more photos" is clickable  
+- [ ] Adjustments shows first 4 rows, "+X more comparables" is clickable
+- [ ] Clicking expand shows all items with smooth animation
+- [ ] Clicking again collapses back to initial count
+- [ ] Expand button text changes to "Show less" when expanded
+- [ ] Orange text color for expand/collapse buttons
+
+---
+
+## Files to Modify
+
+1. `client/src/components/cma/CMAPreviewPanel.tsx` - Main preview panel
+2. `client/src/components/cma/ClickableSectionHeader.tsx` - New component
+3. `client/src/components/cma/ZoomControls.tsx` - New component
+4. `client/src/components/cma/ExpandableList.tsx` - New reusable component
+5. `client/src/components/cma/PropertyDetailsList.tsx` - Updated with expansion
+6. `client/src/components/cma/PropertyPhotosSection.tsx` - Updated with expansion
+7. `client/src/components/cma/AdjustmentsTable.tsx` - Updated with expansion

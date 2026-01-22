@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface PropertyPhotosPreviewProps {
   photos: string[];
@@ -6,9 +9,12 @@ interface PropertyPhotosPreviewProps {
 }
 
 export function PropertyPhotosPreview({ photos, compact }: PropertyPhotosPreviewProps) {
+  const [showAll, setShowAll] = useState(false);
+  
   const displayCount = compact ? 6 : 12;
-  const displayPhotos = photos.slice(0, displayCount);
+  const displayPhotos = showAll ? photos : photos.slice(0, displayCount);
   const remainingCount = photos.length - displayCount;
+  const hasMore = remainingCount > 0;
 
   if (!photos.length) {
     return (
@@ -34,10 +40,35 @@ export function PropertyPhotosPreview({ photos, compact }: PropertyPhotosPreview
           </div>
         ))}
       </div>
-      {remainingCount > 0 && (
-        <p className="text-xs text-muted-foreground mt-2 text-center">
-          +{remainingCount} more photos in full report
-        </p>
+      
+      {hasMore && !showAll && (
+        <div className="flex justify-center mt-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAll(true)}
+            className="text-xs"
+            data-testid="button-show-more-photos"
+          >
+            <span>+{remainingCount} more photos</span>
+            <ChevronDown className="h-3 w-3 ml-1" />
+          </Button>
+        </div>
+      )}
+      
+      {showAll && photos.length > displayCount && (
+        <div className="flex justify-center mt-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAll(false)}
+            className="text-xs text-muted-foreground"
+            data-testid="button-show-less-photos"
+          >
+            <ChevronUp className="h-3 w-3 mr-1" />
+            <span>Show less</span>
+          </Button>
+        </div>
       )}
     </div>
   );
