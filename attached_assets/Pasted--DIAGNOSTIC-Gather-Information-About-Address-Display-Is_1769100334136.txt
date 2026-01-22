@@ -1,0 +1,218 @@
+# DIAGNOSTIC: Gather Information About Address Display Issues
+
+## Purpose
+Gather technical information about how property addresses are displayed in CMA Tab and Presentation Builder BEFORE creating a fix. **No changes needed - just information gathering.**
+
+---
+
+## Issues to Investigate
+
+### Issue 1: CMA Tab - Addresses Not Showing
+- Grid view: Shows photo, price, beds/baths/sqft, but **NO ADDRESS**
+- List view: Shows photo, price, details, but **NO ADDRESS**  
+- Table view: Address column is **EMPTY**
+
+### Issue 2: Presentation Builder - Property Details
+- Shows "Unknown" instead of actual addresses
+- "+6 more properties" link is **NOT CLICKABLE**
+
+---
+
+## Questions to Answer
+
+### 1. CMA Comparable Properties Components
+
+Find the files that render the Grid, List, and Table views:
+
+```bash
+# Search for comparable property card/list components
+grep -r "Grid\|List\|Table" client/src/components/ --include="*.tsx" | grep -i "cma\|comparable\|property"
+grep -r "comparable" client/src/components/ --include="*.tsx" | head -30
+```
+
+**What files render:**
+- Grid view cards?
+- List view rows?
+- Table view?
+
+---
+
+### 2. How is Address Data Structured?
+
+Log the first comparable to see the data structure:
+
+```tsx
+// Add this temporarily in the CMA component
+console.log('=== COMPARABLE DATA STRUCTURE ===');
+console.log('First comparable:', comparables[0]);
+console.log('All keys:', Object.keys(comparables[0] || {}));
+
+// Check address-related fields
+const comp = comparables[0];
+console.log('Address fields:', {
+  address: comp?.address,
+  streetAddress: comp?.streetAddress,
+  fullAddress: comp?.fullAddress,
+  unparsedAddress: comp?.unparsedAddress,
+  streetNumber: comp?.streetNumber,
+  streetName: comp?.streetName,
+  city: comp?.city,
+  // Nested address object
+  addressObj: comp?.address,
+  location: comp?.location,
+});
+```
+
+**What does the console show?**
+
+---
+
+### 3. Grid View Card Component
+
+Find where the Grid card is rendered and show the JSX:
+
+```bash
+grep -r "CardContent\|property.*card" client/src/components/ --include="*.tsx" -A 10 | head -50
+```
+
+**Paste the relevant JSX that should display the address:**
+
+```tsx
+// What does the card render look like?
+<Card>
+  <CardContent>
+    {/* What's here for address? */}
+  </CardContent>
+</Card>
+```
+
+---
+
+### 4. List View Row Component
+
+Find where the List row is rendered:
+
+```bash
+grep -r "ListView\|ListRow\|list.*view" client/src/components/ --include="*.tsx" -A 10
+```
+
+**Paste the relevant JSX:**
+
+---
+
+### 5. Table View Component
+
+Find the table columns definition:
+
+```bash
+grep -r "columns\|TableCell\|Address" client/src/components/ --include="*.tsx" | grep -i "cma\|comparable"
+```
+
+**Paste the table column definition for address:**
+
+```tsx
+// What does the Address column look like?
+{
+  header: 'Address',
+  accessorKey: '???', // What key is used?
+  cell: ???
+}
+```
+
+---
+
+### 6. Presentation Builder - PropertyDetails Component
+
+Find where "Property Details" renders in Live Preview:
+
+```bash
+grep -r "PropertyDetails\|Property Details\|Unknown" client/src/components/ --include="*.tsx"
+grep -r "more properties" client/src/components/ --include="*.tsx"
+```
+
+**What file is it in?**
+
+**Paste the code that:**
+- Renders the property list
+- Shows "Unknown" for address
+- Renders the "+6 more properties" link
+
+---
+
+### 7. Is "+6 more properties" Supposed to be Clickable?
+
+Look at the code for the "more properties" element:
+
+```tsx
+// Is it a button, link, or just text?
+<span>+6 more properties</span>  // Just text - not clickable
+// vs
+<button onClick={...}>+6 more properties</button>  // Clickable
+// vs
+<a href="#" onClick={...}>+6 more properties</a>  // Clickable
+```
+
+**What is the current implementation?**
+
+---
+
+### 8. What Field Should Be Used for Address?
+
+Based on Repliers API data, addresses typically come in these formats:
+
+```typescript
+// Option A: Direct field
+property.address // "1234 Oak St, Austin, TX"
+
+// Option B: Unparsed address field
+property.unparsedAddress // "1234 Oak St, Austin, TX 78701"
+
+// Option C: Address object
+property.address.streetAddress // "1234 Oak St"
+property.address.city // "Austin"
+property.address.state // "TX"
+
+// Option D: Separate fields
+property.streetNumber // "1234"
+property.streetName // "Oak St"
+property.city // "Austin"
+```
+
+**Which format does your data use?**
+
+---
+
+## Summary Format
+
+Please provide answers in this format:
+
+```
+1. Grid view file: [filename]
+   Relevant JSX: [paste code]
+
+2. List view file: [filename]
+   Relevant JSX: [paste code]
+
+3. Table view file: [filename]
+   Address column definition: [paste code]
+
+4. Data structure (console output):
+   [paste the console.log output showing address fields]
+
+5. Property Details file: [filename]
+   Code showing "Unknown": [paste code]
+   "+6 more" code: [paste code]
+
+6. Is "+6 more" clickable: [yes/no, paste implementation]
+
+7. Correct address field to use: [field name based on data]
+```
+
+---
+
+## After Gathering Info
+
+Once you have this information, share it and I'll create a targeted fix that:
+1. Displays addresses correctly in Grid/List/Table views
+2. Displays addresses correctly in Presentation Builder Property Details
+3. Makes "+6 more properties" clickable (if it should be)
