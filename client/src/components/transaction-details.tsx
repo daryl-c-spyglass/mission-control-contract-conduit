@@ -3294,19 +3294,9 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <ImageIcon className="h-12 w-12 text-muted-foreground/50 mb-4" />
                 <h3 className="font-medium mb-2">No Marketing Assets Yet</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Use the Quick Actions above to create social media graphics or print flyers.
+                <p className="text-sm text-muted-foreground">
+                  Use the Quick Actions above to create marketing materials.
                 </p>
-                <div className="flex gap-2">
-                  <Button onClick={() => setGraphicsDialogOpen(true)} data-testid="button-empty-create-graphics">
-                    <ImageIcon className="h-4 w-4 mr-2" />
-                    Create Graphics
-                  </Button>
-                  <Button variant="outline" onClick={() => setFlyerDialogOpen(true)} data-testid="button-empty-create-flyer">
-                    <FileImage className="h-4 w-4 mr-2" />
-                    Create Flyer
-                  </Button>
-                </div>
               </CardContent>
             </Card>
           )}
