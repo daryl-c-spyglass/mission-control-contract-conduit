@@ -2515,8 +2515,16 @@ export async function registerRoutes(
         return res.status(404).json({ message: "CMA not found" });
       }
       
-      // Calculate statistics from propertiesData
-      const properties = (cma.propertiesData || []) as any[];
+      // Try propertiesData first, fall back to linked transaction's cmaData
+      let properties = (cma.propertiesData || []) as any[];
+      
+      if (properties.length === 0 && cma.transactionId) {
+        const transaction = await storage.getTransaction(cma.transactionId);
+        if (transaction?.cmaData) {
+          properties = transaction.cmaData as any[];
+        }
+      }
+      
       if (properties.length === 0) {
         return res.json({
           price: { range: { min: 0, max: 0 }, average: 0, median: 0 },
@@ -2542,22 +2550,32 @@ export async function registerRoutes(
         return { range: { min: sorted[0], max: sorted[sorted.length - 1] }, average: Math.round(avg), median: Math.round(median) };
       };
       
+      // Handle both CMA data formats: {price, sqft, status} and {listPrice, livingArea, standardStatus}
       const prices = properties.map(p => {
-        const isClosed = p.standardStatus === 'Closed';
-        return isClosed && p.closePrice ? Number(p.closePrice) : Number(p.listPrice || 0);
+        const status = (p.standardStatus || p.status || '').toLowerCase();
+        const isClosed = status.includes('closed') || status.includes('sold');
+        const closePrice = p.closePrice || p.soldPrice || (isClosed ? p.price : null);
+        const listPrice = p.listPrice || p.price || 0;
+        return isClosed && closePrice ? Number(closePrice) : Number(listPrice);
       }).filter(p => p > 0);
-      const sqfts = properties.map(p => Number(p.livingArea || 0)).filter(s => s > 0);
+      
+      const sqfts = properties.map(p => Number(p.livingArea || p.sqft || 0)).filter(s => s > 0);
+      
       const pricePerSqft = properties
-        .filter(p => p.livingArea && Number(p.livingArea) > 0)
+        .filter(p => (p.livingArea || p.sqft) && Number(p.livingArea || p.sqft) > 0)
         .map(p => {
-          const isClosed = p.standardStatus === 'Closed';
-          const price = isClosed && p.closePrice ? Number(p.closePrice) : Number(p.listPrice || 0);
-          const sqft = Number(p.livingArea);
+          const status = (p.standardStatus || p.status || '').toLowerCase();
+          const isClosed = status.includes('closed') || status.includes('sold');
+          const closePrice = p.closePrice || p.soldPrice || (isClosed ? p.price : null);
+          const listPrice = p.listPrice || p.price || 0;
+          const price = isClosed && closePrice ? Number(closePrice) : Number(listPrice);
+          const sqft = Number(p.livingArea || p.sqft);
           return sqft > 0 ? price / sqft : 0;
         }).filter(v => v > 0 && !isNaN(v));
-      const doms = properties.map(p => Number(p.daysOnMarket || p.simpleDaysOnMarket || 0)).filter(d => d > 0);
-      const beds = properties.map(p => Number(p.bedroomsTotal || 0)).filter(b => b > 0);
-      const baths = properties.map(p => Number(p.bathroomsTotalInteger || 0)).filter(b => b > 0);
+      
+      const doms = properties.map(p => Number(p.daysOnMarket || p.simpleDaysOnMarket || 0)).filter(d => d >= 0);
+      const beds = properties.map(p => Number(p.bedroomsTotal || p.bedrooms || 0)).filter(b => b > 0);
+      const baths = properties.map(p => Number(p.bathroomsTotalInteger || p.bathrooms || 0)).filter(b => b > 0);
       const years = properties.map(p => Number(p.yearBuilt || 0)).filter(y => y > 0);
       const lots = properties.map(p => Number(p.lotSizeSquareFeet || 0)).filter(l => l > 0);
       const acres = properties.map(p => Number(p.lotSizeAcres || (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : 0))).filter(a => a > 0);
@@ -2587,17 +2605,29 @@ export async function registerRoutes(
         return res.status(404).json({ message: "CMA not found" });
       }
       
-      const properties = (cma.propertiesData || []) as any[];
+      // Try propertiesData first, fall back to linked transaction's cmaData
+      let properties = (cma.propertiesData || []) as any[];
+      
+      if (properties.length === 0 && cma.transactionId) {
+        const transaction = await storage.getTransaction(cma.transactionId);
+        if (transaction?.cmaData) {
+          properties = transaction.cmaData as any[];
+        }
+      }
+      
       const timeline = properties
         .filter(p => p.listDate || p.closeDate)
         .map(p => {
-          const isClosed = p.standardStatus === 'Closed';
+          const status = (p.standardStatus || p.status || '').toLowerCase();
+          const isClosed = status.includes('closed') || status.includes('sold');
+          const closePrice = p.closePrice || p.soldPrice || (isClosed ? p.price : null);
+          const listPrice = p.listPrice || p.price || 0;
           return {
             date: isClosed && p.closeDate ? p.closeDate : p.listDate,
-            price: isClosed && p.closePrice ? Number(p.closePrice) : Number(p.listPrice || 0),
-            status: p.standardStatus || 'Active',
+            price: isClosed && closePrice ? Number(closePrice) : Number(listPrice),
+            status: p.standardStatus || p.status || 'Active',
             propertyId: p.id || p.mlsNumber || '',
-            address: p.unparsedAddress || '',
+            address: p.unparsedAddress || p.address || '',
             daysOnMarket: p.daysOnMarket || p.simpleDaysOnMarket || null,
             cumulativeDaysOnMarket: p.cumulativeDaysOnMarket || null,
           };

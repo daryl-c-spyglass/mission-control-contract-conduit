@@ -38,6 +38,12 @@ Preferred communication style: Simple, everyday language.
 - **Agent Profile System**: Database-backed agent profiles with bio, default cover letter (with AI generation/enhancement), and social media links for CMA reports. Includes tone selection (professional, friendly, confident) for AI-generated cover letters.
 - **Automatic MLS Synchronization**: Background service for regular MLS data sync.
 - **CMA (Comparative Market Analysis) System**: Database-backed storage, public share links, property data visualization (grid, stats, map), and configurable filters for search radius, price, size, and age. Includes API endpoints for CMA management and sharing.
+- **CMA Data Flow**: 
+  - Subject property: `linkedTransaction.mlsData` with coordinates in `coordinates.latitude/longitude`
+  - Comparables: Primary source is `cma.propertiesData`, fallback to `linkedTransaction.cmaData` if empty
+  - Comparable coordinates: Located in `map.latitude/longitude` field
+  - Statistics/Timeline endpoints use same fallback logic for data consistency
+  - Property field mapping: CMA format (`price`, `sqft`, `status`) ↔ Normalized format (`listPrice`, `livingArea`, `standardStatus`)
 - **Status Badges & Utilities**: Consistent styling and display logic for transaction statuses and days remaining.
 - **Shared Listing Utilities**: Predicates and helpers for rental exclusion, accurate Days on Market display, and filtering.
 - **MLS/IDX/VOW Compliance**: Multi-layer rental exclusion, prevention of external media redirects, and consistent DOM normalization.
