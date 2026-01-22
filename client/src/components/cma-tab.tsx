@@ -985,7 +985,12 @@ export function CMATab({ transaction }: CMATabProps) {
                           </Badge>
                         </div>
                         
-                        {/* Row 2: Price + Price per sqft */}
+                        {/* Row 2: Address */}
+                        <p className="text-sm font-medium text-foreground truncate" title={comp.address}>
+                          {comp.address?.split(',')[0] || comp.address || 'Address unavailable'}
+                        </p>
+                        
+                        {/* Row 3: Price + Price per sqft */}
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-lg font-bold">{formatPrice(comp.price)}</p>
                           <p className="text-sm text-muted-foreground whitespace-nowrap">${Math.round(pricePerSqft)}/sqft</p>

@@ -1,0 +1,316 @@
+# FIX: Address Display in CMA Tab and Presentation Builder
+
+## Issues Found
+
+| Issue | File | Line | Problem |
+|-------|------|------|---------|
+| Grid view missing address | `cma-tab.tsx` | ~975 | No address JSX |
+| "+6 more" not clickable | `PropertyDetailsPreview.tsx` | 70 | Uses `<p>` not `<button>` |
+| "Unknown" addresses | `PropertyDetailsPreview.tsx` | 43 | Field name mismatch |
+
+---
+
+## Fix 1: Add Address to Grid View
+
+**File:** `client/src/components/cma-tab.tsx`
+**Location:** Around lines 942-1020 (Grid view card)
+
+Find the Grid view card and add address after the status/distance badges:
+
+**BEFORE (missing address):**
+```tsx
+{/* Property Details */}
+<div className="p-3 space-y-2">
+  {/* Row 1: Status + Distance badges */}
+  <div className="flex items-center gap-2">
+    <Badge ...>{getStatusLabel(comp.status || '')}</Badge>
+    <Badge variant="secondary" ...>{comp.distance.toFixed(1)} mi</Badge>
+  </div>
+  {/* Row 2: Price + Price per sqft */}
+  <div className="flex items-center justify-between gap-2">
+    <p className="text-lg font-bold">{formatPrice(comp.price)}</p>
+    ...
+  </div>
+  {/* Row 3: Property Stats - beds/baths/sqft */}
+  ...
+</div>
+```
+
+**AFTER (with address):**
+```tsx
+{/* Property Details */}
+<div className="p-3 space-y-2">
+  {/* Row 1: Status + Distance badges */}
+  <div className="flex items-center gap-2">
+    <Badge ...>{getStatusLabel(comp.status || '')}</Badge>
+    <Badge variant="secondary" ...>{comp.distance.toFixed(1)} mi</Badge>
+  </div>
+  
+  {/* Row 2: Address - NEW! */}
+  <p className="text-sm font-medium text-foreground truncate" title={comp.address}>
+    {comp.address?.split(',')[0] || comp.address || 'Address unavailable'}
+  </p>
+  
+  {/* Row 3: Price + Price per sqft */}
+  <div className="flex items-center justify-between gap-2">
+    <p className="text-lg font-bold">{formatPrice(comp.price)}</p>
+    ...
+  </div>
+  {/* Row 4: Property Stats - beds/baths/sqft */}
+  ...
+</div>
+```
+
+**Note:** Using `comp.address?.split(',')[0]` shows just the street address (e.g., "1234 Oak St") without city/state, matching the List and Table view format.
+
+---
+
+## Fix 2: Make "+6 more properties" Clickable
+
+**File:** `client/src/components/cma/preview-sections/PropertyDetailsPreview.tsx`
+**Location:** Lines 69-72
+
+### Step 1: Add state for expanded view
+
+At the top of the component:
+
+```tsx
+interface PropertyDetailsPreviewProps {
+  properties: any[];
+  compact?: boolean;
+}
+
+export function PropertyDetailsPreview({ properties, compact }: PropertyDetailsPreviewProps) {
+  // Add state for showing all properties
+  const [showAll, setShowAll] = useState(false);
+  
+  const displayCount = compact ? 4 : 6;
+  const displayProperties = showAll ? properties : properties.slice(0, displayCount);
+  const remainingCount = properties.length - displayCount;
+  
+  // ... rest of component
+}
+```
+
+### Step 2: Update the "+X more properties" to be clickable
+
+**BEFORE:**
+```tsx
+{remainingCount > 0 && (
+  <p className="text-xs text-muted-foreground text-center pt-2">
+    +{remainingCount} more properties
+  </p>
+)}
+```
+
+**AFTER:**
+```tsx
+{remainingCount > 0 && !showAll && (
+  <button
+    onClick={() => setShowAll(true)}
+    className="w-full text-xs text-primary hover:text-primary/80 text-center pt-2 hover:underline cursor-pointer"
+  >
+    +{remainingCount} more properties
+  </button>
+)}
+
+{showAll && properties.length > displayCount && (
+  <button
+    onClick={() => setShowAll(false)}
+    className="w-full text-xs text-muted-foreground hover:text-foreground text-center pt-2 hover:underline cursor-pointer"
+  >
+    Show less
+  </button>
+)}
+```
+
+### Step 3: Use displayProperties in the map
+
+```tsx
+{displayProperties.map((property, index) => (
+  // ... property row JSX
+))}
+```
+
+---
+
+## Fix 3: Fix "Unknown" Addresses in PropertyDetailsPreview
+
+**File:** `client/src/components/cma/preview-sections/PropertyDetailsPreview.tsx`
+**Location:** Lines 43-44
+
+The current code:
+```tsx
+const address = property.unparsedAddress || property.streetAddress || property.address || 'Unknown';
+```
+
+This looks correct, but the data from CMA uses just `address` field. The issue might be that the properties passed to this component don't have the `address` field aliased correctly.
+
+### Check where properties are passed from LivePreviewPanel
+
+**File:** `client/src/components/cma/LivePreviewPanel.tsx`
+
+Look for where `PropertyDetailsPreview` is called and ensure the `comparables` array has the `address` field:
+
+```tsx
+// If the CMA data uses different field names, map them:
+const normalizedComparables = comparables.map(comp => ({
+  ...comp,
+  // Ensure address is available at expected locations
+  address: comp.address || comp.unparsedAddress || comp.streetAddress || 'Unknown',
+  unparsedAddress: comp.unparsedAddress || comp.address,
+  streetAddress: comp.streetAddress || comp.address?.split(',')[0],
+}));
+
+<PropertyDetailsPreview
+  properties={normalizedComparables}
+  compact={compact}
+/>
+```
+
+### Alternative: Update PropertyDetailsPreview to check more fields
+
+```tsx
+// More comprehensive address extraction
+const getAddress = (property: any) => {
+  // Try various field names
+  return property.unparsedAddress ||
+         property.streetAddress ||
+         property.address ||
+         property.fullAddress ||
+         property.location?.address ||
+         (property.streetNumber && property.streetName 
+           ? `${property.streetNumber} ${property.streetName}` 
+           : null) ||
+         'Unknown';
+};
+
+const address = getAddress(property);
+```
+
+---
+
+## Complete PropertyDetailsPreview.tsx Fix
+
+Here's the complete updated component:
+
+```tsx
+import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Home } from 'lucide-react';
+
+interface PropertyDetailsPreviewProps {
+  properties: any[];
+  compact?: boolean;
+}
+
+export function PropertyDetailsPreview({ properties, compact }: PropertyDetailsPreviewProps) {
+  const [showAll, setShowAll] = useState(false);
+  
+  const displayCount = compact ? 4 : 6;
+  const displayProperties = showAll ? properties : properties.slice(0, displayCount);
+  const remainingCount = properties.length - displayCount;
+
+  // Comprehensive address extraction
+  const getAddress = (property: any) => {
+    return property.unparsedAddress ||
+           property.streetAddress ||
+           property.address ||
+           property.fullAddress ||
+           (property.streetNumber && property.streetName 
+             ? `${property.streetNumber} ${property.streetName}` 
+             : null) ||
+           'Unknown';
+  };
+
+  // Get status color
+  const getStatusColor = (status: string) => {
+    const s = status?.toLowerCase();
+    if (s?.includes('active') && !s?.includes('under')) return 'bg-green-500';
+    if (s?.includes('closed') || s?.includes('sold')) return 'bg-red-500';
+    if (s?.includes('pending') || s?.includes('under') || s?.includes('contract')) return 'bg-yellow-500';
+    return 'bg-gray-500';
+  };
+
+  return (
+    <div className="space-y-2">
+      {displayProperties.map((property, index) => {
+        const address = getAddress(property);
+        const displayAddress = address !== 'Unknown' 
+          ? address.split(',')[0] // Just street address
+          : 'Unknown';
+        
+        return (
+          <div key={property.mlsNumber || index} className="flex items-center justify-between py-2 border-b last:border-b-0">
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm truncate" title={address}>
+                {displayAddress}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                ${property.price?.toLocaleString() || '—'} · 
+                {property.bedrooms || 0} bd · 
+                {property.bathrooms || 0} ba · 
+                {property.sqft?.toLocaleString() || '—'} sqft
+              </p>
+            </div>
+            <Badge 
+              className={`${getStatusColor(property.status)} text-white text-xs ml-2 shrink-0`}
+            >
+              {property.status || 'Unknown'}
+            </Badge>
+          </div>
+        );
+      })}
+      
+      {/* Clickable "more properties" button */}
+      {remainingCount > 0 && !showAll && (
+        <button
+          onClick={() => setShowAll(true)}
+          className="w-full text-xs text-primary hover:text-primary/80 text-center pt-2 hover:underline cursor-pointer transition-colors"
+        >
+          +{remainingCount} more properties
+        </button>
+      )}
+      
+      {/* Show less button */}
+      {showAll && properties.length > displayCount && (
+        <button
+          onClick={() => setShowAll(false)}
+          className="w-full text-xs text-muted-foreground hover:text-foreground text-center pt-2 hover:underline cursor-pointer transition-colors"
+        >
+          Show less
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## Verification Checklist
+
+After implementing:
+
+### CMA Tab
+- [ ] Grid view shows address below status badges
+- [ ] List view shows address (already working)
+- [ ] Table view shows address in Address column (already working)
+- [ ] All three views show same address format (street only, no city/state)
+
+### Presentation Builder - Property Details
+- [ ] Shows actual addresses instead of "Unknown"
+- [ ] "+X more properties" is clickable
+- [ ] Clicking expands to show all properties
+- [ ] "Show less" button appears when expanded
+- [ ] Collapse works correctly
+
+---
+
+## Summary of Changes
+
+| File | Change |
+|------|--------|
+| `cma-tab.tsx` | Add address row to Grid view card (~line 975) |
+| `PropertyDetailsPreview.tsx` | Add `showAll` state, make "+X more" clickable, improve address extraction |
+| `LivePreviewPanel.tsx` | (Optional) Normalize address field in comparables |
