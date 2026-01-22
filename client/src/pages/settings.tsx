@@ -130,12 +130,14 @@ export default function Settings() {
     queryKey: ["/api/coordinators"],
   });
 
-  // Agent profile query
+  // Agent profile query - refetch on window focus for cross-device sync
   const { data: agentProfileData } = useQuery<{
     profile: AgentProfile | null;
     user: any;
   }>({
     queryKey: ["/api/agent/profile"],
+    staleTime: 30000, // Consider stale after 30 seconds for cross-device sync
+    refetchOnWindowFocus: true, // Refetch when user returns to the app/tab
   });
 
   // Load agent profile when data arrives
@@ -153,7 +155,7 @@ export default function Settings() {
     }
   }, [agentProfileData]);
 
-  // Notification settings query
+  // Notification settings query - refetch on window focus for cross-device sync
   const { data: savedNotificationSettings } = useQuery<{
     documentUploads: boolean;
     closingReminders: boolean;
@@ -166,6 +168,8 @@ export default function Settings() {
     reminderDayOf: boolean;
   }>({
     queryKey: ["/api/notification-settings"],
+    staleTime: 30000, // Consider stale after 30 seconds for cross-device sync
+    refetchOnWindowFocus: true, // Refetch when user returns to the app/tab
   });
 
   // Load notification settings when fetched - ALL DEFAULTS ARE FALSE
