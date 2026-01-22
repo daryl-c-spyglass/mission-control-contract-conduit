@@ -41,6 +41,7 @@ Preferred communication style: Simple, everyday language.
 - **Status Badges & Utilities**: Consistent styling and display logic for transaction statuses and days remaining.
 - **Shared Listing Utilities**: Predicates and helpers for rental exclusion, accurate Days on Market display, and filtering.
 - **MLS/IDX/VOW Compliance**: Multi-layer rental exclusion, prevention of external media redirects, and consistent DOM normalization.
+- **Photo Upload System**: Photos uploaded via GCS client to `.private/uploads/property-{transactionId}-{timestamp}-{uuid}-{filename}`, served through `/objects/*` route (avoiding sidecar signed URL 500 errors). Server validates file type (jpeg/png/gif/webp) and size (max 10MB). MLS photos stored separately in `mlsData.images`, user uploads in `propertyImages` field.
 
 ## External Dependencies
 - **Slack**: Team coordination.

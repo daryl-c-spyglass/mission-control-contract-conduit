@@ -1869,9 +1869,10 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
 
-      // Get the private object directory for uploads
+      // Get the private object directory from env
       const privateDir = process.env.PRIVATE_OBJECT_DIR;
       if (!privateDir) {
+        console.error("[Photo Upload] PRIVATE_OBJECT_DIR not set");
         return res.status(500).json({ message: "Object storage not configured" });
       }
 
@@ -1893,22 +1894,28 @@ export async function registerRoutes(
       if (fileSizeBytes > maxSizeBytes) {
         return res.status(400).json({ message: `File too large. Maximum size is 10MB. Your file is ${(fileSizeBytes / (1024 * 1024)).toFixed(2)}MB.` });
       }
-
-      // Parse bucket name from private dir path
-      const pathParts = privateDir.split('/').filter(Boolean);
+      
+      // Parse the private directory to get bucket name and base path
+      // Format: /replit-objstore-{uuid}/.private or similar
+      const pathParts = privateDir.startsWith('/') ? privateDir.slice(1).split('/') : privateDir.split('/');
       const bucketName = pathParts[0];
       
-      // Create unique filename
+      // Create unique filename using UUID pattern to match the object storage route
+      const { randomUUID } = await import('crypto');
+      const objectId = randomUUID();
       const timestamp = Date.now();
-      const uniqueFileName = `property-photos/${transaction.id}/${timestamp}-${fileName || 'photo.jpg'}`;
+      const safeFileName = (fileName || 'photo.jpg').replace(/[^a-zA-Z0-9.-]/g, '_');
+      // Store in uploads/ directory to match the /objects/* route pattern
+      const objectName = `.private/uploads/property-${transaction.id}-${timestamp}-${objectId}-${safeFileName}`;
       
-      // Upload to object storage using Replit sidecar
+      console.log(`[Photo Upload] Bucket: ${bucketName}, Object: ${objectName}`);
+      
+      // Upload to object storage using GCS client
       const { objectStorageClient } = await import("./replit_integrations/object_storage/objectStorage");
       const bucket = objectStorageClient.bucket(bucketName);
-      const objectName = `${pathParts.slice(1).join('/')}/${uniqueFileName}`;
       const file = bucket.file(objectName);
       
-      // Convert base64 to buffer (reuse base64Data from validation above)
+      // Convert base64 to buffer
       const buffer = Buffer.from(base64Data, 'base64');
       
       // Determine content type
@@ -1916,38 +1923,27 @@ export async function registerRoutes(
                          imageData.startsWith('data:image/gif') ? 'image/gif' : 
                          imageData.startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg';
       
+      console.log(`[Photo Upload] Saving file (${buffer.length} bytes, ${contentType})`);
+      
       await file.save(buffer, {
         contentType,
         metadata: {
           cacheControl: 'public, max-age=31536000',
         },
       });
+      
+      console.log(`[Photo Upload] File saved successfully`);
 
-      // Get signed URL for viewing the uploaded photo using Replit sidecar
-      const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
-      const signedUrlResponse = await fetch(
-        `${REPLIT_SIDECAR_ENDPOINT}/object-storage/signed-object-url`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            bucket_name: bucketName,
-            object_name: objectName,
-            method: "GET",
-            expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year
-          }),
-        }
-      );
+      // Construct the object path that our /objects/* route can serve
+      // The path matches what getObjectEntityFile expects: /objects/{entityId}
+      const entityId = objectName.replace('.private/', '');
+      const photoUrl = `/objects/${entityId}`;
       
-      if (!signedUrlResponse.ok) {
-        throw new Error(`Failed to get signed URL: ${signedUrlResponse.status}`);
-      }
-      
-      const { signed_url: signedUrl } = await signedUrlResponse.json();
+      console.log(`[Photo Upload] Photo URL: ${photoUrl}`);
 
       // Update transaction with new photo URL
       const currentImages = transaction.propertyImages || [];
-      const updatedImages = [...currentImages, signedUrl];
+      const updatedImages = [...currentImages, photoUrl];
       
       await storage.updateTransaction(transaction.id, {
         propertyImages: updatedImages,
@@ -1962,13 +1958,12 @@ export async function registerRoutes(
 
       res.json({ 
         success: true, 
-        photoUrl: signedUrl,
+        photoUrl: photoUrl,
         propertyImages: updatedImages,
       });
     } catch (error: any) {
-      console.error("Error uploading photo:", error);
-      console.error("Error stack:", error?.stack);
-      console.error("Error message:", error?.message);
+      console.error("[Photo Upload] Error:", error);
+      console.error("[Photo Upload] Stack:", error?.stack);
       res.status(500).json({ message: "Failed to upload photo", error: error?.message });
     }
   });
