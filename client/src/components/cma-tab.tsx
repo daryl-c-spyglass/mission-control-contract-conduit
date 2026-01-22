@@ -971,12 +971,12 @@ export function CMATab({ transaction }: CMATabProps) {
                         )}
                         {/* Status Badge */}
                         <Badge 
-                          className={`absolute top-3 left-3 ${getStatusBadgeStyle(comp.status || '')}`}
+                          className={`absolute top-3 left-3 whitespace-nowrap ${getStatusBadgeStyle(comp.status || '')}`}
                         >
                           {getStatusLabel(comp.status || '')}
                         </Badge>
                         {/* Distance Badge */}
-                        <Badge variant="secondary" className="absolute top-3 right-3 bg-black/60 text-white backdrop-blur-sm border-0">
+                        <Badge variant="secondary" className="absolute top-3 right-3 bg-black/60 text-white backdrop-blur-sm border-0 whitespace-nowrap">
                           {comp.distance.toFixed(1)} mi
                         </Badge>
                       </div>
@@ -1063,7 +1063,7 @@ export function CMATab({ transaction }: CMATabProps) {
                                 {comp.address?.split(',')[0] || comp.address}
                               </p>
                             </div>
-                            <Badge className={getStatusBadgeStyle(comp.status || '')}>
+                            <Badge className={`whitespace-nowrap ${getStatusBadgeStyle(comp.status || '')}`}>
                               {getStatusLabel(comp.status || '')}
                             </Badge>
                           </div>

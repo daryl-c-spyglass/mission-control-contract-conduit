@@ -1,0 +1,108 @@
+# REPLIT PROMPT: Fix CMA Comparable Property Card Overlapping Elements
+
+## Problem
+On the CMA tab > Comparable Properties grid view, the card footer has overlapping elements:
+- Status badge ("Active Listing" / "Closed") is cut off as "Active Listi" / "Closi"
+- Distance badge ("2.2 mi") overlaps with the price
+- Price ("$500,000") is cut off or hidden
+
+See the current broken layout:
+```
+[Active Listi][0.4 mi]$409/sqft  ← All crammed on one line, overlapping
+```
+
+## Required Fix
+
+Change the card footer layout from a single cramped row to a properly spaced layout:
+
+### Before (Single Row - Broken):
+```tsx
+<div className="flex items-center gap-1">
+  <span className="...">Active Listing</span>
+  <span className="...">0.4 mi</span>
+  <span className="...">${price}</span>
+  <span className="...">${pricePerSqft}/sqft</span>
+</div>
+```
+
+### After (Stacked Rows - Fixed):
+```tsx
+<div className="p-3 space-y-2">
+  {/* Row 1: Status + Distance badges */}
+  <div className="flex items-center gap-2">
+    <span className={`text-xs px-2 py-0.5 rounded text-white whitespace-nowrap
+      ${status === 'Active' ? 'bg-green-500' : 
+        status === 'Closed' ? 'bg-red-500' : 
+        status === 'Pending' ? 'bg-yellow-600' : 'bg-gray-500'}`}
+    >
+      {status === 'Active' ? 'Active Listing' : status}
+    </span>
+    <span className="bg-zinc-700 text-white text-xs px-2 py-0.5 rounded whitespace-nowrap">
+      {distance} mi
+    </span>
+  </div>
+  
+  {/* Row 2: Price + Price per sqft (with space between) */}
+  <div className="flex items-center justify-between">
+    <span className="text-lg font-semibold">
+      ${price.toLocaleString()}
+    </span>
+    <span className="text-sm text-muted-foreground">
+      ${pricePerSqft}/sqft
+    </span>
+  </div>
+  
+  {/* Row 3: Property details */}
+  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+    <span>🛏️ {beds} beds</span>
+    <span>🛁 {baths} baths</span>
+    <span>📐 {sqft.toLocaleString()} sqft</span>
+  </div>
+  
+  {/* Row 4: Days on market */}
+  <div className="text-sm text-muted-foreground">
+    ⏱️ {daysOnMarket} days on market
+  </div>
+</div>
+```
+
+## Key CSS Classes to Add
+
+1. **`whitespace-nowrap`** - Prevents text from wrapping/truncating in badges
+2. **`space-y-2`** - Adds vertical spacing between rows
+3. **`justify-between`** - Pushes price and $/sqft to opposite ends
+
+## Expected Result
+
+```
+┌─────────────────────────────────────┐
+│                                     │
+│         [Property Photo]            │
+│                                     │
+├─────────────────────────────────────┤
+│ [Active Listing] [0.4 mi]           │  ← Row 1: Badges (not truncated)
+│ $500,000                 $409/sqft  │  ← Row 2: Price with space
+│ 🛏️ 2 beds  🛁 3 baths  📐 1,538    │  ← Row 3: Details
+│ ⏱️ 1 days on market                 │  ← Row 4: DOM
+└─────────────────────────────────────┘
+```
+
+## File to Modify
+
+Look for the CMA comparable property card component. It might be in:
+- `client/src/components/cma-comparable-card.tsx`
+- `client/src/components/cma-tab.tsx`
+- `client/src/components/comparable-property-card.tsx`
+
+Search for: `Active Listing` or `days on market` or the grid view rendering
+
+## Verification
+
+After fix:
+- [ ] "Active Listing" badge shows full text (not "Active Listi")
+- [ ] "Closed" badge shows full text (not "Closi")
+- [ ] Distance badge fully visible
+- [ ] Price on its own row with full visibility
+- [ ] Price per sqft aligned to the right
+- [ ] No overlapping elements
+- [ ] Works on all card sizes

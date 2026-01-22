@@ -177,7 +177,7 @@ export default function SharedCMAPage() {
                       />
                       {comp.status && (
                         <Badge 
-                          className={`absolute top-2 left-2 ${getStatusBadgeStyle(comp.status)}`}
+                          className={`absolute top-2 left-2 whitespace-nowrap ${getStatusBadgeStyle(comp.status)}`}
                         >
                           {getStatusLabel(comp.status)}
                         </Badge>

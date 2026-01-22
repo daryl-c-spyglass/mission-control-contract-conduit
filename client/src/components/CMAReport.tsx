@@ -3152,7 +3152,7 @@ export function CMAReport({
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-2 flex-wrap">
                                   <p className="font-semibold text-sm truncate max-w-[200px]">{property.unparsedAddress}</p>
-                                  <Badge variant="outline" className={`${status.bg} ${status.text} text-xs flex-shrink-0`}>
+                                  <Badge variant="outline" className={`${status.bg} ${status.text} text-xs flex-shrink-0 whitespace-nowrap`}>
                                     {property.standardStatus}
                                   </Badge>
                                 </div>
