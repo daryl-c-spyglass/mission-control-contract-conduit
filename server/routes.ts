@@ -2735,17 +2735,26 @@ export async function registerRoutes(
     try {
       const { context, tone } = req.body;
       
-      const systemPrompt = `You are a professional real estate agent writing a cover letter for a Comparative Market Analysis (CMA) report. 
+      const toneDescriptions: Record<string, string> = {
+        professional: 'professional, polished, and business-appropriate',
+        friendly: 'warm, approachable, and personable while maintaining professionalism',
+        confident: 'confident, authoritative, and compelling'
+      };
+
+      const hasClientName = context.clientName && context.clientName.trim().length > 0;
+      
+      const systemPrompt = `You are a professional real estate agent at Spyglass Realty, a premier Austin real estate brokerage known for exceptional client service and market expertise. You are writing a cover letter for a Comparative Market Analysis (CMA) report.
 Write a personalized, compelling cover letter based on the provided property and market data.
-The tone should be ${tone || 'professional'}.
+The tone should be ${toneDescriptions[tone] || toneDescriptions.professional}.
 Keep it concise (2-3 paragraphs) but impactful.
 Include specific data points from the analysis to demonstrate expertise.
-End with a clear call to action.`;
+Reflect Spyglass Realty's commitment to exceptional service.
+End with a clear call to action but do NOT include signature.`;
 
-      const userPrompt = `Write a CMA cover letter with this context:
-${context.clientName ? `Client: ${context.clientName}` : 'General client'}
+      const userPrompt = `Write a CMA cover letter for this specific property and client:
+${hasClientName ? `IMPORTANT: Start with "Dear ${context.clientName}," as the greeting.` : 'IMPORTANT: Do NOT include any salutation or greeting - start directly with the body content like "Thank you for the opportunity..." or "I am pleased to present..."'}
 ${context.agentInfo?.name ? `Agent: ${context.agentInfo.name}` : ''}
-${context.agentInfo?.brokerage ? `Brokerage: ${context.agentInfo.brokerage}` : ''}
+Brokerage: Spyglass Realty
 
 Subject Property: ${context.subjectProperty?.address || 'Not specified'}
 ${context.subjectProperty?.price ? `List Price: $${context.subjectProperty.price.toLocaleString()}` : ''}
@@ -2756,7 +2765,9 @@ Market Analysis:
 ${context.comparables?.avgPrice ? `- Average price: $${context.comparables.avgPrice.toLocaleString()}` : ''}
 ${context.comparables?.medianPrice ? `- Median price: $${context.comparables.medianPrice.toLocaleString()}` : ''}
 ${context.comparables?.avgPricePerSqft ? `- Avg price/sqft: $${context.comparables.avgPricePerSqft.toFixed(0)}` : ''}
-${context.marketStats?.avgDOM ? `- Average days on market: ${context.marketStats.avgDOM}` : ''}`;
+${context.marketStats?.avgDOM ? `- Average days on market: ${context.marketStats.avgDOM}` : ''}
+
+Return ONLY the cover letter text${hasClientName ? ' starting with the greeting' : ' with no salutation'}, no signature, no additional commentary.`;
 
       const openai = (await import('openai')).default;
       const client = new openai();
@@ -4368,39 +4379,43 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
       let userPrompt: string;
 
       if (isEnhancing) {
-        systemPrompt = `You are an expert real estate marketing copywriter. Your task is to enhance and improve an existing cover letter for a CMA (Comparative Market Analysis) report. The tone should be ${toneDescriptions[tone]}.`;
+        systemPrompt = `You are an expert real estate marketing copywriter for Spyglass Realty, a premier Austin real estate brokerage. Your task is to enhance and improve an existing cover letter for a CMA (Comparative Market Analysis) report. The tone should be ${toneDescriptions[tone]}.`;
 
-        userPrompt = `Please enhance and improve this cover letter for ${agentName}${agentProfile?.title ? `, ${agentProfile.title}` : ''}${user.marketingTitle ? ` at ${user.marketingTitle}` : ''}:
+        userPrompt = `Please enhance and improve this cover letter for ${agentName}${agentProfile?.title ? `, ${agentProfile.title}` : ''} at Spyglass Realty:
 
 EXISTING COVER LETTER:
 ${existingCoverLetter}
 
 ${agentProfile?.bio ? `AGENT BIO FOR CONTEXT:\n${agentProfile.bio}\n` : ''}
 
-Please:
-1. Improve the writing quality and flow
-2. Make it more ${tone}
-3. Keep it concise (2-3 paragraphs)
-4. Use [Client Name] as placeholder for the client's name
-5. Maintain focus on CMA value proposition
+IMPORTANT REQUIREMENTS:
+1. DO NOT include any salutation like "Dear..." or client name placeholder - the greeting will be added separately when used
+2. Start directly with the body content (e.g., "Thank you for the opportunity..." or "I'm pleased to present...")
+3. Improve the writing quality and flow
+4. Make it more ${tone}
+5. Keep it concise (2-3 paragraphs)
+6. Maintain focus on CMA value proposition and Spyglass Realty's commitment to exceptional service
+7. End with a call to action but do NOT include signature
 
-Return ONLY the improved cover letter text, no additional commentary.`;
+Return ONLY the improved cover letter body text, no salutation, no signature, no additional commentary.`;
       } else {
-        systemPrompt = `You are an expert real estate marketing copywriter. Create a compelling cover letter template for CMA (Comparative Market Analysis) reports. The tone should be ${toneDescriptions[tone]}.`;
+        systemPrompt = `You are an expert real estate marketing copywriter for Spyglass Realty, a premier Austin real estate brokerage known for exceptional client service and market expertise. Create a compelling cover letter template for CMA (Comparative Market Analysis) reports. The tone should be ${toneDescriptions[tone]}.`;
 
-        userPrompt = `Create a cover letter template for ${agentName}${agentProfile?.title ? `, ${agentProfile.title}` : ''}${user.marketingTitle ? ` at ${user.marketingTitle}` : ''}.
+        userPrompt = `Create a default cover letter template for ${agentName}${agentProfile?.title ? `, ${agentProfile.title}` : ''} at Spyglass Realty.
 
 ${agentProfile?.bio ? `AGENT BIO:\n${agentProfile.bio}\n` : ''}
 
-Requirements:
-1. Start with "Dear [Client Name],"
-2. 2-3 paragraphs maximum
-3. Explain the value of the CMA
-4. ${tone === 'professional' ? 'Maintain formal business tone' : tone === 'friendly' ? 'Be warm and approachable' : 'Project confidence and expertise'}
-5. End with offer to discuss further
-6. Do NOT include signature (that's added separately)
+IMPORTANT REQUIREMENTS:
+1. DO NOT include any salutation like "Dear..." - the client name greeting will be added separately in the Presentation Builder when a specific CMA is created
+2. Start directly with the body content (e.g., "Thank you for the opportunity..." or "I'm pleased to present...")
+3. 2-3 paragraphs maximum
+4. Explain the value of the CMA and what insights it provides
+5. ${tone === 'professional' ? 'Maintain formal business tone' : tone === 'friendly' ? 'Be warm and approachable' : 'Project confidence and expertise'}
+6. Reflect Spyglass Realty's commitment to exceptional service and market expertise
+7. End with offer to discuss further
+8. Do NOT include signature (that's added separately)
 
-Return ONLY the cover letter text, no additional commentary.`;
+Return ONLY the cover letter body text, no salutation, no signature, no additional commentary.`;
       }
 
       const OpenAI = (await import('openai')).default;
