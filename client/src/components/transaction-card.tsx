@@ -69,6 +69,13 @@ function OffMarketDateBox({ goLiveDate }: { goLiveDate: string | null }) {
   const days = calculateDaysDifference(goLiveDate);
   const formattedDate = formatDisplayDate(goLiveDate);
   const isPastDate = isDatePast(goLiveDate);
+  const isTodayDate = days === 0;
+
+  const getTooltipMessage = () => {
+    if (isPastDate) return "Days since expected go-live date";
+    if (isTodayDate) return "Listing goes live on MLS today";
+    return "Days until listing goes live on MLS";
+  };
 
   return (
     <div className="bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/50 rounded-lg p-3">
@@ -85,23 +92,32 @@ function OffMarketDateBox({ goLiveDate }: { goLiveDate: string | null }) {
           )}
         </div>
         {days !== null && (
-          <div className="text-right">
-            {isPastDate ? (
-              <>
-                <p className="text-xl sm:text-2xl font-bold text-purple-400 dark:text-purple-500">{Math.abs(days)}</p>
-                <p className="text-[10px] sm:text-xs text-purple-400 dark:text-purple-500">{Math.abs(days) === 1 ? 'day ago' : 'days ago'}</p>
-              </>
-            ) : days === 0 ? (
-              <div className="bg-purple-500 text-white px-3 py-1.5 rounded-lg">
-                <p className="text-xs sm:text-sm font-bold">Today!</p>
-              </div>
-            ) : (
-              <>
-                <p className="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-300">{days}</p>
-                <p className="text-[10px] sm:text-xs text-purple-500 dark:text-purple-400">{days === 1 ? 'day' : 'days'}</p>
-              </>
-            )}
-          </div>
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="text-right cursor-help">
+                  {isPastDate ? (
+                    <>
+                      <p className="text-xl sm:text-2xl font-bold text-purple-400 dark:text-purple-500">{Math.abs(days)}</p>
+                      <p className="text-[10px] sm:text-xs text-purple-400 dark:text-purple-500">{Math.abs(days) === 1 ? 'day ago' : 'days ago'}</p>
+                    </>
+                  ) : isTodayDate ? (
+                    <div className="bg-purple-500 text-white px-3 py-1.5 rounded-lg">
+                      <p className="text-xs sm:text-sm font-bold">Today!</p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-300">{days}</p>
+                      <p className="text-[10px] sm:text-xs text-purple-500 dark:text-purple-400">{days === 1 ? 'day' : 'days'}</p>
+                    </>
+                  )}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="max-w-xs">
+                <p className="text-xs">{getTooltipMessage()}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
     </div>
@@ -128,10 +144,19 @@ function ActiveListingDateBox({ listDate, daysOnMarket }: { listDate: string | n
           )}
         </div>
         {displayDays !== null && (
-          <div className="text-right">
-            <p className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-300">{displayDays}</p>
-            <p className="text-[10px] sm:text-xs text-green-500 dark:text-green-400">{displayDays === 1 ? 'day' : 'days'}</p>
-          </div>
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="text-right cursor-help">
+                  <p className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-300">{displayDays}</p>
+                  <p className="text-[10px] sm:text-xs text-green-500 dark:text-green-400">{displayDays === 1 ? 'day' : 'days'}</p>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="max-w-xs">
+                <p className="text-xs">Days on market since listing</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
     </div>
@@ -148,6 +173,12 @@ function InContractDateBox({
   const daysToClose = calculateDaysDifference(closingDate);
   const isOverdue = daysToClose !== null && daysToClose < 0;
   const isClosingToday = isDateToday(closingDate);
+
+  const getTooltipMessage = () => {
+    if (isClosingToday) return "Closing is scheduled for today";
+    if (isOverdue) return "Days past expected closing date";
+    return "Days until expected closing";
+  };
 
   return (
     <div className="bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800/50 rounded-lg p-3">
@@ -168,15 +199,23 @@ function InContractDateBox({
       {closingDate && (
         <div className="mt-2 pt-2 border-t border-orange-200 dark:border-orange-800/50 flex items-center justify-between">
           <span className="text-[10px] sm:text-xs text-orange-600 dark:text-orange-400 font-medium">Time to Close</span>
-          {isClosingToday ? (
-            <span className="text-xs sm:text-sm text-orange-700 dark:text-orange-300 font-bold">Closing Today!</span>
-          ) : isOverdue ? (
-            <span className="text-xs sm:text-sm text-red-600 dark:text-red-400 font-bold">{Math.abs(daysToClose!)} days overdue</span>
-          ) : (
-            <span className="text-xs sm:text-sm text-orange-700 dark:text-orange-300 font-bold">
-              {daysToClose} {daysToClose === 1 ? 'day' : 'days'} remaining
-            </span>
-          )}
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className={`text-xs sm:text-sm font-bold cursor-help ${isOverdue ? "text-red-600 dark:text-red-400" : "text-orange-700 dark:text-orange-300"}`}>
+                  {isClosingToday 
+                    ? "Closing Today!" 
+                    : isOverdue 
+                      ? `${Math.abs(daysToClose!)} ${Math.abs(daysToClose!) === 1 ? 'day' : 'days'} overdue`
+                      : `${daysToClose} ${daysToClose === 1 ? 'day' : 'days'} remaining`
+                  }
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="max-w-xs">
+                <p className="text-xs">{getTooltipMessage()}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       )}
     </div>
@@ -199,6 +238,12 @@ function PendingDateBox({
   const textColor = isOverdue ? "text-red-600 dark:text-red-400" : "text-yellow-600 dark:text-yellow-400";
   const textColorDark = isOverdue ? "text-red-900 dark:text-red-100" : "text-yellow-900 dark:text-yellow-100";
   const borderColor = isOverdue ? "border-red-200 dark:border-red-800/50" : "border-yellow-200 dark:border-yellow-800/50";
+
+  const getTooltipMessage = () => {
+    if (isClosingToday) return "Closing is scheduled for today";
+    if (isOverdue) return "Days past expected closing date - action may be required";
+    return "Days until expected closing";
+  };
 
   return (
     <div className={`${boxBg} border ${boxBorder} rounded-lg p-3`}>
@@ -224,21 +269,48 @@ function PendingDateBox({
                 <AlertTriangle className="w-3.5 h-3.5" />
                 Overdue
               </span>
-              <span className="text-xs sm:text-sm text-red-700 dark:text-red-300 font-bold">
-                {Math.abs(daysToClose!)} {Math.abs(daysToClose!) === 1 ? 'day' : 'days'} overdue
-              </span>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-xs sm:text-sm text-red-700 dark:text-red-300 font-bold cursor-help">
+                      {Math.abs(daysToClose!)} {Math.abs(daysToClose!) === 1 ? 'day' : 'days'} overdue
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs">
+                    <p className="text-xs">{getTooltipMessage()}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </>
           ) : isClosingToday ? (
             <>
               <span className={`text-[10px] sm:text-xs ${textColor} font-medium`}>Status</span>
-              <span className="text-xs sm:text-sm text-yellow-700 dark:text-yellow-300 font-bold">Closing Today!</span>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-xs sm:text-sm text-yellow-700 dark:text-yellow-300 font-bold cursor-help">Closing Today!</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs">
+                    <p className="text-xs">{getTooltipMessage()}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </>
           ) : (
             <>
               <span className={`text-[10px] sm:text-xs ${textColor} font-medium`}>Time to Close</span>
-              <span className="text-xs sm:text-sm text-yellow-700 dark:text-yellow-300 font-bold">
-                {daysToClose} {daysToClose === 1 ? 'day' : 'days'} remaining
-              </span>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-xs sm:text-sm text-yellow-700 dark:text-yellow-300 font-bold cursor-help">
+                      {daysToClose} {daysToClose === 1 ? 'day' : 'days'} remaining
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs">
+                    <p className="text-xs">{getTooltipMessage()}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </>
           )}
         </div>
@@ -257,6 +329,12 @@ function ClosingSoonDateBox({
   const daysToClose = calculateDaysDifference(closingDate);
   const isClosingToday = isDateToday(closingDate);
   const isOverdue = daysToClose !== null && daysToClose < 0;
+
+  const getTooltipMessage = () => {
+    if (isClosingToday) return "Closing is scheduled for today";
+    if (isOverdue) return "Days past expected closing date";
+    return "Days until closing";
+  };
 
   return (
     <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 rounded-lg p-3">
@@ -282,7 +360,16 @@ function ClosingSoonDateBox({
                 <Clock className="w-3.5 h-3.5" />
                 Closing Today!
               </span>
-              <span className="text-xs sm:text-sm text-amber-700 dark:text-amber-300 font-bold">Today</span>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-xs sm:text-sm text-amber-700 dark:text-amber-300 font-bold cursor-help">Today</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs">
+                    <p className="text-xs">{getTooltipMessage()}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </>
           ) : isOverdue ? (
             <>
@@ -290,9 +377,18 @@ function ClosingSoonDateBox({
                 <AlertTriangle className="w-3.5 h-3.5" />
                 Overdue
               </span>
-              <span className="text-xs sm:text-sm text-red-700 dark:text-red-300 font-bold">
-                {Math.abs(daysToClose!)} {Math.abs(daysToClose!) === 1 ? 'day' : 'days'} overdue
-              </span>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-xs sm:text-sm text-red-700 dark:text-red-300 font-bold cursor-help">
+                      {Math.abs(daysToClose!)} {Math.abs(daysToClose!) === 1 ? 'day' : 'days'} overdue
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs">
+                    <p className="text-xs">{getTooltipMessage()}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </>
           ) : (
             <>
@@ -300,9 +396,18 @@ function ClosingSoonDateBox({
                 <Clock className="w-3.5 h-3.5" />
                 Closing Soon
               </span>
-              <span className="text-xs sm:text-sm text-amber-700 dark:text-amber-300 font-bold">
-                {daysToClose} {daysToClose === 1 ? 'day' : 'days'} remaining
-              </span>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-xs sm:text-sm text-amber-700 dark:text-amber-300 font-bold cursor-help">
+                      {daysToClose} {daysToClose === 1 ? 'day' : 'days'} remaining
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs">
+                    <p className="text-xs">{getTooltipMessage()}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </>
           )}
         </div>
@@ -342,9 +447,18 @@ function ClosedDateBox({
           Completed
         </span>
         {daysSinceClosed !== null && (
-          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 font-medium">
-            {daysSinceClosed} {daysSinceClosed === 1 ? 'day' : 'days'} ago
-          </span>
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 font-medium cursor-help">
+                  {daysSinceClosed} {daysSinceClosed === 1 ? 'day' : 'days'} ago
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="max-w-xs">
+                <p className="text-xs">Days since transaction closed</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
     </div>
