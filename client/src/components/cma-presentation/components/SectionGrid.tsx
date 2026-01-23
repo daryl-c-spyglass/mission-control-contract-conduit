@@ -1,18 +1,20 @@
 import { SectionCard } from './SectionCard';
-import type { WidgetDefinition } from '../types';
+import type { WidgetDefinition, AgentProfile } from '../types';
 
 interface SectionGridProps {
   widgets: WidgetDefinition[];
   onSelectWidget: (index: number) => void;
   compsCount?: number;
   daysOnMarket?: number;
+  agent?: AgentProfile;
 }
 
 export function SectionGrid({ 
   widgets, 
   onSelectWidget, 
   compsCount = 0, 
-  daysOnMarket = 0 
+  daysOnMarket = 0,
+  agent,
 }: SectionGridProps) {
   const getWidgetBadge = (widget: WidgetDefinition): string | number | undefined => {
     if (widget.id === 'comps') {
@@ -35,6 +37,8 @@ export function SectionGrid({
           widget={widget}
           onClick={() => onSelectWidget(index)}
           badge={getWidgetBadge(widget)}
+          agentPhoto={widget.id === 'agent_resume' ? agent?.photo : undefined}
+          agentName={widget.id === 'agent_resume' ? agent?.name : undefined}
         />
       ))}
     </div>

@@ -5,7 +5,6 @@ import {
   User, MessageSquareQuote, Home, Clock, DollarSign, 
   BarChart3, Megaphone, ClipboardList, Link2 
 } from 'lucide-react';
-import { SPYGLASS_LOGO_BLACK } from '../constants/widgets';
 import type { WidgetDefinition } from '../types';
 import { useTheme } from '../hooks/useTheme';
 
@@ -13,20 +12,39 @@ interface SectionCardProps {
   widget: WidgetDefinition;
   onClick: () => void;
   badge?: string | number;
+  agentPhoto?: string;
+  agentName?: string;
 }
 
-export function SectionCard({ widget, onClick, badge }: SectionCardProps) {
+export function SectionCard({ widget, onClick, badge, agentPhoto, agentName }: SectionCardProps) {
   const { theme } = useTheme();
   const [logoError, setLogoError] = useState(false);
+  const [photoError, setPhotoError] = useState(false);
   const logoPath = theme === 'dark' 
-    ? '/assets/spyglass-logo-white.png' 
-    : '/assets/spyglass-logo-black.png';
+    ? '/logos/spyglass-logo-white.png' 
+    : '/logos/spyglass-logo-black.png';
 
   const renderIcon = () => {
     const iconClass = "w-8 h-8 text-muted-foreground";
     
     switch (widget.icon) {
       case 'user':
+        // Show agent photo if available, otherwise show user icon
+        if (agentPhoto && !photoError) {
+          return (
+            <div className="relative">
+              <img 
+                src={agentPhoto}
+                alt={agentName || 'Agent'}
+                className="w-12 h-12 rounded-full object-cover border-2 border-border"
+                onError={() => setPhotoError(true)}
+              />
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#F37216] rounded-full flex items-center justify-center border-2 border-background">
+                <span className="text-white text-[10px] font-bold">i</span>
+              </div>
+            </div>
+          );
+        }
         return (
           <div className="relative">
             <User className={iconClass} />
@@ -46,9 +64,9 @@ export function SectionCard({ widget, onClick, badge }: SectionCardProps) {
         }
         return (
           <img 
-            src={logoPath} 
+            src="/logos/spyglass-logo-square.png"
             alt="Spyglass Realty" 
-            className="w-12 h-auto object-contain"
+            className="w-10 h-10 object-contain"
             onError={() => setLogoError(true)}
           />
         );
@@ -90,9 +108,9 @@ export function SectionCard({ widget, onClick, badge }: SectionCardProps) {
       <span className="text-xs font-bold text-center uppercase tracking-wide line-clamp-2">
         {widget.title}
       </span>
-      {widget.subtitle && (
+      {(widget.subtitle || (widget.id === 'agent_resume' && agentName)) && (
         <span className="text-xs text-muted-foreground text-center">
-          {widget.subtitle}
+          {widget.id === 'agent_resume' ? agentName || 'Agent' : widget.subtitle}
         </span>
       )}
       {(badge || widget.badge) && (

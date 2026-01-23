@@ -124,6 +124,8 @@ export function CmaPresentationPlayer({
         onClose={onClose}
         latitude={latitude}
         longitude={longitude}
+        comparables={comparables}
+        subjectProperty={subjectProperty}
       />
 
       <div className="flex-1 overflow-auto bg-muted/30">
@@ -132,6 +134,7 @@ export function CmaPresentationPlayer({
           onSelectWidget={setCurrentSlide}
           compsCount={comparables.length}
           daysOnMarket={averageDaysOnMarket}
+          agent={agent}
         />
       </div>
     </div>

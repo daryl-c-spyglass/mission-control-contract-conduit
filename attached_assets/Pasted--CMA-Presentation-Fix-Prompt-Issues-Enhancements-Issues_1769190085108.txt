@@ -1,0 +1,501 @@
+# CMA Presentation — Fix Prompt (Issues + Enhancements)
+
+## 🎯 Issues to Fix
+
+### Priority Order:
+1. **Agent Resume Widget** — Show agent profile photo as card icon
+2. **Card Icons** — Replace text fallbacks with actual logos/icons
+3. **Slide Performance** — Transitions are too slow
+4. **PDF Download** — Download icon should export all slides to PDF
+5. **Section Arrangement** — Verify correct order
+
+---
+
+## 📁 LOGO FILES — Upload These to Project
+
+I'm uploading the following logo files. Place them in `public/logos/`:
+
+```
+public/logos/
+├── spyglass-logo-black.png      # For cards (light background)
+├── spyglass-logo-white.png      # For header (dark background)
+├── spyglass-logo-square.png     # Square version for small icons
+├── lre-sgr-white.png            # Spyglass + LeadingRE combined (white)
+├── lre-sgr-black.png            # Spyglass + LeadingRE combined (black)
+```
+
+**Logo Usage Guide:**
+| Location | Logo File | Notes |
+|----------|-----------|-------|
+| Header (dark bg) | `spyglass-logo-white.png` | White logo on map overlay |
+| Card icons (white bg) | `spyglass-logo-square.png` | ~40px height |
+| Thank You slide | `lre-sgr-white.png` | Combined logo |
+
+---
+
+## 🔧 Fix 1: Agent Resume Widget — Show Agent Photo
+
+**Current:** Shows user icon only
+**Expected:** Shows agent profile photo as the card icon, with agent name as subtitle
+
+### Data Source:
+Settings → Agent Marketing Profile → Profile Photo URL
+
+### Card Layout for Agent Resume:
+```tsx
+// Widget 1: Agent Resume - Special card layout
+<div className="bg-white rounded-xl p-5 flex flex-col items-center gap-2 cursor-pointer
+               hover:shadow-lg transition-shadow min-h-[120px]">
+  {/* Agent Photo as Icon */}
+  <div className="relative">
+    <img 
+      src={agentProfile?.photoUrl || '/default-avatar.png'}
+      alt={agentProfile?.name || 'Agent'}
+      className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
+    />
+    {/* Orange info badge */}
+    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-orange-500 rounded-full 
+                    flex items-center justify-center border-2 border-white">
+      <span className="text-white text-xs font-bold">i</span>
+    </div>
+  </div>
+  
+  {/* Title */}
+  <span className="text-[14px] font-semibold text-[#111111] uppercase tracking-[0.04em]">
+    AGENT RESUME
+  </span>
+  
+  {/* Agent Name as Subtitle */}
+  <span className="text-[12px] font-medium text-[#6B6F76]">
+    {agentProfile?.name || 'Agent Name'}
+  </span>
+</div>
+```
+
+### Hook to Fetch Agent Profile:
+```typescript
+// hooks/useAgentProfile.ts
+import { useQuery } from '@tanstack/react-query';
+
+export function useAgentProfile() {
+  return useQuery({
+    queryKey: ['agent-marketing-profile'],
+    queryFn: async () => {
+      // Fetch from Settings → Agent Marketing Profile
+      const response = await fetch('/api/settings/agent-marketing-profile');
+      if (!response.ok) throw new Error('Failed to fetch agent profile');
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+}
+
+// Usage in component:
+const { data: agentProfile } = useAgentProfile();
+// Returns: { name, photoUrl, phone, email, company, bio }
+```
+
+---
+
+## 🔧 Fix 2: Card Icons — Proper Logo/Icon Assignment
+
+### Icon Mapping for All 33 Widgets:
+
+```typescript
+// constants/widgets.ts - Update icon assignments
+
+type IconType = 'agent-photo' | 'spyglass-logo' | 'quote' | 'homes' | 'clock' | 'dollar' | 'link' | 'chart' | 'user';
+
+export const WIDGETS = [
+  // === DYNAMIC WIDGETS (1-10) ===
+  { 
+    id: 'agent_resume', 
+    number: 1, 
+    title: 'AGENT RESUME', 
+    icon: 'agent-photo',  // Special: shows agent profile photo
+    showAgentName: true,
+  },
+  { 
+    id: 'listing_with_spyglass', 
+    number: 2, 
+    title: 'LISTING WITH SPYGLASS REALTY', 
+    icon: 'spyglass-logo',
+  },
+  { 
+    id: 'client_testimonials', 
+    number: 3, 
+    title: 'CLIENT TESTIMONIALS', 
+    subtitle: 'What Clients Say',
+    icon: 'quote',  // Chat bubble / quote icon
+  },
+  { 
+    id: 'marketing', 
+    number: 4, 
+    title: 'MARKETING', 
+    icon: 'spyglass-logo',
+  },
+  { 
+    id: 'comps', 
+    number: 5, 
+    title: 'COMPS', 
+    icon: 'homes',  // House with $ badge
+    badge: 'dynamic', // Shows comp count
+  },
+  { 
+    id: 'time_to_sell', 
+    number: 6, 
+    title: 'TIME TO SELL', 
+    icon: 'clock',
+  },
+  { 
+    id: 'suggested_list_price', 
+    number: 7, 
+    title: 'SUGGESTED LIST PRICE', 
+    icon: 'dollar',
+  },
+  { 
+    id: 'listing_action_plan', 
+    number: 8, 
+    title: 'LISTING ACTION PLAN', 
+    icon: 'spyglass-logo',
+  },
+  { 
+    id: 'spyglass_resources', 
+    number: 9, 
+    title: 'SPYGLASS RESOURCES AND LINKS', 
+    icon: 'link',  // Chain link icon
+  },
+  { 
+    id: 'average_price_acre', 
+    number: 10, 
+    title: 'AVERAGE PRICE/ACRE', 
+    icon: 'chart',  // Bar chart icon
+  },
+  
+  // === STATIC IMAGE WIDGETS (11-33) — All use Spyglass logo ===
+  { id: 'home_selling_system', number: 11, title: 'HOME SELLING SYSTEM', icon: 'spyglass-logo' },
+  { id: 'our_proven_approach', number: 12, title: 'OUR PROVEN APPROACH', icon: 'spyglass-logo' },
+  { id: 'seo_digital_marketing', number: 13, title: 'SEO & DIGITAL MARKETING', icon: 'spyglass-logo' },
+  { id: 'google_meta_ads', number: 14, title: 'GOOGLE + META ADS', icon: 'spyglass-logo' },
+  { id: 'professional_videography', number: 15, title: 'PROFESSIONAL VIDEOGRAPHY', icon: 'spyglass-logo' },
+  { id: 'why_4k_video', number: 16, title: 'WHY 4K VIDEO', icon: 'spyglass-logo' },
+  { id: 'example_videos', number: 17, title: 'EXAMPLE VIDEOS', icon: 'spyglass-logo' },
+  { id: 'aerial_photography', number: 18, title: 'AERIAL PHOTOGRAPHY', icon: 'spyglass-logo' },
+  { id: 'in_house_design', number: 19, title: 'IN-HOUSE DESIGN TEAM', icon: 'spyglass-logo' },
+  { id: 'print_flyers', number: 20, title: 'PRINT & FLYERS', icon: 'spyglass-logo' },
+  { id: 'custom_property_page', number: 21, title: 'CUSTOM PROPERTY PAGE', icon: 'spyglass-logo' },
+  { id: 'global_marketing_reach', number: 22, title: 'GLOBAL MARKETING REACH', icon: 'spyglass-logo' },
+  { id: 'leadingre_network', number: 23, title: 'LEADINGRE NETWORK STRENGTH', icon: 'spyglass-logo' },
+  { id: 'featured_property', number: 24, title: 'FEATURED PROPERTY PROGRAM', icon: 'spyglass-logo' },
+  { id: 'zillow_marketing', number: 25, title: 'ZILLOW MARKETING TOOLS', icon: 'spyglass-logo' },
+  { id: 'zillow_showcase', number: 26, title: 'ZILLOW SHOWCASE LISTINGS', icon: 'spyglass-logo' },
+  { id: 'open_house_process', number: 27, title: 'OPEN HOUSE PROCESS', icon: 'spyglass-logo' },
+  { id: 'pricing_strategy', number: 28, title: 'PRICING STRATEGY', icon: 'spyglass-logo' },
+  { id: 'listing_price', number: 29, title: 'LISTING PRICE', icon: 'spyglass-logo' },
+  { id: 'marketing_timeline', number: 30, title: 'MARKETING TIMELINE', icon: 'spyglass-logo' },
+  { id: 'select_move_program', number: 31, title: 'SELECT MOVE PROGRAM', icon: 'spyglass-logo' },
+  { id: 'what_clients_say', number: 32, title: 'WHAT OUR CLIENTS SAY', icon: 'spyglass-logo' },
+  { id: 'thank_you', number: 33, title: 'THANK YOU', icon: 'spyglass-logo' },
+];
+```
+
+### Icon Renderer Component:
+
+```tsx
+// components/WidgetIcon.tsx
+import { MessageSquareQuote, Home, Clock, DollarSign, Link2, BarChart3, User } from 'lucide-react';
+
+interface WidgetIconProps {
+  icon: string;
+  agentPhoto?: string;
+  agentName?: string;
+  badge?: number | string;
+}
+
+export function WidgetIcon({ icon, agentPhoto, agentName, badge }: WidgetIconProps) {
+  switch (icon) {
+    case 'agent-photo':
+      return (
+        <div className="relative">
+          <img 
+            src={agentPhoto || '/default-avatar.png'}
+            alt={agentName || 'Agent'}
+            className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/default-avatar.png';
+            }}
+          />
+          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-orange-500 rounded-full 
+                          flex items-center justify-center border-2 border-white">
+            <span className="text-white text-[10px] font-bold">i</span>
+          </div>
+        </div>
+      );
+      
+    case 'spyglass-logo':
+      return (
+        <img 
+          src="/logos/spyglass-logo-square.png"
+          alt="Spyglass Realty"
+          className="h-10 w-auto object-contain"
+          onError={(e) => {
+            // Fallback to text if image fails
+            (e.target as HTMLImageElement).style.display = 'none';
+            (e.target as HTMLImageElement).parentElement!.innerHTML = `
+              <div class="flex flex-col items-center">
+                <span class="text-[#FF4B2B] text-sm font-bold">SPYGLASS</span>
+                <span class="text-gray-500 text-xs">REALTY</span>
+              </div>
+            `;
+          }}
+        />
+      );
+      
+    case 'quote':
+      return <MessageSquareQuote className="w-8 h-8 text-[#111111]" strokeWidth={1.5} />;
+      
+    case 'homes':
+      return (
+        <div className="relative">
+          <Home className="w-8 h-8 text-[#111111]" strokeWidth={1.5} />
+          {badge && (
+            <div className="absolute -top-2 -right-2 min-w-[20px] h-5 bg-orange-500 rounded-full 
+                            flex items-center justify-center px-1">
+              <span className="text-white text-[10px] font-bold">{badge}</span>
+            </div>
+          )}
+        </div>
+      );
+      
+    case 'clock':
+      return <Clock className="w-8 h-8 text-[#111111]" strokeWidth={1.5} />;
+      
+    case 'dollar':
+      return <DollarSign className="w-8 h-8 text-[#111111]" strokeWidth={1.5} />;
+      
+    case 'link':
+      return <Link2 className="w-8 h-8 text-[#111111]" strokeWidth={1.5} />;
+      
+    case 'chart':
+      return <BarChart3 className="w-8 h-8 text-[#111111]" strokeWidth={1.5} />;
+      
+    default:
+      return <User className="w-8 h-8 text-[#111111]" strokeWidth={1.5} />;
+  }
+}
+```
+
+---
+
+## 🔧 Fix 3: Slide Performance — Remove/Speed Up Transitions
+
+**Problem:** Slide transitions are too slow, making the UI feel sluggish.
+
+### Solution: Reduce transition duration or remove animations
+
+```tsx
+// In SlideViewer.tsx or wherever slide transitions are defined
+
+// BEFORE (too slow):
+className="transition-all duration-500 ease-in-out"
+
+// AFTER (faster):
+className="transition-all duration-150 ease-out"
+
+// OR remove transition completely for instant switching:
+className="" // No transition classes
+```
+
+### For Card Grid Hover Effects:
+```tsx
+// SectionCard.tsx
+<div className="bg-white rounded-xl p-5 cursor-pointer
+               hover:shadow-md transition-shadow duration-150  /* Fast shadow transition */
+               ...">
+```
+
+### For Slide Content:
+```tsx
+// If using framer-motion or similar, reduce duration:
+<motion.div
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  exit={{ opacity: 0 }}
+  transition={{ duration: 0.15 }}  // Was probably 0.5 or higher
+>
+```
+
+---
+
+## 🔧 Fix 4: PDF Download — Export All Slides
+
+**Location:** Download icon next to agent profile (top-right header)
+
+### Implementation:
+
+```tsx
+// components/PdfDownloadButton.tsx
+import { Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+
+interface PdfDownloadButtonProps {
+  propertyAddress: string;
+  widgets: WidgetDefinition[];
+}
+
+export function PdfDownloadButton({ propertyAddress, widgets }: PdfDownloadButtonProps) {
+  const [isGenerating, setIsGenerating] = useState(false);
+  
+  const handleDownload = async () => {
+    setIsGenerating(true);
+    
+    try {
+      const pdf = new jsPDF('landscape', 'pt', 'letter');
+      const slideContainer = document.getElementById('slide-content');
+      
+      for (let i = 0; i < widgets.length; i++) {
+        // Navigate to each slide
+        // Capture slide content
+        const canvas = await html2canvas(slideContainer!, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+        });
+        
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        
+        if (i > 0) {
+          pdf.addPage();
+        }
+        
+        // Add image to PDF (fit to page)
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, pageHeight);
+      }
+      
+      // Save PDF
+      const filename = `CMA-${propertyAddress.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`;
+      pdf.save(filename);
+      
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+  
+  return (
+    <button
+      onClick={handleDownload}
+      disabled={isGenerating}
+      className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-white/10 
+                 transition-colors disabled:opacity-50"
+      title="Download as PDF"
+    >
+      {isGenerating ? (
+        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+      ) : (
+        <Download className="w-5 h-5 text-white" />
+      )}
+    </button>
+  );
+}
+```
+
+### Dependencies to Install:
+```bash
+npm install html2canvas jspdf
+```
+
+### Alternative: Server-Side PDF Generation (Better Quality)
+```typescript
+// If you have Puppeteer on the server, create an API endpoint:
+// POST /api/cma-presentation/export-pdf
+
+// This would render each slide and compile into a single PDF
+// Better for complex layouts and consistent quality
+```
+
+---
+
+## 🔧 Fix 5: Section Arrangement — Verify Correct Order
+
+The widgets should be in this exact order (7 rows × 5 columns = 35 slots, but only 33 widgets):
+
+```
+Row 1: [1] Agent Resume | [2] Listing with Spyglass | [3] Client Testimonials | [4] Marketing | [5] Comps
+Row 2: [6] Time to Sell | [7] Suggested List Price | [8] Listing Action Plan | [9] Spyglass Resources | [10] Average Price/Acre
+Row 3: [11] Home Selling System | [12] Our Proven Approach | [13] SEO & Digital Marketing | [14] Google + Meta Ads | [15] Professional Videography
+Row 4: [16] Why 4K Video | [17] Example Videos | [18] Aerial Photography | [19] In-House Design Team | [20] Print & Flyers
+Row 5: [21] Custom Property Page | [22] Global Marketing Reach | [23] LeadingRE Network Strength | [24] Featured Property Program | [25] Zillow Marketing Tools
+Row 6: [26] Zillow Showcase Listings | [27] Open House Process | [28] Pricing Strategy | [29] Listing Price | [30] Marketing Timeline
+Row 7: [31] Select Move Program | [32] What Our Clients Say | [33] Thank You | [empty] | [empty]
+```
+
+### Ensure WIDGETS array is sorted by number:
+```typescript
+// Before rendering, sort widgets by number
+const sortedWidgets = [...WIDGETS].sort((a, b) => a.number - b.number);
+```
+
+---
+
+## 🔧 Fix 6: Header Logo — Use Actual Image
+
+```tsx
+// In Header.tsx
+<div className="flex items-center gap-3">
+  {/* Hamburger menu */}
+  <button className="min-w-[44px] min-h-[44px] p-2">
+    <Menu className="w-6 h-6 text-white" />
+  </button>
+  
+  {/* Spyglass Logo - White version for dark background */}
+  <img 
+    src="/logos/spyglass-logo-white.png"
+    alt="Spyglass Realty"
+    className="h-8 w-auto"
+  />
+</div>
+```
+
+---
+
+## 📋 Summary Checklist
+
+| Fix | Priority | Status |
+|-----|----------|--------|
+| Agent Resume shows profile photo | HIGH | ⬜ |
+| Agent name under Agent Resume title | HIGH | ⬜ |
+| Spyglass logo images working on cards | HIGH | ⬜ |
+| Proper icons for non-logo widgets | HIGH | ⬜ |
+| Faster slide transitions | MEDIUM | ⬜ |
+| PDF download working | MEDIUM | ⬜ |
+| Correct widget order | LOW | ⬜ |
+| Header uses logo image | LOW | ⬜ |
+
+---
+
+## 📁 Files to Upload
+
+Upload these logo files to `public/logos/`:
+
+1. `spyglass-logo-white.png` — For header (dark background)
+2. `spyglass-logo-black.png` — For reference
+3. `spyglass-logo-square.png` — For card icons (Square.png)
+4. `lre-sgr-white.png` — Combined logo for Thank You slide
+5. `lre-sgr-black.png` — Combined logo alternative
+
+---
+
+## 🎯 Expected Result After Fixes
+
+- Agent Resume card shows: Agent photo (circle) + "AGENT RESUME" + Agent name
+- All Spyglass-logo widgets show actual logo image
+- Slide transitions are instant/fast
+- Download button generates PDF with all 33 slides
+- Grid shows widgets in correct 1-33 order
+- Match with CloudCMA: **~90%**

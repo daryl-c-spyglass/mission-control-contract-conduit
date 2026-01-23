@@ -6,9 +6,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Menu, Search, Star, Download, Phone, Mail, X } from 'lucide-react';
+import { Menu, Search, Star, Phone, Mail, X } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
-import type { AgentProfile } from '../types';
+import { PdfDownloadButton } from './PdfDownloadButton';
+import type { AgentProfile, CmaProperty } from '../types';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -21,6 +22,8 @@ interface HeaderProps {
   onClose: () => void;
   latitude?: number;
   longitude?: number;
+  comparables?: CmaProperty[];
+  subjectProperty?: CmaProperty;
 }
 
 export function Header({
@@ -32,6 +35,8 @@ export function Header({
   onClose,
   latitude = 30.2672,
   longitude = -97.7431,
+  comparables = [],
+  subjectProperty,
 }: HeaderProps) {
   const { theme, mapStyle } = useTheme();
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -69,9 +74,8 @@ export function Header({
     }
   }, [mapStyle]);
 
-  const logoPath = theme === 'dark' 
-    ? '/assets/spyglass-logo-white.png' 
-    : '/assets/spyglass-logo-white.png';
+  // Use white logo on dark map overlay background
+  const logoPath = '/logos/spyglass-logo-white.png';
 
   return (
     <div className="relative h-40 md:h-48 flex-shrink-0" data-testid="presentation-header">
@@ -128,14 +132,13 @@ export function Header({
             >
               <Star className="w-5 h-5" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
+            <PdfDownloadButton
+              propertyAddress={propertyAddress}
+              agent={agent}
+              comparables={comparables}
+              subjectProperty={subjectProperty}
               className="text-white hover:bg-white/20"
-              data-testid="button-download"
-            >
-              <Download className="w-5 h-5" />
-            </Button>
+            />
 
             <Popover>
               <PopoverTrigger asChild>

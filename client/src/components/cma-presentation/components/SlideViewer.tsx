@@ -158,7 +158,7 @@ export function SlideViewer({
 
       <div className="h-1 bg-muted flex-shrink-0">
         <div
-          className="h-full bg-[#F37216] transition-all duration-300"
+          className="h-full bg-[#F37216] transition-all duration-150 ease-out"
           style={{ width: `${((currentIndex + 1) / totalSlides) * 100}%` }}
           data-testid="progress-bar"
         />

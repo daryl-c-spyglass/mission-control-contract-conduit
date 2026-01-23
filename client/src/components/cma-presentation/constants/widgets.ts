@@ -1,7 +1,10 @@
 import type { WidgetDefinition } from '../types';
 
-export const SPYGLASS_LOGO_WHITE = '/assets/spyglass-logo-white.png';
-export const SPYGLASS_LOGO_BLACK = '/assets/spyglass-logo-black.png';
+export const SPYGLASS_LOGO_WHITE = '/logos/spyglass-logo-white.png';
+export const SPYGLASS_LOGO_BLACK = '/logos/spyglass-logo-black.png';
+export const SPYGLASS_LOGO_SQUARE = '/logos/spyglass-logo-square.png';
+export const LRE_SGR_WHITE = '/logos/lre-sgr-white.png';
+export const LRE_SGR_BLACK = '/logos/lre-sgr-black.png';
 
 export const WIDGETS: WidgetDefinition[] = [
   // Dynamic widgets (1-10)
