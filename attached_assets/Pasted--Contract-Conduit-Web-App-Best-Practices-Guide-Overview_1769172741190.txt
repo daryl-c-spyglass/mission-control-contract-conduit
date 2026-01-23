@@ -1,0 +1,823 @@
+# Contract Conduit - Web App Best Practices Guide
+
+## Overview
+Contract Conduit is a **specialized CRM/Project Management tool** for real estate transaction management. This guide covers best practices to ensure project success.
+
+---
+
+## 1. Architecture & Technical Foundation
+
+### 1.1 Tech Stack Alignment
+Your current stack is solid:
+- **Frontend:** React + TypeScript + TailwindCSS
+- **Backend:** Node.js + Express
+- **Database:** PostgreSQL + Drizzle ORM
+- **Routing:** Wouter (lightweight)
+- **State:** TanStack Query (React Query)
+
+**Best Practices:**
+- ✅ Keep dependencies minimal and well-maintained
+- ✅ Use TypeScript strictly (no `any` types)
+- ✅ Centralize API calls in dedicated service files
+- ✅ Use environment variables for all configs
+
+### 1.2 Project Structure
+```
+client/
+├── src/
+│   ├── components/
+│   │   ├── ui/              # Reusable UI components (Button, Modal, etc.)
+│   │   ├── transactions/    # Transaction-specific components
+│   │   ├── dashboard/       # Dashboard components
+│   │   └── layout/          # Layout components (Sidebar, Header)
+│   ├── hooks/               # Custom hooks
+│   ├── pages/               # Page components
+│   ├── types/               # TypeScript types
+│   ├── lib/                 # Utilities, helpers
+│   ├── services/            # API service functions
+│   └── contexts/            # React contexts
+server/
+├── routes.ts                # API routes
+├── storage.ts               # Database operations
+├── middleware/              # Auth, validation middleware
+└── services/                # Business logic
+shared/
+├── schema.ts                # Database schema
+└── types.ts                 # Shared types
+```
+
+---
+
+## 2. User Experience (UX) Best Practices
+
+### 2.1 Information Architecture
+**For Real Estate CRM Tools:**
+
+| Priority | What Users Need | Implementation |
+|----------|----------------|----------------|
+| **High** | Quick transaction overview | Dashboard with status cards |
+| **High** | Find specific transaction | Search + filters |
+| **High** | Know what needs attention | Action items, alerts, countdowns |
+| **Medium** | Generate marketing materials | One-click generation |
+| **Medium** | Track timeline/history | Activity timeline |
+| **Low** | Customize preferences | Settings page |
+
+### 2.2 Navigation Principles
+```
+✅ DO:
+- Keep primary nav to 5-7 items max
+- Show current location (breadcrumbs, highlighted nav)
+- Provide quick actions where users need them
+- Use consistent back navigation
+
+❌ DON'T:
+- Hide critical actions in nested menus
+- Force users to navigate away for simple tasks
+- Change navigation based on context unexpectedly
+```
+
+### 2.3 Data Display Best Practices
+
+**For Transaction Lists:**
+```tsx
+// Good: Multiple view options for different needs
+<ViewToggle>
+  <GridView />   {/* Visual scanning, status at glance */}
+  <ListView />   {/* Quick comparison, compact */}
+  <TableView />  {/* Data-heavy, sortable, exportable */}
+</ViewToggle>
+
+// Good: Smart defaults
+const defaultSort = "closingDate";  // Most relevant for agents
+const defaultView = "grid";          // Most visual
+
+// Good: Persist preferences
+localStorage.setItem("view-preferences", JSON.stringify(prefs));
+```
+
+**For Data Tables:**
+- Allow sorting on all relevant columns
+- Show clear sort indicators
+- Sticky headers for long lists
+- Highlight rows on hover
+- Support keyboard navigation
+
+### 2.4 Loading & Empty States
+
+**Always handle these states:**
+```tsx
+// 1. Loading State
+if (isLoading) {
+  return <Skeleton />;  // Not just "Loading..."
+}
+
+// 2. Error State
+if (error) {
+  return (
+    <ErrorState 
+      message="Failed to load transactions"
+      action={<Button onClick={refetch}>Try Again</Button>}
+    />
+  );
+}
+
+// 3. Empty State (no data)
+if (transactions.length === 0) {
+  return (
+    <EmptyState
+      icon={<FolderIcon />}
+      title="No transactions yet"
+      description="Create your first transaction to get started"
+      action={<Button>+ New Transaction</Button>}
+    />
+  );
+}
+
+// 4. Empty State (filtered)
+if (filteredTransactions.length === 0 && hasFilters) {
+  return (
+    <EmptyState
+      title="No matching transactions"
+      description="Try adjusting your filters"
+      action={<Button onClick={clearFilters}>Clear Filters</Button>}
+    />
+  );
+}
+```
+
+### 2.5 Feedback & Confirmation
+
+**User Action Feedback:**
+```tsx
+// Good: Optimistic updates with rollback
+const mutation = useMutation({
+  mutationFn: updateTransaction,
+  onMutate: async (newData) => {
+    // Optimistically update UI
+    queryClient.setQueryData(["transaction", id], newData);
+  },
+  onError: (err, newData, context) => {
+    // Rollback on error
+    queryClient.setQueryData(["transaction", id], context.previousData);
+    toast.error("Failed to update");
+  },
+  onSuccess: () => {
+    toast.success("Transaction updated");
+  },
+});
+
+// Good: Confirmation for destructive actions
+const handleDelete = () => {
+  showConfirmDialog({
+    title: "Delete Transaction?",
+    message: "This action cannot be undone.",
+    confirmText: "Delete",
+    confirmVariant: "destructive",
+    onConfirm: () => deleteMutation.mutate(id),
+  });
+};
+```
+
+---
+
+## 3. Performance Best Practices
+
+### 3.1 Data Fetching
+
+```tsx
+// Good: Use React Query for caching and deduplication
+const { data, isLoading } = useQuery({
+  queryKey: ["transactions"],
+  queryFn: fetchTransactions,
+  staleTime: 5 * 60 * 1000,     // 5 minutes
+  cacheTime: 30 * 60 * 1000,    // 30 minutes
+});
+
+// Good: Prefetch on hover for instant navigation
+const prefetchTransaction = (id: number) => {
+  queryClient.prefetchQuery({
+    queryKey: ["transaction", id],
+    queryFn: () => fetchTransaction(id),
+  });
+};
+
+<TransactionCard 
+  onMouseEnter={() => prefetchTransaction(id)}
+  onClick={() => navigate(`/transactions/${id}`)}
+/>
+
+// Good: Paginate large lists
+const { data, fetchNextPage, hasNextPage } = useInfiniteQuery({
+  queryKey: ["transactions"],
+  queryFn: ({ pageParam = 0 }) => fetchTransactions({ offset: pageParam }),
+  getNextPageParam: (lastPage) => lastPage.nextOffset,
+});
+```
+
+### 3.2 Rendering Performance
+
+```tsx
+// Good: Memoize expensive computations
+const sortedTransactions = useMemo(() => {
+  return [...transactions].sort(sortFn);
+}, [transactions, sortFn]);
+
+// Good: Memoize callbacks passed to children
+const handleClick = useCallback((id: number) => {
+  navigate(`/transactions/${id}`);
+}, [navigate]);
+
+// Good: Virtualize long lists
+import { useVirtualizer } from "@tanstack/react-virtual";
+
+function VirtualizedList({ items }) {
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 80,
+  });
+  
+  return (
+    <div ref={parentRef} style={{ overflow: "auto", height: "600px" }}>
+      <div style={{ height: virtualizer.getTotalSize() }}>
+        {virtualizer.getVirtualItems().map((virtualItem) => (
+          <TransactionRow key={virtualItem.key} item={items[virtualItem.index]} />
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+### 3.3 Bundle Size
+
+```tsx
+// Good: Lazy load routes
+const CMAPage = lazy(() => import("./pages/CMA"));
+const SettingsPage = lazy(() => import("./pages/Settings"));
+
+// Good: Dynamic imports for heavy components
+const PDFViewer = lazy(() => import("./components/PDFViewer"));
+
+// Good: Tree-shake icon imports
+import { Home, Settings, User } from "lucide-react";  // ✅
+// import * as Icons from "lucide-react";  // ❌ Imports everything
+```
+
+---
+
+## 4. Error Handling & Resilience
+
+### 4.1 Error Boundaries
+
+```tsx
+// Wrap major sections with error boundaries
+<ErrorBoundary fallback={<ErrorFallback />}>
+  <TransactionDetails />
+</ErrorBoundary>
+
+// Custom error boundary with retry
+class ErrorBoundary extends React.Component {
+  state = { hasError: false, error: null };
+  
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null });
+  };
+  
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 text-center">
+          <h2>Something went wrong</h2>
+          <button onClick={this.handleRetry}>Try Again</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+```
+
+### 4.2 API Error Handling
+
+```tsx
+// Centralized error handling
+async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
+  try {
+    const response = await fetch(url, {
+      ...options,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new ApiError(
+        error.message || `HTTP ${response.status}`,
+        response.status,
+        error.code
+      );
+    }
+    
+    return response.json();
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError("Network error. Please check your connection.");
+  }
+}
+
+// Usage with React Query
+const { data, error } = useQuery({
+  queryKey: ["transactions"],
+  queryFn: () => apiRequest("/api/transactions"),
+  retry: (failureCount, error) => {
+    // Don't retry on 4xx errors
+    if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+      return false;
+    }
+    return failureCount < 3;
+  },
+});
+```
+
+### 4.3 Offline Support (Progressive Enhancement)
+
+```tsx
+// Check online status
+const isOnline = useOnlineStatus();
+
+// Show indicator when offline
+{!isOnline && (
+  <Banner variant="warning">
+    You're offline. Some features may be unavailable.
+  </Banner>
+)}
+
+// Queue mutations when offline
+const mutation = useMutation({
+  mutationFn: updateTransaction,
+  onMutate: (data) => {
+    if (!navigator.onLine) {
+      // Queue for later
+      queueOfflineAction({ type: "UPDATE", data });
+      toast.info("Saved locally. Will sync when online.");
+      return;
+    }
+  },
+});
+```
+
+---
+
+## 5. Security Best Practices
+
+### 5.1 Authentication & Authorization
+
+```tsx
+// Server: Always verify auth on every request
+app.use("/api/*", authenticateMiddleware);
+
+// Server: Check permissions per resource
+app.get("/api/transactions/:id", async (req, res) => {
+  const transaction = await getTransaction(req.params.id);
+  
+  // Check ownership or role
+  if (transaction.userId !== req.user.id && req.user.role !== "admin") {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  
+  res.json(transaction);
+});
+
+// Client: Protect routes
+function ProtectedRoute({ children }) {
+  const { user, isLoading } = useAuth();
+  
+  if (isLoading) return <LoadingSpinner />;
+  if (!user) return <Navigate to="/login" />;
+  
+  return children;
+}
+```
+
+### 5.2 Data Validation
+
+```tsx
+// Server: Validate all inputs with Zod
+import { z } from "zod";
+
+const createTransactionSchema = z.object({
+  address: z.string().min(1).max(200),
+  mlsNumber: z.string().optional(),
+  status: z.enum(["Off Market", "Active Listing", "In Contract", "Pending", "Closed"]),
+  closingDate: z.string().datetime().optional(),
+});
+
+app.post("/api/transactions", async (req, res) => {
+  const result = createTransactionSchema.safeParse(req.body);
+  
+  if (!result.success) {
+    return res.status(400).json({ 
+      error: "Validation failed", 
+      details: result.error.issues 
+    });
+  }
+  
+  // Proceed with validated data
+  const transaction = await createTransaction(result.data);
+  res.json(transaction);
+});
+
+// Client: Validate forms
+const { register, handleSubmit, formState: { errors } } = useForm({
+  resolver: zodResolver(createTransactionSchema),
+});
+```
+
+### 5.3 Prevent Common Vulnerabilities
+
+```tsx
+// XSS: React auto-escapes, but be careful with dangerouslySetInnerHTML
+// ❌ Bad
+<div dangerouslySetInnerHTML={{ __html: userInput }} />
+
+// ✅ Good: Use a sanitizer if you must render HTML
+import DOMPurify from "dompurify";
+<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }} />
+
+// CSRF: Include tokens with state-changing requests
+// SQL Injection: Use parameterized queries (Drizzle handles this)
+// Rate Limiting: Implement on sensitive endpoints
+```
+
+---
+
+## 6. Testing Strategy
+
+### 6.1 Testing Pyramid
+
+```
+                    /\
+                   /  \
+                  / E2E \        ← Few (critical paths)
+                 /______\
+                /        \
+               / Integration\    ← Some (API, hooks)
+              /____________\
+             /              \
+            /    Unit Tests   \  ← Many (utils, components)
+           /__________________\
+```
+
+### 6.2 What to Test
+
+```tsx
+// Unit Tests: Pure functions, utilities
+describe("calculateDaysRemaining", () => {
+  it("returns positive days for future dates", () => {
+    const futureDate = addDays(new Date(), 5);
+    expect(calculateDaysRemaining(futureDate)).toBe(5);
+  });
+  
+  it("returns negative days for past dates", () => {
+    const pastDate = subDays(new Date(), 3);
+    expect(calculateDaysRemaining(pastDate)).toBe(-3);
+  });
+});
+
+// Integration Tests: API endpoints
+describe("POST /api/transactions", () => {
+  it("creates transaction with valid data", async () => {
+    const res = await request(app)
+      .post("/api/transactions")
+      .send({ address: "123 Main St", status: "Active Listing" });
+    
+    expect(res.status).toBe(201);
+    expect(res.body.address).toBe("123 Main St");
+  });
+  
+  it("returns 400 for invalid data", async () => {
+    const res = await request(app)
+      .post("/api/transactions")
+      .send({ status: "Invalid" });
+    
+    expect(res.status).toBe(400);
+  });
+});
+
+// E2E Tests: Critical user flows
+describe("Transaction Flow", () => {
+  it("user can create and view transaction", () => {
+    cy.login();
+    cy.visit("/transactions");
+    cy.findByText("+ New Transaction").click();
+    cy.findByLabelText("Address").type("456 Oak Ave");
+    cy.findByText("Create").click();
+    cy.findByText("456 Oak Ave").should("exist");
+  });
+});
+```
+
+---
+
+## 7. Deployment & Monitoring
+
+### 7.1 Environment Management
+
+```bash
+# .env.example (commit this)
+DATABASE_URL=
+REPLIERS_API_KEY=
+GOOGLE_CLIENT_ID=
+SLACK_BOT_TOKEN=
+NODE_ENV=development
+
+# .env (never commit)
+DATABASE_URL=postgresql://...
+```
+
+```tsx
+// Config validation at startup
+const requiredEnvVars = [
+  "DATABASE_URL",
+  "REPLIERS_API_KEY",
+  "SESSION_SECRET",
+];
+
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    throw new Error(`Missing required environment variable: ${envVar}`);
+  }
+}
+```
+
+### 7.2 Logging & Monitoring
+
+```tsx
+// Structured logging
+import pino from "pino";
+
+const logger = pino({
+  level: process.env.LOG_LEVEL || "info",
+});
+
+// Log important events
+logger.info({ transactionId, userId }, "Transaction created");
+logger.error({ error, transactionId }, "Failed to generate PDF");
+
+// Track key metrics
+const metrics = {
+  transactionsCreated: 0,
+  pdfGenerations: 0,
+  apiErrors: 0,
+};
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+```
+
+### 7.3 Database Migrations
+
+```bash
+# Always use migrations for schema changes
+npm run db:generate   # Generate migration from schema changes
+npm run db:migrate    # Apply migrations
+npm run db:push       # Development only - push schema directly
+
+# Never modify production DB directly
+# Always backup before migrations
+```
+
+---
+
+## 8. Development Workflow
+
+### 8.1 Git Workflow
+
+```bash
+main          ← Production-ready code
+  └── develop ← Integration branch
+        ├── feature/CMA-builder
+        ├── feature/slack-notifications
+        └── fix/address-display
+```
+
+**Commit Messages:**
+```
+feat: add transaction sorting and filtering
+fix: resolve address display issue on card
+refactor: extract date calculation utilities
+docs: update API documentation
+chore: upgrade dependencies
+```
+
+### 8.2 Code Review Checklist
+
+Before merging:
+- [ ] Code follows project conventions
+- [ ] TypeScript types are correct (no `any`)
+- [ ] Loading/error states handled
+- [ ] Mobile responsive
+- [ ] Accessible (keyboard nav, screen readers)
+- [ ] No console errors/warnings
+- [ ] Tests pass
+- [ ] No sensitive data exposed
+
+### 8.3 Feature Development Process
+
+1. **Plan:** Define user story, acceptance criteria
+2. **Design:** UI mockups, API contracts
+3. **Implement:** Code, unit tests
+4. **Review:** Code review, QA testing
+5. **Deploy:** Staging → Production
+6. **Monitor:** Watch for errors, gather feedback
+
+---
+
+## 9. Real Estate CRM-Specific Best Practices
+
+### 9.1 Data Integrity
+
+```tsx
+// Transactions are critical business data
+// Always soft-delete
+const deleteTransaction = async (id: number) => {
+  await db.update(transactions)
+    .set({ deletedAt: new Date() })
+    .where(eq(transactions.id, id));
+};
+
+// Keep audit trail
+const updateTransaction = async (id: number, data: Partial<Transaction>) => {
+  // Log change
+  await db.insert(transactionHistory).values({
+    transactionId: id,
+    userId: currentUser.id,
+    changes: JSON.stringify(data),
+    timestamp: new Date(),
+  });
+  
+  // Apply change
+  await db.update(transactions).set(data).where(eq(transactions.id, id));
+};
+```
+
+### 9.2 Date Handling
+
+```tsx
+// Real estate is date-sensitive
+// Always use consistent timezone handling
+import { zonedTimeToUtc, utcToZonedTime, format } from "date-fns-tz";
+
+const userTimezone = "America/Chicago";  // Get from user profile
+
+// Store in UTC
+const storeDate = (localDate: Date) => {
+  return zonedTimeToUtc(localDate, userTimezone);
+};
+
+// Display in user's timezone
+const displayDate = (utcDate: Date) => {
+  const local = utcToZonedTime(utcDate, userTimezone);
+  return format(local, "MMM d, yyyy", { timeZone: userTimezone });
+};
+```
+
+### 9.3 Document Generation
+
+```tsx
+// PDFs are critical for real estate
+// Best practices:
+// 1. Generate server-side for consistency
+// 2. Cache generated documents
+// 3. Version templates
+// 4. Preview before generating
+
+const generateFlyer = async (transactionId: number) => {
+  // Check cache first
+  const cached = await getFromCache(`flyer-${transactionId}`);
+  if (cached) return cached;
+  
+  // Generate with Puppeteer
+  const html = await renderFlyerTemplate(transactionId);
+  const pdf = await puppeteer.generatePDF(html);
+  
+  // Cache for 1 hour
+  await setCache(`flyer-${transactionId}`, pdf, 3600);
+  
+  return pdf;
+};
+```
+
+---
+
+## 10. Common Pitfalls to Avoid
+
+### ❌ Don't Do This
+
+```tsx
+// 1. Don't fetch in useEffect without cleanup
+useEffect(() => {
+  fetchData().then(setData);  // ❌ Race condition, memory leak
+}, []);
+
+// 2. Don't store derived state
+const [filteredData, setFilteredData] = useState([]);  // ❌
+useEffect(() => {
+  setFilteredData(data.filter(filterFn));
+}, [data, filterFn]);
+
+// 3. Don't ignore error handling
+const data = await fetch("/api/data").then(r => r.json());  // ❌
+
+// 4. Don't use inline functions in render
+<Button onClick={() => handleClick(id)} />  // ❌ Creates new fn each render
+
+// 5. Don't skip loading states
+return <div>{data.name}</div>;  // ❌ Crashes if data is null
+```
+
+### ✅ Do This Instead
+
+```tsx
+// 1. Use React Query or proper cleanup
+const { data } = useQuery({ queryKey: ["data"], queryFn: fetchData });  // ✅
+
+// 2. Derive in render or useMemo
+const filteredData = useMemo(() => data.filter(filterFn), [data, filterFn]);  // ✅
+
+// 3. Handle errors
+try {
+  const response = await fetch("/api/data");
+  if (!response.ok) throw new Error("Failed");
+  const data = await response.json();
+} catch (error) {
+  toast.error("Failed to load data");
+}
+
+// 4. Memoize callbacks
+const handleClick = useCallback((id) => {...}, []);  // ✅
+
+// 5. Always handle loading/null states
+if (isLoading) return <Skeleton />;
+if (!data) return <EmptyState />;
+return <div>{data.name}</div>;  // ✅
+```
+
+---
+
+## Summary Checklist for Project Success
+
+### Foundation
+- [ ] TypeScript strict mode enabled
+- [ ] ESLint + Prettier configured
+- [ ] Environment variables secured
+- [ ] Database migrations workflow
+
+### UX
+- [ ] Loading states on all data fetches
+- [ ] Error states with recovery options
+- [ ] Empty states with helpful CTAs
+- [ ] Responsive design (mobile-first)
+- [ ] User preferences persisted
+
+### Performance
+- [ ] Data caching with React Query
+- [ ] Lazy loading for routes
+- [ ] Optimized images
+- [ ] Virtualized long lists
+
+### Security
+- [ ] Auth on all protected routes
+- [ ] Input validation (client + server)
+- [ ] HTTPS in production
+- [ ] Secrets not in code
+
+### Quality
+- [ ] Unit tests for utilities
+- [ ] Integration tests for API
+- [ ] E2E tests for critical flows
+- [ ] Code review process
+
+### Operations
+- [ ] Error logging/monitoring
+- [ ] Health check endpoint
+- [ ] Backup strategy
+- [ ] Deployment automation
+
+---
+
+**Remember:** The goal is to build a tool that helps real estate agents close deals faster and with less friction. Every feature should serve that goal.
