@@ -356,17 +356,43 @@ export const insertAgentProfileSchema = createInsertSchema(agentProfiles).omit({
   updatedAt: true,
 });
 
+// Helper schema for optional URLs that auto-prepends https:// if missing
+const optionalUrlSchema = z
+  .string()
+  .transform((val) => {
+    if (!val || val.trim() === "") return "";
+    let url = val.trim();
+    if (!url.match(/^https?:\/\//i)) {
+      url = `https://${url}`;
+    }
+    return url;
+  })
+  .refine(
+    (val) => {
+      if (!val) return true;
+      try {
+        new URL(val);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    { message: "Please enter a valid URL (e.g., facebook.com/yourprofile)" }
+  )
+  .optional()
+  .or(z.literal(''));
+
 // Agent profile update validation schema
 export const updateAgentProfileSchema = z.object({
   title: z.string().optional(),
   headshotUrl: z.string().url().optional().or(z.literal('')),
   bio: z.string().optional(),
   defaultCoverLetter: z.string().optional(),
-  facebookUrl: z.string().url().optional().or(z.literal('')),
-  instagramUrl: z.string().url().optional().or(z.literal('')),
-  linkedinUrl: z.string().url().optional().or(z.literal('')),
-  twitterUrl: z.string().url().optional().or(z.literal('')),
-  websiteUrl: z.string().url().optional().or(z.literal('')),
+  facebookUrl: optionalUrlSchema,
+  instagramUrl: optionalUrlSchema,
+  linkedinUrl: optionalUrlSchema,
+  twitterUrl: optionalUrlSchema,
+  websiteUrl: optionalUrlSchema,
   marketingCompany: z.string().optional(),
 });
 

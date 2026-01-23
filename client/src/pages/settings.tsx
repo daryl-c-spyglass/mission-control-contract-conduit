@@ -753,8 +753,8 @@ export default function Settings() {
                 </Label>
                 <Input
                   id="facebookUrl"
-                  type="url"
-                  placeholder="https://facebook.com/yourprofile"
+                  type="text"
+                  placeholder="facebook.com/yourprofile"
                   value={agentProfile.facebookUrl}
                   onChange={(e) => setAgentProfile(prev => ({ ...prev, facebookUrl: e.target.value }))}
                   data-testid="input-facebook-url"
@@ -767,8 +767,8 @@ export default function Settings() {
                 </Label>
                 <Input
                   id="instagramUrl"
-                  type="url"
-                  placeholder="https://instagram.com/yourprofile"
+                  type="text"
+                  placeholder="instagram.com/yourprofile"
                   value={agentProfile.instagramUrl}
                   onChange={(e) => setAgentProfile(prev => ({ ...prev, instagramUrl: e.target.value }))}
                   data-testid="input-instagram-url"
@@ -781,8 +781,8 @@ export default function Settings() {
                 </Label>
                 <Input
                   id="linkedinUrl"
-                  type="url"
-                  placeholder="https://linkedin.com/in/yourprofile"
+                  type="text"
+                  placeholder="linkedin.com/in/yourprofile"
                   value={agentProfile.linkedinUrl}
                   onChange={(e) => setAgentProfile(prev => ({ ...prev, linkedinUrl: e.target.value }))}
                   data-testid="input-linkedin-url"
@@ -795,8 +795,8 @@ export default function Settings() {
                 </Label>
                 <Input
                   id="twitterUrl"
-                  type="url"
-                  placeholder="https://x.com/yourprofile"
+                  type="text"
+                  placeholder="x.com/yourprofile"
                   value={agentProfile.twitterUrl}
                   onChange={(e) => setAgentProfile(prev => ({ ...prev, twitterUrl: e.target.value }))}
                   data-testid="input-twitter-url"
@@ -810,8 +810,8 @@ export default function Settings() {
               </Label>
               <Input
                 id="websiteUrl"
-                type="url"
-                placeholder="https://yourwebsite.com"
+                type="text"
+                placeholder="yourwebsite.com"
                 value={agentProfile.websiteUrl}
                 onChange={(e) => setAgentProfile(prev => ({ ...prev, websiteUrl: e.target.value }))}
                 data-testid="input-website-url"
