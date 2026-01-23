@@ -1,0 +1,235 @@
+# 🔍 INVESTIGATION ONLY - CMA Presentation Builder Issues
+
+**⚠️ DO NOT MAKE ANY CHANGES - This is diagnostic only**
+
+**Issues Reported:**
+1. CMA Presentation Preview - Data from Settings not syncing (Cover Letter, Agent info missing)
+2. Export PDF button not working
+
+---
+
+## Please Investigate and Document:
+
+### 1. CMA Presentation Preview Component
+
+**Find the Preview component and document:**
+- File path for CMA Preview modal/component
+- How it fetches data (user profile, settings, agent info)
+- What API endpoints it calls
+- How sections are populated (Cover Page, Cover Letter, Agent Resume, etc.)
+
+**Search locations:**
+```
+client/src/components/cma/
+client/src/components/presentation/
+client/src/pages/
+```
+
+**Look for files like:**
+- `CMAPreview.tsx`
+- `PresentationPreview.tsx`
+- `PreviewModal.tsx`
+- Any component rendering the preview shown in screenshot
+
+**Please share:**
+- Complete component code
+- API calls/hooks used
+- How it gets user settings data
+
+---
+
+### 2. Settings Data Flow
+
+**Document how settings data should flow to CMA:**
+
+**Check these files:**
+```
+client/src/pages/settings.tsx
+server/routes.ts (profile/settings endpoints)
+shared/schema.ts (user profile schema)
+```
+
+**Specifically find:**
+- How Cover Letter is stored/retrieved
+- How Agent Profile (name, title, photo) is stored
+- How "Our Company" information is stored
+- API endpoint that returns this data
+
+**Please share:**
+- User profile/settings schema
+- API route handlers for profile data
+- How CMA fetches this profile data
+
+---
+
+### 3. Export PDF Functionality
+
+**Find the Export PDF implementation:**
+
+**Search for:**
+```
+client/src/components/ - ExportPDF, PDFExport, GeneratePDF
+server/routes.ts - PDF generation endpoint
+server/ - puppeteer, pdf generation logic
+```
+
+**Document:**
+- What happens when "Export PDF" is clicked
+- API endpoint called
+- Server-side PDF generation logic
+- Any error handling
+
+**Please share:**
+- Export PDF button click handler
+- API endpoint for PDF generation
+- Server-side PDF generation code
+- Any recent errors in console when clicking Export PDF
+
+---
+
+### 4. Console Errors
+
+**Check browser console for errors:**
+
+1. Open CMA Presentation Builder
+2. Click "Preview" button
+3. Check console for any errors
+4. Click "Export PDF" button
+5. Check console for any errors
+
+**Please share:**
+- Any JavaScript errors
+- Any failed network requests (4xx, 5xx)
+- Any TypeScript/compilation errors
+
+---
+
+### 5. Network Tab Investigation
+
+**Check Network tab when:**
+
+1. Opening the Preview modal:
+   - What API calls are made?
+   - Do they succeed (200) or fail (4xx/5xx)?
+   - What data is returned?
+
+2. Clicking Export PDF:
+   - What API endpoint is called?
+   - Does it succeed or fail?
+   - What's the response?
+
+**Please share:**
+- List of API calls made
+- Response status codes
+- Any error responses
+
+---
+
+### 6. Data Mapping Check
+
+**Verify data exists in database:**
+
+Check if user profile has:
+- `defaultCoverLetter` or similar field
+- Agent name, title, photo URL
+- Company information
+
+**Run diagnostic query or check:**
+```sql
+-- Check user profile data
+SELECT * FROM user_profiles WHERE user_id = [current_user_id];
+
+-- Or via API
+GET /api/user/profile
+```
+
+**Please share:**
+- What fields exist in user profile
+- Are Cover Letter, Agent info fields populated?
+- Is data present in DB but not showing in UI?
+
+---
+
+### 7. CMA Report Config
+
+**Check CMA report configuration:**
+
+**Find in schema:**
+```
+shared/schema.ts - cmaReportConfigs, cmaReportTemplates
+```
+
+**Document:**
+- How CMA sections are configured
+- How agent/company data is linked to CMA
+- Any foreign key relationships
+
+---
+
+## Expected Response Format
+
+Please respond with findings in this structure:
+
+```
+## 1. CMA PREVIEW COMPONENT
+File: [path]
+```
+[code]
+```
+Data fetching: [how it gets data]
+Issues found: [any obvious issues]
+
+## 2. SETTINGS DATA FLOW
+User profile fields: [list fields]
+API endpoint: [endpoint]
+Data present in DB: [yes/no]
+
+## 3. EXPORT PDF
+Button handler file: [path]
+API endpoint: [endpoint]
+Server handler file: [path]
+```
+[relevant code]
+```
+
+## 4. CONSOLE ERRORS
+[list any errors]
+
+## 5. NETWORK REQUESTS
+Preview modal:
+- [endpoint] - [status] - [response summary]
+
+Export PDF:
+- [endpoint] - [status] - [response summary]
+
+## 6. DATABASE DATA
+Cover Letter: [present/missing]
+Agent Name: [value or missing]
+Agent Photo: [value or missing]
+Company Info: [present/missing]
+
+## 7. ROOT CAUSE ANALYSIS
+Preview sync issue: [suspected cause]
+Export PDF issue: [suspected cause]
+```
+
+---
+
+## Specific Questions to Answer
+
+1. **Preview Sync Issue:**
+   - Is the Cover Letter saved in Settings?
+   - Is it being fetched when Preview opens?
+   - Is there a mapping issue between Settings fields and Preview fields?
+
+2. **Export PDF Issue:**
+   - Does clicking Export PDF make an API call?
+   - Does the API call succeed or fail?
+   - Is there a server-side error in PDF generation?
+   - Is Puppeteer configured and working?
+
+---
+
+**⚠️ REMINDER: DO NOT MODIFY ANY CODE**
+
+Just investigate and document findings so we can create a targeted fix.
