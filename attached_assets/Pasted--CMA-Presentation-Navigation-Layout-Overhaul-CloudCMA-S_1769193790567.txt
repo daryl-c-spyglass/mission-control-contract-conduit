@@ -1,0 +1,489 @@
+# CMA Presentation — Navigation & Layout Overhaul (CloudCMA Style)
+
+## 📋 Changes Required
+
+| # | Issue | Fix |
+|---|-------|-----|
+| 1 | No "Start Presentation" button | Add button on home (lower right) |
+| 2 | No pencil/draw tool | Add drawing canvas overlay |
+| 3 | Wrong slide navigation | Use CloudCMA style (bottom left/right) |
+| 4 | Duplicate title on slides | Remove duplicate, keep one |
+| 5 | Right-side navigation | Remove completely |
+
+---
+
+## 🎯 Reference: CloudCMA Navigation Layout
+
+### Home Page (Grid View):
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ☰ [LOGO]              COMPARATIVE MARKET ANALYSIS    [Agent]│
+│                        123 Main St, Austin, TX               │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  [Card] [Card] [Card] [Card] [Card]                        │
+│  [Card] [Card] [Card] [Card] [Card]                        │
+│  [Card] [Card] [Card] [Card] [Card]                        │
+│  ...                                                        │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                      [✏️ Pencil]           Start Presentation >│
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Slide View:
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ☰ [LOGO]              AGENT RESUME               [Agent]   │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│                    [Slide Content]                          │
+│                                                             │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│  < Home              [✏️ Pencil]        Listing with Spyglass >│
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔧 Fix 1: Home Page — Add "Start Presentation" Button
+
+### Location: Bottom right of home/grid view
+
+```tsx
+// In the Home/Grid view component
+
+{/* Bottom Navigation Bar - Home View */}
+<div className="fixed bottom-0 left-0 right-0 h-14 bg-white dark:bg-gray-900 
+                border-t border-gray-200 dark:border-gray-700 flex items-center 
+                justify-between px-6 z-40">
+  
+  {/* Left side - empty on home */}
+  <div className="w-40" />
+  
+  {/* Center - Pencil/Draw Tool */}
+  <button
+    onClick={() => setDrawingMode(!drawingMode)}
+    className={`min-w-[44px] min-h-[44px] p-3 rounded-full transition-colors
+                ${drawingMode 
+                  ? 'bg-orange-500 text-white' 
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
+    title="Draw on screen"
+  >
+    <Pencil className="w-5 h-5" />
+  </button>
+  
+  {/* Right side - Start Presentation */}
+  <button
+    onClick={() => navigateToSlide(1)}  // Go to first slide (Agent Resume)
+    className="flex items-center gap-2 text-gray-700 dark:text-gray-300 
+               hover:text-orange-500 dark:hover:text-orange-400 transition-colors
+               min-h-[44px] px-4"
+  >
+    <span className="text-sm font-medium">Start Presentation</span>
+    <ChevronRight className="w-5 h-5" />
+  </button>
+</div>
+```
+
+---
+
+## 🔧 Fix 2: Pencil/Draw Tool — Canvas Overlay
+
+### Drawing Canvas Component:
+
+```tsx
+// components/DrawingCanvas.tsx
+import { useRef, useState, useEffect } from 'react';
+
+interface DrawingCanvasProps {
+  isActive: boolean;
+  onClose: () => void;
+}
+
+export function DrawingCanvas({ isActive, onClose }: DrawingCanvasProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [context, setContext] = useState<CanvasRenderingContext2D | null>(null);
+  
+  useEffect(() => {
+    if (canvasRef.current) {
+      const canvas = canvasRef.current;
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.strokeStyle = '#FF4B2B';  // Orange color
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        setContext(ctx);
+      }
+    }
+  }, [isActive]);
+  
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!context) return;
+    setIsDrawing(true);
+    
+    const { clientX, clientY } = 'touches' in e ? e.touches[0] : e;
+    context.beginPath();
+    context.moveTo(clientX, clientY);
+  };
+  
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing || !context) return;
+    
+    const { clientX, clientY } = 'touches' in e ? e.touches[0] : e;
+    context.lineTo(clientX, clientY);
+    context.stroke();
+  };
+  
+  const stopDrawing = () => {
+    if (context) {
+      context.closePath();
+    }
+    setIsDrawing(false);
+  };
+  
+  const clearCanvas = () => {
+    if (context && canvasRef.current) {
+      context.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    }
+  };
+  
+  if (!isActive) return null;
+  
+  return (
+    <div className="fixed inset-0 z-50 pointer-events-auto">
+      {/* Canvas */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 cursor-crosshair"
+        onMouseDown={startDrawing}
+        onMouseMove={draw}
+        onMouseUp={stopDrawing}
+        onMouseLeave={stopDrawing}
+        onTouchStart={startDrawing}
+        onTouchMove={draw}
+        onTouchEnd={stopDrawing}
+      />
+      
+      {/* Drawing Tools - Top Right */}
+      <div className="absolute top-4 right-4 flex gap-2">
+        <button
+          onClick={clearCanvas}
+          className="min-w-[44px] min-h-[44px] p-2 bg-white dark:bg-gray-800 
+                     rounded-lg shadow-lg text-gray-700 dark:text-gray-300
+                     hover:bg-gray-100 dark:hover:bg-gray-700"
+          title="Clear drawing"
+        >
+          <Trash2 className="w-5 h-5" />
+        </button>
+        <button
+          onClick={onClose}
+          className="min-w-[44px] min-h-[44px] p-2 bg-white dark:bg-gray-800 
+                     rounded-lg shadow-lg text-gray-700 dark:text-gray-300
+                     hover:bg-gray-100 dark:hover:bg-gray-700"
+          title="Exit drawing mode"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 Fix 3: Slide Navigation — CloudCMA Style
+
+### Replace current right-side nav with bottom navigation:
+
+```tsx
+// components/SlideNavigation.tsx
+import { ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
+
+interface SlideNavigationProps {
+  currentSlide: number;
+  totalSlides: number;
+  prevSlideTitle: string | null;  // null if on first slide
+  nextSlideTitle: string | null;  // null if on last slide
+  onPrevious: () => void;
+  onNext: () => void;
+  onHome: () => void;
+  onToggleDrawing: () => void;
+  isDrawingMode: boolean;
+}
+
+export function SlideNavigation({
+  currentSlide,
+  totalSlides,
+  prevSlideTitle,
+  nextSlideTitle,
+  onPrevious,
+  onNext,
+  onHome,
+  onToggleDrawing,
+  isDrawingMode,
+}: SlideNavigationProps) {
+  return (
+    <div className="fixed bottom-0 left-0 right-0 h-14 bg-white dark:bg-gray-900 
+                    border-t border-gray-200 dark:border-gray-700 flex items-center 
+                    justify-between px-4 md:px-6 z-40">
+      
+      {/* Left Side - Previous or Home */}
+      <button
+        onClick={currentSlide === 1 ? onHome : onPrevious}
+        className="flex items-center gap-2 text-gray-700 dark:text-gray-300 
+                   hover:text-orange-500 dark:hover:text-orange-400 transition-colors
+                   min-h-[44px] px-2 md:px-4 max-w-[200px]"
+      >
+        <ChevronLeft className="w-5 h-5 flex-shrink-0" />
+        <span className="text-sm font-medium truncate hidden sm:block">
+          {currentSlide === 1 ? 'Home' : prevSlideTitle || 'Previous'}
+        </span>
+      </button>
+      
+      {/* Center - Pencil Tool */}
+      <button
+        onClick={onToggleDrawing}
+        className={`min-w-[44px] min-h-[44px] p-3 rounded-full transition-colors
+                    ${isDrawingMode 
+                      ? 'bg-orange-500 text-white' 
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    }`}
+        title="Draw on screen"
+      >
+        <Pencil className="w-5 h-5" />
+      </button>
+      
+      {/* Right Side - Next */}
+      {nextSlideTitle ? (
+        <button
+          onClick={onNext}
+          className="flex items-center gap-2 text-gray-700 dark:text-gray-300 
+                     hover:text-orange-500 dark:hover:text-orange-400 transition-colors
+                     min-h-[44px] px-2 md:px-4 max-w-[200px]"
+        >
+          <span className="text-sm font-medium truncate hidden sm:block">
+            {nextSlideTitle}
+          </span>
+          <ChevronRight className="w-5 h-5 flex-shrink-0" />
+        </button>
+      ) : (
+        // Last slide - show Home button
+        <button
+          onClick={onHome}
+          className="flex items-center gap-2 text-gray-700 dark:text-gray-300 
+                     hover:text-orange-500 dark:hover:text-orange-400 transition-colors
+                     min-h-[44px] px-2 md:px-4"
+        >
+          <span className="text-sm font-medium">Home</span>
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 Fix 4: Remove Duplicate Title
+
+### Current Problem:
+```
+┌─────────────────────────────────────────────────────────────┐
+│ [dark header]        AGENT RESUME                           │  ← Title 1
+│                         1 / 33                              │
+├─────────────────────────────────────────────────────────────┤
+│ [teal bar]           AGENT RESUME                           │  ← Title 2 (REMOVE)
+├─────────────────────────────────────────────────────────────┤
+```
+
+### Fix - Keep Only Header Title:
+
+```tsx
+// In SlideViewer.tsx or similar
+
+{/* Slide Header - KEEP THIS */}
+<div className="bg-gray-900 dark:bg-gray-900 py-4 px-6 text-center">
+  <h1 className="text-white text-xl font-bold uppercase tracking-wide">
+    {currentWidget.title}
+  </h1>
+  <p className="text-gray-400 text-sm mt-1">
+    {currentSlide} / {totalSlides}
+  </p>
+</div>
+
+{/* REMOVE THIS DUPLICATE - Delete or comment out */}
+{/* 
+<div className="bg-teal-700 py-3 px-6">
+  <h2 className="text-white font-semibold">{currentWidget.title}</h2>
+</div>
+*/}
+
+{/* Slide Content */}
+<div className="flex-1 overflow-auto p-6">
+  {renderSlideContent()}
+</div>
+```
+
+### Updated Slide Layout:
+
+```tsx
+// Complete Slide View Structure
+<div className="flex flex-col h-full">
+  {/* Single Header with Title + Counter */}
+  <div className="bg-gray-900 py-4 px-6 text-center flex-shrink-0">
+    <h1 className="text-white text-lg md:text-xl font-bold uppercase tracking-wide">
+      {currentWidget.title}
+    </h1>
+    <p className="text-gray-400 text-sm mt-1">
+      {currentSlide} / {totalSlides}
+    </p>
+  </div>
+  
+  {/* Content Area - No duplicate title */}
+  <div className="flex-1 overflow-auto bg-white dark:bg-gray-800">
+    <div className="max-w-4xl mx-auto p-6 md:p-8">
+      {renderSlideContent()}
+    </div>
+  </div>
+  
+  {/* Bottom Navigation */}
+  <SlideNavigation 
+    currentSlide={currentSlide}
+    totalSlides={totalSlides}
+    prevSlideTitle={getPrevSlideTitle()}
+    nextSlideTitle={getNextSlideTitle()}
+    onPrevious={goToPrevious}
+    onNext={goToNext}
+    onHome={goToHome}
+    onToggleDrawing={toggleDrawingMode}
+    isDrawingMode={isDrawingMode}
+  />
+</div>
+```
+
+---
+
+## 🔧 Fix 5: Remove Right-Side Navigation
+
+### Find and Remove:
+
+```tsx
+// REMOVE this right-side navigation panel
+{/* 
+<div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex flex-col gap-2">
+  <button onClick={goToPrev}>
+    <ChevronUp />
+  </button>
+  <button onClick={goToNext}>
+    <ChevronDown />
+  </button>
+</div>
+*/}
+
+// Also remove any:
+// - Fixed right-side arrow buttons
+// - Floating navigation controls on the right
+// - Any < > buttons not in the bottom bar
+```
+
+---
+
+## 📋 PDF Export Considerations
+
+When generating PDF, ensure:
+
+1. **Single title per slide** (no duplicate)
+2. **No navigation elements** in PDF (hide bottom bar)
+3. **Full content visible** without scrolling
+
+```tsx
+// When generating PDF, add a class to hide navigation
+<div className={`slide-container ${isPdfMode ? 'pdf-mode' : ''}`}>
+  {/* Content */}
+  
+  {/* Only show navigation when NOT in PDF mode */}
+  {!isPdfMode && <SlideNavigation {...props} />}
+</div>
+
+// CSS for PDF mode
+.pdf-mode {
+  /* Ensure content fits on page */
+  height: auto;
+  overflow: visible;
+}
+
+.pdf-mode .slide-navigation {
+  display: none;
+}
+```
+
+---
+
+## 📋 Copy/Paste for Replit
+
+```
+Implement CloudCMA-style navigation with these changes:
+
+## 1. HOME PAGE - Add Bottom Bar
+- Center: Pencil icon (toggles drawing mode)
+- Right: "Start Presentation >" button (goes to slide 1)
+
+## 2. DRAWING TOOL
+- Canvas overlay when pencil is clicked
+- Orange stroke color (#FF4B2B)
+- Clear and Exit buttons in top-right
+- Works on both mouse and touch
+
+## 3. SLIDE NAVIGATION - Bottom Bar
+- Left: "< Home" (on slide 1) or "< Previous Slide Title"
+- Center: Pencil icon (same drawing tool)
+- Right: "Next Slide Title >" or "Home >" (on last slide)
+- Remove any right-side navigation arrows
+
+## 4. REMOVE DUPLICATE TITLE
+Current slide shows title twice:
+1. In dark header: "AGENT RESUME" + "1/33"
+2. In teal bar below: "AGENT RESUME"
+
+Remove the second one (teal bar). Keep only the dark header with slide counter.
+
+## 5. PDF FORMATTING
+- Hide navigation bar during PDF export
+- Single title per slide
+- Content should fit on page without scrolling
+
+Reference screenshots attached showing:
+- CloudCMA home with "Start Presentation" button
+- CloudCMA slide with bottom navigation
+- Current duplicate title issue to fix
+```
+
+---
+
+## ✅ Expected Result
+
+### Home Page:
+- Bottom center: Pencil tool
+- Bottom right: "Start Presentation >"
+- Click Start → Goes to Slide 1
+
+### Slide View:
+- Single header with title + "1/33" counter
+- Bottom left: "< Home" or "< Previous Title"
+- Bottom center: Pencil tool
+- Bottom right: "Next Title >" or "Home >"
+
+### Drawing Mode:
+- Click pencil → Orange drawing cursor
+- Draw anywhere on screen
+- Clear/Exit buttons available
