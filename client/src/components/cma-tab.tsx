@@ -263,6 +263,7 @@ export function CMATab({ transaction }: CMATabProps) {
     phone: agentProfileData?.phone || undefined,
     email: agentProfileData?.email || undefined,
     photo: agentProfileData?.profilePhoto || undefined,
+    bio: agentProfileData?.bio || undefined,
   }), [agentProfileData]);
 
   const normalizeStatusLabel = (status: string): 'Active' | 'Pending' | 'Closed' | 'Active Under Contract' => {
@@ -276,31 +277,32 @@ export function CMATab({ transaction }: CMATabProps) {
   const presentationComparables: CmaProperty[] = useMemo(() => {
     if (!cmaData || cmaData.length === 0) return [];
     return cmaData.map((comp, index) => {
-      const sqft = typeof comp.sqft === 'number' ? comp.sqft : parseFloat(comp.sqft as string) || 0;
-      const price = comp.soldPrice || comp.price || 0;
+      const c = comp as any;
+      const sqft = typeof c.sqft === 'number' ? c.sqft : parseFloat(c.sqft as string) || 0;
+      const price = c.soldPrice || c.closePrice || c.price || 0;
       return {
-        id: comp.mlsNumber || `comp-${index}`,
-        address: comp.address || '',
-        city: comp.city || '',
-        state: comp.state || 'TX',
-        zipCode: comp.zipCode || '',
-        price: comp.price,
-        soldPrice: comp.soldPrice,
-        originalPrice: comp.originalPrice,
+        id: c.mlsNumber || `comp-${index}`,
+        address: c.address || '',
+        city: c.city || '',
+        state: c.state || 'TX',
+        zipCode: c.zipCode || '',
+        price: c.price,
+        soldPrice: c.soldPrice || c.closePrice,
+        originalPrice: c.originalPrice || c.listPrice,
         sqft: sqft,
-        beds: comp.bedrooms || 0,
-        baths: comp.bathrooms || 0,
-        lotSize: typeof comp.lotSize === 'number' ? comp.lotSize : undefined,
-        yearBuilt: typeof comp.yearBuilt === 'number' ? comp.yearBuilt : undefined,
-        garageSpaces: comp.garageSpaces,
-        status: normalizeStatusLabel(comp.status || ''),
-        daysOnMarket: comp.daysOnMarket || 0,
-        soldDate: comp.soldDate,
+        beds: c.bedrooms || 0,
+        baths: c.bathrooms || 0,
+        lotSize: typeof c.lotSize === 'number' ? c.lotSize : undefined,
+        yearBuilt: typeof c.yearBuilt === 'number' ? c.yearBuilt : undefined,
+        garageSpaces: c.garageSpaces,
+        status: normalizeStatusLabel(c.status || ''),
+        daysOnMarket: c.daysOnMarket || 0,
+        soldDate: c.soldDate || c.closeDate,
         pricePerSqft: sqft > 0 ? Math.round(price / sqft) : 0,
-        photos: comp.photos || [],
-        latitude: comp.map?.latitude || comp.latitude,
-        longitude: comp.map?.longitude || comp.longitude,
-        acres: comp.acres,
+        photos: c.photos || [],
+        latitude: c.map?.latitude || c.latitude,
+        longitude: c.map?.longitude || c.longitude,
+        acres: c.acres,
       };
     });
   }, [cmaData]);

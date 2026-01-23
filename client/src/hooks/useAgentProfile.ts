@@ -8,6 +8,7 @@ export interface AgentProfileData {
   title: string;
   company: string;
   profilePhoto: string | null;
+  bio: string;
 }
 
 interface AgentProfileResponse {
@@ -56,6 +57,7 @@ export function useAgentProfile() {
         title: user?.marketingTitle || profile?.title || "REALTOR®",
         company: user?.company || profile?.marketingCompany || "Spyglass Realty",
         profilePhoto: user?.marketingHeadshotUrl || profile?.headshotUrl || null,
+        bio: profile?.bio || "",
       };
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
