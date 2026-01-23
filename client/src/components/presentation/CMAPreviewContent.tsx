@@ -11,7 +11,7 @@ interface CMAPreviewContentProps {
   coverLetterOverride?: string;
 }
 
-const SPYGLASS_ORANGE = '#F37216';
+const SPYGLASS_ORANGE = '#EF4923';
 const SPYGLASS_NAVY = '#1a1a2e';
 
 function formatPrice(price: number): string {

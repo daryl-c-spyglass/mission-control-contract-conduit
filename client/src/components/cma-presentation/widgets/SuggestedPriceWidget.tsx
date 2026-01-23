@@ -72,8 +72,8 @@ export function SuggestedPriceWidget({
           )}
 
           <div className="text-center">
-            <div className="inline-block bg-[#F37216]/10 rounded-2xl px-12 py-8">
-              <p className="text-5xl md:text-6xl font-bold text-[#F37216]">
+            <div className="inline-block bg-[#EF4923]/10 rounded-2xl px-12 py-8">
+              <p className="text-5xl md:text-6xl font-bold text-[#EF4923]">
                 {price > 0 ? formatPrice(price) : '$---'}
               </p>
               <p className="text-sm text-muted-foreground mt-2">Suggested List Price</p>

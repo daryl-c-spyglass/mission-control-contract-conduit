@@ -27,17 +27,17 @@ export function SummaryComparablesPreview({ comparables }: SummaryComparablesPre
     <div className="grid grid-cols-3 gap-3">
       <div className="text-center p-3 bg-muted/50 rounded-lg">
         <p className="text-xs text-muted-foreground">Avg Price</p>
-        <p className="font-bold text-[#F37216]">
+        <p className="font-bold text-[#EF4923]">
           ${avgPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
         </p>
       </div>
       <div className="text-center p-3 bg-muted/50 rounded-lg">
         <p className="text-xs text-muted-foreground">Avg $/SqFt</p>
-        <p className="font-bold text-[#F37216]">${avgPricePerSqft.toFixed(0)}</p>
+        <p className="font-bold text-[#EF4923]">${avgPricePerSqft.toFixed(0)}</p>
       </div>
       <div className="text-center p-3 bg-muted/50 rounded-lg">
         <p className="text-xs text-muted-foreground">Properties</p>
-        <p className="font-bold text-[#F37216]">{comparables.length}</p>
+        <p className="font-bold text-[#EF4923]">{comparables.length}</p>
       </div>
     </div>
   );

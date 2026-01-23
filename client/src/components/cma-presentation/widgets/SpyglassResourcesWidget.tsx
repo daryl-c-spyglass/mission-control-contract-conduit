@@ -37,8 +37,8 @@ export function SpyglassResourcesWidget() {
               className="p-4 flex items-center justify-between cursor-pointer hover-elevate"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[#F37216]/10 flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-[#F37216]" />
+                <div className="w-10 h-10 rounded-lg bg-[#EF4923]/10 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-[#EF4923]" />
                 </div>
                 <span className="font-medium">{resource.title}</span>
               </div>

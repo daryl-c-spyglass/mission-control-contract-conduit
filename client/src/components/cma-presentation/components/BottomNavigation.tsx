@@ -60,7 +60,7 @@ export function BottomNavigation({
               onClick={onToggleDrawing}
               className={`min-w-[44px] min-h-[44px] p-3 rounded-full transition-colors
                           ${isDrawingMode 
-                            ? 'bg-[#F37216] text-white' 
+                            ? 'bg-[#EF4923] text-white' 
                             : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                           }`}
               title={isDrawingMode ? "Exit drawing mode" : "Draw on screen"}
@@ -73,7 +73,7 @@ export function BottomNavigation({
           <button
             onClick={onStartPresentation}
             className="flex items-center gap-2 text-gray-700 dark:text-gray-300 
-                       hover:text-[#F37216] dark:hover:text-[#F37216] transition-colors
+                       hover:text-[#EF4923] dark:hover:text-[#EF4923] transition-colors
                        min-h-[44px] px-4"
             data-testid="button-start-presentation"
           >
@@ -86,7 +86,7 @@ export function BottomNavigation({
           <button
             onClick={isFirst ? onHome : onPrevious}
             className="flex items-center gap-2 text-gray-700 dark:text-gray-300 
-                       hover:text-[#F37216] dark:hover:text-[#F37216] transition-colors
+                       hover:text-[#EF4923] dark:hover:text-[#EF4923] transition-colors
                        min-h-[44px] px-2 md:px-4 max-w-[200px]"
             data-testid="button-nav-prev"
           >
@@ -112,7 +112,7 @@ export function BottomNavigation({
               onClick={onToggleDrawing}
               className={`min-w-[44px] min-h-[44px] p-3 rounded-full transition-colors
                           ${isDrawingMode 
-                            ? 'bg-[#F37216] text-white' 
+                            ? 'bg-[#EF4923] text-white' 
                             : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                           }`}
               title={isDrawingMode ? "Exit drawing mode" : "Draw on screen"}
@@ -126,7 +126,7 @@ export function BottomNavigation({
             <button
               onClick={onNext}
               className="flex items-center gap-2 text-gray-700 dark:text-gray-300 
-                         hover:text-[#F37216] dark:hover:text-[#F37216] transition-colors
+                         hover:text-[#EF4923] dark:hover:text-[#EF4923] transition-colors
                          min-h-[44px] px-2 md:px-4 max-w-[200px]"
               data-testid="button-nav-next"
             >
@@ -139,7 +139,7 @@ export function BottomNavigation({
             <button
               onClick={onHome}
               className="flex items-center gap-2 text-gray-700 dark:text-gray-300 
-                         hover:text-[#F37216] dark:hover:text-[#F37216] transition-colors
+                         hover:text-[#EF4923] dark:hover:text-[#EF4923] transition-colors
                          min-h-[44px] px-2 md:px-4"
               data-testid="button-nav-home"
             >

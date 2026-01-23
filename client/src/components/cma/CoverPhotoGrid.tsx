@@ -147,8 +147,8 @@ export function CoverPhotoGrid({
                       className={cn(
                         "relative aspect-square rounded-lg overflow-hidden border-2 transition-all w-full cursor-pointer",
                         isSelected 
-                          ? "border-[#F37216] ring-2 ring-[#F37216]/30" 
-                          : "border-muted hover:border-[#F37216]/50"
+                          ? "border-[#EF4923] ring-2 ring-[#EF4923]/30" 
+                          : "border-muted hover:border-[#EF4923]/50"
                       )}
                       data-testid={`ai-cover-photo-${idx}`}
                     >
@@ -164,7 +164,7 @@ export function CoverPhotoGrid({
                       />
                       
                       {isSelected && (
-                        <div className="absolute top-1.5 right-1.5 w-6 h-6 bg-[#F37216] rounded-full flex items-center justify-center shadow-lg">
+                        <div className="absolute top-1.5 right-1.5 w-6 h-6 bg-[#EF4923] rounded-full flex items-center justify-center shadow-lg">
                           <Check className="w-4 h-4 text-white" />
                         </div>
                       )}
@@ -254,8 +254,8 @@ export function CoverPhotoGrid({
                 className={cn(
                   "relative aspect-square rounded-lg overflow-hidden border-2 transition-all w-full cursor-pointer",
                   isSelected 
-                    ? "border-[#F37216] ring-2 ring-[#F37216]/30" 
-                    : "border-muted hover:border-[#F37216]/50"
+                    ? "border-[#EF4923] ring-2 ring-[#EF4923]/30" 
+                    : "border-muted hover:border-[#EF4923]/50"
                 )}
                 data-testid={`cover-photo-${displayIdx}`}
               >
@@ -271,7 +271,7 @@ export function CoverPhotoGrid({
                 />
                 
                 {isSelected && (
-                  <div className="absolute top-1.5 right-1.5 w-6 h-6 bg-[#F37216] rounded-full flex items-center justify-center shadow-lg">
+                  <div className="absolute top-1.5 right-1.5 w-6 h-6 bg-[#EF4923] rounded-full flex items-center justify-center shadow-lg">
                     <Check className="w-4 h-4 text-white" />
                   </div>
                 )}

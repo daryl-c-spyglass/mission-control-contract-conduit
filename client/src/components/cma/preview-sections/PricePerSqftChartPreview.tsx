@@ -46,7 +46,7 @@ export function PricePerSqftChartPreview({ comparables, compact }: PricePerSqftC
           <Tooltip formatter={(value) => [`$${value}/sqft`, 'Price/SqFt']} />
           <Bar dataKey="pricePerSqft" radius={[4, 4, 0, 0]}>
             {data.map((_, index) => (
-              <Cell key={`cell-${index}`} fill="#F37216" />
+              <Cell key={`cell-${index}`} fill="#EF4923" />
             ))}
           </Bar>
         </BarChart>

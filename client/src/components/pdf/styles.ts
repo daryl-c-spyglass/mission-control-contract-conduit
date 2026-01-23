@@ -3,7 +3,7 @@ import { StyleSheet } from '@react-pdf/renderer';
 // Use Helvetica as the default font (built into react-pdf) for reliable PDF generation
 // No custom font registration needed - Helvetica is always available
 
-export const SPYGLASS_ORANGE = '#F37216';
+export const SPYGLASS_ORANGE = '#EF4923';
 export const SPYGLASS_NAVY = '#1a1a2e';
 export const LIGHT_GRAY = '#9ca3af';
 export const MEDIUM_GRAY = '#666666';

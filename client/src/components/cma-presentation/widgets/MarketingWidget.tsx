@@ -26,25 +26,25 @@ export function MarketingWidget() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-background rounded-lg p-4 text-center">
-                <span className="text-4xl font-bold text-[#F37216]">96%</span>
+                <span className="text-4xl font-bold text-[#EF4923]">96%</span>
                 <p className="text-sm text-muted-foreground mt-2">
                   Of buyers search online during their home search
                 </p>
               </div>
               <div className="bg-background rounded-lg p-4 text-center">
-                <span className="text-4xl font-bold text-[#F37216]">52%</span>
+                <span className="text-4xl font-bold text-[#EF4923]">52%</span>
                 <p className="text-sm text-muted-foreground mt-2">
                   Of buyers found their home through the internet
                 </p>
               </div>
               <div className="bg-background rounded-lg p-4 text-center">
-                <span className="text-4xl font-bold text-[#F37216]">28%</span>
+                <span className="text-4xl font-bold text-[#EF4923]">28%</span>
                 <p className="text-sm text-muted-foreground mt-2">
                   Of buyers found their home through an agent
                 </p>
               </div>
               <div className="bg-background rounded-lg p-4 text-center">
-                <span className="text-4xl font-bold text-[#F37216]">8%</span>
+                <span className="text-4xl font-bold text-[#EF4923]">8%</span>
                 <p className="text-sm text-muted-foreground mt-2">
                   Of buyers found their home through yard signs
                 </p>

@@ -76,7 +76,7 @@ export function AveragePriceAcreWidget({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium truncate">{comp.address}</p>
-                        <p className="text-xs text-[#F37216] font-medium">
+                        <p className="text-xs text-[#EF4923] font-medium">
                           {formatPrice((comp.soldPrice || comp.price) / (comp.acres || 1))}/acre
                         </p>
                         <p className="text-xs text-muted-foreground">{comp.acres?.toFixed(2)} acres</p>
@@ -103,7 +103,7 @@ export function AveragePriceAcreWidget({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium truncate">{comp.address}</p>
-                        <p className="text-xs text-[#F37216] font-medium">
+                        <p className="text-xs text-[#EF4923] font-medium">
                           {formatPrice((comp.soldPrice || comp.price) / (comp.acres || 1))}/acre
                         </p>
                         <p className="text-xs text-muted-foreground">{comp.acres?.toFixed(2)} acres</p>
@@ -130,7 +130,7 @@ export function AveragePriceAcreWidget({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium truncate">{comp.address}</p>
-                        <p className="text-xs text-[#F37216] font-medium">
+                        <p className="text-xs text-[#EF4923] font-medium">
                           {formatPrice((comp.soldPrice || comp.price) / (comp.acres || 1))}/acre
                         </p>
                         <p className="text-xs text-muted-foreground">{comp.acres?.toFixed(2)} acres</p>
@@ -147,8 +147,8 @@ export function AveragePriceAcreWidget({
               <p className="text-lg font-medium">Price vs Acres Chart</p>
               <p className="text-sm">Scatter plot visualization coming soon</p>
               {subjectProperty && (
-                <div className="mt-4 p-4 bg-[#F37216]/10 rounded-lg">
-                  <p className="text-sm font-medium text-[#F37216]">Subject Property</p>
+                <div className="mt-4 p-4 bg-[#EF4923]/10 rounded-lg">
+                  <p className="text-sm font-medium text-[#EF4923]">Subject Property</p>
                   <p className="text-xs">{subjectProperty.acres?.toFixed(2) || '---'} acres</p>
                 </div>
               )}

@@ -64,7 +64,7 @@ Preferred communication style: Simple, everyday language.
   - Sidebar navigation for quick section access
   - Keyboard navigation (Escape, Left/Right arrows)
   - Mobile-optimized with safe area insets and touch handling
-  - Spyglass branding (#F37216 orange, #1a1a2e navy)
+  - Spyglass branding (#EF4923 orange, #222222 black) - Official brand colors
   - Widget types: AgentResume, Comps (Compare/Map/Stats tabs), TimeToSell, SuggestedPrice, AveragePricePerAcre, Static images
   - Data integration: Uses `useAgentProfile` hook for agent data, transforms `CMAComparable[]` to `CmaProperty[]` for presentation
   - Static widget images stored in `public/cma-widgets/` (1.png through 24.png map to widgets 11-34)

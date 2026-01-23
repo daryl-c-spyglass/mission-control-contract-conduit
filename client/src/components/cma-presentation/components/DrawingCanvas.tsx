@@ -23,7 +23,7 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
 
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.strokeStyle = '#F37216';
+        ctx.strokeStyle = '#EF4923';
         ctx.lineWidth = 3;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -39,7 +39,7 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
         canvasRef.current.width = window.innerWidth;
         canvasRef.current.height = window.innerHeight;
         context.putImageData(imageData, 0, 0);
-        context.strokeStyle = '#F37216';
+        context.strokeStyle = '#EF4923';
         context.lineWidth = 3;
         context.lineCap = 'round';
         context.lineJoin = 'round';

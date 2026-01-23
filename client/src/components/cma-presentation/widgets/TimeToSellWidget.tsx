@@ -47,12 +47,12 @@ export function TimeToSellWidget({
         <div className="p-6 border-b">
           <div className="flex items-center justify-center gap-8 flex-wrap">
             <div className="text-center">
-              <span className="text-4xl font-bold text-[#F37216]">{averageDaysOnMarket}</span>
+              <span className="text-4xl font-bold text-[#EF4923]">{averageDaysOnMarket}</span>
               <p className="text-sm text-muted-foreground mt-1">DAYS ON MARKET</p>
             </div>
             <div className="text-3xl text-muted-foreground">|</div>
             <div className="text-center">
-              <span className="text-4xl font-bold text-[#F37216]">{averageListPricePercent.toFixed(2)}%</span>
+              <span className="text-4xl font-bold text-[#EF4923]">{averageListPricePercent.toFixed(2)}%</span>
               <p className="text-sm text-muted-foreground mt-1">OF LIST PRICE</p>
             </div>
           </div>

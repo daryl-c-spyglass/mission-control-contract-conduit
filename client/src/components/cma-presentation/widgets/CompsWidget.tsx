@@ -55,9 +55,9 @@ export function CompsWidget({ comparables, subjectProperty }: CompsWidgetProps) 
           <div className="p-4">
             <div className="flex gap-4 overflow-x-auto pb-4">
               {subjectProperty && (
-                <Card className="min-w-[280px] flex-shrink-0 border-2 border-[#F37216]">
+                <Card className="min-w-[280px] flex-shrink-0 border-2 border-[#EF4923]">
                   <div className="p-4">
-                    <Badge className="bg-[#F37216] text-white mb-2">Subject</Badge>
+                    <Badge className="bg-[#EF4923] text-white mb-2">Subject</Badge>
                     <div className="aspect-video bg-muted rounded-lg mb-3 overflow-hidden">
                       {subjectProperty.photos?.[0] ? (
                         <img 

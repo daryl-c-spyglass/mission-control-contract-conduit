@@ -201,7 +201,7 @@ export function LivePreviewPanel({
       case 'our_company':
         return (
           <div>
-            <p className="font-medium text-[#F37216]">Spyglass Realty</p>
+            <p className="font-medium text-[#EF4923]">Spyglass Realty</p>
             <p className="text-sm text-muted-foreground">
               Company profile and information
             </p>
@@ -234,7 +234,7 @@ export function LivePreviewPanel({
 
       case 'listings_header':
         return (
-          <div className="border-l-4 border-[#F37216] pl-3 py-2">
+          <div className="border-l-4 border-[#EF4923] pl-3 py-2">
             <p className="font-bold text-lg">Comparable Properties</p>
           </div>
         );
@@ -263,7 +263,7 @@ export function LivePreviewPanel({
 
       case 'analysis_header':
         return (
-          <div className="border-l-4 border-[#F37216] pl-3 py-2">
+          <div className="border-l-4 border-[#EF4923] pl-3 py-2">
             <p className="font-bold text-lg">Market Analysis</p>
           </div>
         );

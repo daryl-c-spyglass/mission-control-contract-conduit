@@ -73,7 +73,7 @@ export function Header({
             </Button>
             {logoError ? (
               <div className="flex flex-col items-center">
-                <span className="text-sm font-bold text-[#F37216] tracking-wider">SPYGLASS</span>
+                <span className="text-sm font-bold text-[#EF4923] tracking-wider">SPYGLASS</span>
                 <span className="text-xs text-white/80">REALTY</span>
               </div>
             ) : (
@@ -125,7 +125,7 @@ export function Header({
                   </div>
                   <Avatar className="w-10 h-10 border-2 border-white/30">
                     <AvatarImage src={agent.photo} alt={agent.name} />
-                    <AvatarFallback className="bg-[#F37216] text-white text-sm">
+                    <AvatarFallback className="bg-[#EF4923] text-white text-sm">
                       {agent.name?.charAt(0) || 'A'}
                     </AvatarFallback>
                   </Avatar>
@@ -136,7 +136,7 @@ export function Header({
                   <div className="flex items-center gap-3">
                     <Avatar className="w-12 h-12">
                       <AvatarImage src={agent.photo} alt={agent.name} />
-                      <AvatarFallback className="bg-[#F37216] text-white">
+                      <AvatarFallback className="bg-[#EF4923] text-white">
                         {agent.name?.charAt(0) || 'A'}
                       </AvatarFallback>
                     </Avatar>

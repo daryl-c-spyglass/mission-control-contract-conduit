@@ -1,0 +1,253 @@
+# Spyglass Branding Compliance Fix — Replit Prompt
+
+## 🎯 Objective
+
+Update all brand colors across the entire Contract Conduit codebase to match official Spyglass Realty Branding Guidelines.
+
+---
+
+## 📋 Official Brand Colors
+
+| Color Name | Official Hex | Currently Used (WRONG) |
+|------------|--------------|------------------------|
+| **Spyglass Red-Orange** | `#EF4923` | ❌ `#F37216` |
+| **Spyglass Black** | `#222222` | ⚠️ `#1a1a2e` (navy) |
+
+---
+
+## 🔧 Fix 1: Create Brand Constants File
+
+Create a centralized brand constants file:
+
+```typescript
+// client/src/constants/brand.ts
+
+export const SPYGLASS_COLORS = {
+  // Official brand colors from Spyglass Branding Guidelines
+  orange: '#EF4923',      // Spyglass Red-Orange - PRIMARY ACCENT
+  black: '#222222',       // Spyglass Black - PRIMARY TEXT
+  
+  // Extended palette (derived from brand)
+  orangeLight: '#FEF2EE', // Light orange background
+  orangeDark: '#D13D1A',  // Darker orange for hover states
+  
+  // Backgrounds
+  darkBg: '#222222',      // Dark mode background
+  lightBg: '#FFFFFF',     // Light mode background
+} as const;
+
+// For Tailwind classes reference
+export const BRAND_CLASSES = {
+  textOrange: 'text-[#EF4923]',
+  bgOrange: 'bg-[#EF4923]',
+  borderOrange: 'border-[#EF4923]',
+  textBlack: 'text-[#222222]',
+  bgBlack: 'bg-[#222222]',
+};
+```
+
+---
+
+## 🔧 Fix 2: Update Tailwind Config
+
+Add custom Spyglass colors to Tailwind configuration:
+
+```javascript
+// tailwind.config.js or tailwind.config.ts
+
+module.exports = {
+  theme: {
+    extend: {
+      colors: {
+        spyglass: {
+          orange: '#EF4923',
+          black: '#222222',
+          'orange-light': '#FEF2EE',
+          'orange-dark': '#D13D1A',
+        },
+      },
+    },
+  },
+};
+```
+
+After this, you can use: `bg-spyglass-orange`, `text-spyglass-orange`, `border-spyglass-black`, etc.
+
+---
+
+## 🔧 Fix 3: Global Find & Replace
+
+Perform these exact replacements across all files in `client/src/`:
+
+### Replace #F37216 → #EF4923
+
+```bash
+# Files to update (53+ instances):
+find client/src -type f \( -name "*.tsx" -o -name "*.ts" -o -name "*.css" \) -exec sed -i 's/#F37216/#EF4923/g' {} +
+find client/src -type f \( -name "*.tsx" -o -name "*.ts" -o -name "*.css" \) -exec sed -i 's/#f37216/#EF4923/g' {} +
+```
+
+### Files Requiring #F37216 → #EF4923 Update:
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `components/cma-presentation/components/DrawingCanvas.tsx` | 26, 42 | Drawing stroke color |
+| `components/cma-presentation/widgets/MarketingWidget.tsx` | 29, 35, 41, 47 | Statistics text |
+| `components/cma-presentation/components/Header.tsx` | 76, 128, 139 | Logo text, avatar |
+| `components/presentation/CMAPreviewContent.tsx` | 14 | SPYGLASS_ORANGE constant |
+| `components/cma-presentation/components/SectionCard.tsx` | 44, 53, 62, 81, 87, 89, 91, 119 | Icons, badges |
+| `components/cma/LivePreviewPanel.tsx` | 204, 237, 266 | Border accents |
+| `components/cma/preview-sections/PricePerSqftChartPreview.tsx` | 49 | Chart bar |
+| `components/cma/CoverPhotoGrid.tsx` | 150, 151, 167, 257, 258, 274 | Selection borders |
+| `components/cma-presentation/components/BottomNavigation.tsx` | Multiple | Active button |
+| `pages/CMAPresentationBuilder.tsx` | 730, 744, 757 | Icons, selection |
+
+---
+
+## 🔧 Fix 4: Replace Tailwind Orange Classes
+
+Replace generic Tailwind orange with brand color:
+
+### Option A: Use Custom Tailwind Class (Preferred)
+After updating tailwind.config, replace:
+- `orange-500` → `spyglass-orange`
+- `orange-600` → `spyglass-orange`
+- `orange-100` → `spyglass-orange/10` or `spyglass-orange-light`
+
+### Option B: Use Arbitrary Values
+Replace Tailwind classes with arbitrary brand color:
+- `bg-orange-500` → `bg-[#EF4923]`
+- `text-orange-500` → `text-[#EF4923]`
+- `text-orange-600` → `text-[#EF4923]`
+- `border-orange-500` → `border-[#EF4923]`
+- `bg-orange-100` → `bg-[#EF4923]/10`
+- `bg-orange-500/10` → `bg-[#EF4923]/10`
+
+### Files with Tailwind Orange Classes:
+
+| File | Classes to Replace |
+|------|-------------------|
+| `lib/statusColors.ts` | `bg-orange-500`, `text-orange-500` |
+| `lib/timeline-config.ts` | `text-orange-600`, `bg-orange-100` |
+| `lib/pdfStyles.ts` | `bg-orange-500` |
+| `lib/social-formats.ts` | `bg-orange-500` |
+| `pages/settings.tsx` | `bg-orange-500/10`, `text-orange-500` |
+| `components/transaction-details.tsx` | Multiple orange classes |
+| `components/presentation/ReportSections.tsx` | `bg-orange-100`, `text-orange-600` |
+| `components/cma-stats-view.tsx` | `bg-orange-500`, `text-orange-500` |
+| `components/transaction-card.tsx` | `text-orange-600` |
+| `components/CMAReport.tsx` | Multiple orange classes |
+
+---
+
+## 🔧 Fix 5: Update Constants/Definitions
+
+### Update CMAPreviewContent.tsx:
+```typescript
+// BEFORE:
+const SPYGLASS_ORANGE = '#F37216';
+
+// AFTER:
+const SPYGLASS_ORANGE = '#EF4923';
+```
+
+### Update pdf/styles.ts:
+```typescript
+// BEFORE:
+const SPYGLASS_ORANGE = '#F37216';
+const SPYGLASS_NAVY = '#1a1a2e';
+
+// AFTER:
+const SPYGLASS_ORANGE = '#EF4923';
+const SPYGLASS_BLACK = '#222222';  // Official black instead of navy
+```
+
+---
+
+## 🔧 Fix 6: Navy Gradient Colors (Optional)
+
+The audit found custom navy colors not in the branding guidelines:
+- `#1a1a2e`
+- `#16213e`  
+- `#0f0f23`
+
+**Decision needed:** These are used for dark backgrounds/gradients. Options:
+
+### Option A: Keep as-is (Acceptable)
+These provide visual depth for dark UI elements and don't conflict with brand identity.
+
+### Option B: Simplify to Official Black (Strict Compliance)
+Replace gradient with solid brand black:
+```tsx
+// BEFORE:
+style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%)' }}
+
+// AFTER:
+className="bg-[#222222]"
+```
+
+**Recommendation:** Keep Option A for now - these are background colors, not brand accent colors.
+
+---
+
+## 🔧 Fix 7: Update Documentation
+
+Update `replit.md` or any documentation:
+
+```markdown
+## Brand Colors
+- Spyglass Orange: #EF4923 (NOT #F37216)
+- Spyglass Black: #222222
+```
+
+---
+
+## 📋 Implementation Order
+
+1. ✅ Create `constants/brand.ts` with official colors
+2. ✅ Update `tailwind.config.js` with spyglass colors
+3. ✅ Global replace `#F37216` → `#EF4923` (53+ instances)
+4. ✅ Update all constant definitions (SPYGLASS_ORANGE, etc.)
+5. ✅ Replace Tailwind `orange-*` classes with brand colors
+6. ⏳ (Optional) Address navy gradient colors
+7. ✅ Update documentation
+
+---
+
+## ✅ Verification
+
+After making changes, verify:
+
+```bash
+# Should return 0 results:
+grep -r "#F37216" --include="*.tsx" --include="*.ts" client/src/
+grep -r "#f37216" --include="*.tsx" --include="*.ts" client/src/
+
+# Should return many results:
+grep -r "#EF4923" --include="*.tsx" --include="*.ts" client/src/
+```
+
+---
+
+## 📊 Summary
+
+| Change | Count | Status |
+|--------|-------|--------|
+| `#F37216` → `#EF4923` | 53+ instances | ⬜ To Fix |
+| Tailwind orange → brand | 27+ instances | ⬜ To Fix |
+| Constants/definitions | 5+ files | ⬜ To Fix |
+| Navy colors | 5 instances | ⬜ Optional |
+
+**Total files to update:** ~25 files
+
+---
+
+## 🎨 Quick Reference
+
+```
+CORRECT:   #EF4923 (Spyglass Red-Orange)
+INCORRECT: #F37216, #f97316, orange-500, orange-600
+
+CORRECT:   #222222 (Spyglass Black)
+INCORRECT: #000000, #111111
+```

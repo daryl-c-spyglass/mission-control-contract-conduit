@@ -81,6 +81,12 @@ export default {
           busy: "rgb(239 68 68)",
           offline: "rgb(156 163 175)",
         },
+        spyglass: {
+          orange: "#EF4923",
+          black: "#222222",
+          "orange-light": "#FEF2EE",
+          "orange-dark": "#D13D1A",
+        },
       },
       fontFamily: {
         sans: ["var(--font-sans)"],

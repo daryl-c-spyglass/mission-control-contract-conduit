@@ -727,7 +727,7 @@ export default function CMAPresentationBuilder() {
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-2 mb-1">
-                    <ImageIcon className="w-5 h-5 text-[#F37216]" />
+                    <ImageIcon className="w-5 h-5 text-[#EF4923]" />
                     <CardTitle className="text-base">Cover Page Photo</CardTitle>
                   </div>
                   <CardDescription>
@@ -741,7 +741,7 @@ export default function CMAPresentationBuilder() {
                       className={cn(
                         "flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium",
                         config.coverPhotoSource === 'ai'
-                          ? "border-[#F37216] bg-[#F37216]/10 text-[#F37216]"
+                          ? "border-[#EF4923] bg-[#EF4923]/10 text-[#EF4923]"
                           : "border-muted text-muted-foreground hover:border-muted-foreground"
                       )}
                       data-testid="btn-ai-photo"
@@ -754,7 +754,7 @@ export default function CMAPresentationBuilder() {
                       className={cn(
                         "flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium",
                         config.coverPhotoSource === 'manual'
-                          ? "border-[#F37216] bg-[#F37216]/10 text-[#F37216]"
+                          ? "border-[#EF4923] bg-[#EF4923]/10 text-[#EF4923]"
                           : "border-muted text-muted-foreground hover:border-muted-foreground"
                       )}
                       data-testid="btn-manual-photo"

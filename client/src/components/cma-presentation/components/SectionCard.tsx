@@ -41,7 +41,7 @@ export function SectionCard({ widget, onClick, badge, agentPhoto, agentName }: S
                 className="w-12 h-12 rounded-full object-cover border-2 border-border"
                 onError={() => setPhotoError(true)}
               />
-              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#F37216] rounded-full flex items-center justify-center border-2 border-background">
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#EF4923] rounded-full flex items-center justify-center border-2 border-background">
                 <span className="text-white text-[10px] font-bold">i</span>
               </div>
             </div>
@@ -50,7 +50,7 @@ export function SectionCard({ widget, onClick, badge, agentPhoto, agentName }: S
         return (
           <div className="relative">
             <User className={iconClass} />
-            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#F37216] rounded-full flex items-center justify-center">
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#EF4923] rounded-full flex items-center justify-center">
               <span className="text-white text-[10px] font-bold">i</span>
             </div>
           </div>
@@ -59,7 +59,7 @@ export function SectionCard({ widget, onClick, badge, agentPhoto, agentName }: S
         if (logoError) {
           return (
             <div className="flex flex-col items-center">
-              <span className="text-sm font-bold text-[#F37216] tracking-wider">SPYGLASS</span>
+              <span className="text-sm font-bold text-[#EF4923] tracking-wider">SPYGLASS</span>
               <span className="text-xs text-muted-foreground">REALTY</span>
             </div>
           );
@@ -78,17 +78,17 @@ export function SectionCard({ widget, onClick, badge, agentPhoto, agentName }: S
         return (
           <div className="relative">
             <Home className={iconClass} />
-            <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#F37216] rounded-full flex items-center justify-center">
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#EF4923] rounded-full flex items-center justify-center">
               <DollarSign className="w-3 h-3 text-white" />
             </div>
           </div>
         );
       case 'clock':
-        return <Clock className={`${iconClass} text-[#F37216]`} />;
+        return <Clock className={`${iconClass} text-[#EF4923]`} />;
       case 'dollar':
-        return <DollarSign className={`${iconClass} text-[#F37216]`} />;
+        return <DollarSign className={`${iconClass} text-[#EF4923]`} />;
       case 'chart':
-        return <BarChart3 className={`${iconClass} text-[#F37216]`} />;
+        return <BarChart3 className={`${iconClass} text-[#EF4923]`} />;
       case 'megaphone':
         return <Megaphone className={iconClass} />;
       case 'clipboard':
@@ -116,7 +116,7 @@ export function SectionCard({ widget, onClick, badge, agentPhoto, agentName }: S
         </span>
       )}
       {(badge || widget.badge) && (
-        <Badge variant="secondary" className="text-[#F37216]">
+        <Badge variant="secondary" className="text-[#EF4923]">
           {badge || widget.badge}
         </Badge>
       )}

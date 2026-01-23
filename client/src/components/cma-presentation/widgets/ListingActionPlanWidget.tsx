@@ -26,7 +26,7 @@ export function ListingActionPlanWidget() {
             <h2 className="text-2xl md:text-3xl font-bold">
               WHAT'S NEXT?
             </h2>
-            <p className="text-lg text-[#F37216] font-medium">
+            <p className="text-lg text-[#EF4923] font-medium">
               Keeping you on top of the process.
             </p>
           </div>
@@ -41,7 +41,7 @@ export function ListingActionPlanWidget() {
                 key={index}
                 className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg"
               >
-                <div className="w-8 h-8 rounded-full bg-[#F37216] flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-[#EF4923] flex items-center justify-center flex-shrink-0">
                   <Check className="w-4 h-4 text-white" />
                 </div>
                 <span className="font-medium">{item}</span>

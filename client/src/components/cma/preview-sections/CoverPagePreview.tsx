@@ -23,7 +23,7 @@ export function CoverPagePreview({
 }: CoverPagePreviewProps) {
   return (
     <div className={cn("text-center", compact ? "py-4" : "py-8")}>
-      <p className="text-[#F37216] font-semibold text-sm">Spyglass Realty</p>
+      <p className="text-[#EF4923] font-semibold text-sm">Spyglass Realty</p>
       <h2 className={cn("font-bold mt-2", compact ? "text-lg" : "text-2xl")}>
         {title || "Comparative Market Analysis"}
       </h2>
