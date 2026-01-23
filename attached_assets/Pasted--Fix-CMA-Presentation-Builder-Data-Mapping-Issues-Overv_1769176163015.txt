@@ -1,0 +1,356 @@
+# Fix CMA Presentation Builder - Data Mapping Issues
+
+## Overview
+Fix the data mapping issues in CMA Presentation Builder that cause agent info, cover letter, and photos to not display correctly in Preview and Export PDF.
+
+---
+
+## Root Causes Identified
+
+| Issue | Problem | Solution |
+|-------|---------|----------|
+| Agent Name | Code looks for `profile.name` which doesn't exist | Use `user.firstName/lastName` or `user.marketingDisplayName` |
+| Cover Letter | Field exists but may not propagate correctly | Ensure `profile.defaultCoverLetter` is mapped |
+| Agent Photo | No fallback to `profile.headshotUrl` | Add fallback chain |
+| Export PDF | Same data issues | Fixing `agentInfo` fixes PDF too |
+
+---
+
+## File to Modify
+
+**File:** `client/src/pages/CMAPresentationBuilder.tsx`
+
+---
+
+## Fix 1: Update Agent Info Construction (Lines ~371-391)
+
+**Find this code (around lines 371-391):**
+
+```tsx
+const agentInfo = {
+  firstName: agentProfileData?.profile?.name?.split(' ')[0] || 
+             agentProfileData?.user?.marketingDisplayName?.split(' ')[0] || 'Agent',
+  lastName: agentProfileData?.profile?.name?.split(' ').slice(1).join(' ') || 
+            agentProfileData?.user?.marketingDisplayName?.split(' ').slice(1).join(' ') || '',
+  title: agentProfileData?.profile?.title || 
+         agentProfileData?.user?.marketingTitle || 'Real Estate Professional',
+  email: agentProfileData?.profile?.email || 
+         agentProfileData?.user?.marketingEmail || '',
+  phone: agentProfileData?.profile?.phone || 
+         agentProfileData?.user?.marketingPhone || '',
+  company: agentProfileData?.profile?.company || 'Spyglass Realty',
+  bio: agentProfileData?.profile?.bio,
+  coverLetter: agentProfileData?.profile?.defaultCoverLetter,
+  photo: agentProfileData?.user?.marketingHeadshotUrl || '',
+};
+```
+
+**Replace with this corrected version:**
+
+```tsx
+// Build agent display name from available sources
+const getAgentName = () => {
+  // Priority 1: Marketing display name (user-configured for marketing)
+  if (agentProfileData?.user?.marketingDisplayName) {
+    return agentProfileData.user.marketingDisplayName;
+  }
+  // Priority 2: User's first + last name
+  if (agentProfileData?.user?.firstName || agentProfileData?.user?.lastName) {
+    return `${agentProfileData.user.firstName || ''} ${agentProfileData.user.lastName || ''}`.trim();
+  }
+  // Priority 3: Fallback
+  return 'Agent';
+};
+
+const agentFullName = getAgentName();
+const nameParts = agentFullName.split(' ');
+
+const agentInfo = {
+  // Name - from user table, NOT profile table (profile has no 'name' field)
+  firstName: nameParts[0] || 'Agent',
+  lastName: nameParts.slice(1).join(' ') || '',
+  fullName: agentFullName,
+  
+  // Title - check profile first, then user marketing settings
+  title: agentProfileData?.profile?.title || 
+         agentProfileData?.user?.marketingTitle || 
+         'Real Estate Professional',
+  
+  // Contact info - check user marketing settings first (user-configured), then profile
+  email: agentProfileData?.user?.marketingEmail || 
+         agentProfileData?.user?.email || 
+         '',
+  phone: agentProfileData?.user?.marketingPhone || 
+         '',
+  
+  // Company - from profile's marketing company field
+  company: agentProfileData?.profile?.marketingCompany || 
+           'Spyglass Realty',
+  
+  // Bio - from profile
+  bio: agentProfileData?.profile?.bio || '',
+  
+  // Cover Letter - from profile's defaultCoverLetter field
+  coverLetter: agentProfileData?.profile?.defaultCoverLetter || '',
+  
+  // Photo - check multiple sources with fallback chain
+  photo: agentProfileData?.user?.marketingHeadshotUrl || 
+         agentProfileData?.profile?.headshotUrl || 
+         agentProfileData?.user?.profileImageUrl || 
+         '',
+};
+```
+
+---
+
+## Fix 2: Add Debug Logging (Temporary - Remove After Verification)
+
+Add this right after the `agentInfo` object to help verify data is flowing:
+
+```tsx
+// DEBUG: Remove after verification
+useEffect(() => {
+  if (agentProfileData) {
+    console.log('=== Agent Profile Data Debug ===');
+    console.log('Raw API response:', agentProfileData);
+    console.log('Constructed agentInfo:', agentInfo);
+    console.log('Cover Letter present:', !!agentInfo.coverLetter);
+    console.log('Photo URL:', agentInfo.photo);
+  }
+}, [agentProfileData]);
+```
+
+---
+
+## Fix 3: Ensure Cover Letter Propagates to Preview
+
+Check if the `coverLetter` is being used in the preview. Find where `transformToCMAReportData` is defined and ensure it includes the cover letter.
+
+**Find the transform function (likely in the same file or a utils file):**
+
+Look for something like:
+```tsx
+function transformToCMAReportData(cma, subjectProperty, comparables, agentInfo, statistics) {
+```
+
+**Ensure the agentInfo.coverLetter is included in the output:**
+
+```tsx
+// Inside transformToCMAReportData, ensure this is included:
+return {
+  // ... other fields
+  agent: {
+    name: agentInfo.fullName || `${agentInfo.firstName} ${agentInfo.lastName}`.trim(),
+    firstName: agentInfo.firstName,
+    lastName: agentInfo.lastName,
+    title: agentInfo.title,
+    email: agentInfo.email,
+    phone: agentInfo.phone,
+    company: agentInfo.company,
+    bio: agentInfo.bio,
+    photo: agentInfo.photo,
+  },
+  coverLetter: agentInfo.coverLetter,  // Make sure this is included!
+  // ... other fields
+};
+```
+
+---
+
+## Fix 4: Update CMAPreviewContent to Display Cover Letter
+
+**Find the CMAPreviewContent component** and ensure it receives and displays the cover letter.
+
+The preview is receiving:
+```tsx
+<CMAPreviewContent
+  data={transformToCMAReportData(...)}
+  includedSections={config.includedSections}
+  sectionOrder={config.sectionOrder}
+  coverPageConfig={config.coverPageConfig}
+  coverLetterOverride={config.coverLetterOverride}  // This overrides the default
+/>
+```
+
+**Check the Cover Letter section rendering:**
+
+The Cover Letter section should:
+1. Use `coverLetterOverride` if provided (user customized for this CMA)
+2. Fall back to `data.coverLetter` (from agent profile default)
+3. Show "No cover letter set" message only if both are empty
+
+```tsx
+// In the Cover Letter section of CMAPreviewContent:
+const displayCoverLetter = coverLetterOverride || data?.coverLetter || '';
+
+{displayCoverLetter ? (
+  <div className="prose">
+    {displayCoverLetter}
+  </div>
+) : (
+  <p className="text-muted-foreground">
+    No cover letter set. Add one in Settings → Agent Profile → Default Cover Letter
+  </p>
+)}
+```
+
+---
+
+## Fix 5: Verify API Returns All Required Fields
+
+**Check the API endpoint** (`server/routes.ts` around line 4331) to ensure it returns all fields:
+
+The current endpoint returns:
+```typescript
+res.json({
+  profile: profile || null,  // agentProfiles row
+  user: user ? {
+    id: user.id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    profileImageUrl: user.profileImageUrl,
+    marketingPhone: user.marketingPhone,
+    marketingEmail: user.marketingEmail,
+    marketingDisplayName: user.marketingDisplayName,
+    marketingTitle: user.marketingTitle,
+    marketingHeadshotUrl: user.marketingHeadshotUrl,
+  } : null,
+});
+```
+
+**Verify the profile object includes these fields from agentProfiles table:**
+- `title`
+- `headshotUrl`
+- `bio`
+- `defaultCoverLetter`
+- `marketingCompany`
+
+If any fields are missing, update the storage function:
+
+```typescript
+// In server/storage.ts - getAgentProfile function
+export async function getAgentProfile(userId: string) {
+  const [profile] = await db
+    .select()
+    .from(agentProfiles)
+    .where(eq(agentProfiles.userId, userId))
+    .limit(1);
+  
+  return profile || null;  // Should return all columns
+}
+```
+
+---
+
+## Summary of Changes
+
+| Location | Change |
+|----------|--------|
+| `CMAPresentationBuilder.tsx` ~line 371-391 | Fix `agentInfo` construction to use correct field sources |
+| `CMAPresentationBuilder.tsx` | Add `fullName` to agentInfo for convenience |
+| Photo fallback | Add chain: `marketingHeadshotUrl` → `headshotUrl` → `profileImageUrl` |
+| Cover Letter | Ensure it propagates from `profile.defaultCoverLetter` through to preview |
+
+---
+
+## 📱 Mobile Optimization Requirements
+
+**All changes must be optimized for:**
+
+| Device | Browser | Screen Size |
+|--------|---------|-------------|
+| iPad Pro | Safari | 1024 x 1366 |
+| iPad Air/Mini | Safari | 768 x 1024 |
+| iPhone 14/15 Pro | Safari | 393 x 852 |
+| iPhone SE | Safari | 375 x 667 |
+| Android Tablet | Chrome | 800 x 1280 |
+| Android Phone | Chrome | 360 x 800 |
+
+### Mobile UX Checklist:
+- [x] Touch targets minimum 44x44px
+- [x] No hover-only interactions (provide touch alternatives)
+- [x] Responsive layouts (stack on mobile, side-by-side on tablet+)
+- [x] Safe area insets for notched devices
+- [x] Smooth scrolling with momentum (-webkit-overflow-scrolling: touch)
+- [x] No horizontal overflow
+- [x] Readable font sizes (min 16px for body text)
+- [x] Fast load times on mobile networks
+- [x] Works in both portrait and landscape orientations
+
+### Testing Required:
+- [ ] iPad Safari
+- [ ] iPhone Safari
+- [ ] Android Chrome (phone)
+- [ ] Android Chrome (tablet)
+
+---
+
+## Verification Checklist
+
+After applying fixes:
+
+### Preview Modal
+- [ ] Agent name displays correctly (not "Agent")
+- [ ] Agent title displays correctly
+- [ ] Agent photo displays (if uploaded in Settings)
+- [ ] Cover Letter section shows content (if set in Settings)
+- [ ] Agent Resume section shows bio (if set)
+- [ ] Company name displays correctly
+
+### Export PDF
+- [ ] Clicking Export PDF generates a file
+- [ ] PDF contains correct agent name
+- [ ] PDF contains cover letter (if set)
+- [ ] PDF contains agent photo (if set)
+- [ ] No console errors during export
+
+### Data Flow
+- [ ] Console debug log shows correct agentProfileData
+- [ ] Console debug log shows agentInfo with populated fields
+- [ ] API call to `/api/agent/profile` returns expected data
+
+---
+
+## Testing Steps
+
+1. **Verify Settings Data Exists:**
+   - Go to Settings → Agent Profile
+   - Ensure you have saved: Name, Title, Photo, Cover Letter
+   
+2. **Test Preview:**
+   - Open a CMA → Presentation Builder
+   - Click Preview
+   - Verify all agent info displays correctly
+   
+3. **Test Export PDF:**
+   - Click Export PDF
+   - Open the downloaded PDF
+   - Verify agent info is correct in the PDF
+
+4. **Check Console:**
+   - Open browser DevTools → Console
+   - Look for the debug log showing agentInfo
+   - Verify all fields have values
+
+---
+
+## If Issues Persist
+
+If cover letter still doesn't show after this fix:
+
+1. **Check if data is saved in Settings:**
+   - Go to Settings
+   - Check if Cover Letter field has content
+   - Save again to be sure
+
+2. **Check API response:**
+   - Open DevTools → Network
+   - Find the `/api/agent/profile` request
+   - Check if `profile.defaultCoverLetter` has a value
+
+3. **Check transform function:**
+   - Verify `transformToCMAReportData` includes `coverLetter` in output
+
+4. **Check preview component:**
+   - Verify `CMAPreviewContent` uses the cover letter data

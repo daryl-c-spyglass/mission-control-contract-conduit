@@ -189,8 +189,25 @@ export default function CMAPresentationBuilder() {
 
   // Fetch agent profile for cover page
   const { data: agentProfileData } = useQuery<{
-    profile: { name: string; title: string; email: string; phone: string; company: string; bio?: string; defaultCoverLetter?: string } | null;
-    user: { marketingDisplayName?: string; marketingTitle?: string; marketingHeadshotUrl?: string; marketingPhone?: string; marketingEmail?: string } | null;
+    profile: { 
+      title?: string; 
+      bio?: string; 
+      defaultCoverLetter?: string; 
+      headshotUrl?: string;
+      marketingCompany?: string;
+    } | null;
+    user: { 
+      id?: string;
+      email?: string;
+      firstName?: string; 
+      lastName?: string;
+      profileImageUrl?: string;
+      marketingDisplayName?: string; 
+      marketingTitle?: string; 
+      marketingHeadshotUrl?: string; 
+      marketingPhone?: string; 
+      marketingEmail?: string;
+    } | null;
   }>({
     queryKey: ['/api/agent/profile'],
     queryFn: async () => {
@@ -367,27 +384,57 @@ export default function CMAPresentationBuilder() {
     }
   }, [existingConfig, cma]);
 
+  // Build agent display name from available sources
+  const getAgentName = () => {
+    // Priority 1: Marketing display name (user-configured for marketing)
+    if (agentProfileData?.user?.marketingDisplayName) {
+      return agentProfileData.user.marketingDisplayName;
+    }
+    // Priority 2: User's first + last name
+    if (agentProfileData?.user?.firstName || agentProfileData?.user?.lastName) {
+      return `${agentProfileData.user.firstName || ''} ${agentProfileData.user.lastName || ''}`.trim();
+    }
+    // Priority 3: Fallback
+    return 'Agent';
+  };
+
+  const agentFullName = getAgentName();
+  const nameParts = agentFullName.split(' ');
+
   // Build agent info from profile data for CMA reports
   const agentInfo = {
-    firstName: agentProfileData?.profile?.name?.split(' ')[0] || 
-               agentProfileData?.user?.marketingDisplayName?.split(' ')[0] || 
-               'Agent',
-    lastName: agentProfileData?.profile?.name?.split(' ').slice(1).join(' ') || 
-              agentProfileData?.user?.marketingDisplayName?.split(' ').slice(1).join(' ') || 
-              '',
+    // Name - from user table, NOT profile table (profile has no 'name' field)
+    firstName: nameParts[0] || 'Agent',
+    lastName: nameParts.slice(1).join(' ') || '',
+    fullName: agentFullName,
+    
+    // Title - check profile first, then user marketing settings
     title: agentProfileData?.profile?.title || 
            agentProfileData?.user?.marketingTitle || 
            'Real Estate Professional',
-    email: agentProfileData?.profile?.email || 
-           agentProfileData?.user?.marketingEmail || 
+    
+    // Contact info - check user marketing settings first (user-configured), then profile
+    email: agentProfileData?.user?.marketingEmail || 
+           agentProfileData?.user?.email || 
            '',
-    phone: agentProfileData?.profile?.phone || 
-           agentProfileData?.user?.marketingPhone || 
+    phone: agentProfileData?.user?.marketingPhone || 
            '',
-    company: agentProfileData?.profile?.company || 'Spyglass Realty',
-    bio: agentProfileData?.profile?.bio,
-    coverLetter: agentProfileData?.profile?.defaultCoverLetter,
-    photo: agentProfileData?.user?.marketingHeadshotUrl || '',
+    
+    // Company - from profile's marketing company field
+    company: agentProfileData?.profile?.marketingCompany || 
+             'Spyglass Realty',
+    
+    // Bio - from profile
+    bio: agentProfileData?.profile?.bio || '',
+    
+    // Cover Letter - from profile's defaultCoverLetter field
+    coverLetter: agentProfileData?.profile?.defaultCoverLetter || '',
+    
+    // Photo - check multiple sources with fallback chain
+    photo: agentProfileData?.user?.marketingHeadshotUrl || 
+           agentProfileData?.profile?.headshotUrl || 
+           agentProfileData?.user?.profileImageUrl || 
+           '',
   };
 
   const saveConfigMutation = useMutation({
