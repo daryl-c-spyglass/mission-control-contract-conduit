@@ -1,0 +1,304 @@
+# Archive Section — Add Delete Transaction Button
+
+## 📋 Issue
+
+When viewing an archived transaction, users can only "Restore from Archive" but cannot **permanently delete** the transaction. The delete functionality is missing.
+
+**Current State:**
+- ✅ "Restore from Archive" button exists
+- ✅ Note says "To permanently delete, archive first, then delete from the Archive section"
+- ❌ No actual "Delete" button to permanently delete
+
+**Expected State:**
+- "Delete Transaction" button with red/destructive styling
+- Appears ABOVE "Restore from Archive"
+- Shows confirmation warning dialog before deletion
+- Warning explains this action is permanent and cannot be undone
+
+---
+
+## 🔧 Fix: Add Delete Button to Archive Transaction View
+
+### Locate the Archive Transaction Menu/Dropdown
+
+Find where "Restore from Archive" is rendered (likely in transaction-details.tsx or a dropdown menu component).
+
+### Add Delete Button with Confirmation
+
+```tsx
+// In the dropdown menu or action buttons for archived transactions
+
+import { useState } from 'react';
+import { Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+
+interface ArchiveActionsProps {
+  transaction: {
+    id: number;
+    address: string;
+  };
+  onRestore: () => void;
+  onDelete: () => void;
+}
+
+export function ArchiveActions({ transaction, onRestore, onDelete }: ArchiveActionsProps) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await onDelete();
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      {/* DELETE BUTTON - Appears FIRST/ABOVE Restore */}
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <button
+            className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 
+                       rounded-md transition-colors min-h-[44px] w-full text-left"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Delete Permanently</span>
+          </button>
+        </AlertDialogTrigger>
+        
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              Delete Transaction Permanently?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                You are about to permanently delete the transaction for:
+              </p>
+              <p className="font-semibold text-gray-900">
+                {transaction.address}
+              </p>
+              <div className="bg-red-50 border border-red-200 rounded-md p-3 mt-3">
+                <p className="text-red-800 text-sm font-medium">
+                  ⚠️ This action cannot be undone!
+                </p>
+                <p className="text-red-700 text-sm mt-1">
+                  All transaction data, documents, timeline entries, and associated 
+                  records will be permanently removed from the system.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel className="min-h-[44px]">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white min-h-[44px]"
+            >
+              {isDeleting ? 'Deleting...' : 'Yes, Delete Permanently'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Divider */}
+      <div className="border-t border-gray-200 my-1" />
+
+      {/* RESTORE BUTTON - Appears AFTER Delete */}
+      <button
+        onClick={onRestore}
+        className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-50 
+                   rounded-md transition-colors min-h-[44px] w-full text-left"
+      >
+        <RotateCcw className="w-4 h-4" />
+        <span>Restore from Archive</span>
+      </button>
+      
+      {/* Info Note */}
+      <p className="text-xs text-gray-500 px-4 py-2">
+        ℹ️ Restoring will move this transaction back to active transactions.
+      </p>
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 Backend: Add Delete Endpoint (if not exists)
+
+```typescript
+// server/routes.ts or similar
+
+// DELETE /api/transactions/:id - Permanently delete transaction
+app.delete('/api/transactions/:id', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    // Verify transaction exists and is archived
+    const transaction = await db.query.transactions.findFirst({
+      where: eq(transactions.id, parseInt(id)),
+    });
+    
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    
+    if (transaction.status !== 'archived') {
+      return res.status(400).json({ 
+        error: 'Transaction must be archived before it can be permanently deleted' 
+      });
+    }
+    
+    // Delete related records first (cascade)
+    await db.delete(documents).where(eq(documents.transactionId, parseInt(id)));
+    await db.delete(timelineEntries).where(eq(timelineEntries.transactionId, parseInt(id)));
+    await db.delete(marketingAssets).where(eq(marketingAssets.transactionId, parseInt(id)));
+    // ... delete other related records
+    
+    // Delete the transaction
+    await db.delete(transactions).where(eq(transactions.id, parseInt(id)));
+    
+    res.json({ success: true, message: 'Transaction permanently deleted' });
+  } catch (error) {
+    console.error('Error deleting transaction:', error);
+    res.status(500).json({ error: 'Failed to delete transaction' });
+  }
+});
+```
+
+---
+
+## 🔧 Frontend: Call Delete API
+
+```typescript
+// In the component or hook handling archive actions
+
+const handleDeleteTransaction = async (transactionId: number) => {
+  try {
+    const response = await fetch(`/api/transactions/${transactionId}`, {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to delete transaction');
+    }
+    
+    // Show success toast
+    toast({
+      title: 'Transaction Deleted',
+      description: 'The transaction has been permanently deleted.',
+    });
+    
+    // Navigate back to archive list or refresh
+    navigate('/archive');
+    // or: queryClient.invalidateQueries(['transactions']);
+    
+  } catch (error) {
+    toast({
+      title: 'Error',
+      description: error.message || 'Failed to delete transaction',
+      variant: 'destructive',
+    });
+  }
+};
+```
+
+---
+
+## 📋 Copy/Paste for Replit
+
+```
+Add a "Delete Permanently" button to the Archive section for transactions.
+
+## REQUIREMENTS:
+1. Add "Delete Permanently" button ABOVE "Restore from Archive"
+2. Button should be red/destructive styled (text-red-600, hover:bg-red-50)
+3. Clicking shows AlertDialog confirmation with:
+   - Warning icon + "Delete Transaction Permanently?" title
+   - Transaction address displayed
+   - Red warning box explaining action cannot be undone
+   - "Cancel" and "Yes, Delete Permanently" buttons
+4. Touch targets minimum 44px height
+
+## BUTTON ORDER IN MENU:
+1. 🗑️ Delete Permanently (red)
+2. --- divider ---
+3. ↩️ Restore from Archive
+4. ℹ️ Info note
+
+## BACKEND:
+- Add DELETE /api/transactions/:id endpoint if not exists
+- Verify transaction is archived before allowing delete
+- Delete related records (documents, timeline, marketing assets) first
+- Return success/error response
+
+## FRONTEND:
+- Call DELETE API when confirmed
+- Show success toast and navigate to /archive
+- Show error toast if fails
+
+## CONFIRMATION DIALOG TEXT:
+Title: "Delete Transaction Permanently?"
+Body: "You are about to permanently delete the transaction for: [ADDRESS]"
+Warning: "⚠️ This action cannot be undone! All transaction data, documents, timeline entries, and associated records will be permanently removed."
+```
+
+---
+
+## ✅ Expected Result
+
+**Dropdown Menu:**
+```
+┌──────────────────────────────────────┐
+│ 🗑️ Delete Permanently               │  ← Red text
+├──────────────────────────────────────┤
+│ ↩️ Restore from Archive              │
+│                                      │
+│ ℹ️ To permanently delete, archive    │
+│    first, then delete from Archive.  │
+└──────────────────────────────────────┘
+```
+
+**Confirmation Dialog:**
+```
+┌──────────────────────────────────────────────┐
+│ ⚠️ Delete Transaction Permanently?           │
+├──────────────────────────────────────────────┤
+│                                              │
+│ You are about to permanently delete:         │
+│ 7500 N M                                     │
+│                                              │
+│ ┌──────────────────────────────────────────┐ │
+│ │ ⚠️ This action cannot be undone!         │ │
+│ │ All transaction data, documents...       │ │
+│ └──────────────────────────────────────────┘ │
+│                                              │
+│              [Cancel]  [Yes, Delete]         │
+└──────────────────────────────────────────────┘
+```
+
+---
+
+## 📱 Mobile Optimization
+
+- Touch targets: min-h-[44px] on all buttons
+- Dialog is responsive and scrollable on small screens
+- Buttons stack vertically on mobile if needed

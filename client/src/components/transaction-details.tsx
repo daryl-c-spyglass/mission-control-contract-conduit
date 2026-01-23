@@ -668,6 +668,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   
   // Unarchive dialog state
   const [showUnarchiveDialog, setShowUnarchiveDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [restoreNotificationsOnUnarchive, setRestoreNotificationsOnUnarchive] = useState(true);
   
   // Property photo upload state (for Off Market listings)
@@ -1223,35 +1224,58 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {transaction.isArchived ? (
-                <DropdownMenuItem
-                  onClick={() => setShowUnarchiveDialog(true)}
-                  disabled={unarchiveTransactionMutation.isPending}
-                  className="cursor-pointer"
-                  data-testid="menu-item-restore"
-                >
-                  <ArchiveRestore className="w-4 h-4 mr-2" />
-                  Restore from Archive
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteDialog(true)}
+                    disabled={deleteTransactionMutation.isPending}
+                    className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/30"
+                    data-testid="menu-item-delete"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Permanently
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  <DropdownMenuItem
+                    onClick={() => setShowUnarchiveDialog(true)}
+                    disabled={unarchiveTransactionMutation.isPending}
+                    className="cursor-pointer"
+                    data-testid="menu-item-restore"
+                  >
+                    <ArchiveRestore className="w-4 h-4 mr-2" />
+                    Restore from Archive
+                  </DropdownMenuItem>
+                  
+                  <div className="px-2 py-1.5">
+                    <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+                      <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                      <span>Restoring will move this transaction back to active transactions.</span>
+                    </p>
+                  </div>
+                </>
               ) : (
-                <DropdownMenuItem
-                  onClick={() => archiveTransactionMutation.mutate()}
-                  disabled={archiveTransactionMutation.isPending}
-                  className="cursor-pointer"
-                  data-testid="menu-item-archive"
-                >
-                  <Archive className="w-4 h-4 mr-2" />
-                  Archive Transaction
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem
+                    onClick={() => archiveTransactionMutation.mutate()}
+                    disabled={archiveTransactionMutation.isPending}
+                    className="cursor-pointer"
+                    data-testid="menu-item-archive"
+                  >
+                    <Archive className="w-4 h-4 mr-2" />
+                    Archive Transaction
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  <div className="px-2 py-1.5">
+                    <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+                      <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                      <span>To permanently delete, archive first, then delete from the Archive section.</span>
+                    </p>
+                  </div>
+                </>
               )}
-              
-              <DropdownMenuSeparator />
-              
-              <div className="px-2 py-1.5">
-                <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                  <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                  <span>To permanently delete, archive first, then delete from the Archive section.</span>
-                </p>
-              </div>
             </DropdownMenuContent>
           </DropdownMenu>
           
@@ -1314,6 +1338,48 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                   disabled={unarchiveTransactionMutation.isPending}
                 >
                   {unarchiveTransactionMutation.isPending ? "Restoring..." : "Restore Transaction"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          
+          {/* Delete Transaction Permanently Dialog */}
+          <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                  <Trash2 className="w-5 h-5" />
+                  Delete Transaction Permanently?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="space-y-4">
+                  <p>
+                    You are about to permanently delete the transaction for:
+                  </p>
+                  <p className="font-semibold text-foreground">
+                    {transaction.propertyAddress}
+                  </p>
+                  <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md p-3">
+                    <p className="text-red-800 dark:text-red-200 text-sm font-medium">
+                      This action cannot be undone!
+                    </p>
+                    <p className="text-red-700 dark:text-red-300 text-sm mt-1">
+                      All transaction data, documents, timeline entries, and associated 
+                      records will be permanently removed from the system.
+                    </p>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    deleteTransactionMutation.mutate();
+                    setShowDeleteDialog(false);
+                  }}
+                  disabled={deleteTransactionMutation.isPending}
+                  className="bg-red-600 hover:bg-red-700 text-white focus:ring-red-600"
+                >
+                  {deleteTransactionMutation.isPending ? "Deleting..." : "Yes, Delete Permanently"}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
