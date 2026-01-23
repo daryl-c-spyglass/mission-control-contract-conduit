@@ -1,0 +1,652 @@
+# Update Theme System - Add System Mode, Flash Prevention & Settings UI
+
+## Overview
+Update the Contract Conduit theme system to support **Light/Dark/System** modes with proper flash prevention and Settings page integration.
+
+---
+
+## Current Issues Being Fixed
+
+| Issue | Current State | After Fix |
+|-------|---------------|-----------|
+| No "System" mode | Only light/dark toggle | Light/Dark/System options |
+| Flash on page load | Theme set after React hydrates | Inline script prevents flash |
+| No real-time system tracking | Only checks on mount | Listens for OS theme changes |
+| No Settings UI | Toggle only in header | Full theme controls in Settings |
+| Limited toggle UI | Simple icon button | Dropdown with 3 options |
+
+---
+
+## Files to Modify
+
+1. `client/src/hooks/use-theme.ts` - Add system mode support
+2. `client/src/components/theme-toggle.tsx` - Add dropdown with 3 options
+3. `client/index.html` - Add flash prevention script
+4. `client/src/pages/settings.tsx` - Add theme section
+
+---
+
+## 1. UPDATE: use-theme.ts
+
+**File:** `client/src/hooks/use-theme.ts`
+
+Replace the entire file with:
+
+```typescript
+import { useState, useEffect, useCallback } from "react";
+
+// Theme types
+export type ThemeMode = "light" | "dark" | "system";
+export type ResolvedTheme = "light" | "dark";
+
+const STORAGE_KEY = "theme";
+
+// Get system preference
+function getSystemTheme(): ResolvedTheme {
+  if (typeof window === "undefined") return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+// Resolve theme mode to actual theme
+function resolveTheme(mode: ThemeMode): ResolvedTheme {
+  if (mode === "system") {
+    return getSystemTheme();
+  }
+  return mode;
+}
+
+// Get initial theme from localStorage
+function getStoredTheme(): ThemeMode {
+  if (typeof window === "undefined") return "system";
+  
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored === "light" || stored === "dark" || stored === "system") {
+    return stored;
+  }
+  return "system"; // Default to system
+}
+
+// Apply theme to document
+function applyTheme(resolved: ResolvedTheme) {
+  const root = document.documentElement;
+  
+  // Remove both classes
+  root.classList.remove("light", "dark");
+  
+  // Add resolved theme class
+  root.classList.add(resolved);
+  
+  // Set data attribute for CSS selectors
+  root.setAttribute("data-theme", resolved);
+  
+  // Update meta theme-color
+  const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+  if (metaThemeColor) {
+    metaThemeColor.setAttribute(
+      "content",
+      resolved === "dark" ? "#1a1612" : "#f5f2ef"
+    );
+  }
+}
+
+export function useTheme() {
+  const [mode, setModeState] = useState<ThemeMode>(getStoredTheme);
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => 
+    resolveTheme(getStoredTheme())
+  );
+
+  // Apply theme when mode changes
+  useEffect(() => {
+    const resolved = resolveTheme(mode);
+    setResolvedTheme(resolved);
+    applyTheme(resolved);
+  }, [mode]);
+
+  // Listen for system preference changes when in "system" mode
+  useEffect(() => {
+    if (mode !== "system") return;
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    
+    const handleChange = (e: MediaQueryListEvent) => {
+      const resolved = e.matches ? "dark" : "light";
+      setResolvedTheme(resolved);
+      applyTheme(resolved);
+    };
+
+    // Modern browsers
+    mediaQuery.addEventListener("change", handleChange);
+    
+    return () => {
+      mediaQuery.removeEventListener("change", handleChange);
+    };
+  }, [mode]);
+
+  // Listen for cross-tab storage changes
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY) {
+        const newMode = e.newValue as ThemeMode;
+        if (newMode === "light" || newMode === "dark" || newMode === "system") {
+          setModeState(newMode);
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  // Set theme mode and persist
+  const setTheme = useCallback((newMode: ThemeMode) => {
+    setModeState(newMode);
+    localStorage.setItem(STORAGE_KEY, newMode);
+  }, []);
+
+  // Toggle between light and dark (for quick toggle)
+  const toggleTheme = useCallback(() => {
+    const nextResolved = resolvedTheme === "light" ? "dark" : "light";
+    setTheme(nextResolved);
+  }, [resolvedTheme, setTheme]);
+
+  return {
+    // The user's selected mode (light/dark/system)
+    mode,
+    // The actual applied theme (light/dark)
+    theme: resolvedTheme,
+    resolvedTheme,
+    // Setters
+    setTheme,
+    toggleTheme,
+    // Convenience boolean
+    isDark: resolvedTheme === "dark",
+  };
+}
+```
+
+---
+
+## 2. UPDATE: theme-toggle.tsx
+
+**File:** `client/src/components/theme-toggle.tsx`
+
+Replace the entire file with:
+
+```tsx
+import { useState, useRef, useEffect } from "react";
+import { Moon, Sun, Monitor, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useTheme, ThemeMode } from "@/hooks/use-theme";
+
+const THEME_OPTIONS: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
+];
+
+export function ThemeToggle() {
+  const { mode, resolvedTheme, setTheme } = useTheme();
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Close on escape key
+  useEffect(() => {
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+    
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, []);
+
+  // Get current icon based on resolved theme
+  const CurrentIcon = resolvedTheme === "dark" ? Moon : Sun;
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      {/* Toggle Button */}
+      <Button
+        size="icon"
+        variant="ghost"
+        onClick={() => setIsOpen(!isOpen)}
+        aria-label="Toggle theme"
+        aria-expanded={isOpen}
+        data-testid="button-theme-toggle"
+        className="min-h-[44px] min-w-[44px] touch-manipulation"
+      >
+        <CurrentIcon className="h-5 w-5" />
+      </Button>
+
+      {/* Dropdown Menu */}
+      {isOpen && (
+        <div 
+          className="absolute right-0 mt-2 w-40 bg-card border border-border rounded-lg 
+                   shadow-lg py-1 z-50 animate-in fade-in-0 zoom-in-95 duration-100"
+          role="menu"
+          aria-orientation="vertical"
+        >
+          {THEME_OPTIONS.map((option) => {
+            const Icon = option.icon;
+            const isSelected = mode === option.value;
+            
+            return (
+              <button
+                key={option.value}
+                onClick={() => {
+                  setTheme(option.value);
+                  setIsOpen(false);
+                }}
+                className={`
+                  w-full flex items-center gap-3 px-4 py-3 min-h-[44px]
+                  text-left text-sm transition-colors touch-manipulation
+                  ${isSelected 
+                    ? "bg-primary/10 text-primary font-medium" 
+                    : "text-foreground hover:bg-muted"
+                  }
+                `}
+                role="menuitem"
+              >
+                <Icon className="h-4 w-4" />
+                <span className="flex-1">{option.label}</span>
+                {isSelected && <Check className="h-4 w-4" />}
+              </button>
+            );
+          })}
+          
+          {/* Current mode indicator */}
+          {mode === "system" && (
+            <div className="px-4 py-2 border-t border-border">
+              <p className="text-xs text-muted-foreground">
+                Currently: {resolvedTheme === "dark" ? "Dark" : "Light"}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Simple toggle version (optional export for compact UIs)
+export function ThemeToggleSimple() {
+  const { toggleTheme, resolvedTheme } = useTheme();
+  const Icon = resolvedTheme === "dark" ? Moon : Sun;
+  
+  return (
+    <Button
+      size="icon"
+      variant="ghost"
+      onClick={toggleTheme}
+      aria-label={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} mode`}
+      data-testid="button-theme-toggle-simple"
+      className="min-h-[44px] min-w-[44px] touch-manipulation"
+    >
+      <Icon className="h-5 w-5" />
+    </Button>
+  );
+}
+```
+
+---
+
+## 3. UPDATE: index.html
+
+**File:** `client/index.html`
+
+Add the flash prevention script in the `<head>` section, **before** any other scripts:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  
+  <!-- Theme color meta tags -->
+  <meta name="theme-color" content="#1a1612" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f5f2ef" media="(prefers-color-scheme: light)" />
+  
+  <!-- iOS WebView -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  
+  <title>Contract Conduit</title>
+  
+  <!-- 🔥 FLASH PREVENTION SCRIPT - Must be before any other scripts -->
+  <script>
+    (function() {
+      try {
+        var stored = localStorage.getItem('theme');
+        var mode = stored || 'system';
+        var resolved;
+        
+        if (mode === 'system') {
+          resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        } else {
+          resolved = mode;
+        }
+        
+        document.documentElement.classList.add(resolved);
+        document.documentElement.setAttribute('data-theme', resolved);
+        
+        // Update theme-color meta tag
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) {
+          meta.setAttribute('content', resolved === 'dark' ? '#1a1612' : '#f5f2ef');
+        }
+      } catch (e) {
+        // Fallback to light if localStorage fails
+        document.documentElement.classList.add('light');
+      }
+    })();
+  </script>
+  
+  <!-- Rest of head content... -->
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>
+```
+
+---
+
+## 4. UPDATE: settings.tsx
+
+**File:** `client/src/pages/settings.tsx`
+
+Add a Theme section to the Settings page. Find the appropriate location in the existing Settings component and add this section:
+
+```tsx
+// Add this import at the top
+import { useTheme, ThemeMode } from "@/hooks/use-theme";
+import { Sun, Moon, Monitor, Check } from "lucide-react";
+
+// Inside the Settings component, add this section
+// (Find the appropriate location, likely after other settings sections)
+
+function ThemeSettings() {
+  const { mode, resolvedTheme, setTheme } = useTheme();
+
+  const themeOptions: { value: ThemeMode; label: string; description: string; icon: typeof Sun }[] = [
+    { 
+      value: "light", 
+      label: "Light", 
+      description: "Always use light mode",
+      icon: Sun 
+    },
+    { 
+      value: "dark", 
+      label: "Dark", 
+      description: "Always use dark mode",
+      icon: Moon 
+    },
+    { 
+      value: "system", 
+      label: "System", 
+      description: "Automatically match your device settings",
+      icon: Monitor 
+    },
+  ];
+
+  return (
+    <div className="bg-card rounded-xl p-6 border border-border">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
+          {resolvedTheme === "dark" ? (
+            <Moon className="w-5 h-5 text-primary" />
+          ) : (
+            <Sun className="w-5 h-5 text-primary" />
+          )}
+        </div>
+        <div>
+          <h3 className="font-semibold text-foreground">Appearance</h3>
+          <p className="text-sm text-muted-foreground">
+            Customize how Contract Conduit looks on your device
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {themeOptions.map((option) => {
+          const Icon = option.icon;
+          const isSelected = mode === option.value;
+          
+          return (
+            <button
+              key={option.value}
+              onClick={() => setTheme(option.value)}
+              className={`
+                w-full flex items-center gap-4 p-4 rounded-lg border-2 
+                transition-all touch-manipulation min-h-[72px]
+                ${isSelected 
+                  ? "border-primary bg-primary/5" 
+                  : "border-border hover:border-muted-foreground/30 hover:bg-muted/50"
+                }
+              `}
+            >
+              <div className={`
+                w-10 h-10 rounded-lg flex items-center justify-center
+                ${isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}
+              `}>
+                <Icon className="w-5 h-5" />
+              </div>
+              
+              <div className="flex-1 text-left">
+                <p className={`font-medium ${isSelected ? "text-primary" : "text-foreground"}`}>
+                  {option.label}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {option.description}
+                </p>
+              </div>
+              
+              {isSelected && (
+                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                  <Check className="w-4 h-4 text-primary-foreground" />
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Current state indicator when in system mode */}
+      {mode === "system" && (
+        <div className="mt-4 p-3 bg-muted rounded-lg">
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium">Current appearance:</span>{" "}
+            {resolvedTheme === "dark" ? "Dark" : "Light"} (based on your device settings)
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Then use <ThemeSettings /> in the Settings page JSX
+// Add it in the appropriate location among other settings sections
+```
+
+**Where to add in Settings page:**
+
+Look for the settings sections and add `<ThemeSettings />` as a new section. For example:
+
+```tsx
+// In the Settings page return/JSX, find where other sections are:
+
+return (
+  <div className="space-y-6 p-6">
+    <h1 className="text-2xl font-bold">Settings</h1>
+    
+    {/* ... existing sections ... */}
+    
+    {/* Add Theme Settings section */}
+    <ThemeSettings />
+    
+    {/* ... Social Media Links section ... */}
+    {/* ... Gmail Integration section ... */}
+    {/* ... Slack Notifications section ... */}
+  </div>
+);
+```
+
+---
+
+## 5. UPDATE: index.css (Optional Enhancement)
+
+**File:** `client/src/index.css`
+
+Add smooth theme transitions (add after existing styles):
+
+```css
+/* Theme transition for smooth switching */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background-color 0.2s ease, 
+              border-color 0.2s ease, 
+              color 0.2s ease !important;
+  transition-delay: 0 !important;
+}
+
+/* Touch manipulation utility */
+.touch-manipulation {
+  touch-action: manipulation;
+}
+```
+
+Then update the `use-theme.ts` to add/remove the transition class:
+
+```typescript
+// In applyTheme function, add transition handling:
+function applyTheme(resolved: ResolvedTheme) {
+  const root = document.documentElement;
+  
+  // Add transition class for smooth switching
+  root.classList.add("theme-transition");
+  
+  // Remove both classes
+  root.classList.remove("light", "dark");
+  
+  // Add resolved theme class
+  root.classList.add(resolved);
+  
+  // Set data attribute
+  root.setAttribute("data-theme", resolved);
+  
+  // Update meta theme-color
+  const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+  if (metaThemeColor) {
+    metaThemeColor.setAttribute(
+      "content",
+      resolved === "dark" ? "#1a1612" : "#f5f2ef"
+    );
+  }
+  
+  // Remove transition class after animation completes
+  setTimeout(() => {
+    root.classList.remove("theme-transition");
+  }, 200);
+}
+```
+
+---
+
+## 📱 Mobile Optimization Requirements
+
+**All changes must be optimized for:**
+
+| Device | Browser | Screen Size |
+|--------|---------|-------------|
+| iPad Pro | Safari | 1024 x 1366 |
+| iPad Air/Mini | Safari | 768 x 1024 |
+| iPhone 14/15 Pro | Safari | 393 x 852 |
+| iPhone SE | Safari | 375 x 667 |
+| Android Tablet | Chrome | 800 x 1280 |
+| Android Phone | Chrome | 360 x 800 |
+
+### Mobile UX Checklist:
+- [x] Touch targets minimum 44x44px (all buttons, theme options)
+- [x] No hover-only interactions (touch alternatives provided)
+- [x] Responsive layouts (dropdown adapts to screen size)
+- [x] Safe area insets for notched devices
+- [x] Smooth scrolling with momentum
+- [x] No horizontal overflow
+- [x] Readable font sizes (min 16px for body text)
+- [x] Fast load times (flash prevention reduces perceived load time)
+- [x] Works in both portrait and landscape orientations
+
+### Testing Required:
+- [ ] iPad Safari
+- [ ] iPhone Safari
+- [ ] Android Chrome (phone)
+- [ ] Android Chrome (tablet)
+
+---
+
+## Verification Checklist
+
+### Theme Hook
+- [ ] `mode` returns "light" | "dark" | "system"
+- [ ] `resolvedTheme` returns actual applied theme
+- [ ] `isDark` boolean works correctly
+- [ ] Theme persists after page refresh
+- [ ] Cross-tab sync works (change in one tab reflects in another)
+
+### System Mode
+- [ ] Selecting "System" uses OS preference
+- [ ] Changing OS theme updates app in real-time
+- [ ] "Currently: Light/Dark" indicator shows in system mode
+
+### Flash Prevention
+- [ ] No white flash when loading in dark mode
+- [ ] No dark flash when loading in light mode
+- [ ] Theme applies before React hydrates
+
+### Theme Toggle (Header)
+- [ ] Dropdown shows Light/Dark/System options
+- [ ] Checkmark indicates current selection
+- [ ] Dropdown closes on outside click
+- [ ] Dropdown closes on Escape key
+- [ ] Touch targets are 44px minimum
+
+### Settings Page
+- [ ] Theme section appears in Settings
+- [ ] All 3 options (Light/Dark/System) are selectable
+- [ ] Selected option shows checkmark/highlight
+- [ ] System mode shows "Current appearance" indicator
+
+### Mobile Testing
+- [ ] Theme toggle works on touch devices
+- [ ] Settings theme options are touch-friendly
+- [ ] No layout issues on small screens
+- [ ] Dropdown doesn't overflow screen edges
+
+---
+
+## Summary of Changes
+
+| File | Change |
+|------|--------|
+| `use-theme.ts` | Added "system" mode, OS preference tracking |
+| `theme-toggle.tsx` | Dropdown with 3 options instead of simple toggle |
+| `index.html` | Flash prevention script in `<head>` |
+| `settings.tsx` | New Theme/Appearance section |
+| `index.css` | (Optional) Smooth transition classes |

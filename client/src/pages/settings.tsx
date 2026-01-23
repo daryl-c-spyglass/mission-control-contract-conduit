@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Trash2, Loader2, UserPlus, Save, Mail, CheckCircle2, ExternalLink, User, Camera, Bell, FileText, Sparkles, Link as LinkIcon } from "lucide-react";
+import { Plus, Trash2, Loader2, UserPlus, Save, Mail, CheckCircle2, ExternalLink, User, Camera, Bell, FileText, Sparkles, Link as LinkIcon, Sun, Moon, Monitor, Check } from "lucide-react";
 import { SiFacebook, SiInstagram, SiLinkedin, SiX } from "react-icons/si";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
+import { useTheme, ThemeMode } from "@/hooks/use-theme";
 import type { AgentProfile } from "@shared/schema";
 import {
   Dialog,
@@ -39,6 +40,102 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Coordinator } from "@shared/schema";
+
+function ThemeSettingsSection() {
+  const { mode, resolvedTheme, setTheme } = useTheme();
+
+  const themeOptions: { value: ThemeMode; label: string; description: string; icon: typeof Sun }[] = [
+    { 
+      value: "light", 
+      label: "Light", 
+      description: "Always use light mode",
+      icon: Sun 
+    },
+    { 
+      value: "dark", 
+      label: "Dark", 
+      description: "Always use dark mode",
+      icon: Moon 
+    },
+    { 
+      value: "system", 
+      label: "System", 
+      description: "Match your device settings",
+      icon: Monitor 
+    },
+  ];
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
+            {resolvedTheme === "dark" ? (
+              <Moon className="h-5 w-5 text-primary" />
+            ) : (
+              <Sun className="h-5 w-5 text-primary" />
+            )}
+          </div>
+          <div>
+            <CardTitle>Appearance</CardTitle>
+            <CardDescription>
+              Customize how Contract Conduit looks on your device
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {themeOptions.map((option) => {
+            const Icon = option.icon;
+            const isSelected = mode === option.value;
+            
+            return (
+              <button
+                key={option.value}
+                onClick={() => setTheme(option.value)}
+                className={`
+                  relative flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all
+                  ${isSelected 
+                    ? "border-primary bg-primary/5" 
+                    : "border-border hover:border-primary/50 hover:bg-muted/50"
+                  }
+                `}
+                data-testid={`theme-setting-${option.value}`}
+              >
+                {isSelected && (
+                  <div className="absolute top-2 right-2">
+                    <Check className="h-4 w-4 text-primary" />
+                  </div>
+                )}
+                <div className={`
+                  w-12 h-12 rounded-full flex items-center justify-center
+                  ${isSelected ? "bg-primary/20" : "bg-muted"}
+                `}>
+                  <Icon className={`h-6 w-6 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+                </div>
+                <div className="text-center">
+                  <p className={`font-medium ${isSelected ? "text-primary" : ""}`}>
+                    {option.label}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {option.description}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        
+        {mode === "system" && (
+          <p className="text-sm text-muted-foreground mt-4 text-center">
+            Currently using <span className="font-medium">{resolvedTheme === "dark" ? "dark" : "light"}</span> mode based on your device settings
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Settings() {
   const { toast } = useToast();
@@ -484,6 +581,8 @@ export default function Settings() {
           </div>
         </CardContent>
       </Card>
+
+      <ThemeSettingsSection />
 
       <Card>
         <CardHeader>

@@ -1,54 +1,119 @@
 import { useState, useEffect, useCallback } from "react";
 
-type Theme = "light" | "dark";
+// Theme types
+export type ThemeMode = "light" | "dark" | "system";
+export type ResolvedTheme = "light" | "dark";
+
+const STORAGE_KEY = "theme";
+
+// Get system preference
+function getSystemTheme(): ResolvedTheme {
+  if (typeof window === "undefined") return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+// Resolve theme mode to actual theme
+function resolveTheme(mode: ThemeMode): ResolvedTheme {
+  if (mode === "system") {
+    return getSystemTheme();
+  }
+  return mode;
+}
+
+// Get initial theme from localStorage
+function getStoredTheme(): ThemeMode {
+  if (typeof window === "undefined") return "system";
+  
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored === "light" || stored === "dark" || stored === "system") {
+    return stored;
+  }
+  return "system";
+}
+
+// Apply theme to document
+function applyTheme(resolved: ResolvedTheme) {
+  const root = document.documentElement;
+  
+  root.classList.remove("light", "dark");
+  root.classList.add(resolved);
+  root.setAttribute("data-theme", resolved);
+  
+  // Update meta theme-color
+  const metaThemeColor = document.querySelector('meta[name="theme-color"]:not([media])');
+  if (metaThemeColor) {
+    metaThemeColor.setAttribute(
+      "content",
+      resolved === "dark" ? "#1a1612" : "#f5f2ef"
+    );
+  }
+}
 
 export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>("light");
+  const [mode, setModeState] = useState<ThemeMode>(getStoredTheme);
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => 
+    resolveTheme(getStoredTheme())
+  );
 
+  // Apply theme when mode changes
   useEffect(() => {
-    // Initial theme from localStorage or system preference
-    const stored = localStorage.getItem("theme") as Theme | null;
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const initial = stored || (prefersDark ? "dark" : "light");
-    setThemeState(initial);
-    // Apply initial theme class to DOM
-    document.documentElement.classList.toggle("dark", initial === "dark");
+    const resolved = resolveTheme(mode);
+    setResolvedTheme(resolved);
+    applyTheme(resolved);
+  }, [mode]);
 
-    // Listen for theme changes via storage event (cross-tab) or class mutations
-    const observer = new MutationObserver(() => {
-      const isDark = document.documentElement.classList.contains("dark");
-      setThemeState(isDark ? "dark" : "light");
-    });
+  // Listen for system preference changes when in "system" mode
+  useEffect(() => {
+    if (mode !== "system") return;
 
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    
+    const handleChange = (e: MediaQueryListEvent) => {
+      const resolved = e.matches ? "dark" : "light";
+      setResolvedTheme(resolved);
+      applyTheme(resolved);
+    };
 
-    // Also listen for storage events (cross-tab sync)
+    mediaQuery.addEventListener("change", handleChange);
+    
+    return () => {
+      mediaQuery.removeEventListener("change", handleChange);
+    };
+  }, [mode]);
+
+  // Listen for cross-tab storage changes
+  useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === "theme" && (e.newValue === "light" || e.newValue === "dark")) {
-        setThemeState(e.newValue);
+      if (e.key === STORAGE_KEY) {
+        const newMode = e.newValue as ThemeMode;
+        if (newMode === "light" || newMode === "dark" || newMode === "system") {
+          setModeState(newMode);
+        }
       }
     };
+
     window.addEventListener("storage", handleStorage);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("storage", handleStorage);
-    };
+    return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
-  const setTheme = useCallback((newTheme: Theme) => {
-    setThemeState(newTheme);
-    localStorage.setItem("theme", newTheme);
-    document.documentElement.classList.toggle("dark", newTheme === "dark");
+  // Set theme mode and persist
+  const setTheme = useCallback((newMode: ThemeMode) => {
+    setModeState(newMode);
+    localStorage.setItem(STORAGE_KEY, newMode);
   }, []);
 
+  // Toggle between light and dark (for quick toggle)
   const toggleTheme = useCallback(() => {
-    const next = theme === "light" ? "dark" : "light";
-    setTheme(next);
-  }, [theme, setTheme]);
+    const nextResolved = resolvedTheme === "light" ? "dark" : "light";
+    setTheme(nextResolved);
+  }, [resolvedTheme, setTheme]);
 
-  return { theme, setTheme, toggleTheme, isDark: theme === "dark" };
+  return {
+    mode,
+    theme: resolvedTheme,
+    resolvedTheme,
+    setTheme,
+    toggleTheme,
+    isDark: resolvedTheme === "dark",
+  };
 }
