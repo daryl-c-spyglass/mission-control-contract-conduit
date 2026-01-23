@@ -8,7 +8,8 @@ import {
   Filter, 
   X, 
   ChevronDown,
-  Search
+  Search,
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,13 +74,15 @@ export function TransactionToolbar({
             data-testid="input-search-transactions"
           />
           {filters.search && (
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => onFiltersChange({ search: "" })}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-1 top-1/2 -translate-y-1/2"
               data-testid="button-clear-search"
             >
               <X className="h-4 w-4" />
-            </button>
+            </Button>
           )}
         </div>
 
@@ -97,18 +100,19 @@ export function TransactionToolbar({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              {SORT_OPTIONS.map((option) => (
-                <DropdownMenuItem
-                  key={`${option.field}-${option.direction}`}
-                  onClick={() => onSortChange(option)}
-                  className={sort.field === option.field && sort.direction === option.direction 
-                    ? "bg-accent text-accent-foreground" 
-                    : ""}
-                  data-testid={`sort-${option.field}-${option.direction}`}
-                >
-                  {option.label}
-                </DropdownMenuItem>
-              ))}
+              {SORT_OPTIONS.map((option) => {
+                const isSelected = sort.field === option.field && sort.direction === option.direction;
+                return (
+                  <DropdownMenuItem
+                    key={`${option.field}-${option.direction}`}
+                    onClick={() => onSortChange(option)}
+                    data-testid={`sort-${option.field}-${option.direction}`}
+                  >
+                    {isSelected && <Check className="mr-2 h-4 w-4" />}
+                    {option.label}
+                  </DropdownMenuItem>
+                );
+              })}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -121,38 +125,35 @@ export function TransactionToolbar({
             <Filter className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Filters</span>
             {activeFilterCount > 0 && (
-              <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 flex items-center justify-center">
+              <Badge variant="secondary" className="ml-2">
                 {activeFilterCount}
               </Badge>
             )}
           </Button>
 
-          <div className="flex items-center border border-input rounded-md overflow-visible">
+          <div className="flex items-center gap-1">
             <Button
-              variant={viewMode === "grid" ? "default" : "ghost"}
+              variant={viewMode === "grid" ? "default" : "outline"}
               size="icon"
               onClick={() => onViewModeChange("grid")}
-              className="rounded-r-none border-0"
               title="Grid View"
               data-testid="button-view-grid"
             >
               <LayoutGrid className="h-4 w-4" />
             </Button>
             <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
+              variant={viewMode === "list" ? "default" : "outline"}
               size="icon"
               onClick={() => onViewModeChange("list")}
-              className="rounded-none border-x border-input"
               title="List View"
               data-testid="button-view-list"
             >
               <List className="h-4 w-4" />
             </Button>
             <Button
-              variant={viewMode === "table" ? "default" : "ghost"}
+              variant={viewMode === "table" ? "default" : "outline"}
               size="icon"
               onClick={() => onViewModeChange("table")}
-              className="rounded-l-none border-0"
               title="Table View"
               data-testid="button-view-table"
             >
@@ -171,7 +172,6 @@ export function TransactionToolbar({
                 variant="ghost"
                 size="sm"
                 onClick={onResetFilters}
-                className="text-primary h-auto p-0"
                 data-testid="button-clear-filters"
               >
                 Clear All
@@ -283,10 +283,10 @@ export function TransactionToolbar({
                 variant="ghost"
                 size="sm"
                 onClick={onResetFilters}
-                className="ml-2 text-primary h-auto p-0"
+                className="ml-2"
                 data-testid="button-clear-filters-inline"
               >
-                (Clear filters)
+                Clear filters
               </Button>
             )}
           </span>

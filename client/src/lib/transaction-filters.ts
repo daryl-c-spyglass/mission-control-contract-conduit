@@ -36,7 +36,9 @@ export const SORT_OPTIONS: SortOption[] = [
   { label: "Closing Soon", field: "closingDate", direction: "asc" },
   { label: "Closing Later", field: "closingDate", direction: "desc" },
   { label: "Status", field: "status", direction: "asc" },
-  { label: "Days Remaining", field: "daysRemaining", direction: "asc" },
+  { label: "Status (Reverse)", field: "status", direction: "desc" },
+  { label: "Fewest Days", field: "daysRemaining", direction: "asc" },
+  { label: "Most Days", field: "daysRemaining", direction: "desc" },
 ];
 
 export const STATUS_OPTIONS = [

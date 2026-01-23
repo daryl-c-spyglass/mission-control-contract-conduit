@@ -1,0 +1,486 @@
+# Fix Social Media Links URL Validation
+
+## Problem
+When saving Social Media Links in Settings, users get "Invalid url" errors because:
+- Users enter: `www.test.facebook.com`
+- Validation expects: `https://www.test.facebook.com`
+
+The current Zod validation requires full URLs with protocol, but users naturally omit `https://`.
+
+---
+
+## Solution
+1. Auto-prepend `https://` if user doesn't include protocol
+2. Allow empty strings (optional fields)
+3. Show user-friendly validation errors
+4. Transform/normalize URLs before saving
+
+---
+
+## Implementation
+
+### Option 1: Client-Side Fix (Recommended)
+
+#### Update the Social Links Form Component
+
+```tsx
+// client/src/components/settings/SocialLinksForm.tsx
+
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Facebook, Instagram, Linkedin, Twitter, Globe, Save } from "lucide-react";
+
+interface SocialLinks {
+  facebookUrl: string;
+  instagramUrl: string;
+  linkedinUrl: string;
+  twitterUrl: string;
+  websiteUrl: string;
+}
+
+// Helper function to normalize URL
+function normalizeUrl(url: string): string {
+  if (!url || url.trim() === "") return "";
+  
+  let normalized = url.trim();
+  
+  // If URL doesn't start with http:// or https://, add https://
+  if (normalized && !normalized.match(/^https?:\/\//i)) {
+    normalized = `https://${normalized}`;
+  }
+  
+  return normalized;
+}
+
+// Helper function to validate URL format
+function isValidUrl(url: string): boolean {
+  if (!url || url.trim() === "") return true; // Empty is valid (optional field)
+  
+  try {
+    const normalized = normalizeUrl(url);
+    new URL(normalized);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Helper to display URL without protocol for cleaner UI
+function displayUrl(url: string): string {
+  if (!url) return "";
+  return url.replace(/^https?:\/\//i, "");
+}
+
+export function SocialLinksForm({ initialData }: { initialData?: SocialLinks }) {
+  const [formData, setFormData] = useState<SocialLinks>({
+    facebookUrl: displayUrl(initialData?.facebookUrl || ""),
+    instagramUrl: displayUrl(initialData?.instagramUrl || ""),
+    linkedinUrl: displayUrl(initialData?.linkedinUrl || ""),
+    twitterUrl: displayUrl(initialData?.twitterUrl || ""),
+    websiteUrl: displayUrl(initialData?.websiteUrl || ""),
+  });
+  
+  const [errors, setErrors] = useState<Partial<Record<keyof SocialLinks, string>>>({});
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (data: SocialLinks) => {
+      const response = await fetch("/api/user/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to save");
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
+      // Show success toast
+    },
+    onError: (error) => {
+      // Show error toast
+      console.error("Failed to save social links:", error);
+    },
+  });
+
+  const handleChange = (field: keyof SocialLinks, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Partial<Record<keyof SocialLinks, string>> = {};
+    
+    // Validate each URL
+    Object.entries(formData).forEach(([key, value]) => {
+      if (value && !isValidUrl(value)) {
+        newErrors[key as keyof SocialLinks] = "Please enter a valid URL";
+      }
+    });
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) return;
+    
+    // Normalize all URLs before sending to server
+    const normalizedData: SocialLinks = {
+      facebookUrl: normalizeUrl(formData.facebookUrl),
+      instagramUrl: normalizeUrl(formData.instagramUrl),
+      linkedinUrl: normalizeUrl(formData.linkedinUrl),
+      twitterUrl: normalizeUrl(formData.twitterUrl),
+      websiteUrl: normalizeUrl(formData.websiteUrl),
+    };
+    
+    mutation.mutate(normalizedData);
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div className="bg-gray-800 rounded-xl p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+            <Globe className="w-5 h-5 text-green-500" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-white">Social Media Links</h3>
+            <p className="text-sm text-gray-400">Add your social media profiles to display in CMA reports</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Facebook */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-1">
+              <Facebook className="w-4 h-4 text-blue-500" />
+              Facebook
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                https://
+              </span>
+              <input
+                type="text"
+                value={formData.facebookUrl}
+                onChange={(e) => handleChange("facebookUrl", e.target.value)}
+                placeholder="www.facebook.com/yourprofile"
+                className={`w-full pl-16 pr-4 py-2 bg-gray-900 border rounded-lg text-white
+                  placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50
+                  ${errors.facebookUrl ? "border-red-500" : "border-gray-700"}
+                `}
+              />
+            </div>
+            {errors.facebookUrl && (
+              <p className="text-red-400 text-xs mt-1">{errors.facebookUrl}</p>
+            )}
+          </div>
+
+          {/* Instagram */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-1">
+              <Instagram className="w-4 h-4 text-pink-500" />
+              Instagram
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                https://
+              </span>
+              <input
+                type="text"
+                value={formData.instagramUrl}
+                onChange={(e) => handleChange("instagramUrl", e.target.value)}
+                placeholder="www.instagram.com/yourprofile"
+                className={`w-full pl-16 pr-4 py-2 bg-gray-900 border rounded-lg text-white
+                  placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50
+                  ${errors.instagramUrl ? "border-red-500" : "border-gray-700"}
+                `}
+              />
+            </div>
+            {errors.instagramUrl && (
+              <p className="text-red-400 text-xs mt-1">{errors.instagramUrl}</p>
+            )}
+          </div>
+
+          {/* LinkedIn */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-1">
+              <Linkedin className="w-4 h-4 text-blue-400" />
+              LinkedIn
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                https://
+              </span>
+              <input
+                type="text"
+                value={formData.linkedinUrl}
+                onChange={(e) => handleChange("linkedinUrl", e.target.value)}
+                placeholder="www.linkedin.com/in/yourprofile"
+                className={`w-full pl-16 pr-4 py-2 bg-gray-900 border rounded-lg text-white
+                  placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50
+                  ${errors.linkedinUrl ? "border-red-500" : "border-gray-700"}
+                `}
+              />
+            </div>
+            {errors.linkedinUrl && (
+              <p className="text-red-400 text-xs mt-1">{errors.linkedinUrl}</p>
+            )}
+          </div>
+
+          {/* X (Twitter) */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-1">
+              <Twitter className="w-4 h-4 text-gray-400" />
+              X (Twitter)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                https://
+              </span>
+              <input
+                type="text"
+                value={formData.twitterUrl}
+                onChange={(e) => handleChange("twitterUrl", e.target.value)}
+                placeholder="x.com/yourprofile"
+                className={`w-full pl-16 pr-4 py-2 bg-gray-900 border rounded-lg text-white
+                  placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50
+                  ${errors.twitterUrl ? "border-red-500" : "border-gray-700"}
+                `}
+              />
+            </div>
+            {errors.twitterUrl && (
+              <p className="text-red-400 text-xs mt-1">{errors.twitterUrl}</p>
+            )}
+          </div>
+
+          {/* Website - Full Width */}
+          <div className="md:col-span-2">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-1">
+              <Globe className="w-4 h-4 text-green-500" />
+              Website
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                https://
+              </span>
+              <input
+                type="text"
+                value={formData.websiteUrl}
+                onChange={(e) => handleChange("websiteUrl", e.target.value)}
+                placeholder="www.yourwebsite.com"
+                className={`w-full pl-16 pr-4 py-2 bg-gray-900 border rounded-lg text-white
+                  placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50
+                  ${errors.websiteUrl ? "border-red-500" : "border-gray-700"}
+                `}
+              />
+            </div>
+            {errors.websiteUrl && (
+              <p className="text-red-400 text-xs mt-1">{errors.websiteUrl}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Save Button */}
+        <div className="flex justify-end mt-6">
+          <button
+            type="submit"
+            disabled={mutation.isPending}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg
+                     font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed
+                     transition-colors"
+          >
+            <Save className="w-4 h-4" />
+            {mutation.isPending ? "Saving..." : "Save Social Links"}
+          </button>
+        </div>
+      </div>
+    </form>
+  );
+}
+```
+
+### Option 2: Server-Side Fix (Also Recommended)
+
+Update the Zod schema to be more flexible and transform URLs:
+
+```typescript
+// server/routes.ts or wherever validation is defined
+
+import { z } from "zod";
+
+// Custom URL schema that handles missing protocol
+const optionalUrlSchema = z
+  .string()
+  .transform((val) => {
+    if (!val || val.trim() === "") return "";
+    
+    let url = val.trim();
+    // Add https:// if no protocol specified
+    if (!url.match(/^https?:\/\//i)) {
+      url = `https://${url}`;
+    }
+    return url;
+  })
+  .refine(
+    (val) => {
+      if (!val) return true; // Empty is valid
+      try {
+        new URL(val);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    { message: "Please enter a valid URL" }
+  );
+
+// Updated profile schema
+const updateProfileSchema = z.object({
+  // ... other fields
+  facebookUrl: optionalUrlSchema.optional().or(z.literal("")),
+  instagramUrl: optionalUrlSchema.optional().or(z.literal("")),
+  linkedinUrl: optionalUrlSchema.optional().or(z.literal("")),
+  twitterUrl: optionalUrlSchema.optional().or(z.literal("")),
+  websiteUrl: optionalUrlSchema.optional().or(z.literal("")),
+});
+
+// In your route handler
+app.put("/api/user/profile", async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const result = updateProfileSchema.safeParse(req.body);
+    
+    if (!result.success) {
+      return res.status(400).json({ 
+        error: "Invalid profile data",
+        details: result.error.issues.map(issue => ({
+          field: issue.path.join("."),
+          message: issue.message,
+        })),
+      });
+    }
+
+    // Data is now transformed (https:// added automatically)
+    const profileData = result.data;
+    
+    // Save to database
+    await db.update(userProfiles)
+      .set({
+        facebookUrl: profileData.facebookUrl || null,
+        instagramUrl: profileData.instagramUrl || null,
+        linkedinUrl: profileData.linkedinUrl || null,
+        twitterUrl: profileData.twitterUrl || null,
+        websiteUrl: profileData.websiteUrl || null,
+        updatedAt: new Date(),
+      })
+      .where(eq(userProfiles.userId, req.user.id));
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+```
+
+---
+
+## Visual Improvement: Show Protocol Prefix
+
+The input now shows `https://` as a visual prefix so users understand the format:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  🔗 Facebook                                         │
+│  ┌───────────────────────────────────────────────┐  │
+│  │ https:// │ www.facebook.com/yourprofile       │  │
+│  └───────────────────────────────────────────────┘  │
+│                                                      │
+│  📷 Instagram                                        │
+│  ┌───────────────────────────────────────────────┐  │
+│  │ https:// │ www.instagram.com/yourprofile      │  │
+│  └───────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## Quick Fix: Just Update Server Validation
+
+If you want the fastest fix, just update the server-side validation to transform URLs:
+
+```typescript
+// Find this in your server/routes.ts or validation file:
+
+// BEFORE (strict validation)
+const profileSchema = z.object({
+  facebookUrl: z.string().url().optional(),
+  instagramUrl: z.string().url().optional(),
+  // ...
+});
+
+// AFTER (flexible validation with transform)
+const flexibleUrl = z
+  .string()
+  .optional()
+  .transform((val) => {
+    if (!val || val.trim() === "") return null;
+    let url = val.trim();
+    if (!url.match(/^https?:\/\//i)) {
+      url = `https://${url}`;
+    }
+    return url;
+  })
+  .refine(
+    (val) => {
+      if (!val) return true;
+      try { new URL(val); return true; } 
+      catch { return false; }
+    },
+    { message: "Invalid URL format" }
+  );
+
+const profileSchema = z.object({
+  facebookUrl: flexibleUrl,
+  instagramUrl: flexibleUrl,
+  linkedinUrl: flexibleUrl,
+  twitterUrl: flexibleUrl,
+  websiteUrl: flexibleUrl,
+});
+```
+
+---
+
+## Verification Checklist
+
+- [ ] User can enter URL without `https://` (e.g., `www.facebook.com/me`)
+- [ ] User can enter URL with `https://` (e.g., `https://www.facebook.com/me`)
+- [ ] Empty fields are allowed (optional)
+- [ ] Invalid URLs show user-friendly error message
+- [ ] URLs are normalized before saving (always have `https://`)
+- [ ] Loading data shows URL without protocol for cleaner display
+- [ ] Save button shows loading state
+
+---
+
+## Files to Modify
+
+1. **Server**: `server/routes.ts` - Update Zod validation schema
+2. **Client**: Social links form component - Add URL normalization helper

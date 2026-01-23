@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import type { Transaction, Coordinator } from "@shared/schema";
 import type { SortOption, SortField } from "@/lib/transaction-filters";
+import { SORT_OPTIONS } from "@/lib/transaction-filters";
 import { getStatusConfig } from "@/lib/utils/status-colors";
 
 interface TransactionTableViewProps {
@@ -71,18 +72,18 @@ function SortableHeader({ field, label, sort, onSortChange }: SortableHeaderProp
   const isActive = sort.field === field;
   
   const handleClick = () => {
-    if (isActive) {
-      onSortChange({
-        ...sort,
-        direction: sort.direction === "asc" ? "desc" : "asc",
-        label: `${label} ${sort.direction === "asc" ? "Z-A" : "A-Z"}`,
-      });
+    const newDirection = isActive && sort.direction === "asc" ? "desc" : "asc";
+    const matchingOption = SORT_OPTIONS.find(
+      opt => opt.field === field && opt.direction === newDirection
+    );
+    
+    if (matchingOption) {
+      onSortChange(matchingOption);
     } else {
-      onSortChange({
-        label: `${label} A-Z`,
-        field,
-        direction: "asc",
-      });
+      const anyFieldOption = SORT_OPTIONS.find(opt => opt.field === field);
+      if (anyFieldOption) {
+        onSortChange(anyFieldOption);
+      }
     }
   };
 
@@ -91,7 +92,7 @@ function SortableHeader({ field, label, sort, onSortChange }: SortableHeaderProp
       variant="ghost"
       size="sm"
       onClick={handleClick}
-      className="h-auto p-0 font-medium hover:bg-transparent text-muted-foreground"
+      className="font-medium"
       data-testid={`sort-header-${field}`}
     >
       {label}
