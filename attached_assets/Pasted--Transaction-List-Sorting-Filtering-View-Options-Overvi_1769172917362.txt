@@ -1,0 +1,1077 @@
+# Transaction List - Sorting, Filtering & View Options
+
+## Overview
+Add comprehensive sorting, filtering, and view toggle options to the Transactions page for better UX and data management.
+
+---
+
+## Features to Implement
+
+1. **View Toggle:** Grid, List, Table views
+2. **Sort Options:** Multiple sort criteria
+3. **Filter Options:** Status, date range, coordinator
+4. **Persist Preferences:** Remember user's view/sort preferences
+
+---
+
+## UI Layout
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Transactions                                                                    │
+│  Manage your active real estate transactions                                     │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  ┌─────────────────────────┐  ┌─────────────────────────────────────────────┐   │
+│  │ 🔍 Search by address... │  │ [All] [Active] [Closing Soon] [Closed]     │   │
+│  └─────────────────────────┘  └─────────────────────────────────────────────┘   │
+│                                                                                  │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐│
+│  │ Sort by: [Newest First ▼]    Filter: [All Statuses ▼]   View: [⊞] [≡] [▤] ││
+│  └─────────────────────────────────────────────────────────────────────────────┘│
+│                                                                                  │
+│  Showing 14 transactions                                                         │
+│                                                                                  │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                              │
+│  │   Card 1    │  │   Card 2    │  │   Card 3    │   ← Grid View                │
+│  └─────────────┘  └─────────────┘  └─────────────┘                              │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Implementation
+
+### Step 1: Types and Constants
+
+```tsx
+// client/src/types/transactions.ts
+
+export type ViewMode = "grid" | "list" | "table";
+
+export type SortField = 
+  | "address" 
+  | "createdAt" 
+  | "closingDate" 
+  | "status" 
+  | "daysRemaining";
+
+export type SortDirection = "asc" | "desc";
+
+export interface SortOption {
+  label: string;
+  field: SortField;
+  direction: SortDirection;
+}
+
+export interface FilterState {
+  status: string[];
+  dateRange: {
+    start: Date | null;
+    end: Date | null;
+  };
+  coordinator: string | null;
+  search: string;
+}
+
+// Sort options for dropdown
+export const SORT_OPTIONS: SortOption[] = [
+  { label: "Newest First", field: "createdAt", direction: "desc" },
+  { label: "Oldest First", field: "createdAt", direction: "asc" },
+  { label: "Address A-Z", field: "address", direction: "asc" },
+  { label: "Address Z-A", field: "address", direction: "desc" },
+  { label: "Closing Soon", field: "closingDate", direction: "asc" },
+  { label: "Closing Later", field: "closingDate", direction: "desc" },
+  { label: "Status", field: "status", direction: "asc" },
+  { label: "Days Remaining", field: "daysRemaining", direction: "asc" },
+];
+
+// Status filter options
+export const STATUS_OPTIONS = [
+  { value: "all", label: "All Statuses" },
+  { value: "Off Market", label: "Off Market" },
+  { value: "Active Listing", label: "Active Listing" },
+  { value: "In Contract", label: "In Contract" },
+  { value: "Pending", label: "Pending" },
+  { value: "Closing Soon", label: "Closing Soon" },
+  { value: "Closed", label: "Closed" },
+];
+```
+
+### Step 2: Custom Hook for Transaction Filtering/Sorting
+
+```tsx
+// client/src/hooks/useTransactionFilters.ts
+
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { 
+  ViewMode, 
+  SortOption, 
+  FilterState, 
+  SORT_OPTIONS 
+} from "@/types/transactions";
+
+const STORAGE_KEY = "transaction-preferences";
+
+interface TransactionPreferences {
+  viewMode: ViewMode;
+  sort: SortOption;
+  filters: FilterState;
+}
+
+const defaultFilters: FilterState = {
+  status: [],
+  dateRange: { start: null, end: null },
+  coordinator: null,
+  search: "",
+};
+
+const defaultPreferences: TransactionPreferences = {
+  viewMode: "grid",
+  sort: SORT_OPTIONS[0], // Newest First
+  filters: defaultFilters,
+};
+
+export function useTransactionFilters(transactions: Transaction[]) {
+  // Load saved preferences from localStorage
+  const [preferences, setPreferences] = useState<TransactionPreferences>(() => {
+    if (typeof window === "undefined") return defaultPreferences;
+    
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return { ...defaultPreferences, ...parsed };
+      }
+    } catch (e) {
+      console.error("Failed to load preferences:", e);
+    }
+    return defaultPreferences;
+  });
+
+  const { viewMode, sort, filters } = preferences;
+
+  // Save preferences to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
+    } catch (e) {
+      console.error("Failed to save preferences:", e);
+    }
+  }, [preferences]);
+
+  // Setters
+  const setViewMode = useCallback((mode: ViewMode) => {
+    setPreferences(prev => ({ ...prev, viewMode: mode }));
+  }, []);
+
+  const setSort = useCallback((sortOption: SortOption) => {
+    setPreferences(prev => ({ ...prev, sort: sortOption }));
+  }, []);
+
+  const setFilters = useCallback((newFilters: Partial<FilterState>) => {
+    setPreferences(prev => ({
+      ...prev,
+      filters: { ...prev.filters, ...newFilters },
+    }));
+  }, []);
+
+  const resetFilters = useCallback(() => {
+    setPreferences(prev => ({ ...prev, filters: defaultFilters }));
+  }, []);
+
+  // Filter transactions
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(transaction => {
+      // Search filter
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        const matchesSearch = 
+          transaction.address.toLowerCase().includes(searchLower) ||
+          transaction.mlsNumber?.toLowerCase().includes(searchLower);
+        if (!matchesSearch) return false;
+      }
+
+      // Status filter
+      if (filters.status.length > 0 && !filters.status.includes(transaction.status)) {
+        return false;
+      }
+
+      // Coordinator filter
+      if (filters.coordinator) {
+        const hasCoordinator = transaction.coordinators?.some(
+          c => c.id === filters.coordinator
+        );
+        if (!hasCoordinator) return false;
+      }
+
+      // Date range filter (using closingDate)
+      if (filters.dateRange.start || filters.dateRange.end) {
+        const closingDate = transaction.closingDate 
+          ? new Date(transaction.closingDate) 
+          : null;
+        
+        if (!closingDate) return false;
+        
+        if (filters.dateRange.start && closingDate < filters.dateRange.start) {
+          return false;
+        }
+        if (filters.dateRange.end && closingDate > filters.dateRange.end) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [transactions, filters]);
+
+  // Sort transactions
+  const sortedTransactions = useMemo(() => {
+    const sorted = [...filteredTransactions];
+    
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sort.field) {
+        case "address":
+          comparison = a.address.localeCompare(b.address);
+          break;
+          
+        case "createdAt":
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          break;
+          
+        case "closingDate":
+          const dateA = a.closingDate ? new Date(a.closingDate).getTime() : Infinity;
+          const dateB = b.closingDate ? new Date(b.closingDate).getTime() : Infinity;
+          comparison = dateA - dateB;
+          break;
+          
+        case "status":
+          const statusOrder = ["Off Market", "Active Listing", "In Contract", "Pending", "Closing Soon", "Closed"];
+          comparison = statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status);
+          break;
+          
+        case "daysRemaining":
+          const daysA = calculateDaysRemaining(a);
+          const daysB = calculateDaysRemaining(b);
+          comparison = daysA - daysB;
+          break;
+      }
+      
+      return sort.direction === "asc" ? comparison : -comparison;
+    });
+    
+    return sorted;
+  }, [filteredTransactions, sort]);
+
+  // Active filter count (for badge)
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.status.length > 0) count++;
+    if (filters.coordinator) count++;
+    if (filters.dateRange.start || filters.dateRange.end) count++;
+    return count;
+  }, [filters]);
+
+  return {
+    // Data
+    transactions: sortedTransactions,
+    totalCount: transactions.length,
+    filteredCount: sortedTransactions.length,
+    
+    // View
+    viewMode,
+    setViewMode,
+    
+    // Sort
+    sort,
+    setSort,
+    
+    // Filters
+    filters,
+    setFilters,
+    resetFilters,
+    activeFilterCount,
+  };
+}
+
+// Helper function
+function calculateDaysRemaining(transaction: Transaction): number {
+  if (!transaction.closingDate) return Infinity;
+  const closing = new Date(transaction.closingDate);
+  const today = new Date();
+  return Math.ceil((closing.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+```
+
+### Step 3: Toolbar Component
+
+```tsx
+// client/src/components/transactions/TransactionToolbar.tsx
+
+import { useState } from "react";
+import { 
+  Grid3X3, 
+  List, 
+  Table, 
+  SortAsc, 
+  SortDesc, 
+  Filter, 
+  X, 
+  ChevronDown,
+  Search
+} from "lucide-react";
+import { ViewMode, SortOption, SORT_OPTIONS, STATUS_OPTIONS } from "@/types/transactions";
+
+interface TransactionToolbarProps {
+  // View
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
+  
+  // Sort
+  sort: SortOption;
+  onSortChange: (sort: SortOption) => void;
+  
+  // Filters
+  filters: FilterState;
+  onFiltersChange: (filters: Partial<FilterState>) => void;
+  onResetFilters: () => void;
+  activeFilterCount: number;
+  
+  // Counts
+  totalCount: number;
+  filteredCount: number;
+}
+
+export function TransactionToolbar({
+  viewMode,
+  onViewModeChange,
+  sort,
+  onSortChange,
+  filters,
+  onFiltersChange,
+  onResetFilters,
+  activeFilterCount,
+  totalCount,
+  filteredCount,
+}: TransactionToolbarProps) {
+  const [showFilters, setShowFilters] = useState(false);
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+
+  return (
+    <div className="space-y-4">
+      {/* Main Toolbar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Search */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by address or MLS#..."
+            value={filters.search}
+            onChange={(e) => onFiltersChange({ search: e.target.value })}
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg 
+                     focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500
+                     text-sm"
+          />
+          {filters.search && (
+            <button
+              onClick={() => onFiltersChange({ search: "" })}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Controls */}
+        <div className="flex items-center gap-2">
+          {/* Sort Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowSortDropdown(!showSortDropdown)}
+              className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg
+                       hover:bg-gray-50 text-sm font-medium text-gray-700"
+            >
+              {sort.direction === "asc" ? (
+                <SortAsc className="h-4 w-4" />
+              ) : (
+                <SortDesc className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">{sort.label}</span>
+              <ChevronDown className="h-4 w-4" />
+            </button>
+            
+            {showSortDropdown && (
+              <>
+                <div 
+                  className="fixed inset-0 z-10" 
+                  onClick={() => setShowSortDropdown(false)} 
+                />
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg 
+                              border border-gray-200 py-1 z-20">
+                  {SORT_OPTIONS.map((option) => (
+                    <button
+                      key={`${option.field}-${option.direction}`}
+                      onClick={() => {
+                        onSortChange(option);
+                        setShowSortDropdown(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50
+                        ${sort.field === option.field && sort.direction === option.direction
+                          ? "bg-orange-50 text-orange-600 font-medium"
+                          : "text-gray-700"
+                        }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Filter Button */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium
+              ${activeFilterCount > 0
+                ? "border-orange-500 bg-orange-50 text-orange-600"
+                : "border-gray-200 hover:bg-gray-50 text-gray-700"
+              }`}
+          >
+            <Filter className="h-4 w-4" />
+            <span className="hidden sm:inline">Filters</span>
+            {activeFilterCount > 0 && (
+              <span className="bg-orange-500 text-white text-xs rounded-full w-5 h-5 
+                           flex items-center justify-center">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          {/* View Toggle */}
+          <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+            <button
+              onClick={() => onViewModeChange("grid")}
+              className={`p-2 ${viewMode === "grid" 
+                ? "bg-orange-500 text-white" 
+                : "hover:bg-gray-50 text-gray-600"
+              }`}
+              title="Grid View"
+            >
+              <Grid3X3 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => onViewModeChange("list")}
+              className={`p-2 border-l border-r border-gray-200 ${viewMode === "list" 
+                ? "bg-orange-500 text-white" 
+                : "hover:bg-gray-50 text-gray-600"
+              }`}
+              title="List View"
+            >
+              <List className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => onViewModeChange("table")}
+              className={`p-2 ${viewMode === "table" 
+                ? "bg-orange-500 text-white" 
+                : "hover:bg-gray-50 text-gray-600"
+              }`}
+              title="Table View"
+            >
+              <Table className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter Panel (Collapsible) */}
+      {showFilters && (
+        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-medium text-gray-900">Filters</h3>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={onResetFilters}
+                className="text-sm text-orange-500 hover:text-orange-600 font-medium"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Status Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Status
+              </label>
+              <select
+                value={filters.status[0] || "all"}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  onFiltersChange({ 
+                    status: value === "all" ? [] : [value] 
+                  });
+                }}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+              >
+                {STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Closing Date Range */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Closing After
+              </label>
+              <input
+                type="date"
+                value={filters.dateRange.start?.toISOString().split("T")[0] || ""}
+                onChange={(e) => {
+                  onFiltersChange({
+                    dateRange: {
+                      ...filters.dateRange,
+                      start: e.target.value ? new Date(e.target.value) : null,
+                    },
+                  });
+                }}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Closing Before
+              </label>
+              <input
+                type="date"
+                value={filters.dateRange.end?.toISOString().split("T")[0] || ""}
+                onChange={(e) => {
+                  onFiltersChange({
+                    dateRange: {
+                      ...filters.dateRange,
+                      end: e.target.value ? new Date(e.target.value) : null,
+                    },
+                  });
+                }}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+              />
+            </div>
+
+            {/* Coordinator Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Coordinator
+              </label>
+              <select
+                value={filters.coordinator || ""}
+                onChange={(e) => {
+                  onFiltersChange({ 
+                    coordinator: e.target.value || null 
+                  });
+                }}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+              >
+                <option value="">All Coordinators</option>
+                {/* Populate from your coordinators data */}
+                <option value="1">Randi</option>
+                <option value="2">Daryl</option>
+                <option value="3">Ryan</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Results Count */}
+      <div className="text-sm text-gray-500">
+        {filteredCount === totalCount ? (
+          <span>Showing {totalCount} transactions</span>
+        ) : (
+          <span>
+            Showing {filteredCount} of {totalCount} transactions
+            {activeFilterCount > 0 && (
+              <button
+                onClick={onResetFilters}
+                className="ml-2 text-orange-500 hover:text-orange-600"
+              >
+                (Clear filters)
+              </button>
+            )}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+### Step 4: View Components
+
+#### Grid View (Existing Cards)
+
+```tsx
+// client/src/components/transactions/TransactionGridView.tsx
+
+interface TransactionGridViewProps {
+  transactions: Transaction[];
+  onTransactionClick: (id: number) => void;
+}
+
+export function TransactionGridView({ 
+  transactions, 
+  onTransactionClick 
+}: TransactionGridViewProps) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {transactions.map((transaction) => (
+        <TransactionCard
+          key={transaction.id}
+          transaction={transaction}
+          onClick={() => onTransactionClick(transaction.id)}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+#### List View (Compact)
+
+```tsx
+// client/src/components/transactions/TransactionListView.tsx
+
+interface TransactionListViewProps {
+  transactions: Transaction[];
+  onTransactionClick: (id: number) => void;
+}
+
+export function TransactionListView({ 
+  transactions, 
+  onTransactionClick 
+}: TransactionListViewProps) {
+  return (
+    <div className="space-y-2">
+      {transactions.map((transaction) => (
+        <div
+          key={transaction.id}
+          onClick={() => onTransactionClick(transaction.id)}
+          className="bg-white rounded-lg border border-gray-200 p-4 
+                   hover:shadow-md transition-shadow cursor-pointer
+                   flex items-center justify-between gap-4"
+        >
+          {/* Left: Address & Status */}
+          <div className="flex items-center gap-4 min-w-0 flex-1">
+            <StatusBadge status={transaction.status} />
+            <div className="min-w-0">
+              <h3 className="font-semibold text-gray-900 truncate">
+                {transaction.address}
+              </h3>
+              <p className="text-sm text-gray-500">
+                {transaction.mlsNumber ? `# ${transaction.mlsNumber}` : "(Off Market)"}
+              </p>
+            </div>
+          </div>
+
+          {/* Center: Dates */}
+          <div className="hidden md:flex items-center gap-8 text-sm">
+            <div>
+              <p className="text-gray-500">Contract Date</p>
+              <p className="font-medium">{formatDate(transaction.contractDate) || "—"}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">Closing Date</p>
+              <p className="font-medium">{formatDate(transaction.closingDate) || "—"}</p>
+            </div>
+          </div>
+
+          {/* Right: Days & Coordinator */}
+          <div className="flex items-center gap-4">
+            <DaysIndicator transaction={transaction} />
+            <div className="flex -space-x-2">
+              {transaction.coordinators?.slice(0, 2).map((coord, i) => (
+                <div
+                  key={i}
+                  className={`w-8 h-8 ${coord.color} rounded-full flex items-center 
+                            justify-center text-xs font-medium text-white border-2 border-white`}
+                  title={coord.name}
+                >
+                  {coord.initials}
+                </div>
+              ))}
+            </div>
+            <ChevronRight className="h-5 w-5 text-gray-400" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Small indicator component for days
+function DaysIndicator({ transaction }: { transaction: Transaction }) {
+  const days = calculateDaysRemaining(transaction);
+  const isOverdue = days < 0;
+  
+  if (days === Infinity) return null;
+  
+  return (
+    <div className={`text-right ${isOverdue ? "text-red-600" : "text-gray-700"}`}>
+      <p className="text-lg font-bold">{Math.abs(days)}</p>
+      <p className="text-xs">{isOverdue ? "overdue" : "days"}</p>
+    </div>
+  );
+}
+```
+
+#### Table View
+
+```tsx
+// client/src/components/transactions/TransactionTableView.tsx
+
+interface TransactionTableViewProps {
+  transactions: Transaction[];
+  onTransactionClick: (id: number) => void;
+  sort: SortOption;
+  onSortChange: (sort: SortOption) => void;
+}
+
+export function TransactionTableView({ 
+  transactions, 
+  onTransactionClick,
+  sort,
+  onSortChange,
+}: TransactionTableViewProps) {
+  
+  const handleHeaderClick = (field: SortField) => {
+    if (sort.field === field) {
+      // Toggle direction
+      onSortChange({
+        ...sort,
+        direction: sort.direction === "asc" ? "desc" : "asc",
+      });
+    } else {
+      // New field, default to asc
+      onSortChange({
+        label: field,
+        field,
+        direction: "asc",
+      });
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sort.field !== field) {
+      return <ChevronsUpDown className="h-4 w-4 text-gray-400" />;
+    }
+    return sort.direction === "asc" 
+      ? <ChevronUp className="h-4 w-4 text-orange-500" />
+      : <ChevronDown className="h-4 w-4 text-orange-500" />;
+  };
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th 
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 
+                         uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleHeaderClick("address")}
+              >
+                <div className="flex items-center gap-1">
+                  Address
+                  <SortIcon field="address" />
+                </div>
+              </th>
+              <th 
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 
+                         uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleHeaderClick("status")}
+              >
+                <div className="flex items-center gap-1">
+                  Status
+                  <SortIcon field="status" />
+                </div>
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 
+                           uppercase tracking-wider">
+                MLS #
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 
+                           uppercase tracking-wider">
+                Contract Date
+              </th>
+              <th 
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 
+                         uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleHeaderClick("closingDate")}
+              >
+                <div className="flex items-center gap-1">
+                  Closing Date
+                  <SortIcon field="closingDate" />
+                </div>
+              </th>
+              <th 
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 
+                         uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleHeaderClick("daysRemaining")}
+              >
+                <div className="flex items-center gap-1">
+                  Days
+                  <SortIcon field="daysRemaining" />
+                </div>
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 
+                           uppercase tracking-wider">
+                Coordinator
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {transactions.map((transaction) => {
+              const days = calculateDaysRemaining(transaction);
+              const isOverdue = days < 0 && days !== Infinity;
+              
+              return (
+                <tr
+                  key={transaction.id}
+                  onClick={() => onTransactionClick(transaction.id)}
+                  className="hover:bg-gray-50 cursor-pointer"
+                >
+                  <td className="px-4 py-4">
+                    <div className="font-medium text-gray-900">{transaction.address}</div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <StatusBadge status={transaction.status} size="sm" />
+                  </td>
+                  <td className="px-4 py-4 text-sm text-gray-500">
+                    {transaction.mlsNumber || "—"}
+                  </td>
+                  <td className="px-4 py-4 text-sm text-gray-500">
+                    {formatDate(transaction.contractDate) || "—"}
+                  </td>
+                  <td className="px-4 py-4 text-sm text-gray-500">
+                    {formatDate(transaction.closingDate) || "—"}
+                  </td>
+                  <td className="px-4 py-4">
+                    {days !== Infinity && (
+                      <span className={`text-sm font-medium ${
+                        isOverdue ? "text-red-600" : "text-gray-900"
+                      }`}>
+                        {Math.abs(days)} {isOverdue ? "overdue" : "days"}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="flex -space-x-2">
+                      {transaction.coordinators?.slice(0, 2).map((coord, i) => (
+                        <div
+                          key={i}
+                          className={`w-7 h-7 ${coord.color} rounded-full flex items-center 
+                                    justify-center text-xs font-medium text-white 
+                                    border-2 border-white`}
+                          title={coord.name}
+                        >
+                          {coord.initials}
+                        </div>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+```
+
+### Step 5: Main Transactions Page
+
+```tsx
+// client/src/pages/Transactions.tsx
+
+import { useTransactionFilters } from "@/hooks/useTransactionFilters";
+import { TransactionToolbar } from "@/components/transactions/TransactionToolbar";
+import { TransactionGridView } from "@/components/transactions/TransactionGridView";
+import { TransactionListView } from "@/components/transactions/TransactionListView";
+import { TransactionTableView } from "@/components/transactions/TransactionTableView";
+
+export function TransactionsPage() {
+  const { data: rawTransactions = [], isLoading } = useQuery({
+    queryKey: ["transactions"],
+    queryFn: fetchTransactions,
+  });
+
+  const {
+    transactions,
+    totalCount,
+    filteredCount,
+    viewMode,
+    setViewMode,
+    sort,
+    setSort,
+    filters,
+    setFilters,
+    resetFilters,
+    activeFilterCount,
+  } = useTransactionFilters(rawTransactions);
+
+  const navigate = useNavigate();
+  
+  const handleTransactionClick = (id: number) => {
+    navigate(`/transactions/${id}`);
+  };
+
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
+  return (
+    <div className="p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
+        <p className="text-gray-500">Manage your active real estate transactions</p>
+      </div>
+
+      {/* Toolbar */}
+      <div className="mb-6">
+        <TransactionToolbar
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          sort={sort}
+          onSortChange={setSort}
+          filters={filters}
+          onFiltersChange={setFilters}
+          onResetFilters={resetFilters}
+          activeFilterCount={activeFilterCount}
+          totalCount={totalCount}
+          filteredCount={filteredCount}
+        />
+      </div>
+
+      {/* View */}
+      {transactions.length === 0 ? (
+        <EmptyState 
+          title="No transactions found"
+          description={activeFilterCount > 0 
+            ? "Try adjusting your filters" 
+            : "Create your first transaction to get started"
+          }
+          action={activeFilterCount > 0 ? (
+            <button onClick={resetFilters} className="text-orange-500">
+              Clear filters
+            </button>
+          ) : undefined}
+        />
+      ) : viewMode === "grid" ? (
+        <TransactionGridView 
+          transactions={transactions} 
+          onTransactionClick={handleTransactionClick} 
+        />
+      ) : viewMode === "list" ? (
+        <TransactionListView 
+          transactions={transactions} 
+          onTransactionClick={handleTransactionClick} 
+        />
+      ) : (
+        <TransactionTableView 
+          transactions={transactions} 
+          onTransactionClick={handleTransactionClick}
+          sort={sort}
+          onSortChange={setSort}
+        />
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## Keyboard Shortcuts (Optional Enhancement)
+
+```tsx
+// Add keyboard navigation
+useEffect(() => {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    // Cmd/Ctrl + 1/2/3 for view toggle
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey) {
+      if (e.key === "1") { setViewMode("grid"); e.preventDefault(); }
+      if (e.key === "2") { setViewMode("list"); e.preventDefault(); }
+      if (e.key === "3") { setViewMode("table"); e.preventDefault(); }
+    }
+    
+    // Cmd/Ctrl + F for search focus
+    if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+      document.getElementById("transaction-search")?.focus();
+      e.preventDefault();
+    }
+  };
+  
+  window.addEventListener("keydown", handleKeyDown);
+  return () => window.removeEventListener("keydown", handleKeyDown);
+}, []);
+```
+
+---
+
+## Verification Checklist
+
+### View Toggle
+- [ ] Grid view shows cards in 3-column layout
+- [ ] List view shows compact horizontal rows
+- [ ] Table view shows full data table with sortable columns
+- [ ] View preference persists after page refresh
+
+### Sorting
+- [ ] "Newest First" sorts by creation date descending
+- [ ] "Oldest First" sorts by creation date ascending
+- [ ] "Address A-Z" sorts alphabetically
+- [ ] "Address Z-A" sorts reverse alphabetically
+- [ ] "Closing Soon" shows nearest closing dates first
+- [ ] "Days Remaining" sorts by urgency
+- [ ] Table headers are clickable for sorting
+- [ ] Sort preference persists after page refresh
+
+### Filtering
+- [ ] Search filters by address and MLS number
+- [ ] Status filter shows only selected status
+- [ ] Date range filter works correctly
+- [ ] Coordinator filter shows assigned transactions
+- [ ] "Clear All" button resets all filters
+- [ ] Active filter count shows in badge
+- [ ] Filter panel is collapsible
+
+### Empty States
+- [ ] Shows appropriate message when no transactions
+- [ ] Shows "adjust filters" message when filters return empty
+- [ ] Provides clear action to reset filters
+
+---
+
+## Files to Create/Modify
+
+1. **`client/src/types/transactions.ts`** - Types and constants
+2. **`client/src/hooks/useTransactionFilters.ts`** - Filter/sort hook
+3. **`client/src/components/transactions/TransactionToolbar.tsx`** - Toolbar component
+4. **`client/src/components/transactions/TransactionGridView.tsx`** - Grid view
+5. **`client/src/components/transactions/TransactionListView.tsx`** - List view
+6. **`client/src/components/transactions/TransactionTableView.tsx`** - Table view
+7. **`client/src/pages/Transactions.tsx`** - Update main page
