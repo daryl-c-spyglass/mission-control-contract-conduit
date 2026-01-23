@@ -56,6 +56,18 @@ Preferred communication style: Simple, everyday language.
 - **Shared Listing Utilities**: Predicates and helpers for rental exclusion, accurate Days on Market display, and filtering.
 - **MLS/IDX/VOW Compliance**: Multi-layer rental exclusion, prevention of external media redirects, and consistent DOM normalization.
 - **Photo Upload System**: Photos uploaded via GCS client to `.private/uploads/property-{transactionId}-{timestamp}-{uuid}-{filename}`, served through `/objects/*` route (avoiding sidecar signed URL 500 errors). Server validates file type (jpeg/png/gif/webp) and size (max 10MB). MLS photos stored separately in `mlsData.images`, user uploads in `propertyImages` field.
+- **CMA Presentation Player**: Fullscreen interactive slideshow with 33 widgets (10 dynamic + 23 static images) for client presentations. Features:
+  - Located at `client/src/components/cma-presentation/`
+  - Responsive grid layout (2-5 columns based on screen size)
+  - Mapbox header background with theme-synced styles
+  - Agent profile popover with photo, contact info
+  - Sidebar navigation for quick section access
+  - Keyboard navigation (Escape, Left/Right arrows)
+  - Mobile-optimized with safe area insets and touch handling
+  - Spyglass branding (#F37216 orange, #1a1a2e navy)
+  - Widget types: AgentResume, Comps (Compare/Map/Stats tabs), TimeToSell, SuggestedPrice, AveragePricePerAcre, Static images
+  - Data integration: Uses `useAgentProfile` hook for agent data, transforms `CMAComparable[]` to `CmaProperty[]` for presentation
+  - Static widget images stored in `public/cma-widgets/` (1.png through 24.png map to widgets 11-34)
 
 ## External Dependencies
 - **Slack**: Team coordination.

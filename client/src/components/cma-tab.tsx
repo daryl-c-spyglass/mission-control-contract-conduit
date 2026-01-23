@@ -23,6 +23,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useAgentProfile } from "@/hooks/useAgentProfile";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getStatusBadgeStyle, getStatusLabel, getStatusColor } from "@/lib/utils/status-colors";
 import { CMAMap } from "@/components/cma-map";
@@ -35,6 +36,7 @@ import { CMAEmailShareDialog } from "@/components/cma/CMAEmailShareDialog";
 import { CMASourceIndicator } from "@/components/cma-source-indicator";
 import { sanitizePhotoUrl } from "@/lib/cma-map-data";
 import { CmaPresentationPlayer } from "@/components/cma-presentation";
+import type { AgentProfile, CmaProperty } from "@/components/cma-presentation";
 import type { Transaction, CMAComparable, Cma, PropertyStatistics, CmaStatMetric, Property } from "@shared/schema";
 import { useLocation } from "wouter";
 import { 
@@ -223,6 +225,7 @@ const MAIN_VIEW_TABS = [
 export function CMATab({ transaction }: CMATabProps) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { data: agentProfileData } = useAgentProfile();
   const [mainView, setMainView] = useState<MainView>('compare');
   const [subView, setSubView] = useState<SubView>('grid');
   const [statusFilter, setStatusFilter] = useState<StatusFilterType>('all');
@@ -251,6 +254,100 @@ export function CMATab({ transaction }: CMATabProps) {
     mlsData?.map?.latitude || 
     mlsData?.latitude
   );
+
+  const agentProfile: AgentProfile = useMemo(() => ({
+    name: agentProfileData 
+      ? `${agentProfileData.firstName} ${agentProfileData.lastName}`.trim() || 'Agent'
+      : 'Agent',
+    company: agentProfileData?.company || 'Spyglass Realty',
+    phone: agentProfileData?.phone || undefined,
+    email: agentProfileData?.email || undefined,
+    photo: agentProfileData?.profilePhoto || undefined,
+  }), [agentProfileData]);
+
+  const normalizeStatusLabel = (status: string): 'Active' | 'Pending' | 'Closed' | 'Active Under Contract' => {
+    const lower = (status || '').toLowerCase().trim();
+    if (lower.includes('closed') || lower.includes('sold')) return 'Closed';
+    if (lower.includes('pending')) return 'Pending';
+    if (lower.includes('under contract')) return 'Active Under Contract';
+    return 'Active';
+  };
+
+  const presentationComparables: CmaProperty[] = useMemo(() => {
+    if (!cmaData || cmaData.length === 0) return [];
+    return cmaData.map((comp, index) => {
+      const sqft = typeof comp.sqft === 'number' ? comp.sqft : parseFloat(comp.sqft as string) || 0;
+      const price = comp.soldPrice || comp.price || 0;
+      return {
+        id: comp.mlsNumber || `comp-${index}`,
+        address: comp.address || '',
+        city: comp.city || '',
+        state: comp.state || 'TX',
+        zipCode: comp.zipCode || '',
+        price: comp.price,
+        soldPrice: comp.soldPrice,
+        originalPrice: comp.originalPrice,
+        sqft: sqft,
+        beds: comp.bedrooms || 0,
+        baths: comp.bathrooms || 0,
+        lotSize: typeof comp.lotSize === 'number' ? comp.lotSize : undefined,
+        yearBuilt: typeof comp.yearBuilt === 'number' ? comp.yearBuilt : undefined,
+        garageSpaces: comp.garageSpaces,
+        status: normalizeStatusLabel(comp.status || ''),
+        daysOnMarket: comp.daysOnMarket || 0,
+        soldDate: comp.soldDate,
+        pricePerSqft: sqft > 0 ? Math.round(price / sqft) : 0,
+        photos: comp.photos || [],
+        latitude: comp.map?.latitude || comp.latitude,
+        longitude: comp.map?.longitude || comp.longitude,
+        acres: comp.acres,
+      };
+    });
+  }, [cmaData]);
+
+  const subjectProperty: CmaProperty | undefined = useMemo(() => {
+    if (!mlsData) return undefined;
+    const sqft = typeof mlsData.sqft === 'number' 
+      ? mlsData.sqft 
+      : parseFloat(mlsData.sqft as string) || 0;
+    const price = transaction.listPrice || mlsData.listPrice || mlsData.price || 0;
+    const lat = mlsData.coordinates?.latitude || mlsData.map?.latitude || mlsData.latitude;
+    const lng = mlsData.coordinates?.longitude || mlsData.map?.longitude || mlsData.longitude;
+    return {
+      id: transaction.mlsNumber || transaction.id,
+      address: transaction.propertyAddress || mlsData.address || '',
+      city: mlsData.city || '',
+      state: mlsData.state || 'TX',
+      zipCode: mlsData.zipCode || '',
+      price: price,
+      sqft: sqft,
+      beds: mlsData.bedrooms || transaction.bedrooms || 0,
+      baths: mlsData.bathrooms || transaction.bathrooms || 0,
+      lotSize: mlsData.lotSize ? parseFloat(mlsData.lotSize) : undefined,
+      yearBuilt: mlsData.yearBuilt ? parseInt(mlsData.yearBuilt, 10) : undefined,
+      status: normalizeStatusLabel(mlsStatus),
+      daysOnMarket: mlsData.daysOnMarket || mlsData.simpleDaysOnMarket || 0,
+      pricePerSqft: sqft > 0 ? Math.round(price / sqft) : 0,
+      photos: mlsData.images || mlsData.photos || [],
+      isSubject: true,
+      latitude: lat,
+      longitude: lng,
+    };
+  }, [mlsData, transaction, mlsStatus]);
+
+  const averageDaysOnMarket = useMemo(() => {
+    if (!presentationComparables.length) return 0;
+    const total = presentationComparables.reduce((sum, c) => sum + c.daysOnMarket, 0);
+    return Math.round(total / presentationComparables.length);
+  }, [presentationComparables]);
+
+  const averagePricePerSqft = useMemo(() => {
+    if (!presentationComparables.length) return 0;
+    const validComps = presentationComparables.filter(c => c.pricePerSqft > 0);
+    if (!validComps.length) return 0;
+    const total = validComps.reduce((sum, c) => sum + c.pricePerSqft, 0);
+    return Math.round(total / validComps.length);
+  }, [presentationComparables]);
 
   const generateCmaMutation = useMutation({
     mutationFn: async () => {
@@ -681,9 +778,12 @@ export function CMATab({ transaction }: CMATabProps) {
         onClose={() => setShowCmaPresentation(false)}
         propertyAddress={transaction.propertyAddress || 'Property Address'}
         mlsNumber={transaction.mlsNumber || ''}
-        agentName="Agent"
-        compsCount={cmaData?.length || 0}
-        daysOnMarket={mlsData?.daysOnMarket || mlsData?.simpleDaysOnMarket || 0}
+        agent={agentProfile}
+        subjectProperty={subjectProperty}
+        comparables={presentationComparables}
+        averageDaysOnMarket={averageDaysOnMarket}
+        latitude={subjectProperty?.latitude}
+        longitude={subjectProperty?.longitude}
       />
 
 
