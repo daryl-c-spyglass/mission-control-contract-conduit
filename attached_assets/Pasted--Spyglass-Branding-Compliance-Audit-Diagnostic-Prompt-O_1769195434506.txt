@@ -1,0 +1,240 @@
+# Spyglass Branding Compliance Audit — Diagnostic Prompt
+
+## 🎯 Objective
+
+Audit the entire Contract Conduit application to check compliance with Spyglass Realty Branding Guidelines. **DO NOT make any changes** — only generate a report of what follows the guidelines and what doesn't.
+
+---
+
+## 📋 Spyglass Branding Guidelines (Reference)
+
+### Official Logo Formats (4 approved versions):
+1. **Black and Red** — For light backgrounds
+2. **White and Red** — For dark backgrounds  
+3. **All White** — For dark backgrounds (solid)
+4. **All Black** — For light backgrounds (solid)
+
+⚠️ **Agents and teams are NOT permitted to alter the color of any Spyglass Logos.**
+
+### Official Brand Colors:
+| Color | Hex | RGB |
+|-------|-----|-----|
+| **Spyglass Red-Orange** | `#EF4923` | rgb(239, 73, 35) |
+| **Spyglass Black** | `#222222` | rgb(34, 34, 34) |
+
+---
+
+## 🔍 Audit Tasks
+
+Please perform a comprehensive audit across ALL sections of the app and generate a report.
+
+### 1. COLOR AUDIT
+
+Search the entire codebase for color usage and check compliance:
+
+```bash
+# Find all hex colors used in the project
+grep -r "#[0-9A-Fa-f]\{6\}" --include="*.tsx" --include="*.ts" --include="*.css" --include="*.scss" . | grep -v node_modules
+
+# Specifically look for orange/red colors that should be #EF4923
+grep -rE "#[Ff][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]|#[Ee][Ff]|orange|red-" --include="*.tsx" --include="*.ts" --include="*.css" . | grep -v node_modules
+
+# Look for black colors that should be #222222
+grep -rE "#[0-2][0-2][0-2]|#000|#111|#333|gray-900|slate-900" --include="*.tsx" --include="*.ts" --include="*.css" . | grep -v node_modules
+```
+
+**Check for these INCORRECT colors being used instead of official ones:**
+| Incorrect | Should Be |
+|-----------|-----------|
+| `#F37216` (wrong orange) | `#EF4923` |
+| `#FF4B2B` (wrong orange) | `#EF4923` |
+| `#FF5A3D` (wrong orange) | `#EF4923` |
+| `#000000` (pure black) | `#222222` |
+| `#111111` (too dark) | `#222222` |
+| Any other orange/red | `#EF4923` |
+
+### 2. LOGO AUDIT
+
+Find all logo references and usages:
+
+```bash
+# Find all logo files
+find . -type f \( -name "*logo*" -o -name "*spyglass*" -o -name "*Logo*" \) -not -path "./node_modules/*"
+
+# Find all logo imports/references in code
+grep -r "logo" --include="*.tsx" --include="*.ts" . | grep -v node_modules
+
+# Find image src attributes that might contain logos
+grep -rE "src=.*logo|src=.*spyglass|src=.*Logo" --include="*.tsx" --include="*.ts" . | grep -v node_modules
+```
+
+**Check each logo usage for:**
+- [ ] Is it using an official logo format (not custom/altered)?
+- [ ] Is the correct version used for the background? (white logo on dark bg, black logo on light bg)
+- [ ] Are any logos being rendered as text instead of images?
+- [ ] Are logo colors being altered via CSS filters or opacity changes?
+
+### 3. SECTION-BY-SECTION AUDIT
+
+Audit each section of the app:
+
+#### A. Dashboard / Transactions List
+- Header logo
+- Navigation colors
+- Button colors (primary action buttons)
+- Status badge colors
+- Card backgrounds
+
+#### B. Transaction Detail View
+- Tab navigation styling
+- Section headers
+- Action buttons ("Create Flyer", "Marketing Materials")
+- Status indicators
+
+#### C. MLS Data Section
+- Property card styling
+- Price display colors
+- Feature tag colors
+- Listing information colors
+
+#### D. CMA Section
+- Comparable property cards
+- Price highlighting
+- Distance indicators
+- Map markers (if any)
+
+#### E. Documents Section
+- Upload button styling
+- File type indicators
+- Action buttons
+
+#### F. Marketing Section
+- "Create Marketing Materials" button
+- Generated graphics preview
+- Status type selector
+- Slack integration styling
+
+#### G. Timeline Section
+- Timeline dot colors
+- Event type colors
+- Date/time styling
+
+#### H. Templates Section
+- Search input styling
+- Template card borders/accents
+- Action buttons
+
+#### I. CMA Presentation Player (New Feature)
+- Header logo (top-left)
+- Hero section background
+- Card icon logos
+- Agent profile styling
+- Navigation colors
+- Slide title colors
+- Widget card borders/accents
+
+#### J. Settings Section
+- Form input focus colors
+- Save/Cancel button colors
+- Tab navigation
+- Profile photo borders
+
+#### K. Graphics Generator (if integrated)
+- Template accent colors
+- Generated output colors
+- Brand element placement
+
+---
+
+## 📊 Report Format
+
+Generate the audit report in this format:
+
+```markdown
+# Spyglass Branding Compliance Report
+Generated: [DATE]
+
+## Summary
+- Total Issues Found: [X]
+- Critical (Wrong Colors): [X]
+- Warning (Logo Issues): [X]
+- Info (Minor Inconsistencies): [X]
+
+## Color Compliance
+
+### ✅ COMPLIANT
+| Location | Color Used | Purpose |
+|----------|------------|---------|
+| [file:line] | #EF4923 | Primary button |
+| ... | ... | ... |
+
+### ❌ NON-COMPLIANT
+| Location | Color Used | Should Be | Purpose |
+|----------|------------|-----------|---------|
+| [file:line] | #F37216 | #EF4923 | Orange accent |
+| [file:line] | #000000 | #222222 | Text color |
+| ... | ... | ... | ... |
+
+## Logo Compliance
+
+### ✅ COMPLIANT
+| Location | Logo Type | Background | Notes |
+|----------|-----------|------------|-------|
+| Header | White+Red | Dark | Correct |
+| ... | ... | ... | ... |
+
+### ❌ NON-COMPLIANT
+| Location | Issue | Recommendation |
+|----------|-------|----------------|
+| Card icons | Text fallback instead of logo | Use image file |
+| [location] | Wrong logo version for bg | Use white logo on dark |
+| ... | ... | ... |
+
+## Section-by-Section Findings
+
+### Dashboard
+- ✅ Header logo: Compliant
+- ❌ Primary buttons: Using #F37216 instead of #EF4923
+- ...
+
+### CMA Presentation
+- ❌ Card logos: Using text fallback
+- ❌ Orange accents: Using #FF4B2B instead of #EF4923
+- ...
+
+[Continue for each section...]
+
+## Recommendations
+
+1. **Critical:** Update all orange colors from [current] to #EF4923
+2. **Critical:** Update all pure black (#000000) to #222222
+3. **High:** Replace text-based logos with image files
+4. ...
+
+## Files Requiring Updates
+1. `client/src/components/...` - Lines X, Y, Z
+2. `client/src/styles/...` - Lines X, Y, Z
+3. ...
+```
+
+---
+
+## 🚫 DO NOT
+
+- Make any code changes
+- Modify any files
+- Update any colors or logos
+- This is AUDIT ONLY
+
+---
+
+## ✅ DELIVERABLE
+
+Provide a comprehensive markdown report showing:
+1. All color usages and their compliance status
+2. All logo usages and their compliance status
+3. Section-by-section breakdown
+4. List of files that need updates (for future fixing)
+5. Priority ranking of issues
+
+Run the diagnostic commands and compile the findings into the report format above.
