@@ -1,0 +1,300 @@
+# CMA Presentation — Step-by-Step Logo & Hero Fix
+
+## 📋 Fix List (In Order)
+
+| # | Issue | Logo File | Location |
+|---|-------|-----------|----------|
+| 1 | Header logo (upper left) | `SpyglassRealty_Logo_White.png` | Already in Replit |
+| 2 | Card icons showing "SPYGLASS REALTY" text | `Square.png` | Already in Replit |
+| 3 | Hero background (no Mapbox) | Use dark gradient | CSS only |
+
+---
+
+## 🔧 Fix 1: Header Logo (Upper Left)
+
+**Current:** Shows "SPYGLASS REALTY" as orange/white text
+**Expected:** Shows the actual Spyglass logo image (white version)
+
+### Step 1: Find the logo file path in Replit
+
+```bash
+# Run this to find where SpyglassRealty_Logo_White.png is located
+find . -name "SpyglassRealty_Logo_White.png" -o -name "*Logo_White*" | grep -v node_modules
+```
+
+### Step 2: Copy logo to public folder (if needed)
+
+```bash
+# If the file is in uploads or another location, copy to public
+mkdir -p public/logos
+cp [found-path]/SpyglassRealty_Logo_White.png public/logos/spyglass-logo-white.png
+```
+
+### Step 3: Update Header Component
+
+Find the header component (likely `CmaPresentationHeader.tsx` or similar) and update:
+
+```tsx
+// FIND this pattern (text-based logo):
+<div className="flex flex-col">
+  <span className="text-orange-500 font-bold">SPYGLASS</span>
+  <span className="text-white text-xs">REALTY</span>
+</div>
+
+// REPLACE WITH:
+<img 
+  src="/logos/spyglass-logo-white.png"
+  alt="Spyglass Realty"
+  className="h-8 w-auto"
+/>
+```
+
+**Full Header Logo Section:**
+```tsx
+{/* Top Left - Logo */}
+<div className="absolute top-4 left-4 z-20 flex items-center gap-3">
+  {/* Hamburger Menu */}
+  <button 
+    onClick={onMenuToggle}
+    className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-white/10"
+  >
+    <Menu className="w-6 h-6 text-white" />
+  </button>
+  
+  {/* Spyglass Logo - White version for dark background */}
+  <img 
+    src="/logos/spyglass-logo-white.png"
+    alt="Spyglass Realty"
+    className="h-8 w-auto object-contain"
+  />
+</div>
+```
+
+---
+
+## 🔧 Fix 2: Card Icons — Replace Text with Logo Image
+
+**Current:** Many cards show "SPYGLASS REALTY" as text
+**Expected:** Show the square logo image
+
+### Widgets That Need Logo Image:
+
+| Widget # | Title |
+|----------|-------|
+| 2 | LISTING WITH SPYGLASS REALTY |
+| 4 | MARKETING |
+| 8 | LISTING ACTION PLAN |
+| 11 | HOME SELLING SYSTEM |
+| 12 | OUR PROVEN APPROACH |
+| 13 | SEO & DIGITAL MARKETING |
+| 14 | GOOGLE + META ADS |
+| 15 | PROFESSIONAL VIDEOGRAPHY |
+| 16 | WHY 4K VIDEO |
+| 17 | EXAMPLE VIDEOS |
+| 18 | AERIAL PHOTOGRAPHY |
+| 19 | IN-HOUSE DESIGN TEAM |
+| 20 | PRINT & FLYERS |
+| 21 | CUSTOM PROPERTY PAGE |
+| 22 | GLOBAL MARKETING REACH |
+| 23 | LEADINGRE NETWORK STRENGTH |
+| 24 | FEATURED PROPERTY PROGRAM |
+| 25 | ZILLOW MARKETING TOOLS |
+| 26 | ZILLOW SHOWCASE LISTINGS |
+| 27 | OPEN HOUSE PROCESS |
+| 28 | PRICING STRATEGY |
+| 29 | LISTING PRICE |
+| 30 | MARKETING TIMELINE |
+| 31 | SELECT MOVE PROGRAM |
+| 32 | WHAT OUR CLIENTS SAY |
+| 33 | THANK YOU |
+
+**Total: 25 widgets** need the Square.png logo
+
+### Step 1: Copy Square.png to public folder
+
+```bash
+# Find and copy the Square.png logo
+find . -name "Square.png" | grep -v node_modules
+mkdir -p public/logos
+cp [found-path]/Square.png public/logos/spyglass-logo-square.png
+```
+
+### Step 2: Update the Icon Renderer
+
+Find the component that renders card icons (likely `WidgetIcon.tsx` or `SectionCard.tsx`) and update:
+
+```tsx
+// FIND the spyglass-logo case or text fallback:
+case 'spyglass-logo':
+  return (
+    <div className="flex flex-col items-center">
+      <span className="text-orange-500 text-sm font-bold">SPYGLASS</span>
+      <span className="text-gray-400 text-xs">REALTY</span>
+    </div>
+  );
+
+// REPLACE WITH:
+case 'spyglass-logo':
+  return (
+    <img 
+      src="/logos/spyglass-logo-square.png"
+      alt="Spyglass Realty"
+      className="h-12 w-12 object-contain"
+    />
+  );
+```
+
+### Step 3: Verify All 25 Widgets Use 'spyglass-logo' Icon Type
+
+In your widgets configuration, ensure these widgets have `icon: 'spyglass-logo'`:
+
+```typescript
+// Widgets 2, 4, 8, 11-33 should all have:
+{ id: 'listing_with_spyglass', icon: 'spyglass-logo', ... },
+{ id: 'marketing', icon: 'spyglass-logo', ... },
+{ id: 'listing_action_plan', icon: 'spyglass-logo', ... },
+{ id: 'home_selling_system', icon: 'spyglass-logo', ... },
+// ... etc for all 11-33
+```
+
+---
+
+## 🔧 Fix 3: Hero Section Background (No Mapbox Fallback)
+
+**Current:** Shows "mapbox" text/logo, no actual map
+**Expected:** Dark gradient background similar to CloudCMA
+
+### CloudCMA Hero Colors (from inspection):
+- Background: Dark gray gradient
+- Overlay: Semi-transparent black
+
+### Update Hero Section CSS:
+
+```tsx
+{/* Hero Section */}
+<div className="relative h-[200px] overflow-hidden">
+  {/* Background - Dark Gradient (Mapbox fallback) */}
+  <div 
+    className="absolute inset-0"
+    style={{
+      background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%)'
+    }}
+  />
+  
+  {/* Subtle pattern overlay for depth */}
+  <div 
+    className="absolute inset-0 opacity-30"
+    style={{
+      backgroundImage: `radial-gradient(circle at 25% 25%, rgba(255,255,255,0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 75% 75%, rgba(255,255,255,0.05) 0%, transparent 50%)`
+    }}
+  />
+  
+  {/* Dark overlay for text readability */}
+  <div className="absolute inset-0 bg-black/40" />
+  
+  {/* Content */}
+  <div className="relative z-10 h-full flex flex-col items-center justify-center text-white px-4">
+    <h1 className="text-2xl md:text-3xl font-bold tracking-[0.15em] uppercase text-center">
+      COMPARATIVE MARKET ANALYSIS
+    </h1>
+    <p className="text-sm md:text-base mt-3 opacity-90 text-center">
+      {propertyAddress}
+    </p>
+    <p className="text-xs opacity-70 mt-1">
+      MLS# {mlsNumber}
+    </p>
+  </div>
+</div>
+```
+
+### Alternative Simple Dark Background:
+
+```tsx
+{/* Simpler version - just dark solid color */}
+<div className="relative h-[200px] bg-gray-900">
+  {/* Content */}
+  <div className="h-full flex flex-col items-center justify-center text-white px-4">
+    <h1 className="text-2xl md:text-3xl font-bold tracking-[0.15em] uppercase">
+      COMPARATIVE MARKET ANALYSIS
+    </h1>
+    <p className="text-sm md:text-base mt-3 opacity-90">
+      {propertyAddress}
+    </p>
+    <p className="text-xs opacity-70 mt-1">
+      MLS# {mlsNumber}
+    </p>
+  </div>
+</div>
+```
+
+### Remove Mapbox Reference (Temporarily)
+
+If there's a Mapbox component that's failing, comment it out:
+
+```tsx
+{/* TODO: Re-enable when Mapbox token is configured
+<Map
+  mapboxAccessToken={MAPBOX_TOKEN}
+  ...
+/>
+*/}
+
+{/* Use gradient fallback instead */}
+<div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" />
+```
+
+---
+
+## 📋 Summary — Copy/Paste to Replit
+
+```
+Please fix these 3 issues in order:
+
+## Fix 1: Header Logo (Upper Left)
+1. Find SpyglassRealty_Logo_White.png in the project
+2. Copy it to: public/logos/spyglass-logo-white.png
+3. In the header component, replace the text-based logo with:
+   <img src="/logos/spyglass-logo-white.png" alt="Spyglass Realty" className="h-8 w-auto" />
+
+## Fix 2: Card Icons (25 widgets showing "SPYGLASS REALTY" text)
+1. Find Square.png in the project
+2. Copy it to: public/logos/spyglass-logo-square.png
+3. In the icon renderer component, update the 'spyglass-logo' case to use:
+   <img src="/logos/spyglass-logo-square.png" alt="Spyglass Realty" className="h-12 w-12 object-contain" />
+
+Widgets needing this fix: 2, 4, 8, 11-33 (total 25 widgets)
+
+## Fix 3: Hero Background (Mapbox not loading)
+Since Mapbox isn't configured yet, use a dark gradient fallback:
+- Remove or comment out the Mapbox component
+- Use this background instead:
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%)
+- Or simply: bg-gray-900
+
+Run these commands first to find the files:
+find . -name "SpyglassRealty_Logo_White.png" | grep -v node_modules
+find . -name "Square.png" | grep -v node_modules
+```
+
+---
+
+## ✅ Expected Result After Fixes
+
+| Element | Before | After |
+|---------|--------|-------|
+| Header logo | "SPYGLASS REALTY" text | Actual white logo image |
+| Card icons (25 widgets) | "SPYGLASS REALTY" text | Square logo image |
+| Hero background | "mapbox" text/broken | Dark gradient |
+
+---
+
+## 🎯 Verification Checklist
+
+After applying fixes, verify:
+
+- [ ] Header shows white Spyglass logo (not text)
+- [ ] All 25 card icons show square logo (not text)
+- [ ] Hero section has dark gradient background (no "mapbox" text)
+- [ ] No broken image icons anywhere
+- [ ] Check browser console for any 404 errors on image paths

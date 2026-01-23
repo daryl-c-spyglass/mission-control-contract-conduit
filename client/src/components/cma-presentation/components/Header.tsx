@@ -42,6 +42,7 @@ export function Header({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [logoError, setLogoError] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -52,16 +53,29 @@ export function Header({
       return;
     }
 
-    mapboxgl.accessToken = token;
+    try {
+      mapboxgl.accessToken = token;
 
-    mapRef.current = new mapboxgl.Map({
-      container: mapContainerRef.current,
-      style: mapStyle,
-      center: [longitude, latitude],
-      zoom: 14,
-      interactive: false,
-      attributionControl: false,
-    });
+      mapRef.current = new mapboxgl.Map({
+        container: mapContainerRef.current,
+        style: mapStyle,
+        center: [longitude, latitude],
+        zoom: 14,
+        interactive: false,
+        attributionControl: false,
+      });
+
+      mapRef.current.on('load', () => {
+        setMapLoaded(true);
+      });
+
+      mapRef.current.on('error', () => {
+        console.warn('Mapbox failed to load');
+        setMapLoaded(false);
+      });
+    } catch (error) {
+      console.warn('Mapbox initialization error:', error);
+    }
 
     return () => {
       mapRef.current?.remove();
@@ -79,13 +93,23 @@ export function Header({
 
   return (
     <div className="relative h-40 md:h-48 flex-shrink-0" data-testid="presentation-header">
+      {/* Dark gradient fallback background - always visible underneath */}
+      <div 
+        className="absolute inset-0"
+        style={{
+          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%)'
+        }}
+      />
+      
+      {/* Mapbox container - renders on top when loaded */}
       <div 
         ref={mapContainerRef} 
         className="absolute inset-0"
         data-testid="header-map"
       />
       
-      <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/80" />
+      {/* Dark overlay for text readability */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70" />
       
       <div className="relative z-10 h-full flex flex-col">
         <div className="flex items-center justify-between p-3">
