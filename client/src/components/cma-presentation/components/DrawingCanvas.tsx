@@ -1,12 +1,16 @@
-import { useRef, useState, useEffect } from 'react';
-import { Trash2, X } from 'lucide-react';
+import { useRef, useState, useEffect, useImperativeHandle, forwardRef } from 'react';
+
+export interface DrawingCanvasHandle {
+  clear: () => void;
+}
 
 interface DrawingCanvasProps {
   isActive: boolean;
   onClose: () => void;
 }
 
-export function DrawingCanvas({ isActive, onClose }: DrawingCanvasProps) {
+export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(
+  function DrawingCanvas({ isActive, onClose }, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [context, setContext] = useState<CanvasRenderingContext2D | null>(null);
@@ -87,6 +91,11 @@ export function DrawingCanvas({ isActive, onClose }: DrawingCanvasProps) {
     }
   };
 
+  // Expose clear function to parent
+  useImperativeHandle(ref, () => ({
+    clear: clearCanvas,
+  }), [context]);
+
   if (!isActive) return null;
 
   return (
@@ -103,29 +112,6 @@ export function DrawingCanvas({ isActive, onClose }: DrawingCanvasProps) {
         onTouchMove={draw}
         onTouchEnd={stopDrawing}
       />
-
-      <div className="absolute top-4 right-4 flex gap-2">
-        <button
-          onClick={clearCanvas}
-          className="min-w-[44px] min-h-[44px] p-2 bg-white dark:bg-gray-800 
-                     rounded-lg shadow-lg text-gray-700 dark:text-gray-300
-                     hover:bg-gray-100 dark:hover:bg-gray-700"
-          title="Clear drawing"
-          data-testid="button-clear-drawing"
-        >
-          <Trash2 className="w-5 h-5" />
-        </button>
-        <button
-          onClick={onClose}
-          className="min-w-[44px] min-h-[44px] p-2 bg-white dark:bg-gray-800 
-                     rounded-lg shadow-lg text-gray-700 dark:text-gray-300
-                     hover:bg-gray-100 dark:hover:bg-gray-700"
-          title="Exit drawing mode"
-          data-testid="button-exit-drawing"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
     </div>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Trash2, X } from 'lucide-react';
 
 interface BottomNavigationProps {
   mode: 'home' | 'slide';
@@ -11,6 +11,7 @@ interface BottomNavigationProps {
   onHome?: () => void;
   onStartPresentation?: () => void;
   onToggleDrawing: () => void;
+  onClearDrawing?: () => void;
   isDrawingMode: boolean;
 }
 
@@ -25,6 +26,7 @@ export function BottomNavigation({
   onHome,
   onStartPresentation,
   onToggleDrawing,
+  onClearDrawing,
   isDrawingMode,
 }: BottomNavigationProps) {
   const isFirst = currentSlide === 0;
@@ -42,18 +44,31 @@ export function BottomNavigation({
         <>
           <div className="w-40" />
           
-          <button
-            onClick={onToggleDrawing}
-            className={`min-w-[44px] min-h-[44px] p-3 rounded-full transition-colors
-                        ${isDrawingMode 
-                          ? 'bg-[#F37216] text-white' 
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                        }`}
-            title="Draw on screen"
-            data-testid="button-toggle-drawing"
-          >
-            <Pencil className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {isDrawingMode && (
+              <button
+                onClick={onClearDrawing}
+                className="min-w-[44px] min-h-[44px] p-3 rounded-full bg-gray-100 dark:bg-gray-800 
+                           text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                title="Clear drawing"
+                data-testid="button-clear-drawing"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            )}
+            <button
+              onClick={onToggleDrawing}
+              className={`min-w-[44px] min-h-[44px] p-3 rounded-full transition-colors
+                          ${isDrawingMode 
+                            ? 'bg-[#F37216] text-white' 
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                          }`}
+              title={isDrawingMode ? "Exit drawing mode" : "Draw on screen"}
+              data-testid="button-toggle-drawing"
+            >
+              {isDrawingMode ? <X className="w-5 h-5" /> : <Pencil className="w-5 h-5" />}
+            </button>
+          </div>
           
           <button
             onClick={onStartPresentation}
@@ -81,18 +96,31 @@ export function BottomNavigation({
             </span>
           </button>
           
-          <button
-            onClick={onToggleDrawing}
-            className={`min-w-[44px] min-h-[44px] p-3 rounded-full transition-colors
-                        ${isDrawingMode 
-                          ? 'bg-[#F37216] text-white' 
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                        }`}
-            title="Draw on screen"
-            data-testid="button-toggle-drawing-slide"
-          >
-            <Pencil className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {isDrawingMode && (
+              <button
+                onClick={onClearDrawing}
+                className="min-w-[44px] min-h-[44px] p-3 rounded-full bg-gray-100 dark:bg-gray-800 
+                           text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                title="Clear drawing"
+                data-testid="button-clear-drawing-slide"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            )}
+            <button
+              onClick={onToggleDrawing}
+              className={`min-w-[44px] min-h-[44px] p-3 rounded-full transition-colors
+                          ${isDrawingMode 
+                            ? 'bg-[#F37216] text-white' 
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                          }`}
+              title={isDrawingMode ? "Exit drawing mode" : "Draw on screen"}
+              data-testid="button-toggle-drawing-slide"
+            >
+              {isDrawingMode ? <X className="w-5 h-5" /> : <Pencil className="w-5 h-5" />}
+            </button>
+          </div>
           
           {!isLast ? (
             <button

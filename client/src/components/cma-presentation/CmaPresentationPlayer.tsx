@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { SectionGrid } from './components/SectionGrid';
 import { SlideViewer } from './components/SlideViewer';
 import { BottomNavigation } from './components/BottomNavigation';
-import { DrawingCanvas } from './components/DrawingCanvas';
+import { DrawingCanvas, type DrawingCanvasHandle } from './components/DrawingCanvas';
 import { WIDGETS } from './constants/widgets';
 import type { AgentProfile, CmaProperty } from './types';
 
@@ -38,6 +38,11 @@ export function CmaPresentationPlayer({
   const [currentSlide, setCurrentSlide] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [drawingMode, setDrawingMode] = useState(false);
+  const drawingCanvasRef = useRef<DrawingCanvasHandle>(null);
+
+  const handleClearDrawing = () => {
+    drawingCanvasRef.current?.clear();
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -109,9 +114,10 @@ export function CmaPresentationPlayer({
           onNext={() => setCurrentSlide(Math.min(WIDGETS.length - 1, currentSlide + 1))}
           onHome={() => setCurrentSlide(null)}
           onToggleDrawing={() => setDrawingMode(!drawingMode)}
+          onClearDrawing={handleClearDrawing}
           isDrawingMode={drawingMode}
         />
-        <DrawingCanvas isActive={drawingMode} onClose={() => setDrawingMode(false)} />
+        <DrawingCanvas ref={drawingCanvasRef} isActive={drawingMode} onClose={() => setDrawingMode(false)} />
       </>
     );
   }
@@ -165,10 +171,11 @@ export function CmaPresentationPlayer({
         mode="home"
         onStartPresentation={() => setCurrentSlide(0)}
         onToggleDrawing={() => setDrawingMode(!drawingMode)}
+        onClearDrawing={handleClearDrawing}
         isDrawingMode={drawingMode}
       />
       
-      <DrawingCanvas isActive={drawingMode} onClose={() => setDrawingMode(false)} />
+      <DrawingCanvas ref={drawingCanvasRef} isActive={drawingMode} onClose={() => setDrawingMode(false)} />
     </div>
   );
 }
