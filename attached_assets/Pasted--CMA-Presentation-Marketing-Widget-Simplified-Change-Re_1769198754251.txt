@@ -1,0 +1,129 @@
+# CMA Presentation — Marketing Widget (Simplified)
+
+## 📋 Change
+
+**Remove:** Statistics cards (96%, 52%, 28%, 8%)
+**Keep:** Intro heading + paragraph + infographic image
+
+---
+
+## 🎯 Target Layout (Exact CloudCMA Match)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         MARKETING                                │
+│                           4 / 33                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│     Where are homebuyers looking for information?               │
+│                                                                 │
+│     One of our top priorities is making sure we market your     │
+│     property in the places your future buyer is looking. We     │
+│     take a look at marketing- and buyer-behavior trends to      │
+│     determine where to invest our resources. The latest data    │
+│     indicates we need to invest in our website, our signage     │
+│     and marketing materials, and our continued professional     │
+│     development.                                                │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                                                           │  │
+│  │           [INFOGRAPHIC IMAGE]                             │  │
+│  │                                                           │  │
+│  │   "HOW WE DRIVE INTEREST TO YOUR PROPERTY"               │  │
+│  │   - Private Facebook Groups                               │  │
+│  │   - Google SEO and Online Presence                        │  │
+│  │                                                           │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔧 Updated Component
+
+```tsx
+// components/cma-presentation/widgets/MarketingWidget.tsx
+
+export function MarketingWidget() {
+  return (
+    <div className="h-full overflow-auto bg-white">
+      <div className="max-w-4xl mx-auto p-6 md:p-10">
+        
+        {/* Intro Section */}
+        <div className="text-center mb-8">
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6">
+            Where are homebuyers looking for information?
+          </h2>
+          <p className="text-gray-600 leading-relaxed">
+            One of our top priorities is making sure we market your property in the places 
+            your future buyer is looking. We take a look at marketing- and buyer-behavior 
+            trends to determine where to invest our resources. The latest data indicates 
+            we need to invest in our website, our signage and marketing materials, and 
+            our continued professional development.
+          </p>
+        </div>
+
+        {/* Infographic Image */}
+        <div>
+          <img
+            src="/cma-widgets/marketing-infographic.png"
+            alt="How We Drive Interest To Your Property - Private Facebook Groups and Google SEO"
+            className="w-full h-auto"
+          />
+        </div>
+
+        {/* NO STATISTICS CARDS - REMOVED */}
+        
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 📋 Copy/Paste for Replit
+
+```
+Update the Marketing widget (Widget 4) - REMOVE statistics cards, show only intro text + infographic image.
+
+## REMOVE:
+- All statistics cards (96%, 52%, 28%, 8%)
+- "HOW WE DRIVE INTEREST TO YOUR PROPERTY" heading above cards
+- The entire StatCard component and grid
+
+## KEEP/ADD:
+1. Heading: "Where are homebuyers looking for information?"
+   - className="text-2xl md:text-3xl font-bold text-gray-900 mb-6 text-center"
+
+2. Paragraph (centered):
+   "One of our top priorities is making sure we market your property in the places your future buyer is looking. We take a look at marketing- and buyer-behavior trends to determine where to invest our resources. The latest data indicates we need to invest in our website, our signage and marketing materials, and our continued professional development."
+   - className="text-gray-600 leading-relaxed text-center"
+
+3. Infographic image (I've attached it):
+   - Save to: public/cma-widgets/marketing-infographic.png
+   - Display: <img src="/cma-widgets/marketing-infographic.png" className="w-full h-auto" />
+   - No rounded corners or shadow needed - let the image display as-is
+
+## FINAL STRUCTURE:
+<div className="max-w-4xl mx-auto p-6 md:p-10">
+  <div className="text-center mb-8">
+    <h2>Where are homebuyers looking for information?</h2>
+    <p>One of our top priorities...</p>
+  </div>
+  <img src="/cma-widgets/marketing-infographic.png" className="w-full h-auto" />
+</div>
+
+That's it - simple and clean like CloudCMA.
+```
+
+---
+
+## ✅ Expected Result
+
+Just two elements:
+1. **Intro text** (heading + paragraph, centered)
+2. **Infographic image** (full width below text)
+
+No statistics cards, no extra sections.
