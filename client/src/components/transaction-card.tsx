@@ -1,4 +1,4 @@
-import { Calendar, Hash, Mail, MessageSquare, Users, FileSpreadsheet, Image as ImageIcon, FileText, Plus, Link2, Clock } from "lucide-react";
+import { Calendar, Hash, Mail, MessageSquare, Users, FileSpreadsheet, Image as ImageIcon, FileText, Plus, Link2, Clock, CheckCircle, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { Transaction, Coordinator, MLSData } from "@shared/schema";
-import { getStatusBadgeStyle, getStatusLabel, getDaysRemainingStyle } from "@/lib/utils/status-colors";
-import { formatDistanceToNow } from "date-fns";
+import { getStatusBadgeStyle, getStatusLabel } from "@/lib/utils/status-colors";
+import { format, differenceInDays, isPast, isToday } from "date-fns";
 
 interface TransactionCardProps {
   transaction: Transaction;
@@ -23,49 +23,437 @@ interface TransactionCardProps {
   onAddMLSClick?: () => void;
 }
 
-function getDaysRemaining(closingDate: string | null): number | null {
-  if (!closingDate) return null;
-  const closing = new Date(closingDate);
-  const today = new Date();
-  const diff = closing.getTime() - today.getTime();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+function formatDisplayDate(dateString: string | null | undefined): string | null {
+  if (!dateString) return null;
+  try {
+    return format(new Date(dateString), "MMM d, yyyy");
+  } catch {
+    return null;
+  }
 }
 
-function formatDate(dateString: string | null): string {
-  if (!dateString) return "—";
-  return new Date(dateString).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+function calculateDaysDifference(targetDate: string | null | undefined): number | null {
+  if (!targetDate) return null;
+  try {
+    const target = new Date(targetDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    target.setHours(0, 0, 0, 0);
+    return differenceInDays(target, today);
+  } catch {
+    return null;
+  }
+}
+
+function isDatePast(date: string | null | undefined): boolean {
+  if (!date) return false;
+  try {
+    const target = new Date(date);
+    target.setHours(23, 59, 59, 999);
+    return isPast(target);
+  } catch {
+    return false;
+  }
+}
+
+function isDateToday(date: string | null | undefined): boolean {
+  if (!date) return false;
+  try {
+    return isToday(new Date(date));
+  } catch {
+    return false;
+  }
+}
+
+function OffMarketDateBox({ goLiveDate }: { goLiveDate: string | null }) {
+  const days = calculateDaysDifference(goLiveDate);
+  const formattedDate = formatDisplayDate(goLiveDate);
+  const isPastDate = isDatePast(goLiveDate);
+
+  return (
+    <div className="bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/50 rounded-lg p-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-400 uppercase tracking-wide font-medium flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5" />
+            Going Live
+          </p>
+          {formattedDate ? (
+            <p className="text-sm sm:text-base text-purple-900 dark:text-purple-100 font-semibold mt-1">{formattedDate}</p>
+          ) : (
+            <p className="text-xs sm:text-sm text-purple-400 dark:text-purple-500 mt-1">Not set</p>
+          )}
+        </div>
+        {days !== null && (
+          <div className="text-right">
+            {isPastDate ? (
+              <>
+                <p className="text-xl sm:text-2xl font-bold text-purple-400 dark:text-purple-500">{Math.abs(days)}</p>
+                <p className="text-[10px] sm:text-xs text-purple-400 dark:text-purple-500">{Math.abs(days) === 1 ? 'day ago' : 'days ago'}</p>
+              </>
+            ) : days === 0 ? (
+              <div className="bg-purple-500 text-white px-3 py-1.5 rounded-lg">
+                <p className="text-xs sm:text-sm font-bold">Today!</p>
+              </div>
+            ) : (
+              <>
+                <p className="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-300">{days}</p>
+                <p className="text-[10px] sm:text-xs text-purple-500 dark:text-purple-400">{days === 1 ? 'day' : 'days'}</p>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ActiveListingDateBox({ listDate, daysOnMarket }: { listDate: string | null; daysOnMarket?: number | null }) {
+  const computedDays = listDate ? Math.abs(calculateDaysDifference(listDate) || 0) : null;
+  const displayDays = daysOnMarket ?? computedDays;
+  const formattedDate = formatDisplayDate(listDate);
+
+  return (
+    <div className="bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800/50 rounded-lg p-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-[10px] sm:text-xs text-green-600 dark:text-green-400 uppercase tracking-wide font-medium flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5" />
+            Days on Market
+          </p>
+          {formattedDate ? (
+            <p className="text-sm sm:text-base text-green-900 dark:text-green-100 font-semibold mt-1">Listed {formattedDate}</p>
+          ) : (
+            <p className="text-xs sm:text-sm text-green-400 dark:text-green-500 mt-1">List date not set</p>
+          )}
+        </div>
+        {displayDays !== null && (
+          <div className="text-right">
+            <p className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-300">{displayDays}</p>
+            <p className="text-[10px] sm:text-xs text-green-500 dark:text-green-400">{displayDays === 1 ? 'day' : 'days'}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function InContractDateBox({ 
+  contractDate, 
+  closingDate 
+}: { 
+  contractDate: string | null; 
+  closingDate: string | null;
+}) {
+  const daysToClose = calculateDaysDifference(closingDate);
+  const isOverdue = daysToClose !== null && daysToClose < 0;
+  const isClosingToday = isDateToday(closingDate);
+
+  return (
+    <div className="bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800/50 rounded-lg p-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-[10px] sm:text-xs text-orange-600 dark:text-orange-400 uppercase tracking-wide font-medium">Contract Date</p>
+          <p className="text-xs sm:text-sm text-orange-900 dark:text-orange-100 font-semibold mt-1">
+            {formatDisplayDate(contractDate) || "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] sm:text-xs text-orange-600 dark:text-orange-400 uppercase tracking-wide font-medium">Closing Date</p>
+          <p className="text-xs sm:text-sm text-orange-900 dark:text-orange-100 font-semibold mt-1">
+            {formatDisplayDate(closingDate) || "—"}
+          </p>
+        </div>
+      </div>
+      {closingDate && (
+        <div className="mt-2 pt-2 border-t border-orange-200 dark:border-orange-800/50 flex items-center justify-between">
+          <span className="text-[10px] sm:text-xs text-orange-600 dark:text-orange-400 font-medium">Time to Close</span>
+          {isClosingToday ? (
+            <span className="text-xs sm:text-sm text-orange-700 dark:text-orange-300 font-bold">Closing Today!</span>
+          ) : isOverdue ? (
+            <span className="text-xs sm:text-sm text-red-600 dark:text-red-400 font-bold">{Math.abs(daysToClose!)} days overdue</span>
+          ) : (
+            <span className="text-xs sm:text-sm text-orange-700 dark:text-orange-300 font-bold">
+              {daysToClose} {daysToClose === 1 ? 'day' : 'days'} remaining
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PendingDateBox({ 
+  contractDate, 
+  closingDate 
+}: { 
+  contractDate: string | null; 
+  closingDate: string | null;
+}) {
+  const daysToClose = calculateDaysDifference(closingDate);
+  const isOverdue = daysToClose !== null && daysToClose < 0;
+  const isClosingToday = isDateToday(closingDate);
+
+  const boxBg = isOverdue ? "bg-red-50 dark:bg-red-950/40" : "bg-yellow-50 dark:bg-yellow-950/40";
+  const boxBorder = isOverdue ? "border-red-200 dark:border-red-800/50" : "border-yellow-200 dark:border-yellow-800/50";
+  const textColor = isOverdue ? "text-red-600 dark:text-red-400" : "text-yellow-600 dark:text-yellow-400";
+  const textColorDark = isOverdue ? "text-red-900 dark:text-red-100" : "text-yellow-900 dark:text-yellow-100";
+  const borderColor = isOverdue ? "border-red-200 dark:border-red-800/50" : "border-yellow-200 dark:border-yellow-800/50";
+
+  return (
+    <div className={`${boxBg} border ${boxBorder} rounded-lg p-3`}>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className={`text-[10px] sm:text-xs ${textColor} uppercase tracking-wide font-medium`}>Contract Date</p>
+          <p className={`text-xs sm:text-sm ${textColorDark} font-semibold mt-1`}>
+            {formatDisplayDate(contractDate) || "—"}
+          </p>
+        </div>
+        <div>
+          <p className={`text-[10px] sm:text-xs ${textColor} uppercase tracking-wide font-medium`}>Closing Date</p>
+          <p className={`text-xs sm:text-sm ${textColorDark} font-semibold mt-1`}>
+            {formatDisplayDate(closingDate) || "—"}
+          </p>
+        </div>
+      </div>
+      {closingDate && (
+        <div className={`mt-2 pt-2 border-t ${borderColor} flex items-center justify-between`}>
+          {isOverdue ? (
+            <>
+              <span className="text-[10px] sm:text-xs text-red-600 dark:text-red-400 font-medium flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Overdue
+              </span>
+              <span className="text-xs sm:text-sm text-red-700 dark:text-red-300 font-bold">
+                {Math.abs(daysToClose!)} {Math.abs(daysToClose!) === 1 ? 'day' : 'days'} overdue
+              </span>
+            </>
+          ) : isClosingToday ? (
+            <>
+              <span className={`text-[10px] sm:text-xs ${textColor} font-medium`}>Status</span>
+              <span className="text-xs sm:text-sm text-yellow-700 dark:text-yellow-300 font-bold">Closing Today!</span>
+            </>
+          ) : (
+            <>
+              <span className={`text-[10px] sm:text-xs ${textColor} font-medium`}>Time to Close</span>
+              <span className="text-xs sm:text-sm text-yellow-700 dark:text-yellow-300 font-bold">
+                {daysToClose} {daysToClose === 1 ? 'day' : 'days'} remaining
+              </span>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClosingSoonDateBox({ 
+  contractDate, 
+  closingDate 
+}: { 
+  contractDate: string | null; 
+  closingDate: string | null;
+}) {
+  const daysToClose = calculateDaysDifference(closingDate);
+  const isClosingToday = isDateToday(closingDate);
+  const isOverdue = daysToClose !== null && daysToClose < 0;
+
+  return (
+    <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 rounded-lg p-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-[10px] sm:text-xs text-amber-600 dark:text-amber-400 uppercase tracking-wide font-medium">Contract Date</p>
+          <p className="text-xs sm:text-sm text-amber-900 dark:text-amber-100 font-semibold mt-1">
+            {formatDisplayDate(contractDate) || "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] sm:text-xs text-amber-600 dark:text-amber-400 uppercase tracking-wide font-medium">Closing Date</p>
+          <p className="text-xs sm:text-sm text-amber-900 dark:text-amber-100 font-semibold mt-1">
+            {formatDisplayDate(closingDate) || "—"}
+          </p>
+        </div>
+      </div>
+      {closingDate && (
+        <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-800/50 flex items-center justify-between">
+          {isClosingToday ? (
+            <>
+              <span className="text-[10px] sm:text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                Closing Today!
+              </span>
+              <span className="text-xs sm:text-sm text-amber-700 dark:text-amber-300 font-bold">Today</span>
+            </>
+          ) : isOverdue ? (
+            <>
+              <span className="text-[10px] sm:text-xs text-red-600 dark:text-red-400 font-medium flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Overdue
+              </span>
+              <span className="text-xs sm:text-sm text-red-700 dark:text-red-300 font-bold">
+                {Math.abs(daysToClose!)} {Math.abs(daysToClose!) === 1 ? 'day' : 'days'} overdue
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-[10px] sm:text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                Closing Soon
+              </span>
+              <span className="text-xs sm:text-sm text-amber-700 dark:text-amber-300 font-bold">
+                {daysToClose} {daysToClose === 1 ? 'day' : 'days'} remaining
+              </span>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClosedDateBox({ 
+  contractDate, 
+  closedDate 
+}: { 
+  contractDate: string | null; 
+  closedDate: string | null;
+}) {
+  const daysSinceClosed = closedDate ? Math.abs(calculateDaysDifference(closedDate) || 0) : null;
+
+  return (
+    <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">Contract Date</p>
+          <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 font-semibold mt-1">
+            {formatDisplayDate(contractDate) || "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">Closed On</p>
+          <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 font-semibold mt-1">
+            {formatDisplayDate(closedDate) || "—"}
+          </p>
+        </div>
+      </div>
+      <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+        <span className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium flex items-center gap-1">
+          <CheckCircle className="w-3.5 h-3.5" />
+          Completed
+        </span>
+        {daysSinceClosed !== null && (
+          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 font-medium">
+            {daysSinceClosed} {daysSinceClosed === 1 ? 'day' : 'days'} ago
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DefaultDateBox({ 
+  contractDate, 
+  closingDate 
+}: { 
+  contractDate: string | null; 
+  closingDate: string | null;
+}) {
+  const daysToClose = calculateDaysDifference(closingDate);
+  const isOverdue = daysToClose !== null && daysToClose < 0;
+  const isClosingToday = isDateToday(closingDate);
+
+  return (
+    <div className="bg-muted/50 border border-border rounded-lg p-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide font-medium">Contract Date</p>
+          <p className="text-xs sm:text-sm text-foreground font-semibold mt-1">
+            {formatDisplayDate(contractDate) || "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide font-medium">Closing Date</p>
+          <p className="text-xs sm:text-sm text-foreground font-semibold mt-1">
+            {formatDisplayDate(closingDate) || "—"}
+          </p>
+        </div>
+      </div>
+      {closingDate && daysToClose !== null && (
+        <div className="mt-2 pt-2 border-t border-border flex items-center justify-between">
+          <span className="text-[10px] sm:text-xs text-muted-foreground font-medium">Time to Close</span>
+          {isClosingToday ? (
+            <span className="text-xs sm:text-sm text-foreground font-bold">Closing Today!</span>
+          ) : isOverdue ? (
+            <span className="text-xs sm:text-sm text-red-600 dark:text-red-400 font-bold">{Math.abs(daysToClose)} days overdue</span>
+          ) : (
+            <span className="text-xs sm:text-sm text-foreground font-bold">
+              {daysToClose} {daysToClose === 1 ? 'day' : 'days'} remaining
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function TransactionCard({ transaction, coordinators, onClick, onMarketingClick, onMLSClick, onDocsClick, onAddMLSClick }: TransactionCardProps) {
-  // Determine if this is an off-market listing
   const isOffMarket = transaction.isOffMarket && !transaction.mlsNumber;
   
-  // Determine if connected to Repliers MLS (has MLS number and not off-market)
   const isConnectedToMLS = !!(
     transaction.mlsNumber && 
     transaction.mlsNumber.length > 0 && 
     !transaction.isOffMarket
   );
   
-  // Use MLS status as source of truth, fallback to transaction status, or off-market status
   const mlsData = transaction.mlsData as MLSData | null;
   const displayStatus = isOffMarket ? 'off_market' : (mlsData?.status || transaction.status);
   const statusLabel = getStatusLabel(displayStatus);
-  const daysRemaining = getDaysRemaining(transaction.closingDate);
   
-  // Format last synced time for tooltip
   const lastSynced = transaction.mlsLastSyncedAt;
   const lastSyncedText = lastSynced 
-    ? formatDistanceToNow(new Date(lastSynced), { addSuffix: true })
+    ? `${Math.floor((Date.now() - new Date(lastSynced).getTime()) / (1000 * 60 * 60 * 24))} days ago`
     : 'Not yet synced';
   
   const transactionCoordinators = coordinators.filter(
     (c) => transaction.coordinatorIds?.includes(c.id)
   );
+
+  const renderDateBox = () => {
+    const statusLower = displayStatus.toLowerCase().replace(/\s+/g, '');
+    
+    if (isOffMarket || statusLower.includes('offmarket') || statusLower === 'off_market') {
+      return <OffMarketDateBox goLiveDate={transaction.goLiveDate} />;
+    }
+    
+    if (statusLower.includes('comingsoon')) {
+      return <OffMarketDateBox goLiveDate={transaction.goLiveDate} />;
+    }
+    
+    if (statusLower.includes('active') || statusLower === 'forsale') {
+      const listDate = mlsData?.listDate || null;
+      const daysOnMarket = mlsData?.daysOnMarket;
+      return <ActiveListingDateBox listDate={listDate} daysOnMarket={daysOnMarket} />;
+    }
+    
+    if (statusLower.includes('closed') || statusLower.includes('sold')) {
+      const closedDate = mlsData?.soldDate || null;
+      return <ClosedDateBox contractDate={transaction.contractDate} closedDate={closedDate} />;
+    }
+    
+    if (statusLower.includes('cleartoclose')) {
+      return <ClosingSoonDateBox contractDate={transaction.contractDate} closingDate={transaction.closingDate} />;
+    }
+    
+    if (statusLower.includes('pending')) {
+      return <PendingDateBox contractDate={transaction.contractDate} closingDate={transaction.closingDate} />;
+    }
+    
+    if (statusLower.includes('contract')) {
+      return <InContractDateBox contractDate={transaction.contractDate} closingDate={transaction.closingDate} />;
+    }
+    
+    return <DefaultDateBox contractDate={transaction.contractDate} closingDate={transaction.closingDate} />;
+  };
 
   return (
     <Card
@@ -123,87 +511,7 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
       </CardHeader>
 
       <CardContent className="space-y-3 sm:space-y-4">
-        {/* Conditional dates section: Off-market shows Date Going Live, others show Contract/Closing */}
-        {isOffMarket ? (
-          <div className="bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-950/40 dark:to-purple-900/30 border border-purple-200 dark:border-purple-800/50 rounded-lg p-3">
-            <div className="flex items-center justify-between">
-              {/* Left side: Label and Date */}
-              <div>
-                <p className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-400 uppercase tracking-wide font-medium flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5" />
-                  Going Live
-                </p>
-                {transaction.goLiveDate ? (
-                  <p className="text-sm sm:text-base text-purple-900 dark:text-purple-100 font-semibold mt-1" data-testid={`text-go-live-date-${transaction.id}`}>
-                    {formatDate(transaction.goLiveDate)}
-                  </p>
-                ) : (
-                  <p className="text-xs sm:text-sm text-purple-400 dark:text-purple-500 mt-1" data-testid={`text-go-live-date-${transaction.id}`}>
-                    Not set
-                  </p>
-                )}
-              </div>
-              
-              {/* Right side: Countdown */}
-              {transaction.goLiveDate && (() => {
-                const goLive = new Date(transaction.goLiveDate);
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                goLive.setHours(0, 0, 0, 0);
-                const daysUntil = Math.ceil((goLive.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                
-                if (daysUntil === 0) {
-                  return (
-                    <div className="bg-purple-500 text-white px-3 py-1.5 rounded-lg text-center">
-                      <p className="text-sm font-bold">Today!</p>
-                    </div>
-                  );
-                } else if (daysUntil < 0) {
-                  return (
-                    <div className="text-right text-purple-400 dark:text-purple-500">
-                      <p className="text-xl sm:text-2xl font-bold">{Math.abs(daysUntil)}</p>
-                      <p className="text-[10px] sm:text-xs">{Math.abs(daysUntil) === 1 ? 'day ago' : 'days ago'}</p>
-                    </div>
-                  );
-                } else {
-                  return (
-                    <div className={`text-right ${daysUntil <= 7 ? 'text-purple-600 dark:text-purple-300' : 'text-purple-500 dark:text-purple-400'}`}>
-                      <p className="text-xl sm:text-2xl font-bold">{daysUntil}</p>
-                      <p className="text-[10px] sm:text-xs">{daysUntil === 1 ? 'day' : 'days'}</p>
-                    </div>
-                  );
-                }
-              })()}
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-2 sm:gap-4 text-xs sm:text-sm">
-            <div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide mb-1">Contract Date</p>
-              <div className="flex items-center gap-1 sm:gap-1.5">
-                <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground flex-shrink-0" />
-                <span data-testid={`text-contract-date-${transaction.id}`}>
-                  {formatDate(transaction.contractDate)}
-                </span>
-              </div>
-            </div>
-            <div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide mb-1">Closing Date</p>
-              <div className="flex items-center gap-1 sm:gap-1.5">
-                <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground flex-shrink-0" />
-                <span data-testid={`text-closing-date-${transaction.id}`}>
-                  {formatDate(transaction.closingDate)}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {daysRemaining !== null && !displayStatus.toLowerCase().includes('closed') && !displayStatus.toLowerCase().includes('sold') && !displayStatus.toLowerCase().includes('cancel') && (
-          <div className={`text-xs sm:text-sm ${getDaysRemainingStyle(daysRemaining)}`}>
-            {daysRemaining > 0 ? `${daysRemaining} days remaining` : daysRemaining === 0 ? "Closing today" : `${Math.abs(daysRemaining)} days overdue`}
-          </div>
-        )}
+        {renderDateBox()}
 
         {transactionCoordinators.length > 0 && (
           <div className="flex items-center gap-2">
@@ -297,7 +605,7 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
           <Button
             size="sm"
             variant="ghost"
-            className="gap-1 sm:gap-1.5 text-[11px] sm:text-xs text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/30 mt-2"
+            className="gap-1 sm:gap-1.5 text-[11px] sm:text-xs text-purple-600 dark:text-purple-400 mt-2"
             onClick={(e) => {
               e.stopPropagation();
               onAddMLSClick();

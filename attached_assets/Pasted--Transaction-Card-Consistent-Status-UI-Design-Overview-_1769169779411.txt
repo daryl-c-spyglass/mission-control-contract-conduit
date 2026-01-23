@@ -1,0 +1,786 @@
+# Transaction Card - Consistent Status UI Design
+
+## Overview
+Redesign all transaction cards to have consistent, aligned UI across all statuses. Each status gets a themed colored info box with relevant date information and countdown/status indicators.
+
+---
+
+## Status Color System
+
+| Status | Badge Color | Box BG | Box Border | Text Color |
+|--------|-------------|--------|------------|------------|
+| Off Market | `bg-purple-500` | `bg-purple-50` | `border-purple-200` | `text-purple-600/900` |
+| Active Listing | `bg-green-500` | `bg-green-50` | `border-green-200` | `text-green-600/900` |
+| In Contract | `bg-orange-500` | `bg-orange-50` | `border-orange-200` | `text-orange-600/900` |
+| Pending | `bg-yellow-500` | `bg-yellow-50` | `border-yellow-200` | `text-yellow-600/900` |
+| Pending (Overdue) | `bg-yellow-500` | `bg-red-50` | `border-red-200` | `text-red-600/900` |
+| Closing Soon | `bg-amber-500` | `bg-amber-50` | `border-amber-200` | `text-amber-600/900` |
+| Closed | `bg-gray-500` | `bg-gray-100` | `border-gray-200` | `text-gray-500/700` |
+
+---
+
+## Implementation
+
+### File: `client/src/components/transactions/TransactionCard.tsx`
+
+```tsx
+import { format, differenceInDays, isPast, isToday } from "date-fns";
+import { 
+  Calendar, 
+  Clock, 
+  AlertTriangle, 
+  CheckCircle, 
+  FileText, 
+  Image, 
+  MessageSquare,
+  Mail,
+  Plus
+} from "lucide-react";
+
+// ============================================
+// TYPES
+// ============================================
+
+type TransactionStatus = 
+  | "Off Market" 
+  | "Active Listing" 
+  | "In Contract" 
+  | "Pending" 
+  | "Closing Soon" 
+  | "Closed";
+
+interface Transaction {
+  id: number;
+  address: string;
+  mlsNumber: string | null;
+  status: TransactionStatus;
+  // Dates
+  goLiveDate: string | null;      // For Off Market
+  listDate: string | null;         // For Active Listing
+  contractDate: string | null;     // For In Contract, Pending, Closing Soon, Closed
+  closingDate: string | null;      // For In Contract, Pending, Closing Soon, Closed
+  closedDate: string | null;       // For Closed (actual close date)
+  // Other
+  coordinators: { name: string; initials: string; color: string }[];
+  hasSlackChannel: boolean;
+  hasEmails: boolean;
+}
+
+interface TransactionCardProps {
+  transaction: Transaction;
+  onClick: () => void;
+}
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+function formatDate(date: string | Date | null | undefined): string | null {
+  if (!date) return null;
+  try {
+    return format(new Date(date), "MMM d, yyyy");
+  } catch {
+    return null;
+  }
+}
+
+function calculateDaysDifference(targetDate: string | Date | null | undefined): number | null {
+  if (!targetDate) return null;
+  try {
+    const target = new Date(targetDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    target.setHours(0, 0, 0, 0);
+    return differenceInDays(target, today);
+  } catch {
+    return null;
+  }
+}
+
+function isDatePast(date: string | Date | null | undefined): boolean {
+  if (!date) return false;
+  try {
+    const target = new Date(date);
+    target.setHours(23, 59, 59, 999);
+    return isPast(target);
+  } catch {
+    return false;
+  }
+}
+
+function isDateToday(date: string | Date | null | undefined): boolean {
+  if (!date) return false;
+  try {
+    return isToday(new Date(date));
+  } catch {
+    return false;
+  }
+}
+
+// ============================================
+// STATUS BADGE COMPONENT
+// ============================================
+
+function StatusBadge({ status }: { status: TransactionStatus }) {
+  const styles: Record<TransactionStatus, string> = {
+    "Off Market": "bg-purple-500 text-white",
+    "Active Listing": "bg-green-500 text-white",
+    "In Contract": "bg-orange-500 text-white",
+    "Pending": "bg-yellow-500 text-white",
+    "Closing Soon": "bg-amber-500 text-white",
+    "Closed": "bg-gray-500 text-white",
+  };
+
+  return (
+    <span className={`px-3 py-1 text-xs font-medium rounded-full ${styles[status]}`}>
+      {status}
+    </span>
+  );
+}
+
+// ============================================
+// DATE INFO BOX COMPONENTS
+// ============================================
+
+// Off Market - Going Live countdown
+function OffMarketDateBox({ goLiveDate }: { goLiveDate: string | null }) {
+  const days = calculateDaysDifference(goLiveDate);
+  const formattedDate = formatDate(goLiveDate);
+  const isPastDate = isDatePast(goLiveDate);
+
+  return (
+    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs text-purple-600 uppercase tracking-wide font-medium flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5" />
+            Going Live
+          </p>
+          {formattedDate ? (
+            <p className="text-base text-purple-900 font-semibold mt-1">{formattedDate}</p>
+          ) : (
+            <p className="text-sm text-purple-400 mt-1">Not set</p>
+          )}
+        </div>
+        {days !== null && (
+          <div className="text-right">
+            {isPastDate ? (
+              <>
+                <p className="text-2xl font-bold text-purple-400">{Math.abs(days)}</p>
+                <p className="text-xs text-purple-400">days ago</p>
+              </>
+            ) : days === 0 ? (
+              <div className="bg-purple-500 text-white px-3 py-1 rounded-lg">
+                <p className="text-sm font-bold">Today</p>
+              </div>
+            ) : (
+              <>
+                <p className="text-2xl font-bold text-purple-600">{days}</p>
+                <p className="text-xs text-purple-500">{days === 1 ? "day" : "days"}</p>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Active Listing - Days on Market
+function ActiveListingDateBox({ listDate }: { listDate: string | null }) {
+  const days = listDate ? Math.abs(calculateDaysDifference(listDate) || 0) : null;
+  const formattedDate = formatDate(listDate);
+
+  return (
+    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs text-green-600 uppercase tracking-wide font-medium flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5" />
+            Days on Market
+          </p>
+          {formattedDate ? (
+            <p className="text-base text-green-900 font-semibold mt-1">Listed {formattedDate}</p>
+          ) : (
+            <p className="text-sm text-green-400 mt-1">List date not set</p>
+          )}
+        </div>
+        {days !== null && (
+          <div className="text-right">
+            <p className="text-2xl font-bold text-green-600">{days}</p>
+            <p className="text-xs text-green-500">{days === 1 ? "day" : "days"}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// In Contract - Contract & Closing dates with countdown
+function InContractDateBox({ 
+  contractDate, 
+  closingDate 
+}: { 
+  contractDate: string | null; 
+  closingDate: string | null;
+}) {
+  const daysToClose = calculateDaysDifference(closingDate);
+  const isOverdue = daysToClose !== null && daysToClose < 0;
+  const isClosingToday = isDateToday(closingDate);
+
+  return (
+    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-xs text-orange-600 uppercase tracking-wide font-medium">Contract Date</p>
+          <p className="text-sm text-orange-900 font-semibold mt-1">
+            {formatDate(contractDate) || "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-orange-600 uppercase tracking-wide font-medium">Closing Date</p>
+          <p className="text-sm text-orange-900 font-semibold mt-1">
+            {formatDate(closingDate) || "—"}
+          </p>
+        </div>
+      </div>
+      {closingDate && (
+        <div className="mt-2 pt-2 border-t border-orange-200 flex items-center justify-between">
+          <span className="text-xs text-orange-600 font-medium">Time to Close</span>
+          {isClosingToday ? (
+            <span className="text-sm text-orange-700 font-bold">Closing Today!</span>
+          ) : isOverdue ? (
+            <span className="text-sm text-red-600 font-bold">{Math.abs(daysToClose)} days overdue</span>
+          ) : (
+            <span className="text-sm text-orange-700 font-bold">
+              {daysToClose} {daysToClose === 1 ? "day" : "days"} remaining
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Pending - Similar to In Contract but with overdue warning styling
+function PendingDateBox({ 
+  contractDate, 
+  closingDate 
+}: { 
+  contractDate: string | null; 
+  closingDate: string | null;
+}) {
+  const daysToClose = calculateDaysDifference(closingDate);
+  const isOverdue = daysToClose !== null && daysToClose < 0;
+  const isClosingToday = isDateToday(closingDate);
+
+  // Use red theme if overdue, yellow if on track
+  const boxBg = isOverdue ? "bg-red-50" : "bg-yellow-50";
+  const boxBorder = isOverdue ? "border-red-200" : "border-yellow-200";
+  const textColor = isOverdue ? "text-red-600" : "text-yellow-600";
+  const textColorDark = isOverdue ? "text-red-900" : "text-yellow-900";
+  const borderColor = isOverdue ? "border-red-200" : "border-yellow-200";
+
+  return (
+    <div className={`${boxBg} border ${boxBorder} rounded-lg p-3 mb-4`}>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className={`text-xs ${textColor} uppercase tracking-wide font-medium`}>Contract Date</p>
+          <p className={`text-sm ${textColorDark} font-semibold mt-1`}>
+            {formatDate(contractDate) || "—"}
+          </p>
+        </div>
+        <div>
+          <p className={`text-xs ${textColor} uppercase tracking-wide font-medium`}>Closing Date</p>
+          <p className={`text-sm ${textColorDark} font-semibold mt-1`}>
+            {formatDate(closingDate) || "—"}
+          </p>
+        </div>
+      </div>
+      {closingDate && (
+        <div className={`mt-2 pt-2 border-t ${borderColor} flex items-center justify-between`}>
+          {isOverdue ? (
+            <>
+              <span className="text-xs text-red-600 font-medium flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Overdue
+              </span>
+              <span className="text-sm text-red-700 font-bold">
+                {Math.abs(daysToClose)} {Math.abs(daysToClose) === 1 ? "day" : "days"} overdue
+              </span>
+            </>
+          ) : isClosingToday ? (
+            <>
+              <span className={`text-xs ${textColor} font-medium`}>Status</span>
+              <span className="text-sm text-yellow-700 font-bold">Closing Today!</span>
+            </>
+          ) : (
+            <>
+              <span className={`text-xs ${textColor} font-medium`}>Time to Close</span>
+              <span className="text-sm text-yellow-700 font-bold">
+                {daysToClose} {daysToClose === 1 ? "day" : "days"} remaining
+              </span>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Closing Soon - Urgent amber styling
+function ClosingSoonDateBox({ 
+  contractDate, 
+  closingDate 
+}: { 
+  contractDate: string | null; 
+  closingDate: string | null;
+}) {
+  const daysToClose = calculateDaysDifference(closingDate);
+  const isClosingToday = isDateToday(closingDate);
+  const isOverdue = daysToClose !== null && daysToClose < 0;
+
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-xs text-amber-600 uppercase tracking-wide font-medium">Contract Date</p>
+          <p className="text-sm text-amber-900 font-semibold mt-1">
+            {formatDate(contractDate) || "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-amber-600 uppercase tracking-wide font-medium">Closing Date</p>
+          <p className="text-sm text-amber-900 font-semibold mt-1">
+            {formatDate(closingDate) || "—"}
+          </p>
+        </div>
+      </div>
+      {closingDate && (
+        <div className="mt-2 pt-2 border-t border-amber-200 flex items-center justify-between">
+          {isClosingToday ? (
+            <>
+              <span className="text-xs text-amber-600 font-medium flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                Closing Today!
+              </span>
+              <span className="text-sm text-amber-700 font-bold">Today</span>
+            </>
+          ) : isOverdue ? (
+            <>
+              <span className="text-xs text-red-600 font-medium flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Overdue
+              </span>
+              <span className="text-sm text-red-700 font-bold">
+                {Math.abs(daysToClose)} {Math.abs(daysToClose) === 1 ? "day" : "days"} overdue
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-xs text-amber-600 font-medium flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                Closing Soon
+              </span>
+              <span className="text-sm text-amber-700 font-bold">
+                {daysToClose} {daysToClose === 1 ? "day" : "days"} remaining
+              </span>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Closed - Completed styling
+function ClosedDateBox({ 
+  contractDate, 
+  closedDate 
+}: { 
+  contractDate: string | null; 
+  closedDate: string | null;
+}) {
+  const daysSinceClosed = closedDate ? Math.abs(calculateDaysDifference(closedDate) || 0) : null;
+
+  return (
+    <div className="bg-gray-100 border border-gray-200 rounded-lg p-3 mb-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Contract Date</p>
+          <p className="text-sm text-gray-700 font-semibold mt-1">
+            {formatDate(contractDate) || "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Closed On</p>
+          <p className="text-sm text-gray-700 font-semibold mt-1">
+            {formatDate(closedDate) || "—"}
+          </p>
+        </div>
+      </div>
+      <div className="mt-2 pt-2 border-t border-gray-200 flex items-center justify-between">
+        <span className="text-xs text-gray-500 font-medium flex items-center gap-1">
+          <CheckCircle className="w-3.5 h-3.5" />
+          Completed
+        </span>
+        {daysSinceClosed !== null && (
+          <span className="text-sm text-gray-600 font-medium">
+            {daysSinceClosed} {daysSinceClosed === 1 ? "day" : "days"} ago
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// QUICK ACTION BUTTONS
+// ============================================
+
+interface QuickActionProps {
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+}
+
+function QuickActionButton({ icon, label, onClick }: QuickActionProps) {
+  return (
+    <button
+      onClick={onClick}
+      className="px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg 
+                 hover:bg-gray-50 active:bg-gray-100 transition-colors
+                 flex items-center gap-1 text-gray-700"
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+// ============================================
+// MAIN TRANSACTION CARD COMPONENT
+// ============================================
+
+export function TransactionCard({ transaction, onClick }: TransactionCardProps) {
+  const {
+    address,
+    mlsNumber,
+    status,
+    goLiveDate,
+    listDate,
+    contractDate,
+    closingDate,
+    closedDate,
+    coordinators,
+    hasSlackChannel,
+    hasEmails,
+  } = transaction;
+
+  const isOffMarket = status === "Off Market";
+
+  // Render the appropriate date box based on status
+  const renderDateBox = () => {
+    switch (status) {
+      case "Off Market":
+        return <OffMarketDateBox goLiveDate={goLiveDate} />;
+      case "Active Listing":
+        return <ActiveListingDateBox listDate={listDate} />;
+      case "In Contract":
+        return <InContractDateBox contractDate={contractDate} closingDate={closingDate} />;
+      case "Pending":
+        return <PendingDateBox contractDate={contractDate} closingDate={closingDate} />;
+      case "Closing Soon":
+        return <ClosingSoonDateBox contractDate={contractDate} closingDate={closingDate} />;
+      case "Closed":
+        return <ClosedDateBox contractDate={contractDate} closedDate={closedDate} />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div
+      onClick={onClick}
+      className="bg-white rounded-xl border border-gray-200 p-5 
+                 hover:shadow-md transition-shadow cursor-pointer"
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div className="min-w-0 flex-1 mr-3">
+          <h3 className="font-semibold text-gray-900 truncate">{address}</h3>
+          {mlsNumber ? (
+            <p className="text-sm text-gray-500"># {mlsNumber}</p>
+          ) : (
+            <p className="text-sm text-gray-500">(Off Market)</p>
+          )}
+        </div>
+        <StatusBadge status={status} />
+      </div>
+
+      {/* Date Info Box - Status-specific */}
+      {renderDateBox()}
+
+      {/* Coordinators */}
+      {coordinators && coordinators.length > 0 && (
+        <div className="flex items-center gap-2 mb-3">
+          {coordinators.slice(0, 3).map((coordinator, index) => (
+            <div
+              key={index}
+              className={`w-6 h-6 ${coordinator.color || "bg-gray-400"} rounded-full 
+                        flex items-center justify-center text-xs font-medium text-white`}
+              title={coordinator.name}
+            >
+              {coordinator.initials}
+            </div>
+          ))}
+          {coordinators.length > 3 && (
+            <span className="text-xs text-gray-500">+{coordinators.length - 3}</span>
+          )}
+          <span className="text-sm text-gray-600 ml-1">
+            {coordinators[0]?.name?.split(" ")[0]}
+          </span>
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <div className="flex flex-wrap gap-2">
+        {/* MLS - only show if has MLS number */}
+        {mlsNumber && (
+          <QuickActionButton
+            icon={<FileText className="w-3 h-3" />}
+            label="MLS"
+            onClick={(e) => { e?.stopPropagation(); }}
+          />
+        )}
+        
+        <QuickActionButton
+          icon={<Image className="w-3 h-3" />}
+          label="Marketing"
+          onClick={(e) => { e?.stopPropagation(); }}
+        />
+        
+        <QuickActionButton
+          icon={<FileText className="w-3 h-3" />}
+          label="Docs"
+          onClick={(e) => { e?.stopPropagation(); }}
+        />
+        
+        {hasSlackChannel && (
+          <QuickActionButton
+            icon={<MessageSquare className="w-3 h-3" />}
+            label="Slack"
+            onClick={(e) => { e?.stopPropagation(); }}
+          />
+        )}
+        
+        {hasEmails && (
+          <QuickActionButton
+            icon={<Mail className="w-3 h-3" />}
+            label="Emails"
+            onClick={(e) => { e?.stopPropagation(); }}
+          />
+        )}
+      </div>
+
+      {/* Add MLS Number - only for Off Market without MLS */}
+      {isOffMarket && !mlsNumber && (
+        <button
+          onClick={(e) => { e.stopPropagation(); /* Open add MLS modal */ }}
+          className="flex items-center gap-1 text-xs text-orange-500 font-medium 
+                   hover:text-orange-600 transition-colors mt-3"
+        >
+          <Plus className="w-3 h-3" />
+          Add MLS Number
+        </button>
+      )}
+    </div>
+  );
+}
+
+export default TransactionCard;
+```
+
+---
+
+## Usage Example
+
+```tsx
+// In your Transactions page or list component
+
+import { TransactionCard } from "@/components/transactions/TransactionCard";
+
+function TransactionsList() {
+  const transactions = [
+    {
+      id: 1,
+      address: "612 Twelve Oaks LN",
+      mlsNumber: null,
+      status: "Off Market" as const,
+      goLiveDate: "2026-01-30",
+      listDate: null,
+      contractDate: null,
+      closingDate: null,
+      closedDate: null,
+      coordinators: [{ name: "Daryl Camingao", initials: "DC", color: "bg-gray-400" }],
+      hasSlackChannel: true,
+      hasEmails: false,
+    },
+    {
+      id: 2,
+      address: "13106 New Boston",
+      mlsNumber: "ACT2572987",
+      status: "Active Listing" as const,
+      goLiveDate: null,
+      listDate: "2026-01-01",
+      contractDate: null,
+      closingDate: null,
+      closedDate: null,
+      coordinators: [{ name: "Randi White", initials: "RW", color: "bg-purple-500" }],
+      hasSlackChannel: true,
+      hasEmails: false,
+    },
+    // ... more transactions
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {transactions.map((transaction) => (
+        <TransactionCard
+          key={transaction.id}
+          transaction={transaction}
+          onClick={() => navigate(`/transactions/${transaction.id}`)}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+## Status-Specific Date Box Summary
+
+| Status | Primary Info | Secondary Info | Bottom Row |
+|--------|--------------|----------------|------------|
+| **Off Market** | "Going Live" label + date | — | Countdown: "7 days" / "Today" / "3 days ago" |
+| **Active Listing** | "Days on Market" + list date | — | Counter: "22 days" |
+| **In Contract** | Contract Date | Closing Date | "4 days remaining" |
+| **Pending** | Contract Date | Closing Date | "X remaining" or "X overdue" (red) |
+| **Closing Soon** | Contract Date | Closing Date | "Closing Today!" or "X days remaining" |
+| **Closed** | Contract Date | Closed Date | "Completed - X days ago" |
+
+---
+
+## Urgency Color Logic
+
+```typescript
+// When to use red/warning styling:
+
+// Pending status
+if (status === "Pending" && daysToClose < 0) {
+  // Use red theme - overdue
+  boxBg = "bg-red-50";
+  borderColor = "border-red-200";
+  textColor = "text-red-600";
+}
+
+// Any status with closing date
+if (daysToClose < 0) {
+  // Show "X days overdue" in red
+}
+
+if (daysToClose === 0) {
+  // Show "Closing Today!" in amber/orange
+}
+
+if (daysToClose > 0 && daysToClose <= 3) {
+  // Consider additional urgency styling
+}
+```
+
+---
+
+## Database Fields Required
+
+Ensure your transactions table has these date fields:
+
+```typescript
+// shared/schema.ts
+
+export const transactions = pgTable("transactions", {
+  id: serial("id").primaryKey(),
+  address: text("address").notNull(),
+  mlsNumber: text("mls_number"),
+  status: text("status").notNull(), // "Off Market", "Active Listing", etc.
+  
+  // Date fields
+  goLiveDate: timestamp("go_live_date"),      // Off Market only
+  listDate: timestamp("list_date"),            // Active Listing - when listed on MLS
+  contractDate: timestamp("contract_date"),    // In Contract, Pending, Closing Soon, Closed
+  closingDate: timestamp("closing_date"),      // Expected closing date
+  closedDate: timestamp("closed_date"),        // Actual close date (for Closed status)
+  
+  // ... other fields
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+```
+
+---
+
+## Verification Checklist
+
+### Off Market
+- [ ] Purple theme applied
+- [ ] Shows "Going Live" with date
+- [ ] Countdown shows days until live
+- [ ] Shows "Today" badge when date is today
+- [ ] Shows "X days ago" (muted) for past dates
+- [ ] Shows "Not set" when no date
+
+### Active Listing
+- [ ] Green theme applied
+- [ ] Shows "Days on Market" with list date
+- [ ] Counter shows total days listed
+
+### In Contract
+- [ ] Orange theme applied
+- [ ] Shows Contract Date and Closing Date
+- [ ] Shows "X days remaining" countdown
+- [ ] Shows "Closing Today!" when closing is today
+- [ ] Shows "X days overdue" in red when past
+
+### Pending
+- [ ] Yellow theme by default
+- [ ] Switches to red theme when overdue
+- [ ] Shows warning icon when overdue
+- [ ] Same date layout as In Contract
+
+### Closing Soon
+- [ ] Amber theme applied
+- [ ] Shows urgency with clock icon
+- [ ] "Closing Today!" prominently displayed
+- [ ] Same date layout as In Contract
+
+### Closed
+- [ ] Gray theme applied
+- [ ] Shows Contract Date and Closed Date (actual)
+- [ ] Shows checkmark icon for "Completed"
+- [ ] Shows "X days ago" since closure
+
+### All Statuses
+- [ ] Consistent card height and padding
+- [ ] Status badge colors match theme
+- [ ] Quick action buttons aligned
+- [ ] Coordinators display correctly
+- [ ] Hover state works
+- [ ] Click navigates to detail
+
+---
+
+## Files to Create/Modify
+
+1. **`client/src/components/transactions/TransactionCard.tsx`** - Main component (replace existing)
+2. **`shared/schema.ts`** - Add missing date fields if needed
+3. **`server/routes.ts`** - Ensure date fields returned in API responses
