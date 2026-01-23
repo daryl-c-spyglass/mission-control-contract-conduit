@@ -1233,23 +1233,15 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                   Restore from Archive
                 </DropdownMenuItem>
               ) : (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuItem
-                      onClick={() => archiveTransactionMutation.mutate()}
-                      disabled={archiveTransactionMutation.isPending}
-                      className="cursor-pointer"
-                      data-testid="menu-item-archive"
-                    >
-                      <Archive className="w-4 h-4 mr-2" />
-                      <span className="flex-1">Archive Transaction</span>
-                      <Info className="w-3.5 h-3.5 ml-2 text-muted-foreground cursor-help" />
-                    </DropdownMenuItem>
-                  </TooltipTrigger>
-                  <TooltipContent side="left" className="max-w-[200px]">
-                    <p className="text-xs">Archived transactions can be restored anytime. Permanent deletion is available in the Archive section.</p>
-                  </TooltipContent>
-                </Tooltip>
+                <DropdownMenuItem
+                  onClick={() => archiveTransactionMutation.mutate()}
+                  disabled={archiveTransactionMutation.isPending}
+                  className="cursor-pointer"
+                  data-testid="menu-item-archive"
+                >
+                  <Archive className="w-4 h-4 mr-2" />
+                  Archive Transaction
+                </DropdownMenuItem>
               )}
               
               <DropdownMenuSeparator />
