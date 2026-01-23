@@ -1,0 +1,327 @@
+# CMA Presentation — Logo Theme Fix & Remove Mapbox
+
+## 📋 Issues to Fix
+
+| Issue | Current | Fix |
+|-------|---------|-----|
+| 1. Mapbox in header | Shows broken/unnecessary | Remove completely, use dark gradient |
+| 2. Card logos too small | Unreadable at 100% zoom | Make larger + theme-aware |
+| 3. Logo theme support | Single logo | White logo for dark mode, Black logo for light mode |
+
+---
+
+## 📁 Logo Files (Already in Replit)
+
+| File | Use For |
+|------|---------|
+| `SpyglassRealty_Logo_White.png` | Dark mode (dark background) |
+| `SpyglassRealty_Logo_Black.png` | Light mode (white background) |
+
+---
+
+## 🔧 Fix 1: Remove Mapbox from Header
+
+Replace the Mapbox component with a simple dark gradient background.
+
+### Find and Replace in Header Component:
+
+```tsx
+// REMOVE this Mapbox section:
+{/* 
+<Map
+  mapboxAccessToken={...}
+  mapStyle="..."
+  ...
+/>
+*/}
+
+// REPLACE entire hero section with:
+<div className="relative h-[180px] overflow-hidden">
+  {/* Dark gradient background - no Mapbox */}
+  <div 
+    className="absolute inset-0"
+    style={{
+      background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%)'
+    }}
+  />
+  
+  {/* Content */}
+  <div className="relative z-10 h-full flex flex-col items-center justify-center text-white px-4">
+    <h1 className="text-2xl md:text-3xl font-bold tracking-[0.12em] uppercase">
+      COMPARATIVE MARKET ANALYSIS
+    </h1>
+    <p className="text-sm md:text-base mt-3 opacity-90">
+      {propertyAddress}
+    </p>
+    <p className="text-xs opacity-70 mt-1">
+      MLS# {mlsNumber}
+    </p>
+  </div>
+</div>
+```
+
+---
+
+## 🔧 Fix 2: Theme-Aware Logos (Dark/Light Mode)
+
+### Step 1: Create Logo Constants
+
+```typescript
+// constants/logos.ts
+export const LOGOS = {
+  // For dark backgrounds (dark mode)
+  white: '/logos/SpyglassRealty_Logo_White.png',
+  // For light backgrounds (light mode)
+  black: '/logos/SpyglassRealty_Logo_Black.png',
+};
+```
+
+### Step 2: Create Theme-Aware Logo Component
+
+```tsx
+// components/SpyglassLogo.tsx
+import { useTheme } from '../hooks/useTheme';
+
+interface SpyglassLogoProps {
+  className?: string;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+export function SpyglassLogo({ className = '', size = 'md' }: SpyglassLogoProps) {
+  const { theme } = useTheme(); // Returns 'light' | 'dark'
+  
+  // Select logo based on theme
+  // Dark mode = use white logo (visible on dark bg)
+  // Light mode = use black logo (visible on light bg)
+  const logoSrc = theme === 'dark' 
+    ? '/logos/SpyglassRealty_Logo_White.png'
+    : '/logos/SpyglassRealty_Logo_Black.png';
+  
+  // Size classes
+  const sizeClasses = {
+    sm: 'h-6 w-auto',   // Small - for tight spaces
+    md: 'h-10 w-auto',  // Medium - for header
+    lg: 'h-16 w-auto',  // Large - for cards
+  };
+  
+  return (
+    <img 
+      src={logoSrc}
+      alt="Spyglass Realty"
+      className={`object-contain ${sizeClasses[size]} ${className}`}
+    />
+  );
+}
+```
+
+### Step 3: Theme Hook (if not exists)
+
+```typescript
+// hooks/useTheme.ts
+import { useState, useEffect } from 'react';
+
+export function useTheme() {
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  
+  useEffect(() => {
+    // Check for dark mode
+    const checkTheme = () => {
+      // 1. Check document class (Tailwind dark mode)
+      if (document.documentElement.classList.contains('dark')) {
+        setTheme('dark');
+        return;
+      }
+      
+      // 2. Check localStorage
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'dark' || savedTheme === 'light') {
+        setTheme(savedTheme);
+        return;
+      }
+      
+      // 3. Check system preference
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        setTheme('dark');
+        return;
+      }
+      
+      setTheme('light');
+    };
+    
+    checkTheme();
+    
+    // Listen for changes
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { 
+      attributes: true, 
+      attributeFilter: ['class'] 
+    });
+    
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.addEventListener('change', checkTheme);
+    
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener('change', checkTheme);
+    };
+  }, []);
+  
+  return { theme };
+}
+```
+
+---
+
+## 🔧 Fix 3: Card Logos — Larger & Theme-Aware
+
+The current card logos are too small. Make them larger and use the correct theme.
+
+### Update Card Icon Component:
+
+```tsx
+// In the component that renders card icons (WidgetIcon.tsx or SectionCard.tsx)
+
+import { useTheme } from '../hooks/useTheme';
+
+// For the 'spyglass-logo' icon type:
+case 'spyglass-logo':
+  const { theme } = useTheme();
+  const cardLogoSrc = theme === 'dark'
+    ? '/logos/SpyglassRealty_Logo_White.png'
+    : '/logos/SpyglassRealty_Logo_Black.png';
+  
+  return (
+    <img 
+      src={cardLogoSrc}
+      alt="Spyglass Realty"
+      className="h-10 w-auto max-w-[120px] object-contain"  // Larger size!
+    />
+  );
+```
+
+### Alternative: Inline Theme Detection (if hook is complex)
+
+```tsx
+case 'spyglass-logo':
+  // Inline theme detection
+  const isDarkMode = document.documentElement.classList.contains('dark') ||
+    window.matchMedia('(prefers-color-scheme: dark)').matches;
+  
+  return (
+    <img 
+      src={isDarkMode 
+        ? '/logos/SpyglassRealty_Logo_White.png' 
+        : '/logos/SpyglassRealty_Logo_Black.png'
+      }
+      alt="Spyglass Realty"
+      className="h-10 w-auto max-w-[120px] object-contain"
+    />
+  );
+```
+
+---
+
+## 🔧 Fix 4: Header Logo — Theme-Aware
+
+The header logo in the top-left also needs theme support:
+
+```tsx
+// In Header.tsx - top left logo area
+const { theme } = useTheme();
+
+<div className="absolute top-4 left-4 z-20 flex items-center gap-3">
+  {/* Hamburger Menu */}
+  <button onClick={onMenuToggle} className="min-w-[44px] min-h-[44px] p-2">
+    <Menu className="w-6 h-6 text-white" />
+  </button>
+  
+  {/* Theme-Aware Logo */}
+  <img 
+    src={theme === 'dark' 
+      ? '/logos/SpyglassRealty_Logo_White.png'
+      : '/logos/SpyglassRealty_Logo_Black.png'
+    }
+    alt="Spyglass Realty"
+    className="h-8 w-auto"
+  />
+</div>
+```
+
+---
+
+## 📋 Copy/Paste for Replit
+
+```
+Fix these issues:
+
+## 1. REMOVE MAPBOX FROM HEADER
+- Remove the Mapbox component completely
+- Replace with dark gradient background:
+  style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%)' }}
+
+## 2. THEME-AWARE LOGOS
+Use different logos based on dark/light mode:
+- Dark mode → SpyglassRealty_Logo_White.png (white logo on dark bg)
+- Light mode → SpyglassRealty_Logo_Black.png (black logo on light bg)
+
+Detection logic:
+const isDarkMode = document.documentElement.classList.contains('dark') ||
+  window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+const logoSrc = isDarkMode 
+  ? '/logos/SpyglassRealty_Logo_White.png' 
+  : '/logos/SpyglassRealty_Logo_Black.png';
+
+## 3. CARD LOGOS TOO SMALL
+Current logos are unreadable. Increase size:
+- Change: className="h-6" or similar small size
+- To: className="h-10 w-auto max-w-[120px] object-contain"
+
+Apply to:
+- Header logo (top-left)
+- All 25 card icons using spyglass-logo type
+
+## 4. COPY LOGO FILES
+Make sure both logos are in public/logos/:
+- public/logos/SpyglassRealty_Logo_White.png
+- public/logos/SpyglassRealty_Logo_Black.png
+```
+
+---
+
+## ✅ Expected Result
+
+| Element | Dark Mode | Light Mode |
+|---------|-----------|------------|
+| Header logo | White logo | Black logo |
+| Card icons | White logo | Black logo |
+| Hero background | Dark gradient | Dark gradient (or light variant) |
+| Logo size | h-10 (readable) | h-10 (readable) |
+
+---
+
+## 🎯 Visual Reference
+
+**Dark Mode Card:**
+```
+┌─────────────────────────────────┐
+│                                 │
+│     [WHITE SPYGLASS LOGO]       │  ← Visible on dark card
+│          h-10 size              │
+│                                 │
+│    LISTING WITH SPYGLASS        │
+│           REALTY                │
+└─────────────────────────────────┘
+```
+
+**Light Mode Card:**
+```
+┌─────────────────────────────────┐
+│                                 │
+│     [BLACK SPYGLASS LOGO]       │  ← Visible on white card
+│          h-10 size              │
+│                                 │
+│    LISTING WITH SPYGLASS        │
+│           REALTY                │
+└─────────────────────────────────┘
+```

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -10,8 +10,6 @@ import { Menu, Search, Star, Phone, Mail, X } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { PdfDownloadButton } from './PdfDownloadButton';
 import type { AgentProfile, CmaProperty } from '../types';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
 
 interface HeaderProps {
   propertyAddress: string;
@@ -33,67 +31,18 @@ export function Header({
   agent,
   onMenuClick,
   onClose,
-  latitude = 30.2672,
-  longitude = -97.7431,
   comparables = [],
   subjectProperty,
 }: HeaderProps) {
-  const { theme, mapStyle } = useTheme();
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const { theme } = useTheme();
   const [logoError, setLogoError] = useState(false);
-  const [mapLoaded, setMapLoaded] = useState(false);
 
-  useEffect(() => {
-    if (!mapContainerRef.current) return;
-    
-    const token = import.meta.env.VITE_MAPBOX_TOKEN;
-    if (!token) {
-      console.warn('Mapbox token not found');
-      return;
-    }
-
-    try {
-      mapboxgl.accessToken = token;
-
-      mapRef.current = new mapboxgl.Map({
-        container: mapContainerRef.current,
-        style: mapStyle,
-        center: [longitude, latitude],
-        zoom: 14,
-        interactive: false,
-        attributionControl: false,
-      });
-
-      mapRef.current.on('load', () => {
-        setMapLoaded(true);
-      });
-
-      mapRef.current.on('error', () => {
-        console.warn('Mapbox failed to load');
-        setMapLoaded(false);
-      });
-    } catch (error) {
-      console.warn('Mapbox initialization error:', error);
-    }
-
-    return () => {
-      mapRef.current?.remove();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (mapRef.current) {
-      mapRef.current.setStyle(mapStyle);
-    }
-  }, [mapStyle]);
-
-  // Use white logo on dark map overlay background
-  const logoPath = '/logos/spyglass-logo-white.png';
+  // Theme-aware logo: white logo on dark background (always dark header)
+  const logoPath = '/logos/SpyglassRealty_Logo_White.png';
 
   return (
     <div className="relative h-40 md:h-48 flex-shrink-0" data-testid="presentation-header">
-      {/* Dark gradient fallback background - always visible underneath */}
+      {/* Dark gradient background */}
       <div 
         className="absolute inset-0"
         style={{
@@ -101,15 +50,14 @@ export function Header({
         }}
       />
       
-      {/* Mapbox container - renders on top when loaded */}
+      {/* Subtle pattern overlay for depth */}
       <div 
-        ref={mapContainerRef} 
-        className="absolute inset-0"
-        data-testid="header-map"
+        className="absolute inset-0 opacity-20"
+        style={{
+          backgroundImage: `radial-gradient(circle at 25% 25%, rgba(255,255,255,0.1) 0%, transparent 50%),
+                            radial-gradient(circle at 75% 75%, rgba(255,255,255,0.05) 0%, transparent 50%)`
+        }}
       />
-      
-      {/* Dark overlay for text readability */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70" />
       
       <div className="relative z-10 h-full flex flex-col">
         <div className="flex items-center justify-between p-3">
@@ -132,7 +80,7 @@ export function Header({
               <img 
                 src={logoPath} 
                 alt="Spyglass Realty" 
-                className="h-6 md:h-8 w-auto"
+                className="h-8 md:h-10 w-auto max-w-[160px] object-contain"
                 data-testid="header-logo"
                 onError={() => setLogoError(true)}
               />

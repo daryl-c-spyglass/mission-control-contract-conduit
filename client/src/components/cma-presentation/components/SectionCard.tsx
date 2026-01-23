@@ -20,9 +20,11 @@ export function SectionCard({ widget, onClick, badge, agentPhoto, agentName }: S
   const { theme } = useTheme();
   const [logoError, setLogoError] = useState(false);
   const [photoError, setPhotoError] = useState(false);
+  
+  // Theme-aware logo: white for dark mode, black for light mode
   const logoPath = theme === 'dark' 
-    ? '/logos/spyglass-logo-white.png' 
-    : '/logos/spyglass-logo-black.png';
+    ? '/logos/SpyglassRealty_Logo_White.png' 
+    : '/logos/SpyglassRealty_Logo_Black.png';
 
   const renderIcon = () => {
     const iconClass = "w-8 h-8 text-muted-foreground";
@@ -64,9 +66,9 @@ export function SectionCard({ widget, onClick, badge, agentPhoto, agentName }: S
         }
         return (
           <img 
-            src="/logos/spyglass-logo-square.png"
+            src={logoPath}
             alt="Spyglass Realty" 
-            className="w-10 h-10 object-contain"
+            className="h-10 w-auto max-w-[120px] object-contain"
             onError={() => setLogoError(true)}
           />
         );
