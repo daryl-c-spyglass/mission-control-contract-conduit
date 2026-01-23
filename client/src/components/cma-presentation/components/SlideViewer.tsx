@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, X, Home } from 'lucide-react';
-import type { WidgetDefinition, AgentProfile, CmaProperty } from '../types';
+import { Menu } from 'lucide-react';
+import type { AgentProfile, CmaProperty } from '../types';
 import { WIDGETS } from '../constants/widgets';
 
 import { StaticImageWidget } from '../widgets/StaticImageWidget';
@@ -40,8 +40,6 @@ export function SlideViewer({
 }: SlideViewerProps) {
   const widget = WIDGETS[currentIndex];
   const totalSlides = WIDGETS.length;
-  const isFirst = currentIndex === 0;
-  const isLast = currentIndex === totalSlides - 1;
 
   const renderWidget = () => {
     if (widget.type === 'static' && widget.imagePath) {
@@ -72,11 +70,6 @@ export function SlideViewer({
       default:
         return (
           <div className="flex flex-col h-full bg-background">
-            <div className="bg-gray-900 text-white py-3 px-4 text-center flex-shrink-0">
-              <span className="font-bold tracking-wider text-sm uppercase">
-                {widget.title}
-              </span>
-            </div>
             <div className="flex-1 flex items-center justify-center p-6">
               <div className="text-center text-muted-foreground">
                 <p className="text-lg font-medium">{widget.title}</p>
@@ -93,78 +86,73 @@ export function SlideViewer({
       className="fixed inset-0 z-50 bg-background flex flex-col"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
-        paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
         paddingRight: 'env(safe-area-inset-right)',
       }}
       data-testid="slide-viewer"
     >
-      <div className="flex items-center justify-between p-2 border-b bg-background flex-shrink-0">
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onHome}
-            data-testid="button-home"
-          >
-            <Home className="w-5 h-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            data-testid="button-close-slide"
-          >
-            <X className="w-5 h-5" />
-          </Button>
+      <div 
+        className="flex-shrink-0"
+        style={{
+          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%)'
+        }}
+      >
+        <div className="flex items-center justify-between p-3">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onHome}
+              className="text-white hover:bg-white/10"
+              data-testid="button-menu-slide"
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
+            <img 
+              src="/logos/SpyglassRealty_Logo_White.png" 
+              alt="Spyglass Realty" 
+              className="h-8 w-auto max-w-[120px] object-contain"
+            />
+          </div>
+
+          <div className="text-center flex-1">
+            <h1 
+              className="text-white text-lg md:text-xl font-bold uppercase tracking-wide"
+              data-testid="text-slide-title"
+            >
+              {widget.title}
+            </h1>
+          </div>
+
+          <div className="w-[100px] flex justify-end">
+            <div className="flex items-center gap-2">
+              {agent.photo && (
+                <img 
+                  src={agent.photo} 
+                  alt={agent.name}
+                  className="w-8 h-8 rounded-full object-cover border-2 border-white/30"
+                />
+              )}
+              <div className="text-right hidden md:block">
+                <p className="text-white text-xs font-medium truncate max-w-[80px]">
+                  {agent.name?.split(' ')[0]}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="text-center">
+        <div className="text-center pb-2">
           <p 
-            className="text-sm font-medium truncate max-w-[200px] md:max-w-none"
-            data-testid="text-slide-title"
-          >
-            {widget.title}
-          </p>
-          <p 
-            className="text-xs text-muted-foreground"
+            className="text-white/70 text-xs"
             data-testid="text-slide-counter"
           >
             {currentIndex + 1} / {totalSlides}
           </p>
         </div>
-
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onPrev}
-            disabled={isFirst}
-            data-testid="button-prev-slide"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onNext}
-            disabled={isLast}
-            data-testid="button-next-slide"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </Button>
-        </div>
       </div>
 
-      <div className="h-1 bg-muted flex-shrink-0">
-        <div
-          className="h-full bg-[#F37216] transition-all duration-150 ease-out"
-          style={{ width: `${((currentIndex + 1) / totalSlides) * 100}%` }}
-          data-testid="progress-bar"
-        />
-      </div>
-
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-auto pb-16">
         {renderWidget()}
       </div>
     </div>

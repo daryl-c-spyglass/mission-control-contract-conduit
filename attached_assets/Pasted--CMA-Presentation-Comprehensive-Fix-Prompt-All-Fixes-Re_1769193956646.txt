@@ -1,0 +1,421 @@
+# CMA Presentation — Comprehensive Fix Prompt
+
+## 📋 All Fixes Required
+
+| # | Issue | Priority |
+|---|-------|----------|
+| 1 | Remove Mapbox from header | HIGH |
+| 2 | Theme-aware logos (dark/light mode) | HIGH |
+| 3 | Card logos too small/unreadable | HIGH |
+| 4 | Agent profile stays in upper-right on slides | HIGH |
+| 5 | Slide layout matches CloudCMA | HIGH |
+
+---
+
+## 📁 Logo Files (Already Uploaded to Replit)
+
+| File | Use For |
+|------|---------|
+| `SpyglassRealty_Logo_White.png` | Dark mode (visible on dark background) |
+| `SpyglassRealty_Logo_Black.png` | Light mode (visible on light background) |
+
+**Copy both to:** `public/logos/`
+
+---
+
+## 🔧 Fix 1: Remove Mapbox from Header
+
+Replace Mapbox with a dark gradient background:
+
+```tsx
+// In CmaPresentationHeader.tsx or similar
+
+// REMOVE any Mapbox/Map component
+
+// USE this instead for hero background:
+<div className="relative h-[180px] overflow-hidden">
+  {/* Dark gradient background */}
+  <div 
+    className="absolute inset-0"
+    style={{
+      background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%)'
+    }}
+  />
+  
+  {/* Top Left - Hamburger + Logo */}
+  <div className="absolute top-4 left-4 z-20 flex items-center gap-3">
+    <button onClick={onMenuToggle} className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-white/10">
+      <Menu className="w-6 h-6 text-white" />
+    </button>
+    <ThemeAwareLogo size="md" />
+  </div>
+  
+  {/* Top Right - Agent Profile (ALWAYS VISIBLE) */}
+  <div className="absolute top-4 right-4 z-20 flex items-center gap-3">
+    {/* Search, Star, Download icons */}
+    <button className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-white/10">
+      <Search className="w-5 h-5 text-white" />
+    </button>
+    <button className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-white/10">
+      <Star className="w-5 h-5 text-white" />
+    </button>
+    <button className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-white/10">
+      <Download className="w-5 h-5 text-white" />
+    </button>
+    
+    {/* Agent Name + Company + Photo */}
+    <div className="flex items-center gap-3">
+      <div className="text-right">
+        <p className="text-white text-sm font-medium">{agentProfile?.name || 'Agent Name'}</p>
+        <p className="text-white/70 text-xs">{agentProfile?.company || 'Spyglass Realty'}</p>
+      </div>
+      <img 
+        src={agentProfile?.photoUrl || '/default-avatar.png'}
+        alt={agentProfile?.name || 'Agent'}
+        className="w-10 h-10 rounded-full object-cover border-2 border-white/20"
+      />
+    </div>
+  </div>
+  
+  {/* Center Title (for home view) */}
+  <div className="relative z-10 h-full flex flex-col items-center justify-center text-white px-4">
+    <h1 className="text-2xl md:text-3xl font-bold tracking-[0.12em] uppercase">
+      COMPARATIVE MARKET ANALYSIS
+    </h1>
+    <p className="text-sm md:text-base mt-3 opacity-90">
+      {propertyAddress}
+    </p>
+    <p className="text-xs opacity-70 mt-1">
+      MLS# {mlsNumber}
+    </p>
+  </div>
+</div>
+```
+
+---
+
+## 🔧 Fix 2: Theme-Aware Logo Component
+
+Create a reusable component that shows the correct logo based on theme:
+
+```tsx
+// components/ThemeAwareLogo.tsx
+import { useState, useEffect } from 'react';
+
+interface ThemeAwareLogoProps {
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+}
+
+export function ThemeAwareLogo({ size = 'md', className = '' }: ThemeAwareLogoProps) {
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  
+  useEffect(() => {
+    const checkTheme = () => {
+      const dark = document.documentElement.classList.contains('dark') ||
+        (!document.documentElement.classList.contains('light') && 
+         window.matchMedia('(prefers-color-scheme: dark)').matches);
+      setIsDarkMode(dark);
+    };
+    
+    checkTheme();
+    
+    // Listen for theme changes
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.addEventListener('change', checkTheme);
+    
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener('change', checkTheme);
+    };
+  }, []);
+  
+  const logoSrc = isDarkMode 
+    ? '/logos/SpyglassRealty_Logo_White.png' 
+    : '/logos/SpyglassRealty_Logo_Black.png';
+  
+  const sizeClasses = {
+    sm: 'h-6 w-auto',
+    md: 'h-8 w-auto',
+    lg: 'h-12 w-auto max-w-[140px]',
+  };
+  
+  return (
+    <img 
+      src={logoSrc}
+      alt="Spyglass Realty"
+      className={`object-contain ${sizeClasses[size]} ${className}`}
+    />
+  );
+}
+```
+
+---
+
+## 🔧 Fix 3: Card Logos — Larger & Theme-Aware
+
+Update the icon renderer for card logos:
+
+```tsx
+// In WidgetIcon.tsx or wherever card icons are rendered
+import { ThemeAwareLogo } from './ThemeAwareLogo';
+
+// For 'spyglass-logo' icon type:
+case 'spyglass-logo':
+  return <ThemeAwareLogo size="lg" />;
+
+// OR inline version without the component:
+case 'spyglass-logo':
+  const isDark = document.documentElement.classList.contains('dark') ||
+    window.matchMedia('(prefers-color-scheme: dark)').matches;
+  
+  return (
+    <img 
+      src={isDark 
+        ? '/logos/SpyglassRealty_Logo_White.png' 
+        : '/logos/SpyglassRealty_Logo_Black.png'
+      }
+      alt="Spyglass Realty"
+      className="h-12 w-auto max-w-[140px] object-contain"
+    />
+  );
+```
+
+---
+
+## 🔧 Fix 4: Slide Layout — Agent Profile Always in Upper Right
+
+When viewing any slide (not just home), the header should show:
+- Left: Hamburger menu + Spyglass logo
+- Center: Slide title (e.g., "AGENT RESUME")
+- Right: Agent name + company + photo
+
+### Slide Header Component:
+
+```tsx
+// components/SlideHeader.tsx
+interface SlideHeaderProps {
+  title: string;
+  agentProfile: {
+    name: string;
+    company: string;
+    photoUrl: string;
+  };
+  onMenuToggle: () => void;
+  onClose: () => void;
+}
+
+export function SlideHeader({ title, agentProfile, onMenuToggle, onClose }: SlideHeaderProps) {
+  return (
+    <div className="h-[60px] bg-gray-900 flex items-center justify-between px-4">
+      {/* Left - Hamburger + Logo */}
+      <div className="flex items-center gap-3">
+        <button 
+          onClick={onMenuToggle}
+          className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-white/10"
+        >
+          <Menu className="w-6 h-6 text-white" />
+        </button>
+        <ThemeAwareLogo size="sm" />
+      </div>
+      
+      {/* Center - Slide Title */}
+      <h2 className="text-white text-lg font-semibold tracking-wider uppercase">
+        {title}
+      </h2>
+      
+      {/* Right - Icons + Agent Profile */}
+      <div className="flex items-center gap-2">
+        {/* Action Icons */}
+        <button className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-white/10">
+          <Search className="w-5 h-5 text-white" />
+        </button>
+        <button className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-white/10">
+          <Star className="w-5 h-5 text-white" />
+        </button>
+        <button className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-white/10">
+          <Download className="w-5 h-5 text-white" />
+        </button>
+        
+        {/* Agent Name + Company */}
+        <div className="text-right ml-2 hidden md:block">
+          <p className="text-white text-sm font-medium">{agentProfile.name}</p>
+          <p className="text-white/70 text-xs">{agentProfile.company}</p>
+        </div>
+        
+        {/* Agent Photo */}
+        <img 
+          src={agentProfile.photoUrl || '/default-avatar.png'}
+          alt={agentProfile.name}
+          className="w-9 h-9 rounded-full object-cover border border-white/20"
+        />
+        
+        {/* Close Button */}
+        <button 
+          onClick={onClose}
+          className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-white/10 ml-1"
+        >
+          <X className="w-5 h-5 text-white" />
+        </button>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 Fix 5: Agent Resume Slide Content
+
+The Agent Resume slide (Widget 1) should show the agent's bio:
+
+```tsx
+// widgets/AgentResumeWidget.tsx
+interface AgentResumeWidgetProps {
+  agentProfile: {
+    name: string;
+    company: string;
+    photoUrl: string;
+    bio: string;  // From Settings → Agent Marketing Profile → Bio
+  };
+}
+
+export function AgentResumeWidget({ agentProfile }: AgentResumeWidgetProps) {
+  return (
+    <div className="h-full flex flex-col">
+      {/* Slide Header */}
+      <SlideHeader 
+        title="AGENT RESUME"
+        agentProfile={agentProfile}
+        onMenuToggle={...}
+        onClose={...}
+      />
+      
+      {/* Content Area - Bio Text */}
+      <div className="flex-1 bg-black p-8 md:p-16 overflow-auto">
+        <div className="max-w-4xl mx-auto">
+          <p className="text-white text-sm md:text-base leading-relaxed text-center whitespace-pre-line">
+            {agentProfile.bio || 'Agent bio not available. Please update in Settings → Agent Marketing Profile.'}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### Bio Data Source:
+- **Settings → Agent Marketing Profile → Bio & Default Cover Letter**
+- Or: `/api/settings/agent-marketing-profile` → `bio` field
+
+---
+
+## 📋 Complete Prompt — Copy/Paste to Replit
+
+```
+Please implement these fixes for the CMA Presentation:
+
+## 1. REMOVE MAPBOX FROM HEADER
+- Remove any Mapbox/Map component from the hero section
+- Replace with dark gradient background:
+  style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%)' }}
+
+## 2. THEME-AWARE LOGOS
+Both logo files are already uploaded. Copy to public/logos/:
+- SpyglassRealty_Logo_White.png (for dark mode)
+- SpyglassRealty_Logo_Black.png (for light mode)
+
+Use this logic to detect theme:
+const isDarkMode = document.documentElement.classList.contains('dark') ||
+  window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+const logoSrc = isDarkMode 
+  ? '/logos/SpyglassRealty_Logo_White.png' 
+  : '/logos/SpyglassRealty_Logo_Black.png';
+
+Apply to:
+- Header logo (top-left)
+- All card icons using spyglass-logo type (widgets 2, 4, 8, 11-33)
+
+## 3. CARD LOGOS TOO SMALL
+Make card logos larger and readable:
+- Current: h-6 or smaller
+- Change to: className="h-12 w-auto max-w-[140px] object-contain"
+
+## 4. AGENT PROFILE IN UPPER RIGHT (ON ALL SLIDES)
+When viewing any slide, the header must show:
+- LEFT: Hamburger menu + Spyglass logo
+- CENTER: Slide title (e.g., "AGENT RESUME", "COMPS", etc.)
+- RIGHT: Search/Star/Download icons + Agent Name + Company + Profile Photo + Close (X)
+
+Agent info layout (right side):
+<div className="flex items-center gap-3">
+  <div className="text-right">
+    <p className="text-white text-sm font-medium">{agentProfile.name}</p>
+    <p className="text-white/70 text-xs">{agentProfile.company || 'Spyglass Realty'}</p>
+  </div>
+  <img src={agentProfile.photoUrl} className="w-9 h-9 rounded-full object-cover" />
+</div>
+
+Get agent data from: Settings → Agent Marketing Profile
+- name
+- company (default: 'Spyglass Realty')  
+- photoUrl
+- bio (for Agent Resume slide content)
+
+## 5. AGENT RESUME SLIDE CONTENT
+Widget 1 (Agent Resume) should show:
+- Header with "AGENT RESUME" title
+- Agent profile in upper right
+- Main content: Agent bio text (centered, white text on black background)
+
+Bio source: Settings → Agent Marketing Profile → Bio field
+
+## Mobile Optimization
+- Touch targets: min 44x44px
+- Agent name/company hidden on small screens (md:block)
+- Responsive padding on slide content
+```
+
+---
+
+## ✅ Expected Result
+
+**Home View:**
+```
+┌────────────────────────────────────────────────────────────────────┐
+│ ☰ [LOGO]                              🔍 ⭐ ⬇️  Agent Name  [📷]  │
+│                                              Spyglass Realty       │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│              COMPARATIVE MARKET ANALYSIS                           │
+│              154 Pettigrew, Buda, TX 78610                        │
+│                    MLS# ACT2451173                                 │
+│                                                                    │
+├────────────────────────────────────────────────────────────────────┤
+│  [Card 1]    [Card 2]    [Card 3]    [Card 4]    [Card 5]        │
+│  Agent       Listing     Client      Marketing   Comps            │
+│  Resume      w/Spyglass  Testimonial            [10]              │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**Slide View (Agent Resume):**
+```
+┌────────────────────────────────────────────────────────────────────┐
+│ ☰ [LOGO]      AGENT RESUME       🔍 ⭐ ⬇️  Ryan Rodenbeck  [📷] ✕ │
+│                                              Spyglass Realty       │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│    Ryan is the owner/broker of Spyglass Realty and started his    │
+│    career in Austin real estate as an investor in 2001, buying    │
+│    investment properties and using them for passive rental         │
+│    income. He received his real estate license in 2004. In 2008   │
+│    he started Spyglass Realty with his wife, Angel Rodenbeck...   │
+│                                                                    │
+│    [Bio text continues, centered, white on black background]       │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+```
