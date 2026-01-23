@@ -26,8 +26,10 @@ interface AgentProfileResponse {
     email?: string;
     firstName?: string;
     lastName?: string;
-    company?: string;
-    phone?: string;
+    profileImageUrl?: string;
+    marketingPhone?: string;
+    marketingEmail?: string;
+    marketingDisplayName?: string;
     marketingTitle?: string;
     marketingHeadshotUrl?: string;
   } | null;
@@ -49,14 +51,24 @@ export function useAgentProfile() {
       const user = data.user;
       const profile = data.profile;
       
+      // Use marketingDisplayName if available, otherwise fall back to firstName + lastName
+      const displayName = user?.marketingDisplayName?.trim();
+      const fallbackName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim();
+      const fullName = displayName || fallbackName;
+      
+      // Split for firstName/lastName if only displayName is available
+      const nameParts = fullName.split(' ');
+      const firstName = displayName ? nameParts[0] || '' : (user?.firstName || '');
+      const lastName = displayName ? nameParts.slice(1).join(' ') || '' : (user?.lastName || '');
+      
       return {
-        firstName: user?.firstName || "",
-        lastName: user?.lastName || "",
-        email: user?.email || "",
-        phone: user?.phone || "",
+        firstName,
+        lastName,
+        email: user?.marketingEmail || user?.email || "",
+        phone: user?.marketingPhone || "",
         title: user?.marketingTitle || profile?.title || "REALTOR®",
-        company: user?.company || profile?.marketingCompany || "Spyglass Realty",
-        profilePhoto: user?.marketingHeadshotUrl || profile?.headshotUrl || null,
+        company: profile?.marketingCompany || "Spyglass Realty",
+        profilePhoto: user?.marketingHeadshotUrl || profile?.headshotUrl || user?.profileImageUrl || null,
         bio: profile?.bio || "",
       };
     },

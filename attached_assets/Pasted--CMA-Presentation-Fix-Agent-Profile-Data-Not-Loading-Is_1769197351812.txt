@@ -1,0 +1,379 @@
+# CMA Presentation — Fix Agent Profile Data Not Loading
+
+## 📋 Issue
+
+Agent Marketing Profile data is not loading in the CMA Presentation Player:
+
+| Element | Expected | Actual |
+|---------|----------|--------|
+| Agent Name | "Daryl Camingao" | "Agent" |
+| Agent Photo | Profile picture | Generic "A" avatar |
+| Company | "Spyglass Realty" | Shows correctly |
+| Bio (Slide 1) | Professional bio text | "Professional bio not available" |
+
+**Root Cause:** The data pipeline from Settings → Agent Marketing Profile to the CMA Presentation is broken.
+
+---
+
+## 🔍 Step 1: Diagnostic — Check Data Source
+
+First, verify the agent profile data exists and the API endpoint works:
+
+```bash
+# Check if agent marketing profile API returns data
+curl -X GET "http://localhost:5000/api/settings/agent-marketing-profile" \
+  -H "Cookie: [session-cookie]"
+```
+
+### Expected API Response:
+```json
+{
+  "name": "Daryl Camingao",
+  "email": "daryl@spyglassrealty.com",
+  "phone": "(512) 555-1234",
+  "company": "Spyglass Realty",
+  "photoUrl": "/uploads/agent-photo.jpg",
+  "bio": "Professional bio text here...",
+  "licenseNumber": "123456",
+  "title": "REALTOR®"
+}
+```
+
+### Check in Browser Console:
+```javascript
+// Run in browser console while on CMA Presentation page
+fetch('/api/settings/agent-marketing-profile')
+  .then(r => r.json())
+  .then(data => console.log('Agent Profile:', data))
+  .catch(err => console.error('Error:', err));
+```
+
+---
+
+## 🔧 Step 2: Fix the useAgentProfile Hook
+
+The hook fetching agent data likely has issues. Find and fix it:
+
+### Locate the Hook:
+```bash
+grep -rn "useAgentProfile\|agent-marketing-profile" --include="*.tsx" --include="*.ts" client/src/
+```
+
+### Fix the Hook:
+
+```typescript
+// hooks/useAgentProfile.ts or similar
+
+import { useQuery } from '@tanstack/react-query';
+
+interface AgentProfile {
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  photoUrl: string;
+  bio: string;
+  licenseNumber?: string;
+  title?: string;
+}
+
+export function useAgentProfile() {
+  return useQuery<AgentProfile>({
+    queryKey: ['agent-marketing-profile'],
+    queryFn: async () => {
+      const response = await fetch('/api/settings/agent-marketing-profile', {
+        credentials: 'include', // Important for auth cookies
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch agent profile');
+      }
+      
+      const data = await response.json();
+      console.log('Agent profile loaded:', data); // Debug log
+      return data;
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    retry: 2,
+  });
+}
+```
+
+---
+
+## 🔧 Step 3: Fix CMA Presentation Components
+
+### Header Component — Agent Profile Display
+
+```tsx
+// components/cma-presentation/components/Header.tsx
+
+import { useAgentProfile } from '@/hooks/useAgentProfile';
+
+export function Header({ onMenuToggle, onClose }) {
+  const { data: agentProfile, isLoading, error } = useAgentProfile();
+  
+  // Debug logging
+  console.log('Header - Agent Profile:', { agentProfile, isLoading, error });
+  
+  // Fallback values
+  const displayName = agentProfile?.name || 'Agent Name';
+  const displayCompany = agentProfile?.company || 'Spyglass Realty';
+  const displayPhoto = agentProfile?.photoUrl || null;
+  
+  return (
+    <div className="...">
+      {/* Agent Profile - Right Side */}
+      <div className="flex items-center gap-3">
+        <div className="text-right">
+          <p className="text-white text-sm font-medium">
+            {isLoading ? 'Loading...' : displayName}
+          </p>
+          <p className="text-white/70 text-xs">{displayCompany}</p>
+        </div>
+        
+        {/* Profile Photo with Fallback */}
+        {displayPhoto ? (
+          <img 
+            src={displayPhoto}
+            alt={displayName}
+            className="w-10 h-10 rounded-full object-cover border-2 border-white/20"
+            onError={(e) => {
+              // Fallback to initials if image fails
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.nextElementSibling?.classList.remove('hidden');
+            }}
+          />
+        ) : null}
+        
+        {/* Initials Fallback */}
+        <div 
+          className={`w-10 h-10 rounded-full bg-[#EF4923] flex items-center justify-center 
+                      text-white font-semibold ${displayPhoto ? 'hidden' : ''}`}
+        >
+          {displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### Agent Resume Widget — Bio Display
+
+```tsx
+// components/cma-presentation/widgets/AgentResumeWidget.tsx
+
+import { useAgentProfile } from '@/hooks/useAgentProfile';
+import { Link } from 'wouter';
+
+export function AgentResumeWidget() {
+  const { data: agentProfile, isLoading, error } = useAgentProfile();
+  
+  // Debug logging
+  console.log('AgentResumeWidget - Profile:', { agentProfile, isLoading, error });
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin w-8 h-8 border-2 border-[#EF4923] border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+  
+  if (!agentProfile?.bio) {
+    return (
+      <div className="text-center py-12 px-6">
+        <p className="text-gray-600 mb-2">Professional bio not available.</p>
+        <Link href="/settings">
+          <a className="text-[#EF4923] hover:underline text-sm">
+            Go to Settings → Bio & Default Cover Letter to add your professional bio.
+          </a>
+        </Link>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="p-8 md:p-16 max-w-4xl mx-auto">
+      <p className="text-gray-800 leading-relaxed text-center whitespace-pre-line">
+        {agentProfile.bio}
+      </p>
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 Step 4: Check API Endpoint Returns Correct Data
+
+### Server-side — Verify Endpoint
+
+```typescript
+// server/routes.ts
+
+app.get('/api/settings/agent-marketing-profile', async (req, res) => {
+  try {
+    const userId = req.user?.id; // Get authenticated user
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    const profile = await db.query.agentProfiles.findFirst({
+      where: eq(agentProfiles.userId, userId),
+    });
+    
+    if (!profile) {
+      // Return empty profile with defaults
+      return res.json({
+        name: '',
+        email: '',
+        phone: '',
+        company: 'Spyglass Realty',
+        photoUrl: '',
+        bio: '',
+      });
+    }
+    
+    // Log for debugging
+    console.log('Returning agent profile:', profile);
+    
+    res.json(profile);
+  } catch (error) {
+    console.error('Error fetching agent profile:', error);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+```
+
+---
+
+## 🔧 Step 5: Pass Agent Profile via Context (Alternative)
+
+If the hook approach has issues, use React Context:
+
+```tsx
+// context/AgentProfileContext.tsx
+
+import { createContext, useContext, ReactNode } from 'react';
+import { useAgentProfile } from '@/hooks/useAgentProfile';
+
+interface AgentProfile {
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  photoUrl: string;
+  bio: string;
+}
+
+const AgentProfileContext = createContext<{
+  profile: AgentProfile | null;
+  isLoading: boolean;
+  error: Error | null;
+}>({
+  profile: null,
+  isLoading: true,
+  error: null,
+});
+
+export function AgentProfileProvider({ children }: { children: ReactNode }) {
+  const { data, isLoading, error } = useAgentProfile();
+  
+  return (
+    <AgentProfileContext.Provider value={{ 
+      profile: data || null, 
+      isLoading, 
+      error: error as Error | null 
+    }}>
+      {children}
+    </AgentProfileContext.Provider>
+  );
+}
+
+export function useAgentProfileContext() {
+  return useContext(AgentProfileContext);
+}
+```
+
+Then wrap CMA Presentation with the provider:
+
+```tsx
+// In CmaPresentationPlayer.tsx
+<AgentProfileProvider>
+  <Header />
+  <SlideViewer />
+  {/* etc */}
+</AgentProfileProvider>
+```
+
+---
+
+## 📋 Copy/Paste for Replit
+
+```
+Fix Agent Marketing Profile data not loading in CMA Presentation.
+
+## SYMPTOMS:
+- Agent name shows "Agent" instead of actual name
+- Profile photo missing (shows generic avatar)
+- Bio shows "Professional bio not available"
+- Data from Settings → Agent Marketing Profile not syncing
+
+## DIAGNOSTIC STEPS:
+1. Check browser console for errors when loading CMA Presentation
+2. Test API endpoint: fetch('/api/settings/agent-marketing-profile').then(r=>r.json()).then(console.log)
+3. Add console.log to useAgentProfile hook to see what data returns
+
+## FIX:
+1. In useAgentProfile hook:
+   - Ensure fetch includes credentials: 'include'
+   - Add console.log for debugging
+   - Handle error states properly
+
+2. In Header.tsx:
+   - Get data from useAgentProfile hook
+   - Add fallbacks: agentProfile?.name || 'Agent Name'
+   - Add image onError handler for photo fallback
+   - Show loading state while fetching
+
+3. In AgentResumeWidget.tsx:
+   - Get bio from useAgentProfile hook
+   - Show loading spinner while fetching
+   - Show helpful message if bio is empty with link to Settings
+
+4. Verify API endpoint /api/settings/agent-marketing-profile:
+   - Returns correct user's profile data
+   - Includes name, email, phone, company, photoUrl, bio fields
+   - Handles missing profile gracefully
+
+## DEBUG:
+Add these console.logs:
+- In useAgentProfile: console.log('API Response:', data)
+- In Header: console.log('Agent Profile:', agentProfile)
+- In AgentResumeWidget: console.log('Bio:', agentProfile?.bio)
+
+Check browser Network tab for /api/settings/agent-marketing-profile request status and response.
+```
+
+---
+
+## ✅ Expected Result After Fix
+
+**Home View:**
+- Agent name: "Daryl Camingao" (from Settings)
+- Agent photo: Actual profile photo
+- Company: "Spyglass Realty"
+
+**Agent Resume Slide:**
+- Shows full professional bio from Settings
+- Agent profile in header with correct name and photo
+
+**Console Output (Debug):**
+```
+Agent profile loaded: {name: "Daryl Camingao", company: "Spyglass Realty", bio: "...", photoUrl: "..."}
+Header - Agent Profile: {agentProfile: {...}, isLoading: false, error: null}
+AgentResumeWidget - Profile: {agentProfile: {...}, isLoading: false, error: null}
+```
