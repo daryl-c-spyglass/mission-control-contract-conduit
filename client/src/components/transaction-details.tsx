@@ -1233,50 +1233,33 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                   Restore from Archive
                 </DropdownMenuItem>
               ) : (
-                <DropdownMenuItem
-                  onClick={() => archiveTransactionMutation.mutate()}
-                  disabled={archiveTransactionMutation.isPending}
-                  className="cursor-pointer"
-                  data-testid="menu-item-archive"
-                >
-                  <Archive className="w-4 h-4 mr-2" />
-                  Archive Transaction
-                </DropdownMenuItem>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuItem
+                      onClick={() => archiveTransactionMutation.mutate()}
+                      disabled={archiveTransactionMutation.isPending}
+                      className="cursor-pointer"
+                      data-testid="menu-item-archive"
+                    >
+                      <Archive className="w-4 h-4 mr-2" />
+                      <span className="flex-1">Archive Transaction</span>
+                      <Info className="w-3.5 h-3.5 ml-2 text-muted-foreground cursor-help" />
+                    </DropdownMenuItem>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-[200px]">
+                    <p className="text-xs">Archived transactions can be restored anytime. Permanent deletion is available in the Archive section.</p>
+                  </TooltipContent>
+                </Tooltip>
               )}
               
               <DropdownMenuSeparator />
               
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <DropdownMenuItem
-                    onSelect={(e) => e.preventDefault()}
-                    className="text-red-600 cursor-pointer focus:text-red-600"
-                    data-testid="menu-item-delete"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete Transaction
-                  </DropdownMenuItem>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Are you sure you want to permanently delete "{transaction.propertyAddress}"?
-                      This action cannot be undone and will remove all associated data.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => deleteTransactionMutation.mutate()}
-                      className="bg-destructive text-destructive-foreground"
-                      disabled={deleteTransactionMutation.isPending}
-                    >
-                      {deleteTransactionMutation.isPending ? "Deleting..." : "Delete"}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <div className="px-2 py-1.5">
+                <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+                  <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                  <span>To permanently delete, archive first, then delete from the Archive section.</span>
+                </p>
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
           

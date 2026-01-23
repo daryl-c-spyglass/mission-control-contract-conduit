@@ -1,0 +1,422 @@
+# Remove Delete Transaction Button & Add Archive Tooltip
+
+## Overview
+Remove the "Delete Transaction" option from the transaction detail page dropdown menu. Add a tooltip to "Archive Transaction" explaining that permanent deletion is available in the Archive section.
+
+---
+
+## Current State
+The three-dot menu on transaction detail page shows:
+- Archive Transaction
+- Delete Transaction ← **Remove this**
+
+## Desired State
+The three-dot menu should show:
+- Archive Transaction (with tooltip explaining deletion is in Archive)
+
+---
+
+## Implementation
+
+### Update Transaction Actions Menu
+
+```tsx
+// client/src/components/transactions/TransactionActionsMenu.tsx
+
+import { useState } from "react";
+import { 
+  MoreVertical, 
+  Archive, 
+  Info
+} from "lucide-react";
+
+interface TransactionActionsMenuProps {
+  transactionId: number;
+  onArchive: () => void;
+}
+
+export function TransactionActionsMenu({ 
+  transactionId, 
+  onArchive 
+}: TransactionActionsMenuProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  return (
+    <div className="relative">
+      {/* Trigger Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-2 min-w-[44px] min-h-[44px] rounded-lg hover:bg-gray-100 
+                 transition-colors touch-manipulation"
+        aria-label="Transaction actions"
+      >
+        <MoreVertical className="w-5 h-5 text-gray-500" />
+      </button>
+
+      {/* Dropdown Menu */}
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 z-10" 
+            onClick={() => setIsOpen(false)} 
+          />
+          
+          {/* Menu */}
+          <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg 
+                        border border-gray-200 py-2 z-20">
+            
+            {/* Archive Transaction */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  onArchive();
+                  setIsOpen(false);
+                }}
+                onMouseEnter={() => setShowTooltip(true)}
+                onMouseLeave={() => setShowTooltip(false)}
+                className="w-full flex items-center gap-3 px-4 py-3 min-h-[44px]
+                         text-left text-gray-700 hover:bg-gray-50 
+                         transition-colors touch-manipulation"
+              >
+                <Archive className="w-5 h-5 text-gray-500" />
+                <div className="flex-1">
+                  <span className="font-medium">Archive Transaction</span>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Move to archive for safekeeping
+                  </p>
+                </div>
+                <Info className="w-4 h-4 text-gray-400" />
+              </button>
+
+              {/* Tooltip */}
+              {showTooltip && (
+                <div className="absolute right-full top-1/2 -translate-y-1/2 mr-2 
+                              w-56 px-3 py-2 bg-gray-900 text-white text-xs 
+                              rounded-lg shadow-lg z-30">
+                  <p>
+                    Archived transactions can be restored anytime. 
+                    <strong className="text-orange-400"> Permanent deletion</strong> is 
+                    available in the Archive section.
+                  </p>
+                  {/* Arrow */}
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full
+                                border-8 border-transparent border-l-gray-900" />
+                </div>
+              )}
+            </div>
+
+            {/* Info Note (Always Visible) */}
+            <div className="mx-4 mt-2 pt-2 border-t border-gray-100">
+              <p className="text-xs text-gray-400 flex items-start gap-2">
+                <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                <span>
+                  To permanently delete a transaction, first archive it, 
+                  then delete from the Archive section.
+                </span>
+              </p>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+### Alternative: Simpler Implementation
+
+If you prefer a simpler dropdown without the inline tooltip:
+
+```tsx
+// client/src/components/transactions/TransactionActionsMenu.tsx
+
+import { useState } from "react";
+import { MoreVertical, Archive } from "lucide-react";
+import { SimpleTooltip } from "@/components/ui/SimpleTooltip";
+
+interface TransactionActionsMenuProps {
+  transactionId: number;
+  onArchive: () => void;
+}
+
+export function TransactionActionsMenu({ 
+  transactionId, 
+  onArchive 
+}: TransactionActionsMenuProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      {/* Trigger Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-2 min-w-[44px] min-h-[44px] rounded-lg hover:bg-gray-100 
+                 transition-colors touch-manipulation"
+        aria-label="Transaction actions"
+      >
+        <MoreVertical className="w-5 h-5 text-gray-500" />
+      </button>
+
+      {/* Dropdown Menu */}
+      {isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 z-10" 
+            onClick={() => setIsOpen(false)} 
+          />
+          
+          <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg 
+                        border border-gray-200 overflow-hidden z-20">
+            
+            {/* Archive Transaction with Tooltip */}
+            <SimpleTooltip 
+              content="Permanent deletion available in Archive section"
+              position="left"
+            >
+              <button
+                onClick={() => {
+                  onArchive();
+                  setIsOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 min-h-[44px]
+                         text-left text-gray-700 hover:bg-gray-50 
+                         transition-colors touch-manipulation"
+              >
+                <Archive className="w-5 h-5 text-gray-500" />
+                <span>Archive Transaction</span>
+              </button>
+            </SimpleTooltip>
+
+            {/* Divider + Info */}
+            <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
+              <p className="text-xs text-gray-500">
+                💡 To permanently delete, archive first, then delete from Archive.
+              </p>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+### Update Transaction Detail Page
+
+Remove the delete confirmation dialog and delete mutation:
+
+```tsx
+// client/src/pages/TransactionDetail.tsx
+
+// REMOVE these:
+// - deleteMutation
+// - handleDelete function  
+// - Delete confirmation dialog
+// - Any references to deleting from this page
+
+// KEEP:
+// - archiveMutation
+// - handleArchive function
+// - Archive confirmation dialog
+
+export function TransactionDetailPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  
+  // Archive mutation
+  const archiveMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/transactions/${id}/archive`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to archive");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast.success("Transaction archived successfully");
+      navigate("/transactions");
+    },
+    onError: () => {
+      toast.error("Failed to archive transaction");
+    },
+  });
+
+  const handleArchive = () => {
+    // Show confirmation dialog
+    showConfirmDialog({
+      title: "Archive Transaction?",
+      message: (
+        <div className="space-y-2">
+          <p>This transaction will be moved to the Archive.</p>
+          <p className="text-sm text-gray-500">
+            You can restore it anytime from the Archive section. 
+            Permanent deletion is also available there.
+          </p>
+        </div>
+      ),
+      confirmText: "Archive",
+      confirmVariant: "primary", // Not destructive since it's reversible
+      onConfirm: () => archiveMutation.mutate(),
+    });
+  };
+
+  return (
+    <div>
+      {/* Header with actions */}
+      <div className="flex items-center justify-between">
+        <h1>{transaction.address}</h1>
+        
+        <div className="flex items-center gap-2">
+          <Button variant="outline">Slack</Button>
+          <Button variant="outline">Emails</Button>
+          
+          {/* Actions Menu - Now only has Archive */}
+          <TransactionActionsMenu
+            transactionId={transaction.id}
+            onArchive={handleArchive}
+          />
+        </div>
+      </div>
+      
+      {/* Rest of the page */}
+    </div>
+  );
+}
+```
+
+---
+
+## Archive Section Enhancement
+
+Add permanent delete functionality to the Archive page:
+
+```tsx
+// client/src/pages/Archive.tsx
+
+function ArchiveTransactionCard({ transaction, onRestore, onDelete }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold">{transaction.address}</h3>
+          <p className="text-sm text-gray-500">
+            Archived {formatRelativeTime(transaction.archivedAt)}
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {/* Restore Button */}
+          <button
+            onClick={onRestore}
+            className="flex items-center gap-2 px-4 py-2 min-h-[44px]
+                     text-gray-700 hover:bg-gray-100 rounded-lg
+                     transition-colors touch-manipulation"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span className="hidden sm:inline">Restore</span>
+          </button>
+          
+          {/* Permanent Delete Button */}
+          <button
+            onClick={onDelete}
+            className="flex items-center gap-2 px-4 py-2 min-h-[44px]
+                     text-red-600 hover:bg-red-50 rounded-lg
+                     transition-colors touch-manipulation"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Delete Permanently</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 📱 Mobile Optimization Requirements
+
+**All changes must be optimized for:**
+
+| Device | Browser | Screen Size |
+|--------|---------|-------------|
+| iPad Pro | Safari | 1024 x 1366 |
+| iPad Air/Mini | Safari | 768 x 1024 |
+| iPhone 14/15 Pro | Safari | 393 x 852 |
+| iPhone SE | Safari | 375 x 667 |
+| Android Tablet | Chrome | 800 x 1280 |
+| Android Phone | Chrome | 360 x 800 |
+
+### Mobile-Specific Implementation
+
+```tsx
+// Dropdown menu on mobile should be larger and more touch-friendly
+<div className="absolute right-0 mt-2 bg-white rounded-lg shadow-lg 
+              border border-gray-200 overflow-hidden z-20
+              w-64 sm:w-56"> {/* Wider on mobile */}
+  
+  <button
+    className="w-full flex items-center gap-3 px-4 py-4 sm:py-3 min-h-[48px]
+             text-left text-gray-700 hover:bg-gray-50 active:bg-gray-100
+             transition-colors touch-manipulation"
+  >
+    {/* Content */}
+  </button>
+</div>
+
+// On mobile, show tooltip content inline instead of hover tooltip
+{isMobile ? (
+  // Show info text directly
+  <p className="text-xs text-gray-500 px-4 py-2 bg-gray-50">
+    To permanently delete, archive first then delete from Archive section.
+  </p>
+) : (
+  // Desktop: Show tooltip on hover
+  <Tooltip content="Permanent deletion available in Archive section">
+    {/* ... */}
+  </Tooltip>
+)}
+```
+
+### Mobile UX Checklist
+
+- [x] Touch targets minimum 44x44px (menu button, archive button)
+- [x] No hover-only interactions (info text shown inline on mobile)
+- [x] Responsive layouts (wider dropdown on mobile)
+- [x] Safe area insets for notched devices
+- [x] Smooth scrolling with momentum
+- [x] No horizontal overflow
+- [x] Readable font sizes (min 16px for body text)
+- [x] Fast load times on mobile networks
+- [x] Works in both portrait and landscape orientations
+
+### Testing Required
+
+- [ ] iPad Safari
+- [ ] iPhone Safari
+- [ ] Android Chrome (phone)
+- [ ] Android Chrome (tablet)
+
+---
+
+## Verification Checklist
+
+- [ ] "Delete Transaction" button removed from dropdown
+- [ ] "Archive Transaction" button shows tooltip on hover (desktop)
+- [ ] Info text about permanent deletion visible on mobile
+- [ ] Archive page has "Delete Permanently" option
+- [ ] Delete confirmation dialog shows warning about permanent action
+- [ ] All touch targets are 44px minimum
+- [ ] Dropdown works well on mobile devices
+
+---
+
+## Files to Modify
+
+1. **`client/src/components/transactions/TransactionActionsMenu.tsx`** - Remove delete option, add tooltip
+2. **`client/src/pages/TransactionDetail.tsx`** - Remove delete mutation and handler
+3. **`client/src/pages/Archive.tsx`** - Ensure permanent delete is available here
