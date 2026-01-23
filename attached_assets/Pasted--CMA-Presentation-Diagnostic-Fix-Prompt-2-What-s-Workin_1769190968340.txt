@@ -1,0 +1,453 @@
+# CMA Presentation — Diagnostic & Fix Prompt #2
+
+## ✅ What's Working
+- Agent Resume shows profile photo + name ✅
+- Grid layout (5 columns) ✅
+- Sidebar sections numbered 1-33 ✅
+- Widget titles displaying ✅
+
+## ❌ Issues to Fix
+
+| Issue | Priority |
+|-------|----------|
+| 1. Mapbox not showing (just "mapbox" text) | HIGH |
+| 2. Header Spyglass logo missing | HIGH |
+| 3. Card logo images still text fallback | HIGH |
+| 4. Click response very slow | HIGH |
+| 5. Sidebar sections layout off | MEDIUM |
+
+---
+
+## 🔧 Fix 1: Mapbox Integration — Not Loading
+
+**Symptom:** Header shows "mapbox" text instead of actual map
+
+### Step 1: Diagnostic — Check if token is being used
+
+```typescript
+// Add this console.log to debug Mapbox
+console.log('MAPBOX_TOKEN:', import.meta.env.VITE_MAPBOX_TOKEN);
+// OR if using process.env:
+console.log('MAPBOX_TOKEN:', process.env.MAPBOX_TOKEN);
+```
+
+### Step 2: Verify Replit Secrets Configuration
+
+The token exists in Replit Secrets as `MAPBOX_TOKEN`. But the app might be looking for a different variable name.
+
+**Check these possible variable names:**
+- `MAPBOX_TOKEN`
+- `VITE_MAPBOX_TOKEN` (for Vite)
+- `REACT_APP_MAPBOX_TOKEN` (for CRA)
+- `NEXT_PUBLIC_MAPBOX_TOKEN` (for Next.js)
+
+### Step 3: Update Environment Variable
+
+If using **Vite** (most likely based on your setup):
+
+```bash
+# In Replit Secrets, add BOTH:
+MAPBOX_TOKEN=pk.xxxxx
+VITE_MAPBOX_TOKEN=pk.xxxxx
+```
+
+**Vite only exposes variables prefixed with `VITE_`** to the client-side code.
+
+### Step 4: Fix the Map Component
+
+```tsx
+// In Header.tsx or wherever the map is rendered
+import Map from 'react-map-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+// Get token - try multiple variable names
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || 
+                     import.meta.env.MAPBOX_TOKEN ||
+                     process.env.VITE_MAPBOX_TOKEN;
+
+// Debug log
+console.log('Mapbox token available:', !!MAPBOX_TOKEN);
+console.log('Mapbox token prefix:', MAPBOX_TOKEN?.substring(0, 10));
+
+export function Header({ propertyAddress, mlsNumber, coordinates }) {
+  // Check if we have valid coordinates and token
+  if (!MAPBOX_TOKEN) {
+    console.error('Mapbox token not found! Check environment variables.');
+  }
+
+  return (
+    <div className="relative h-[200px] overflow-hidden">
+      {/* Mapbox Map Background */}
+      {MAPBOX_TOKEN && coordinates?.lat && coordinates?.lng ? (
+        <Map
+          mapboxAccessToken={MAPBOX_TOKEN}
+          initialViewState={{
+            longitude: coordinates.lng,
+            latitude: coordinates.lat,
+            zoom: 14,
+          }}
+          style={{ position: 'absolute', width: '100%', height: '100%' }}
+          mapStyle="mapbox://styles/mapbox/dark-v11"
+          interactive={false}  // Disable map interactions for background
+          attributionControl={false}
+        />
+      ) : (
+        // Fallback gradient background if no map
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-gray-700" />
+      )}
+      
+      {/* Dark overlay for text readability */}
+      <div className="absolute inset-0 bg-black/50" />
+      
+      {/* Content */}
+      <div className="relative z-10 h-full flex flex-col items-center justify-center text-white">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-widest uppercase">
+          COMPARATIVE MARKET ANALYSIS
+        </h1>
+        <p className="text-sm md:text-base mt-2 opacity-90">
+          {propertyAddress}
+        </p>
+        <p className="text-xs opacity-70 mt-1">
+          MLS# {mlsNumber}
+        </p>
+      </div>
+    </div>
+  );
+}
+```
+
+### Step 5: Verify Mapbox CSS is Imported
+
+```typescript
+// At the top of your main App.tsx or the component file
+import 'mapbox-gl/dist/mapbox-gl.css';
+```
+
+---
+
+## 🔧 Fix 2: Header Spyglass Logo — Not Showing
+
+**Symptom:** Top-left shows "SPYGLASS REALTY" text instead of logo image
+
+### Step 1: Verify Logo File Location
+
+```bash
+# Run this to find where logo files are in the project
+find . -name "*spyglass*" -o -name "*logo*" | grep -v node_modules
+
+# Check public directory
+ls -la public/
+ls -la public/logos/
+ls -la public/images/
+```
+
+### Step 2: Check the Actual Path Being Used
+
+```tsx
+// In the component, add this debug:
+const logoPath = '/logos/spyglass-logo-white.png';
+console.log('Logo path:', logoPath);
+
+// Test if the path works by opening in browser:
+// https://your-app.replit.app/logos/spyglass-logo-white.png
+```
+
+### Step 3: Fix the Logo Component
+
+```tsx
+// In Header.tsx - top-left logo area
+<div className="absolute top-4 left-4 z-20 flex items-center gap-3">
+  {/* Hamburger menu */}
+  <button 
+    onClick={onMenuClick}
+    className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-white/10"
+  >
+    <Menu className="w-6 h-6 text-white" />
+  </button>
+  
+  {/* Spyglass Logo */}
+  <img 
+    src="/logos/spyglass-logo-white.png"
+    alt="Spyglass Realty"
+    className="h-8 w-auto"
+    onError={(e) => {
+      console.error('Logo failed to load:', e.target.src);
+      // Fallback to text
+      e.target.style.display = 'none';
+      e.target.parentElement.innerHTML += `
+        <div class="flex flex-col">
+          <span class="text-orange-500 text-sm font-bold">SPYGLASS</span>
+          <span class="text-white text-xs">REALTY</span>
+        </div>
+      `;
+    }}
+  />
+</div>
+```
+
+### Step 4: Alternative — Copy Logo to Correct Location
+
+If the logo file exists but is in wrong location:
+
+```bash
+# Create logos directory if it doesn't exist
+mkdir -p public/logos
+
+# If logo is somewhere else, copy it
+cp path/to/SpyglassRealty_Logo_White.png public/logos/spyglass-logo-white.png
+```
+
+---
+
+## 🔧 Fix 3: Card Logo Images — Still Showing Text Fallback
+
+**Symptom:** Cards show "SPYGLASS REALTY" text instead of logo image
+
+### Step 1: Same Issue as Header — Verify Path
+
+```tsx
+// In WidgetIcon.tsx or SectionCard.tsx
+const logoPath = '/logos/spyglass-logo-square.png';
+
+// Add error logging
+<img 
+  src={logoPath}
+  alt="Spyglass Realty"
+  className="h-10 w-auto"
+  onLoad={() => console.log('Logo loaded successfully')}
+  onError={(e) => {
+    console.error('Card logo failed:', e.target.src);
+    // Show text fallback
+  }}
+/>
+```
+
+### Step 2: Check Network Tab
+
+In browser DevTools → Network tab:
+1. Filter by "Images"
+2. Look for failed requests to logo files
+3. Check the actual URL being requested
+4. Verify if 404 or other error
+
+### Step 3: Fix with Correct Path
+
+```tsx
+// WidgetIcon.tsx - Update the spyglass-logo case
+case 'spyglass-logo':
+  return (
+    <img 
+      src="/logos/spyglass-logo-square.png"  // Verify this path exists!
+      alt="Spyglass Realty"
+      className="h-10 w-auto object-contain"
+      onError={(e) => {
+        // Text fallback that matches current display
+        const target = e.target as HTMLImageElement;
+        target.style.display = 'none';
+        const fallback = document.createElement('div');
+        fallback.className = 'flex flex-col items-center';
+        fallback.innerHTML = `
+          <span class="text-orange-500 text-sm font-bold tracking-wider">SPYGLASS</span>
+          <span class="text-gray-400 text-xs">REALTY</span>
+        `;
+        target.parentElement?.appendChild(fallback);
+      }}
+    />
+  );
+```
+
+---
+
+## 🔧 Fix 4: Click Response Very Slow — Performance Issue
+
+**Symptom:** Clicking a section takes too long to respond
+
+### Cause 1: Heavy Transition Animations
+
+```tsx
+// FIND and REMOVE or REDUCE these:
+
+// TOO SLOW:
+className="transition-all duration-500"
+className="transition-all duration-700"
+
+// CHANGE TO:
+className="transition-all duration-100"
+// OR REMOVE COMPLETELY:
+className=""
+```
+
+### Cause 2: Framer Motion Animations
+
+```tsx
+// If using framer-motion, reduce duration:
+
+// BEFORE:
+<motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.5 }}
+>
+
+// AFTER:
+<motion.div
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  transition={{ duration: 0.1 }}
+>
+```
+
+### Cause 3: Heavy Re-renders
+
+```tsx
+// Wrap SlideViewer in React.memo to prevent unnecessary re-renders
+export const SlideViewer = React.memo(function SlideViewer({ ... }) {
+  // component code
+});
+
+// Use useMemo for expensive computations
+const sortedWidgets = useMemo(() => 
+  [...WIDGETS].sort((a, b) => a.number - b.number),
+  []
+);
+```
+
+### Cause 4: Lazy Load Widget Content
+
+```tsx
+// Don't load all widget content upfront
+// Only load when that widget is selected
+
+const [activeWidget, setActiveWidget] = useState(null);
+
+// In SlideViewer:
+{activeWidget && (
+  <Suspense fallback={<div>Loading...</div>}>
+    <WidgetContent widgetId={activeWidget} />
+  </Suspense>
+)}
+```
+
+### Quick Fix — Remove All Transitions Temporarily
+
+```tsx
+// In SectionCard.tsx
+<div 
+  onClick={() => onSelect(widget.id)}
+  className="bg-white rounded-xl p-5 cursor-pointer hover:shadow-md"
+  // REMOVED: transition-all duration-300
+>
+
+// In SlideViewer.tsx
+<div className="h-full">
+  {/* REMOVED: any motion/transition wrappers */}
+  {renderWidget()}
+</div>
+```
+
+---
+
+## 🔧 Fix 5: Sidebar Sections Layout Off
+
+**Symptom:** Second screenshot shows sidebar sections might have alignment/spacing issues
+
+### Check Sidebar Styling
+
+```tsx
+// Sidebar.tsx
+<div className="fixed inset-y-0 left-0 w-72 bg-gray-900 z-50 overflow-y-auto">
+  {/* Header */}
+  <div className="flex items-center justify-between p-4 border-b border-gray-700">
+    <span className="text-white font-semibold">Sections</span>
+    <button onClick={onClose} className="min-w-[44px] min-h-[44px] p-2">
+      <X className="w-5 h-5 text-white" />
+    </button>
+  </div>
+  
+  {/* Home Link */}
+  <button 
+    onClick={() => onNavigate('home')}
+    className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-gray-800"
+  >
+    <Home className="w-5 h-5" />
+    <span>Home</span>
+  </button>
+  
+  {/* Section List */}
+  <div className="py-2">
+    {widgets.map((widget) => (
+      <button
+        key={widget.id}
+        onClick={() => onNavigate(widget.id)}
+        className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-gray-800 text-left"
+      >
+        <span className="w-6 text-gray-400 text-sm">{widget.number}</span>
+        <span className="flex-1 text-sm truncate">{widget.title}</span>
+        {widget.badge && (
+          <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">
+            {widget.badge}
+          </span>
+        )}
+      </button>
+    ))}
+  </div>
+</div>
+```
+
+---
+
+## 📋 Diagnostic Commands to Run
+
+Please run these and share the output:
+
+```bash
+# 1. Find all logo files
+find . -type f \( -name "*spyglass*" -o -name "*logo*" \) -not -path "./node_modules/*" 2>/dev/null
+
+# 2. Check public directory structure
+ls -la public/
+ls -la public/logos/ 2>/dev/null || echo "logos folder doesn't exist"
+
+# 3. Check environment variables (redacted)
+echo "VITE_MAPBOX_TOKEN exists: $([ -n \"$VITE_MAPBOX_TOKEN\" ] && echo 'yes' || echo 'no')"
+echo "MAPBOX_TOKEN exists: $([ -n \"$MAPBOX_TOKEN\" ] && echo 'yes' || echo 'no')"
+
+# 4. Search for mapbox usage in code
+grep -r "mapbox" --include="*.tsx" --include="*.ts" -l . | grep -v node_modules
+```
+
+---
+
+## 📋 Summary — Priority Order
+
+1. **Add `VITE_MAPBOX_TOKEN` to Replit Secrets** (copy value from `MAPBOX_TOKEN`)
+2. **Verify logo files are in `public/logos/`** and paths are correct
+3. **Remove/reduce transition durations** (change 500ms → 100ms)
+4. **Add console.log debugging** to identify exact failures
+
+---
+
+## ⚡ Quick Wins — Paste This Fix
+
+```tsx
+// 1. In your environment or component, add this:
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+if (!MAPBOX_TOKEN) {
+  console.error('❌ MAPBOX TOKEN NOT FOUND - Add VITE_MAPBOX_TOKEN to Replit Secrets');
+}
+
+// 2. For faster clicks, find all these patterns and reduce:
+// FIND: duration-300, duration-500, duration-700
+// REPLACE WITH: duration-100 or remove entirely
+
+// 3. For logo debugging:
+<img 
+  src="/logos/spyglass-logo-white.png"
+  onError={(e) => console.error('Logo not found at:', e.target.src)}
+/>
+```
+
+After running diagnostics, let me know:
+1. What logo files exist and where
+2. What environment variable names are set
+3. Any console errors in browser DevTools
