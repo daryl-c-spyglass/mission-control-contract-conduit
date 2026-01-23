@@ -116,16 +116,19 @@ export function Header({
               <PopoverTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="flex items-center gap-2 text-white hover:bg-white/20 px-2"
+                  className="flex items-center gap-3 text-white hover:bg-white/20 px-2"
                   data-testid="button-agent-profile"
                 >
-                  <Avatar className="w-8 h-8">
+                  <div className="text-right hidden md:block">
+                    <p className="text-sm font-medium">{agent.name}</p>
+                    <p className="text-xs text-white/70">{agent.company || 'Spyglass Realty'}</p>
+                  </div>
+                  <Avatar className="w-10 h-10 border-2 border-white/30">
                     <AvatarImage src={agent.photo} alt={agent.name} />
                     <AvatarFallback className="bg-[#F37216] text-white text-sm">
                       {agent.name?.charAt(0) || 'A'}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-sm hidden sm:block">{agent.name}</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-64" align="end" data-testid="agent-popover">
@@ -139,7 +142,7 @@ export function Header({
                     </Avatar>
                     <div>
                       <p className="font-medium">{agent.name}</p>
-                      <p className="text-sm text-muted-foreground">{agent.company}</p>
+                      <p className="text-sm text-muted-foreground">{agent.company || 'Spyglass Realty'}</p>
                     </div>
                   </div>
                   {agent.phone && (

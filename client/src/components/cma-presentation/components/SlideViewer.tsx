@@ -124,21 +124,21 @@ export function SlideViewer({
             </h1>
           </div>
 
-          <div className="w-[100px] flex justify-end">
-            <div className="flex items-center gap-2">
-              {agent.photo && (
-                <img 
-                  src={agent.photo} 
-                  alt={agent.name}
-                  className="w-8 h-8 rounded-full object-cover border-2 border-white/30"
-                />
-              )}
-              <div className="text-right hidden md:block">
-                <p className="text-white text-xs font-medium truncate max-w-[80px]">
-                  {agent.name?.split(' ')[0]}
-                </p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right hidden md:block">
+              <p className="text-white text-sm font-medium" data-testid="text-agent-name">
+                {agent.name || 'Agent'}
+              </p>
+              <p className="text-white/70 text-xs" data-testid="text-agent-company">
+                {agent.company || 'Spyglass Realty'}
+              </p>
             </div>
+            <img 
+              src={agent.photo || '/default-avatar.png'} 
+              alt={agent.name || 'Agent'}
+              className="w-10 h-10 rounded-full object-cover border-2 border-white/30"
+              data-testid="img-agent-photo"
+            />
           </div>
         </div>
 
