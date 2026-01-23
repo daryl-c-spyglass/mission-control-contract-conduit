@@ -125,17 +125,55 @@ export function TransactionCard({ transaction, coordinators, onClick, onMarketin
       <CardContent className="space-y-3 sm:space-y-4">
         {/* Conditional dates section: Off-market shows Date Going Live, others show Contract/Closing */}
         {isOffMarket ? (
-          <div className="text-xs sm:text-sm">
-            <div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
-                <Clock className="h-3 w-3 text-purple-500" />
-                Date Going Live
-              </p>
-              <div className={`flex items-center gap-1 sm:gap-1.5 ${transaction.goLiveDate ? "font-medium" : "text-muted-foreground"}`}>
-                <span data-testid={`text-go-live-date-${transaction.id}`}>
-                  {formatDate(transaction.goLiveDate)}
-                </span>
+          <div className="bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-950/40 dark:to-purple-900/30 border border-purple-200 dark:border-purple-800/50 rounded-lg p-3">
+            <div className="flex items-center justify-between">
+              {/* Left side: Label and Date */}
+              <div>
+                <p className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-400 uppercase tracking-wide font-medium flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5" />
+                  Going Live
+                </p>
+                {transaction.goLiveDate ? (
+                  <p className="text-sm sm:text-base text-purple-900 dark:text-purple-100 font-semibold mt-1" data-testid={`text-go-live-date-${transaction.id}`}>
+                    {formatDate(transaction.goLiveDate)}
+                  </p>
+                ) : (
+                  <p className="text-xs sm:text-sm text-purple-400 dark:text-purple-500 mt-1" data-testid={`text-go-live-date-${transaction.id}`}>
+                    Not set
+                  </p>
+                )}
               </div>
+              
+              {/* Right side: Countdown */}
+              {transaction.goLiveDate && (() => {
+                const goLive = new Date(transaction.goLiveDate);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                goLive.setHours(0, 0, 0, 0);
+                const daysUntil = Math.ceil((goLive.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                
+                if (daysUntil === 0) {
+                  return (
+                    <div className="bg-purple-500 text-white px-3 py-1.5 rounded-lg text-center">
+                      <p className="text-sm font-bold">Today!</p>
+                    </div>
+                  );
+                } else if (daysUntil < 0) {
+                  return (
+                    <div className="text-right text-purple-400 dark:text-purple-500">
+                      <p className="text-xl sm:text-2xl font-bold">{Math.abs(daysUntil)}</p>
+                      <p className="text-[10px] sm:text-xs">{Math.abs(daysUntil) === 1 ? 'day ago' : 'days ago'}</p>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className={`text-right ${daysUntil <= 7 ? 'text-purple-600 dark:text-purple-300' : 'text-purple-500 dark:text-purple-400'}`}>
+                      <p className="text-xl sm:text-2xl font-bold">{daysUntil}</p>
+                      <p className="text-[10px] sm:text-xs">{daysUntil === 1 ? 'day' : 'days'}</p>
+                    </div>
+                  );
+                }
+              })()}
             </div>
           </div>
         ) : (
