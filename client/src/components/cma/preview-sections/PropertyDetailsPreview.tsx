@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { getStatusColor } from "@/lib/statusColors";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 interface Property {
   address?: string;
@@ -95,23 +96,27 @@ export function PropertyDetailsPreview({ properties, compact }: PropertyDetailsP
       })}
       
       {remainingCount > 0 && !showAll && (
-        <button
+        <Button
+          variant="outline"
+          size="default"
           onClick={() => setShowAll(true)}
-          className="w-full text-xs text-primary hover:text-primary/80 text-center pt-2 hover:underline cursor-pointer transition-colors"
+          className="w-full mt-3 touch-manipulation"
           data-testid="button-show-more-properties"
         >
           +{remainingCount} more properties
-        </button>
+        </Button>
       )}
       
       {showAll && properties.length > displayCount && (
-        <button
+        <Button
+          variant="ghost"
+          size="default"
           onClick={() => setShowAll(false)}
-          className="w-full text-xs text-muted-foreground hover:text-foreground text-center pt-2 hover:underline cursor-pointer transition-colors"
+          className="w-full mt-3 touch-manipulation"
           data-testid="button-show-less-properties"
         >
           Show less
-        </button>
+        </Button>
       )}
     </div>
   );

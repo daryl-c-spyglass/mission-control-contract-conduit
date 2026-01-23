@@ -28,47 +28,48 @@ export function PropertyPhotosPreview({ photos, compact }: PropertyPhotosPreview
     <div>
       <div className={cn("grid gap-2", compact ? "grid-cols-3" : "grid-cols-4")}>
         {displayPhotos.map((photo, i) => (
-          <div key={i} className="aspect-square rounded overflow-hidden bg-muted">
+          <button
+            key={i}
+            type="button"
+            className="aspect-square rounded-lg overflow-hidden bg-muted relative group focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 touch-manipulation"
+          >
             <img
               src={photo}
               alt={`Property ${i + 1}`}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+              loading="lazy"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
               }}
             />
-          </div>
+          </button>
         ))}
       </div>
       
       {hasMore && !showAll && (
-        <div className="flex justify-center mt-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowAll(true)}
-            className="text-xs"
-            data-testid="button-show-more-photos"
-          >
-            <span>+{remainingCount} more photos</span>
-            <ChevronDown className="h-3 w-3 ml-1" />
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="default"
+          onClick={() => setShowAll(true)}
+          className="w-full mt-3 touch-manipulation"
+          data-testid="button-show-more-photos"
+        >
+          <span>+{remainingCount} more photos</span>
+          <ChevronDown className="h-4 w-4 ml-1" />
+        </Button>
       )}
       
       {showAll && photos.length > displayCount && (
-        <div className="flex justify-center mt-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowAll(false)}
-            className="text-xs text-muted-foreground"
-            data-testid="button-show-less-photos"
-          >
-            <ChevronUp className="h-3 w-3 mr-1" />
-            <span>Show less</span>
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="default"
+          onClick={() => setShowAll(false)}
+          className="w-full mt-3 touch-manipulation"
+          data-testid="button-show-less-photos"
+        >
+          <ChevronUp className="h-4 w-4 mr-1" />
+          <span>Show less</span>
+        </Button>
       )}
     </div>
   );

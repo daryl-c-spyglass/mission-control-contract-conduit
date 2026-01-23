@@ -1,7 +1,9 @@
 import { cn } from "@/lib/utils";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { isPdfImplemented, getSectionSource } from "@/lib/cma-section-sources";
 
 interface PreviewSectionProps {
   title: string;
@@ -37,38 +39,63 @@ export function PreviewSection({
     }
   };
 
+  const pdfImplemented = sectionId ? isPdfImplemented(sectionId) : true;
+  const source = sectionId ? getSectionSource(sectionId) : null;
+  const isClickable = onClick && sectionId;
+  const hasSource = sourceUrl && onSourceClick;
+
   return (
     <div 
       className={cn(
         "border rounded-lg overflow-hidden transition-colors",
-        onClick && "cursor-pointer hover:border-primary/50 hover:bg-muted/30"
+        isClickable && "cursor-pointer hover:border-primary/50 active:bg-muted/50"
       )}
       onClick={handleClick}
+      role={isClickable ? "button" : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (isClickable && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          handleClick();
+        }
+      }}
       data-testid={`preview-section-${sectionId}`}
     >
-      <div className="flex items-center justify-between gap-2 px-3 py-2 bg-muted/50 border-b">
-        <div className="flex items-center gap-2">
-          <Icon className="w-4 h-4 text-muted-foreground" />
+      <div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-muted/50 border-b min-h-[44px]">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           <span className="font-medium text-sm text-muted-foreground">{title}</span>
+          
+          {!pdfImplemented && (
+            <Badge 
+              variant="outline" 
+              className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700"
+            >
+              Preview Only
+            </Badge>
+          )}
         </div>
         
-        {sourceUrl && onSourceClick && (
+        {hasSource && (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={handleSourceClick}
-                  className="text-[10px] text-primary"
+                  className="touch-manipulation"
                   data-testid={`button-source-${sectionId}`}
                 >
-                  <span>Source</span>
-                  <ExternalLink className="h-2.5 w-2.5 ml-1" />
+                  {source?.navigateTo ? (
+                    <ExternalLink className="h-4 w-4" />
+                  ) : (
+                    <Info className="h-4 w-4" />
+                  )}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="left">
-                <p className="text-xs">Data from: {sourceLabel || 'External Source'}</p>
+                <p className="text-xs font-medium">Data from: {sourceLabel || source?.label || 'External Source'}</p>
                 <p className="text-[10px] text-muted-foreground">Click to view/edit</p>
               </TooltipContent>
             </Tooltip>

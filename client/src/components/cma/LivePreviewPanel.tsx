@@ -1,9 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useLocation } from "wouter";
 import { Eye, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PreviewSection } from "./PreviewSection";
 import { ExpandedPreviewModal } from "./ExpandedPreviewModal";
+import { ZoomControls } from "./ZoomControls";
 import { CMA_REPORT_SECTIONS, CmaSectionConfig } from "@shared/cma-sections";
 import { CoverPagePreview } from "./preview-sections/CoverPagePreview";
 import { SummaryComparablesPreview } from "./preview-sections/SummaryComparablesPreview";
@@ -12,6 +13,7 @@ import { PricePerSqftChartPreview } from "./preview-sections/PricePerSqftChartPr
 import { PropertyPhotosPreview } from "./preview-sections/PropertyPhotosPreview";
 import { PropertyDetailsPreview } from "./preview-sections/PropertyDetailsPreview";
 import { CMAMapPreview } from "@/components/presentation/CMAMapPreview";
+import { PDF_IMPLEMENTATION_STATUS } from "@/lib/cma-section-sources";
 import type { PropertyForAdjustment } from "@/lib/adjustmentCalculations";
 
 interface SectionSource {
@@ -83,8 +85,17 @@ export function LivePreviewPanel({
 }: LivePreviewPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
+  const [zoom, setZoom] = useState(100);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [, navigate] = useLocation();
+
+  const sectionStats = useMemo(() => {
+    const implemented = includedSections.filter(
+      (id) => PDF_IMPLEMENTATION_STATUS[id] === true
+    ).length;
+    const previewOnly = includedSections.length - implemented;
+    return { implemented, previewOnly };
+  }, [includedSections]);
   
   const handleSourceClick = (url: string) => {
     navigate(url);
@@ -338,49 +349,51 @@ export function LivePreviewPanel({
         onMouseLeave={() => setIsHovering(false)}
       >
         {/* Fixed Header */}
-        <div className="flex-shrink-0 flex items-center justify-between p-3 border-b bg-muted/30">
-          <div>
+        <div className="flex-shrink-0 flex items-center justify-between p-3 border-b bg-muted/30 gap-2">
+          <div className="min-w-0">
             <h3 className="font-semibold text-sm flex items-center gap-2">
-              <Eye className="w-4 h-4" />
-              Live Preview
+              <Eye className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">Live Preview</span>
             </h3>
-            <p className="text-xs text-muted-foreground">
-              Preview how your CMA will appear
+            <p className="text-xs text-muted-foreground truncate">
+              {enabledSections.length} sections
+              {sectionStats.previewOnly > 0 && (
+                <span className="text-amber-600 dark:text-amber-400 ml-1">
+                  ({sectionStats.previewOnly} preview only)
+                </span>
+              )}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-              {enabledSections.length} sections
-            </span>
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => setIsExpanded(true)}
-              className="h-7 w-7 p-0"
-              title="Expand to full screen"
-              data-testid="button-expand-preview"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </Button>
-          </div>
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => setIsExpanded(true)}
+            className="flex-shrink-0 touch-manipulation"
+            title="Expand to full screen"
+            data-testid="button-expand-preview"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </Button>
         </div>
 
         {/* Scrollable Preview Area - FILLS REMAINING HEIGHT */}
         <div 
           ref={scrollRef}
-          className={`
-            flex-1 overflow-y-auto overflow-x-hidden
-            transition-all duration-200
-            ${isHovering ? 'scrollbar-visible' : 'scrollbar-thin scrollbar-thumb-muted'}
-          `}
-          style={{ minHeight: 0 }}
+          className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
+          style={{ 
+            minHeight: 0,
+            WebkitOverflowScrolling: 'touch',
+          }}
         >
-          <div className="p-3 space-y-3">
+          <div 
+            className="p-3 space-y-3 transition-transform duration-200 origin-top"
+            style={{ transform: `scale(${zoom / 100})` }}
+          >
             {previewContent(true)}
           </div>
           
           {/* Scroll indicator at bottom when content overflows */}
-          {enabledSections.length > 3 && (
+          {enabledSections.length > 3 && zoom === 100 && (
             <div className="sticky bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none flex items-end justify-center pb-1">
               <span className="text-[10px] text-muted-foreground animate-pulse">
                 Scroll for more sections
@@ -388,6 +401,14 @@ export function LivePreviewPanel({
             </div>
           )}
         </div>
+
+        {/* Zoom Controls Footer */}
+        <ZoomControls 
+          zoom={zoom} 
+          onZoomChange={setZoom}
+          showSlider={true}
+          showFitButton={false}
+        />
       </div>
 
       {/* Expanded Modal */}

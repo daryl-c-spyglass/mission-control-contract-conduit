@@ -1,0 +1,1256 @@
+# CMA Presentation Builder - Live Preview Enhancements
+
+## Overview
+
+Enhance the CMA Presentation Builder Live Preview panel with three key improvements plus full mobile optimization:
+
+1. **Clickable Section Sources** - Each section links to its data source
+2. **Modern Zoom Controls** - Replace percentage buttons with zoom in/out icons  
+3. **Expandable Content** - Make "+X more" links functional
+4. **Mobile Optimization** - Full iPad/iOS/Android responsive support
+
+---
+
+## 📱 Mobile Optimization Requirements (MANDATORY)
+
+All changes MUST be optimized for these devices:
+
+| Device | Browser | Screen Size |
+|--------|---------|-------------|
+| iPad Pro | Safari | 1024 x 1366 |
+| iPad Air/Mini | Safari | 768 x 1024 |
+| iPhone 14/15 Pro | Safari | 393 x 852 |
+| iPhone SE | Safari | 375 x 667 |
+| Android Tablet | Chrome | 800 x 1280 |
+| Android Phone | Chrome | 360 x 800 |
+
+### Mobile UX Checklist:
+- [ ] Touch targets minimum 44x44px
+- [ ] No hover-only interactions (provide touch alternatives)
+- [ ] Responsive layouts (stack on mobile, side-by-side on tablet+)
+- [ ] Safe area insets for notched devices
+- [ ] Smooth scrolling with momentum (-webkit-overflow-scrolling: touch)
+- [ ] No horizontal overflow
+- [ ] Readable font sizes (min 16px for body text)
+- [ ] Fast load times on mobile networks
+- [ ] Works in both portrait and landscape orientations
+
+---
+
+## Current PDF Export Section Status
+
+Reference this when building the Live Preview to show appropriate status indicators:
+
+### ✅ FULLY IMPLEMENTED (12 sections)
+| # | Section | PDF File | Notes |
+|---|---------|----------|-------|
+| 1 | Cover Page | CoverPageSection.tsx | Full implementation |
+| 2 | Listing Brochure | ListingBrochureSection.tsx | Full implementation |
+| 3 | Cover Letter | CoverLetterSection.tsx | Full implementation |
+| 4 | Agent Resume | AgentResumeSection.tsx | ⚠️ Stats hardcoded (5 years, 50+ homes) |
+| 5 | Our Company | OurCompanySection.tsx | ⚠️ Stats/content hardcoded |
+| 6 | What is a CMA? | WhatIsCMASection.tsx | Static educational content |
+| 7 | Contact Me | ContactMeSection.tsx | Full implementation |
+| 8 | Summary of Comparables | SummaryComparablesSection.tsx | Full implementation |
+| 9 | Listings Header | ChapterHeaderSection.tsx | Chapter divider |
+| 10 | Property Details | PropertyDetailsSection.tsx | Full implementation |
+| 11 | Analysis Header | ChapterHeaderSection.tsx | Chapter divider |
+| 12 | Comparable Stats | ComparableStatsSection.tsx | Full implementation |
+
+### ❌ NOT IMPLEMENTED (5 sections - return null)
+| # | Section | Status | Reason |
+|---|---------|--------|--------|
+| 1 | Property Photos | Returns null | Photo gallery not built |
+| 2 | Adjustments | Returns null | Price adjustments not built |
+| 3 | Online Valuation | Returns null | AVM/Zestimate not built |
+| 4 | Price Per Sq Ft | Returns null | Chart visualization not built |
+| 5 | Map of All Listings | Header only | Maps can't render in react-pdf |
+
+---
+
+## Enhancement 1: Clickable Section Sources
+
+### Requirement
+When a section's data comes from an external source (MLS, agent profile, settings), clicking the section header or info icon should navigate to that source.
+
+### Implementation
+
+#### 1.1 Add Source Configuration to Section Types
+
+```typescript
+// client/src/types/cma-sections.ts
+
+export type SourceType = 'mls' | 'agent-profile' | 'cma-settings' | 'manual' | 'static';
+
+export interface SectionSourceConfig {
+  type: SourceType;
+  label: string;
+  navigateTo?: string; // Route path or URL
+  tabName?: string;    // For internal tab navigation
+}
+
+export interface PreviewSectionConfig {
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  enabled: boolean;
+  pdfImplemented: boolean; // NEW: Track PDF export status
+  source?: SectionSourceConfig;
+}
+```
+
+#### 1.2 Define Section Sources
+
+```typescript
+// client/src/lib/cma-section-sources.ts
+
+import { SectionSourceConfig } from '@/types/cma-sections';
+
+export const SECTION_SOURCES: Record<string, SectionSourceConfig> = {
+  cover_page: {
+    type: 'cma-settings',
+    label: 'Content Tab',
+    tabName: 'content',
+  },
+  listing_brochure: {
+    type: 'mls',
+    label: 'MLS Data',
+    tabName: 'mls-data',
+  },
+  cover_letter: {
+    type: 'agent-profile',
+    label: 'Agent Profile Settings',
+    navigateTo: '/settings/profile',
+  },
+  agent_resume: {
+    type: 'agent-profile',
+    label: 'Agent Profile Settings',
+    navigateTo: '/settings/profile',
+  },
+  our_company: {
+    type: 'agent-profile',
+    label: 'Company Settings',
+    navigateTo: '/settings/profile',
+  },
+  what_is_cma: {
+    type: 'static',
+    label: 'Static Content',
+  },
+  contact_me: {
+    type: 'agent-profile',
+    label: 'Agent Profile Settings',
+    navigateTo: '/settings/profile',
+  },
+  map_all_listings: {
+    type: 'mls',
+    label: 'CMA Comparables',
+    tabName: 'sections',
+  },
+  summary_comparables: {
+    type: 'mls',
+    label: 'CMA Comparables',
+    tabName: 'sections',
+  },
+  property_details: {
+    type: 'mls',
+    label: 'MLS Data',
+    tabName: 'mls-data',
+  },
+  property_photos: {
+    type: 'mls',
+    label: 'Layout Tab',
+    tabName: 'layout',
+  },
+  adjustments: {
+    type: 'cma-settings',
+    label: 'Content Tab',
+    tabName: 'content',
+  },
+  comparable_stats: {
+    type: 'mls',
+    label: 'CMA Analysis',
+    tabName: 'sections',
+  },
+};
+
+// PDF implementation status
+export const PDF_IMPLEMENTATION_STATUS: Record<string, boolean> = {
+  cover_page: true,
+  listing_brochure: true,
+  cover_letter: true,
+  agent_resume: true,
+  our_company: true,
+  what_is_cma: true,
+  contact_me: true,
+  map_all_listings: false, // Only header, no actual map
+  summary_comparables: true,
+  listings_header: true,
+  property_details: true,
+  property_photos: false,
+  adjustments: false,
+  analysis_header: true,
+  online_valuation: false,
+  price_per_sqft: false,
+  comparable_stats: true,
+};
+```
+
+#### 1.3 Clickable Section Header Component
+
+```tsx
+// client/src/components/cma/preview/ClickableSectionHeader.tsx
+
+import { ExternalLink, Info } from 'lucide-react';
+import { useLocation } from 'wouter';
+import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { SECTION_SOURCES, PDF_IMPLEMENTATION_STATUS } from '@/lib/cma-section-sources';
+import { cn } from '@/lib/utils';
+
+interface ClickableSectionHeaderProps {
+  sectionId: string;
+  title: string;
+  icon: React.ReactNode;
+  onTabChange?: (tab: string) => void;
+  className?: string;
+}
+
+export function ClickableSectionHeader({
+  sectionId,
+  title,
+  icon,
+  onTabChange,
+  className,
+}: ClickableSectionHeaderProps) {
+  const [, navigate] = useLocation();
+  const source = SECTION_SOURCES[sectionId];
+  const isPdfImplemented = PDF_IMPLEMENTATION_STATUS[sectionId];
+
+  const handleClick = () => {
+    if (!source) return;
+    
+    if (source.navigateTo) {
+      navigate(source.navigateTo);
+    } else if (source.tabName && onTabChange) {
+      onTabChange(source.tabName);
+    }
+  };
+
+  const isClickable = source && (source.navigateTo || source.tabName);
+
+  return (
+    <div
+      className={cn(
+        'flex items-center justify-between p-3 bg-white border-b border-gray-100',
+        isClickable && 'cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors',
+        className
+      )}
+      onClick={isClickable ? handleClick : undefined}
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (isClickable && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          handleClick();
+        }
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-gray-500">{icon}</span>
+        <span className="font-medium text-gray-900 text-sm">{title}</span>
+        
+        {/* PDF Implementation Status Badge */}
+        {!isPdfImplemented && (
+          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-700 rounded">
+            Preview Only
+          </span>
+        )}
+      </div>
+
+      {source && source.type !== 'static' && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 min-w-[44px] min-h-[44px]" // 44px touch target
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleClick();
+                }}
+              >
+                {source.navigateTo ? (
+                  <ExternalLink className="h-4 w-4 text-gray-400" />
+                ) : (
+                  <Info className="h-4 w-4 text-gray-400" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p className="text-xs">
+                Data from: {source.label}
+                {isClickable && ' (Click to edit)'}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## Enhancement 2: Modern Zoom Controls
+
+### Requirement
+Replace static percentage buttons (50%, 100%, 150%) with modern zoom controls featuring zoom in/out buttons, a slider, and fit-to-width option.
+
+### Implementation
+
+```tsx
+// client/src/components/cma/preview/ZoomControls.tsx
+
+import { ZoomIn, ZoomOut, Maximize2, RotateCcw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
+import { cn } from '@/lib/utils';
+
+interface ZoomControlsProps {
+  zoom: number;
+  onZoomChange: (zoom: number) => void;
+  minZoom?: number;
+  maxZoom?: number;
+  className?: string;
+}
+
+export function ZoomControls({
+  zoom,
+  onZoomChange,
+  minZoom = 50,
+  maxZoom = 200,
+  className,
+}: ZoomControlsProps) {
+  const zoomStep = 10;
+
+  const handleZoomIn = () => {
+    const newZoom = Math.min(zoom + zoomStep, maxZoom);
+    onZoomChange(newZoom);
+  };
+
+  const handleZoomOut = () => {
+    const newZoom = Math.max(zoom - zoomStep, minZoom);
+    onZoomChange(newZoom);
+  };
+
+  const handleReset = () => {
+    onZoomChange(100);
+  };
+
+  const handleFitToWidth = () => {
+    // Calculate fit-to-width zoom based on container
+    onZoomChange(100);
+  };
+
+  return (
+    <div
+      className={cn(
+        'flex items-center justify-center gap-2 p-3 bg-white border-t border-gray-200',
+        // Mobile responsive: stack controls on very small screens
+        'flex-wrap sm:flex-nowrap',
+        className
+      )}
+    >
+      {/* Zoom Out Button - 44px touch target */}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleZoomOut}
+        disabled={zoom <= minZoom}
+        className="h-11 w-11 p-0 min-w-[44px] min-h-[44px] touch-manipulation"
+        title="Zoom Out"
+      >
+        <ZoomOut className="h-4 w-4" />
+      </Button>
+
+      {/* Zoom Slider - Hidden on mobile, visible on tablet+ */}
+      <div className="hidden sm:flex items-center gap-2 w-24 md:w-32">
+        <Slider
+          value={[zoom]}
+          min={minZoom}
+          max={maxZoom}
+          step={zoomStep}
+          onValueChange={([value]) => onZoomChange(value)}
+          className="w-full touch-manipulation"
+        />
+      </div>
+
+      {/* Percentage Display */}
+      <div className="px-3 py-2 bg-gray-100 rounded text-sm font-medium text-gray-700 min-w-[60px] text-center select-none">
+        {zoom}%
+      </div>
+
+      {/* Zoom In Button - 44px touch target */}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleZoomIn}
+        disabled={zoom >= maxZoom}
+        className="h-11 w-11 p-0 min-w-[44px] min-h-[44px] touch-manipulation"
+        title="Zoom In"
+      >
+        <ZoomIn className="h-4 w-4" />
+      </Button>
+
+      {/* Divider - Hidden on mobile */}
+      <div className="hidden md:block w-px h-6 bg-gray-200 mx-1" />
+
+      {/* Fit to Width Button - Hidden on mobile */}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleFitToWidth}
+        className="hidden md:flex h-11 px-3 min-h-[44px] touch-manipulation items-center gap-1"
+        title="Fit to Width"
+      >
+        <Maximize2 className="h-4 w-4" />
+        <span className="text-xs">Fit</span>
+      </Button>
+
+      {/* Reset Button - Shows on all screens */}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleReset}
+        disabled={zoom === 100}
+        className="h-11 px-3 min-h-[44px] touch-manipulation flex items-center gap-1"
+        title="Reset to 100%"
+      >
+        <RotateCcw className="h-3 w-3" />
+        <span className="text-xs hidden sm:inline">Reset</span>
+      </Button>
+    </div>
+  );
+}
+```
+
+### Alternative Simple Version (No Slider)
+
+For cleaner mobile experience, use this simpler version:
+
+```tsx
+// client/src/components/cma/preview/SimpleZoomControls.tsx
+
+import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
+interface SimpleZoomControlsProps {
+  zoom: number;
+  onZoomChange: (zoom: number) => void;
+  className?: string;
+}
+
+export function SimpleZoomControls({
+  zoom,
+  onZoomChange,
+  className,
+}: SimpleZoomControlsProps) {
+  const zoomLevels = [50, 75, 100, 125, 150, 200];
+
+  const zoomIn = () => {
+    const currentIndex = zoomLevels.indexOf(zoom);
+    if (currentIndex === -1) {
+      // Find nearest higher level
+      const nextLevel = zoomLevels.find((l) => l > zoom);
+      onZoomChange(nextLevel || 200);
+    } else if (currentIndex < zoomLevels.length - 1) {
+      onZoomChange(zoomLevels[currentIndex + 1]);
+    }
+  };
+
+  const zoomOut = () => {
+    const currentIndex = zoomLevels.indexOf(zoom);
+    if (currentIndex === -1) {
+      // Find nearest lower level
+      const prevLevel = [...zoomLevels].reverse().find((l) => l < zoom);
+      onZoomChange(prevLevel || 50);
+    } else if (currentIndex > 0) {
+      onZoomChange(zoomLevels[currentIndex - 1]);
+    }
+  };
+
+  const fitToWidth = () => {
+    onZoomChange(100);
+  };
+
+  return (
+    <div
+      className={cn(
+        'flex items-center justify-center gap-1.5 p-2 bg-white border-t border-gray-200',
+        className
+      )}
+    >
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={zoomOut}
+        disabled={zoom <= 50}
+        className="h-11 w-11 p-0 min-w-[44px] min-h-[44px] hover:bg-gray-100 active:bg-gray-200 touch-manipulation"
+        title="Zoom Out"
+      >
+        <ZoomOut className="h-5 w-5 text-gray-600" />
+      </Button>
+
+      <div className="px-3 py-2 bg-gray-100 rounded text-sm font-medium text-gray-700 min-w-[56px] text-center tabular-nums">
+        {zoom}%
+      </div>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={zoomIn}
+        disabled={zoom >= 200}
+        className="h-11 w-11 p-0 min-w-[44px] min-h-[44px] hover:bg-gray-100 active:bg-gray-200 touch-manipulation"
+        title="Zoom In"
+      >
+        <ZoomIn className="h-5 w-5 text-gray-600" />
+      </Button>
+
+      <div className="w-px h-6 bg-gray-200 mx-1" />
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={fitToWidth}
+        className="h-11 w-11 p-0 min-w-[44px] min-h-[44px] hover:bg-gray-100 active:bg-gray-200 touch-manipulation"
+        title="Fit to Width"
+      >
+        <Maximize2 className="h-5 w-5 text-gray-600" />
+      </Button>
+    </div>
+  );
+}
+```
+
+---
+
+## Enhancement 3: Expandable Content (+X More)
+
+### Requirement
+Make "+X more" links in Property Photos, Property Details, and Adjustments sections clickable to expand and show full content.
+
+### Implementation
+
+#### 3.1 Expandable Section Wrapper
+
+```tsx
+// client/src/components/cma/preview/ExpandableSection.tsx
+
+import { useState, useRef, useEffect } from 'react';
+import { ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
+interface ExpandableSectionProps {
+  title: string;
+  icon: React.ReactNode;
+  totalCount: number;
+  previewCount: number;
+  children: React.ReactNode;
+  expandedContent: React.ReactNode;
+  onTabChange?: (tab: string) => void;
+  sourceTab?: string;
+}
+
+export function ExpandableSection({
+  title,
+  icon,
+  totalCount,
+  previewCount,
+  children,
+  expandedContent,
+  onTabChange,
+  sourceTab,
+}: ExpandableSectionProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const expandedRef = useRef<HTMLDivElement>(null);
+
+  const remainingCount = totalCount - previewCount;
+  const hasMore = remainingCount > 0;
+
+  // Close on escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isExpanded) {
+        setIsExpanded(false);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isExpanded]);
+
+  // Scroll into view when expanded
+  useEffect(() => {
+    if (isExpanded && expandedRef.current) {
+      expandedRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [isExpanded]);
+
+  return (
+    <div className="border-b border-gray-100">
+      {/* Section Header */}
+      <div className="flex items-center justify-between p-3 bg-white">
+        <div className="flex items-center gap-2">
+          <span className="text-gray-500">{icon}</span>
+          <span className="font-medium text-gray-900 text-sm">{title}</span>
+          {hasMore && (
+            <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded">
+              {totalCount}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Preview Content */}
+      <div className="px-3 pb-3">
+        {children}
+
+        {/* "+X more" Button */}
+        {hasMore && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className={cn(
+              'w-full mt-2 h-11 min-h-[44px] touch-manipulation',
+              'text-orange-600 hover:text-orange-700 hover:bg-orange-50',
+              'active:bg-orange-100 transition-colors',
+              'flex items-center justify-center gap-1'
+            )}
+          >
+            {isExpanded ? (
+              <>
+                <ChevronUp className="h-4 w-4" />
+                <span>Show less</span>
+              </>
+            ) : (
+              <>
+                <span>+{remainingCount} more {title.toLowerCase()}</span>
+                <ChevronDown className="h-4 w-4" />
+              </>
+            )}
+          </Button>
+        )}
+      </div>
+
+      {/* Expanded Content Panel */}
+      {isExpanded && (
+        <div
+          ref={expandedRef}
+          className={cn(
+            'border-t border-gray-200 bg-gray-50',
+            'animate-in slide-in-from-top-2 duration-200'
+          )}
+        >
+          <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-white">
+            <span className="text-sm font-medium text-gray-900">
+              All {title} ({totalCount})
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsExpanded(false)}
+              className="h-9 w-9 p-0 min-w-[44px] min-h-[44px] touch-manipulation"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="p-3 max-h-[50vh] overflow-y-auto overscroll-contain">
+            {expandedContent}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+#### 3.2 Property Photos Expandable
+
+```tsx
+// client/src/components/cma/preview/PropertyPhotosPreview.tsx
+
+import { useState } from 'react';
+import { Image, ZoomIn } from 'lucide-react';
+import { ExpandableSection } from './ExpandableSection';
+import { cn } from '@/lib/utils';
+
+interface Photo {
+  id: string;
+  url: string;
+  caption?: string;
+}
+
+interface PropertyPhotosPreviewProps {
+  photos: Photo[];
+  previewCount?: number;
+  onPhotoClick?: (photo: Photo, index: number) => void;
+}
+
+export function PropertyPhotosPreview({
+  photos,
+  previewCount = 4,
+  onPhotoClick,
+}: PropertyPhotosPreviewProps) {
+  const previewPhotos = photos.slice(0, previewCount);
+
+  const PhotoGrid = ({ items, showOverlay = false }: { items: Photo[]; showOverlay?: boolean }) => (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+      {items.map((photo, index) => (
+        <button
+          key={photo.id}
+          onClick={() => onPhotoClick?.(photo, index)}
+          className={cn(
+            'relative aspect-[4/3] rounded-lg overflow-hidden',
+            'bg-gray-100 group touch-manipulation',
+            'focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2'
+          )}
+        >
+          <img
+            src={photo.url}
+            alt={photo.caption || `Photo ${index + 1}`}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+          <div
+            className={cn(
+              'absolute inset-0 bg-black/0 group-hover:bg-black/30',
+              'group-active:bg-black/40 transition-colors',
+              'flex items-center justify-center'
+            )}
+          >
+            <ZoomIn
+              className={cn(
+                'h-6 w-6 text-white opacity-0',
+                'group-hover:opacity-100 group-active:opacity-100',
+                'transition-opacity'
+              )}
+            />
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+
+  return (
+    <ExpandableSection
+      title="Property Photos"
+      icon={<Image className="h-4 w-4" />}
+      totalCount={photos.length}
+      previewCount={previewCount}
+      expandedContent={<PhotoGrid items={photos} />}
+    >
+      <PhotoGrid items={previewPhotos} />
+    </ExpandableSection>
+  );
+}
+```
+
+#### 3.3 Comparable Properties Expandable
+
+```tsx
+// client/src/components/cma/preview/ComparablePropertiesPreview.tsx
+
+import { Home, MapPin, Bed, Bath, Square } from 'lucide-react';
+import { ExpandableSection } from './ExpandableSection';
+import { formatPrice } from '@/lib/utils';
+
+interface Comparable {
+  id: string;
+  address: string;
+  city: string;
+  state: string;
+  listPrice: number;
+  beds: number;
+  baths: number;
+  sqft: number;
+  distance?: string;
+  photoUrl?: string;
+}
+
+interface ComparablePropertiesPreviewProps {
+  comparables: Comparable[];
+  previewCount?: number;
+  onPropertyClick?: (comparable: Comparable) => void;
+}
+
+export function ComparablePropertiesPreview({
+  comparables,
+  previewCount = 3,
+  onPropertyClick,
+}: ComparablePropertiesPreviewProps) {
+  const previewItems = comparables.slice(0, previewCount);
+
+  const PropertyCard = ({ property }: { property: Comparable }) => (
+    <button
+      onClick={() => onPropertyClick?.(property)}
+      className={cn(
+        'w-full text-left p-3 bg-white rounded-lg border border-gray-200',
+        'hover:border-orange-300 hover:shadow-sm active:bg-gray-50',
+        'transition-all touch-manipulation',
+        'focus:outline-none focus:ring-2 focus:ring-orange-500'
+      )}
+    >
+      <div className="flex gap-3">
+        {property.photoUrl && (
+          <div className="w-20 h-16 rounded overflow-hidden flex-shrink-0 bg-gray-100">
+            <img
+              src={property.photoUrl}
+              alt={property.address}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-medium text-gray-900 text-sm truncate">
+                {property.address}
+              </p>
+              <p className="text-xs text-gray-500">
+                {property.city}, {property.state}
+              </p>
+            </div>
+            {property.distance && (
+              <span className="text-xs text-gray-400 whitespace-nowrap">
+                {property.distance}
+              </span>
+            )}
+          </div>
+          <div className="mt-1 flex items-center justify-between">
+            <p className="font-semibold text-orange-600">
+              {formatPrice(property.listPrice)}
+            </p>
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <span className="flex items-center gap-0.5">
+                <Bed className="h-3 w-3" /> {property.beds}
+              </span>
+              <span className="flex items-center gap-0.5">
+                <Bath className="h-3 w-3" /> {property.baths}
+              </span>
+              <span className="flex items-center gap-0.5">
+                <Square className="h-3 w-3" /> {property.sqft.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </button>
+  );
+
+  const PropertyList = ({ items }: { items: Comparable[] }) => (
+    <div className="space-y-2">
+      {items.map((property) => (
+        <PropertyCard key={property.id} property={property} />
+      ))}
+    </div>
+  );
+
+  return (
+    <ExpandableSection
+      title="Properties"
+      icon={<Home className="h-4 w-4" />}
+      totalCount={comparables.length}
+      previewCount={previewCount}
+      expandedContent={<PropertyList items={comparables} />}
+    >
+      <PropertyList items={previewItems} />
+    </ExpandableSection>
+  );
+}
+```
+
+#### 3.4 Adjustments Expandable
+
+```tsx
+// client/src/components/cma/preview/AdjustmentsPreview.tsx
+
+import { Calculator, TrendingUp, TrendingDown } from 'lucide-react';
+import { ExpandableSection } from './ExpandableSection';
+import { formatPrice, cn } from '@/lib/utils';
+
+interface AdjustmentRow {
+  id: string;
+  address: string;
+  originalPrice: number;
+  adjustedPrice: number;
+  totalAdjustment: number;
+}
+
+interface AdjustmentsPreviewProps {
+  adjustments: AdjustmentRow[];
+  previewCount?: number;
+}
+
+export function AdjustmentsPreview({
+  adjustments,
+  previewCount = 3,
+}: AdjustmentsPreviewProps) {
+  const previewItems = adjustments.slice(0, previewCount);
+
+  const AdjustmentCard = ({ item }: { item: AdjustmentRow }) => {
+    const isPositive = item.totalAdjustment > 0;
+    const isNegative = item.totalAdjustment < 0;
+
+    return (
+      <div className="p-3 bg-white rounded-lg border border-gray-200">
+        <p className="font-medium text-gray-900 text-sm truncate mb-2">
+          {item.address}
+        </p>
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <div>
+            <p className="text-gray-500">Original</p>
+            <p className="font-medium">{formatPrice(item.originalPrice)}</p>
+          </div>
+          <div>
+            <p className="text-gray-500">Adjustment</p>
+            <p
+              className={cn(
+                'font-medium flex items-center gap-0.5',
+                isPositive && 'text-red-600',   // Positive = subject worth MORE = RED
+                isNegative && 'text-green-600', // Negative = subject worth LESS = GREEN
+                !isPositive && !isNegative && 'text-gray-600'
+              )}
+            >
+              {isPositive && <TrendingUp className="h-3 w-3" />}
+              {isNegative && <TrendingDown className="h-3 w-3" />}
+              {isPositive ? '+' : ''}{formatPrice(item.totalAdjustment)}
+            </p>
+          </div>
+          <div>
+            <p className="text-gray-500">Adjusted</p>
+            <p className="font-semibold text-orange-600">
+              {formatPrice(item.adjustedPrice)}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const AdjustmentsList = ({ items }: { items: AdjustmentRow[] }) => (
+    <div className="space-y-2">
+      {items.map((item) => (
+        <AdjustmentCard key={item.id} item={item} />
+      ))}
+    </div>
+  );
+
+  return (
+    <ExpandableSection
+      title="Adjustments"
+      icon={<Calculator className="h-4 w-4" />}
+      totalCount={adjustments.length}
+      previewCount={previewCount}
+      expandedContent={<AdjustmentsList items={adjustments} />}
+    >
+      <AdjustmentsList items={previewItems} />
+    </ExpandableSection>
+  );
+}
+```
+
+---
+
+## Integration: Updated Live Preview Panel
+
+```tsx
+// client/src/components/cma/preview/LivePreviewPanel.tsx
+
+import { useState, useMemo } from 'react';
+import { Expand, FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ZoomControls } from './ZoomControls';
+import { ClickableSectionHeader } from './ClickableSectionHeader';
+import { PropertyPhotosPreview } from './PropertyPhotosPreview';
+import { ComparablePropertiesPreview } from './ComparablePropertiesPreview';
+import { AdjustmentsPreview } from './AdjustmentsPreview';
+import { PDF_IMPLEMENTATION_STATUS } from '@/lib/cma-section-sources';
+import { cn } from '@/lib/utils';
+
+interface LivePreviewPanelProps {
+  cmaData: any; // Your CMA data type
+  enabledSections: string[];
+  onTabChange: (tab: string) => void;
+  onExpandClick: () => void;
+}
+
+export function LivePreviewPanel({
+  cmaData,
+  enabledSections,
+  onTabChange,
+  onExpandClick,
+}: LivePreviewPanelProps) {
+  const [zoom, setZoom] = useState(100);
+
+  // Count implemented vs preview-only sections
+  const sectionStats = useMemo(() => {
+    const implemented = enabledSections.filter(
+      (id) => PDF_IMPLEMENTATION_STATUS[id] === true
+    ).length;
+    const previewOnly = enabledSections.length - implemented;
+    return { implemented, previewOnly };
+  }, [enabledSections]);
+
+  return (
+    <div className="flex flex-col h-full bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-white">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-gray-500" />
+          <span className="font-medium text-gray-900 text-sm">Live Preview</span>
+          {sectionStats.previewOnly > 0 && (
+            <span className="text-xs text-gray-500">
+              ({sectionStats.previewOnly} preview only)
+            </span>
+          )}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onExpandClick}
+          className="h-10 px-3 min-h-[44px] touch-manipulation flex items-center gap-1"
+        >
+          <Expand className="h-4 w-4" />
+          <span className="hidden sm:inline">Expand</span>
+        </Button>
+      </div>
+
+      {/* Scrollable Preview Content */}
+      <div
+        className="flex-1 overflow-y-auto overscroll-contain"
+        style={{
+          WebkitOverflowScrolling: 'touch', // Smooth momentum scrolling on iOS
+        }}
+      >
+        <div
+          className="origin-top-left transition-transform duration-200"
+          style={{ transform: `scale(${zoom / 100})` }}
+        >
+          {/* Render enabled sections with clickable headers */}
+          {enabledSections.map((sectionId) => (
+            <div key={sectionId}>
+              <ClickableSectionHeader
+                sectionId={sectionId}
+                title={getSectionTitle(sectionId)}
+                icon={getSectionIcon(sectionId)}
+                onTabChange={onTabChange}
+              />
+              
+              {/* Section-specific content */}
+              {sectionId === 'property_photos' && cmaData?.photos && (
+                <PropertyPhotosPreview
+                  photos={cmaData.photos}
+                  previewCount={4}
+                />
+              )}
+              
+              {sectionId === 'property_details' && cmaData?.comparables && (
+                <ComparablePropertiesPreview
+                  comparables={cmaData.comparables}
+                  previewCount={3}
+                />
+              )}
+              
+              {sectionId === 'adjustments' && cmaData?.adjustments && (
+                <AdjustmentsPreview
+                  adjustments={cmaData.adjustments}
+                  previewCount={3}
+                />
+              )}
+              
+              {/* Other sections render their standard preview content */}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Zoom Controls Footer */}
+      <ZoomControls zoom={zoom} onZoomChange={setZoom} />
+    </div>
+  );
+}
+
+// Helper functions (implement based on your section config)
+function getSectionTitle(id: string): string {
+  const titles: Record<string, string> = {
+    cover_page: 'Cover Page',
+    listing_brochure: 'Listing Brochure',
+    cover_letter: 'Cover Letter',
+    agent_resume: 'Agent Resume',
+    our_company: 'Our Company',
+    what_is_cma: 'What is a CMA?',
+    contact_me: 'Contact Me',
+    map_all_listings: 'Map of All Listings',
+    summary_comparables: 'Summary of Comparables',
+    property_details: 'Property Details',
+    property_photos: 'Property Photos',
+    adjustments: 'Adjustments',
+    comparable_stats: 'Comparable Stats',
+  };
+  return titles[id] || id;
+}
+
+function getSectionIcon(id: string): React.ReactNode {
+  // Return appropriate Lucide icon for each section
+  return null; // Implement based on your icon mapping
+}
+```
+
+---
+
+## Mobile-Specific CSS Utilities
+
+Add to your global CSS or Tailwind config:
+
+```css
+/* client/src/styles/mobile-utils.css */
+
+/* Safe area padding for notched devices */
+.safe-area-inset-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Prevent pull-to-refresh on scrollable areas */
+.overscroll-none {
+  overscroll-behavior: none;
+}
+
+/* Smooth momentum scrolling on iOS */
+.scroll-smooth-touch {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent text selection on interactive elements */
+.select-none-touch {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Larger touch target for small buttons */
+.touch-target-44 {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Prevent zoom on input focus (iOS Safari) */
+input, select, textarea {
+  font-size: 16px;
+}
+
+/* Hide scrollbars on mobile but allow scrolling */
+@media (max-width: 768px) {
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+```
+
+---
+
+## Testing Checklist
+
+### Desktop Testing
+- [ ] Click section headers → navigates to correct source
+- [ ] Info icons show tooltips on hover
+- [ ] Zoom controls work (in/out/slider/reset/fit)
+- [ ] "+X more" buttons expand sections
+- [ ] Expanded sections can be collapsed
+- [ ] "Preview Only" badges show for unimplemented PDF sections
+
+### Mobile Testing (Required)
+
+#### iPad Safari
+- [ ] All touch targets are at least 44x44px
+- [ ] Zoom controls work with touch
+- [ ] Expandable sections work
+- [ ] No horizontal scroll
+- [ ] Landscape and portrait work
+
+#### iPhone Safari
+- [ ] Touch targets accessible
+- [ ] Scroll momentum feels natural
+- [ ] No zoom on input focus (16px font)
+- [ ] Safe area padding on notched devices
+- [ ] "+X more" buttons large enough to tap
+
+#### Android Chrome (Phone)
+- [ ] Touch interactions responsive
+- [ ] No janky animations
+- [ ] Proper touch feedback (active states)
+
+#### Android Chrome (Tablet)
+- [ ] Side-by-side layout on larger screens
+- [ ] Touch targets sized correctly
+
+---
+
+## Files to Create/Modify
+
+| File | Action | Description |
+|------|--------|-------------|
+| `client/src/types/cma-sections.ts` | Create | Type definitions for section sources |
+| `client/src/lib/cma-section-sources.ts` | Create | Section source config + PDF status |
+| `client/src/components/cma/preview/ClickableSectionHeader.tsx` | Create | Clickable section header component |
+| `client/src/components/cma/preview/ZoomControls.tsx` | Create | Modern zoom controls |
+| `client/src/components/cma/preview/ExpandableSection.tsx` | Create | Generic expandable wrapper |
+| `client/src/components/cma/preview/PropertyPhotosPreview.tsx` | Create | Photo grid with expand |
+| `client/src/components/cma/preview/ComparablePropertiesPreview.tsx` | Create | Property cards with expand |
+| `client/src/components/cma/preview/AdjustmentsPreview.tsx` | Create | Adjustments with expand |
+| `client/src/components/cma/preview/LivePreviewPanel.tsx` | Modify | Integrate all components |
+| `client/src/styles/mobile-utils.css` | Create | Mobile-specific utilities |
+
+---
+
+## Implementation Order
+
+1. **Phase 1: Zoom Controls** (replace existing buttons)
+2. **Phase 2: Clickable Headers** (add source navigation)
+3. **Phase 3: Expandable Content** (implement "+X more")
+4. **Phase 4: Mobile Polish** (test all devices, fix issues)
+
+---
+
+## Spyglass Branding
+
+- Primary Orange: `#F37216`
+- Use for: active states, links, prices, CTAs
+- Touch feedback: `bg-orange-50` → `bg-orange-100` on active
+
+---
+
+## Notes
+
+- The "Preview Only" badge helps users understand which sections won't appear in exported PDF
+- All interactive elements must have 44x44px minimum touch targets
+- Test zoom controls at different levels to ensure content remains readable
+- Expandable sections use smooth animations for polish
+- Consider adding haptic feedback for mobile interactions (via vibration API)

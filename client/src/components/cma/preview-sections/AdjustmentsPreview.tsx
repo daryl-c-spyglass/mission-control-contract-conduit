@@ -46,33 +46,29 @@ export function AdjustmentsPreview({ subjectProperty, comparables, compact }: Ad
       </table>
       
       {hasMore && !showAll && (
-        <div className="flex justify-center mt-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowAll(true)}
-            className="text-xs"
-            data-testid="button-show-more-adjustments"
-          >
-            <span>+{remainingCount} more comparables</span>
-            <ChevronDown className="h-3 w-3 ml-1" />
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="default"
+          onClick={() => setShowAll(true)}
+          className="w-full mt-3 touch-manipulation"
+          data-testid="button-show-more-adjustments"
+        >
+          <span>+{remainingCount} more comparables</span>
+          <ChevronDown className="h-4 w-4 ml-1" />
+        </Button>
       )}
       
       {showAll && comparables.length > displayCount && (
-        <div className="flex justify-center mt-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowAll(false)}
-            className="text-xs text-muted-foreground"
-            data-testid="button-show-less-adjustments"
-          >
-            <ChevronUp className="h-3 w-3 mr-1" />
-            <span>Show less</span>
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="default"
+          onClick={() => setShowAll(false)}
+          className="w-full mt-3 touch-manipulation"
+          data-testid="button-show-less-adjustments"
+        >
+          <ChevronUp className="h-4 w-4 mr-1" />
+          <span>Show less</span>
+        </Button>
       )}
     </div>
   );
