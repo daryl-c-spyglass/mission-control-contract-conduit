@@ -255,16 +255,20 @@ export function CMATab({ transaction }: CMATabProps) {
     mlsData?.latitude
   );
 
-  const agentProfile: AgentProfile = useMemo(() => ({
-    name: agentProfileData 
-      ? `${agentProfileData.firstName} ${agentProfileData.lastName}`.trim() || 'Agent'
-      : 'Agent',
-    company: agentProfileData?.company || 'Spyglass Realty',
-    phone: agentProfileData?.phone || undefined,
-    email: agentProfileData?.email || undefined,
-    photo: agentProfileData?.profilePhoto || undefined,
-    bio: agentProfileData?.bio || undefined,
-  }), [agentProfileData]);
+  const agentProfile: AgentProfile = useMemo(() => {
+    const firstName = agentProfileData?.firstName || '';
+    const lastName = agentProfileData?.lastName || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    
+    return {
+      name: fullName || 'Agent',
+      company: agentProfileData?.company || 'Spyglass Realty',
+      phone: agentProfileData?.phone || undefined,
+      email: agentProfileData?.email || undefined,
+      photo: agentProfileData?.profilePhoto || undefined,
+      bio: agentProfileData?.bio || undefined,
+    };
+  }, [agentProfileData]);
 
   const normalizeStatusLabel = (status: string): 'Active' | 'Pending' | 'Closed' | 'Active Under Contract' => {
     const lower = (status || '').toLowerCase().trim();

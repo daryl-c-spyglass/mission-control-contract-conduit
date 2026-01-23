@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -16,6 +17,7 @@ interface SectionCardProps {
 
 export function SectionCard({ widget, onClick, badge }: SectionCardProps) {
   const { theme } = useTheme();
+  const [logoError, setLogoError] = useState(false);
   const logoPath = theme === 'dark' 
     ? '/assets/spyglass-logo-white.png' 
     : '/assets/spyglass-logo-black.png';
@@ -34,11 +36,20 @@ export function SectionCard({ widget, onClick, badge }: SectionCardProps) {
           </div>
         );
       case 'spyglass':
+        if (logoError) {
+          return (
+            <div className="flex flex-col items-center">
+              <span className="text-sm font-bold text-[#F37216] tracking-wider">SPYGLASS</span>
+              <span className="text-xs text-muted-foreground">REALTY</span>
+            </div>
+          );
+        }
         return (
           <img 
             src={logoPath} 
             alt="Spyglass Realty" 
             className="w-12 h-auto object-contain"
+            onError={() => setLogoError(true)}
           />
         );
       case 'quote':

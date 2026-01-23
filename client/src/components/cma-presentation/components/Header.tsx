@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -36,6 +36,7 @@ export function Header({
   const { theme, mapStyle } = useTheme();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
+  const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -94,12 +95,20 @@ export function Header({
             >
               <Menu className="w-5 h-5" />
             </Button>
-            <img 
-              src={logoPath} 
-              alt="Spyglass Realty" 
-              className="h-6 md:h-8 w-auto"
-              data-testid="header-logo"
-            />
+            {logoError ? (
+              <div className="flex flex-col items-center">
+                <span className="text-sm font-bold text-[#F37216] tracking-wider">SPYGLASS</span>
+                <span className="text-xs text-white/80">REALTY</span>
+              </div>
+            ) : (
+              <img 
+                src={logoPath} 
+                alt="Spyglass Realty" 
+                className="h-6 md:h-8 w-auto"
+                data-testid="header-logo"
+                onError={() => setLogoError(true)}
+              />
+            )}
           </div>
 
           <div className="flex items-center gap-1">
