@@ -45,12 +45,6 @@ export function AveragePriceAcreWidget({
 
   return (
     <div className="flex flex-col h-full bg-background" data-testid="average-price-acre-widget">
-      <div className="bg-gray-900 text-white py-3 px-4 text-center flex-shrink-0">
-        <span className="font-bold tracking-wider text-sm uppercase">
-          {formatPrice(avgPrice)} / ACRE
-        </span>
-      </div>
-      
       <div className="flex-1 overflow-auto">
         <div className="p-6 border-b text-center">
           <p className="text-sm text-muted-foreground">

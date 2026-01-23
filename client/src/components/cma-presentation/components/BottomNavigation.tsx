@@ -47,6 +47,7 @@ export function BottomNavigation({
           <div className="flex items-center gap-2">
             {isDrawingMode && (
               <button
+                type="button"
                 onClick={onClearDrawing}
                 className="min-w-[44px] min-h-[44px] p-3 rounded-full bg-gray-100 dark:bg-gray-800 
                            text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
@@ -57,6 +58,7 @@ export function BottomNavigation({
               </button>
             )}
             <button
+              type="button"
               onClick={onToggleDrawing}
               className={`min-w-[44px] min-h-[44px] p-3 rounded-full transition-colors
                           ${isDrawingMode 
@@ -71,6 +73,7 @@ export function BottomNavigation({
           </div>
           
           <button
+            type="button"
             onClick={onStartPresentation}
             className="flex items-center gap-2 text-gray-700 dark:text-gray-300 
                        hover:text-[#EF4923] dark:hover:text-[#EF4923] transition-colors
@@ -78,20 +81,21 @@ export function BottomNavigation({
             data-testid="button-start-presentation"
           >
             <span className="text-sm font-medium">Start Presentation</span>
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-5 h-5 flex-shrink-0" />
           </button>
         </>
       ) : (
         <>
           <button
+            type="button"
             onClick={isFirst ? onHome : onPrevious}
             className="flex items-center gap-2 text-gray-700 dark:text-gray-300 
                        hover:text-[#EF4923] dark:hover:text-[#EF4923] transition-colors
-                       min-h-[44px] px-2 md:px-4 max-w-[200px]"
+                       min-h-[44px] px-2 md:px-4 min-w-[60px] max-w-[140px]"
             data-testid="button-nav-prev"
           >
             <ChevronLeft className="w-5 h-5 flex-shrink-0" />
-            <span className="text-sm font-medium truncate hidden sm:block">
+            <span className="text-sm font-medium truncate hidden sm:inline max-w-[100px]">
               {isFirst ? 'Home' : prevSlideTitle || 'Previous'}
             </span>
           </button>
@@ -99,6 +103,7 @@ export function BottomNavigation({
           <div className="flex items-center gap-2">
             {isDrawingMode && (
               <button
+                type="button"
                 onClick={onClearDrawing}
                 className="min-w-[44px] min-h-[44px] p-3 rounded-full bg-gray-100 dark:bg-gray-800 
                            text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
@@ -109,6 +114,7 @@ export function BottomNavigation({
               </button>
             )}
             <button
+              type="button"
               onClick={onToggleDrawing}
               className={`min-w-[44px] min-h-[44px] p-3 rounded-full transition-colors
                           ${isDrawingMode 
@@ -124,19 +130,21 @@ export function BottomNavigation({
           
           {!isLast ? (
             <button
+              type="button"
               onClick={onNext}
               className="flex items-center gap-2 text-gray-700 dark:text-gray-300 
                          hover:text-[#EF4923] dark:hover:text-[#EF4923] transition-colors
-                         min-h-[44px] px-2 md:px-4 max-w-[200px]"
+                         min-h-[44px] px-2 md:px-4 min-w-[60px] max-w-[140px]"
               data-testid="button-nav-next"
             >
-              <span className="text-sm font-medium truncate hidden sm:block">
+              <span className="text-sm font-medium truncate hidden sm:inline max-w-[100px]">
                 {nextSlideTitle || 'Next'}
               </span>
               <ChevronRight className="w-5 h-5 flex-shrink-0" />
             </button>
           ) : (
             <button
+              type="button"
               onClick={onHome}
               className="flex items-center gap-2 text-gray-700 dark:text-gray-300 
                          hover:text-[#EF4923] dark:hover:text-[#EF4923] transition-colors
@@ -144,7 +152,7 @@ export function BottomNavigation({
               data-testid="button-nav-home"
             >
               <span className="text-sm font-medium">Home</span>
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="w-5 h-5 flex-shrink-0" />
             </button>
           )}
         </>

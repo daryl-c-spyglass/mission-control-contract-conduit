@@ -9,12 +9,6 @@ export function ListingWithSpyglassWidget({
 }: ListingWithSpyglassWidgetProps) {
   return (
     <div className="flex flex-col h-full bg-background" data-testid="listing-with-spyglass-widget">
-      <div className="bg-gray-900 text-white py-3 px-4 text-center flex-shrink-0">
-        <span className="font-bold tracking-wider text-sm uppercase">
-          LISTING WITH SPYGLASS REALTY
-        </span>
-      </div>
-      
       <div className="flex-1 overflow-auto p-6 md:p-8">
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="aspect-video w-full bg-gray-900 rounded-lg overflow-hidden">

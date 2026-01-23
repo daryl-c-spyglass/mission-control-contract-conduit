@@ -54,12 +54,6 @@ export function SuggestedPriceWidget({
 
   return (
     <div className="flex flex-col h-full bg-background" data-testid="suggested-price-widget">
-      <div className="bg-gray-900 text-white py-3 px-4 text-center flex-shrink-0">
-        <span className="font-bold tracking-wider text-sm uppercase">
-          SUGGESTED LIST PRICE
-        </span>
-      </div>
-      
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-3xl mx-auto space-y-8">
           {subjectProperty && (

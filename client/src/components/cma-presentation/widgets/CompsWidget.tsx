@@ -37,12 +37,9 @@ export function CompsWidget({ comparables, subjectProperty }: CompsWidgetProps) 
 
   return (
     <div className="flex flex-col h-full bg-background" data-testid="comps-widget">
-      <div className="bg-gray-900 text-white py-3 px-4 text-center flex-shrink-0 flex items-center justify-between">
-        <span className="font-bold tracking-wider text-sm uppercase">
-          {comparables.length} COMPARABLE HOMES
-        </span>
+      <div className="flex items-center justify-end p-3 border-b">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
-          <TabsList className="bg-gray-800">
+          <TabsList>
             <TabsTrigger value="compare" className="text-xs">Compare</TabsTrigger>
             <TabsTrigger value="map" className="text-xs">Map</TabsTrigger>
             <TabsTrigger value="stats" className="text-xs">Stats</TabsTrigger>

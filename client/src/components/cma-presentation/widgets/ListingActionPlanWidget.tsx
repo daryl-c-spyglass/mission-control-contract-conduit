@@ -14,12 +14,6 @@ const ACTION_ITEMS = [
 export function ListingActionPlanWidget() {
   return (
     <div className="flex flex-col h-full bg-background" data-testid="listing-action-plan-widget">
-      <div className="bg-gray-900 text-white py-3 px-4 text-center flex-shrink-0">
-        <span className="font-bold tracking-wider text-sm uppercase">
-          LISTING ACTION PLAN
-        </span>
-      </div>
-      
       <div className="flex-1 overflow-auto p-6 md:p-8">
         <div className="max-w-3xl mx-auto space-y-8">
           <div className="text-center space-y-4">
