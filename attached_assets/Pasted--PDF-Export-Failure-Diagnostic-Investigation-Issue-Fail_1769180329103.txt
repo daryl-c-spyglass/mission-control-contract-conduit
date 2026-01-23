@@ -1,0 +1,371 @@
+# PDF Export Failure - Diagnostic Investigation
+
+## Issue
+"Failed to export PDF" error appears when clicking Export PDF button in Presentation Builder.
+
+## Screenshot Context
+- CMA for: 154 Pettigrew, Buda, TX 78610
+- Live Preview shows: 17 sections (5 preview only)
+- All Introduction sections enabled (7/7)
+- Red toast/banner shows "Failed to export PDF"
+
+---
+
+## DIAGNOSTIC STEP 1: Add Detailed Error Logging
+
+Find the Export PDF mutation in `client/src/pages/CMAPresentationBuilder.tsx` and add comprehensive error logging:
+
+```typescript
+// Find the export PDF function (around lines 455-494) and update it:
+
+const handleExportPdf = async () => {
+  console.log('=== PDF EXPORT DEBUG START ===');
+  
+  try {
+    setIsExporting(true);
+    
+    // Log the data being passed to PDF
+    console.log('1. CMA Data:', JSON.stringify(cmaData, null, 2));
+    console.log('2. Enabled Sections:', enabledSections);
+    console.log('3. Agent Info:', JSON.stringify(agentInfo, null, 2));
+    console.log('4. Subject Property:', JSON.stringify(subjectProperty, null, 2));
+    console.log('5. Comparables:', comparables?.length, 'properties');
+    
+    // Check for common data issues
+    if (!cmaData) {
+      throw new Error('CMA data is null or undefined');
+    }
+    if (!agentInfo) {
+      throw new Error('Agent info is null or undefined');
+    }
+    if (!subjectProperty) {
+      throw new Error('Subject property is null or undefined');
+    }
+    
+    // Log before creating PDF document
+    console.log('6. Creating PDF document...');
+    
+    const pdfDoc = (
+      <CMAPdfDocument
+        data={transformedData}
+        enabledSections={enabledSections}
+        config={presentationConfig}
+      />
+    );
+    
+    console.log('7. PDF document component created');
+    console.log('8. Calling pdf().toBlob()...');
+    
+    // Wrap the blob creation in its own try-catch
+    let blob;
+    try {
+      blob = await pdf(pdfDoc).toBlob();
+      console.log('9. Blob created successfully, size:', blob.size);
+    } catch (blobError) {
+      console.error('PDF Blob creation failed:', blobError);
+      console.error('Blob error stack:', blobError.stack);
+      throw new Error(`PDF rendering failed: ${blobError.message}`);
+    }
+    
+    // Create download
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `CMA-${subjectProperty?.address || 'report'}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    console.log('10. PDF download initiated successfully');
+    console.log('=== PDF EXPORT DEBUG END ===');
+    
+    toast.success('PDF exported successfully');
+    
+  } catch (error) {
+    console.error('=== PDF EXPORT ERROR ===');
+    console.error('Error type:', error.constructor.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('Full error object:', error);
+    
+    // More specific error messages
+    let userMessage = 'Failed to export PDF';
+    if (error.message.includes('image')) {
+      userMessage = 'Failed to export PDF: Image loading error';
+    } else if (error.message.includes('font')) {
+      userMessage = 'Failed to export PDF: Font loading error';
+    } else if (error.message.includes('undefined')) {
+      userMessage = 'Failed to export PDF: Missing data';
+    }
+    
+    toast.error(userMessage);
+  } finally {
+    setIsExporting(false);
+  }
+};
+```
+
+---
+
+## DIAGNOSTIC STEP 2: Check CMAPdfDocument Component
+
+Examine `client/src/components/pdf/CMAPdfDocument.tsx` for potential issues:
+
+```typescript
+// Add error boundary logging to CMAPdfDocument.tsx
+
+import { Document, Page } from '@react-pdf/renderer';
+
+interface CMAPdfDocumentProps {
+  data: CMAReportData;
+  enabledSections: string[];
+  config: PresentationConfig;
+}
+
+export function CMAPdfDocument({ data, enabledSections, config }: CMAPdfDocumentProps) {
+  // Log what's being rendered
+  console.log('CMAPdfDocument rendering with:', {
+    dataExists: !!data,
+    enabledSectionsCount: enabledSections?.length,
+    configExists: !!config,
+  });
+
+  // Validate required data before rendering
+  if (!data) {
+    console.error('CMAPdfDocument: data is undefined');
+    return (
+      <Document>
+        <Page size="LETTER">
+          {/* Empty fallback */}
+        </Page>
+      </Document>
+    );
+  }
+
+  // Rest of the component...
+}
+```
+
+---
+
+## DIAGNOSTIC STEP 3: Check Individual Section Components
+
+Each section that returns actual content needs to handle missing data gracefully. Check these files:
+
+### 3.1 CoverPageSection.tsx
+```typescript
+// Add null checks
+export function CoverPageSection({ data, config }: CoverPageSectionProps) {
+  console.log('CoverPageSection data:', {
+    agent: data?.agent,
+    subjectProperty: data?.subjectProperty,
+    config: config,
+  });
+  
+  // Ensure we don't render undefined values
+  const agentName = data?.agent?.firstName 
+    ? `${data.agent.firstName} ${data.agent.lastName || ''}`.trim()
+    : 'Agent';
+  
+  const companyName = data?.agent?.company || 'Spyglass Realty';
+  
+  // ... rest of component
+}
+```
+
+### 3.2 ListingBrochureSection.tsx
+```typescript
+// Check for photo URL issues
+export function ListingBrochureSection({ data }: ListingBrochureSectionProps) {
+  const property = data?.subjectProperty;
+  
+  console.log('ListingBrochureSection:', {
+    hasProperty: !!property,
+    hasPhotos: !!property?.photos?.length,
+    firstPhotoUrl: property?.photos?.[0],
+  });
+  
+  // Handle missing photo gracefully
+  const photoUrl = property?.photos?.[0];
+  const hasValidPhoto = photoUrl && photoUrl.startsWith('http');
+  
+  // Only render Image if we have a valid URL
+  // ... rest of component
+}
+```
+
+---
+
+## DIAGNOSTIC STEP 4: Common PDF Export Issues
+
+### Issue 1: External Image URLs
+@react-pdf/renderer can fail silently on external images. Check if agent photo or property photos are causing issues:
+
+```typescript
+// In any section using <Image>, wrap with error handling:
+import { Image } from '@react-pdf/renderer';
+
+// Instead of:
+<Image src={agentPhotoUrl} />
+
+// Use:
+{agentPhotoUrl && (
+  <Image 
+    src={agentPhotoUrl} 
+    // Add cache: false if images are failing
+    cache={false}
+  />
+)}
+```
+
+### Issue 2: Undefined Text Values
+```typescript
+// Bad - can cause render failure:
+<Text>{data.agent.title}</Text>
+
+// Good - with fallback:
+<Text>{data?.agent?.title || ''}</Text>
+```
+
+### Issue 3: Font Loading
+Check if Google Fonts are loading correctly in `client/src/components/pdf/styles.ts`:
+
+```typescript
+import { Font } from '@react-pdf/renderer';
+
+// Ensure fonts are registered before any PDF rendering
+Font.register({
+  family: 'Roboto',
+  fonts: [
+    { src: 'https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Me5Q.ttf', fontWeight: 400 },
+    { src: 'https://fonts.gstatic.com/s/roboto/v30/KFOlCnqEu92Fr1MmWUlvAw.ttf', fontWeight: 700 },
+  ],
+});
+
+// Alternative: Use system fonts as fallback
+Font.registerHyphenationCallback((word) => [word]);
+```
+
+---
+
+## DIAGNOSTIC STEP 5: Run These Checks in Browser Console
+
+After adding the logging, open Browser DevTools (F12) → Console tab, then click "Export PDF" again.
+
+Look for:
+1. Which step number it reaches before failing
+2. Any specific error messages
+3. Whether data objects are properly populated
+4. Any network errors loading images or fonts
+
+---
+
+## DIAGNOSTIC STEP 6: Quick Test - Minimal PDF Export
+
+To isolate the issue, temporarily replace the PDF export with a minimal version:
+
+```typescript
+const handleExportPdfMinimal = async () => {
+  try {
+    setIsExporting(true);
+    
+    // Minimal PDF with just text
+    const minimalDoc = (
+      <Document>
+        <Page size="LETTER" style={{ padding: 40 }}>
+          <Text style={{ fontSize: 24, marginBottom: 20 }}>
+            CMA Report
+          </Text>
+          <Text style={{ fontSize: 12 }}>
+            Property: {subjectProperty?.address || 'N/A'}
+          </Text>
+          <Text style={{ fontSize: 12 }}>
+            Agent: {agentInfo?.firstName || 'N/A'}
+          </Text>
+        </Page>
+      </Document>
+    );
+    
+    const blob = await pdf(minimalDoc).toBlob();
+    
+    // Download
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'test-minimal.pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    toast.success('Minimal PDF exported!');
+  } catch (error) {
+    console.error('Minimal PDF failed:', error);
+    toast.error('Even minimal PDF failed: ' + error.message);
+  } finally {
+    setIsExporting(false);
+  }
+};
+```
+
+If the minimal PDF works, progressively add sections back to find which one is causing the failure.
+
+---
+
+## Expected Output
+
+After running diagnostics, report back with:
+
+1. **Console output** - What step number did it reach?
+2. **Error message** - What's the actual error?
+3. **Data state** - Are all required objects populated?
+4. **Minimal test** - Does the minimal PDF work?
+
+---
+
+## Quick Fixes to Try First
+
+### Fix 1: Add Missing Import
+```typescript
+// Make sure this import exists at the top:
+import { pdf, Document, Page, Text, View, Image } from '@react-pdf/renderer';
+```
+
+### Fix 2: Check for Async Issues
+```typescript
+// Ensure the pdf() function is awaited properly
+const blob = await pdf(pdfDoc).toBlob();
+```
+
+### Fix 3: Disable Problematic Sections Temporarily
+If certain sections fail, disable them in the enabledSections filter:
+
+```typescript
+const safeSections = enabledSections.filter(section => 
+  !['property_photos', 'adjustments', 'map_all_listings'].includes(section)
+);
+```
+
+---
+
+## Files to Check
+
+| File | Purpose | Priority |
+|------|---------|----------|
+| `client/src/pages/CMAPresentationBuilder.tsx` | Export mutation | HIGH |
+| `client/src/components/pdf/CMAPdfDocument.tsx` | Main PDF orchestrator | HIGH |
+| `client/src/components/pdf/CoverPageSection.tsx` | First section to render | HIGH |
+| `client/src/components/pdf/styles.ts` | Font registration | MEDIUM |
+| `client/src/lib/cma-transformer.ts` | Data transformation | MEDIUM |
+
+---
+
+## Next Steps
+
+1. **Add the logging from Step 1**
+2. **Click Export PDF again**
+3. **Copy the console output**
+4. **Share the specific error message**
+
+This will tell us exactly what's failing and why!

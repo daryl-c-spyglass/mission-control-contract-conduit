@@ -454,7 +454,16 @@ export default function CMAPresentationBuilder() {
 
   const exportPdfMutation = useMutation({
     mutationFn: async () => {
+      console.log('[PDF Export] Starting PDF generation...');
+      
       if (!cma) throw new Error('CMA not found');
+      if (!subjectProperty) throw new Error('Subject property not found');
+      if (!agentInfo) throw new Error('Agent info not found');
+      
+      console.log('[PDF Export] Data validation passed');
+      console.log('[PDF Export] Subject:', (subjectProperty as any)?.address || (subjectProperty as any)?.unparsedAddress);
+      console.log('[PDF Export] Comparables:', comparables?.length || 0);
+      console.log('[PDF Export] Included sections:', config.includedSections?.length || 0);
       
       const reportData = transformToCMAReportData(
         cma,
@@ -463,6 +472,11 @@ export default function CMAPresentationBuilder() {
         agentInfo,
         statistics
       );
+      
+      console.log('[PDF Export] Report data transformed');
+      console.log('[PDF Export] Agent:', reportData.agent?.firstName, reportData.agent?.lastName);
+      console.log('[PDF Export] Agent photo:', reportData.agent?.photo ? 'present' : 'missing');
+      console.log('[PDF Export] Subject photos:', reportData.subjectProperty?.photos?.length || 0);
 
       const pdfDoc = (
         <CMAPdfDocument
@@ -473,8 +487,20 @@ export default function CMAPresentationBuilder() {
           coverLetterOverride={config.coverLetterOverride}
         />
       );
-
-      const blob = await pdf(pdfDoc).toBlob();
+      
+      console.log('[PDF Export] Creating PDF blob...');
+      
+      let blob: Blob;
+      try {
+        blob = await pdf(pdfDoc).toBlob();
+        console.log('[PDF Export] Blob created successfully, size:', blob.size);
+      } catch (blobError: any) {
+        console.error('[PDF Export] Blob creation failed:', blobError);
+        console.error('[PDF Export] Error message:', blobError?.message);
+        console.error('[PDF Export] Error stack:', blobError?.stack);
+        throw new Error(`PDF rendering failed: ${blobError?.message || 'Unknown error'}`);
+      }
+      
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -483,13 +509,31 @@ export default function CMAPresentationBuilder() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      
+      console.log('[PDF Export] Download triggered successfully');
     },
     onSuccess: () => {
       toast({ title: 'PDF exported successfully' });
     },
-    onError: (error) => {
-      console.error('PDF export error:', error);
-      toast({ title: 'Failed to export PDF', variant: 'destructive' });
+    onError: (error: any) => {
+      console.error('[PDF Export] Error:', error);
+      console.error('[PDF Export] Error message:', error?.message);
+      console.error('[PDF Export] Error stack:', error?.stack);
+      
+      let message = 'Failed to export PDF';
+      if (error?.message) {
+        if (error.message.includes('image')) {
+          message = 'Failed to export PDF: Image loading issue';
+        } else if (error.message.includes('font')) {
+          message = 'Failed to export PDF: Font loading issue';
+        } else if (error.message.includes('not found')) {
+          message = `Failed to export PDF: ${error.message}`;
+        } else {
+          message = `Failed to export PDF: ${error.message}`;
+        }
+      }
+      
+      toast({ title: message, variant: 'destructive' });
     },
   });
 
