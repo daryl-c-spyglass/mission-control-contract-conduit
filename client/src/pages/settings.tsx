@@ -155,7 +155,8 @@ export default function Settings() {
     }
   }, [agentProfileData]);
 
-  // Notification settings query - refetch on window focus for cross-device sync
+  // Notification settings query - scoped by userId for per-user sync
+  // Refetch on window focus for cross-device sync
   const { data: savedNotificationSettings } = useQuery<{
     documentUploads: boolean;
     closingReminders: boolean;
@@ -167,9 +168,10 @@ export default function Settings() {
     reminder1Day: boolean;
     reminderDayOf: boolean;
   }>({
-    queryKey: ["/api/notification-settings"],
+    queryKey: ["/api/notification-settings", user?.id], // Include userId for per-user cache separation
     staleTime: 30000, // Consider stale after 30 seconds for cross-device sync
     refetchOnWindowFocus: true, // Refetch when user returns to the app/tab
+    enabled: !!user, // Only fetch when user is logged in
   });
 
   // Load notification settings when fetched - ALL DEFAULTS ARE FALSE
@@ -214,7 +216,7 @@ export default function Settings() {
     },
     onSuccess: (data) => {
       toast({ title: "Settings saved", description: "Your notification preferences have been updated." });
-      queryClient.invalidateQueries({ queryKey: ["/api/notification-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notification-settings", user?.id] }); // Include userId to invalidate correct user's cache
       // Update local state with server response to ensure consistency - ALL DEFAULTS ARE FALSE
       if (data) {
         setNotificationSettings({

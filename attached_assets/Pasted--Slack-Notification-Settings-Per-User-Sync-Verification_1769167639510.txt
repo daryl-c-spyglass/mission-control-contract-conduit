@@ -1,0 +1,484 @@
+# Slack Notification Settings - Per-User Sync Verification & Fix
+
+## Overview
+Verify that Slack Notification settings in the Settings page are properly synced per-user. Each user logging in with their Spyglass Realty email should have their own individual notification preferences saved and loaded.
+
+---
+
+## Diagnostic Checklist
+
+Before making changes, verify the following:
+
+### 1. Database Schema Check
+Confirm the `notification_settings` table has a `userId` column:
+
+```sql
+-- Run in database console or via API
+SELECT column_name, data_type 
+FROM information_schema.columns 
+WHERE table_name = 'notification_settings';
+```
+
+Expected columns:
+- `id`
+- `user_id` (links to users table)
+- `document_uploads`
+- `closing_date_reminders`
+- `marketing_assets`
+- `reminder_14_days`
+- `reminder_7_days`
+- `reminder_3_days`
+- `reminder_day_of`
+- `created_at`
+- `updated_at`
+
+### 2. API Endpoint Check
+Verify these endpoints exist and use authenticated user:
+
+```
+GET  /api/notification-settings     → Should fetch current user's settings
+PUT  /api/notification-settings     → Should update current user's settings
+```
+
+### 3. Settings Page Check
+Verify the Settings page:
+- Loads settings on mount using current user's ID
+- Saves settings using current user's ID
+- Shows loading state while fetching
+- Shows current values after load
+
+---
+
+## Implementation Verification
+
+### File: `server/routes.ts`
+
+Verify the notification settings endpoints use `req.user.id`:
+
+```typescript
+// GET - Fetch current user's notification settings
+app.get("/api/notification-settings", async (req, res) => {
+  try {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const userId = req.user.id;  // ✅ Must use authenticated user's ID
+    const settings = await getUserNotificationSettings(userId);
+    
+    res.json(settings);
+  } catch (error) {
+    console.error("Error fetching notification settings:", error);
+    res.status(500).json({ error: "Failed to fetch notification settings" });
+  }
+});
+
+// PUT - Update current user's notification settings
+app.put("/api/notification-settings", async (req, res) => {
+  try {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const userId = req.user.id;  // ✅ Must use authenticated user's ID
+    const updatedSettings = await updateUserNotificationSettings(userId, req.body);
+    
+    res.json(updatedSettings);
+  } catch (error) {
+    console.error("Error updating notification settings:", error);
+    res.status(500).json({ error: "Failed to update notification settings" });
+  }
+});
+```
+
+### File: `server/services/slackNotificationService.ts`
+
+Verify the settings functions use userId parameter:
+
+```typescript
+/**
+ * Get user's notification preferences
+ * Each user has their own settings
+ */
+export async function getUserNotificationSettings(userId: number): Promise<NotificationPreferences> {
+  if (!userId) {
+    console.warn("[Notifications] No userId provided, returning defaults");
+    return DEFAULT_PREFERENCES;
+  }
+
+  const settings = await db
+    .select()
+    .from(notificationSettings)
+    .where(eq(notificationSettings.userId, userId))  // ✅ Filter by userId
+    .limit(1);
+
+  if (settings.length === 0) {
+    // No settings found for this user - return defaults
+    console.log(`[Notifications] No settings found for user ${userId}, using defaults`);
+    return DEFAULT_PREFERENCES;
+  }
+
+  const s = settings[0];
+  return {
+    documentUploads: s.documentUploads ?? false,
+    closingDateReminders: s.closingDateReminders ?? false,
+    marketingAssets: s.marketingAssets ?? false,
+    reminder14Days: s.reminder14Days ?? false,
+    reminder7Days: s.reminder7Days ?? false,
+    reminder3Days: s.reminder3Days ?? false,
+    reminderDayOf: s.reminderDayOf ?? false,
+  };
+}
+
+/**
+ * Update user's notification preferences
+ * Creates new record if doesn't exist (upsert)
+ */
+export async function updateUserNotificationSettings(
+  userId: number,
+  updatedPrefs: Partial<NotificationPreferences>
+): Promise<NotificationPreferences> {
+  if (!userId) {
+    throw new Error("userId is required to update notification settings");
+  }
+
+  // Check if settings exist for this user
+  const existing = await db
+    .select()
+    .from(notificationSettings)
+    .where(eq(notificationSettings.userId, userId))
+    .limit(1);
+
+  if (existing.length === 0) {
+    // Create new settings for this user
+    await db.insert(notificationSettings).values({
+      userId,  // ✅ Link to specific user
+      documentUploads: updatedPrefs.documentUploads ?? false,
+      closingDateReminders: updatedPrefs.closingDateReminders ?? false,
+      marketingAssets: updatedPrefs.marketingAssets ?? false,
+      reminder14Days: updatedPrefs.reminder14Days ?? false,
+      reminder7Days: updatedPrefs.reminder7Days ?? false,
+      reminder3Days: updatedPrefs.reminder3Days ?? false,
+      reminderDayOf: updatedPrefs.reminderDayOf ?? false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  } else {
+    // Update existing settings for this user
+    await db
+      .update(notificationSettings)
+      .set({
+        ...updatedPrefs,
+        updatedAt: new Date(),
+      })
+      .where(eq(notificationSettings.userId, userId));  // ✅ Update only this user's record
+  }
+
+  // Return the updated settings
+  return getUserNotificationSettings(userId);
+}
+```
+
+---
+
+## Frontend Implementation
+
+### File: `client/src/pages/Settings.tsx` (or NotificationSettings component)
+
+```tsx
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";  // Or your auth hook
+
+interface NotificationPreferences {
+  documentUploads: boolean;
+  closingDateReminders: boolean;
+  marketingAssets: boolean;
+  reminder14Days: boolean;
+  reminder7Days: boolean;
+  reminder3Days: boolean;
+  reminderDayOf: boolean;
+}
+
+export function SlackNotificationSettings() {
+  const { user } = useAuth();  // Get current authenticated user
+  const queryClient = useQueryClient();
+
+  // Fetch current user's settings
+  const { data: settings, isLoading } = useQuery<NotificationPreferences>({
+    queryKey: ["notification-settings", user?.id],  // ✅ Include userId in query key
+    queryFn: async () => {
+      const response = await fetch("/api/notification-settings", {
+        credentials: "include",  // ✅ Include auth cookies
+      });
+      if (!response.ok) throw new Error("Failed to fetch settings");
+      return response.json();
+    },
+    enabled: !!user,  // Only fetch if user is logged in
+  });
+
+  // Update settings mutation
+  const updateMutation = useMutation({
+    mutationFn: async (newSettings: Partial<NotificationPreferences>) => {
+      const response = await fetch("/api/notification-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",  // ✅ Include auth cookies
+        body: JSON.stringify(newSettings),
+      });
+      if (!response.ok) throw new Error("Failed to update settings");
+      return response.json();
+    },
+    onSuccess: () => {
+      // Invalidate and refetch
+      queryClient.invalidateQueries({ queryKey: ["notification-settings", user?.id] });
+    },
+  });
+
+  // Toggle handler
+  const handleToggle = (key: keyof NotificationPreferences, value: boolean) => {
+    updateMutation.mutate({ [key]: value });
+  };
+
+  if (isLoading) {
+    return <div className="animate-pulse">Loading notification settings...</div>;
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+          <Bell className="h-5 w-5 text-orange-500" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Slack Notifications</h2>
+          <p className="text-sm text-gray-500">
+            Control what notifications are sent to transaction Slack channels
+          </p>
+        </div>
+      </div>
+
+      {/* User indicator - shows whose settings these are */}
+      {user && (
+        <div className="mb-4 px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-600">
+          Settings for: <span className="font-medium">{user.email}</span>
+        </div>
+      )}
+
+      {/* Notification Types */}
+      <div className="space-y-1 mb-6">
+        <h3 className="text-sm font-medium text-gray-700 mb-3">Notification Types</h3>
+        
+        <ToggleRow
+          label="Document Uploads"
+          description="Receive notifications when documents are uploaded"
+          checked={settings?.documentUploads ?? false}
+          onChange={(checked) => handleToggle("documentUploads", checked)}
+          disabled={updateMutation.isPending}
+        />
+        
+        <ToggleRow
+          label="Closing Date Reminders"
+          description="Receive reminders as the closing date approaches"
+          checked={settings?.closingDateReminders ?? false}
+          onChange={(checked) => handleToggle("closingDateReminders", checked)}
+          disabled={updateMutation.isPending}
+        />
+        
+        <ToggleRow
+          label="Marketing Assets"
+          description="Receive notifications when marketing materials are created"
+          checked={settings?.marketingAssets ?? false}
+          onChange={(checked) => handleToggle("marketingAssets", checked)}
+          disabled={updateMutation.isPending}
+        />
+      </div>
+
+      {/* Reminder Schedule - Only show if closingDateReminders is enabled */}
+      {settings?.closingDateReminders && (
+        <div className="pt-4 border-t border-gray-200">
+          <h3 className="text-sm font-medium text-gray-700 mb-2">Reminder Schedule</h3>
+          <p className="text-xs text-gray-500 mb-4">
+            Choose which closing date reminders to receive
+          </p>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <ToggleRow
+              label="14 days before"
+              checked={settings?.reminder14Days ?? false}
+              onChange={(checked) => handleToggle("reminder14Days", checked)}
+              disabled={updateMutation.isPending}
+              compact
+            />
+            
+            <ToggleRow
+              label="7 days before"
+              checked={settings?.reminder7Days ?? false}
+              onChange={(checked) => handleToggle("reminder7Days", checked)}
+              disabled={updateMutation.isPending}
+              compact
+            />
+            
+            <ToggleRow
+              label="3 days before"
+              checked={settings?.reminder3Days ?? false}
+              onChange={(checked) => handleToggle("reminder3Days", checked)}
+              disabled={updateMutation.isPending}
+              compact
+            />
+            
+            <ToggleRow
+              label="Day of closing"
+              checked={settings?.reminderDayOf ?? false}
+              onChange={(checked) => handleToggle("reminderDayOf", checked)}
+              disabled={updateMutation.isPending}
+              compact
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Toggle Row Component
+interface ToggleRowProps {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+  compact?: boolean;
+}
+
+function ToggleRow({ label, description, checked, onChange, disabled, compact }: ToggleRowProps) {
+  return (
+    <div className={`flex items-center justify-between ${compact ? "py-2" : "py-3"}`}>
+      <div>
+        <p className={`font-medium text-gray-900 ${compact ? "text-sm" : ""}`}>{label}</p>
+        {description && (
+          <p className="text-sm text-gray-500">{description}</p>
+        )}
+      </div>
+      <Switch
+        checked={checked}
+        onCheckedChange={onChange}
+        disabled={disabled}
+        className="data-[state=checked]:bg-orange-500"
+      />
+    </div>
+  );
+}
+```
+
+---
+
+## When Sending Notifications - Check User's Settings
+
+When the notification service sends notifications, it should check the transaction owner's settings:
+
+### File: `server/services/slackNotificationService.ts`
+
+```typescript
+/**
+ * Send closing date reminder - checks user's settings first
+ */
+export async function sendClosingDateReminder(
+  transaction: Transaction,
+  daysUntilClosing: number
+): Promise<boolean> {
+  // Get the transaction owner's notification settings
+  const userSettings = await getUserNotificationSettings(transaction.userId);
+  
+  // Check if closing date reminders are enabled
+  if (!userSettings.closingDateReminders) {
+    console.log(`[Notifications] Closing reminders disabled for user ${transaction.userId}`);
+    return false;
+  }
+  
+  // Check if this specific interval is enabled
+  const reminderKey = getReminderKeyForDays(daysUntilClosing);
+  if (reminderKey && !userSettings[reminderKey]) {
+    console.log(`[Notifications] ${daysUntilClosing}-day reminder disabled for user ${transaction.userId}`);
+    return false;
+  }
+  
+  // Proceed with sending notification...
+  // ... rest of notification logic
+}
+
+function getReminderKeyForDays(days: number): keyof NotificationPreferences | null {
+  switch (days) {
+    case 14: return "reminder14Days";
+    case 7: return "reminder7Days";
+    case 3: return "reminder3Days";
+    case 0: return "reminderDayOf";
+    default: return null;
+  }
+}
+```
+
+---
+
+## Verification Steps
+
+After implementation, test with two different users:
+
+### Test 1: User A (e.g., daryl@spyglassrealty.com)
+1. Log in as User A
+2. Go to Settings > Slack Notifications
+3. Enable "Document Uploads", disable "Marketing Assets"
+4. Note the settings
+
+### Test 2: User B (e.g., randi@spyglassrealty.com)
+1. Log in as User B
+2. Go to Settings > Slack Notifications
+3. Settings should be DEFAULT (all off) or User B's previous settings
+4. User B's settings should NOT show User A's settings
+5. Enable "Marketing Assets", disable "Document Uploads"
+
+### Test 3: Verify Isolation
+1. Log back in as User A
+2. Settings should still show User A's preferences (Document Uploads ON, Marketing Assets OFF)
+3. User B's changes should NOT affect User A
+
+---
+
+## Database Query to Verify
+
+```sql
+-- Check all users' notification settings
+SELECT 
+  u.email,
+  ns.document_uploads,
+  ns.closing_date_reminders,
+  ns.marketing_assets,
+  ns.reminder_14_days,
+  ns.reminder_7_days,
+  ns.reminder_3_days,
+  ns.reminder_day_of
+FROM notification_settings ns
+JOIN users u ON ns.user_id = u.id
+ORDER BY u.email;
+```
+
+---
+
+## Summary
+
+| Requirement | Implementation |
+|-------------|----------------|
+| Per-user settings | `notification_settings.userId` links to `users.id` |
+| Load on Settings page | Fetch via `/api/notification-settings` with auth |
+| Save on toggle | PUT to `/api/notification-settings` with auth |
+| Isolated per user | Each user has their own row in `notification_settings` |
+| Check before sending | Notification service checks user's preferences |
+
+---
+
+## Files to Verify/Modify
+
+1. **`shared/schema.ts`** - Verify `notificationSettings` table has `userId` column
+2. **`server/routes.ts`** - Verify endpoints use `req.user.id`
+3. **`server/services/slackNotificationService.ts`** - Verify functions use userId parameter
+4. **`client/src/pages/Settings.tsx`** - Verify frontend fetches/saves with auth
