@@ -1,0 +1,293 @@
+# CMA Presentation — Client Testimonials Widget (Google Reviews Format)
+
+## 📋 Objective
+
+Update the **Client Testimonials** widget (Widget 3) to display reviews in the same format as Google Reviews, with a link to view all reviews on Google.
+
+---
+
+## 🎯 Design Reference
+
+Match this Google Reviews format:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│    ┌───┐                                                    ⋮   │
+│    │ P │  1 review                                              │
+│    └───┘  ★★★★★  2 years ago                                    │
+│                                                                 │
+│    My family and I recently relocated internationally to        │
+│    Austin. I was introduced to Ryan through a trusted...        │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│    ┌───┐                                                    ⋮   │
+│    │ J │  3 reviews                                             │
+│    └───┘  ★★★★★  1 year ago                                     │
+│                                                                 │
+│    Ryan and his team at Spyglass Realty made our home           │
+│    buying experience seamless and stress-free...                │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│         Click to read all of our reviews on Google! →           │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔧 Component Implementation
+
+```tsx
+// components/cma-presentation/widgets/ClientTestimonialsWidget.tsx
+
+import { Star, ExternalLink } from 'lucide-react';
+
+interface Review {
+  id: string;
+  authorName: string;
+  authorInitial: string;
+  avatarColor: string;
+  reviewCount: string;
+  rating: number;
+  timeAgo: string;
+  text: string;
+}
+
+// Sample reviews - these could come from an API or be hardcoded
+const SAMPLE_REVIEWS: Review[] = [
+  {
+    id: '1',
+    authorName: 'Patricia M.',
+    authorInitial: 'P',
+    avatarColor: '#EC407A', // Pink
+    reviewCount: '1 review',
+    rating: 5,
+    timeAgo: '2 years ago',
+    text: 'My family and I recently relocated internationally to Austin. I was introduced to Ryan through a trusted colleague and from the very beginning, he demonstrated exceptional knowledge of the Austin market and genuine care for finding us the perfect home.',
+  },
+  {
+    id: '2',
+    authorName: 'James T.',
+    authorInitial: 'J',
+    avatarColor: '#42A5F5', // Blue
+    reviewCount: '3 reviews',
+    rating: 5,
+    timeAgo: '1 year ago',
+    text: 'Ryan and his team at Spyglass Realty made our home buying experience seamless and stress-free. Their attention to detail and market expertise helped us find exactly what we were looking for.',
+  },
+  {
+    id: '3',
+    authorName: 'Sarah K.',
+    authorInitial: 'S',
+    avatarColor: '#66BB6A', // Green
+    reviewCount: '2 reviews',
+    rating: 5,
+    timeAgo: '8 months ago',
+    text: 'Exceptional service from start to finish! The Spyglass team went above and beyond to ensure we found our dream home. Highly recommend to anyone looking to buy or sell in Austin.',
+  },
+];
+
+const GOOGLE_REVIEWS_URL = 'https://www.google.com/search?q=spyglass+realty';
+
+export function ClientTestimonialsWidget() {
+  return (
+    <div className="h-full flex flex-col bg-white">
+      {/* Reviews List */}
+      <div className="flex-1 overflow-auto p-4 md:p-8 space-y-6">
+        {SAMPLE_REVIEWS.map((review) => (
+          <ReviewCard key={review.id} review={review} />
+        ))}
+      </div>
+      
+      {/* Footer Link to Google Reviews */}
+      <div className="border-t border-gray-200 p-4 md:p-6">
+        <a
+          href={GOOGLE_REVIEWS_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 text-[#EF4923] hover:text-[#D13D1A] 
+                     font-medium transition-colors min-h-[44px]"
+        >
+          <span>Click to read all of our reviews on Google!</span>
+          <ExternalLink className="w-4 h-4" />
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function ReviewCard({ review }: { review: Review }) {
+  return (
+    <div className="border-b border-gray-100 pb-6 last:border-b-0">
+      {/* Header: Avatar, Name, Review Count */}
+      <div className="flex items-start gap-3">
+        {/* Avatar Circle with Initial */}
+        <div
+          className="w-10 h-10 rounded-full flex items-center justify-center text-white 
+                     font-semibold text-lg flex-shrink-0"
+          style={{ backgroundColor: review.avatarColor }}
+        >
+          {review.authorInitial}
+        </div>
+        
+        {/* Author Info */}
+        <div className="flex-1 min-w-0">
+          <p className="text-gray-500 text-sm">{review.reviewCount}</p>
+          
+          {/* Stars and Time */}
+          <div className="flex items-center gap-2 mt-1">
+            {/* Star Rating */}
+            <div className="flex items-center">
+              {[...Array(5)].map((_, i) => (
+                <Star
+                  key={i}
+                  className={`w-4 h-4 ${
+                    i < review.rating 
+                      ? 'text-yellow-400 fill-yellow-400' 
+                      : 'text-gray-300'
+                  }`}
+                />
+              ))}
+            </div>
+            
+            {/* Time Ago */}
+            <span className="text-gray-500 text-sm">{review.timeAgo}</span>
+          </div>
+        </div>
+        
+        {/* More Options (decorative) */}
+        <button className="text-gray-400 p-1 min-w-[44px] min-h-[44px] flex items-center justify-center">
+          <span className="text-xl leading-none">⋮</span>
+        </button>
+      </div>
+      
+      {/* Review Text */}
+      <p className="mt-3 text-gray-800 leading-relaxed text-sm md:text-base">
+        {review.text}
+      </p>
+    </div>
+  );
+}
+```
+
+---
+
+## 🎨 Styling Details
+
+### Avatar Colors (Google-style palette):
+```typescript
+const AVATAR_COLORS = [
+  '#EC407A', // Pink
+  '#42A5F5', // Blue
+  '#66BB6A', // Green
+  '#FFA726', // Orange
+  '#AB47BC', // Purple
+  '#26A69A', // Teal
+  '#EF5350', // Red
+  '#5C6BC0', // Indigo
+];
+```
+
+### Star Rating:
+- Filled star: `text-yellow-400 fill-yellow-400`
+- Empty star: `text-gray-300`
+
+### Google Reviews Link:
+```
+https://www.google.com/search?q=spyglass+realty
+```
+
+---
+
+## 📋 Copy/Paste for Replit
+
+```
+Update the Client Testimonials widget (Widget 3) to match Google Reviews format.
+
+## DESIGN:
+Each review card shows:
+1. Colored circle avatar with initial letter (like Google)
+2. "X reviews" text
+3. 5-star rating (yellow filled stars)
+4. "X years/months ago" timestamp
+5. Review text
+
+## LAYOUT:
+- Scrollable list of review cards
+- Bottom footer with link: "Click to read all of our reviews on Google!"
+- Link opens: https://www.google.com/search?q=spyglass+realty
+
+## REVIEW CARD STRUCTURE:
+┌────────────────────────────────────┐
+│ [P]  1 review                    ⋮ │
+│      ★★★★★  2 years ago            │
+│                                    │
+│ Review text here...                │
+└────────────────────────────────────┘
+
+## AVATAR COLORS (Google-style):
+- Pink: #EC407A
+- Blue: #42A5F5
+- Green: #66BB6A
+- Orange: #FFA726
+- Purple: #AB47BC
+
+## STAR STYLING:
+- Filled: className="text-yellow-400 fill-yellow-400"
+- Empty: className="text-gray-300"
+
+## FOOTER LINK:
+<a href="https://www.google.com/search?q=spyglass+realty" target="_blank">
+  Click to read all of our reviews on Google! →
+</a>
+- Color: text-[#EF4923] (Spyglass orange)
+- Include ExternalLink icon
+
+## SAMPLE REVIEWS (hardcoded for now):
+1. Patricia M. - Pink avatar - 5 stars - "My family and I recently relocated..."
+2. James T. - Blue avatar - 5 stars - "Ryan and his team at Spyglass..."
+3. Sarah K. - Green avatar - 5 stars - "Exceptional service from start to finish..."
+
+## MOBILE:
+- Touch targets min 44x44px
+- Scrollable review list
+- Responsive padding (p-4 on mobile, p-8 on desktop)
+
+I've attached a screenshot showing the exact Google Reviews format to match.
+```
+
+---
+
+## ✅ Expected Result
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    CLIENT TESTIMONIALS                       │
+│                          3 / 33                              │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌───┐                                                  ⋮   │
+│  │ P │  1 review                                            │
+│  └───┘  ★★★★★  2 years ago                                  │
+│                                                             │
+│  My family and I recently relocated internationally to      │
+│  Austin. I was introduced to Ryan through a trusted...      │
+│                                                             │
+│  ─────────────────────────────────────────────────────────  │
+│                                                             │
+│  ┌───┐                                                  ⋮   │
+│  │ J │  3 reviews                                           │
+│  └───┘  ★★★★★  1 year ago                                   │
+│                                                             │
+│  Ryan and his team at Spyglass Realty made our home         │
+│  buying experience seamless and stress-free...              │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│      🔗 Click to read all of our reviews on Google!         │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
