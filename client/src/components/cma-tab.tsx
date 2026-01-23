@@ -34,6 +34,7 @@ import { CMANotesDialog } from "@/components/cma/CMANotesDialog";
 import { CMAEmailShareDialog } from "@/components/cma/CMAEmailShareDialog";
 import { CMASourceIndicator } from "@/components/cma-source-indicator";
 import { sanitizePhotoUrl } from "@/lib/cma-map-data";
+import { CmaPresentationPlayer } from "@/components/cma-presentation";
 import type { Transaction, CMAComparable, Cma, PropertyStatistics, CmaStatMetric, Property } from "@shared/schema";
 import { useLocation } from "wouter";
 import { 
@@ -235,6 +236,7 @@ export function CMATab({ transaction }: CMATabProps) {
   const [emailShareDialogOpen, setEmailShareDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showCmaPresentation, setShowCmaPresentation] = useState(false);
   
   const cmaData = transaction.cmaData as CMAComparable[] | null;
   const cmaSource = (transaction as any).cmaSource;
@@ -621,6 +623,7 @@ export function CMATab({ transaction }: CMATabProps) {
           onPrint={handlePrint}
           onExportPDF={handleExportPDF}
           onPresentation={handlePresentation}
+          onCmaPresentation={() => setShowCmaPresentation(true)}
           onAdjustFilters={handleAdjustFilters}
           onNotes={handleNotes}
           onProduceUrl={handleProduceUrl}
@@ -670,6 +673,17 @@ export function CMATab({ transaction }: CMATabProps) {
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id, 'cma'] });
         }}
+      />
+
+      {/* CMA Presentation Player */}
+      <CmaPresentationPlayer
+        isOpen={showCmaPresentation}
+        onClose={() => setShowCmaPresentation(false)}
+        propertyAddress={transaction.propertyAddress || 'Property Address'}
+        mlsNumber={transaction.mlsNumber || ''}
+        agentName="Agent"
+        compsCount={cmaData?.length || 0}
+        daysOnMarket={mlsData?.daysOnMarket || mlsData?.simpleDaysOnMarket || 0}
       />
 
 

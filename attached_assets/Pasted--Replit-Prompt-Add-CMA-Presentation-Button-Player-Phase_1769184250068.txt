@@ -1,0 +1,486 @@
+# Replit Prompt: Add "CMA Presentation" Button & Player — Phase 1
+
+## 🎯 Objective
+
+Add a new **"CMA Presentation"** button to the CMA tab toolbar (next to "Save CMA" and "Presentation Builder") that opens an interactive presentation player for clients. This is a **new feature** — do NOT modify the existing Presentation Builder.
+
+---
+
+## 📍 Location
+
+**File to modify:** The CMA tab component (likely `client/src/components/transactions/CMATab.tsx` or similar)
+
+**Button placement:** In the button row next to "Save CMA" and "Presentation Builder" buttons (see screenshot reference — the empty space with red arrow)
+
+---
+
+## 🔧 Implementation Steps
+
+### Step 1: Add the "CMA Presentation" Button
+
+In the CMA tab toolbar, add a new button:
+
+```tsx
+<Button
+  variant="outline"
+  onClick={() => setShowCmaPresentation(true)}
+  className="flex items-center gap-2 min-h-[44px] px-4"
+>
+  <Play className="w-4 h-4" />
+  CMA Presentation
+</Button>
+```
+
+**Button styling requirements:**
+- Match existing button styles (outline variant)
+- Icon: Play icon from lucide-react
+- Min height 44px for touch targets
+- Position: After "Presentation Builder" button
+
+### Step 2: Create CMA Presentation Modal/Fullscreen Component
+
+Create new file: `client/src/components/cma-presentation/CmaPresentationPlayer.tsx`
+
+```tsx
+import React, { useState, useEffect } from 'react';
+import { X, ChevronLeft, ChevronRight, Play, Pause, Menu, Share2, Maximize2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+interface CmaPresentationPlayerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  propertyAddress: string;
+  mlsNumber: string;
+  agentName: string;
+  agentPhoto?: string;
+  compsCount: number;
+  daysOnMarket: number;
+  // Add more props as needed from CMA data
+}
+
+export function CmaPresentationPlayer({
+  isOpen,
+  onClose,
+  propertyAddress,
+  mlsNumber,
+  agentName,
+  agentPhoto,
+  compsCount,
+  daysOnMarket,
+}: CmaPresentationPlayerProps) {
+  const [currentSection, setCurrentSection] = useState<number | null>(null);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Define all 24 sections/widgets
+  const sections = [
+    { id: 'agent_resume', title: 'AGENT RESUME', subtitle: agentName, icon: 'user', type: 'image' },
+    { id: 'listing_with_spyglass', title: 'LISTING WITH SPYGLASS REALTY', icon: 'building', type: 'video', videoUrl: 'https://www.youtube.com/embed/iB_u-ksW3ts' },
+    { id: 'client_testimonials', title: 'CLIENT TESTIMONIALS', subtitle: 'What Clients Say', icon: 'quote', type: 'html' },
+    { id: 'marketing', title: 'MARKETING', icon: 'megaphone', type: 'image' },
+    { id: 'comps', title: 'COMPS', subtitle: `${compsCount} Comparable Homes`, icon: 'homes', type: 'map' },
+    { id: 'time_to_sell', title: 'TIME TO SELL', subtitle: `${daysOnMarket} Days on Market`, icon: 'clock', type: 'chart' },
+    { id: 'suggested_list_price', title: 'SUGGESTED LIST PRICE', icon: 'dollar', type: 'chart' },
+    { id: 'listing_action_plan', title: 'LISTING ACTION PLAN', icon: 'clipboard', type: 'image' },
+    { id: 'spyglass_resources', title: 'SPYGLASS RESOURCES AND LINKS', icon: 'link', type: 'html' },
+    { id: 'average_price_acre', title: 'AVERAGE PRICE/ACRE', icon: 'chart', type: 'chart' },
+    { id: 'home_selling_system', title: 'HOME SELLING SYSTEM', icon: 'settings', type: 'image' },
+    { id: 'our_proven_approach', title: 'OUR PROVEN APPROACH', icon: 'check', type: 'image' },
+    { id: 'seo_digital_marketing', title: 'SEO & DIGITAL MARKETING', icon: 'globe', type: 'image' },
+    { id: 'google_meta_ads', title: 'GOOGLE + META ADS', icon: 'megaphone', type: 'image' },
+    { id: 'professional_videography', title: 'PROFESSIONAL VIDEOGRAPHY', icon: 'video', type: 'video' },
+    { id: 'why_4k_video', title: 'WHY 4K VIDEO', icon: 'video', type: 'video' },
+    { id: 'example_videos', title: 'EXAMPLE VIDEOS', icon: 'play', type: 'video' },
+    { id: 'aerial_photography', title: 'AERIAL PHOTOGRAPHY', icon: 'camera', type: 'image' },
+    { id: 'in_house_design', title: 'IN-HOUSE DESIGN TEAM', icon: 'palette', type: 'image' },
+    { id: 'print_flyers', title: 'PRINT & FLYERS', icon: 'printer', type: 'image' },
+    { id: 'custom_property_page', title: 'CUSTOM PROPERTY PAGE', icon: 'globe', type: 'html' },
+    { id: 'global_marketing_reach', title: 'GLOBAL MARKETING REACH', icon: 'globe', type: 'image' },
+    { id: 'leadingre_network', title: 'LEADINGRE NETWORK STRENGTH', icon: 'network', type: 'image' },
+    { id: 'featured_property', title: 'FEATURED PROPERTY PROGRAM', icon: 'star', type: 'image' },
+    // Add remaining sections...
+  ];
+
+  if (!isOpen) return null;
+
+  // TOC View (Grid)
+  if (currentSection === null) {
+    return (
+      <div className="fixed inset-0 bg-black z-50 flex flex-col" style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}>
+        {/* Header with Map Background */}
+        <div className="relative h-32 md:h-40 bg-gradient-to-b from-gray-800 to-gray-900">
+          {/* Map background placeholder - will integrate Mapbox later */}
+          <div className="absolute inset-0 opacity-30 bg-[url('/map-dark-pattern.svg')] bg-cover" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-black/80" />
+          
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 left-4 p-2 bg-black/50 rounded-full hover:bg-black/70 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center z-10"
+          >
+            <X className="w-5 h-5 text-white" />
+          </button>
+
+          {/* Header Content */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4 pt-8">
+            <h1 className="text-lg md:text-2xl font-bold tracking-wide text-white">
+              COMPARATIVE MARKET ANALYSIS
+            </h1>
+            <p className="text-sm text-gray-300 mt-1">{propertyAddress}</p>
+            <p className="text-xs text-gray-400">MLS# {mlsNumber}</p>
+          </div>
+
+          {/* Agent Badge */}
+          <div className="absolute top-4 right-4 flex items-center gap-2 bg-black/50 rounded-full px-3 py-1.5">
+            {agentPhoto ? (
+              <img src={agentPhoto} alt={agentName} className="w-6 h-6 rounded-full object-cover" />
+            ) : (
+              <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-xs font-bold">
+                {agentName?.charAt(0)}
+              </div>
+            )}
+            <span className="text-xs text-white hidden sm:block">{agentName}</span>
+          </div>
+
+          {/* Spyglass Logo */}
+          <div className="absolute top-4 left-16 text-xs font-bold tracking-widest text-gray-400">
+            SPYGLASS
+          </div>
+        </div>
+
+        {/* Section Grid */}
+        <div className="flex-1 overflow-auto p-4 bg-gray-100">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {sections.map((section, index) => (
+              <button
+                key={section.id}
+                onClick={() => {
+                  setCurrentSection(index);
+                  setCurrentSlide(0);
+                }}
+                className="bg-white rounded-lg p-4 text-center hover:shadow-lg transition-all min-h-[100px] flex flex-col items-center justify-center gap-2 border border-gray-200"
+              >
+                <SectionIcon icon={section.icon} />
+                <h4 className="text-xs font-bold uppercase leading-tight text-gray-900">
+                  {section.title}
+                </h4>
+                {section.subtitle && (
+                  <p className="text-xs text-gray-500">{section.subtitle}</p>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Slide Player View
+  const section = sections[currentSection];
+  
+  return (
+    <div className="fixed inset-0 bg-black z-50 flex flex-col" style={{
+      paddingTop: 'env(safe-area-inset-top)',
+      paddingBottom: 'env(safe-area-inset-bottom)',
+    }}>
+      {/* Top Bar */}
+      <div className="flex items-center justify-between p-4 bg-black/90">
+        <button
+          onClick={() => setCurrentSection(null)}
+          className="p-2 hover:bg-gray-800 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center"
+        >
+          <X className="w-6 h-6 text-white" />
+        </button>
+        <div className="text-center flex-1">
+          <p className="text-sm font-medium text-white">{section.title}</p>
+          <p className="text-xs text-gray-400">{currentSection + 1} / {sections.length}</p>
+        </div>
+        <button className="p-2 hover:bg-gray-800 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center">
+          <Share2 className="w-5 h-5 text-white" />
+        </button>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="h-1 bg-gray-800">
+        <div
+          className="h-full bg-orange-500 transition-all duration-300"
+          style={{ width: `${((currentSection + 1) / sections.length) * 100}%` }}
+        />
+      </div>
+
+      {/* Slide Content */}
+      <div className="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
+        <SlideContent section={section} />
+        
+        {/* Swipe hint */}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-gray-500">
+          ← Swipe to navigate →
+        </div>
+      </div>
+
+      {/* Bottom Controls */}
+      <div className="flex items-center justify-center gap-4 p-4 bg-black/90">
+        <button
+          onClick={() => setCurrentSection(Math.max(0, currentSection - 1))}
+          disabled={currentSection === 0}
+          className="p-3 bg-gray-800 hover:bg-gray-700 rounded-full disabled:opacity-50 min-w-[44px] min-h-[44px] flex items-center justify-center"
+        >
+          <ChevronLeft className="w-6 h-6 text-white" />
+        </button>
+        <button
+          onClick={() => setIsPlaying(!isPlaying)}
+          className="p-4 bg-orange-500 hover:bg-orange-600 rounded-full min-w-[56px] min-h-[56px] flex items-center justify-center"
+        >
+          {isPlaying ? <Pause className="w-6 h-6 text-white" /> : <Play className="w-6 h-6 text-white" />}
+        </button>
+        <button
+          onClick={() => setCurrentSection(Math.min(sections.length - 1, currentSection + 1))}
+          disabled={currentSection === sections.length - 1}
+          className="p-3 bg-gray-800 hover:bg-gray-700 rounded-full disabled:opacity-50 min-w-[44px] min-h-[44px] flex items-center justify-center"
+        >
+          <ChevronRight className="w-6 h-6 text-white" />
+        </button>
+      </div>
+
+      {/* TOC Button */}
+      <button
+        onClick={() => setCurrentSection(null)}
+        className="absolute bottom-24 right-4 p-3 bg-gray-800 hover:bg-gray-700 rounded-full min-w-[44px] min-h-[44px] flex items-center justify-center"
+      >
+        <Menu className="w-5 h-5 text-white" />
+      </button>
+    </div>
+  );
+}
+
+// Helper component for section icons
+function SectionIcon({ icon }: { icon: string }) {
+  // Map icon names to lucide icons or custom SVGs
+  const iconClass = "w-6 h-6 text-gray-600";
+  
+  switch (icon) {
+    case 'user': return <User className={iconClass} />;
+    case 'building': return <Building2 className={iconClass} />;
+    case 'quote': return <Quote className={iconClass} />;
+    case 'megaphone': return <Megaphone className={iconClass} />;
+    case 'homes': return <Building2 className={iconClass} />;
+    case 'clock': return <Clock className={iconClass} />;
+    case 'dollar': return <DollarSign className={iconClass} />;
+    case 'clipboard': return <FileText className={iconClass} />;
+    case 'link': return <Link2 className={iconClass} />;
+    case 'chart': return <BarChart3 className={iconClass} />;
+    case 'settings': return <Settings className={iconClass} />;
+    case 'check': return <Check className={iconClass} />;
+    case 'globe': return <Globe className={iconClass} />;
+    case 'video': return <Video className={iconClass} />;
+    case 'play': return <Play className={iconClass} />;
+    case 'camera': return <Camera className={iconClass} />;
+    case 'palette': return <Palette className={iconClass} />;
+    case 'printer': return <Printer className={iconClass} />;
+    case 'network': return <Network className={iconClass} />;
+    case 'star': return <Star className={iconClass} />;
+    default: return <FileText className={iconClass} />;
+  }
+}
+
+// Helper component for slide content
+function SlideContent({ section }: { section: any }) {
+  if (section.type === 'video' && section.videoUrl) {
+    return (
+      <div className="w-full max-w-4xl aspect-video bg-gray-900 rounded-lg overflow-hidden">
+        <iframe
+          src={section.videoUrl}
+          className="w-full h-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          title={section.title}
+        />
+      </div>
+    );
+  }
+
+  // Placeholder for other slide types
+  return (
+    <div className="text-center">
+      <div className="w-24 h-24 mx-auto mb-4 bg-gray-800 rounded-2xl flex items-center justify-center">
+        <SectionIcon icon={section.icon} />
+      </div>
+      <h2 className="text-2xl font-bold text-white">{section.title}</h2>
+      {section.subtitle && <p className="text-gray-400 mt-2">{section.subtitle}</p>}
+      <p className="text-sm text-gray-500 mt-4">Slide Type: {section.type}</p>
+      <p className="text-xs text-gray-600 mt-2">(Content will be populated from CMA data)</p>
+    </div>
+  );
+}
+
+// Don't forget to import all the icons at the top:
+import { 
+  User, Building2, Quote, Megaphone, Clock, DollarSign, 
+  FileText, Link2, BarChart3, Settings, Check, Globe, 
+  Video, Camera, Palette, Printer, Network, Star, Play 
+} from 'lucide-react';
+```
+
+### Step 3: Add State and Import to CMA Tab
+
+In your CMA tab component, add:
+
+```tsx
+import { CmaPresentationPlayer } from '@/components/cma-presentation/CmaPresentationPlayer';
+
+// Inside the component:
+const [showCmaPresentation, setShowCmaPresentation] = useState(false);
+
+// In the JSX, add the modal:
+<CmaPresentationPlayer
+  isOpen={showCmaPresentation}
+  onClose={() => setShowCmaPresentation(false)}
+  propertyAddress={property?.address || 'Property Address'}
+  mlsNumber={property?.mlsNumber || ''}
+  agentName={agent?.name || 'Agent Name'}
+  agentPhoto={agent?.photoUrl}
+  compsCount={comps?.length || 0}
+  daysOnMarket={marketData?.daysOnMarket || 0}
+/>
+```
+
+### Step 4: Create Index File for Clean Imports
+
+Create: `client/src/components/cma-presentation/index.ts`
+
+```ts
+export { CmaPresentationPlayer } from './CmaPresentationPlayer';
+```
+
+---
+
+## 📱 Mobile Optimization Requirements
+
+### Touch Targets
+- All buttons: `min-w-[44px] min-h-[44px]`
+- Grid cards: minimum 100px height
+- Control buttons: 44-56px diameter
+
+### Safe Areas (iPhone Notch)
+```css
+.cma-presentation-root {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+```
+
+### Responsive Grid
+- Mobile (< 640px): 2 columns
+- Tablet (640-768px): 3 columns  
+- Medium (768-1024px): 4 columns
+- Desktop (1024px+): 5 columns
+
+### Prevent Scroll During Player
+```tsx
+useEffect(() => {
+  if (isOpen) {
+    document.body.style.overflow = 'hidden';
+  } else {
+    document.body.style.overflow = '';
+  }
+  return () => {
+    document.body.style.overflow = '';
+  };
+}, [isOpen]);
+```
+
+---
+
+## 🎨 Styling Requirements
+
+### Brand Colors
+- Spyglass Orange: `#F37216` / `bg-orange-500`
+- Dark background: `bg-gray-900`, `bg-black`
+- Card background: `bg-white`
+- Text on dark: `text-white`, `text-gray-300`, `text-gray-400`
+
+### Button Variants
+- Primary action (Play): `bg-orange-500 hover:bg-orange-600`
+- Secondary (Nav): `bg-gray-800 hover:bg-gray-700`
+- Outline (CMA Presentation button): Match existing toolbar buttons
+
+---
+
+## ✅ Acceptance Criteria
+
+1. [ ] "CMA Presentation" button appears next to "Presentation Builder"
+2. [ ] Clicking button opens fullscreen presentation player
+3. [ ] TOC grid displays all 24 sections with icons
+4. [ ] Clicking a section opens the slide player
+5. [ ] Slide player shows section title and navigation
+6. [ ] YouTube video embeds play correctly (Listing with Spyglass)
+7. [ ] Close button returns to TOC or closes player
+8. [ ] Works on iPad Safari (1024x1366)
+9. [ ] Works on iPhone Safari (393x852)
+10. [ ] All touch targets are at least 44x44px
+11. [ ] No horizontal scroll on any device
+12. [ ] Safe areas respected on notched devices
+
+---
+
+## 🧪 Testing Checklist
+
+### Desktop
+- [ ] Button visible and clickable
+- [ ] Player opens fullscreen
+- [ ] Grid shows 5 columns
+- [ ] Keyboard navigation (Escape to close)
+
+### iPad Safari
+- [ ] Grid shows 4 columns in portrait
+- [ ] Grid shows 5 columns in landscape
+- [ ] Touch navigation works
+- [ ] YouTube plays inline
+
+### iPhone Safari
+- [ ] Grid shows 2 columns
+- [ ] Safe area padding applied
+- [ ] Touch targets easy to tap
+- [ ] Video plays fullscreen properly
+
+### Android Chrome
+- [ ] Similar to iPhone tests
+- [ ] Back button closes player
+
+---
+
+## 📁 Files to Create/Modify
+
+### Create:
+- `client/src/components/cma-presentation/CmaPresentationPlayer.tsx`
+- `client/src/components/cma-presentation/index.ts`
+
+### Modify:
+- CMA Tab component (add button + state + modal)
+
+---
+
+## 🚀 Future Phases (Not in this prompt)
+
+- Phase 2: Add swipe gestures, image slides, more widget content
+- Phase 3: Add Mapbox for comps, charts for market data
+- Phase 4: Add shareable links, PWA support, analytics
+
+---
+
+## ⚠️ Important Notes
+
+1. **Do NOT modify** the existing "Presentation Builder" — this is a completely new feature
+2. Keep the player **simple for Phase 1** — we'll add features in later phases
+3. The YouTube embed for "Listing with Spyglass Realty" should work immediately
+4. Use the **existing UI components** (Button, etc.) from the project's component library
+5. Match the **dark theme** of Contract Conduit for the player
+
+---
+
+*This is Phase 1 of the CMA Presentation Player feature for Contract Conduit.*

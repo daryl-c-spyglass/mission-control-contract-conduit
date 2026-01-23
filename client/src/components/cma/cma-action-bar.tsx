@@ -21,7 +21,8 @@ import {
   Copy, 
   ExternalLink,
   ChevronDown,
-  Loader2
+  Loader2,
+  Play
 } from 'lucide-react';
 
 interface CMAActionBarProps {
@@ -33,6 +34,7 @@ interface CMAActionBarProps {
   onPrint?: () => void;
   onExportPDF?: () => void;
   onPresentation?: () => void;
+  onCmaPresentation?: () => void;
   onAdjustFilters?: () => void;
   onNotes?: () => void;
   onProduceUrl?: () => void;
@@ -48,6 +50,7 @@ export function CMAActionBar({
   onPrint,
   onExportPDF,
   onPresentation,
+  onCmaPresentation,
   onAdjustFilters,
   onNotes,
   onProduceUrl,
@@ -80,6 +83,17 @@ export function CMAActionBar({
         >
           <LayoutGrid className="w-4 h-4" />
           Presentation Builder
+        </Button>
+
+        {/* CMA Presentation - Interactive Player */}
+        <Button 
+          variant="outline" 
+          onClick={onCmaPresentation}
+          className="gap-2"
+          data-testid="button-cma-presentation"
+        >
+          <Play className="w-4 h-4" />
+          CMA Presentation
         </Button>
       </div>
 
