@@ -1,0 +1,749 @@
+# CMA Presentation Player — Complete Build Spec
+
+## 🎯 Objective
+
+Add a new **"CMA Presentation"** button to the CMA tab toolbar (next to "Save CMA" and "Presentation Builder") that opens an interactive presentation player mimicking [CloudCMA Live](https://cloudcma.com/live/eb8b2c14de80370852b135aed77de3bb).
+
+**IMPORTANT:** This is a **NEW feature** — do NOT modify the existing Presentation Builder.
+
+---
+
+## 📁 ATTACHED FILES — READ THIS FIRST
+
+### 1. Widget Images ZIP File
+I have uploaded **`drive-download-20260123T164733Z-3-001.zip`** to this project. This contains 23 widget images for slides 11-33 (Home Selling System through Thank You).
+
+**Action Required:**
+1. Unzip the file
+2. Create directory: `public/cma-widgets/`
+3. Copy all images to `public/cma-widgets/`
+4. Rename files to match this convention: `{number}-{kebab-case-name}.png`
+
+**Expected files after setup:**
+```
+public/cma-widgets/
+├── 11-home-selling-system.png
+├── 12-our-proven-approach.png
+├── 13-seo-digital-marketing.png
+├── 14-google-meta-ads.png
+├── 15-professional-videography.png
+├── 16-why-4k-video.png
+├── 17-example-videos.png
+├── 18-aerial-photography.png
+├── 19-in-house-design-team.png
+├── 20-print-flyers.png
+├── 21-custom-property-page.png
+├── 22-global-marketing-reach.png
+├── 23-leadingre-network-strength.png
+├── 24-featured-property-program.png
+├── 25-zillow-marketing-tools.png
+├── 26-zillow-showcase-listings.png
+├── 27-open-house-process.png
+├── 28-pricing-strategy.png
+├── 29-listing-price.png
+├── 30-marketing-timeline.png
+├── 31-select-move-program.png
+├── 32-what-our-clients-say.png
+└── 33-thank-you.png
+```
+
+### 2. Spyglass Logo — ALREADY IN PROJECT
+The **Spyglass Realty logo** is already uploaded in this Replit project. 
+
+**Action Required:**
+- Search the project for existing Spyglass logo files (check `public/`, `assets/`, `images/`, or `src/assets/`)
+- Look for files like: `spyglass-logo.png`, `spyglass-realty-logo.svg`, `logo.png`, etc.
+- Use the existing logo path for the header and widget cards that need the Spyglass logo icon
+- If multiple versions exist (light/dark), use the appropriate one based on theme
+
+### 3. CloudCMA Reference PDF
+I have also attached **`CloudCMA_-_Presentation_Builder.pdf`** which contains detailed screenshots and specifications for each widget.
+
+---
+
+## 📍 Button Location
+
+**Add button in:** CMA Tab toolbar, after "Presentation Builder" button
+
+```
+[Save CMA] [Presentation Builder] [▶ CMA Presentation]    [Share ▼] [Export ▼] ...
+```
+
+**Button Code:**
+```tsx
+<Button 
+  variant="outline" 
+  onClick={() => setShowCmaPresentation(true)}
+  className="flex items-center gap-2 min-h-[44px]"
+>
+  <Play className="w-4 h-4" />
+  CMA Presentation
+</Button>
+```
+
+---
+
+## 🏗️ Architecture Overview
+
+### Data Sources
+
+| Data Type | Source Location | Notes |
+|-----------|-----------------|-------|
+| Property Data | CMA Tab → Repliers API | Address, comps, market stats |
+| Agent Profile | Settings → Agent Marketing Profile | Photo, name, company, phone, email |
+| Agent Bio | Settings → Bio & Default Cover Letter → Professional Bio | For Agent Resume slide |
+| Maps | Mapbox GL JS | **Must sync with light/dark/system mode** |
+| Widget Images | `public/cma-widgets/` folder | From uploaded zip file |
+| Spyglass Logo | **Use existing logo in project** | Search project for existing file |
+
+### Theme Support
+All components must support:
+- ✅ Light mode
+- ✅ Dark mode  
+- ✅ System preference detection
+- ✅ Mapbox style switching (dark-v11 / light-v11)
+
+---
+
+## 📐 UI Layout (from CloudCMA reference)
+
+### Main Structure
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ☰ SPYGLASS LOGO                                         🔍 ⭐ 📥 │Agent│
+│                                                          │Avatar│
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│           ████████ MAPBOX DARK MAP BACKGROUND ████████                  │
+│                                                                         │
+│              COMPARATIVE MARKET ANALYSIS                                │
+│           2402 Rockingham Cir, Austin, TX 78704                        │
+│              Prepared for Rockingham Circle                             │
+│                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐          │
+│  │  👤     │ │SPYGLASS │ │   "     │ │SPYGLASS │ │  🏠$    │          │
+│  │  AGENT  │ │  LOGO   │ │ CLIENT  │ │  LOGO   │ │  COMPS  │          │
+│  │ RESUME  │ │LISTING  │ │TESTIMON.│ │MARKETING│ │11 Homes │          │
+│  └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘          │
+│                                                                         │
+│  (Grid continues with all 33 sections in 5 columns...)                 │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Header Component
+- **Left:** Hamburger menu (☰) + Spyglass Logo (use existing logo from project)
+- **Center:** Mapbox map as background with overlay
+- **Right:** Search icon, Star icon, Download icon, Agent avatar with name
+
+### Sidebar Navigation (opens with ☰ hamburger menu)
+
+```
+┌──────────────────────┐
+│ ✕                    │
+├──────────────────────┤
+│ 🏠 Home              │
+│ 👤 Agent Resume      │
+│ 📄 Listing with...   │
+│ 💬 Client Testimonials│
+│ 📢 Marketing         │
+│ 🏘 Comps          11 │  ← Badge with count
+│ ⏱ Time to Sell      │
+│ 💲 Suggested List... │
+│ ... (all 33 items)   │
+└──────────────────────┘
+```
+
+### Agent Profile Popover (on avatar click)
+
+```
+┌──────────────────────┐
+│ Ryan Rodenbeck    📷 │
+│ Spyglass Realty      │
+├──────────────────────┤
+│ 📞 512-298-5668      │
+│ ✉️ ryan@spyglass...  │
+├──────────────────────┤
+│ [📧 Email Report]    │
+└──────────────────────┘
+```
+
+---
+
+## 📦 All 33 Widgets — Complete Specifications
+
+### DYNAMIC WIDGETS (1-10) — Data from CMA Tab/Repliers API
+
+#### Widget 1: Agent Resume
+- **Card Icon:** User profile icon with info badge (orange)
+- **Card Subtitle:** Agent name (from Settings → Agent Marketing Profile)
+- **Data Source:** Settings → Bio & Default Cover Letter → Professional Bio
+- **Slide Content:** Professional bio text (multiple paragraphs, centered)
+- **Slide Header:** Black bar with "AGENT RESUME"
+
+#### Widget 2: Listing with Spyglass Realty
+- **Card Icon:** SPYGLASS LOGO (use existing logo from project)
+- **Slide Content:**
+  - YouTube video embed:
+    ```html
+    <iframe 
+      width="100%" 
+      height="auto"
+      style="aspect-ratio: 16/9;"
+      src="https://www.youtube.com/embed/iB_u-ksW3ts" 
+      title="How Spyglass Markets Your Home" 
+      frameborder="0" 
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+      referrerpolicy="strict-origin-when-cross-origin" 
+      allowfullscreen
+    ></iframe>
+    ```
+  - Default text below video:
+    > "We aim to combine our expertise with an award-winning marketing strategy to quickly sell your property for the highest possible price.
+    > 
+    > We thank you in advance for considering Spyglass Realty as your listing partner and brokerage."
+- **Slide Header:** Black bar with "LISTING WITH SPYGLASS REALTY"
+
+#### Widget 3: Client Testimonials
+- **Card Icon:** Quote marks `"` with circle
+- **Card Subtitle:** "What Clients Say"
+- **Slide Content:**
+  - Clickable link: "Click to read all of our reviews on Google!"
+  - Link URL: `https://www.google.com/search?q=spyglass+realty`
+  - Optional: Display embedded Google review cards
+- **Slide Header:** Black bar with "CLIENT TESTIMONIALS"
+
+#### Widget 4: Marketing
+- **Card Icon:** SPYGLASS LOGO (use existing logo from project)
+- **Slide Content:** 
+  1. **Text section:**
+     > **"Where are homebuyers looking for information?"**
+     > 
+     > One of our top priorities is making sure we market your property in the places your future buyer is looking. We take a look at marketing- and buyer-behavior trends to determine where to invest our resources. The latest data indicates we need to invest in our website, our signage and marketing materials, and our continued professional development.
+  2. **Image section:** "HOW WE DRIVE INTEREST TO YOUR PROPERTY"
+     - Private Facebook Groups collage
+     - Google SEO and Online Presence examples
+- **Slide Header:** Black bar with "MARKETING"
+
+#### Widget 5: Comps (Comparable Homes)
+- **Card Icon:** House with $ badge (orange)
+- **Card Subtitle:** "{count} Comparable Homes" (dynamic from CMA data)
+- **Card Badge:** Show count number (e.g., "11")
+- **Data Source:** CMA Tab → Repliers API
+- **Slide Content:** Three tabs in upper right corner:
+  1. **Compare tab:** Horizontal scroll of property cards
+     - Subject property on far left (highlighted)
+     - Each card shows: photo, address, city/state, price, status badge (Closed/Active), beds, baths, sqft (with +/- comparison), lot size, garage spaces, Year Comp Guide, Listing Details (Orig Price, List Price, Sold Price, Price/SqFt, Sold Date, DOM), Virtual Tour link
+  2. **Map tab:** Mapbox map with price markers
+     - Color coded: green=Closed, red=Active, yellow=Pending
+     - Orange marker for subject property
+     - Price labels on markers
+  3. **Stats tab:** Table view with filters
+     - Filter buttons: All, Closed, Active, Active Under Contract
+     - Summary row: Low Price, High Price, Avg Price, Median, Avg $/SqFt, Avg DOM
+     - Table columns: Address, Status, Price, Sold Date, $/SqFt, Beds, Baths, SqFt, Lot Size, Garage Spaces
+- **Slide Header:** Black bar with "{count} COMPARABLE HOMES"
+- **Mapbox:** Must sync with light/dark/system mode
+
+#### Widget 6: Time to Sell
+- **Card Icon:** Clock with checkmark line (orange)
+- **Card Subtitle:** "{days} Days on Market" (dynamic)
+- **Data Source:** CMA Tab → Repliers API (including property photos)
+- **Slide Content:**
+  - Header stats: "**55** DAYS ON MARKET | **89.07%** OF LIST PRICE"
+  - Subtext: "Sold homes were on the market for an average of 55 days before they accepted an offer. These homes sold for an average of 89.07% of list price."
+  - Left sidebar: Property list grouped by status (● Closed, ● Active Under Contract, ● Active)
+    - Each shows: thumbnail photo, address, days + % change
+    - **Photos are clickable** → opens modal with full property details
+  - Main chart: Scatter plot (Price vs Days on Market)
+    - X-axis: Days on market (0, 55, 92, 165)
+    - Y-axis: Price ($175k to $1.75M)
+    - Circle markers: ○ = Original list price, ● = Most recent price or sold price
+- **Slide Header:** Black bar with "TIME TO SELL"
+
+#### Widget 7: Suggested List Price
+- **Card Icon:** Dollar sign in hanging sign box (orange)
+- **Data Source:** CMA Tab → Repliers API
+- **Slide Content:**
+  - Property address centered at top
+  - Large price display: **$---** (computed from comps average)
+  - Mapbox map with subject property marker (orange pin)
+  - "Compare pricing with the comps" section:
+    - Tabs: All | Sold | Active
+    - Stats: Average Price, Average $/sq. ft.
+- **Suggested Price Calculation Logic:**
+  ```typescript
+  // Simple approach: weighted average of closed comps
+  const closedComps = comps.filter(c => c.status === 'Closed');
+  const avgPricePerSqft = closedComps.reduce((sum, c) => sum + (c.soldPrice / c.sqft), 0) / closedComps.length;
+  const suggestedPrice = avgPricePerSqft * subjectProperty.sqft;
+  ```
+- **Slide Header:** Black bar with "SUGGESTED LIST PRICE"
+- **Mapbox:** Must sync with light/dark/system mode
+
+#### Widget 8: Listing Action Plan
+- **Card Icon:** SPYGLASS LOGO (use existing logo from project)
+- **Slide Content:** Text only (no image)
+  ```
+  WHAT'S NEXT?
+  Keeping you on top of the process.
+  
+  Once we have negotiated and agreed to the terms on the contract, our next goal
+  is to manage each and every step of the process to ensure your property closes
+  successfully. There are countless details and loose ends to handle leading up to
+  closing and we make sure you're always informed of WHAT'S NEXT. You can be
+  confident that we will be as detail-oriented during the post-contract phase as we
+  were during the marketing phase. We'll continue to keep you up-to-date on the
+  status of the closing process and will work diligently to ensure the closing is as
+  smooth and problem-free as possible.
+  
+  • Pre-listing appointment
+  • Staging Consultation
+  • Pricing analysis
+  • Listing preparation
+  • Marketing period
+  • Offer & negotiation
+  • Contingency period
+  • Closing
+  ```
+- **Slide Header:** Black bar with "LISTING ACTION PLAN"
+
+#### Widget 9: Spyglass Resources and Links
+- **Card Icon:** SPYGLASS LOGO (use existing logo from project)
+- **Slide Content:** List of clickable links
+  - Spyglass Listing Presentation (link)
+  - Listing Agreement (link)
+- **Slide Header:** Black bar with "SPYGLASS RESOURCES AND LINKS"
+
+#### Widget 10: Average Price/Acre
+- **Card Icon:** Scatter plot dots pattern (orange dots)
+- **Card Subtitle:** "$X,XXX,XXX / Acre" (dynamic - computed average)
+- **Data Source:** CMA Tab → Repliers API
+- **Slide Content:**
+  - Header: "$4,957,228 / ACRE" with subtext
+  - Left sidebar: Properties grouped by status with $/acre each
+    - **Each property is clickable** → opens property detail modal
+  - Main chart: Scatter plot (Price vs Acres)
+    - ● Subject Property marker (filled orange)
+    - ○ Comp markers with trend line
+- **Slide Header:** Shows computed average price/acre
+
+---
+
+### STATIC IMAGE WIDGETS (11-33) — From Uploaded ZIP File
+
+These widgets display the static images from the uploaded `drive-download-20260123T164733Z-3-001.zip` file.
+
+**Card Icon for all:** SPYGLASS LOGO (use existing logo from project)
+
+| # | Widget ID | Title | Image File |
+|---|-----------|-------|------------|
+| 11 | home_selling_system | HOME SELLING SYSTEM | `11-home-selling-system.png` |
+| 12 | our_proven_approach | OUR PROVEN APPROACH | `12-our-proven-approach.png` |
+| 13 | seo_digital_marketing | SEO & DIGITAL MARKETING | `13-seo-digital-marketing.png` |
+| 14 | google_meta_ads | GOOGLE + META ADS | `14-google-meta-ads.png` |
+| 15 | professional_videography | PROFESSIONAL VIDEOGRAPHY | `15-professional-videography.png` |
+| 16 | why_4k_video | WHY 4K VIDEO | `16-why-4k-video.png` |
+| 17 | example_videos | EXAMPLE VIDEOS | `17-example-videos.png` |
+| 18 | aerial_photography | AERIAL PHOTOGRAPHY | `18-aerial-photography.png` |
+| 19 | in_house_design | IN-HOUSE DESIGN TEAM | `19-in-house-design-team.png` |
+| 20 | print_flyers | PRINT & FLYERS | `20-print-flyers.png` |
+| 21 | custom_property_page | CUSTOM PROPERTY PAGE | `21-custom-property-page.png` |
+| 22 | global_marketing_reach | GLOBAL MARKETING REACH | `22-global-marketing-reach.png` |
+| 23 | leadingre_network | LEADINGRE NETWORK STRENGTH | `23-leadingre-network-strength.png` |
+| 24 | featured_property | FEATURED PROPERTY PROGRAM | `24-featured-property-program.png` |
+| 25 | zillow_marketing | ZILLOW MARKETING TOOLS | `25-zillow-marketing-tools.png` |
+| 26 | zillow_showcase | ZILLOW SHOWCASE LISTINGS | `26-zillow-showcase-listings.png` |
+| 27 | open_house_process | OPEN HOUSE PROCESS | `27-open-house-process.png` |
+| 28 | pricing_strategy | PRICING STRATEGY | `28-pricing-strategy.png` |
+| 29 | listing_price | LISTING PRICE | `29-listing-price.png` |
+| 30 | marketing_timeline | MARKETING TIMELINE | `30-marketing-timeline.png` |
+| 31 | select_move_program | SELECT MOVE PROGRAM | `31-select-move-program.png` |
+| 32 | what_clients_say | WHAT OUR CLIENTS SAY | `32-what-our-clients-say.png` |
+| 33 | thank_you | THANK YOU | `33-thank-you.png` |
+
+---
+
+## 🔧 Implementation
+
+### File Structure
+
+```
+client/src/components/cma-presentation/
+├── index.ts                       # Exports
+├── CmaPresentationButton.tsx      # Button for CMA tab toolbar
+├── CmaPresentationPlayer.tsx      # Main fullscreen player
+├── constants/
+│   └── widgets.ts                 # Widget definitions & image paths
+├── components/
+│   ├── Header.tsx                 # Mapbox header + Spyglass logo + agent
+│   ├── Sidebar.tsx                # Mobile sidebar navigation
+│   ├── SectionGrid.tsx            # 5-column grid of cards
+│   ├── SectionCard.tsx            # Individual clickable card
+│   ├── SlideViewer.tsx            # Content viewer when card clicked
+│   ├── AgentPopover.tsx           # Agent contact dropdown
+│   └── widgets/
+│       ├── AgentResumeWidget.tsx
+│       ├── ListingWithSpyglassWidget.tsx
+│       ├── ClientTestimonialsWidget.tsx
+│       ├── MarketingWidget.tsx
+│       ├── CompsWidget.tsx
+│       ├── TimeToSellWidget.tsx
+│       ├── SuggestedPriceWidget.tsx
+│       ├── ListingActionPlanWidget.tsx
+│       ├── SpyglassResourcesWidget.tsx
+│       ├── AveragePriceAcreWidget.tsx
+│       └── StaticImageWidget.tsx  # Reusable for widgets 11-33
+├── hooks/
+│   ├── useCmaData.ts
+│   ├── useAgentProfile.ts
+│   └── useTheme.ts
+└── types/
+    └── index.ts
+
+public/cma-widgets/                # Created from uploaded zip file
+├── 11-home-selling-system.png
+├── ... (all 23 images)
+└── 33-thank-you.png
+```
+
+### Widget Configuration Constants
+
+```typescript
+// client/src/components/cma-presentation/constants/widgets.ts
+
+// IMPORTANT: Update this path to the actual Spyglass logo location in the project
+// Search for existing files like: spyglass-logo.png, logo.svg, etc.
+export const SPYGLASS_LOGO_PATH = '/path/to/existing/spyglass-logo.png'; // UPDATE THIS
+
+export interface WidgetDefinition {
+  id: string;
+  number: number;
+  title: string;
+  subtitle?: string;
+  icon: 'user' | 'spyglass' | 'quote' | 'homes' | 'clock' | 'dollar' | 'chart';
+  type: 'dynamic' | 'static' | 'youtube' | 'text';
+  imagePath?: string;
+  component?: string;
+  badge?: number | string;
+}
+
+export const WIDGETS: WidgetDefinition[] = [
+  // Dynamic widgets (1-10)
+  { id: 'agent_resume', number: 1, title: 'AGENT RESUME', icon: 'user', type: 'dynamic', component: 'AgentResumeWidget' },
+  { id: 'listing_with_spyglass', number: 2, title: 'LISTING WITH SPYGLASS REALTY', icon: 'spyglass', type: 'youtube' },
+  { id: 'client_testimonials', number: 3, title: 'CLIENT TESTIMONIALS', subtitle: 'What Clients Say', icon: 'quote', type: 'dynamic' },
+  { id: 'marketing', number: 4, title: 'MARKETING', icon: 'spyglass', type: 'dynamic' },
+  { id: 'comps', number: 5, title: 'COMPS', icon: 'homes', type: 'dynamic', component: 'CompsWidget' },
+  { id: 'time_to_sell', number: 6, title: 'TIME TO SELL', icon: 'clock', type: 'dynamic', component: 'TimeToSellWidget' },
+  { id: 'suggested_list_price', number: 7, title: 'SUGGESTED LIST PRICE', icon: 'dollar', type: 'dynamic', component: 'SuggestedPriceWidget' },
+  { id: 'listing_action_plan', number: 8, title: 'LISTING ACTION PLAN', icon: 'spyglass', type: 'text' },
+  { id: 'spyglass_resources', number: 9, title: 'SPYGLASS RESOURCES AND LINKS', icon: 'spyglass', type: 'dynamic' },
+  { id: 'average_price_acre', number: 10, title: 'AVERAGE PRICE/ACRE', icon: 'chart', type: 'dynamic', component: 'AveragePriceAcreWidget' },
+  
+  // Static image widgets (11-33) - from uploaded zip file
+  { id: 'home_selling_system', number: 11, title: 'HOME SELLING SYSTEM', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/11-home-selling-system.png' },
+  { id: 'our_proven_approach', number: 12, title: 'OUR PROVEN APPROACH', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/12-our-proven-approach.png' },
+  { id: 'seo_digital_marketing', number: 13, title: 'SEO & DIGITAL MARKETING', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/13-seo-digital-marketing.png' },
+  { id: 'google_meta_ads', number: 14, title: 'GOOGLE + META ADS', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/14-google-meta-ads.png' },
+  { id: 'professional_videography', number: 15, title: 'PROFESSIONAL VIDEOGRAPHY', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/15-professional-videography.png' },
+  { id: 'why_4k_video', number: 16, title: 'WHY 4K VIDEO', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/16-why-4k-video.png' },
+  { id: 'example_videos', number: 17, title: 'EXAMPLE VIDEOS', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/17-example-videos.png' },
+  { id: 'aerial_photography', number: 18, title: 'AERIAL PHOTOGRAPHY', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/18-aerial-photography.png' },
+  { id: 'in_house_design', number: 19, title: 'IN-HOUSE DESIGN TEAM', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/19-in-house-design-team.png' },
+  { id: 'print_flyers', number: 20, title: 'PRINT & FLYERS', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/20-print-flyers.png' },
+  { id: 'custom_property_page', number: 21, title: 'CUSTOM PROPERTY PAGE', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/21-custom-property-page.png' },
+  { id: 'global_marketing_reach', number: 22, title: 'GLOBAL MARKETING REACH', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/22-global-marketing-reach.png' },
+  { id: 'leadingre_network', number: 23, title: 'LEADINGRE NETWORK STRENGTH', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/23-leadingre-network-strength.png' },
+  { id: 'featured_property', number: 24, title: 'FEATURED PROPERTY PROGRAM', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/24-featured-property-program.png' },
+  { id: 'zillow_marketing', number: 25, title: 'ZILLOW MARKETING TOOLS', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/25-zillow-marketing-tools.png' },
+  { id: 'zillow_showcase', number: 26, title: 'ZILLOW SHOWCASE LISTINGS', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/26-zillow-showcase-listings.png' },
+  { id: 'open_house_process', number: 27, title: 'OPEN HOUSE PROCESS', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/27-open-house-process.png' },
+  { id: 'pricing_strategy', number: 28, title: 'PRICING STRATEGY', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/28-pricing-strategy.png' },
+  { id: 'listing_price', number: 29, title: 'LISTING PRICE', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/29-listing-price.png' },
+  { id: 'marketing_timeline', number: 30, title: 'MARKETING TIMELINE', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/30-marketing-timeline.png' },
+  { id: 'select_move_program', number: 31, title: 'SELECT MOVE PROGRAM', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/31-select-move-program.png' },
+  { id: 'what_clients_say', number: 32, title: 'WHAT OUR CLIENTS SAY', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/32-what-our-clients-say.png' },
+  { id: 'thank_you', number: 33, title: 'THANK YOU', icon: 'spyglass', type: 'static', imagePath: '/cma-widgets/33-thank-you.png' },
+];
+```
+
+### Static Image Widget Component
+
+```tsx
+// client/src/components/cma-presentation/widgets/StaticImageWidget.tsx
+
+interface StaticImageWidgetProps {
+  title: string;
+  imagePath: string;
+}
+
+export function StaticImageWidget({ title, imagePath }: StaticImageWidgetProps) {
+  return (
+    <div className="flex flex-col h-full bg-white dark:bg-gray-800">
+      {/* Black Header Bar */}
+      <div className="bg-gray-900 text-white py-3 px-4 text-center flex-shrink-0">
+        <span className="font-bold tracking-wider text-sm uppercase">
+          {title}
+        </span>
+      </div>
+      
+      {/* Image Content - Scrollable */}
+      <div className="flex-1 overflow-auto p-4 flex items-start justify-center">
+        <img 
+          src={imagePath}
+          alt={title}
+          className="w-full h-auto max-w-4xl"
+          loading="lazy"
+          onError={(e) => {
+            console.error(`Failed to load image: ${imagePath}`);
+            (e.target as HTMLImageElement).style.display = 'none';
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+```
+
+### Section Card with Spyglass Logo Icon
+
+```tsx
+// client/src/components/cma-presentation/components/SectionCard.tsx
+
+import { SPYGLASS_LOGO_PATH } from '../constants/widgets';
+import { User, MessageSquareQuote, Home, Clock, DollarSign, BarChart3 } from 'lucide-react';
+
+interface SectionCardProps {
+  widget: WidgetDefinition;
+  onClick: () => void;
+}
+
+export function SectionCard({ widget, onClick }: SectionCardProps) {
+  const renderIcon = () => {
+    switch (widget.icon) {
+      case 'user':
+        return (
+          <div className="relative">
+            <User className="w-8 h-8 text-gray-600 dark:text-gray-400" />
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center">
+              <span className="text-white text-xs">i</span>
+            </div>
+          </div>
+        );
+      case 'spyglass':
+        return (
+          <img 
+            src={SPYGLASS_LOGO_PATH} 
+            alt="Spyglass Realty" 
+            className="w-12 h-auto object-contain"
+          />
+        );
+      case 'quote':
+        return <MessageSquareQuote className="w-8 h-8 text-gray-600 dark:text-gray-400" />;
+      case 'homes':
+        return (
+          <div className="relative">
+            <Home className="w-8 h-8 text-gray-600 dark:text-gray-400" />
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center">
+              <DollarSign className="w-3 h-3 text-white" />
+            </div>
+          </div>
+        );
+      case 'clock':
+        return <Clock className="w-8 h-8 text-gray-600 dark:text-gray-400" />;
+      case 'dollar':
+        return <DollarSign className="w-8 h-8 text-orange-500" />;
+      case 'chart':
+        return <BarChart3 className="w-8 h-8 text-orange-500" />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 
+                 p-4 flex flex-col items-center justify-center gap-2 
+                 hover:shadow-lg hover:border-orange-300 transition-all
+                 min-h-[120px] min-w-[44px] touch-manipulation"
+    >
+      {renderIcon()}
+      <span className="text-xs font-bold text-center text-gray-900 dark:text-white uppercase tracking-wide">
+        {widget.title}
+      </span>
+      {widget.subtitle && (
+        <span className="text-xs text-gray-500 dark:text-gray-400 text-center">
+          {widget.subtitle}
+        </span>
+      )}
+      {widget.badge && (
+        <span className="text-xs text-orange-500 font-medium">
+          {widget.badge}
+        </span>
+      )}
+    </button>
+  );
+}
+```
+
+---
+
+## 📱 Mobile Optimization
+
+### Touch Targets (44px minimum)
+```css
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
+}
+```
+
+### Safe Areas
+```css
+.cma-presentation-root {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+```
+
+### Responsive Grid
+```tsx
+<div className="grid gap-3 p-4
+  grid-cols-2           /* Mobile: 2 columns */
+  sm:grid-cols-3        /* Tablet portrait: 3 columns */
+  md:grid-cols-4        /* Tablet landscape: 4 columns */
+  lg:grid-cols-5        /* Desktop: 5 columns - matches CloudCMA */
+">
+```
+
+### Testing Checklist
+- [ ] iPad Pro Safari (1024×1366)
+- [ ] iPad Air Safari (768×1024)
+- [ ] iPhone 14/15 Pro Safari (393×852)
+- [ ] iPhone SE Safari (375×667)
+- [ ] Android Chrome Phone (360×800)
+- [ ] Android Chrome Tablet (800×1280)
+
+---
+
+## 🎨 Theme Support
+
+### Mapbox Style Switching
+
+```tsx
+// hooks/useTheme.ts
+export function useTheme() {
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  
+  useEffect(() => {
+    const updateTheme = () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      setTheme(isDark ? 'dark' : 'light');
+    };
+    
+    updateTheme();
+    
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(document.documentElement, { 
+      attributes: true, 
+      attributeFilter: ['class'] 
+    });
+    
+    return () => observer.disconnect();
+  }, []);
+  
+  const mapStyle = theme === 'dark'
+    ? 'mapbox://styles/mapbox/dark-v11'
+    : 'mapbox://styles/mapbox/light-v11';
+  
+  return { theme, mapStyle };
+}
+```
+
+### Brand Colors
+```typescript
+const colors = {
+  spyglassOrange: '#F37216',
+  headerBg: 'bg-gray-900',
+  cardBg: 'bg-white dark:bg-gray-800',
+  textPrimary: 'text-gray-900 dark:text-white',
+  statusClosed: 'bg-green-500',
+  statusActive: 'bg-red-500',
+  statusPending: 'bg-yellow-500',
+};
+```
+
+---
+
+## ✅ Acceptance Criteria
+
+### Phase 1: Setup & Core Structure
+- [ ] Unzip `drive-download-20260123T164733Z-3-001.zip` and place images in `public/cma-widgets/`
+- [ ] Find and use existing Spyglass logo from project
+- [ ] "CMA Presentation" button visible in CMA tab toolbar (after Presentation Builder)
+- [ ] Clicking opens fullscreen presentation player
+- [ ] Header shows Mapbox map background with property address
+- [ ] Header shows Spyglass logo (top left)
+- [ ] Mapbox syncs with light/dark/system theme
+- [ ] Agent avatar in top right (from Settings → Agent Marketing Profile)
+- [ ] Agent popover shows phone/email on avatar click
+- [ ] Grid displays all 33 section cards in 5 columns (desktop)
+- [ ] Hamburger menu opens sidebar navigation
+- [ ] Close button returns to CMA tab
+- [ ] All touch targets ≥ 44px
+- [ ] Safe areas respected on notched devices
+
+### Phase 2: Widget Content
+- [ ] Widget images (11-33) load from `public/cma-widgets/` folder
+- [ ] Agent Resume shows bio from Settings
+- [ ] YouTube video plays in Listing with Spyglass widget
+- [ ] Comps widget shows Compare, Map, Stats tabs
+- [ ] Time to Sell shows chart with clickable properties
+- [ ] Suggested List Price shows Mapbox map
+- [ ] All static image widgets display correctly
+
+### Phase 3: Navigation
+- [ ] Card click opens full slide view
+- [ ] Back button returns to grid
+- [ ] Prev/Next navigation between slides
+- [ ] Slide counter shows current position (e.g., "5 / 33")
+
+---
+
+## 🔗 Reference
+
+- **CloudCMA Live:** https://cloudcma.com/live/eb8b2c14de80370852b135aed77de3bb
+- **YouTube Video:** https://www.youtube.com/embed/iB_u-ksW3ts
+- **Brand Color:** #F37216 (Spyglass Orange)
+- **Google Reviews:** https://www.google.com/search?q=spyglass+realty
+
+---
+
+## 📎 Files Uploaded to This Project
+
+1. **`drive-download-20260123T164733Z-3-001.zip`** — Widget images (unzip to `public/cma-widgets/`)
+2. **`CloudCMA_-_Presentation_Builder.pdf`** — Detailed screenshots and specs
+3. **Spyglass Logo** — ALREADY EXISTS in project (search and use existing file)
+
+---
+
+## ⚠️ IMPORTANT REMINDERS
+
+1. **DO NOT modify** the existing "Presentation Builder" — this is completely separate
+2. **UNZIP** the widget images file and place in `public/cma-widgets/`
+3. **FIND** the existing Spyglass logo in the project and use it (don't create new)
+4. **Mapbox MUST sync** with the app's light/dark/system theme preference
+5. **All data** comes from existing sources — CMA Tab (Repliers) and Settings
+6. **Mobile-first** — this will primarily be shown on iPads to clients
+
+---
+
+*This is the complete build spec for the CMA Presentation Player feature.*
