@@ -1,0 +1,268 @@
+# 🔍 INVESTIGATION ONLY - Document Theme System Implementation
+
+**⚠️ DO NOT MAKE ANY CHANGES - This is documentation only**
+
+**Goal:** Document the complete theme system implementation (light/dark/system mode) so it can be reviewed and improved.
+
+---
+
+## Please Provide the Complete Code For:
+
+### 1. Theme Context/Provider
+Find and share the theme context file. Look for files like:
+- `ThemeContext.tsx`
+- `ThemeProvider.tsx`
+- `theme-context.tsx`
+- Any file in `contexts/` or `providers/` related to theme
+
+**Search locations:**
+```
+client/src/contexts/
+client/src/providers/
+client/src/context/
+client/src/lib/
+```
+
+**Please share:**
+- Full file path
+- Complete code of the theme context/provider
+- How theme state is managed
+- How it persists user preference (localStorage, API, etc.)
+
+---
+
+### 2. App.tsx or Main Entry Point
+Find and share how the ThemeProvider wraps the app.
+
+**Please share:**
+- The relevant portion of `App.tsx` or `main.tsx`
+- Order of providers (QueryClient, Auth, Theme, etc.)
+- How ThemeProvider is imported and used
+
+---
+
+### 3. Tailwind Configuration
+Find and share the Tailwind config.
+
+**Search for:**
+```
+tailwind.config.js
+tailwind.config.ts
+tailwind.config.cjs
+```
+
+**Please share:**
+- Complete tailwind config file
+- Specifically the `darkMode` setting
+- Any custom color configurations
+
+---
+
+### 4. CSS Variables / Global Styles
+Find and share theme-related CSS.
+
+**Search in:**
+```
+client/src/index.css
+client/src/styles/globals.css
+client/src/styles/theme.css
+client/src/app.css
+```
+
+**Please share:**
+- All CSS variables used for theming
+- Light mode values (`:root` or default)
+- Dark mode values (`.dark` class)
+- Any theme transition styles
+
+---
+
+### 5. Theme Toggle/Switcher Component
+Find the UI component that allows users to switch themes.
+
+**Search for:**
+- `ThemeToggle`
+- `ThemeSwitcher`
+- `DarkModeToggle`
+- Look in Settings page or Header component
+
+**Please share:**
+- Full file path
+- Complete component code
+- How it calls setTheme or updates theme
+
+---
+
+### 6. Layout Component
+Find the main layout component that applies theme classes.
+
+**Search for:**
+```
+client/src/components/Layout.tsx
+client/src/components/layout/Layout.tsx
+client/src/layouts/
+```
+
+**Please share:**
+- Complete Layout component code
+- How it applies dark/light classes to the document or container
+- Any theme-related logic
+
+---
+
+### 7. Settings Page (Theme Section)
+Find where users can change theme in Settings.
+
+**Search for:**
+```
+client/src/pages/Settings.tsx
+client/src/pages/settings/
+```
+
+**Please share:**
+- The theme-related section of the Settings page
+- How theme preference is saved
+- Any API calls to persist theme
+
+---
+
+### 8. index.html
+Find the HTML entry point.
+
+**Search for:**
+```
+index.html
+client/index.html
+public/index.html
+```
+
+**Please share:**
+- Any theme-related meta tags
+- Any inline scripts that set initial theme (to prevent flash)
+- Theme color meta tags
+
+---
+
+### 9. Database Schema (if theme is persisted)
+If theme preference is stored in database, find the schema.
+
+**Search in:**
+```
+shared/schema.ts
+db/schema.ts
+server/db/schema.ts
+```
+
+**Please share:**
+- User preferences table/schema
+- Theme field definition
+
+---
+
+### 10. API Routes (if theme is persisted)
+If there's an API to save/load theme preference.
+
+**Search for:**
+- Routes handling `/api/user/preferences`
+- Routes handling `/api/user/profile`
+- Any theme-related API endpoints
+
+**Please share:**
+- Route handlers for saving/loading theme
+- How theme is validated and stored
+
+---
+
+## Expected Response Format
+
+Please respond with this structure:
+
+```
+## 1. THEME CONTEXT
+File: [full path]
+```
+[complete code]
+```
+
+## 2. APP.TSX / MAIN ENTRY
+File: [full path]
+```
+[relevant code showing provider setup]
+```
+
+## 3. TAILWIND CONFIG
+File: [full path]
+```
+[complete config]
+```
+
+## 4. CSS VARIABLES
+File: [full path]
+```
+[all theme-related CSS]
+```
+
+## 5. THEME TOGGLE COMPONENT
+File: [full path]
+```
+[complete component code]
+```
+
+## 6. LAYOUT COMPONENT
+File: [full path]
+```
+[complete code]
+```
+
+## 7. SETTINGS PAGE (Theme Section)
+File: [full path]
+```
+[theme-related code]
+```
+
+## 8. INDEX.HTML
+File: [full path]
+```
+[theme-related portions]
+```
+
+## 9. DATABASE SCHEMA
+File: [full path]
+```
+[user preferences / theme schema]
+```
+
+## 10. API ROUTES
+File: [full path]
+```
+[theme-related API handlers]
+```
+
+## ADDITIONAL NOTES
+- [Any other theme-related files found]
+- [Current issues or limitations observed]
+- [How system mode detection works currently]
+```
+
+---
+
+## Summary of What I Need
+
+| # | Item | Why It's Needed |
+|---|------|-----------------|
+| 1 | Theme Context | Understand state management |
+| 2 | App.tsx | See provider hierarchy |
+| 3 | Tailwind Config | Verify darkMode setting |
+| 4 | CSS Variables | See color tokens |
+| 5 | Theme Toggle | Understand UI implementation |
+| 6 | Layout | See how theme is applied to DOM |
+| 7 | Settings Page | See user-facing theme controls |
+| 8 | index.html | Check for flash prevention |
+| 9 | DB Schema | Understand persistence |
+| 10 | API Routes | Understand server-side handling |
+
+---
+
+**⚠️ REMINDER: DO NOT MODIFY ANY CODE**
+
+Just find and document these files. The goal is to understand the current implementation so we can plan improvements.
