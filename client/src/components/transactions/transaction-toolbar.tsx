@@ -248,10 +248,10 @@ export function TransactionToolbar({
                 Coordinator
               </label>
               <Select
-                value={filters.coordinator || ""}
+                value={filters.coordinator || "all"}
                 onValueChange={(value) => {
                   onFiltersChange({ 
-                    coordinator: value || null 
+                    coordinator: value === "all" ? null : value 
                   });
                 }}
               >
@@ -259,7 +259,7 @@ export function TransactionToolbar({
                   <SelectValue placeholder="All Coordinators" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Coordinators</SelectItem>
+                  <SelectItem value="all">All Coordinators</SelectItem>
                   {coordinators.map((coord) => (
                     <SelectItem key={coord.id} value={coord.id}>
                       {coord.name}
