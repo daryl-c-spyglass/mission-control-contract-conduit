@@ -1,0 +1,481 @@
+# 🔍 INVESTIGATION ONLY - CMA Live Preview Sections & Export PDF
+
+**⚠️ DO NOT MAKE ANY CHANGES - This is diagnostic only**
+
+**Goals:**
+1. Document ALL sections in Live Preview and their data sources
+2. Identify why Export PDF is failing
+3. Determine which sections might be redundant or not needed
+
+---
+
+## PART 1: EXPORT PDF FAILURE INVESTIGATION
+
+### 1.1 Get Console Errors
+
+**Steps:**
+1. Open browser DevTools (F12 or Cmd+Option+I)
+2. Go to Console tab
+3. Clear console
+4. Click "Export PDF" button
+5. Copy ALL error messages that appear
+
+**Please share:**
+- Complete error stack trace
+- Any warnings before the error
+- Network request failures (if any)
+
+---
+
+### 1.2 Find Export PDF Code
+
+**Search for the export mutation in CMAPresentationBuilder.tsx:**
+
+Look for `exportPdfMutation` and share:
+- The complete mutation code
+- What library it uses (`@react-pdf/renderer`, `pdf-lib`, etc.)
+- The `CMAPdfDocument` component import
+
+**Find and share the CMAPdfDocument component:**
+```
+client/src/components/pdf/CMAPdfDocument.tsx
+```
+
+**Please share:**
+- Complete CMAPdfDocument component code
+- All imports it uses
+- Any sub-components it references
+
+---
+
+### 1.3 Check PDF Library Installation
+
+**Run in terminal:**
+```bash
+npm list @react-pdf/renderer
+npm list react-pdf
+```
+
+**Check package.json for PDF-related packages:**
+```
+grep -i "pdf" package.json
+```
+
+---
+
+### 1.4 Network Tab Check
+
+When clicking Export PDF:
+1. Does it make any API calls?
+2. Or is it client-side only?
+3. Any failed requests?
+
+---
+
+## PART 2: LIVE PREVIEW SECTIONS DOCUMENTATION
+
+### Document Each Section's Data Source
+
+For each section in the Live Preview, find and document:
+1. Component file path
+2. Props it receives
+3. Where the data comes from
+4. Whether data is from API, Settings, or hardcoded
+
+---
+
+### INTRODUCTION SECTIONS (7)
+
+#### 2.1 Cover Page
+**What it displays:**
+- Company name ("Spyglass Realty")
+- Title ("Comparative Market Analysis")
+- Subtitle ("Prepared exclusively for you")
+- Date
+- Agent photo
+- Agent name
+
+**Find the component and document:**
+- File path
+- Data source for each field
+- Is company name hardcoded or from settings?
+
+---
+
+#### 2.2 Listing Brochure
+**What it displays:**
+- Property photos
+- Property details
+
+**Find the component and document:**
+- File path
+- Where photos come from (MLS data? Uploaded?)
+- Property data source
+
+---
+
+#### 2.3 Cover Letter
+**What it displays:**
+- "Dear," 
+- Letter content
+
+**Find the component and document:**
+- File path
+- Data source (Settings → Default Cover Letter? CMA-specific override?)
+- Client name placeholder handling
+
+---
+
+#### 2.4 Agent Resume
+**What it displays:**
+- Agent photo
+- Agent name ("Daryl Camingao")
+- Agent title ("AI Web Developer")
+- Bio content
+
+**Find the component and document:**
+- File path
+- Data source for each field
+- Where photo URL comes from
+
+---
+
+#### 2.5 Our Company
+**What it displays:**
+- Company name ("Spyglass Realty")
+- Description ("Company profile and information")
+
+**Find the component and document:**
+- File path
+- Is this hardcoded or configurable?
+- Where should company info come from?
+
+---
+
+#### 2.6 What is a CMA?
+**What it displays:**
+- Educational content about CMAs
+
+**Find the component and document:**
+- File path
+- Is content static/hardcoded?
+- Should it be customizable?
+
+---
+
+#### 2.7 Contact Me
+**What it displays:**
+- Agent contact information
+
+**Find the component and document:**
+- File path
+- Data source (same as Agent Resume?)
+- Social media links included?
+
+---
+
+### LISTINGS SECTIONS (6)
+
+#### 2.8 Map of All Listings
+**What it displays:**
+- Map with property markers
+
+**Find the component and document:**
+- File path
+- Map library used (Mapbox? Google Maps?)
+- Data source for markers
+
+---
+
+#### 2.9 Summary of Comparable Properties
+**What it displays:**
+- Table/grid of comparables
+- Key stats
+
+**Find the component and document:**
+- File path
+- Data source (CMA comparables)
+- Fields displayed
+
+---
+
+#### 2.10 Listings Chapter Header
+**What it displays:**
+- Section divider/title
+
+**Find the component and document:**
+- File path
+- Is it just a static header?
+
+---
+
+#### 2.11 Property Details
+**What it displays:**
+- Individual property cards
+- Property specifications
+
+**Find the component and document:**
+- File path
+- Data source per property
+- Which fields from MLS data
+
+---
+
+#### 2.12 Property Photos
+**What it displays:**
+- Photo gallery for properties
+
+**Find the component and document:**
+- File path
+- Photo source (MLS? Repliers API?)
+- Photo selection logic
+
+---
+
+#### 2.13 Adjustments
+**What it displays:**
+- Price adjustments between comparables
+
+**Find the component and document:**
+- File path
+- Calculation logic
+- Data source
+
+---
+
+### ANALYSIS SECTIONS (4)
+
+#### 2.14 Analysis Chapter Header
+**What it displays:**
+- Section divider/title
+
+**Find the component and document:**
+- File path
+- Static or dynamic?
+
+---
+
+#### 2.15 Online Valuation Analysis
+**What it displays:**
+- AVM/Zestimate type data?
+- Valuation comparison
+
+**Find the component and document:**
+- File path
+- Data source (API? Calculated?)
+
+---
+
+#### 2.16 Average Price Per Sq. Ft.
+**What it displays:**
+- Price/sqft calculations
+- Charts/graphs?
+
+**Find the component and document:**
+- File path
+- Calculation logic
+- Visualization library used
+
+---
+
+#### 2.17 Comparable Property Statistics
+**What it displays:**
+- Statistical analysis
+- Min/max/avg values
+
+**Find the component and document:**
+- File path
+- Statistics calculated
+- Data source
+
+---
+
+## PART 3: FIND THE MAIN PREVIEW COMPONENTS
+
+### 3.1 CMAPreviewContent Component
+**File path likely:**
+```
+client/src/components/cma/CMAPreviewContent.tsx
+```
+
+**Please share:**
+- Complete component code
+- How it maps sections to components
+- The `includedSections` handling
+- The `sectionOrder` handling
+
+---
+
+### 3.2 transformToCMAReportData Function
+**Find where this function is defined:**
+
+**Please share:**
+- Complete function code
+- All fields it returns
+- How it maps data to sections
+
+---
+
+### 3.3 Section Component Registry
+**Find how sections are mapped to components:**
+
+Look for something like:
+```tsx
+const SECTION_COMPONENTS = {
+  coverPage: CoverPageSection,
+  listingBrochure: ListingBrochureSection,
+  // ...
+};
+```
+
+**Please share:**
+- The complete mapping
+- File paths for each section component
+
+---
+
+## PART 4: PDF DOCUMENT STRUCTURE
+
+### 4.1 CMAPdfDocument Component
+**Find and share the complete PDF document component:**
+```
+client/src/components/pdf/CMAPdfDocument.tsx
+```
+
+**Document:**
+- Which sections it renders
+- How it maps to preview sections
+- Any sections that are different from preview
+
+---
+
+### 4.2 PDF Section Components
+**Find all PDF-specific section components:**
+```
+client/src/components/pdf/sections/
+```
+
+**List all files and their purposes**
+
+---
+
+## Expected Response Format
+
+```
+## PART 1: EXPORT PDF FAILURE
+
+### Console Errors:
+[paste complete error]
+
+### Export Mutation Code:
+File: [path]
+```tsx
+[code]
+```
+
+### CMAPdfDocument:
+File: [path]
+```tsx
+[code]
+```
+
+### PDF Libraries Installed:
+[list packages]
+
+---
+
+## PART 2: SECTION DATA SOURCES
+
+### Cover Page
+File: [path]
+Data Sources:
+- Company Name: [source - hardcoded/settings/api]
+- Agent Name: [source]
+- Agent Photo: [source]
+- Date: [source]
+
+### Listing Brochure
+File: [path]
+Data Sources:
+- Photos: [source]
+- Property Data: [source]
+
+[... continue for all 17 sections ...]
+
+---
+
+## PART 3: MAIN COMPONENTS
+
+### CMAPreviewContent
+File: [path]
+```tsx
+[code]
+```
+
+### transformToCMAReportData
+File: [path]
+```tsx
+[code]
+```
+
+### Section Registry
+```tsx
+[mapping code]
+```
+
+---
+
+## PART 4: PDF STRUCTURE
+
+### CMAPdfDocument
+File: [path]
+```tsx
+[code - or first 200 lines if very long]
+```
+
+### PDF Sections Found:
+- [list all PDF section files]
+
+---
+
+## SUMMARY
+
+### Sections with Missing/Incomplete Data:
+1. [section] - [issue]
+2. [section] - [issue]
+
+### Sections that may be redundant:
+1. [section] - [reason]
+
+### Export PDF Suspected Issue:
+[your analysis of why it's failing]
+```
+
+---
+
+## Quick Commands to Find Files
+
+Run these to help locate files:
+
+```bash
+# Find all CMA-related components
+find client/src -name "*CMA*" -o -name "*cma*" | head -30
+
+# Find all PDF-related components
+find client/src -name "*PDF*" -o -name "*pdf*" | head -30
+
+# Find preview components
+find client/src -name "*Preview*" -o -name "*preview*" | head -30
+
+# Find section components
+find client/src/components -type d -name "sections"
+
+# Search for section mapping
+grep -r "SECTION" client/src --include="*.tsx" | head -20
+```
+
+---
+
+**⚠️ REMINDER: DO NOT MODIFY ANY CODE**
+
+Just investigate and document findings so we can create targeted fixes.
