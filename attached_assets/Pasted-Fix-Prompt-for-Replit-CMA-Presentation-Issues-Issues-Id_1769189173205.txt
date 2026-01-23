@@ -1,0 +1,167 @@
+Fix Prompt for Replit — CMA Presentation Issues
+Issues Identified from Screenshot:
+
+Broken Spyglass Logo — All cards showing broken image icon with "Spyglass Realty" alt text
+"undefined undefined" — Agent name in top-right showing undefined instead of actual name
+Missing Agent Avatar — Profile photo not loading
+
+
+Issue 1: Fix Broken Spyglass Logo
+Problem: The Spyglass logo path is incorrect. The <img> tags are failing to load.
+Diagnostic Steps:
+bash# Find all image files in the project that might be the Spyglass logo
+find . -type f \( -name "*spyglass*" -o -name "*logo*" \) -not -path "./node_modules/*" 2>/dev/null
+
+# Also check common asset directories
+ls -la public/
+ls -la public/images/
+ls -la src/assets/
+ls -la client/public/
+Fix: Once you find the actual logo file path, update the SPYGLASS_LOGO_PATH constant:
+typescript// In constants/widgets.ts or wherever the logo path is defined
+// Change from whatever broken path to the actual path found above
+export const SPYGLASS_LOGO_PATH = '/actual/path/to/spyglass-logo.png';
+Alternative Fix: If no logo exists, use the Spyglass text as fallback:
+tsx// In SectionCard.tsx - update the spyglass icon case
+case 'spyglass':
+  return (
+    <div className="flex flex-col items-center">
+      <span className="text-sm font-bold text-gray-800 tracking-wider">SPYGLASS</span>
+      <span className="text-xs text-gray-600">REALTY</span>
+    </div>
+  );
+
+Issue 2: Fix "undefined undefined" Agent Name
+Problem: Agent profile data is not being fetched correctly from Settings.
+Diagnostic Steps:
+typescript// Add console.log to debug agent data
+// In the component that displays agent info (likely Header.tsx or AgentPopover.tsx)
+
+console.log('Agent data:', agent);
+console.log('Agent firstName:', agent?.firstName);
+console.log('Agent lastName:', agent?.lastName);
+console.log('Agent displayName:', agent?.displayName);
+console.log('Agent name:', agent?.name);
+Likely Causes:
+
+Agent data hook not fetching from correct source
+Property names mismatch (e.g., using firstName when API returns first_name)
+Agent profile not set up in Settings
+
+Fix: Check and update the agent data hook:
+typescript// In hooks/useAgentProfile.ts
+export function useAgentProfile() {
+  // Check if using the correct API endpoint
+  // Settings → Agent Marketing Profile
+  
+  const { data: settings } = useQuery({
+    queryKey: ['agent-settings'],
+    queryFn: async () => {
+      const response = await fetch('/api/settings/agent-profile');
+      return response.json();
+    }
+  });
+  
+  // Return with fallbacks
+  return {
+    name: settings?.name || settings?.displayName || 
+          `${settings?.firstName || ''} ${settings?.lastName || ''}`.trim() || 
+          'Agent Name',
+    photo: settings?.photo || settings?.avatar || settings?.profilePhoto || null,
+    phone: settings?.phone || settings?.phoneNumber || '',
+    email: settings?.email || '',
+    company: settings?.company || 'Spyglass Realty'
+  };
+}
+In the Header component, add fallback:
+tsx// Display agent name with fallback
+<span className="text-sm font-medium">
+  {agent?.name || 'Agent'}
+</span>
+
+Issue 3: Apply Typography & Color System
+Add these design tokens to match CloudCMA styling:
+typescript// In a new file: client/src/components/cma-presentation/constants/theme.ts
+
+export const CMA_THEME = {
+  colors: {
+    textPrimary: '#111111',
+    textSecondary: '#6B6F76',
+    textMuted: '#9AA0A6',
+    brand: '#FF4B2B',      // Orange accent
+    background: '#F6F7F9', // Page background
+    card: '#FFFFFF',
+    headerOverlay: 'rgba(0,0,0,0.6)',
+  },
+  
+  fontSizes: {
+    headerTitle: '32px',      // "COMPARATIVE MARKET ANALYSIS"
+    headerSubtitle: '15px',   // Address
+    cardTitle: '14px',        // "AGENT RESUME", "COMPS"
+    cardSubtitle: '12px',     // "Ryan Rodenbeck", "11 Comparable Homes"
+  },
+  
+  fontWeights: {
+    bold: 700,      // Main titles
+    semibold: 600,  // Card titles
+    medium: 500,    // Subtitles
+    regular: 400,   // Body text
+  },
+  
+  letterSpacing: {
+    tight: '0.04em',
+    wide: '0.08em',   // ALL CAPS titles
+  }
+};
+Update Section Cards styling:
+tsx// SectionCard.tsx
+<div className="bg-white rounded-xl shadow-sm p-5 flex flex-col items-center gap-3
+               hover:shadow-md transition-shadow cursor-pointer min-h-[120px]">
+  {/* Icon */}
+  <div className="h-8 flex items-center justify-center">
+    {renderIcon()}
+  </div>
+  
+  {/* Title - matches CloudCMA */}
+  <span className="text-[14px] font-semibold text-[#111111] uppercase tracking-[0.04em] text-center">
+    {widget.title}
+  </span>
+  
+  {/* Subtitle - matches CloudCMA */}
+  {widget.subtitle && (
+    <span className="text-[12px] font-medium text-[#6B6F76] text-center">
+      {widget.subtitle}
+    </span>
+  )}
+</div>
+Update Header styling:
+tsx// Header.tsx
+<div className="relative h-[200px]">
+  {/* Mapbox background */}
+  <Map ... />
+  
+  {/* Dark overlay */}
+  <div className="absolute inset-0 bg-black/60" />
+  
+  {/* Content */}
+  <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+    <h1 className="text-[32px] font-bold tracking-[0.08em] uppercase">
+      COMPARATIVE MARKET ANALYSIS
+    </h1>
+    <p className="text-[15px] font-medium opacity-85 mt-2">
+      {propertyAddress}
+    </p>
+    <p className="text-[13px] opacity-70 mt-1">
+      MLS# {mlsNumber}
+    </p>
+  </div>
+</div>
+Update page background:
+tsx// CmaPresentationPlayer.tsx
+<div className="fixed inset-0 bg-[#F6F7F9] overflow-auto">
+  ...
+</div>
+
+Summary of Fixes Needed:
+IssuePriorityFixBroken Spyglass logoHIGHFind actual logo path or create text fallback"undefined undefined"HIGHFix agent data fetching, add fallbacksTypography mismatchMEDIUMApply CloudCMA color/font tokensPage backgroundLOWChange to #F6F7F9
+Please run the diagnostic commands first to find the logo path, then apply the fixes.
