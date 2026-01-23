@@ -99,10 +99,14 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
   if (!isActive) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] pointer-events-auto" data-testid="drawing-canvas">
+    <div 
+      className="fixed inset-0 z-[54] pointer-events-none" 
+      style={{ bottom: '56px' }}
+      data-testid="drawing-canvas"
+    >
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 cursor-crosshair"
+        className="absolute inset-0 cursor-crosshair pointer-events-auto"
         style={{ touchAction: 'none' }}
         onMouseDown={startDrawing}
         onMouseMove={draw}

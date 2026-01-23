@@ -89,13 +89,13 @@ export function BottomNavigation({
           <button
             type="button"
             onClick={isFirst ? onHome : onPrevious}
-            className="flex items-center gap-2 text-gray-700 dark:text-gray-300 
+            className="flex items-center gap-1 text-gray-700 dark:text-gray-300 
                        hover:text-[#EF4923] dark:hover:text-[#EF4923] transition-colors
-                       min-h-[44px] px-2 md:px-4 min-w-[60px] max-w-[140px]"
+                       min-h-[44px] px-2 md:px-3"
             data-testid="button-nav-prev"
           >
             <ChevronLeft className="w-5 h-5 flex-shrink-0" />
-            <span className="text-sm font-medium truncate hidden sm:inline max-w-[100px]">
+            <span className="text-xs font-medium truncate hidden sm:inline max-w-[80px] md:max-w-[120px]">
               {isFirst ? 'Home' : prevSlideTitle || 'Previous'}
             </span>
           </button>
@@ -132,12 +132,12 @@ export function BottomNavigation({
             <button
               type="button"
               onClick={onNext}
-              className="flex items-center gap-2 text-gray-700 dark:text-gray-300 
+              className="flex items-center gap-1 text-gray-700 dark:text-gray-300 
                          hover:text-[#EF4923] dark:hover:text-[#EF4923] transition-colors
-                         min-h-[44px] px-2 md:px-4 min-w-[60px] max-w-[140px]"
+                         min-h-[44px] px-2 md:px-3"
               data-testid="button-nav-next"
             >
-              <span className="text-sm font-medium truncate hidden sm:inline max-w-[100px]">
+              <span className="text-xs font-medium truncate hidden sm:inline max-w-[80px] md:max-w-[120px] text-right">
                 {nextSlideTitle || 'Next'}
               </span>
               <ChevronRight className="w-5 h-5 flex-shrink-0" />
@@ -146,12 +146,12 @@ export function BottomNavigation({
             <button
               type="button"
               onClick={onHome}
-              className="flex items-center gap-2 text-gray-700 dark:text-gray-300 
+              className="flex items-center gap-1 text-gray-700 dark:text-gray-300 
                          hover:text-[#EF4923] dark:hover:text-[#EF4923] transition-colors
-                         min-h-[44px] px-2 md:px-4"
+                         min-h-[44px] px-2 md:px-3"
               data-testid="button-nav-home"
             >
-              <span className="text-sm font-medium">Home</span>
+              <span className="text-xs font-medium">Home</span>
               <ChevronRight className="w-5 h-5 flex-shrink-0" />
             </button>
           )}
