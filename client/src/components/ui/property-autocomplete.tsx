@@ -110,8 +110,8 @@ export function PropertyAutocomplete({
       'a': { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', label: 'Active' },
       'pending': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', label: 'Pending' },
       'p': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', label: 'Pending' },
-      'under contract': { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400', label: 'Under Contract' },
-      'u': { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400', label: 'Under Contract' },
+      'under contract': { bg: 'bg-[#EF4923]/10 dark:bg-[#EF4923]/20/30', text: 'text-[#EF4923] dark:text-[#EF4923]/80', label: 'Under Contract' },
+      'u': { bg: 'bg-[#EF4923]/10 dark:bg-[#EF4923]/20/30', text: 'text-[#EF4923] dark:text-[#EF4923]/80', label: 'Under Contract' },
       'sold': { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-600 dark:text-gray-400', label: 'Sold' },
       's': { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-600 dark:text-gray-400', label: 'Sold' },
     };

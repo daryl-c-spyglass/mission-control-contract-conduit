@@ -1107,7 +1107,7 @@ export function MarketingMaterialsDialog({
 
             {/* Open House Date/Time Fields - shown only when Open House is selected */}
             {status === 'open_house' && (
-              <div className="space-y-3 p-3 rounded-md bg-orange-500/10 border border-orange-500/20">
+              <div className="space-y-3 p-3 rounded-md bg-[#EF4923]/10 border border-[#EF4923]/20">
                 <div className="space-y-2">
                   <Label>Open House Date</Label>
                   <Input
@@ -1150,7 +1150,7 @@ export function MarketingMaterialsDialog({
                   </div>
                 </div>
                 {openHouseDate && (
-                  <p className="text-xs text-orange-600 font-medium">
+                  <p className="text-xs text-[#EF4923] font-medium">
                     Preview: {formatDateShort(openHouseDate)} | {formatTime12h(openHouseTimeStart).replace(' ', '')}-{formatTime12h(openHouseTimeEnd).replace(' ', '')}
                   </p>
                 )}

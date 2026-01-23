@@ -249,7 +249,7 @@ export function PhotoGalleryModal({
                   }}
                   className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all
                     ${index === currentIndex 
-                      ? 'border-orange-500 ring-2 ring-orange-500/20' 
+                      ? 'border-[#EF4923] ring-2 ring-[#EF4923]/20' 
                       : 'border-border opacity-70 hover:opacity-100 hover:border-muted-foreground'
                     }`}
                   data-testid={`button-gallery-thumb-${index}`}

@@ -550,7 +550,7 @@ const getStatusBadgeColor = (status: string, isSubject?: boolean): string => {
     case 'active':
       return 'bg-green-500 text-white';
     case 'active under contract':
-      return 'bg-orange-500 text-white';
+      return 'bg-[#EF4923] text-white';
     case 'pending':
       return 'bg-gray-500 text-white';
     default:
@@ -679,7 +679,7 @@ function AveragePricePerSqftSection({ comparables, subjectProperty }: { comparab
     if (normalized === 'closed' || normalized === 'sold') return 'bg-zinc-700 dark:bg-zinc-600';
     if (normalized === 'active') return 'bg-green-500';
     if (normalized === 'pending') return 'bg-gray-500';
-    if (normalized?.includes('under contract')) return 'bg-orange-500';
+    if (normalized?.includes('under contract')) return 'bg-[#EF4923]';
     return 'bg-zinc-700 dark:bg-zinc-600';
   };
 
@@ -920,7 +920,7 @@ function AveragePricePerSqftSection({ comparables, subjectProperty }: { comparab
                 </div>
 
                 {/* Price */}
-                <div className="text-xl font-bold text-orange-500 mb-4">
+                <div className="text-xl font-bold text-[#EF4923] mb-4">
                   {formatPrice(selectedProperty.soldPrice || selectedProperty.price)}
                 </div>
 

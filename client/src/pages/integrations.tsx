@@ -69,7 +69,7 @@ const integrations: IntegrationConfig[] = [
     name: "Follow Up Boss",
     description: "Pull client information and link contacts to transactions",
     icon: Users,
-    iconColor: "text-orange-500",
+    iconColor: "text-[#EF4923]",
     fields: [
       { key: "apiKey", label: "API Key", placeholder: "Your FUB API key", type: "password" },
     ],

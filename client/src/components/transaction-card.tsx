@@ -181,28 +181,28 @@ function InContractDateBox({
   };
 
   return (
-    <div className="bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800/50 rounded-lg p-3">
+    <div className="bg-[#EF4923]/5 dark:bg-[#EF4923]/10/40 border border-[#EF4923]/20 dark:border-[#EF4923]/80/50 rounded-lg p-3">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <p className="text-[10px] sm:text-xs text-orange-600 dark:text-orange-400 uppercase tracking-wide font-medium">Contract Date</p>
-          <p className="text-xs sm:text-sm text-orange-900 dark:text-orange-100 font-semibold mt-1">
+          <p className="text-[10px] sm:text-xs text-[#EF4923] dark:text-[#EF4923]/80 uppercase tracking-wide font-medium">Contract Date</p>
+          <p className="text-xs sm:text-sm text-[#EF4923] dark:text-[#EF4923]/50 font-semibold mt-1">
             {formatDisplayDate(contractDate) || "—"}
           </p>
         </div>
         <div>
-          <p className="text-[10px] sm:text-xs text-orange-600 dark:text-orange-400 uppercase tracking-wide font-medium">Closing Date</p>
-          <p className="text-xs sm:text-sm text-orange-900 dark:text-orange-100 font-semibold mt-1">
+          <p className="text-[10px] sm:text-xs text-[#EF4923] dark:text-[#EF4923]/80 uppercase tracking-wide font-medium">Closing Date</p>
+          <p className="text-xs sm:text-sm text-[#EF4923] dark:text-[#EF4923]/50 font-semibold mt-1">
             {formatDisplayDate(closingDate) || "—"}
           </p>
         </div>
       </div>
       {closingDate && (
-        <div className="mt-2 pt-2 border-t border-orange-200 dark:border-orange-800/50 flex items-center justify-between">
-          <span className="text-[10px] sm:text-xs text-orange-600 dark:text-orange-400 font-medium">Time to Close</span>
+        <div className="mt-2 pt-2 border-t border-[#EF4923]/20 dark:border-[#EF4923]/80/50 flex items-center justify-between">
+          <span className="text-[10px] sm:text-xs text-[#EF4923] dark:text-[#EF4923]/80 font-medium">Time to Close</span>
           <TooltipProvider delayDuration={200}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className={`text-xs sm:text-sm font-bold cursor-help ${isOverdue ? "text-red-600 dark:text-red-400" : "text-orange-700 dark:text-orange-300"}`}>
+                <span className={`text-xs sm:text-sm font-bold cursor-help ${isOverdue ? "text-red-600 dark:text-red-400" : "text-[#EF4923] dark:text-[#EF4923]/70"}`}>
                   {isClosingToday 
                     ? "Closing Today!" 
                     : isOverdue 

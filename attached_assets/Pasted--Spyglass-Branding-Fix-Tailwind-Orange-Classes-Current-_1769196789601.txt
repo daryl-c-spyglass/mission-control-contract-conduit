@@ -1,0 +1,309 @@
+# Spyglass Branding — Fix Tailwind Orange Classes
+
+## 📋 Current Status
+
+| Category | Count | Status |
+|----------|-------|--------|
+| ✅ `#EF4923` (correct hex) | 61 instances | DONE |
+| ⚠️ Tailwind `orange-*` classes | 73+ instances | TO FIX |
+| ✅ Logo usage | All correct | DONE |
+
+---
+
+## 🎯 Objective
+
+Replace all Tailwind `orange-*` classes with the official Spyglass brand color `#EF4923`.
+
+**Tailwind's orange-500 = `#f97316`** (WRONG)
+**Spyglass Orange = `#EF4923`** (CORRECT)
+
+---
+
+## 🔧 Step 1: Verify Tailwind Config Has Brand Colors
+
+Ensure `tailwind.config.ts` includes:
+
+```typescript
+// tailwind.config.ts
+export default {
+  theme: {
+    extend: {
+      colors: {
+        spyglass: {
+          orange: '#EF4923',
+          black: '#222222',
+        },
+      },
+    },
+  },
+}
+```
+
+---
+
+## 🔧 Step 2: Replace Orange Classes
+
+### Replacement Map:
+
+| Tailwind Class | Replace With |
+|----------------|--------------|
+| `bg-orange-500` | `bg-[#EF4923]` or `bg-spyglass-orange` |
+| `bg-orange-600` | `bg-[#EF4923]` |
+| `bg-orange-100` | `bg-[#EF4923]/10` |
+| `bg-orange-50` | `bg-[#EF4923]/5` |
+| `bg-orange-500/10` | `bg-[#EF4923]/10` |
+| `text-orange-500` | `text-[#EF4923]` or `text-spyglass-orange` |
+| `text-orange-600` | `text-[#EF4923]` |
+| `text-orange-700` | `text-[#EF4923]` |
+| `border-orange-500` | `border-[#EF4923]` |
+| `border-orange-200` | `border-[#EF4923]/20` |
+| `ring-orange-500` | `ring-[#EF4923]` |
+
+---
+
+## 📁 Files to Update (18 files, 73+ instances)
+
+### Transaction & Dashboard Section
+
+**lib/statusColors.ts** (Line 6)
+```tsx
+// BEFORE:
+'Under Contract': { bg: 'bg-orange-500', text: 'text-orange-500' }
+
+// AFTER:
+'Under Contract': { bg: 'bg-[#EF4923]', text: 'text-[#EF4923]' }
+```
+
+**lib/pdfStyles.ts** (Line 38)
+```tsx
+// BEFORE:
+bg: 'bg-orange-500'
+
+// AFTER:
+bg: 'bg-[#EF4923]'
+```
+
+**components/transaction-card.tsx** (Lines 184-205)
+```tsx
+// BEFORE:
+className="bg-orange-50 text-orange-600 border-orange-200"
+
+// AFTER:
+className="bg-[#EF4923]/5 text-[#EF4923] border-[#EF4923]/20"
+```
+
+**components/transaction-details.tsx** (Lines 204, 1514, 2946, 3219, 3304)
+```tsx
+// BEFORE:
+bg-orange-500, ring-orange-500, text-orange-500
+
+// AFTER:
+bg-[#EF4923], ring-[#EF4923], text-[#EF4923]
+```
+
+**components/ui/property-autocomplete.tsx** (Lines 113-114)
+```tsx
+// BEFORE:
+className="bg-orange-100 text-orange-700"
+
+// AFTER:
+className="bg-[#EF4923]/10 text-[#EF4923]"
+```
+
+### CMA Section
+
+**components/CMAReport.tsx** (Lines 1086, 2141, 2238, 2413, 2726, 2765-2773, 3201, 3948)
+```tsx
+// Replace all instances:
+text-orange-600 → text-[#EF4923]
+bg-orange-500 → bg-[#EF4923]
+bg-orange-50 → bg-[#EF4923]/5
+```
+
+**components/cma-stats-view.tsx** (Lines 553, 682, 923)
+```tsx
+// BEFORE:
+bg-orange-500, text-orange-500
+
+// AFTER:
+bg-[#EF4923], text-[#EF4923]
+```
+
+**components/cma/PropertyDetailModal.tsx** (Lines 63, 141)
+```tsx
+// BEFORE:
+bg-orange-500, text-orange-500
+
+// AFTER:
+bg-[#EF4923], text-[#EF4923]
+```
+
+### Marketing Section
+
+**components/marketing-materials-dialog.tsx** (Lines 1110, 1153)
+```tsx
+// BEFORE:
+bg-orange-500/10, text-orange-600
+
+// AFTER:
+bg-[#EF4923]/10, text-[#EF4923]
+```
+
+**components/create-flyer-dialog.tsx** (Lines 1981, 2051)
+```tsx
+// BEFORE:
+bg-orange-500/10, text-orange-600
+
+// AFTER:
+bg-[#EF4923]/10, text-[#EF4923]
+```
+
+**lib/social-formats.ts** (Lines 66-67)
+```tsx
+// BEFORE:
+bg: 'bg-orange-500'
+
+// AFTER:
+bg: 'bg-[#EF4923]'
+```
+
+### Timeline Section
+
+**lib/timeline-config.ts** (Lines 24, 35, 57, 58)
+```tsx
+// BEFORE:
+text-orange-600, bg-orange-100
+
+// AFTER:
+text-[#EF4923], bg-[#EF4923]/10
+```
+
+### Presentation Section
+
+**components/presentation/CoverPageEditor.tsx** (Lines 91, 104, 117, 131)
+```tsx
+// BEFORE:
+bg-orange-500, text-orange-500
+
+// AFTER:
+bg-[#EF4923], text-[#EF4923]
+```
+
+**components/presentation/ReportSections.tsx** (Lines 204, 274)
+```tsx
+// BEFORE:
+bg-orange-100, text-orange-600
+
+// AFTER:
+bg-[#EF4923]/10, text-[#EF4923]
+```
+
+**components/presentation/CMAPreviewContent.tsx** (Lines 29, 42, 64)
+```tsx
+// BEFORE:
+bg-orange-500, text-orange-500
+
+// AFTER:
+bg-[#EF4923], text-[#EF4923]
+```
+
+### Settings & Admin
+
+**pages/settings.tsx** (Lines 642-643)
+```tsx
+// BEFORE:
+bg-orange-500/10, text-orange-500
+
+// AFTER:
+bg-[#EF4923]/10, text-[#EF4923]
+```
+
+**pages/admin.tsx** (Lines 89-90)
+```tsx
+// BEFORE:
+text-orange-500, bg-orange-500/10
+
+// AFTER:
+text-[#EF4923], bg-[#EF4923]/10
+```
+
+**pages/integrations.tsx** (Line 72)
+```tsx
+// BEFORE:
+text-orange-500
+
+// AFTER:
+text-[#EF4923]
+```
+
+### Other
+
+**components/photo-gallery-modal.tsx** (Line 252)
+```tsx
+// BEFORE:
+border-orange-500
+
+// AFTER:
+border-[#EF4923]
+```
+
+---
+
+## 📋 Copy/Paste for Replit
+
+```
+Replace all Tailwind orange-* classes with official Spyglass brand color #EF4923.
+
+## REPLACEMENT MAP:
+- bg-orange-500 → bg-[#EF4923]
+- bg-orange-600 → bg-[#EF4923]
+- bg-orange-100 → bg-[#EF4923]/10
+- bg-orange-50 → bg-[#EF4923]/5
+- bg-orange-500/10 → bg-[#EF4923]/10
+- text-orange-500 → text-[#EF4923]
+- text-orange-600 → text-[#EF4923]
+- text-orange-700 → text-[#EF4923]
+- border-orange-500 → border-[#EF4923]
+- border-orange-200 → border-[#EF4923]/20
+- ring-orange-500 → ring-[#EF4923]
+
+## FILES TO UPDATE (18 files):
+1. lib/statusColors.ts
+2. lib/pdfStyles.ts
+3. lib/timeline-config.ts
+4. lib/social-formats.ts
+5. components/transaction-card.tsx
+6. components/transaction-details.tsx
+7. components/ui/property-autocomplete.tsx
+8. components/CMAReport.tsx
+9. components/cma-stats-view.tsx
+10. components/cma/PropertyDetailModal.tsx
+11. components/marketing-materials-dialog.tsx
+12. components/create-flyer-dialog.tsx
+13. components/presentation/CoverPageEditor.tsx
+14. components/presentation/ReportSections.tsx
+15. components/presentation/CMAPreviewContent.tsx
+16. components/photo-gallery-modal.tsx
+17. pages/settings.tsx
+18. pages/admin.tsx
+19. pages/integrations.tsx
+
+## VERIFICATION:
+After changes, run:
+grep -rn "orange-" --include="*.tsx" --include="*.ts" client/src/ | grep -v node_modules | grep -v "spyglass-orange"
+
+Should return 0 results for orange-500, orange-600, etc.
+```
+
+---
+
+## ✅ Expected Final State
+
+| Category | Before | After |
+|----------|--------|-------|
+| `#F37216` (wrong hex) | 53+ | 0 ✅ |
+| `#EF4923` (correct hex) | 61 | 61 ✅ |
+| Tailwind `orange-*` | 73+ | 0 ✅ |
+| Custom `[#EF4923]` | 0 | 73+ ✅ |
+
+**Full branding compliance achieved!**

@@ -1083,7 +1083,7 @@ export function CMAReport({
                       'Active': 'text-green-600',
                       'Closed': 'text-red-600',
                       'Active Under Contract': 'text-yellow-600',
-                      'Pending': 'text-orange-600',
+                      'Pending': 'text-[#EF4923]',
                     };
                     
                     return (
@@ -2138,7 +2138,7 @@ export function CMAReport({
                 const statusColors: Record<string, string> = {
                   'Active': 'bg-green-500',
                   'Closed': 'bg-red-500',
-                  'Active Under Contract': 'bg-orange-500',
+                  'Active Under Contract': 'bg-[#EF4923]',
                   'Pending': 'bg-gray-500',
                 };
                 
@@ -2235,7 +2235,7 @@ export function CMAReport({
                       'Active': 'text-green-600',
                       'Closed': 'text-red-600',
                       'Active Under Contract': 'text-yellow-600',
-                      'Pending': 'text-orange-600',
+                      'Pending': 'text-[#EF4923]',
                     };
                     
                     return statsFilteredProps.map((property) => {
@@ -2410,7 +2410,7 @@ export function CMAReport({
                     'Active': 'bg-green-500',
                     'Closed': 'bg-red-500',
                     'Active Under Contract': 'bg-yellow-500',
-                    'Pending': 'bg-orange-500',
+                    'Pending': 'bg-[#EF4923]',
                   };
                   
                   return (
@@ -2723,7 +2723,7 @@ export function CMAReport({
                         {hasValidRange ? (
                           <>
                             <div 
-                              className="absolute h-full bg-gradient-to-r from-green-500/40 via-primary/60 to-orange-500/40 rounded-md"
+                              className="absolute h-full bg-gradient-to-r from-green-500/40 via-primary/60 to-[#EF4923]/40 rounded-md"
                               style={{ left: `${leftPct}%`, right: `${rightPct}%` }}
                             />
                             <div 
@@ -2762,15 +2762,15 @@ export function CMAReport({
                     </p>
                   </div>
 
-                  <div className="p-4 rounded-md bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800">
+                  <div className="p-4 rounded-md bg-[#EF4923]/5 dark:bg-[#EF4923]/10/30 border border-[#EF4923]/20 dark:border-[#EF4923]/80">
                     <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                      <span className="font-medium text-orange-700 dark:text-orange-400">Maximum Value</span>
+                      <TrendingUp className="w-4 h-4 text-[#EF4923] dark:text-[#EF4923]/80" />
+                      <span className="font-medium text-[#EF4923] dark:text-[#EF4923]/80">Maximum Value</span>
                     </div>
-                    <p className="text-2xl font-bold text-orange-700 dark:text-orange-400">
+                    <p className="text-2xl font-bold text-[#EF4923] dark:text-[#EF4923]/80">
                       ${pricingSuggestion.maxValuePrice.toLocaleString()}
                     </p>
-                    <p className="text-xs text-orange-600/80 dark:text-orange-400/80 mt-1">
+                    <p className="text-xs text-[#EF4923]/80 dark:text-[#EF4923]/80/80 mt-1">
                       Aggressive pricing for maximum return
                     </p>
                   </div>
@@ -3198,7 +3198,7 @@ export function CMAReport({
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="text-lg">🏠</span>
-                        <div className="w-2 h-2 rounded-sm bg-orange-500"></div>
+                        <div className="w-2 h-2 rounded-sm bg-[#EF4923]"></div>
                         <span>Pending</span>
                       </div>
                       <div className="flex items-center gap-1">
@@ -3945,7 +3945,7 @@ export function CMAReport({
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="text-lg">🏠</span>
-                        <div className="w-2 h-2 rounded-sm bg-orange-500"></div>
+                        <div className="w-2 h-2 rounded-sm bg-[#EF4923]"></div>
                         <span>Pending</span>
                       </div>
                       <div className="flex items-center gap-1">

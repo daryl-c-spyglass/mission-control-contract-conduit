@@ -60,7 +60,7 @@ export function PropertyDetailModal({ isOpen, onClose, property }: PropertyDetai
     if (normalized === 'closed' || normalized === 'sold') return 'bg-red-500';
     if (normalized === 'active') return 'bg-green-500';
     if (normalized === 'pending') return 'bg-gray-500';
-    if (normalized === 'active under contract' || normalized === 'under contract') return 'bg-orange-500';
+    if (normalized === 'active under contract' || normalized === 'under contract') return 'bg-[#EF4923]';
     return 'bg-gray-500';
   };
 
@@ -138,7 +138,7 @@ export function PropertyDetailModal({ isOpen, onClose, property }: PropertyDetai
         
         <div className="p-6">
           <div className="mb-4">
-            <div className="text-3xl font-bold text-orange-500">
+            <div className="text-3xl font-bold text-[#EF4923]">
               {formatPrice(property.price)}
             </div>
             {property.pricePerSqft && (

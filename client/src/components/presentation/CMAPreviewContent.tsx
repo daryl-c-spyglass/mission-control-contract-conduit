@@ -26,7 +26,7 @@ function getStatusBg(status: string): string {
   const lower = status.toLowerCase();
   if (lower.includes('sold') || lower.includes('closed')) return 'bg-green-600';
   if (lower.includes('pending')) return 'bg-yellow-600';
-  if (lower.includes('active')) return 'bg-orange-500';
+  if (lower.includes('active')) return 'bg-[#EF4923]';
   return 'bg-gray-500';
 }
 
@@ -39,7 +39,7 @@ function CoverPagePreview({ data, config }: { data: CMAReportData; config: Cover
       className="aspect-[8.5/11] rounded-lg flex flex-col items-center justify-center p-12 text-center"
       style={{ backgroundColor: SPYGLASS_NAVY }}
     >
-      <p className="text-orange-500 font-semibold tracking-widest mb-8 text-sm">
+      <p className="text-[#EF4923] font-semibold tracking-widest mb-8 text-sm">
         {agent.company || 'SPYGLASS REALTY'}
       </p>
       <h1 className="text-3xl font-bold text-white mb-4">
@@ -61,7 +61,7 @@ function CoverPagePreview({ data, config }: { data: CMAReportData; config: Cover
       {config.showAgentPhoto && (
         <div className="flex items-center gap-3 mt-8">
           {agent.photo ? (
-            <img src={agent.photo} alt={agent.firstName} className="w-12 h-12 rounded-full object-cover border-2 border-orange-500" />
+            <img src={agent.photo} alt={agent.firstName} className="w-12 h-12 rounded-full object-cover border-2 border-[#EF4923]" />
           ) : (
             <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold text-lg" style={{ backgroundColor: SPYGLASS_ORANGE }}>
               {agentInitial}

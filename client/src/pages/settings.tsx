@@ -639,8 +639,8 @@ export default function Settings() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-orange-500/10">
-              <FileText className="h-5 w-5 text-orange-500" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#EF4923]/10">
+              <FileText className="h-5 w-5 text-[#EF4923]" />
             </div>
             <div>
               <CardTitle>Bio & Default Cover Letter</CardTitle>

@@ -1978,7 +1978,7 @@ export function CreateFlyerDialog({
 
                 {/* Open House Fields - Only show when status is "open_house" */}
                 {watchedValues.status === 'open_house' && (
-                  <div className="space-y-3 p-3 rounded-md bg-orange-500/10 border border-orange-500/20">
+                  <div className="space-y-3 p-3 rounded-md bg-[#EF4923]/10 border border-[#EF4923]/20">
                     <FormField
                       control={form.control}
                       name="openHouseDate"
@@ -2048,7 +2048,7 @@ export function CreateFlyerDialog({
                       />
                     </div>
                     {watchedValues.openHouseDate && (
-                      <p className="text-xs text-orange-600 font-medium">
+                      <p className="text-xs text-[#EF4923] font-medium">
                         Preview: {formatDateShort(watchedValues.openHouseDate)} | {formatTime12h(watchedValues.openHouseTimeStart || '13:00')}-{formatTime12h(watchedValues.openHouseTimeEnd || '16:00')}
                       </p>
                     )}

@@ -88,7 +88,7 @@ export function CoverPageEditor({ config, onChange, agentName, agentPhoto }: Cov
               onClick={() => handleChange('background', 'none')}
               className={cn(
                 "flex-1 gap-2",
-                config.background === 'none' && "bg-orange-500 hover:bg-orange-600"
+                config.background === 'none' && "bg-[#EF4923] hover:bg-[#EF4923]"
               )}
               data-testid="button-bg-white"
             >
@@ -101,7 +101,7 @@ export function CoverPageEditor({ config, onChange, agentName, agentPhoto }: Cov
               onClick={() => handleChange('background', 'gradient')}
               className={cn(
                 "flex-1 gap-2",
-                config.background === 'gradient' && "bg-orange-500 hover:bg-orange-600"
+                config.background === 'gradient' && "bg-[#EF4923] hover:bg-[#EF4923]"
               )}
               data-testid="button-bg-gradient"
             >
@@ -114,7 +114,7 @@ export function CoverPageEditor({ config, onChange, agentName, agentPhoto }: Cov
               onClick={() => handleChange('background', 'property')}
               className={cn(
                 "flex-1 gap-2",
-                config.background === 'property' && "bg-orange-500 hover:bg-orange-600"
+                config.background === 'property' && "bg-[#EF4923] hover:bg-[#EF4923]"
               )}
               data-testid="button-bg-property"
             >
@@ -128,7 +128,7 @@ export function CoverPageEditor({ config, onChange, agentName, agentPhoto }: Cov
           <Label className="text-sm">Preview:</Label>
           <div className="border rounded-lg p-4 bg-gradient-to-b from-white to-muted/30">
             <div className="text-center space-y-2">
-              <p className="text-xs text-orange-500 font-medium">Spyglass Realty</p>
+              <p className="text-xs text-[#EF4923] font-medium">Spyglass Realty</p>
               <p className="text-base font-bold">{config.title || 'Comparative Market Analysis'}</p>
               <p className="text-xs text-muted-foreground">{config.subtitle || 'Prepared exclusively for you'}</p>
               {config.showDate && (

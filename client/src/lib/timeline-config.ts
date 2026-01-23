@@ -21,7 +21,7 @@ export const TIMELINE_EVENT_CONFIG: Record<string, TimelineEventConfig> = {
   'mls_refreshed': { icon: RefreshCw, color: 'text-blue-600', bgColor: 'bg-blue-100 dark:bg-blue-900/30', label: 'MLS Refresh' },
   'mls_auto_synced': { icon: RefreshCw, color: 'text-blue-500', bgColor: 'bg-blue-50 dark:bg-blue-900/20', label: 'Auto Sync' },
   'price_changed': { icon: DollarSign, color: 'text-yellow-600', bgColor: 'bg-yellow-100 dark:bg-yellow-900/30', label: 'Price' },
-  'mls_status_changed': { icon: BarChart3, color: 'text-orange-600', bgColor: 'bg-orange-100 dark:bg-orange-900/30', label: 'MLS Status' },
+  'mls_status_changed': { icon: BarChart3, color: 'text-[#EF4923]', bgColor: 'bg-[#EF4923]/10 dark:bg-[#EF4923]/20/30', label: 'MLS Status' },
   'photos_updated': { icon: Camera, color: 'text-pink-600', bgColor: 'bg-pink-100 dark:bg-pink-900/30', label: 'Photos' },
   
   // Document events
@@ -32,7 +32,7 @@ export const TIMELINE_EVENT_CONFIG: Record<string, TimelineEventConfig> = {
   
   // Marketing events
   'graphic_created': { icon: Palette, color: 'text-pink-600', bgColor: 'bg-pink-100 dark:bg-pink-900/30', label: 'Graphic' },
-  'flyer_created': { icon: Newspaper, color: 'text-orange-600', bgColor: 'bg-orange-100 dark:bg-orange-900/30', label: 'Flyer' },
+  'flyer_created': { icon: Newspaper, color: 'text-[#EF4923]', bgColor: 'bg-[#EF4923]/10 dark:bg-[#EF4923]/20/30', label: 'Flyer' },
   'quick_create_all': { icon: Sparkles, color: 'text-purple-600', bgColor: 'bg-purple-100 dark:bg-purple-900/30', label: 'Quick Create' },
   'asset_downloaded': { icon: Download, color: 'text-green-600', bgColor: 'bg-green-100 dark:bg-green-900/30', label: 'Download' },
   'asset_deleted': { icon: Trash2, color: 'text-red-600', bgColor: 'bg-red-100 dark:bg-red-900/30', label: 'Deleted' },
@@ -54,8 +54,8 @@ export const TIMELINE_EVENT_CONFIG: Record<string, TimelineEventConfig> = {
   // Dates events
   'contract_date_set': { icon: Calendar, color: 'text-blue-600', bgColor: 'bg-blue-100 dark:bg-blue-900/30', label: 'Contract Date' },
   'closing_date_set': { icon: Target, color: 'text-green-600', bgColor: 'bg-green-100 dark:bg-green-900/30', label: 'Closing Date' },
-  'date_updated': { icon: Pencil, color: 'text-orange-600', bgColor: 'bg-orange-100 dark:bg-orange-900/30', label: 'Date Updated' },
-  'dates_updated': { icon: Calendar, color: 'text-orange-600', bgColor: 'bg-orange-100 dark:bg-orange-900/30', label: 'Dates Updated' },
+  'date_updated': { icon: Pencil, color: 'text-[#EF4923]', bgColor: 'bg-[#EF4923]/10 dark:bg-[#EF4923]/20/30', label: 'Date Updated' },
+  'dates_updated': { icon: Calendar, color: 'text-[#EF4923]', bgColor: 'bg-[#EF4923]/10 dark:bg-[#EF4923]/20/30', label: 'Dates Updated' },
   'deadline_approaching': { icon: Clock, color: 'text-red-600', bgColor: 'bg-red-100 dark:bg-red-900/30', label: 'Deadline' },
   
   // Communication events

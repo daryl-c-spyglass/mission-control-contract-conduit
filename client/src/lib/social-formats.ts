@@ -63,8 +63,8 @@ export const SOCIAL_FORMATS: SocialFormat[] = [
 ];
 
 export const STATUS_OPTIONS = [
-  { value: 'just_listed', label: 'Just Listed', color: 'bg-orange-500' },
-  { value: 'for_sale', label: 'For Sale', color: 'bg-orange-500' },
+  { value: 'just_listed', label: 'Just Listed', color: 'bg-[#EF4923]' },
+  { value: 'for_sale', label: 'For Sale', color: 'bg-[#EF4923]' },
   { value: 'for_lease', label: 'For Lease', color: 'bg-cyan-500' },
   { value: 'under_contract', label: 'Under Contract', color: 'bg-blue-500' },
   { value: 'just_sold', label: 'Just Sold', color: 'bg-red-500' },

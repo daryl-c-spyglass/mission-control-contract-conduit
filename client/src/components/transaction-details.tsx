@@ -201,7 +201,7 @@ const DOCUMENT_TYPE_OPTIONS: { value: DocumentType; label: string }[] = [
 
 const DOCUMENT_TYPE_COLORS: Record<DocumentType, string> = {
   contract: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  amendment: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+  amendment: 'bg-[#EF4923]/10 text-[#EF4923] dark:bg-[#EF4923]/20 dark:text-[#EF4923]/60',
   addendum: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
   disclosure: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
   inspection: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
@@ -1511,7 +1511,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 py-3 bg-black/50 backdrop-blur-sm">
                       <div className="flex items-center gap-3">
                         <Badge 
-                          className={isPrintFlyer ? "bg-orange-500 text-white" : "bg-white/20 text-white"}
+                          className={isPrintFlyer ? "bg-[#EF4923] text-white" : "bg-white/20 text-white"}
                         >
                           {typeLabel}
                         </Badge>
@@ -2943,7 +2943,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                                   setPhotoGalleryIndex(index);
                                   setPhotoGalleryOpen(true);
                                 }}
-                                className="relative aspect-square rounded-md overflow-hidden border hover:ring-2 hover:ring-orange-500 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                className="relative aspect-square rounded-md overflow-hidden border hover:ring-2 hover:ring-[#EF4923] transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#EF4923]"
                                 data-testid={`mls-photo-${index}`}
                               >
                                 <img 
@@ -2959,7 +2959,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                                   setPhotoGalleryIndex(7);
                                   setPhotoGalleryOpen(true);
                                 }}
-                                className="aspect-square rounded-md bg-muted flex items-center justify-center hover:bg-muted/80 hover:ring-2 hover:ring-orange-500 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                className="aspect-square rounded-md bg-muted flex items-center justify-center hover:bg-muted/80 hover:ring-2 hover:ring-[#EF4923] transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#EF4923]"
                                 data-testid="mls-photo-more"
                               >
                                 <span className="text-sm font-medium text-muted-foreground">+{mlsPhotos.length - 7}</span>
@@ -3216,11 +3216,11 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                           <div className="flex items-center gap-4">
                             <div className={cn(
                               "p-3 rounded-lg",
-                              hasPhotosForMarketing ? "bg-orange-500/10" : "bg-muted"
+                              hasPhotosForMarketing ? "bg-[#EF4923]/10" : "bg-muted"
                             )}>
                               <FileImage className={cn(
                                 "h-6 w-6",
-                                hasPhotosForMarketing ? "text-orange-500" : "text-muted-foreground"
+                                hasPhotosForMarketing ? "text-[#EF4923]" : "text-muted-foreground"
                               )} />
                             </div>
                             <div>
@@ -3301,7 +3301,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                                   isAltStyle ? 'Alt Style' : asset.type;
                 
                 const getBadgeStyle = () => {
-                  if (isPrintFlyer) return 'bg-orange-500 text-white hover:bg-orange-600';
+                  if (isPrintFlyer) return 'bg-[#EF4923] text-white hover:bg-[#EF4923]';
                   if (isLandscape) return 'bg-purple-500 text-white hover:bg-purple-600';
                   if (isSquare) return 'bg-blue-500 text-white hover:bg-blue-600';
                   if (isStory) return 'bg-pink-500 text-white hover:bg-pink-600';

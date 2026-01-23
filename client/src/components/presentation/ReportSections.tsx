@@ -201,7 +201,7 @@ export function ReportSections({
                     <CategoryIcon categoryId={category.id} />
                   </span>
                   <span className="font-medium">{category.name}</span>
-                  <span className="px-2 py-0.5 text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-800 rounded-full">
+                  <span className="px-2 py-0.5 text-xs font-medium bg-[#EF4923]/10 dark:bg-[#EF4923]/20/30 text-[#EF4923] dark:text-[#EF4923]/80 border border-[#EF4923]/20 dark:border-[#EF4923]/80 rounded-full">
                     {getEnabledCount(category)}
                   </span>
                 </div>
@@ -271,7 +271,7 @@ export function ReportSections({
                       <Switch
                         checked={includedSections.includes(section.id)}
                         onCheckedChange={() => toggleSection(section.id)}
-                        className="data-[state=checked]:bg-orange-500 flex-shrink-0"
+                        className="data-[state=checked]:bg-[#EF4923] flex-shrink-0"
                         data-testid={`toggle-${section.id}`}
                       />
                     </div>
