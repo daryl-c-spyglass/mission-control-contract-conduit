@@ -95,7 +95,7 @@ export function BottomNavigation({
             data-testid="button-nav-prev"
           >
             <ChevronLeft className="w-5 h-5 flex-shrink-0" />
-            <span className="text-xs font-medium truncate hidden sm:inline max-w-[80px] md:max-w-[120px]">
+            <span className="text-xs font-medium hidden sm:inline sm:truncate sm:max-w-[80px] md:max-w-[140px] lg:max-w-[220px] xl:max-w-none xl:whitespace-normal">
               {isFirst ? 'Home' : prevSlideTitle || 'Previous'}
             </span>
           </button>
@@ -137,7 +137,7 @@ export function BottomNavigation({
                          min-h-[44px] px-2 md:px-3"
               data-testid="button-nav-next"
             >
-              <span className="text-xs font-medium truncate hidden sm:inline max-w-[80px] md:max-w-[120px] text-right">
+              <span className="text-xs font-medium hidden sm:inline sm:truncate sm:max-w-[80px] md:max-w-[140px] lg:max-w-[220px] xl:max-w-none xl:whitespace-normal text-right">
                 {nextSlideTitle || 'Next'}
               </span>
               <ChevronRight className="w-5 h-5 flex-shrink-0" />

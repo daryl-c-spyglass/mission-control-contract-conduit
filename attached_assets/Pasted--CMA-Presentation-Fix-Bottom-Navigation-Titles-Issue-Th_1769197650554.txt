@@ -1,0 +1,217 @@
+# CMA Presentation — Fix Bottom Navigation Titles
+
+## 📋 Issue
+
+The **Bottom Navigation** bar shows truncated slide titles ("LISTING WITH SPY...") even on desktop where there's enough space.
+
+---
+
+## 🎯 Expected Responsive Behavior
+
+| Screen Size | Behavior |
+|-------------|----------|
+| **Mobile** (< 640px) | Chevron icons only (no text) |
+| **Tablet** (640px - 1023px) | Truncated titles with ellipsis |
+| **Desktop** (1024px+) | **Full titles, NO truncation** |
+
+---
+
+## 🔧 Fix: Update BottomNavigation Component
+
+```tsx
+// components/cma-presentation/components/BottomNavigation.tsx
+
+import { ChevronLeft, ChevronRight, Home, Pencil } from 'lucide-react';
+
+interface BottomNavigationProps {
+  currentSlide: number;
+  totalSlides: number;
+  prevTitle?: string;
+  nextTitle?: string;
+  onPrev: () => void;
+  onNext: () => void;
+  onHome: () => void;
+  onDraw?: () => void;
+}
+
+export function BottomNavigation({
+  currentSlide,
+  totalSlides,
+  prevTitle,
+  nextTitle,
+  onPrev,
+  onNext,
+  onHome,
+  onDraw,
+}: BottomNavigationProps) {
+  return (
+    <div className="fixed bottom-0 left-0 right-0 h-14 bg-white border-t border-gray-200 
+                    flex items-center justify-between px-2 sm:px-4 z-40">
+      
+      {/* Previous Button */}
+      <button
+        onClick={onPrev}
+        disabled={currentSlide <= 1}
+        className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 
+                   text-gray-700 hover:bg-gray-100 rounded-lg
+                   disabled:opacity-40 disabled:cursor-not-allowed
+                   min-w-[44px] min-h-[44px] transition-colors"
+        aria-label={prevTitle ? `Previous: ${prevTitle}` : 'Previous slide'}
+      >
+        <ChevronLeft className="w-5 h-5 flex-shrink-0" />
+        {/* 
+          Mobile: hidden
+          Tablet (sm-lg): truncated with max-width
+          Desktop (lg+): full text, no truncation
+        */}
+        <span className="hidden sm:block sm:truncate sm:max-w-[120px] lg:truncate-none lg:max-w-none text-sm font-medium">
+          {prevTitle || 'Previous'}
+        </span>
+      </button>
+
+      {/* Center Actions */}
+      <div className="flex items-center gap-1 sm:gap-2">
+        {/* Home Button */}
+        <button
+          onClick={onHome}
+          className="flex items-center gap-2 px-3 py-2 
+                     text-gray-700 hover:bg-gray-100 rounded-lg
+                     min-w-[44px] min-h-[44px] transition-colors"
+          aria-label="Return to home"
+        >
+          <Home className="w-5 h-5" />
+          <span className="hidden sm:block text-sm font-medium">Home</span>
+        </button>
+
+        {/* Draw/Pencil Button */}
+        {onDraw && (
+          <button
+            onClick={onDraw}
+            className="flex items-center justify-center p-2 
+                       text-gray-700 hover:bg-gray-100 rounded-lg
+                       min-w-[44px] min-h-[44px] transition-colors"
+            aria-label="Drawing mode"
+          >
+            <Pencil className="w-5 h-5" />
+          </button>
+        )}
+      </div>
+
+      {/* Next Button */}
+      <button
+        onClick={onNext}
+        disabled={currentSlide >= totalSlides}
+        className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 
+                   text-gray-700 hover:bg-gray-100 rounded-lg
+                   disabled:opacity-40 disabled:cursor-not-allowed
+                   min-w-[44px] min-h-[44px] transition-colors"
+        aria-label={nextTitle ? `Next: ${nextTitle}` : 'Next slide'}
+      >
+        {/* 
+          Mobile: hidden
+          Tablet (sm-lg): truncated with max-width
+          Desktop (lg+): full text, no truncation
+        */}
+        <span className="hidden sm:block sm:truncate sm:max-w-[120px] lg:truncate-none lg:max-w-none text-sm font-medium">
+          {nextTitle || 'Next'}
+        </span>
+        <ChevronRight className="w-5 h-5 flex-shrink-0" />
+      </button>
+    </div>
+  );
+}
+```
+
+---
+
+## 🎨 Key CSS Classes Explained
+
+```css
+/* Mobile: Hide text */
+hidden
+
+/* Tablet (640px+): Show text but truncate */
+sm:block sm:truncate sm:max-w-[120px]
+
+/* Desktop (1024px+): Show full text, remove truncation */
+lg:truncate-none lg:max-w-none
+```
+
+**Note:** Tailwind doesn't have `truncate-none` by default. Use one of these approaches:
+
+### Option A: Override with whitespace-normal
+```tsx
+className="hidden sm:block sm:truncate sm:max-w-[120px] lg:whitespace-normal lg:overflow-visible lg:max-w-none"
+```
+
+### Option B: Use conditional classes
+```tsx
+className={`hidden sm:block text-sm font-medium ${
+  // Check if we're on desktop - use media query or just set larger max-width
+  'sm:truncate sm:max-w-[120px] md:max-w-[180px] lg:max-w-[300px] xl:max-w-none'
+}`}
+```
+
+### Option C: Simpler - Just increase max-width on larger screens
+```tsx
+className="hidden sm:block truncate max-w-[100px] md:max-w-[150px] lg:max-w-[250px] xl:max-w-[350px] text-sm font-medium"
+```
+
+---
+
+## 📋 Copy/Paste for Replit
+
+```
+Fix Bottom Navigation bar - show FULL titles on desktop (no truncation).
+
+## RESPONSIVE BEHAVIOR:
+- Mobile (< 640px): Chevron icons only, no text
+- Tablet (640px - 1023px): Truncated titles with "..."
+- Desktop (1024px+): FULL titles, NO truncation
+
+## FIND:
+BottomNavigation component in client/src/components/cma-presentation/
+
+## UPDATE TITLE SPANS:
+Change the className for prev/next title spans to:
+
+className="hidden sm:block truncate max-w-[100px] md:max-w-[180px] lg:max-w-[280px] xl:max-w-none xl:whitespace-normal text-sm font-medium"
+
+## BREAKDOWN:
+- hidden = hide on mobile
+- sm:block = show on tablet+
+- truncate max-w-[100px] = truncate on small tablet
+- md:max-w-[180px] = more space on medium
+- lg:max-w-[280px] = even more on large
+- xl:max-w-none xl:whitespace-normal = FULL text on extra large (desktop)
+
+## ALSO:
+- Keep flex-shrink-0 on chevron icons
+- Keep min-w-[44px] min-h-[44px] on buttons for touch targets
+- Add aria-label with full title for accessibility
+```
+
+---
+
+## ✅ Expected Result
+
+**Mobile (< 640px):**
+```
+┌─────────────────────────────────┐
+│  <       🏠  ✏️           >    │
+└─────────────────────────────────┘
+```
+
+**Tablet (640px - 1023px):**
+```
+┌─────────────────────────────────────────────┐
+│ < AGENT...    🏠 Home ✏️    LISTING WI... > │
+└─────────────────────────────────────────────┘
+```
+
+**Desktop (1024px+):**
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ < AGENT RESUME    🏠 Home  ✏️    LISTING WITH SPYGLASS REALTY >     │
+└──────────────────────────────────────────────────────────────────────┘
+```
