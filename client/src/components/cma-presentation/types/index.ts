@@ -22,6 +22,7 @@ export interface AgentProfile {
 
 export interface CmaProperty {
   id: string;
+  mlsNumber?: string;
   address: string;
   city: string;
   state: string;
@@ -37,13 +38,16 @@ export interface CmaProperty {
   garageSpaces?: number;
   status: 'Active' | 'Pending' | 'Closed' | 'Active Under Contract';
   daysOnMarket: number;
+  listDate?: string;
   soldDate?: string;
+  lastUpdated?: string;
   pricePerSqft: number;
   photos: string[];
   isSubject?: boolean;
   latitude?: number;
   longitude?: number;
   acres?: number;
+  description?: string;
 }
 
 export interface CmaPresentationData {

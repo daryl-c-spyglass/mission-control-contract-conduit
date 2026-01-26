@@ -1,0 +1,510 @@
+# Time to Sell Slide — Add Clickable Property Modal
+
+## Objective
+
+Make the property items in the Time to Sell sidebar **clickable** to open a detailed property modal showing:
+- Photo gallery with navigation arrows
+- Property stats (beds, baths, sqft, year built, garages, lot size)
+- Property description (MLS remarks)
+- Listing details (original price, list price changes, sold price)
+- **NO "Virtual Tour - View" link** (remove this)
+
+---
+
+## Reference
+- **CloudCMA Example:** https://cloudcma.com/live/eb8b2c14de80370852b135aed77de3bb/time-to-sell
+- **Data Source:** Repliers API
+
+---
+
+## Current State (1st Screenshot)
+- Properties listed in sidebar with thumbnail + address + days
+- NOT clickable
+
+## Target State (2nd & 3rd Screenshots)
+- Click property → Opens detailed modal
+- Modal shows full property info from Repliers
+
+---
+
+## Modal Design
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ X    2502 Spring Creek Drive   Austin, TX 78704                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                                                                     │   │
+│  │  [Map]        [Main Photo]              [Street View]               │   │
+│  │              < navigation >                                         │   │
+│  │                                                                     │   │
+│  │              [📷 40] [🎥 Tour]                                      │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐         │
+│  │ BEDROOMS │ │BATHROOMS │ │HOME SIZE │ │YEAR BUILT│ │ GARAGES  │         │
+│  │    3     │ │    2     │ │2,042sqft │ │  1964    │ │    2     │         │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘         │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ [Property Description - Full MLS remarks text]                      │   │
+│  │ Updated Barton Hills Beauty just 3 blocks from Barton Springs Pool! │   │
+│  │ This move-in-ready, single-story home features 3 bedrooms...        │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ┌─ Right Sidebar ──────────────────┐                                      │
+│  │ CLOSED • 119 DAYS                │                                      │
+│  │ $1,160,000        $568/sqft      │                                      │
+│  │ 3 beds  2 baths  2,042 sqft      │                                      │
+│  │                                  │                                      │
+│  │ Listed: 5/19/25  Sold: 10/31/25  │                                      │
+│  │                                  │                                      │
+│  │ Original List Price  $1,450,000  │                                      │
+│  │ List Price ↓$155,000 $1,295,000  │                                      │
+│  │ Sold Price 80%       $1,160,000  │                                      │
+│  │                                  │                                      │
+│  │ MLS # 3513687                    │                                      │
+│  │ Last Updated 1/16/26 at 12:02AM  │                                      │
+│  └──────────────────────────────────┘                                      │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Implementation
+
+### 1. Make Sidebar Items Clickable
+
+```tsx
+// In TimeToSellWidget.tsx or similar
+
+const [selectedProperty, setSelectedProperty] = useState<CmaProperty | null>(null);
+
+// Sidebar property item - make it a button
+<button
+  onClick={() => setSelectedProperty(property)}
+  className="w-full flex gap-2 p-2 rounded-lg hover:bg-gray-100 
+             cursor-pointer transition-colors text-left"
+>
+  {/* Thumbnail */}
+  <div className="w-16 h-12 rounded overflow-hidden flex-shrink-0">
+    <img 
+      src={property.photos?.[0] || '/placeholder-property.jpg'} 
+      alt={property.address}
+      className="w-full h-full object-cover"
+    />
+  </div>
+  
+  {/* Details */}
+  <div className="flex-1 min-w-0">
+    <p className="text-sm font-medium text-gray-900 truncate">
+      {property.address}
+    </p>
+    <p className="text-xs text-gray-500">
+      {property.daysOnMarket} Days
+      {property.percentOfList && <span> • {property.percentOfList}%</span>}
+    </p>
+  </div>
+</button>
+```
+
+### 2. Property Detail Modal Component
+
+```tsx
+// components/cma-presentation/widgets/TimeToSellPropertyModal.tsx
+
+import { X, ChevronLeft, ChevronRight, Bed, Bath, Square, Calendar, Car } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
+interface TimeToSellPropertyModalProps {
+  property: CmaProperty;
+  onClose: () => void;
+}
+
+export function TimeToSellPropertyModal({ property, onClose }: TimeToSellPropertyModalProps) {
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const photos = property.photos || [];
+  
+  // Close on ESC
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft') handlePrevPhoto();
+      if (e.key === 'ArrowRight') handleNextPhoto();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentPhotoIndex]);
+  
+  const handlePrevPhoto = () => {
+    setCurrentPhotoIndex(prev => (prev > 0 ? prev - 1 : photos.length - 1));
+  };
+  
+  const handleNextPhoto = () => {
+    setCurrentPhotoIndex(prev => (prev < photos.length - 1 ? prev + 1 : 0));
+  };
+  
+  const formatCurrency = (value: number) => 
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+  
+  const formatDate = (dateStr: string) => 
+    new Date(dateStr).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
+  
+  const getStatusColor = (status: string) => {
+    const s = status?.toLowerCase() || '';
+    if (s.includes('closed') || s.includes('sold')) return 'text-red-500';
+    if (s.includes('active') && !s.includes('under')) return 'text-green-500';
+    if (s.includes('under contract')) return 'text-orange-500';
+    return 'text-gray-500';
+  };
+  
+  // Calculate price difference
+  const priceDiff = property.originalPrice && property.listPrice
+    ? property.originalPrice - property.listPrice
+    : 0;
+  
+  // Calculate sold price percentage
+  const soldPricePercent = property.originalPrice && property.soldPrice
+    ? ((property.soldPrice / property.originalPrice) * 100).toFixed(0)
+    : null;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/60 z-50" onClick={onClose} />
+      
+      {/* Modal */}
+      <div className="fixed inset-4 md:inset-8 lg:inset-12 bg-white rounded-xl shadow-2xl z-50 
+                      overflow-hidden flex flex-col max-h-[90vh]">
+        
+        {/* Header */}
+        <div className="flex items-center gap-4 p-4 border-b bg-white">
+          <button
+            onClick={onClose}
+            className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-gray-100"
+            aria-label="Close"
+          >
+            <X className="w-6 h-6 text-gray-600" />
+          </button>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">{property.address}</h2>
+            <p className="text-sm text-gray-500">{property.city}, {property.state} {property.zipCode}</p>
+          </div>
+        </div>
+        
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="flex flex-col lg:flex-row">
+            
+            {/* Left Side - Photo & Details */}
+            <div className="flex-1 p-4">
+              
+              {/* Photo Gallery */}
+              <div className="relative rounded-lg overflow-hidden bg-gray-100 mb-6">
+                <div className="aspect-[16/10]">
+                  {photos.length > 0 ? (
+                    <img
+                      src={photos[currentPhotoIndex]}
+                      alt={`${property.address} - Photo ${currentPhotoIndex + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      No photos available
+                    </div>
+                  )}
+                </div>
+                
+                {/* Photo Navigation */}
+                {photos.length > 1 && (
+                  <>
+                    <button
+                      onClick={handlePrevPhoto}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 
+                                 min-w-[48px] min-h-[48px] bg-black/50 hover:bg-black/70 
+                                 text-white rounded-full flex items-center justify-center shadow-lg"
+                    >
+                      <ChevronLeft className="w-6 h-6" />
+                    </button>
+                    <button
+                      onClick={handleNextPhoto}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 
+                                 min-w-[48px] min-h-[48px] bg-black/50 hover:bg-black/70 
+                                 text-white rounded-full flex items-center justify-center shadow-lg"
+                    >
+                      <ChevronRight className="w-6 h-6" />
+                    </button>
+                    
+                    {/* Photo Counter */}
+                    <div className="absolute bottom-4 left-4 flex gap-2">
+                      <span className="px-3 py-1.5 bg-black/60 text-white text-sm rounded-lg flex items-center gap-1">
+                        📷 {photos.length}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+              
+              {/* Property Stats Grid */}
+              <div className="grid grid-cols-3 md:grid-cols-5 gap-4 mb-6">
+                <StatBox icon={<Bed className="w-5 h-5" />} label="BEDROOMS" value={property.beds} />
+                <StatBox icon={<Bath className="w-5 h-5" />} label="BATHROOMS" value={property.baths} />
+                <StatBox icon={<Square className="w-5 h-5" />} label="HOME SIZE" value={`${property.sqft?.toLocaleString()} sq. ft.`} />
+                <StatBox icon={<Calendar className="w-5 h-5" />} label="YEAR BUILT" value={property.yearBuilt || '—'} />
+                <StatBox icon={<Car className="w-5 h-5" />} label="GARAGES" value={property.garageSpaces || '—'} />
+              </div>
+              
+              {/* Property Description */}
+              {property.description && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Description</h3>
+                  <p className="text-gray-600 leading-relaxed">{property.description}</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Right Sidebar - Pricing Info */}
+            <div className="lg:w-80 p-4 lg:border-l bg-gray-50">
+              
+              {/* Status & Days */}
+              <div className="mb-4">
+                <span className={`font-bold ${getStatusColor(property.status)}`}>
+                  {property.status?.toUpperCase()}
+                </span>
+                <span className="text-gray-500 ml-2">• {property.daysOnMarket} DAYS</span>
+              </div>
+              
+              {/* Price */}
+              <div className="mb-4">
+                <p className="text-3xl font-bold text-gray-900">
+                  {formatCurrency(property.soldPrice || property.price)}
+                </p>
+                <p className="text-gray-500">
+                  ${Math.round((property.soldPrice || property.price) / property.sqft)}/sqft
+                </p>
+              </div>
+              
+              {/* Quick Stats */}
+              <p className="text-gray-600 mb-4">
+                {property.beds} beds · {property.baths} baths · {property.sqft?.toLocaleString()} sqft
+              </p>
+              
+              {/* Dates */}
+              {(property.listDate || property.soldDate) && (
+                <p className="text-sm text-gray-500 mb-4">
+                  {property.listDate && <span>Listed: {formatDate(property.listDate)}</span>}
+                  {property.listDate && property.soldDate && <span> · </span>}
+                  {property.soldDate && <span>Sold: {formatDate(property.soldDate)}</span>}
+                </p>
+              )}
+              
+              {/* Price History */}
+              <div className="space-y-3 border-t pt-4">
+                {property.originalPrice && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Original List Price</span>
+                    <span className="font-medium">{formatCurrency(property.originalPrice)}</span>
+                  </div>
+                )}
+                
+                {property.listPrice && property.originalPrice && property.listPrice !== property.originalPrice && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">
+                      List Price{' '}
+                      {priceDiff > 0 && (
+                        <span className="text-red-500">↓{formatCurrency(priceDiff)}</span>
+                      )}
+                    </span>
+                    <span className="font-medium">{formatCurrency(property.listPrice)}</span>
+                  </div>
+                )}
+                
+                {property.soldPrice && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">
+                      Sold Price{' '}
+                      {soldPricePercent && <span className="text-gray-500">{soldPricePercent}%</span>}
+                    </span>
+                    <span className="font-medium">{formatCurrency(property.soldPrice)}</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* MLS Info */}
+              <div className="border-t pt-4 mt-4">
+                <p className="text-sm text-gray-500">
+                  MLS # {property.mlsNumber || property.id}
+                </p>
+                {property.lastUpdated && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Last Updated {new Date(property.lastUpdated).toLocaleString()}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Stat Box Component
+function StatBox({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
+  return (
+    <div className="text-center p-3 bg-white rounded-lg border">
+      <div className="flex justify-center text-gray-400 mb-1">{icon}</div>
+      <p className="text-xs text-gray-500 uppercase">{label}</p>
+      <p className="text-lg font-semibold text-gray-900">{value}</p>
+    </div>
+  );
+}
+```
+
+### 3. Add Modal to Time to Sell Widget
+
+```tsx
+// In TimeToSellWidget.tsx
+
+{selectedProperty && (
+  <TimeToSellPropertyModal
+    property={selectedProperty}
+    onClose={() => setSelectedProperty(null)}
+  />
+)}
+```
+
+---
+
+## Data Requirements from Repliers
+
+Ensure these fields are mapped from Repliers API:
+
+```typescript
+interface CmaProperty {
+  // Basic
+  id: string;
+  mlsNumber: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  
+  // Property Details
+  beds: number;
+  baths: number;
+  sqft: number;
+  yearBuilt: number;
+  garageSpaces: number;
+  lotSize: number;
+  
+  // Pricing
+  originalPrice: number;    // First list price
+  listPrice: number;        // Current/last list price
+  soldPrice: number;        // Sold price (if closed)
+  pricePerSqft: number;
+  
+  // Dates
+  listDate: string;
+  soldDate: string;
+  daysOnMarket: number;
+  lastUpdated: string;
+  
+  // Status
+  status: string;
+  
+  // Content
+  description: string;      // MLS remarks
+  photos: string[];
+}
+```
+
+---
+
+## Copy/Paste for Replit
+
+```
+Add clickable property modal to Time to Sell slide.
+
+## FEATURE:
+Click property in sidebar → Open detailed modal with:
+- Photo gallery with navigation arrows
+- Property stats (beds, baths, sqft, year built, garages)
+- Property description (MLS remarks)
+- Price history (Original List, List Price, Sold Price)
+- Status badge + Days on Market
+- MLS # and last updated
+- NO Virtual Tour link
+
+## IMPLEMENTATION:
+
+1. Make sidebar items clickable:
+const [selectedProperty, setSelectedProperty] = useState(null);
+
+<button onClick={() => setSelectedProperty(property)}>
+  {/* property item */}
+</button>
+
+2. Create TimeToSellPropertyModal component with:
+   - X close button in header
+   - Address + City, State Zip
+   - Photo gallery with < > navigation (bg-black/50 arrows)
+   - Stats grid: Beds, Baths, Sqft, Year Built, Garages
+   - Description section (MLS remarks from Repliers)
+   - Right sidebar with:
+     - Status (CLOSED • 119 DAYS) - colored by status
+     - Price ($1,160,000) + $/sqft
+     - Beds/baths/sqft summary
+     - Listed/Sold dates
+     - Original List Price
+     - List Price (with price drop if applicable)
+     - Sold Price (with percentage)
+     - MLS #
+
+3. Add modal to widget:
+{selectedProperty && (
+  <TimeToSellPropertyModal
+    property={selectedProperty}
+    onClose={() => setSelectedProperty(null)}
+  />
+)}
+
+## DATA FROM REPLIERS:
+Ensure these fields are mapped:
+- originalPrice (first list price)
+- listPrice (current/last list price)
+- soldPrice
+- description (MLS remarks)
+- yearBuilt
+- garageSpaces
+- listDate, soldDate
+- photos array
+
+## STATUS COLORS:
+- Closed = text-red-500
+- Active = text-green-500
+- Under Contract = text-orange-500
+
+## MOBILE:
+- Modal: full screen (inset-4)
+- Photo nav arrows: 48x48px
+- Close button: 44x44px
+- Scrollable content
+
+I've attached CloudCMA screenshots showing the design.
+```
+
+---
+
+## Expected Result
+
+1. **Click property in sidebar** → Modal opens
+2. **Modal shows:**
+   - Photo gallery with navigation
+   - Property stats (beds, baths, sqft, etc.)
+   - Full description from MLS
+   - Price history with changes highlighted
+   - Status and days on market
+3. **Close via:** X button, click outside, ESC key
