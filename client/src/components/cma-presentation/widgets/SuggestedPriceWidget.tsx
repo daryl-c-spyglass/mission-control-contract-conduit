@@ -45,9 +45,9 @@ function PriceTooltip({
   return (
     <>
       <div className="fixed inset-0 z-[90]" onClick={onClose} />
-      <div className="absolute z-[100] top-full left-1/2 -translate-x-1/2 mt-2 
+      <div className="absolute z-[100] bottom-full left-1/2 -translate-x-1/2 mb-2 
                       w-80 sm:w-96 bg-card rounded-xl shadow-2xl 
-                      border border-border overflow-hidden">
+                      border border-border overflow-hidden max-h-[70vh] overflow-y-auto">
         <div className="flex items-center justify-between px-4 py-3 bg-muted border-b border-border">
           <h4 className="font-semibold text-foreground flex items-center gap-2">
             <Info className="w-4 h-4 text-[#EF4923]" />
