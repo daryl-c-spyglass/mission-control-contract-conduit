@@ -23,6 +23,8 @@ export function SuggestedPriceWidget({
   const [isEditing, setIsEditing] = useState(false);
   const [displayPrice, setDisplayPrice] = useState<number>(0);
   const [editedPrice, setEditedPrice] = useState<number>(0);
+  const [mapToken, setMapToken] = useState<string | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
   
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -46,16 +48,24 @@ export function SuggestedPriceWidget({
   }, [suggestedPrice, closedComps.length, subjectProperty?.sqft]);
 
   useEffect(() => {
+    fetch('/api/mapbox-token')
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (data.token) setMapToken(data.token);
+        else setMapError(data.error || 'Failed to load map token');
+      })
+      .catch((err) => setMapError(`Failed to load map: ${err.message}`));
+  }, []);
+
+  useEffect(() => {
     if (!mapContainer.current || map.current) return;
     if (!subjectProperty?.latitude || !subjectProperty?.longitude) return;
+    if (!mapToken) return;
     
-    const token = import.meta.env.VITE_MAPBOX_TOKEN;
-    if (!token) {
-      console.warn('[SuggestedPriceWidget] No Mapbox token found');
-      return;
-    }
-    
-    mapboxgl.accessToken = token;
+    mapboxgl.accessToken = mapToken;
     
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -74,7 +84,7 @@ export function SuggestedPriceWidget({
       map.current?.remove();
       map.current = null;
     };
-  }, [subjectProperty?.latitude, subjectProperty?.longitude]);
+  }, [subjectProperty?.latitude, subjectProperty?.longitude, mapToken]);
 
   const formatPrice = (amount: number) => {
     return new Intl.NumberFormat('en-US', { 
@@ -203,20 +213,25 @@ export function SuggestedPriceWidget({
           </div>
           
           <div className="order-2 flex flex-col min-h-[150px] sm:min-h-[180px] lg:min-h-0 lg:h-full">
-            <div 
-              ref={mapContainer}
-              className="flex-1 w-full rounded-lg overflow-hidden bg-muted min-h-[150px] sm:min-h-[180px]"
-              data-testid="map-container"
-            >
-              {!hasCoordinates && (
-                <div className="h-full w-full flex items-center justify-center text-center text-muted-foreground p-4">
-                  <div>
-                    <p className="font-medium text-sm sm:text-base">Subject Property Map</p>
-                    <p className="text-xs sm:text-sm">No coordinates available</p>
-                  </div>
+            {hasCoordinates && mapToken && !mapError ? (
+              <div 
+                ref={mapContainer}
+                className="flex-1 w-full rounded-lg overflow-hidden bg-muted min-h-[150px] sm:min-h-[180px]"
+                data-testid="map-container"
+              />
+            ) : (
+              <div 
+                className="flex-1 w-full rounded-lg overflow-hidden bg-muted min-h-[150px] sm:min-h-[180px] flex items-center justify-center text-center text-muted-foreground p-4"
+                data-testid="map-placeholder"
+              >
+                <div>
+                  <p className="font-medium text-sm sm:text-base">Subject Property Map</p>
+                  <p className="text-xs sm:text-sm">
+                    {mapError ? mapError : !hasCoordinates ? 'No coordinates available' : 'Loading map...'}
+                  </p>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
         
