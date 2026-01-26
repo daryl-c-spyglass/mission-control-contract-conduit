@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { X, Info, Home, ChevronLeft, ChevronRight, Bed, Bath, Ruler, Calendar, Car, MapPin } from 'lucide-react';
+import { X, Info, Home, ChevronLeft, ChevronRight, Bed, Bath, Ruler, Calendar, Car, MapPin, LandPlot } from 'lucide-react';
 import {
   ScatterChart,
   Scatter,
@@ -17,12 +17,54 @@ interface TimeToSellWidgetProps {
   comparables: CmaProperty[];
   averageDaysOnMarket: number;
   averageListPricePercent?: number;
+  subjectProperty?: CmaProperty;
 }
 
 interface PropertySidebarItemProps {
   property: CmaProperty;
   showPercentOfList?: boolean;
   onClick: () => void;
+}
+
+type StatusColor = 'red' | 'green' | 'orange' | 'blue' | 'gray';
+
+function getStatusColor(status: string): StatusColor {
+  const s = status?.toLowerCase() || '';
+  if (s.includes('closed') || s.includes('sold')) return 'red';
+  if (s === 'active') return 'green';
+  if (s.includes('pending') || s.includes('under contract') || s.includes('active under')) return 'orange';
+  if (s.includes('expired') || s.includes('canceled') || s.includes('withdrawn')) return 'blue';
+  return 'green';
+}
+
+function getStatusColorHex(statusColor: StatusColor): string {
+  switch (statusColor) {
+    case 'red': return '#ef4444';
+    case 'green': return '#22c55e';
+    case 'orange': return '#f97316';
+    case 'blue': return '#3b82f6';
+    default: return '#6b7280';
+  }
+}
+
+function getStatusColorClass(statusColor: StatusColor): string {
+  switch (statusColor) {
+    case 'red': return 'text-red-500';
+    case 'green': return 'text-green-500';
+    case 'orange': return 'text-orange-500';
+    case 'blue': return 'text-blue-500';
+    default: return 'text-gray-500';
+  }
+}
+
+function getStatusBgClass(statusColor: StatusColor): string {
+  switch (statusColor) {
+    case 'red': return 'bg-red-500';
+    case 'green': return 'bg-green-500';
+    case 'orange': return 'bg-orange-500';
+    case 'blue': return 'bg-blue-500';
+    default: return 'bg-gray-500';
+  }
 }
 
 function PropertySidebarItem({ property, showPercentOfList = false, onClick }: PropertySidebarItemProps) {
@@ -36,15 +78,17 @@ function PropertySidebarItem({ property, showPercentOfList = false, onClick }: P
     <button
       onClick={onClick}
       className="w-full flex gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 
-                 cursor-pointer mb-1 transition-colors text-left"
+                 cursor-pointer mb-1 transition-colors text-left min-h-[60px]"
       data-testid={`button-property-sidebar-item-${property.id}`}
+      aria-label={`View details for ${property.address}`}
     >
-      <div className="w-16 h-12 rounded overflow-hidden flex-shrink-0 bg-muted">
+      <div className="w-16 h-12 rounded-md overflow-hidden flex-shrink-0 bg-muted">
         {property.photos?.[0] ? (
           <img
             src={property.photos[0]}
             alt={property.address}
             className="w-full h-full object-cover"
+            loading="lazy"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -59,7 +103,7 @@ function PropertySidebarItem({ property, showPercentOfList = false, onClick }: P
         <p className="text-xs text-muted-foreground">
           {property.daysOnMarket || 0} Days
           {showPercentOfList && percentOfList && (
-            <span> • {percentOfList}%</span>
+            <span className="ml-1">• {percentOfList}%</span>
           )}
         </p>
       </div>
@@ -79,34 +123,65 @@ function TimeToSellInfoModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
             also see the difference between the original list price and the sold price. If the listing
             isn't sold, you can see if the price has dropped.
           </p>
+          <p className="text-muted-foreground">
+            This chart shows that pricing the home correctly from the beginning will help reduce the 
+            days on market.
+          </p>
           <div className="space-y-2">
             <h4 className="font-semibold">How to read the chart:</h4>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
               <li><span className="text-red-500 font-medium">Red dots</span> represent closed/sold properties</li>
               <li><span className="text-green-500 font-medium">Green dots</span> represent active listings</li>
               <li><span className="text-orange-500 font-medium">Orange dots</span> represent properties under contract</li>
-              <li>Vertical lines show price changes from original list to final price</li>
+              <li><span className="text-blue-500 font-medium">Blue dots</span> represent expired/canceled listings</li>
             </ul>
           </div>
+          <button
+            onClick={() => onClose()}
+            className="w-full py-3 bg-[#EF4923] hover:bg-[#d94420] text-white rounded-lg 
+                       font-medium transition-colors min-h-[44px]"
+          >
+            Got it
+          </button>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
 
-function StatBox({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
-  return (
-    <div className="text-center p-3 bg-background rounded-lg border">
-      <div className="flex justify-center text-muted-foreground mb-1">{icon}</div>
-      <p className="text-xs text-muted-foreground uppercase">{label}</p>
-      <p className="text-lg font-semibold text-foreground">{value}</p>
-    </div>
-  );
+interface ComparisonDiff {
+  value: string;
+  isPositive: boolean;
 }
 
-function TimeToSellPropertyModal({ property, onClose }: { property: CmaProperty; onClose: () => void }) {
+function calcPercentDiff(propValue: number | undefined, subjectValue: number | undefined): ComparisonDiff | null {
+  if (!propValue || !subjectValue || subjectValue === 0) return null;
+  const diff = ((propValue - subjectValue) / subjectValue) * 100;
+  return {
+    value: Math.abs(diff).toFixed(1),
+    isPositive: diff >= 0
+  };
+}
+
+function TimeToSellPropertyModal({ 
+  property, 
+  subjectProperty,
+  onClose 
+}: { 
+  property: CmaProperty; 
+  subjectProperty?: CmaProperty;
+  onClose: () => void;
+}) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const photos = property.photos || [];
+  const statusColor = getStatusColor(property.status);
+  const statusColorClass = getStatusColorClass(statusColor);
+
+  const sqftDiff = calcPercentDiff(property.sqft, subjectProperty?.sqft);
+  const lotSizeDiff = calcPercentDiff(property.lotSize, subjectProperty?.lotSize);
+  const garageDiff = property.garageSpaces !== undefined && subjectProperty?.garageSpaces !== undefined
+    ? property.garageSpaces - subjectProperty.garageSpaces
+    : null;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -133,201 +208,268 @@ function TimeToSellPropertyModal({ property, onClose }: { property: CmaProperty;
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
-
-  const getStatusColor = (status: string) => {
-    const s = status?.toLowerCase() || '';
-    if (s.includes('closed') || s.includes('sold')) return 'text-red-500';
-    if (s.includes('active') && !s.includes('under')) return 'text-green-500';
-    if (s.includes('under') || s.includes('pending')) return 'text-orange-500';
-    return 'text-gray-500';
-  };
-
-  const priceDiff = property.originalPrice && property.price && property.originalPrice !== property.price
-    ? property.originalPrice - property.price
-    : 0;
-
-  const soldPricePercent = property.originalPrice && property.soldPrice
-    ? ((property.soldPrice / property.originalPrice) * 100).toFixed(0)
+  const displayPrice = property.soldPrice || property.listPrice || property.price;
+  const currentListPrice = property.listPrice || property.price;
+  const soldPercent = property.soldPrice && currentListPrice
+    ? Math.round((property.soldPrice / currentListPrice) * 100)
     : null;
 
-  const displayPrice = property.soldPrice || property.price;
-  const pricePerSqft = property.sqft && displayPrice ? Math.round(displayPrice / property.sqft) : null;
-
   return (
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] p-0 overflow-hidden">
-        <div className="flex items-center gap-4 p-4 border-b bg-background">
-          <button
-            onClick={onClose}
-            className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-muted transition-colors"
-            aria-label="Close"
-            data-testid="button-close-property-modal"
-          >
-            <X className="w-6 h-6 text-muted-foreground" />
-          </button>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-xl font-bold text-foreground truncate">{property.address}</h2>
-            <p className="text-sm text-muted-foreground flex items-center gap-1">
-              <MapPin className="w-3 h-3" />
-              {property.city}, {property.state} {property.zipCode}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto max-h-[calc(90vh-80px)]">
-          <div className="flex flex-col lg:flex-row">
-            <div className="flex-1 p-4">
-              <div className="relative rounded-lg overflow-hidden bg-muted mb-6">
-                <div className="aspect-[16/10]">
-                  {photos.length > 0 ? (
-                    <img
-                      src={photos[currentPhotoIndex]}
-                      alt={`${property.address} - Photo ${currentPhotoIndex + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                      <Home className="w-16 h-16" />
-                    </div>
-                  )}
-                </div>
-
-                {photos.length > 1 && (
-                  <>
-                    <button
-                      onClick={handlePrevPhoto}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 
-                                 min-w-[48px] min-h-[48px] bg-black/50 hover:bg-black/70 
-                                 text-white rounded-full flex items-center justify-center shadow-lg
-                                 transition-colors"
-                      data-testid="button-prev-photo"
-                      aria-label="Previous photo"
-                    >
-                      <ChevronLeft className="w-6 h-6" />
-                    </button>
-                    <button
-                      onClick={handleNextPhoto}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 
-                                 min-w-[48px] min-h-[48px] bg-black/50 hover:bg-black/70 
-                                 text-white rounded-full flex items-center justify-center shadow-lg
-                                 transition-colors"
-                      data-testid="button-next-photo"
-                      aria-label="Next photo"
-                    >
-                      <ChevronRight className="w-6 h-6" />
-                    </button>
-
-                    <div className="absolute bottom-4 left-4 flex gap-2">
-                      <span className="px-3 py-1.5 bg-black/60 text-white text-sm rounded-lg flex items-center gap-1">
-                        {currentPhotoIndex + 1} / {photos.length}
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="grid grid-cols-3 md:grid-cols-5 gap-3 mb-6">
-                <StatBox icon={<Bed className="w-5 h-5" />} label="BEDROOMS" value={property.beds || '—'} />
-                <StatBox icon={<Bath className="w-5 h-5" />} label="BATHROOMS" value={property.baths || '—'} />
-                <StatBox icon={<Ruler className="w-5 h-5" />} label="HOME SIZE" value={property.sqft ? `${property.sqft.toLocaleString()} sqft` : '—'} />
-                <StatBox icon={<Calendar className="w-5 h-5" />} label="YEAR BUILT" value={property.yearBuilt || '—'} />
-                <StatBox icon={<Car className="w-5 h-5" />} label="GARAGES" value={property.garageSpaces || '—'} />
-              </div>
-
-              {property.description && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-foreground mb-2">Description</h3>
-                  <p className="text-muted-foreground leading-relaxed">{property.description}</p>
-                </div>
+    <>
+      <div 
+        className="fixed inset-0 bg-black/60 z-[80] backdrop-blur-sm"
+        onClick={onClose}
+      />
+      
+      <div className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 
+                      md:-translate-x-1/2 md:-translate-y-1/2 
+                      md:w-full md:max-w-md lg:max-w-lg
+                      bg-background rounded-xl shadow-2xl z-[80] 
+                      overflow-hidden flex flex-col max-h-[90vh]">
+        
+        <button
+          onClick={onClose}
+          className="absolute top-3 left-3 z-10 
+                     min-w-[44px] min-h-[44px] 
+                     flex items-center justify-center
+                     bg-black/50 hover:bg-black/70 
+                     text-white rounded-full transition-colors"
+          aria-label="Close modal"
+          data-testid="button-close-property-modal"
+        >
+          <X className="w-5 h-5" />
+        </button>
+        
+        <div className="relative w-full aspect-video bg-muted flex-shrink-0">
+          {photos.length > 0 ? (
+            <>
+              <img 
+                src={photos[currentPhotoIndex]} 
+                alt={`${property.address} - Photo ${currentPhotoIndex + 1}`}
+                className="w-full h-full object-cover"
+              />
+              
+              {photos.length > 1 && (
+                <>
+                  <button
+                    onClick={handlePrevPhoto}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 
+                               min-w-[44px] min-h-[44px] 
+                               flex items-center justify-center
+                               bg-black/50 hover:bg-black/70 
+                               text-white rounded-full transition-colors"
+                    aria-label="Previous photo"
+                    data-testid="button-prev-photo"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  
+                  <button
+                    onClick={handleNextPhoto}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 
+                               min-w-[44px] min-h-[44px] 
+                               flex items-center justify-center
+                               bg-black/50 hover:bg-black/70 
+                               text-white rounded-full transition-colors"
+                    aria-label="Next photo"
+                    data-testid="button-next-photo"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                  
+                  <div className="absolute bottom-3 right-3 
+                                  px-3 py-1 bg-black/60 text-white text-sm rounded-full">
+                    {currentPhotoIndex + 1} / {photos.length}
+                  </div>
+                </>
               )}
+            </>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+              <Home className="w-16 h-16" />
             </div>
-
-            <div className="lg:w-80 p-4 lg:border-l bg-muted/30">
-              <div className="mb-4">
-                <span className={`font-bold ${getStatusColor(property.status)}`}>
-                  {property.status?.toUpperCase()}
-                </span>
-                <span className="text-muted-foreground ml-2">• {property.daysOnMarket || 0} DAYS</span>
+          )}
+        </div>
+        
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-4 border-b">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-bold text-foreground uppercase truncate">
+                  {property.address}
+                </h2>
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  {property.city}, {property.state} {property.zipCode}
+                </p>
               </div>
-
-              <div className="mb-4">
-                <p className="text-3xl font-bold text-foreground">
+              <div className="text-right flex-shrink-0">
+                <p className="text-xl font-bold text-foreground">
                   {formatCurrency(displayPrice)}
                 </p>
-                {pricePerSqft && (
-                  <p className="text-muted-foreground">
-                    ${pricePerSqft}/sqft
-                  </p>
-                )}
-              </div>
-
-              <p className="text-muted-foreground mb-4">
-                {property.beds} beds · {property.baths} baths · {property.sqft?.toLocaleString()} sqft
-              </p>
-
-              {(property.listDate || property.soldDate) && (
-                <p className="text-sm text-muted-foreground mb-4">
-                  {property.listDate && <span>Listed: {formatDate(property.listDate)}</span>}
-                  {property.listDate && property.soldDate && <span> · </span>}
-                  {property.soldDate && <span>Sold: {formatDate(property.soldDate)}</span>}
+                <p className={`text-sm font-medium ${statusColorClass}`}>
+                  {property.status}
                 </p>
-              )}
-
-              <div className="space-y-3 border-t pt-4">
-                {property.originalPrice && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Original List Price</span>
-                    <span className="font-medium">{formatCurrency(property.originalPrice)}</span>
-                  </div>
-                )}
-
-                {property.price && property.originalPrice && property.price !== property.originalPrice && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      List Price{' '}
-                      {priceDiff > 0 && (
-                        <span className="text-red-500">↓{formatCurrency(priceDiff)}</span>
-                      )}
-                    </span>
-                    <span className="font-medium">{formatCurrency(property.price)}</span>
-                  </div>
-                )}
-
-                {property.soldPrice && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      Sold Price{' '}
-                      {soldPricePercent && <span className="text-muted-foreground">{soldPricePercent}%</span>}
-                    </span>
-                    <span className="font-medium">{formatCurrency(property.soldPrice)}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="border-t pt-4 mt-4">
-                <p className="text-sm text-muted-foreground">
-                  MLS # {property.mlsNumber || property.id}
-                </p>
-                {property.lastUpdated && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Last Updated {new Date(property.lastUpdated).toLocaleString()}
-                  </p>
-                )}
               </div>
             </div>
           </div>
+          
+          <div className="grid grid-cols-3 border-b">
+            <div className="p-3 border-r">
+              <p className="text-xs text-muted-foreground">Beds</p>
+              <p className="text-lg font-semibold text-foreground">
+                {property.beds ?? '-'}
+              </p>
+            </div>
+            <div className="p-3 border-r">
+              <p className="text-xs text-muted-foreground">Baths</p>
+              <p className="text-lg font-semibold text-foreground">
+                {property.baths ?? '-'}
+              </p>
+            </div>
+            <div className="p-3">
+              <p className="text-xs text-muted-foreground">
+                Sq. Ft.
+                {sqftDiff && (
+                  <span className={`ml-1 ${sqftDiff.isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                    {sqftDiff.isPositive ? '↑' : '↓'}{sqftDiff.value}%
+                  </span>
+                )}
+              </p>
+              <p className="text-lg font-semibold text-foreground">
+                {property.sqft?.toLocaleString() ?? '-'}
+              </p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-3 border-b">
+            <div className="p-3 border-r">
+              <p className="text-xs text-muted-foreground">
+                Lot Size
+                {lotSizeDiff && (
+                  <span className={`ml-1 ${lotSizeDiff.isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                    {lotSizeDiff.isPositive ? '↑' : '↓'}{lotSizeDiff.value}%
+                  </span>
+                )}
+              </p>
+              <p className="text-lg font-semibold text-foreground">
+                {property.lotSize?.toLocaleString() ?? '-'}
+              </p>
+            </div>
+            <div className="p-3 border-r">
+              <p className="text-xs text-muted-foreground">
+                Garage
+                {garageDiff !== null && garageDiff !== 0 && (
+                  <span className={`ml-1 ${garageDiff >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {garageDiff >= 0 ? '↑' : '↓'}{Math.abs(garageDiff)}
+                  </span>
+                )}
+              </p>
+              <p className="text-lg font-semibold text-foreground">
+                {property.garageSpaces ?? '-'}
+              </p>
+            </div>
+            <div className="p-3">
+              <p className="text-xs text-muted-foreground">Year Built</p>
+              <p className="text-lg font-semibold text-foreground">
+                {property.yearBuilt ?? '-'}
+              </p>
+            </div>
+          </div>
+          
+          <div className="p-4">
+            <h3 className="text-sm font-semibold text-foreground mb-3">
+              Listing Details
+            </h3>
+            
+            <div className="space-y-0">
+              {property.originalPrice && property.originalPrice !== currentListPrice && (
+                <div className="flex justify-between items-center py-2.5 border-b border-muted">
+                  <span className="text-sm text-muted-foreground">Orig. Price</span>
+                  <span className="text-sm font-medium text-foreground">
+                    {formatCurrency(property.originalPrice)}
+                  </span>
+                </div>
+              )}
+              
+              <div className="flex justify-between items-center py-2.5 border-b border-muted">
+                <span className="text-sm text-muted-foreground">List Price</span>
+                <span className="text-sm font-medium text-foreground">
+                  {formatCurrency(currentListPrice)}
+                </span>
+              </div>
+              
+              {property.soldPrice && (
+                <div className="flex justify-between items-center py-2.5 border-b border-muted">
+                  <span className="text-sm text-muted-foreground">
+                    Sold Price {soldPercent && <span className="text-muted-foreground/60">{soldPercent}%</span>}
+                  </span>
+                  <span className="text-sm font-medium text-foreground">
+                    {formatCurrency(property.soldPrice)}
+                  </span>
+                </div>
+              )}
+              
+              {property.pricePerSqft > 0 && (
+                <div className="flex justify-between items-center py-2.5 border-b border-muted">
+                  <span className="text-sm text-muted-foreground">Price per Sq. Ft.</span>
+                  <span className="text-sm font-medium text-foreground">
+                    ${property.pricePerSqft.toLocaleString()}
+                  </span>
+                </div>
+              )}
+              
+              {property.soldDate && (
+                <div className="flex justify-between items-center py-2.5 border-b border-muted">
+                  <span className="text-sm text-muted-foreground">Sold Date</span>
+                  <span className="text-sm font-medium text-foreground">
+                    {new Date(property.soldDate).toLocaleDateString()}
+                  </span>
+                </div>
+              )}
+              
+              {property.listDate && (
+                <div className="flex justify-between items-center py-2.5 border-b border-muted">
+                  <span className="text-sm text-muted-foreground">List Date</span>
+                  <span className="text-sm font-medium text-foreground">
+                    {new Date(property.listDate).toLocaleDateString()}
+                  </span>
+                </div>
+              )}
+              
+              <div className="flex justify-between items-center py-2.5 border-b border-muted">
+                <span className="text-sm text-muted-foreground">Days on Market</span>
+                <span className="text-sm font-medium text-foreground">
+                  {property.daysOnMarket}
+                </span>
+              </div>
+              
+              <div className="flex justify-between items-center py-2.5">
+                <span className="text-sm text-muted-foreground">MLS #</span>
+                <span className="text-sm font-medium text-foreground">
+                  {property.mlsNumber || property.id}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          {property.description && (
+            <div className="p-4 border-t">
+              <h3 className="text-sm font-semibold text-foreground mb-2">Description</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{property.description}</p>
+            </div>
+          )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </>
   );
 }
 
 export function TimeToSellWidget({
   comparables,
   averageDaysOnMarket,
-  averageListPricePercent
+  averageListPricePercent,
+  subjectProperty
 }: TimeToSellWidgetProps) {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<CmaProperty | null>(null);
@@ -348,6 +490,12 @@ export function TimeToSellWidget({
     comparables.filter(c => {
       const s = c.status?.toLowerCase() || '';
       return s === 'active' || (s.includes('active') && !s.includes('under'));
+    }), [comparables]);
+
+  const expiredComps = useMemo(() =>
+    comparables.filter(c => {
+      const s = c.status?.toLowerCase() || '';
+      return s.includes('expired') || s.includes('canceled') || s.includes('withdrawn');
     }), [comparables]);
 
   const calculatedAvgDaysOnMarket = useMemo(() => {
@@ -374,18 +522,14 @@ export function TimeToSellWidget({
 
   const chartData = useMemo(() => {
     return comparables.map(p => {
-      const status = p.status?.toLowerCase() || '';
-      let statusCategory = 'active';
-      if (status.includes('closed') || status.includes('sold')) statusCategory = 'closed';
-      else if (status.includes('under') || status.includes('pending')) statusCategory = 'underContract';
-
+      const statusColor = getStatusColor(p.status);
       return {
         id: p.id,
         address: p.address,
         daysOnMarket: p.daysOnMarket || 0,
         originalPrice: p.originalPrice || p.price || 0,
-        currentPrice: p.soldPrice || p.price || 0,
-        status: statusCategory,
+        currentPrice: p.soldPrice || p.listPrice || p.price || 0,
+        statusColor,
       };
     }).filter(d => d.daysOnMarket >= 0 && d.currentPrice > 0);
   }, [comparables]);
@@ -394,15 +538,6 @@ export function TimeToSellWidget({
     if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
     if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
     return `$${value}`;
-  };
-
-  const getChartStatusColor = (status: string) => {
-    switch (status) {
-      case 'closed': return '#ef4444';
-      case 'underContract': return '#f97316';
-      case 'active': return '#22c55e';
-      default: return '#6b7280';
-    }
   };
 
   const CustomTooltip = ({ active, payload }: any) => {
@@ -433,6 +568,7 @@ export function TimeToSellWidget({
       {selectedProperty && (
         <TimeToSellPropertyModal
           property={selectedProperty}
+          subjectProperty={subjectProperty}
           onClose={() => setSelectedProperty(null)}
         />
       )}
@@ -453,8 +589,8 @@ export function TimeToSellWidget({
 
           <p className="text-center text-muted-foreground max-w-2xl mx-auto">
             Sold homes were on the market for an average of{' '}
-            <span className="text-[#EF4923] font-medium">{calculatedAvgDaysOnMarket}</span>{' '}
-            days before they accepted an offer. These homes sold for an average of{' '}
+            <span className="text-[#EF4923] font-medium">{calculatedAvgDaysOnMarket} days</span>{' '}
+            before they accepted an offer. These homes sold for an average of{' '}
             <span className="text-[#EF4923] font-medium">{calculatedAvgPercentOfList.toFixed(2)}%</span>{' '}
             of list price.{' '}
             <button
@@ -470,7 +606,7 @@ export function TimeToSellWidget({
         </div>
 
         <div className="flex flex-col md:flex-row min-h-[400px]">
-          <div className="w-full md:w-56 border-r overflow-auto max-h-[500px] flex-shrink-0">
+          <div className="w-full md:w-64 lg:w-72 border-r overflow-auto max-h-[500px] flex-shrink-0">
             {closedComps.length > 0 && (
               <div className="p-3">
                 <div className="flex items-center gap-2 mb-2">
@@ -528,7 +664,26 @@ export function TimeToSellWidget({
               </div>
             )}
 
-            {closedComps.length === 0 && underContractComps.length === 0 && activeComps.length === 0 && (
+            {expiredComps.length > 0 && (
+              <div className="p-3 border-t">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
+                    {expiredComps.length}
+                  </span>
+                  <span className="font-semibold text-foreground">Expired/Canceled</span>
+                </div>
+                {expiredComps.map((comp) => (
+                  <PropertySidebarItem
+                    key={comp.id}
+                    property={comp}
+                    showPercentOfList={false}
+                    onClick={() => setSelectedProperty(comp)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {closedComps.length === 0 && underContractComps.length === 0 && activeComps.length === 0 && expiredComps.length === 0 && (
               <div className="p-4 text-center text-muted-foreground">
                 <p className="text-sm">No comparable properties</p>
               </div>
@@ -536,7 +691,7 @@ export function TimeToSellWidget({
           </div>
 
           <div className="flex-1 p-4 flex flex-col">
-            {chartData.length > 0 ? (
+            {chartData.length >= 3 ? (
               <>
                 <div className="flex-1 min-h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -565,7 +720,7 @@ export function TimeToSellWidget({
                       <Tooltip content={<CustomTooltip />} />
                       <Scatter name="Properties" data={chartData} fill="#8884d8">
                         {chartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={getChartStatusColor(entry.status)} />
+                          <Cell key={`cell-${index}`} fill={getStatusColorHex(entry.statusColor)} />
                         ))}
                       </Scatter>
                     </ScatterChart>
@@ -585,8 +740,21 @@ export function TimeToSellWidget({
                     <span className="w-3 h-3 rounded-full bg-green-500" />
                     <span className="text-sm text-muted-foreground">Active</span>
                   </div>
+                  {expiredComps.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-blue-500" />
+                      <span className="text-sm text-muted-foreground">Expired/Canceled</span>
+                    </div>
+                  )}
                 </div>
               </>
+            ) : chartData.length > 0 ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center text-muted-foreground">
+                  <p className="text-lg font-medium">Insufficient data</p>
+                  <p className="text-sm">Minimum 3 properties required for chart</p>
+                </div>
+              </div>
             ) : (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center text-muted-foreground">

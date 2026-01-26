@@ -1,0 +1,943 @@
+# Replit Agent Task: Time to Sell - Clickable Property Modal with Repliers Data
+
+## Overview
+Enhance the Time to Sell slide in CMA Presentation Builder with clickable properties that open a detailed modal. Uses Repliers API data exclusively with ACTRIS MLS compliance.
+
+---
+
+## REPLIERS DATA MAPPING (CRITICAL)
+
+### Authoritative Field Mappings
+
+| UI Field | Repliers Field | Notes |
+|----------|----------------|-------|
+| Days on Market | `simpleDaysOnMarket` | **ONLY use this field** - authoritative DOM |
+| Original Price | `OriginalListPrice` | Falls back to `ListPrice` if null |
+| List Price | `ListPrice` | Current/most recent list price |
+| Sold Price | `ClosePrice` | Only for Closed status |
+| Sold Date | `CloseDate` | Only for Closed status |
+| Status | `MlsStatus` | Active, Pending, Closed, Expired, Canceled |
+| Address | `UnparsedAddress` OR build from `StreetNumber` + `StreetName` + `StreetSuffix` |
+| City | `City` | |
+| State | `StateOrProvince` | |
+| Zip | `PostalCode` | |
+| Beds | `BedroomsTotal` | |
+| Baths | `BathroomsTotalInteger` | |
+| Sq Ft | `LivingArea` | |
+| Lot Size | `LotSizeSquareFeet` | |
+| Garage | `GarageSpaces` | |
+| Year Built | `YearBuilt` | |
+| Photos | `Media[].MediaURL` | Filter by `MediaCategory === 'Photo'` |
+| MLS # | `ListingId` | |
+| Price/SqFt | Calculated: `(ClosePrice || ListPrice) / LivingArea` | |
+
+### Status Color Mapping (EXACT)
+
+```typescript
+const STATUS_COLORS = {
+  'Closed': 'red',      // #ef4444 - Sold properties
+  'Sold': 'red',        // #ef4444 - Alias
+  'Active': 'green',    // #22c55e - Currently on market
+  'Pending': 'orange',  // #f97316 - Under contract
+  'Under Contract': 'orange', // #f97316 - Alias
+  'Expired': 'blue',    // #3b82f6 - Listing expired
+  'Canceled': 'blue',   // #3b82f6 - Listing canceled
+  'Withdrawn': 'blue',  // #3b82f6 - Listing withdrawn
+} as const;
+```
+
+---
+
+## NON-NEGOTIABLE RULES
+
+1. **Data Source:** Repliers API ONLY
+2. **MLS:** ACTRIS only
+3. **DOM Field:** `simpleDaysOnMarket` ONLY - never calculate manually
+4. **No Rentals:** Filter out all rental/lease listings
+5. **Subdivision Logic:** Comps filtered by MLS Subdivision field, NOT neighborhood boundaries
+6. **No Silent Fallbacks:** If required field missing → log warning and exclude listing
+
+---
+
+## IMPLEMENTATION
+
+### Step 1: Data Assembly Function
+
+```typescript
+// types/repliers.ts
+interface RepliersListing {
+  ListingId: string;
+  MlsStatus: string;
+  ListPrice: number;
+  OriginalListPrice?: number;
+  ClosePrice?: number;
+  CloseDate?: string;
+  simpleDaysOnMarket: number;
+  UnparsedAddress?: string;
+  StreetNumber?: string;
+  StreetName?: string;
+  StreetSuffix?: string;
+  City: string;
+  StateOrProvince: string;
+  PostalCode: string;
+  BedroomsTotal: number;
+  BathroomsTotalInteger: number;
+  LivingArea: number;
+  LotSizeSquareFeet?: number;
+  GarageSpaces?: number;
+  YearBuilt?: number;
+  Media?: Array<{
+    MediaURL: string;
+    MediaCategory: string;
+    Order?: number;
+  }>;
+  PropertySubType?: string;
+}
+
+interface TimeToSellProperty {
+  id: string;
+  mlsNumber: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  status: string;
+  statusColor: 'red' | 'green' | 'orange' | 'blue';
+  daysOnMarket: number;
+  originalPrice: number;
+  listPrice: number;
+  soldPrice?: number;
+  soldDate?: string;
+  pricePerSqft: number;
+  beds: number;
+  baths: number;
+  sqft: number;
+  lotSize?: number;
+  garageSpaces?: number;
+  yearBuilt?: number;
+  photos: string[];
+  // For chart plotting
+  chartPoints: {
+    originalPoint: { x: number; y: number };
+    currentPoint: { x: number; y: number };
+  };
+}
+
+// Transform Repliers data to Time to Sell format
+function buildTimeToSellDataset(
+  listings: RepliersListing[],
+  subjectProperty?: TimeToSellProperty
+): TimeToSellProperty[] {
+  const dataset: TimeToSellProperty[] = [];
+  
+  for (const listing of listings) {
+    // RULE: Exclude rentals
+    if (listing.PropertySubType?.toLowerCase().includes('lease') ||
+        listing.PropertySubType?.toLowerCase().includes('rental')) {
+      console.warn(`[TimeToSell] Excluding rental: ${listing.ListingId}`);
+      continue;
+    }
+    
+    // RULE: Require simpleDaysOnMarket
+    if (listing.simpleDaysOnMarket === undefined || listing.simpleDaysOnMarket === null) {
+      console.warn(`[TimeToSell] Missing simpleDaysOnMarket: ${listing.ListingId}`);
+      continue;
+    }
+    
+    // RULE: Require ListPrice
+    if (!listing.ListPrice) {
+      console.warn(`[TimeToSell] Missing ListPrice: ${listing.ListingId}`);
+      continue;
+    }
+    
+    // Build address
+    const address = listing.UnparsedAddress || 
+      [listing.StreetNumber, listing.StreetName, listing.StreetSuffix]
+        .filter(Boolean)
+        .join(' ');
+    
+    if (!address) {
+      console.warn(`[TimeToSell] Missing address: ${listing.ListingId}`);
+      continue;
+    }
+    
+    // Determine status color
+    const statusColor = getStatusColor(listing.MlsStatus);
+    
+    // Get photos (sorted by Order if available)
+    const photos = (listing.Media || [])
+      .filter(m => m.MediaCategory === 'Photo')
+      .sort((a, b) => (a.Order || 0) - (b.Order || 0))
+      .map(m => m.MediaURL);
+    
+    // Calculate prices
+    const originalPrice = listing.OriginalListPrice || listing.ListPrice;
+    const currentPrice = listing.ClosePrice || listing.ListPrice;
+    const pricePerSqft = listing.LivingArea 
+      ? Math.round(currentPrice / listing.LivingArea)
+      : 0;
+    
+    const property: TimeToSellProperty = {
+      id: listing.ListingId,
+      mlsNumber: listing.ListingId,
+      address,
+      city: listing.City,
+      state: listing.StateOrProvince,
+      zip: listing.PostalCode,
+      status: listing.MlsStatus,
+      statusColor,
+      daysOnMarket: listing.simpleDaysOnMarket,
+      originalPrice,
+      listPrice: listing.ListPrice,
+      soldPrice: listing.ClosePrice,
+      soldDate: listing.CloseDate,
+      pricePerSqft,
+      beds: listing.BedroomsTotal,
+      baths: listing.BathroomsTotalInteger,
+      sqft: listing.LivingArea,
+      lotSize: listing.LotSizeSquareFeet,
+      garageSpaces: listing.GarageSpaces,
+      yearBuilt: listing.YearBuilt,
+      photos,
+      chartPoints: {
+        originalPoint: { x: listing.simpleDaysOnMarket, y: originalPrice },
+        currentPoint: { x: listing.simpleDaysOnMarket, y: currentPrice },
+      },
+    };
+    
+    dataset.push(property);
+  }
+  
+  // Log dataset for debugging
+  console.log('[TimeToSell] Dataset built:', dataset.length, 'properties');
+  
+  return dataset;
+}
+
+function getStatusColor(status: string): 'red' | 'green' | 'orange' | 'blue' {
+  const s = status?.toLowerCase() || '';
+  if (s.includes('closed') || s.includes('sold')) return 'red';
+  if (s === 'active') return 'green';
+  if (s.includes('pending') || s.includes('under contract')) return 'orange';
+  if (s.includes('expired') || s.includes('canceled') || s.includes('withdrawn')) return 'blue';
+  return 'green'; // Default to active
+}
+```
+
+### Step 2: Summary Metrics Calculation
+
+```typescript
+// Calculate header stats (CLOSED properties only)
+function calculateTimeToSellMetrics(properties: TimeToSellProperty[]) {
+  const closedProperties = properties.filter(p => p.statusColor === 'red');
+  
+  if (closedProperties.length === 0) {
+    return { avgDaysOnMarket: 0, avgPercentOfList: 0, closedCount: 0 };
+  }
+  
+  // Average DOM
+  const totalDom = closedProperties.reduce((sum, p) => sum + p.daysOnMarket, 0);
+  const avgDaysOnMarket = Math.round(totalDom / closedProperties.length);
+  
+  // Average % of list price: (ClosePrice / OriginalListPrice) * 100
+  const propertiesWithBothPrices = closedProperties.filter(
+    p => p.soldPrice && p.originalPrice
+  );
+  
+  let avgPercentOfList = 0;
+  if (propertiesWithBothPrices.length > 0) {
+    const totalPercent = propertiesWithBothPrices.reduce((sum, p) => {
+      return sum + ((p.soldPrice! / p.originalPrice) * 100);
+    }, 0);
+    avgPercentOfList = parseFloat((totalPercent / propertiesWithBothPrices.length).toFixed(2));
+  }
+  
+  return {
+    avgDaysOnMarket,
+    avgPercentOfList,
+    closedCount: closedProperties.length,
+  };
+}
+```
+
+### Step 3: Property Detail Modal Component
+
+```tsx
+import { useState, useEffect } from 'react';
+import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+
+interface PropertyDetailModalProps {
+  property: TimeToSellProperty;
+  subjectProperty?: TimeToSellProperty;
+  onClose: () => void;
+}
+
+export function PropertyDetailModal({ 
+  property, 
+  subjectProperty,
+  onClose 
+}: PropertyDetailModalProps) {
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const photos = property.photos || [];
+  
+  // Calculate comparison percentages
+  const calcDiff = (propValue: number | undefined, subjectValue: number | undefined): string | null => {
+    if (!propValue || !subjectValue || subjectValue === 0) return null;
+    const diff = ((propValue - subjectValue) / subjectValue) * 100;
+    return diff.toFixed(1);
+  };
+  
+  const sqftDiff = calcDiff(property.sqft, subjectProperty?.sqft);
+  const lotSizeDiff = calcDiff(property.lotSize, subjectProperty?.lotSize);
+  const garageDiff = property.garageSpaces !== undefined && subjectProperty?.garageSpaces !== undefined
+    ? property.garageSpaces - subjectProperty.garageSpaces
+    : null;
+  
+  // Sold percentage
+  const soldPercent = property.soldPrice && property.listPrice
+    ? Math.round((property.soldPrice / property.listPrice) * 100)
+    : null;
+  
+  // Photo navigation
+  const handlePrevPhoto = () => {
+    setCurrentPhotoIndex(prev => prev === 0 ? photos.length - 1 : prev - 1);
+  };
+  
+  const handleNextPhoto = () => {
+    setCurrentPhotoIndex(prev => prev === photos.length - 1 ? 0 : prev + 1);
+  };
+  
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft' && photos.length > 1) handlePrevPhoto();
+      if (e.key === 'ArrowRight' && photos.length > 1) handleNextPhoto();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [photos.length]);
+  
+  // Status color classes
+  const statusColorClass = {
+    red: 'text-red-500',
+    green: 'text-green-500',
+    orange: 'text-orange-500',
+    blue: 'text-blue-500',
+  }[property.statusColor];
+  
+  return (
+    <>
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      
+      {/* Modal */}
+      <div className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 
+                      md:-translate-x-1/2 md:-translate-y-1/2 
+                      md:w-full md:max-w-md lg:max-w-lg
+                      bg-white dark:bg-gray-900 rounded-xl shadow-2xl z-50 
+                      overflow-hidden flex flex-col max-h-[90vh]">
+        
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 left-3 z-10 
+                     min-w-[44px] min-h-[44px] 
+                     flex items-center justify-center
+                     bg-black/50 hover:bg-black/70 
+                     text-white rounded-full transition-colors"
+          aria-label="Close modal"
+        >
+          <X className="w-5 h-5" />
+        </button>
+        
+        {/* Photo Section */}
+        <div className="relative w-full aspect-video bg-gray-200 dark:bg-gray-800 flex-shrink-0">
+          {photos.length > 0 ? (
+            <>
+              <img 
+                src={photos[currentPhotoIndex]} 
+                alt={`${property.address} - Photo ${currentPhotoIndex + 1}`}
+                className="w-full h-full object-cover"
+              />
+              
+              {photos.length > 1 && (
+                <>
+                  {/* Previous Arrow */}
+                  <button
+                    onClick={handlePrevPhoto}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 
+                               min-w-[44px] min-h-[44px] 
+                               flex items-center justify-center
+                               bg-black/50 hover:bg-black/70 
+                               text-white rounded-full transition-colors"
+                    aria-label="Previous photo"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  
+                  {/* Next Arrow */}
+                  <button
+                    onClick={handleNextPhoto}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 
+                               min-w-[44px] min-h-[44px] 
+                               flex items-center justify-center
+                               bg-black/50 hover:bg-black/70 
+                               text-white rounded-full transition-colors"
+                    aria-label="Next photo"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                  
+                  {/* Photo Counter */}
+                  <div className="absolute bottom-3 right-3 
+                                  px-3 py-1 bg-black/60 text-white text-sm rounded-full">
+                    {currentPhotoIndex + 1} / {photos.length}
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-400">
+              No photos available
+            </div>
+          )}
+        </div>
+        
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Address & Price Header */}
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 uppercase truncate">
+                  {property.address}
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {property.city}, {property.state} {property.zip}
+                </p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                  ${(property.soldPrice || property.listPrice)?.toLocaleString()}
+                </p>
+                <p className={`text-sm font-medium ${statusColorClass}`}>
+                  {property.status}
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Property Stats Grid - Row 1 */}
+          <div className="grid grid-cols-3 border-b border-gray-200 dark:border-gray-700">
+            <div className="p-3 border-r border-gray-200 dark:border-gray-700">
+              <p className="text-xs text-gray-500 dark:text-gray-400">Beds</p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {property.beds ?? '-'}
+              </p>
+            </div>
+            <div className="p-3 border-r border-gray-200 dark:border-gray-700">
+              <p className="text-xs text-gray-500 dark:text-gray-400">Baths</p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {property.baths ?? '-'}
+              </p>
+            </div>
+            <div className="p-3">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Sq. Ft.
+                {sqftDiff && (
+                  <span className={`ml-1 ${parseFloat(sqftDiff) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {parseFloat(sqftDiff) >= 0 ? '↑' : '↓'}{Math.abs(parseFloat(sqftDiff))}%
+                  </span>
+                )}
+              </p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {property.sqft?.toLocaleString() ?? '-'}
+              </p>
+            </div>
+          </div>
+          
+          {/* Property Stats Grid - Row 2 */}
+          <div className="grid grid-cols-3 border-b border-gray-200 dark:border-gray-700">
+            <div className="p-3 border-r border-gray-200 dark:border-gray-700">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Lot Size
+                {lotSizeDiff && (
+                  <span className={`ml-1 ${parseFloat(lotSizeDiff) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {parseFloat(lotSizeDiff) >= 0 ? '↑' : '↓'}{Math.abs(parseFloat(lotSizeDiff))}%
+                  </span>
+                )}
+              </p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {property.lotSize?.toLocaleString() ?? '-'}
+              </p>
+            </div>
+            <div className="p-3 border-r border-gray-200 dark:border-gray-700">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Garage Spaces
+                {garageDiff !== null && garageDiff !== 0 && (
+                  <span className={`ml-1 ${garageDiff >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {garageDiff >= 0 ? '↑' : '↓'}{Math.abs(garageDiff)}
+                  </span>
+                )}
+              </p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {property.garageSpaces ?? '-'}
+              </p>
+            </div>
+            <div className="p-3"></div>
+          </div>
+          
+          {/* Listing Details Section */}
+          <div className="p-4">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+              Listing Details
+            </h3>
+            
+            <div className="space-y-0">
+              {/* Original Price */}
+              {property.originalPrice && property.originalPrice !== property.listPrice && (
+                <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-gray-800">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Orig. Price</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    ${property.originalPrice.toLocaleString()}
+                  </span>
+                </div>
+              )}
+              
+              {/* List Price */}
+              <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-gray-800">
+                <span className="text-sm text-gray-600 dark:text-gray-400">List Price</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  ${property.listPrice?.toLocaleString()}
+                </span>
+              </div>
+              
+              {/* Sold Price (only for closed) */}
+              {property.soldPrice && (
+                <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-gray-800">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Sold Price {soldPercent && <span className="text-gray-400">{soldPercent}%</span>}
+                  </span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    ${property.soldPrice.toLocaleString()}
+                  </span>
+                </div>
+              )}
+              
+              {/* Price per Sq Ft */}
+              {property.pricePerSqft > 0 && (
+                <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-gray-800">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Price per Sq. Ft.</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    ${property.pricePerSqft.toLocaleString()}
+                  </span>
+                </div>
+              )}
+              
+              {/* Sold Date (only for closed) */}
+              {property.soldDate && (
+                <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-gray-800">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Sold Date</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {new Date(property.soldDate).toLocaleDateString()}
+                  </span>
+                </div>
+              )}
+              
+              {/* Days on Market */}
+              <div className="flex justify-between items-center py-2.5">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Days on Market</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {property.daysOnMarket}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+```
+
+### Step 4: Sidebar Property Item (Clickable)
+
+```tsx
+interface PropertySidebarItemProps {
+  property: TimeToSellProperty;
+  onClick: () => void;
+  showPercentOfList?: boolean;
+}
+
+function PropertySidebarItem({ 
+  property, 
+  onClick,
+  showPercentOfList = false 
+}: PropertySidebarItemProps) {
+  const percentOfList = property.soldPrice && property.originalPrice 
+    ? Math.round((property.soldPrice / property.originalPrice) * 100)
+    : null;
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 p-2 rounded-lg 
+                 hover:bg-gray-100 dark:hover:bg-gray-800 
+                 transition-colors cursor-pointer
+                 min-h-[60px] text-left"
+      aria-label={`View details for ${property.address}`}
+    >
+      {/* Thumbnail */}
+      <div className="w-16 h-12 rounded-md overflow-hidden flex-shrink-0 bg-gray-200 dark:bg-gray-700">
+        <img 
+          src={property.photos?.[0] || '/placeholder-property.jpg'} 
+          alt={property.address}
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
+      </div>
+      
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+          {property.address}
+        </p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {property.daysOnMarket} Days
+          {showPercentOfList && percentOfList && (
+            <span className="ml-1">• {percentOfList}%</span>
+          )}
+        </p>
+      </div>
+    </button>
+  );
+}
+```
+
+### Step 5: Complete TimeToSellSlide Component
+
+```tsx
+import { useState, useMemo } from 'react';
+import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { Info } from 'lucide-react';
+
+interface TimeToSellSlideProps {
+  listings: RepliersListing[];
+  subjectProperty?: TimeToSellProperty;
+}
+
+export function TimeToSellSlide({ listings, subjectProperty }: TimeToSellSlideProps) {
+  const [selectedProperty, setSelectedProperty] = useState<TimeToSellProperty | null>(null);
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  
+  // Transform Repliers data
+  const properties = useMemo(() => {
+    return buildTimeToSellDataset(listings, subjectProperty);
+  }, [listings, subjectProperty]);
+  
+  // Calculate metrics
+  const metrics = useMemo(() => {
+    return calculateTimeToSellMetrics(properties);
+  }, [properties]);
+  
+  // Group by status for sidebar
+  const closedProperties = properties.filter(p => p.statusColor === 'red');
+  const underContractProperties = properties.filter(p => p.statusColor === 'orange');
+  const activeProperties = properties.filter(p => p.statusColor === 'green');
+  const expiredProperties = properties.filter(p => p.statusColor === 'blue');
+  
+  // Chart data
+  const chartData = properties.flatMap(p => [
+    { ...p, price: p.originalPrice, dotType: 'original' },
+    { ...p, price: p.soldPrice || p.listPrice, dotType: 'current' },
+  ]);
+  
+  const formatPrice = (value: number) => {
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(2)}M`;
+    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+    return `$${value}`;
+  };
+
+  return (
+    <div className="flex flex-col md:flex-row h-full bg-white dark:bg-gray-900">
+      {/* Mobile: Horizontal Scroll Sidebar */}
+      <div className="md:hidden w-full overflow-x-auto pb-3 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex gap-2 px-3 min-w-max">
+          {properties.map(property => (
+            <button
+              key={property.id}
+              onClick={() => setSelectedProperty(property)}
+              className="flex-shrink-0 flex items-center gap-2 p-2 rounded-lg 
+                         bg-gray-100 dark:bg-gray-800 min-w-[160px] min-h-[44px]"
+            >
+              <img 
+                src={property.photos?.[0] || '/placeholder-property.jpg'} 
+                className="w-10 h-10 rounded object-cover"
+                alt={property.address}
+              />
+              <div className="text-left min-w-0">
+                <p className="text-xs font-medium truncate max-w-[100px]">{property.address}</p>
+                <p className="text-xs text-gray-500">{property.daysOnMarket}d</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+      
+      {/* Desktop: Vertical Sidebar */}
+      <div className="hidden md:block w-64 lg:w-72 h-full overflow-y-auto border-r border-gray-200 dark:border-gray-700 p-3">
+        {/* Closed */}
+        {closedProperties.length > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-2 h-2 rounded-full bg-red-500"></span>
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Closed</span>
+              <span className="text-xs text-gray-500">({closedProperties.length})</span>
+            </div>
+            {closedProperties.map(p => (
+              <PropertySidebarItem
+                key={p.id}
+                property={p}
+                onClick={() => setSelectedProperty(p)}
+                showPercentOfList={true}
+              />
+            ))}
+          </div>
+        )}
+        
+        {/* Under Contract */}
+        {underContractProperties.length > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Active Under Contract</span>
+              <span className="text-xs text-gray-500">({underContractProperties.length})</span>
+            </div>
+            {underContractProperties.map(p => (
+              <PropertySidebarItem key={p.id} property={p} onClick={() => setSelectedProperty(p)} />
+            ))}
+          </div>
+        )}
+        
+        {/* Active */}
+        {activeProperties.length > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-2 h-2 rounded-full bg-green-500"></span>
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Active</span>
+              <span className="text-xs text-gray-500">({activeProperties.length})</span>
+            </div>
+            {activeProperties.map(p => (
+              <PropertySidebarItem key={p.id} property={p} onClick={() => setSelectedProperty(p)} />
+            ))}
+          </div>
+        )}
+        
+        {/* Expired/Canceled */}
+        {expiredProperties.length > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Expired/Canceled</span>
+              <span className="text-xs text-gray-500">({expiredProperties.length})</span>
+            </div>
+            {expiredProperties.map(p => (
+              <PropertySidebarItem key={p.id} property={p} onClick={() => setSelectedProperty(p)} />
+            ))}
+          </div>
+        )}
+      </div>
+      
+      {/* Main Content */}
+      <div className="flex-1 p-4 md:p-6 overflow-auto">
+        {/* Header Stats */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 mb-4">
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100">
+              {metrics.avgDaysOnMarket}
+            </span>
+            <span className="text-lg md:text-xl text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+              Days on Market
+            </span>
+          </div>
+          <span className="hidden sm:block text-3xl text-gray-300 dark:text-gray-600">|</span>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl md:text-4xl font-bold text-[#EF4923]">
+              {metrics.avgPercentOfList}%
+            </span>
+            <span className="text-lg md:text-xl text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+              of List Price
+            </span>
+          </div>
+        </div>
+        
+        {/* Explanatory Text */}
+        <p className="text-center text-sm text-gray-600 dark:text-gray-400 mb-6 max-w-2xl mx-auto">
+          Sold homes were on the market for an average of{' '}
+          <span className="text-[#EF4923] font-medium">{metrics.avgDaysOnMarket} days</span>{' '}
+          before they accepted an offer. These homes sold for an average of{' '}
+          <span className="text-[#EF4923] font-medium">{metrics.avgPercentOfList}%</span>{' '}
+          of list price.
+          <button 
+            onClick={() => setShowInfoModal(true)}
+            className="inline-flex ml-1 text-gray-400 hover:text-gray-600 min-w-[44px] min-h-[44px] items-center justify-center"
+            aria-label="More information about this chart"
+          >
+            <Info className="w-4 h-4" />
+          </button>
+        </p>
+        
+        {/* Scatter Chart */}
+        {properties.length >= 3 ? (
+          <div className="w-full h-[300px] md:h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis 
+                  dataKey="daysOnMarket" 
+                  name="Days on Market"
+                  type="number"
+                  tick={{ fontSize: 12 }}
+                  label={{ value: 'Days on market', position: 'bottom', offset: 20 }}
+                />
+                <YAxis 
+                  dataKey="price" 
+                  name="Price"
+                  type="number"
+                  tickFormatter={formatPrice}
+                  tick={{ fontSize: 12 }}
+                />
+                <Tooltip 
+                  formatter={(value: number) => [formatPrice(value), 'Price']}
+                  labelFormatter={(label) => `${label} Days on Market`}
+                />
+                
+                {/* Render scatter points by status */}
+                <Scatter name="Closed" data={closedProperties} fill="#ef4444" />
+                <Scatter name="Active" data={activeProperties} fill="#22c55e" />
+                <Scatter name="Pending" data={underContractProperties} fill="#f97316" />
+                <Scatter name="Expired" data={expiredProperties} fill="#3b82f6" />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="w-full h-[300px] flex items-center justify-center text-gray-500">
+            Insufficient comparable data available (minimum 3 properties required)
+          </div>
+        )}
+        
+        {/* Legend */}
+        <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 mt-4">
+          <div className="flex items-center gap-2">
+            <span className="w-4 h-4 rounded-full border-2 border-gray-400 bg-white"></span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">Original list price</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-4 h-4 rounded-full bg-gray-400"></span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">Most recent price or sold price</span>
+          </div>
+        </div>
+      </div>
+      
+      {/* Property Detail Modal */}
+      {selectedProperty && (
+        <PropertyDetailModal
+          property={selectedProperty}
+          subjectProperty={subjectProperty}
+          onClose={() => setSelectedProperty(null)}
+        />
+      )}
+      
+      {/* Info Modal */}
+      {showInfoModal && (
+        <TimeToSellInfoModal onClose={() => setShowInfoModal(false)} />
+      )}
+    </div>
+  );
+}
+
+// Info Modal Component
+function TimeToSellInfoModal({ onClose }: { onClose: () => void }) {
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
+                      w-full max-w-lg bg-white dark:bg-gray-900 rounded-xl shadow-2xl z-50 p-6">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+          TIME TO SELL SCATTER CHART
+        </h2>
+        <p className="text-gray-600 dark:text-gray-400 mb-4">
+          The time to sell scatter chart is a way to visualize how long the listings took to sell. 
+          Not only can you see the relationship between the price and days on market, but you can 
+          also see the difference between the original list price and the sold price. If the listing 
+          isn't sold, you can see if the price has dropped.
+        </p>
+        <p className="text-gray-600 dark:text-gray-400">
+          This chart shows that pricing the home correctly from the beginning will help reduce the 
+          days on market.
+        </p>
+        <button
+          onClick={onClose}
+          className="mt-6 w-full py-3 bg-[#EF4923] hover:bg-[#d94420] text-white rounded-lg font-medium transition-colors min-h-[44px]"
+        >
+          Got it
+        </button>
+      </div>
+    </>
+  );
+}
+```
+
+---
+
+## MOBILE OPTIMIZATION CHECKLIST
+
+| Requirement | Implementation |
+|-------------|----------------|
+| Touch targets 44x44px | All buttons use `min-w-[44px] min-h-[44px]` |
+| Horizontal scroll sidebar | Mobile uses horizontal scroll strip |
+| Modal responsive | `fixed inset-4` on mobile, centered on desktop |
+| Smooth scrolling | Native CSS overflow with momentum |
+| Safe areas | Modal uses `inset-4` for notch clearance |
+| Keyboard nav | ESC closes, arrows navigate photos |
+| No hover-only | All hover states have touch alternatives |
+
+---
+
+## VALIDATION CHECKLIST
+
+- [ ] All DOM values come from `simpleDaysOnMarket` only
+- [ ] No rentals appear in dataset
+- [ ] Status colors match: Red=Closed, Green=Active, Orange=Pending, Blue=Expired
+- [ ] Metrics calculated from CLOSED properties only
+- [ ] Missing required fields logged and excluded (no silent fallbacks)
+- [ ] Dataset logged before render: `console.log('[TimeToSell] Dataset built:', ...)`
+- [ ] Chart shows "Insufficient data" if < 3 properties
+- [ ] All touch targets minimum 44x44px
+- [ ] Dark mode colors correct
+- [ ] NO "Virtual Tour" link in modal
+
+---
+
+## FILES TO CREATE/MODIFY
+
+1. `client/src/components/cma/presentation/slides/TimeToSellSlide.tsx`
+2. `client/src/components/cma/PropertyDetailModal.tsx`
+3. `client/src/lib/timeToSellDataset.ts` (data transformation)
+4. `client/src/types/repliers.ts` (type definitions if not existing)
+
+---
+
+## TEST SCENARIOS
+
+1. Click property in sidebar → Modal opens with correct data
+2. Navigate photos with arrows → Photos cycle correctly
+3. Close modal via X, click outside, ESC → All work
+4. Check console for dataset log → Shows property count
+5. Verify DOM field is `simpleDaysOnMarket` → Never calculated
+6. Mobile test → Horizontal sidebar scrolls, modal fits viewport
+7. Dark mode → All colors correct

@@ -28,6 +28,7 @@ export interface CmaProperty {
   state: string;
   zipCode: string;
   price: number;
+  listPrice?: number;
   soldPrice?: number;
   originalPrice?: number;
   sqft: number;
@@ -36,7 +37,7 @@ export interface CmaProperty {
   lotSize?: number;
   yearBuilt?: number;
   garageSpaces?: number;
-  status: 'Active' | 'Pending' | 'Closed' | 'Active Under Contract';
+  status: 'Active' | 'Pending' | 'Closed' | 'Active Under Contract' | 'Expired' | 'Canceled' | 'Withdrawn';
   daysOnMarket: number;
   listDate?: string;
   soldDate?: string;
