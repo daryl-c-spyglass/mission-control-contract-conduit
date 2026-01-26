@@ -1,0 +1,220 @@
+# CMA Presentation — Add X Close Button to Slides
+
+## Issue
+
+When viewing slides in the CMA Presentation, there is no visible "X" button to close/exit the slide view. Users can only press ESC on keyboard, which is not discoverable.
+
+---
+
+## Solution
+
+Add an X close button in the top-right corner of the slide header, after the agent profile.
+
+---
+
+## Target Layout
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ ☰ [Logo]           COMPS              Daryl Camingao  [📷]  [X]       │
+│                    5 / 33              Spyglass Realty                 │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                    Compare  Map  Stats │
+│  ┌─────────────────────────────────┐  ┌──────────┐                    │
+│  │         Subject                 │  │  Closed  │                    │
+│  │         [Property Image]        │  │  [Image] │                    │
+│  └─────────────────────────────────┘  └──────────┘                    │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Implementation
+
+### Update the Slide Header Component:
+
+```tsx
+// In SlideHeader.tsx or Header.tsx for slide view
+
+import { X, Menu, Search, Star, Download } from 'lucide-react';
+
+interface SlideHeaderProps {
+  slideTitle: string;
+  currentSlide: number;
+  totalSlides: number;
+  agentName: string;
+  agentCompany: string;
+  agentPhoto: string;
+  onMenuToggle: () => void;
+  onClose: () => void;  // Add this prop
+}
+
+export function SlideHeader({
+  slideTitle,
+  currentSlide,
+  totalSlides,
+  agentName,
+  agentCompany,
+  agentPhoto,
+  onMenuToggle,
+  onClose,
+}: SlideHeaderProps) {
+  return (
+    <header className="relative h-[60px] bg-[#1a1a2e] flex items-center px-4">
+      {/* Left - Hamburger + Logo */}
+      <div className="flex items-center gap-3 z-10">
+        <button 
+          onClick={onMenuToggle}
+          className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-white/10 transition-colors"
+        >
+          <Menu className="w-6 h-6 text-white" />
+        </button>
+        <img 
+          src="/logos/spyglass-logo-white.png" 
+          alt="Spyglass Realty" 
+          className="h-6 hidden sm:block" 
+        />
+      </div>
+      
+      {/* Center - Title (absolutely positioned for true center) */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="text-center">
+          <h1 className="text-white text-lg font-bold tracking-wider uppercase">
+            {slideTitle}
+          </h1>
+          <p className="text-white/60 text-sm">
+            {currentSlide} / {totalSlides}
+          </p>
+        </div>
+      </div>
+      
+      {/* Right - Agent Profile + Close Button */}
+      <div className="ml-auto flex items-center gap-2 z-10">
+        {/* Agent Name + Company (hidden on mobile) */}
+        <div className="text-right hidden md:block">
+          <p className="text-white text-sm font-medium">{agentName}</p>
+          <p className="text-white/70 text-xs">{agentCompany}</p>
+        </div>
+        
+        {/* Agent Photo */}
+        <img 
+          src={agentPhoto} 
+          alt={agentName}
+          className="w-9 h-9 rounded-full object-cover border border-white/20"
+        />
+        
+        {/* CLOSE BUTTON - New */}
+        <button
+          onClick={onClose}
+          className="ml-2 min-w-[44px] min-h-[44px] p-2 rounded-lg 
+                     hover:bg-white/10 transition-colors
+                     flex items-center justify-center"
+          aria-label="Close presentation (Esc)"
+          title="Close (Esc)"
+        >
+          <X className="w-6 h-6 text-white" />
+        </button>
+      </div>
+    </header>
+  );
+}
+```
+
+### Parent Component - Pass onClose Handler:
+
+```tsx
+// In CmaPresentationPlayer.tsx or SlideViewer.tsx
+
+const handleClose = () => {
+  // Navigate back to CMA tab or close the presentation
+  // Option 1: If using state
+  setIsPresenting(false);
+  
+  // Option 2: If using navigation
+  navigate(`/transactions/${transactionId}/cma`);
+  
+  // Option 3: If it's a modal/overlay
+  onClose?.();
+};
+
+// Also keep ESC key handler
+useEffect(() => {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      handleClose();
+    }
+  };
+  
+  window.addEventListener('keydown', handleKeyDown);
+  return () => window.removeEventListener('keydown', handleKeyDown);
+}, []);
+
+return (
+  <SlideHeader
+    // ... other props
+    onClose={handleClose}
+  />
+);
+```
+
+---
+
+## Copy/Paste for Replit
+
+```
+Add an X close button to the CMA Presentation slide view header.
+
+## LOCATION:
+Top-right corner of the slide header, AFTER the agent profile photo
+
+## BUTTON SPECS:
+- Icon: X from lucide-react
+- Size: w-6 h-6 for icon
+- Touch target: min-w-[44px] min-h-[44px]
+- Styling: p-2 rounded-lg hover:bg-white/10 transition-colors
+- Color: text-white
+- Spacing: ml-2 (gap from agent photo)
+- Accessibility: aria-label="Close presentation (Esc)" title="Close (Esc)"
+
+## CODE:
+Add after the agent photo in the header:
+
+<button
+  onClick={onClose}
+  className="ml-2 min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-white/10 transition-colors flex items-center justify-center"
+  aria-label="Close presentation (Esc)"
+  title="Close (Esc)"
+>
+  <X className="w-6 h-6 text-white" />
+</button>
+
+## HANDLER:
+- Clicking X should close the presentation/return to CMA tab
+- Keep existing ESC key functionality
+- Both should call the same handleClose function
+
+## LAYOUT ORDER (right side):
+1. Agent name + company (hidden on mobile)
+2. Agent photo
+3. X close button (NEW)
+```
+
+---
+
+## Expected Result
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ ☰ [Logo]        COMPS         Daryl Camingao [📷] [X]           │
+│                 5 / 33         Spyglass Realty      ↑            │
+│                                                     │            │
+│                                              Close button        │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+The X button:
+- Appears after agent profile
+- Has hover state (bg-white/10)
+- Shows tooltip "Close (Esc)" on hover
+- Has proper touch target size
+- Works same as pressing ESC key

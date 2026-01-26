@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Menu } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import type { AgentProfile, CmaProperty } from '../types';
 import { WIDGETS } from '../constants/widgets';
 
@@ -139,6 +139,17 @@ export function SlideViewer({
               className="w-10 h-10 rounded-full object-cover border-2 border-white/30"
               data-testid="img-agent-photo"
             />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="ml-1 text-white hover:bg-white/10"
+              aria-label="Close presentation (Esc)"
+              title="Close (Esc)"
+              data-testid="button-close-slide"
+            >
+              <X className="w-5 h-5" />
+            </Button>
           </div>
         </div>
 
