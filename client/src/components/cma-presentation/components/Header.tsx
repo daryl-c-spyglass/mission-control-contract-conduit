@@ -22,6 +22,9 @@ interface HeaderProps {
   longitude?: number;
   comparables?: CmaProperty[];
   subjectProperty?: CmaProperty;
+  averageDaysOnMarket?: number;
+  suggestedListPrice?: number | null;
+  avgPricePerAcre?: number | null;
 }
 
 export function Header({
@@ -33,6 +36,9 @@ export function Header({
   onClose,
   comparables = [],
   subjectProperty,
+  averageDaysOnMarket = 0,
+  suggestedListPrice,
+  avgPricePerAcre,
 }: HeaderProps) {
   const { theme } = useTheme();
   const [logoError, setLogoError] = useState(false);
@@ -98,6 +104,10 @@ export function Header({
               agent={agent}
               comparables={comparables}
               subjectProperty={subjectProperty}
+              averageDaysOnMarket={averageDaysOnMarket}
+              suggestedListPrice={suggestedListPrice}
+              avgPricePerAcre={avgPricePerAcre}
+              preparedFor={preparedFor}
               className="text-white hover:bg-white/20"
             />
 

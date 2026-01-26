@@ -68,6 +68,14 @@ Preferred communication style: Simple, everyday language.
   - Widget types: AgentResume, Comps (Compare/Map/Stats tabs), TimeToSell, SuggestedPrice, AveragePricePerAcre, SpyglassResources, Static images
   - Data integration: Uses `useAgentProfile` hook for agent data, transforms `CMAComparable[]` to `CmaProperty[]` for presentation
   - Static widget images stored in `public/cma-widgets/` (1.png through 24.png map to widgets 11-34)
+- **CMA PDF Export System**: Client-side PDF generation using @react-pdf/renderer:
+  - Files: `pdf/CmaPdfDocument.tsx` (main document), `pdf/styles.ts` (Spyglass branding styles)
+  - Button: `PdfDownloadButton.tsx` in presentation header, uses `pdf().toBlob()` for generation
+  - Features: Landscape Letter format, all 33 widgets covered, specialized pages for dynamic content
+  - Page Types: CoverPage, AgentResumePage, ComparablesSummaryPage, TimeToSellPage, SuggestedPricePage, AveragePricePerAcrePage, ListingActionPlanPage, ClientTestimonialsPage, ListingWithSpyglassPage, SpyglassResourcesPage, MarketingPage, ThankYouPage, StaticImagePage (fallback), PropertyDetailPage (top 3 comparables)
+  - Data Flow: CmaPresentationPlayer → Header → PdfDownloadButton → CmaPdfDocument (props: agent, comparables, subjectProperty, averageDaysOnMarket, suggestedListPrice, avgPricePerAcre, preparedFor)
+  - Styling: Spyglass brand colors (#EF4923, #222222), Inter font registered, 40+ style definitions
+  - Output: `CMA-{address}-{date}.pdf` with toast notifications for status updates
 - **CMA Resources System**: Agent-managed resources (documents, links) for CMA presentations:
   - Database: `agentResources` table with id, userId, name, type (file/link), url, fileUrl, displayOrder, isActive, timestamps
   - API Endpoints: GET/POST `/api/agent/resources`, PATCH/DELETE `/api/agent/resources/:id`, POST `/api/agent/resources/reorder`, POST `/api/agent/resources/upload`

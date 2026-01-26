@@ -175,6 +175,9 @@ export function CmaPresentationPlayer({
         longitude={longitude}
         comparables={comparables}
         subjectProperty={subjectProperty}
+        averageDaysOnMarket={averageDaysOnMarket}
+        suggestedListPrice={suggestedListPrice}
+        avgPricePerAcre={avgPricePerAcre}
       />
 
       <div className="flex-1 overflow-auto bg-muted/30 pb-16">
