@@ -1,0 +1,197 @@
+# Fix CMA Tab Property Modal — Navigation Arrows Not Visible
+
+## Issue
+
+The CMA Tab's Comparable Properties modal has navigation arrows that are barely visible (see 2nd screenshot with red arrows). The CMA Presentation modal is already fixed - now need to fix the CMA Tab modal to match.
+
+**Location:** CMA Tab → Comparable Properties → Click property card → Photo gallery modal
+
+---
+
+## Find the Component
+
+```bash
+# Search for the photo gallery/lightbox modal in CMA components
+grep -rn "photo.*modal\|lightbox\|gallery.*modal\|ChevronLeft\|ChevronRight" --include="*.tsx" client/src/components/
+
+# Look for PropertyDetailModal or similar
+grep -rn "PropertyDetail\|property.*modal" --include="*.tsx" client/src/components/
+```
+
+Likely files:
+- `client/src/components/property-detail-modal.tsx`
+- `client/src/components/photo-gallery-modal.tsx`
+- `client/src/components/cma-property-modal.tsx`
+
+---
+
+## Current vs Target
+
+| Element | Current (Broken) | Target (Fixed) |
+|---------|------------------|----------------|
+| Left Arrow | Tiny, barely visible | 48x48px dark circular button |
+| Right Arrow | Tiny, barely visible | 48x48px dark circular button |
+| Close X | Small in corner | Larger, more visible |
+| Background | None | bg-black/50 with shadow |
+
+---
+
+## Fix Implementation
+
+Replace the current arrow buttons with visible styled buttons:
+
+```tsx
+{/* Photo Gallery Container */}
+<div className="relative w-full h-full">
+  {/* Main Photo */}
+  <img src={photos[currentIndex]} className="w-full h-full object-contain" />
+  
+  {/* Close Button - Top Left */}
+  <button
+    onClick={onClose}
+    className="absolute top-4 left-4 
+               min-w-[44px] min-h-[44px] 
+               bg-black/50 hover:bg-black/70 
+               text-white rounded-full 
+               flex items-center justify-center
+               transition-all shadow-lg z-10"
+    aria-label="Close"
+  >
+    <X className="w-6 h-6" />
+  </button>
+  
+  {/* Previous Arrow - Left Side */}
+  {photos.length > 1 && (
+    <button
+      onClick={handlePrevPhoto}
+      className="absolute left-4 top-1/2 -translate-y-1/2 
+                 min-w-[48px] min-h-[48px] 
+                 bg-black/50 hover:bg-black/70 
+                 text-white rounded-full 
+                 flex items-center justify-center
+                 transition-all shadow-lg z-10"
+      aria-label="Previous photo"
+    >
+      <ChevronLeft className="w-6 h-6" />
+    </button>
+  )}
+  
+  {/* Next Arrow - Right Side */}
+  {photos.length > 1 && (
+    <button
+      onClick={handleNextPhoto}
+      className="absolute right-4 top-1/2 -translate-y-1/2 
+                 min-w-[48px] min-h-[48px] 
+                 bg-black/50 hover:bg-black/70 
+                 text-white rounded-full 
+                 flex items-center justify-center
+                 transition-all shadow-lg z-10"
+      aria-label="Next photo"
+    >
+      <ChevronRight className="w-6 h-6" />
+    </button>
+  )}
+  
+  {/* Photo Counter - Bottom Center */}
+  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 
+                  px-4 py-2 bg-black/60 text-white text-sm rounded-full">
+    {currentIndex + 1} / {photos.length}
+  </div>
+</div>
+```
+
+---
+
+## Copy/Paste for Replit
+
+```
+Fix the CMA Tab property modal photo navigation arrows - they are barely visible.
+
+## ISSUE:
+In CMA Tab → Comparable Properties → Click a property card → The photo gallery modal has tiny, nearly invisible navigation arrows and close button (see attached screenshot with red arrows).
+
+The CMA Presentation modal is already fixed - now apply same fix to CMA Tab modal.
+
+## FIND THE FILE:
+Search for the photo gallery/lightbox component used in CMA Tab:
+grep -rn "photo.*modal\|lightbox\|gallery" --include="*.tsx" client/src/components/
+
+Likely in:
+- client/src/components/photo-gallery-modal.tsx
+- client/src/components/property-detail-modal.tsx
+
+## UPDATE NAVIGATION BUTTONS TO:
+
+{/* Close Button - Top Left */}
+<button
+  onClick={onClose}
+  className="absolute top-4 left-4 
+             min-w-[44px] min-h-[44px] 
+             bg-black/50 hover:bg-black/70 
+             text-white rounded-full 
+             flex items-center justify-center
+             transition-all shadow-lg z-10"
+>
+  <X className="w-6 h-6" />
+</button>
+
+{/* Previous Arrow */}
+<button
+  onClick={handlePrevPhoto}
+  className="absolute left-4 top-1/2 -translate-y-1/2 
+             min-w-[48px] min-h-[48px] 
+             bg-black/50 hover:bg-black/70 
+             text-white rounded-full 
+             flex items-center justify-center
+             transition-all shadow-lg z-10"
+>
+  <ChevronLeft className="w-6 h-6" />
+</button>
+
+{/* Next Arrow */}
+<button
+  onClick={handleNextPhoto}
+  className="absolute right-4 top-1/2 -translate-y-1/2 
+             min-w-[48px] min-h-[48px] 
+             bg-black/50 hover:bg-black/70 
+             text-white rounded-full 
+             flex items-center justify-center
+             transition-all shadow-lg z-10"
+>
+  <ChevronRight className="w-6 h-6" />
+</button>
+
+## STYLING REQUIREMENTS:
+- Size: 48x48px (44px minimum for close button)
+- Background: bg-black/50 (semi-transparent dark)
+- Hover: bg-black/70
+- Shape: rounded-full (circular)
+- Shadow: shadow-lg
+- Color: text-white
+- Icons: w-6 h-6
+
+This should match the already-fixed CMA Presentation modal navigation.
+```
+
+---
+
+## Expected Result
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  [X]                                                        │  ← Visible close button
+│                                                             │
+│                                                             │
+│  [<]              [Property Photo]                 [>]     │  ← Visible nav arrows
+│                                                             │
+│                                                             │
+│                        1 / 40                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+All buttons should be:
+- Dark circular background (bg-black/50)
+- 48x48px size
+- White icons
+- Shadow for visibility
+- Hover state (bg-black/70)

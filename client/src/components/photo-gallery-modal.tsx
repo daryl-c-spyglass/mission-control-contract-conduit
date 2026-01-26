@@ -145,15 +145,21 @@ export function PhotoGalleryModal({
 
         <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-muted/30">
           {hasMultiplePhotos && (
-            <Button
-              variant="secondary"
-              size="icon"
+            <button
               onClick={goToPrevious}
-              className="absolute left-4 z-10 h-12 w-12 rounded-full shadow-lg"
+              className="absolute left-4 top-1/2 -translate-y-1/2 z-10
+                         min-w-[48px] min-h-[48px] 
+                         bg-black/50 hover:bg-black/70 
+                         text-white rounded-full 
+                         flex items-center justify-center
+                         transition-all duration-200
+                         shadow-lg
+                         focus:outline-none focus:ring-2 focus:ring-white/50"
+              aria-label="Previous photo"
               data-testid="button-gallery-prev"
             >
-              <ChevronLeft className="w-8 h-8" />
-            </Button>
+              <ChevronLeft className="w-6 h-6" />
+            </button>
           )}
 
           <div className="overflow-auto max-w-full max-h-full p-4">
@@ -171,15 +177,21 @@ export function PhotoGalleryModal({
           </div>
 
           {hasMultiplePhotos && (
-            <Button
-              variant="secondary"
-              size="icon"
+            <button
               onClick={goToNext}
-              className="absolute right-4 z-10 h-12 w-12 rounded-full shadow-lg"
+              className="absolute right-4 top-1/2 -translate-y-1/2 z-10
+                         min-w-[48px] min-h-[48px] 
+                         bg-black/50 hover:bg-black/70 
+                         text-white rounded-full 
+                         flex items-center justify-center
+                         transition-all duration-200
+                         shadow-lg
+                         focus:outline-none focus:ring-2 focus:ring-white/50"
+              aria-label="Next photo"
               data-testid="button-gallery-next"
             >
-              <ChevronRight className="w-8 h-8" />
-            </Button>
+              <ChevronRight className="w-6 h-6" />
+            </button>
           )}
         </div>
 
