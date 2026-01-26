@@ -1,0 +1,1100 @@
+# Replit Agent Task: Time to Sell - Two-Stage Property Interaction
+
+## Overview
+Implement a two-stage property interaction on the Time to Sell slide:
+
+1. **Click sidebar item** → Property card panel slides in on the left
+2. **Click card/View button** → Full detail modal opens with map, photos, description, details
+
+---
+
+## INTERACTION FLOW
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  SIDEBAR          │  PROPERTY CARD PANEL    │  SCATTER CHART            │
+│                   │  (appears on click)     │                           │
+│  ● Closed (6)     │  ┌─────────────────┐    │   55 DAYS ON MARKET       │
+│    [img] 2502...  │  │   [Photo]       │    │                           │
+│    [img] 2112...  │  │                 │    │       ○      ○            │
+│                   │  │  ← X close      │    │    ●     ●                │
+│  ● Under Contract │  ├─────────────────┤    │         ●                 │
+│    [img] 2400...  │  │ Address  $Price │    │                           │
+│                   │  │ City     Status │    │                           │
+│  ● Active (4)     │  ├─────────────────┤    │                           │
+│    [img] 2505...  │  │ Beds         3  │    │                           │
+│    [img] 2713...  │  │ Baths      2.0  │    │  ○ Original list price    │
+│                   │  │ Sq.Ft.    2042  │    │  ● Sold/current price     │
+│                   │  │ Lot Size  9679  │    │                           │
+│                   │  │ Garage       2  │    │                           │
+│                   │  ├─────────────────┤    │                           │
+│                   │  │ Listing Details │    │                           │
+│                   │  │ Orig.  $1.45M   │    │                           │
+│                   │  │ List   $1.295M  │    │                           │
+│                   │  │ Sold   $1.16M   │    │                           │
+│                   │  │ $/SqFt    $568  │    │                           │
+│                   │  │ Sold Date 10/31 │    │                           │
+│                   │  │ DOM        119  │    │                           │
+│                   │  │                 │    │                           │
+│                   │  │ [View] button   │    │                           │
+│                   │  └─────────────────┘    │                           │
+└─────────────────────────────────────────────────────────────────────────┘
+
+                              ↓ Click "View" or card
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  ✕  2502 Spring Creek Drive  Austin, TX 78704                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│  [MAP]              │  [PHOTO 1]  [PHOTO 2]  [PHOTO 3]                  │
+│                     │                                                    │
+│  📷 40  🎥 Tour     │  CLOSED ● 119 DAYS                                │
+├─────────────────────┤  $1,160,000  $568/sqft                            │
+│  🛏 BEDROOMS    3   │  3 beds  2 baths  2,042 sqft                      │
+│  🚿 BATHROOMS   2   │                                                    │
+│  📐 HOME SIZE ↓4%   │  Listed: 5/19/25  Sold: 10/31/25                  │
+│     2,042 sq.ft.    │                                                    │
+│  📅 YEAR BUILT ↑5yrs│  Original List Price         $1,450,000           │
+│     1964            │  List Price ↓$155,000        $1,295,000           │
+│  🚗 GARAGES     2   │  Sold Price 80%              $1,160,000           │
+│  📏 LOT SIZE ↓29%   │                                                    │
+│     9,679           │  MLS# 3513687 ↗                                   │
+├─────────────────────┤  Last Updated 1/16/26 at 12:02AM                  │
+│  [Property Description - full MLS remarks text]                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Details                                                                │
+│  Accessibility Features: None                                           │
+│  Appliances: Built-In Gas Range, Refrigerator, Dishwasher...           │
+│  Laundry Features: Inside, Laundry Room, Washer Hookup...              │
+│  ...                                                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## REPLIERS DATA MAPPING (STRICT - NO FALLBACKS)
+
+### Required Fields from Repliers Listings API
+
+| UI Field | Repliers Field | Notes |
+|----------|----------------|-------|
+| Address | `address.streetNumber` + `address.streetName` + `address.streetSuffix` | Build full address |
+| City | `address.city` | |
+| State | `address.state` | |
+| Zip | `address.zip` | |
+| Status | Derive from `soldDate`/`soldPrice` presence + `lastStatus` | "Closed" if has soldDate |
+| Beds | `details.numBedrooms` | |
+| Baths | `details.numBathrooms` | |
+| Sq Ft | `details.sqft` | Parse string → number |
+| Lot Size | `lot.squareFeet` | Fallback: `lot.acres * 43560` |
+| Garage | `details.numGarageSpaces` | |
+| Year Built | `details.yearBuilt` | |
+| Original Price | `originalPrice` | |
+| List Price | `listPrice` | |
+| Sold Price | `soldPrice` | Only for Closed |
+| Sold Date | `soldDate` | Only for Closed |
+| Days on Market | `simpleDaysOnMarket` | **ONLY this field** for display |
+| Photos | `images[].url` | Filter by photo type |
+| Description | `remarks` or `publicRemarks` | Full MLS description |
+| MLS # | `mlsNumber` | |
+| Last Updated | `updatedOn` or `lastUpdate` | |
+| Coordinates | `map.latitude`, `map.longitude` | For map display |
+
+### Computed Fields (Client-Side)
+
+```typescript
+// Price per Sq Ft
+const pricePerSqft = status === 'Closed' 
+  ? Math.round(soldPrice / sqft)
+  : Math.round(listPrice / sqft);
+// Guard: if sqft missing/0 → show "N/A"
+
+// Sold to Original Percentage
+const soldToOriginalPct = soldPrice && originalPrice
+  ? Math.round((soldPrice / originalPrice) * 100)
+  : null;
+
+// Price Drop Amount
+const priceDrop = originalPrice && listPrice && originalPrice > listPrice
+  ? originalPrice - listPrice
+  : null;
+```
+
+### Single Listing Endpoint (for MLS History / Price Timeline)
+
+```
+GET https://api.repliers.io/listings/{mlsNumber}
+```
+
+Returns expanded view with MLS history for:
+- Original list price (empty dot)
+- Price changes/adjustments (empty dots)
+- Sold price (solid dot)
+
+---
+
+## NON-NEGOTIABLE RULES
+
+1. **Data Source:** Repliers API ONLY (ACTRIS feed)
+2. **Lease Exclusion:** `type: "Sale"` - NO leases/rentals anywhere
+3. **DOM Field:** `simpleDaysOnMarket` ONLY for display
+4. **No Silent Fallbacks:** Missing field → show "N/A" and log warning
+5. **Status Logic:** Derive "Closed" from presence of `soldDate`/`soldPrice`
+
+---
+
+## IMPLEMENTATION
+
+### Step 1: State Management
+
+```tsx
+interface TimeToSellState {
+  selectedPropertyId: string | null;  // For card panel
+  detailModalOpen: boolean;           // For full modal
+  selectedProperty: NormalizedListing | null;
+}
+
+const [state, setState] = useState<TimeToSellState>({
+  selectedPropertyId: null,
+  detailModalOpen: false,
+  selectedProperty: null,
+});
+
+// Click sidebar item → Show card panel
+const handleSidebarClick = (property: NormalizedListing) => {
+  setState({
+    selectedPropertyId: property.mlsNumber,
+    detailModalOpen: false,
+    selectedProperty: property,
+  });
+};
+
+// Click card/View → Open full modal
+const handleViewClick = () => {
+  setState(prev => ({ ...prev, detailModalOpen: true }));
+};
+
+// Close card panel
+const handleCloseCard = () => {
+  setState({
+    selectedPropertyId: null,
+    detailModalOpen: false,
+    selectedProperty: null,
+  });
+};
+
+// Close full modal (keep card open)
+const handleCloseModal = () => {
+  setState(prev => ({ ...prev, detailModalOpen: false }));
+};
+```
+
+### Step 2: Normalized Listing Model
+
+```typescript
+interface NormalizedListing {
+  // Identifiers
+  mlsNumber: string;
+  
+  // Address
+  address: {
+    full: string;        // "2502 Spring Creek Drive"
+    city: string;        // "Austin"
+    state: string;       // "TX"
+    zip: string;         // "78704"
+  };
+  
+  // Status
+  statusLabel: 'Closed' | 'Active' | 'Pending' | 'Expired' | 'Canceled';
+  statusColor: 'red' | 'green' | 'orange' | 'blue';
+  
+  // Prices
+  prices: {
+    original: number | null;
+    list: number;
+    sold: number | null;
+    priceDrop: number | null;      // original - list (if dropped)
+  };
+  
+  // Dates
+  soldDate: string | null;
+  listDate: string | null;
+  lastUpdated: string | null;
+  
+  // DOM
+  dom: {
+    simple: number;      // simpleDaysOnMarket - USE THIS
+    raw: number | null;  // daysOnMarket - debug only
+  };
+  
+  // Property Details
+  beds: number | null;
+  baths: number | null;
+  sqft: number | null;
+  lotSqFt: number | null;
+  garageSpaces: number | null;
+  yearBuilt: number | null;
+  
+  // Computed
+  pricePerSqft: number | null;
+  soldToOriginalPct: number | null;
+  
+  // Media
+  photos: string[];
+  photoCount: number;
+  hasVirtualTour: boolean;
+  virtualTourUrl: string | null;
+  
+  // Location
+  coordinates: {
+    lat: number;
+    lng: number;
+  } | null;
+  
+  // Content
+  description: string | null;
+  
+  // Features (for detail modal)
+  features: {
+    accessibility: string[];
+    appliances: string[];
+    laundry: string[];
+    levels: string;
+    lotFeatures: string[];
+    otherStructures: string[];
+    // ... other feature categories
+  };
+  
+  // MLS History (from single listing endpoint)
+  priceHistory: Array<{
+    date: string;
+    price: number;
+    event: 'listed' | 'price_change' | 'sold';
+  }>;
+}
+```
+
+### Step 3: Data Mapping Function
+
+```typescript
+function normalizeRepliersListing(raw: RepliersListing): NormalizedListing | null {
+  // RULE: Exclude leases
+  if (raw.type === 'Lease' || raw.propertyType?.toLowerCase().includes('lease')) {
+    console.warn(`[TimeToSell] Excluding lease: ${raw.mlsNumber}`);
+    return null;
+  }
+  
+  // RULE: Require simpleDaysOnMarket
+  if (raw.simpleDaysOnMarket === undefined || raw.simpleDaysOnMarket === null) {
+    console.warn(`[TimeToSell] Missing simpleDaysOnMarket: ${raw.mlsNumber}`);
+    return null;
+  }
+  
+  // RULE: Require listPrice
+  if (!raw.listPrice) {
+    console.warn(`[TimeToSell] Missing listPrice: ${raw.mlsNumber}`);
+    return null;
+  }
+  
+  // Build address
+  const addressParts = [
+    raw.address?.streetNumber,
+    raw.address?.streetName,
+    raw.address?.streetSuffix
+  ].filter(Boolean);
+  
+  const fullAddress = addressParts.join(' ') || raw.address?.unparsedAddress;
+  if (!fullAddress) {
+    console.warn(`[TimeToSell] Missing address: ${raw.mlsNumber}`);
+    return null;
+  }
+  
+  // Determine status
+  const isClosed = !!(raw.soldDate && raw.soldPrice);
+  const statusLabel = isClosed ? 'Closed' 
+    : raw.lastStatus?.toLowerCase().includes('pending') ? 'Pending'
+    : raw.lastStatus?.toLowerCase().includes('expired') ? 'Expired'
+    : raw.lastStatus?.toLowerCase().includes('cancel') ? 'Canceled'
+    : 'Active';
+  
+  const statusColor = statusLabel === 'Closed' ? 'red'
+    : statusLabel === 'Active' ? 'green'
+    : statusLabel === 'Pending' ? 'orange'
+    : 'blue';
+  
+  // Parse sqft (Repliers returns string)
+  const sqft = raw.details?.sqft ? parseInt(raw.details.sqft, 10) : null;
+  
+  // Lot size with acres conversion
+  const lotSqFt = raw.lot?.squareFeet 
+    || (raw.lot?.acres ? Math.round(raw.lot.acres * 43560) : null);
+  
+  // Compute price per sqft
+  const effectivePrice = isClosed ? raw.soldPrice : raw.listPrice;
+  const pricePerSqft = sqft && sqft > 0 && effectivePrice
+    ? Math.round(effectivePrice / sqft)
+    : null;
+  
+  // Compute sold-to-original percentage
+  const soldToOriginalPct = raw.soldPrice && raw.originalPrice
+    ? Math.round((raw.soldPrice / raw.originalPrice) * 100)
+    : null;
+  
+  // Price drop
+  const priceDrop = raw.originalPrice && raw.listPrice && raw.originalPrice > raw.listPrice
+    ? raw.originalPrice - raw.listPrice
+    : null;
+  
+  // Photos
+  const photos = (raw.images || [])
+    .filter(img => img.type === 'photo' || !img.type)
+    .sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
+    .map(img => img.url);
+  
+  return {
+    mlsNumber: raw.mlsNumber,
+    address: {
+      full: fullAddress,
+      city: raw.address?.city || '',
+      state: raw.address?.state || '',
+      zip: raw.address?.zip || '',
+    },
+    statusLabel,
+    statusColor,
+    prices: {
+      original: raw.originalPrice || null,
+      list: raw.listPrice,
+      sold: raw.soldPrice || null,
+      priceDrop,
+    },
+    soldDate: raw.soldDate || null,
+    listDate: raw.listDate || null,
+    lastUpdated: raw.updatedOn || raw.lastUpdate || null,
+    dom: {
+      simple: raw.simpleDaysOnMarket,
+      raw: raw.daysOnMarket || null,
+    },
+    beds: raw.details?.numBedrooms ?? null,
+    baths: raw.details?.numBathrooms ?? null,
+    sqft,
+    lotSqFt,
+    garageSpaces: raw.details?.numGarageSpaces ?? null,
+    yearBuilt: raw.details?.yearBuilt ?? null,
+    pricePerSqft,
+    soldToOriginalPct,
+    photos,
+    photoCount: photos.length,
+    hasVirtualTour: !!raw.virtualTour,
+    virtualTourUrl: raw.virtualTour || null,
+    coordinates: raw.map?.latitude && raw.map?.longitude
+      ? { lat: raw.map.latitude, lng: raw.map.longitude }
+      : null,
+    description: raw.remarks || raw.publicRemarks || null,
+    features: {
+      accessibility: raw.accessibilityFeatures || [],
+      appliances: raw.appliances || [],
+      laundry: raw.laundryFeatures || [],
+      levels: raw.levels || '',
+      lotFeatures: raw.lotFeatures || [],
+      otherStructures: raw.otherStructures || [],
+    },
+    priceHistory: [], // Populated from single listing endpoint
+  };
+}
+```
+
+### Step 4: Property Card Panel Component
+
+```tsx
+interface PropertyCardPanelProps {
+  property: NormalizedListing;
+  subjectProperty?: NormalizedListing;
+  onClose: () => void;
+  onViewClick: () => void;
+}
+
+export function PropertyCardPanel({ 
+  property, 
+  subjectProperty,
+  onClose,
+  onViewClick 
+}: PropertyCardPanelProps) {
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  
+  // Comparison calculations
+  const calcPercentDiff = (propValue: number | null, subjectValue: number | null) => {
+    if (!propValue || !subjectValue || subjectValue === 0) return null;
+    const diff = ((propValue - subjectValue) / subjectValue) * 100;
+    return { text: `${diff >= 0 ? '↑' : '↓'}${Math.abs(diff).toFixed(2)}%`, isPositive: diff >= 0 };
+  };
+  
+  const calcNumericDiff = (propValue: number | null, subjectValue: number | null) => {
+    if (propValue === null || subjectValue === null) return null;
+    const diff = propValue - subjectValue;
+    if (diff === 0) return null;
+    return { text: `${diff >= 0 ? '↑' : '↓'}${Math.abs(diff)}`, isPositive: diff >= 0 };
+  };
+  
+  const sqftDiff = calcPercentDiff(property.sqft, subjectProperty?.sqft ?? null);
+  const lotSizeDiff = calcPercentDiff(property.lotSqFt, subjectProperty?.lotSqFt ?? null);
+  const garageDiff = calcNumericDiff(property.garageSpaces, subjectProperty?.garageSpaces ?? null);
+  
+  const statusColorClass = {
+    red: 'text-red-500',
+    green: 'text-green-500',
+    orange: 'text-orange-500',
+    blue: 'text-blue-500',
+  }[property.statusColor];
+
+  return (
+    <div className="w-72 lg:w-80 h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
+      
+      {/* Close Button */}
+      <button
+        onClick={onClose}
+        className="absolute top-3 left-3 z-10 min-w-[44px] min-h-[44px] 
+                   flex items-center justify-center text-gray-500 hover:text-gray-700
+                   dark:text-gray-400 dark:hover:text-gray-200"
+        aria-label="Close panel"
+      >
+        <X className="w-5 h-5" />
+      </button>
+      
+      {/* Photo Section */}
+      <div className="relative w-full aspect-[4/3] bg-gray-200 dark:bg-gray-800 flex-shrink-0">
+        {property.photos.length > 0 ? (
+          <>
+            <img 
+              src={property.photos[currentPhotoIndex]} 
+              alt={property.address.full}
+              className="w-full h-full object-cover cursor-pointer"
+              onClick={onViewClick}
+            />
+            {property.photos.length > 1 && (
+              <>
+                <button
+                  onClick={() => setCurrentPhotoIndex(i => i === 0 ? property.photos.length - 1 : i - 1)}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 min-w-[36px] min-h-[36px] 
+                             bg-black/40 hover:bg-black/60 text-white rounded-full flex items-center justify-center"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setCurrentPhotoIndex(i => i === property.photos.length - 1 ? 0 : i + 1)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 min-w-[36px] min-h-[36px] 
+                             bg-black/40 hover:bg-black/60 text-white rounded-full flex items-center justify-center"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </>
+            )}
+          </>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gray-400">
+            No photos
+          </div>
+        )}
+      </div>
+      
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto">
+        
+        {/* Header */}
+        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex justify-between items-start gap-2">
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase truncate">
+                {property.address.full}
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {property.address.city}, {property.address.state} {property.address.zip}
+              </p>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="text-base font-bold text-gray-900 dark:text-gray-100">
+                ${(property.prices.sold || property.prices.list).toLocaleString()}
+              </p>
+              <p className={`text-xs font-medium ${statusColorClass}`}>
+                {property.statusLabel}
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        {/* Property Stats */}
+        <div className="divide-y divide-gray-100 dark:divide-gray-800">
+          <div className="flex justify-between px-4 py-2.5">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Beds</span>
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              {property.beds ?? 'N/A'}
+            </span>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Baths</span>
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              {property.baths ?? 'N/A'}
+            </span>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Sq. Ft.
+              {sqftDiff && (
+                <span className={`ml-1 ${sqftDiff.isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                  {sqftDiff.text}
+                </span>
+              )}
+            </span>
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              {property.sqft?.toLocaleString() ?? 'N/A'}
+            </span>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Lot Size
+              {lotSizeDiff && (
+                <span className={`ml-1 ${lotSizeDiff.isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                  {lotSizeDiff.text}
+                </span>
+              )}
+            </span>
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              {property.lotSqFt?.toLocaleString() ?? 'N/A'}
+            </span>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Garage Spaces
+              {garageDiff && (
+                <span className={`ml-1 ${garageDiff.isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                  {garageDiff.text}
+                </span>
+              )}
+            </span>
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              {property.garageSpaces ?? 'N/A'}
+            </span>
+          </div>
+        </div>
+        
+        {/* Listing Details Header */}
+        <div className="px-4 py-2.5 bg-gray-50 dark:bg-gray-800/50 border-y border-gray-200 dark:border-gray-700">
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Listing Details</h4>
+        </div>
+        
+        {/* Listing Details */}
+        <div className="divide-y divide-gray-100 dark:divide-gray-800">
+          {property.prices.original && property.prices.original !== property.prices.list && (
+            <div className="flex justify-between px-4 py-2.5">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Orig. Price</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                ${property.prices.original.toLocaleString()}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between px-4 py-2.5">
+            <span className="text-sm text-gray-600 dark:text-gray-400">List Price</span>
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              ${property.prices.list.toLocaleString()}
+            </span>
+          </div>
+          {property.prices.sold && (
+            <div className="flex justify-between px-4 py-2.5">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                Sold Price {property.soldToOriginalPct && (
+                  <span className="text-green-500">{property.soldToOriginalPct}%</span>
+                )}
+              </span>
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                ${property.prices.sold.toLocaleString()}
+              </span>
+            </div>
+          )}
+          {property.pricePerSqft && (
+            <div className="flex justify-between px-4 py-2.5">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Price per Sq. Ft.</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                ${property.pricePerSqft.toLocaleString()}
+              </span>
+            </div>
+          )}
+          {property.soldDate && (
+            <div className="flex justify-between px-4 py-2.5">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Sold Date</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                {new Date(property.soldDate).toLocaleDateString()}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between px-4 py-2.5">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Days on Market</span>
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              {property.dom.simple}
+            </span>
+          </div>
+        </div>
+        
+        {/* View Button */}
+        <div className="p-4">
+          <button
+            onClick={onViewClick}
+            className="w-full py-3 bg-[#EF4923] hover:bg-[#d94420] text-white rounded-lg 
+                       font-medium transition-colors min-h-[44px]"
+          >
+            View Full Details
+          </button>
+        </div>
+        
+      </div>
+    </div>
+  );
+}
+```
+
+### Step 5: Full Detail Modal Component
+
+```tsx
+interface PropertyDetailModalProps {
+  property: NormalizedListing;
+  subjectProperty?: NormalizedListing;
+  onClose: () => void;
+}
+
+export function PropertyDetailModal({ 
+  property, 
+  subjectProperty,
+  onClose 
+}: PropertyDetailModalProps) {
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  
+  // Comparison calculations (same as card panel)
+  const calcPercentDiff = (propValue: number | null, subjectValue: number | null) => {
+    if (!propValue || !subjectValue || subjectValue === 0) return null;
+    const diff = ((propValue - subjectValue) / subjectValue) * 100;
+    return { text: `${diff >= 0 ? '↑' : '↓'}${Math.abs(diff).toFixed(0)}%`, isPositive: diff >= 0 };
+  };
+  
+  const calcYearDiff = (propYear: number | null, subjectYear: number | null) => {
+    if (!propYear || !subjectYear) return null;
+    const diff = propYear - subjectYear;
+    if (diff === 0) return null;
+    return { text: `${diff >= 0 ? '↑' : '↓'}${Math.abs(diff)} yrs`, isPositive: diff >= 0 };
+  };
+  
+  const sqftDiff = calcPercentDiff(property.sqft, subjectProperty?.sqft ?? null);
+  const lotSizeDiff = calcPercentDiff(property.lotSqFt, subjectProperty?.lotSqFt ?? null);
+  const yearDiff = calcYearDiff(property.yearBuilt, subjectProperty?.yearBuilt ?? null);
+  
+  const statusColorClass = property.statusColor === 'red' ? 'text-red-500' 
+    : property.statusColor === 'green' ? 'text-green-500' 
+    : property.statusColor === 'orange' ? 'text-orange-500' 
+    : 'text-blue-500';
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft') setCurrentPhotoIndex(i => i === 0 ? property.photos.length - 1 : i - 1);
+      if (e.key === 'ArrowRight') setCurrentPhotoIndex(i => i === property.photos.length - 1 ? 0 : i + 1);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [property.photos.length]);
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/70 z-50" onClick={onClose} />
+      
+      {/* Modal */}
+      <div className="fixed inset-4 md:inset-8 lg:inset-12 bg-white dark:bg-gray-900 
+                      rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col">
+        
+        {/* Header */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center 
+                       text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+            {property.address.full}
+          </h2>
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {property.address.city}, {property.address.state} {property.address.zip}
+          </span>
+        </div>
+        
+        {/* Main Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
+            
+            {/* Left Column: Map + Photos + Stats */}
+            <div className="lg:col-span-2 border-r border-gray-200 dark:border-gray-700">
+              
+              {/* Map + Photos Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                {/* Map */}
+                {property.coordinates && (
+                  <div className="aspect-video bg-gray-200 dark:bg-gray-800">
+                    {/* Google Maps or Mapbox embed */}
+                    <iframe
+                      src={`https://www.google.com/maps/embed/v1/place?key=${GOOGLE_MAPS_API_KEY}&q=${property.coordinates.lat},${property.coordinates.lng}&zoom=15`}
+                      className="w-full h-full border-0"
+                      allowFullScreen
+                      loading="lazy"
+                    />
+                  </div>
+                )}
+                
+                {/* Photo Gallery */}
+                <div className="relative aspect-video bg-gray-200 dark:bg-gray-800">
+                  {property.photos.length > 0 && (
+                    <>
+                      <img 
+                        src={property.photos[currentPhotoIndex]} 
+                        alt={`${property.address.full} - Photo ${currentPhotoIndex + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      {/* Photo navigation */}
+                      <button
+                        onClick={() => setCurrentPhotoIndex(i => i === property.photos.length - 1 ? 0 : i + 1)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] 
+                                   bg-black/40 hover:bg-black/60 text-white rounded-full"
+                      >
+                        <ChevronRight className="w-6 h-6" />
+                      </button>
+                      {/* Photo count badge */}
+                      <div className="absolute bottom-2 left-2 flex gap-2">
+                        <span className="px-2 py-1 bg-black/60 text-white text-xs rounded flex items-center gap-1">
+                          <Camera className="w-3 h-3" /> {property.photoCount}
+                        </span>
+                        {property.hasVirtualTour && (
+                          <span className="px-2 py-1 bg-black/60 text-white text-xs rounded flex items-center gap-1">
+                            <Video className="w-3 h-3" /> Tour
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              {/* Property Stats Grid */}
+              <div className="grid grid-cols-3 md:grid-cols-6 gap-4 p-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Bed className="w-4 h-4" /> BEDROOMS
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.beds ?? 'N/A'}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Bath className="w-4 h-4" /> BATHROOMS
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.baths ?? 'N/A'}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Square className="w-4 h-4" /> HOME SIZE
+                    {sqftDiff && (
+                      <span className={sqftDiff.isPositive ? 'text-green-500' : 'text-red-500'}>
+                        {sqftDiff.text}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.sqft?.toLocaleString() ?? 'N/A'} <span className="text-sm font-normal">sq. ft.</span>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Calendar className="w-4 h-4" /> YEAR BUILT
+                    {yearDiff && (
+                      <span className={yearDiff.isPositive ? 'text-green-500' : 'text-red-500'}>
+                        {yearDiff.text}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.yearBuilt ?? 'N/A'}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Car className="w-4 h-4" /> GARAGES
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.garageSpaces ?? 'N/A'}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Maximize className="w-4 h-4" /> LOT SIZE
+                    {lotSizeDiff && (
+                      <span className={lotSizeDiff.isPositive ? 'text-green-500' : 'text-red-500'}>
+                        {lotSizeDiff.text}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.lotSqFt?.toLocaleString() ?? 'N/A'}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Property Description */}
+              {property.description && (
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                  <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                    {property.description}
+                  </p>
+                </div>
+              )}
+              
+              {/* Details Section */}
+              <div className="p-4">
+                <h3 className="text-lg font-semibold text-[#EF4923] mb-4">Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  {property.features.accessibility?.length > 0 && (
+                    <div>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">Accessibility Features:</span>{' '}
+                      <span className="text-gray-600 dark:text-gray-400">
+                        {property.features.accessibility.join(', ') || 'None'}
+                      </span>
+                    </div>
+                  )}
+                  {property.features.appliances?.length > 0 && (
+                    <div>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">Appliances:</span>{' '}
+                      <span className="text-gray-600 dark:text-gray-400">
+                        {property.features.appliances.join(', ')}
+                      </span>
+                    </div>
+                  )}
+                  {property.features.laundry?.length > 0 && (
+                    <div>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">Laundry Features:</span>{' '}
+                      <span className="text-gray-600 dark:text-gray-400">
+                        {property.features.laundry.join(', ')}
+                      </span>
+                    </div>
+                  )}
+                  {property.features.levels && (
+                    <div>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">Levels:</span>{' '}
+                      <span className="text-gray-600 dark:text-gray-400">{property.features.levels}</span>
+                    </div>
+                  )}
+                  {property.features.lotFeatures?.length > 0 && (
+                    <div>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">Lot Features:</span>{' '}
+                      <span className="text-gray-600 dark:text-gray-400">
+                        {property.features.lotFeatures.join(', ')}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Right Column: Pricing Details */}
+            <div className="p-4">
+              {/* Status + Days + Price */}
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`text-sm font-semibold uppercase ${statusColorClass}`}>
+                    {property.statusLabel}
+                  </span>
+                  <span className="text-sm text-gray-500">•</span>
+                  <span className="text-sm text-gray-500">{property.dom.simple} DAYS</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                    ${(property.prices.sold || property.prices.list).toLocaleString()}
+                  </span>
+                  {property.pricePerSqft && (
+                    <span className="text-sm text-gray-500">${property.pricePerSqft}/sqft</span>
+                  )}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  {property.beds} beds  {property.baths} baths  {property.sqft?.toLocaleString()} sqft
+                </div>
+              </div>
+              
+              {/* Dates */}
+              <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                {property.listDate && (
+                  <span>Listed: {new Date(property.listDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}</span>
+                )}
+                {property.soldDate && (
+                  <span className="ml-4">Sold: {new Date(property.soldDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}</span>
+                )}
+              </div>
+              
+              {/* Price Details */}
+              <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-4">
+                {property.prices.original && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Original List Price</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      ${property.prices.original.toLocaleString()}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    List Price
+                    {property.prices.priceDrop && (
+                      <span className="text-red-500 ml-1">
+                        ↓${property.prices.priceDrop.toLocaleString()}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    ${property.prices.list.toLocaleString()}
+                  </span>
+                </div>
+                {property.prices.sold && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      Sold Price
+                      {property.soldToOriginalPct && (
+                        <span className="text-green-500 ml-1">{property.soldToOriginalPct}%</span>
+                      )}
+                    </span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      ${property.prices.sold.toLocaleString()}
+                    </span>
+                  </div>
+                )}
+              </div>
+              
+              {/* MLS Info */}
+              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">MLS#</span>
+                  <a 
+                    href={`https://www.har.com/listing/${property.mlsNumber}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#EF4923] hover:underline flex items-center gap-1"
+                  >
+                    {property.mlsNumber}
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+                {property.lastUpdated && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    Last Updated {new Date(property.lastUpdated).toLocaleString()}
+                  </div>
+                )}
+              </div>
+            </div>
+            
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+```
+
+### Step 6: Main TimeToSellSlide Integration
+
+```tsx
+export function TimeToSellSlide({ listings, subjectProperty }: TimeToSellSlideProps) {
+  const [state, setState] = useState({
+    selectedProperty: null as NormalizedListing | null,
+    detailModalOpen: false,
+  });
+  
+  // Normalize all listings (with lease exclusion + validation logging)
+  const properties = useMemo(() => {
+    const normalized = listings
+      .map(normalizeRepliersListing)
+      .filter((p): p is NormalizedListing => p !== null);
+    console.log('[TimeToSell] Dataset built:', normalized.length, 'properties');
+    return normalized;
+  }, [listings]);
+  
+  return (
+    <div className="flex h-full">
+      {/* Sidebar */}
+      <PropertySidebar 
+        properties={properties}
+        onSelectProperty={(p) => setState({ selectedProperty: p, detailModalOpen: false })}
+        selectedId={state.selectedProperty?.mlsNumber}
+      />
+      
+      {/* Property Card Panel (appears when property selected) */}
+      {state.selectedProperty && !state.detailModalOpen && (
+        <PropertyCardPanel
+          property={state.selectedProperty}
+          subjectProperty={subjectProperty}
+          onClose={() => setState({ selectedProperty: null, detailModalOpen: false })}
+          onViewClick={() => setState(s => ({ ...s, detailModalOpen: true }))}
+        />
+      )}
+      
+      {/* Main Chart Area */}
+      <div className="flex-1 p-6 overflow-auto">
+        {/* Header stats + chart */}
+      </div>
+      
+      {/* Full Detail Modal */}
+      {state.selectedProperty && state.detailModalOpen && (
+        <PropertyDetailModal
+          property={state.selectedProperty}
+          subjectProperty={subjectProperty}
+          onClose={() => setState(s => ({ ...s, detailModalOpen: false }))}
+        />
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## MOBILE OPTIMIZATION
+
+| Requirement | Implementation |
+|-------------|----------------|
+| Touch targets | All buttons `min-w-[44px] min-h-[44px]` |
+| Card panel mobile | Full screen overlay on mobile `< md` |
+| Detail modal mobile | `fixed inset-4` with scroll |
+| Keyboard nav | ESC closes, arrows navigate photos |
+| Safe areas | Modal uses insets for notch devices |
+
+---
+
+## VALIDATION CHECKLIST
+
+- [ ] Lease exclusion: `type: "Sale"` enforced, leases logged and filtered
+- [ ] DOM field: Only `simpleDaysOnMarket` used for display
+- [ ] Missing fields: Show "N/A" and log warning (no silent 0)
+- [ ] Status logic: "Closed" derived from `soldDate`/`soldPrice` presence
+- [ ] Price per Sq Ft: Computed correctly, guarded for 0/missing sqft
+- [ ] Sold-to-Original %: Computed correctly
+- [ ] Dataset logged: `console.log('[TimeToSell] Dataset built:', ...)`
+- [ ] 44px touch targets on all interactive elements
+- [ ] Dark mode colors correct
+- [ ] Comparison arrows: Green=higher, Red=lower vs subject
+
+---
+
+## TEST SCENARIOS
+
+1. Click sidebar item → Card panel appears on left
+2. Click "View Full Details" → Full modal opens
+3. Close modal → Returns to card panel view
+4. Close card panel → Returns to default view
+5. Photo navigation works in both card and modal
+6. All fields display correctly from Repliers data
+7. Mobile: Card panel is full screen overlay
+8. Keyboard: ESC closes, arrows navigate

@@ -1,6 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { X, Info, Home, ChevronLeft, ChevronRight, Bed, Bath, Ruler, Calendar, Car, MapPin, LandPlot } from 'lucide-react';
+import { 
+  X, Info, Home, ChevronLeft, ChevronRight, 
+  Bed, Bath, Ruler, Calendar, Car, MapPin, 
+  Camera, Video, Square, Maximize, ExternalLink
+} from 'lucide-react';
 import {
   ScatterChart,
   Scatter,
@@ -18,12 +22,6 @@ interface TimeToSellWidgetProps {
   averageDaysOnMarket: number;
   averageListPricePercent?: number;
   subjectProperty?: CmaProperty;
-}
-
-interface PropertySidebarItemProps {
-  property: CmaProperty;
-  showPercentOfList?: boolean;
-  onClick: () => void;
 }
 
 type StatusColor = 'red' | 'green' | 'orange' | 'blue' | 'gray';
@@ -67,7 +65,48 @@ function getStatusBgClass(statusColor: StatusColor): string {
   }
 }
 
-function PropertySidebarItem({ property, showPercentOfList = false, onClick }: PropertySidebarItemProps) {
+interface ComparisonDiff {
+  text: string;
+  isPositive: boolean;
+}
+
+function calcPercentDiff(propValue: number | undefined | null, subjectValue: number | undefined | null): ComparisonDiff | null {
+  if (!propValue || !subjectValue || subjectValue === 0) return null;
+  const diff = ((propValue - subjectValue) / subjectValue) * 100;
+  return {
+    text: `${diff >= 0 ? '↑' : '↓'}${Math.abs(diff).toFixed(1)}%`,
+    isPositive: diff >= 0
+  };
+}
+
+function calcNumericDiff(propValue: number | undefined | null, subjectValue: number | undefined | null): ComparisonDiff | null {
+  if (propValue === null || propValue === undefined || subjectValue === null || subjectValue === undefined) return null;
+  const diff = propValue - subjectValue;
+  if (diff === 0) return null;
+  return {
+    text: `${diff >= 0 ? '↑' : '↓'}${Math.abs(diff)}`,
+    isPositive: diff >= 0
+  };
+}
+
+function calcYearDiff(propYear: number | undefined | null, subjectYear: number | undefined | null): ComparisonDiff | null {
+  if (!propYear || !subjectYear) return null;
+  const diff = propYear - subjectYear;
+  if (diff === 0) return null;
+  return {
+    text: `${diff >= 0 ? '↑' : '↓'}${Math.abs(diff)} yrs`,
+    isPositive: diff >= 0
+  };
+}
+
+interface PropertySidebarItemProps {
+  property: CmaProperty;
+  showPercentOfList?: boolean;
+  isSelected?: boolean;
+  onClick: () => void;
+}
+
+function PropertySidebarItem({ property, showPercentOfList = false, isSelected = false, onClick }: PropertySidebarItemProps) {
   const percentOfList = property.soldPrice && property.originalPrice
     ? ((property.soldPrice / property.originalPrice) * 100).toFixed(0)
     : property.soldPrice && property.price
@@ -77,8 +116,11 @@ function PropertySidebarItem({ property, showPercentOfList = false, onClick }: P
   return (
     <button
       onClick={onClick}
-      className="w-full flex gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 
-                 cursor-pointer mb-1 transition-colors text-left min-h-[60px]"
+      className={`w-full flex gap-2 p-2 rounded-lg cursor-pointer mb-1 transition-colors text-left min-h-[60px]
+        ${isSelected 
+          ? 'bg-[#EF4923]/10 ring-2 ring-[#EF4923]' 
+          : 'hover:bg-gray-100 dark:hover:bg-zinc-800'
+        }`}
       data-testid={`button-property-sidebar-item-${property.id}`}
       aria-label={`View details for ${property.address}`}
     >
@@ -120,8 +162,7 @@ function TimeToSellInfoModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
           <p className="text-muted-foreground">
             The time to sell scatter chart is a way to visualize how long the listings took to sell.
             Not only can you see the relationship between the price and days on market, but you can
-            also see the difference between the original list price and the sold price. If the listing
-            isn't sold, you can see if the price has dropped.
+            also see the difference between the original list price and the sold price.
           </p>
           <p className="text-muted-foreground">
             This chart shows that pricing the home correctly from the beginning will help reduce the 
@@ -149,29 +190,14 @@ function TimeToSellInfoModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   );
 }
 
-interface ComparisonDiff {
-  value: string;
-  isPositive: boolean;
-}
-
-function calcPercentDiff(propValue: number | undefined, subjectValue: number | undefined): ComparisonDiff | null {
-  if (!propValue || !subjectValue || subjectValue === 0) return null;
-  const diff = ((propValue - subjectValue) / subjectValue) * 100;
-  return {
-    value: Math.abs(diff).toFixed(1),
-    isPositive: diff >= 0
-  };
-}
-
-function TimeToSellPropertyModal({ 
-  property, 
-  subjectProperty,
-  onClose 
-}: { 
-  property: CmaProperty; 
+interface PropertyCardPanelProps {
+  property: CmaProperty;
   subjectProperty?: CmaProperty;
   onClose: () => void;
-}) {
+  onViewClick: () => void;
+}
+
+function PropertyCardPanel({ property, subjectProperty, onClose, onViewClick }: PropertyCardPanelProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const photos = property.photos || [];
   const statusColor = getStatusColor(property.status);
@@ -179,9 +205,240 @@ function TimeToSellPropertyModal({
 
   const sqftDiff = calcPercentDiff(property.sqft, subjectProperty?.sqft);
   const lotSizeDiff = calcPercentDiff(property.lotSize, subjectProperty?.lotSize);
-  const garageDiff = property.garageSpaces !== undefined && subjectProperty?.garageSpaces !== undefined
-    ? property.garageSpaces - subjectProperty.garageSpaces
+  const garageDiff = calcNumericDiff(property.garageSpaces, subjectProperty?.garageSpaces);
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+
+  const displayPrice = property.soldPrice || property.listPrice || property.price;
+  const currentListPrice = property.listPrice || property.price;
+  const soldPercent = property.soldPrice && property.originalPrice
+    ? Math.round((property.soldPrice / property.originalPrice) * 100)
     : null;
+
+  return (
+    <div className="w-72 lg:w-80 h-full bg-background border-r flex flex-col overflow-hidden relative animate-in slide-in-from-left duration-200">
+      <button
+        onClick={onClose}
+        className="absolute top-3 right-3 z-10 min-w-[36px] min-h-[36px] 
+                   flex items-center justify-center rounded-full
+                   bg-black/40 hover:bg-black/60 text-white transition-colors"
+        aria-label="Close panel"
+        data-testid="button-close-card-panel"
+      >
+        <X className="w-4 h-4" />
+      </button>
+      
+      <div className="relative w-full aspect-[4/3] bg-muted flex-shrink-0">
+        {photos.length > 0 ? (
+          <>
+            <img 
+              src={photos[currentPhotoIndex]} 
+              alt={property.address}
+              className="w-full h-full object-cover cursor-pointer"
+              onClick={onViewClick}
+            />
+            {photos.length > 1 && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentPhotoIndex(i => i === 0 ? photos.length - 1 : i - 1);
+                  }}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 min-w-[36px] min-h-[36px] 
+                             bg-black/40 hover:bg-black/60 text-white rounded-full flex items-center justify-center"
+                  data-testid="button-card-prev-photo"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentPhotoIndex(i => i === photos.length - 1 ? 0 : i + 1);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 min-w-[36px] min-h-[36px] 
+                             bg-black/40 hover:bg-black/60 text-white rounded-full flex items-center justify-center"
+                  data-testid="button-card-next-photo"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+                <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 text-white text-xs rounded">
+                  {currentPhotoIndex + 1}/{photos.length}
+                </div>
+              </>
+            )}
+          </>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground cursor-pointer" onClick={onViewClick}>
+            <Home className="w-12 h-12" />
+          </div>
+        )}
+      </div>
+      
+      <div className="flex-1 overflow-y-auto">
+        <div className="px-4 py-3 border-b">
+          <div className="flex justify-between items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-bold text-foreground uppercase truncate">
+                {property.address}
+              </h3>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <MapPin className="w-3 h-3" />
+                {property.city}, {property.state} {property.zipCode}
+              </p>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="text-base font-bold text-foreground">
+                {formatCurrency(displayPrice)}
+              </p>
+              <p className={`text-xs font-medium ${statusColorClass}`}>
+                {property.status}
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="divide-y divide-muted">
+          <div className="flex justify-between px-4 py-2.5">
+            <span className="text-sm text-muted-foreground">Beds</span>
+            <span className="text-sm font-medium text-foreground">
+              {property.beds ?? 'N/A'}
+            </span>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <span className="text-sm text-muted-foreground">Baths</span>
+            <span className="text-sm font-medium text-foreground">
+              {property.baths ?? 'N/A'}
+            </span>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <span className="text-sm text-muted-foreground">
+              Sq. Ft.
+              {sqftDiff && (
+                <span className={`ml-1 ${sqftDiff.isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                  {sqftDiff.text}
+                </span>
+              )}
+            </span>
+            <span className="text-sm font-medium text-foreground">
+              {property.sqft?.toLocaleString() ?? 'N/A'}
+            </span>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <span className="text-sm text-muted-foreground">
+              Lot Size
+              {lotSizeDiff && (
+                <span className={`ml-1 ${lotSizeDiff.isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                  {lotSizeDiff.text}
+                </span>
+              )}
+            </span>
+            <span className="text-sm font-medium text-foreground">
+              {property.lotSize?.toLocaleString() ?? 'N/A'}
+            </span>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <span className="text-sm text-muted-foreground">
+              Garage
+              {garageDiff && (
+                <span className={`ml-1 ${garageDiff.isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                  {garageDiff.text}
+                </span>
+              )}
+            </span>
+            <span className="text-sm font-medium text-foreground">
+              {property.garageSpaces ?? 'N/A'}
+            </span>
+          </div>
+        </div>
+        
+        <div className="px-4 py-2.5 bg-muted/50 border-y">
+          <h4 className="text-sm font-semibold text-foreground">Listing Details</h4>
+        </div>
+        
+        <div className="divide-y divide-muted">
+          {property.originalPrice && property.originalPrice !== currentListPrice && (
+            <div className="flex justify-between px-4 py-2.5">
+              <span className="text-sm text-muted-foreground">Orig. Price</span>
+              <span className="text-sm font-medium text-foreground">
+                {formatCurrency(property.originalPrice)}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between px-4 py-2.5">
+            <span className="text-sm text-muted-foreground">List Price</span>
+            <span className="text-sm font-medium text-foreground">
+              {formatCurrency(currentListPrice)}
+            </span>
+          </div>
+          {property.soldPrice && (
+            <div className="flex justify-between px-4 py-2.5">
+              <span className="text-sm text-muted-foreground">
+                Sold Price {soldPercent && (
+                  <span className="text-muted-foreground/60">{soldPercent}%</span>
+                )}
+              </span>
+              <span className="text-sm font-medium text-foreground">
+                {formatCurrency(property.soldPrice)}
+              </span>
+            </div>
+          )}
+          {property.pricePerSqft > 0 && (
+            <div className="flex justify-between px-4 py-2.5">
+              <span className="text-sm text-muted-foreground">$/Sq. Ft.</span>
+              <span className="text-sm font-medium text-foreground">
+                ${property.pricePerSqft.toLocaleString()}
+              </span>
+            </div>
+          )}
+          {property.soldDate && (
+            <div className="flex justify-between px-4 py-2.5">
+              <span className="text-sm text-muted-foreground">Sold Date</span>
+              <span className="text-sm font-medium text-foreground">
+                {new Date(property.soldDate).toLocaleDateString()}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between px-4 py-2.5">
+            <span className="text-sm text-muted-foreground">DOM</span>
+            <span className="text-sm font-medium text-foreground">
+              {property.daysOnMarket}
+            </span>
+          </div>
+        </div>
+        
+        <div className="p-4">
+          <button
+            onClick={onViewClick}
+            className="w-full py-3 bg-[#EF4923] hover:bg-[#d94420] text-white rounded-lg 
+                       font-medium transition-colors min-h-[44px] flex items-center justify-center gap-2"
+            data-testid="button-view-full-details"
+          >
+            View Full Details
+            <ExternalLink className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface PropertyDetailModalProps {
+  property: CmaProperty;
+  subjectProperty?: CmaProperty;
+  onClose: () => void;
+}
+
+function PropertyDetailModal({ property, subjectProperty, onClose }: PropertyDetailModalProps) {
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const photos = property.photos || [];
+  const statusColor = getStatusColor(property.status);
+  const statusColorClass = getStatusColorClass(statusColor);
+  const statusBgClass = getStatusBgClass(statusColor);
+
+  const sqftDiff = calcPercentDiff(property.sqft, subjectProperty?.sqft);
+  const lotSizeDiff = calcPercentDiff(property.lotSize, subjectProperty?.lotSize);
+  const yearDiff = calcYearDiff(property.yearBuilt, subjectProperty?.yearBuilt);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -197,268 +454,270 @@ function TimeToSellPropertyModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [photos.length, onClose]);
 
-  const handlePrevPhoto = () => {
-    setCurrentPhotoIndex(prev => (prev > 0 ? prev - 1 : photos.length - 1));
-  };
-
-  const handleNextPhoto = () => {
-    setCurrentPhotoIndex(prev => (prev < photos.length - 1 ? prev + 1 : 0));
-  };
-
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 
   const displayPrice = property.soldPrice || property.listPrice || property.price;
   const currentListPrice = property.listPrice || property.price;
-  const soldPercent = property.soldPrice && currentListPrice
-    ? Math.round((property.soldPrice / currentListPrice) * 100)
+  const soldPercent = property.soldPrice && property.originalPrice
+    ? Math.round((property.soldPrice / property.originalPrice) * 100)
+    : null;
+  const priceDrop = property.originalPrice && currentListPrice && property.originalPrice > currentListPrice
+    ? property.originalPrice - currentListPrice
     : null;
 
   return (
     <>
       <div 
-        className="fixed inset-0 bg-black/60 z-[80] backdrop-blur-sm"
+        className="fixed inset-0 bg-black/70 z-[80] backdrop-blur-sm"
         onClick={onClose}
       />
       
-      <div className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 
-                      md:-translate-x-1/2 md:-translate-y-1/2 
-                      md:w-full md:max-w-md lg:max-w-lg
-                      bg-background rounded-xl shadow-2xl z-[80] 
-                      overflow-hidden flex flex-col max-h-[90vh]">
-        
-        <button
-          onClick={onClose}
-          className="absolute top-3 left-3 z-10 
-                     min-w-[44px] min-h-[44px] 
-                     flex items-center justify-center
-                     bg-black/50 hover:bg-black/70 
-                     text-white rounded-full transition-colors"
-          aria-label="Close modal"
-          data-testid="button-close-property-modal"
-        >
-          <X className="w-5 h-5" />
-        </button>
-        
-        <div className="relative w-full aspect-video bg-muted flex-shrink-0">
-          {photos.length > 0 ? (
-            <>
-              <img 
-                src={photos[currentPhotoIndex]} 
-                alt={`${property.address} - Photo ${currentPhotoIndex + 1}`}
-                className="w-full h-full object-cover"
-              />
-              
-              {photos.length > 1 && (
-                <>
-                  <button
-                    onClick={handlePrevPhoto}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 
-                               min-w-[44px] min-h-[44px] 
-                               flex items-center justify-center
-                               bg-black/50 hover:bg-black/70 
-                               text-white rounded-full transition-colors"
-                    aria-label="Previous photo"
-                    data-testid="button-prev-photo"
-                  >
-                    <ChevronLeft className="w-6 h-6" />
-                  </button>
-                  
-                  <button
-                    onClick={handleNextPhoto}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 
-                               min-w-[44px] min-h-[44px] 
-                               flex items-center justify-center
-                               bg-black/50 hover:bg-black/70 
-                               text-white rounded-full transition-colors"
-                    aria-label="Next photo"
-                    data-testid="button-next-photo"
-                  >
-                    <ChevronRight className="w-6 h-6" />
-                  </button>
-                  
-                  <div className="absolute bottom-3 right-3 
-                                  px-3 py-1 bg-black/60 text-white text-sm rounded-full">
-                    {currentPhotoIndex + 1} / {photos.length}
-                  </div>
-                </>
-              )}
-            </>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-              <Home className="w-16 h-16" />
-            </div>
-          )}
+      <div className="fixed inset-4 md:inset-6 lg:inset-8 bg-background rounded-xl shadow-2xl z-[80] overflow-hidden flex flex-col">
+        <div className="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center 
+                       text-muted-foreground hover:text-foreground transition-colors"
+            data-testid="button-close-detail-modal"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <h2 className="text-lg font-bold text-foreground truncate">
+            {property.address}
+          </h2>
+          <span className="text-sm text-muted-foreground flex-shrink-0">
+            {property.city}, {property.state} {property.zipCode}
+          </span>
         </div>
         
         <div className="flex-1 overflow-y-auto">
-          <div className="p-4 border-b">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-bold text-foreground uppercase truncate">
-                  {property.address}
-                </h2>
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <MapPin className="w-3 h-3" />
-                  {property.city}, {property.state} {property.zipCode}
-                </p>
+          <div className="grid grid-cols-1 lg:grid-cols-3 min-h-full">
+            <div className="lg:col-span-1 border-r flex flex-col">
+              {property.latitude && property.longitude && (
+                <div className="aspect-video bg-muted flex-shrink-0">
+                  <iframe
+                    src={`https://www.google.com/maps?q=${property.latitude},${property.longitude}&z=15&output=embed`}
+                    className="w-full h-full border-0"
+                    allowFullScreen
+                    loading="lazy"
+                    title="Property Location"
+                  />
+                </div>
+              )}
+              
+              <div className="grid grid-cols-2 gap-4 p-4 border-b">
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1 text-muted-foreground text-xs mb-1">
+                    <Bed className="w-4 h-4" /> BEDROOMS
+                  </div>
+                  <div className="text-xl font-bold text-foreground">
+                    {property.beds ?? 'N/A'}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1 text-muted-foreground text-xs mb-1">
+                    <Bath className="w-4 h-4" /> BATHROOMS
+                  </div>
+                  <div className="text-xl font-bold text-foreground">
+                    {property.baths ?? 'N/A'}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1 text-muted-foreground text-xs mb-1">
+                    <Square className="w-4 h-4" /> HOME SIZE
+                    {sqftDiff && (
+                      <span className={sqftDiff.isPositive ? 'text-green-500' : 'text-red-500'}>
+                        {sqftDiff.text}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xl font-bold text-foreground">
+                    {property.sqft?.toLocaleString() ?? 'N/A'}
+                    <span className="text-xs font-normal ml-1">sq.ft.</span>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1 text-muted-foreground text-xs mb-1">
+                    <Calendar className="w-4 h-4" /> YEAR BUILT
+                    {yearDiff && (
+                      <span className={yearDiff.isPositive ? 'text-green-500' : 'text-red-500'}>
+                        {yearDiff.text}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xl font-bold text-foreground">
+                    {property.yearBuilt ?? 'N/A'}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1 text-muted-foreground text-xs mb-1">
+                    <Car className="w-4 h-4" /> GARAGES
+                  </div>
+                  <div className="text-xl font-bold text-foreground">
+                    {property.garageSpaces ?? 'N/A'}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1 text-muted-foreground text-xs mb-1">
+                    <Maximize className="w-4 h-4" /> LOT SIZE
+                    {lotSizeDiff && (
+                      <span className={lotSizeDiff.isPositive ? 'text-green-500' : 'text-red-500'}>
+                        {lotSizeDiff.text}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xl font-bold text-foreground">
+                    {property.lotSize?.toLocaleString() ?? 'N/A'}
+                  </div>
+                </div>
               </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-xl font-bold text-foreground">
-                  {formatCurrency(displayPrice)}
-                </p>
-                <p className={`text-sm font-medium ${statusColorClass}`}>
-                  {property.status}
-                </p>
-              </div>
+              
+              {property.description && (
+                <div className="p-4 flex-1">
+                  <h4 className="text-sm font-semibold text-foreground mb-2">Property Description</h4>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {property.description}
+                  </p>
+                </div>
+              )}
             </div>
-          </div>
-          
-          <div className="grid grid-cols-3 border-b">
-            <div className="p-3 border-r">
-              <p className="text-xs text-muted-foreground">Beds</p>
-              <p className="text-lg font-semibold text-foreground">
-                {property.beds ?? '-'}
-              </p>
-            </div>
-            <div className="p-3 border-r">
-              <p className="text-xs text-muted-foreground">Baths</p>
-              <p className="text-lg font-semibold text-foreground">
-                {property.baths ?? '-'}
-              </p>
-            </div>
-            <div className="p-3">
-              <p className="text-xs text-muted-foreground">
-                Sq. Ft.
-                {sqftDiff && (
-                  <span className={`ml-1 ${sqftDiff.isPositive ? 'text-green-500' : 'text-red-500'}`}>
-                    {sqftDiff.isPositive ? '↑' : '↓'}{sqftDiff.value}%
-                  </span>
-                )}
-              </p>
-              <p className="text-lg font-semibold text-foreground">
-                {property.sqft?.toLocaleString() ?? '-'}
-              </p>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-3 border-b">
-            <div className="p-3 border-r">
-              <p className="text-xs text-muted-foreground">
-                Lot Size
-                {lotSizeDiff && (
-                  <span className={`ml-1 ${lotSizeDiff.isPositive ? 'text-green-500' : 'text-red-500'}`}>
-                    {lotSizeDiff.isPositive ? '↑' : '↓'}{lotSizeDiff.value}%
-                  </span>
-                )}
-              </p>
-              <p className="text-lg font-semibold text-foreground">
-                {property.lotSize?.toLocaleString() ?? '-'}
-              </p>
-            </div>
-            <div className="p-3 border-r">
-              <p className="text-xs text-muted-foreground">
-                Garage
-                {garageDiff !== null && garageDiff !== 0 && (
-                  <span className={`ml-1 ${garageDiff >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    {garageDiff >= 0 ? '↑' : '↓'}{Math.abs(garageDiff)}
-                  </span>
-                )}
-              </p>
-              <p className="text-lg font-semibold text-foreground">
-                {property.garageSpaces ?? '-'}
-              </p>
-            </div>
-            <div className="p-3">
-              <p className="text-xs text-muted-foreground">Year Built</p>
-              <p className="text-lg font-semibold text-foreground">
-                {property.yearBuilt ?? '-'}
-              </p>
-            </div>
-          </div>
-          
-          <div className="p-4">
-            <h3 className="text-sm font-semibold text-foreground mb-3">
-              Listing Details
-            </h3>
             
-            <div className="space-y-0">
-              {property.originalPrice && property.originalPrice !== currentListPrice && (
-                <div className="flex justify-between items-center py-2.5 border-b border-muted">
-                  <span className="text-sm text-muted-foreground">Orig. Price</span>
-                  <span className="text-sm font-medium text-foreground">
-                    {formatCurrency(property.originalPrice)}
-                  </span>
-                </div>
-              )}
-              
-              <div className="flex justify-between items-center py-2.5 border-b border-muted">
-                <span className="text-sm text-muted-foreground">List Price</span>
-                <span className="text-sm font-medium text-foreground">
-                  {formatCurrency(currentListPrice)}
-                </span>
+            <div className="lg:col-span-2 flex flex-col">
+              <div className="relative aspect-video bg-muted flex-shrink-0">
+                {photos.length > 0 ? (
+                  <>
+                    <img 
+                      src={photos[currentPhotoIndex]} 
+                      alt={`${property.address} - Photo ${currentPhotoIndex + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    {photos.length > 1 && (
+                      <>
+                        <button
+                          onClick={() => setCurrentPhotoIndex(i => i === 0 ? photos.length - 1 : i - 1)}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 min-w-[48px] min-h-[48px] 
+                                     bg-black/50 hover:bg-black/70 text-white rounded-full 
+                                     flex items-center justify-center shadow-lg"
+                          data-testid="button-modal-prev-photo"
+                        >
+                          <ChevronLeft className="w-6 h-6" />
+                        </button>
+                        <button
+                          onClick={() => setCurrentPhotoIndex(i => i === photos.length - 1 ? 0 : i + 1)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 min-w-[48px] min-h-[48px] 
+                                     bg-black/50 hover:bg-black/70 text-white rounded-full 
+                                     flex items-center justify-center shadow-lg"
+                          data-testid="button-modal-next-photo"
+                        >
+                          <ChevronRight className="w-6 h-6" />
+                        </button>
+                      </>
+                    )}
+                    <div className="absolute bottom-3 left-3 flex gap-2">
+                      <span className="px-2 py-1 bg-black/60 text-white text-xs rounded flex items-center gap-1">
+                        <Camera className="w-3 h-3" /> {photos.length}
+                      </span>
+                    </div>
+                    <div className="absolute bottom-3 right-3 px-3 py-1 bg-black/60 text-white text-sm rounded">
+                      {currentPhotoIndex + 1} / {photos.length}
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                    <Home className="w-16 h-16" />
+                  </div>
+                )}
               </div>
               
-              {property.soldPrice && (
-                <div className="flex justify-between items-center py-2.5 border-b border-muted">
-                  <span className="text-sm text-muted-foreground">
-                    Sold Price {soldPercent && <span className="text-muted-foreground/60">{soldPercent}%</span>}
-                  </span>
-                  <span className="text-sm font-medium text-foreground">
-                    {formatCurrency(property.soldPrice)}
-                  </span>
+              <div className="p-6 border-b">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className={`px-3 py-1 ${statusBgClass} text-white text-sm font-medium rounded`}>
+                      {property.status}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {property.daysOnMarket} DAYS
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-foreground">
+                      {formatCurrency(displayPrice)}
+                    </p>
+                    {property.pricePerSqft > 0 && (
+                      <p className="text-muted-foreground">
+                        ${property.pricePerSqft}/sqft
+                      </p>
+                    )}
+                  </div>
                 </div>
-              )}
-              
-              {property.pricePerSqft > 0 && (
-                <div className="flex justify-between items-center py-2.5 border-b border-muted">
-                  <span className="text-sm text-muted-foreground">Price per Sq. Ft.</span>
-                  <span className="text-sm font-medium text-foreground">
-                    ${property.pricePerSqft.toLocaleString()}
-                  </span>
+                
+                <div className="flex flex-wrap gap-4 mt-4 text-muted-foreground">
+                  <span>{property.beds} beds</span>
+                  <span>{property.baths} baths</span>
+                  <span>{property.sqft?.toLocaleString()} sqft</span>
                 </div>
-              )}
-              
-              {property.soldDate && (
-                <div className="flex justify-between items-center py-2.5 border-b border-muted">
-                  <span className="text-sm text-muted-foreground">Sold Date</span>
-                  <span className="text-sm font-medium text-foreground">
-                    {new Date(property.soldDate).toLocaleDateString()}
-                  </span>
-                </div>
-              )}
-              
-              {property.listDate && (
-                <div className="flex justify-between items-center py-2.5 border-b border-muted">
-                  <span className="text-sm text-muted-foreground">List Date</span>
-                  <span className="text-sm font-medium text-foreground">
-                    {new Date(property.listDate).toLocaleDateString()}
-                  </span>
-                </div>
-              )}
-              
-              <div className="flex justify-between items-center py-2.5 border-b border-muted">
-                <span className="text-sm text-muted-foreground">Days on Market</span>
-                <span className="text-sm font-medium text-foreground">
-                  {property.daysOnMarket}
-                </span>
+                
+                {(property.listDate || property.soldDate) && (
+                  <div className="flex flex-wrap gap-4 mt-3 text-sm text-muted-foreground">
+                    {property.listDate && (
+                      <span>Listed: {new Date(property.listDate).toLocaleDateString()}</span>
+                    )}
+                    {property.soldDate && (
+                      <span>Sold: {new Date(property.soldDate).toLocaleDateString()}</span>
+                    )}
+                  </div>
+                )}
               </div>
               
-              <div className="flex justify-between items-center py-2.5">
-                <span className="text-sm text-muted-foreground">MLS #</span>
-                <span className="text-sm font-medium text-foreground">
-                  {property.mlsNumber || property.id}
-                </span>
+              <div className="p-6 flex-1">
+                <h4 className="text-sm font-semibold text-foreground mb-4">Price History</h4>
+                <div className="space-y-3">
+                  {property.originalPrice && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Original List Price</span>
+                      <span className="font-medium text-foreground">
+                        {formatCurrency(property.originalPrice)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">
+                      List Price
+                      {priceDrop && (
+                        <span className="text-red-500 ml-1">
+                          ↓{formatCurrency(priceDrop)}
+                        </span>
+                      )}
+                    </span>
+                    <span className="font-medium text-foreground">
+                      {formatCurrency(currentListPrice)}
+                    </span>
+                  </div>
+                  {property.soldPrice && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">
+                        Sold Price
+                        {soldPercent && (
+                          <span className="text-muted-foreground/60 ml-1">{soldPercent}%</span>
+                        )}
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {formatCurrency(property.soldPrice)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="mt-6 pt-4 border-t flex flex-wrap gap-4 text-sm text-muted-foreground">
+                  <span>MLS# {property.mlsNumber || property.id}</span>
+                  {property.lastUpdated && (
+                    <span>Last Updated {new Date(property.lastUpdated).toLocaleString()}</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-          
-          {property.description && (
-            <div className="p-4 border-t">
-              <h3 className="text-sm font-semibold text-foreground mb-2">Description</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{property.description}</p>
-            </div>
-          )}
         </div>
       </div>
     </>
@@ -472,7 +731,31 @@ export function TimeToSellWidget({
   subjectProperty
 }: TimeToSellWidgetProps) {
   const [showInfoModal, setShowInfoModal] = useState(false);
-  const [selectedProperty, setSelectedProperty] = useState<CmaProperty | null>(null);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+
+  const selectedProperty = useMemo(() => {
+    if (!selectedPropertyId) return null;
+    return comparables.find(c => c.id === selectedPropertyId) || null;
+  }, [selectedPropertyId, comparables]);
+
+  const handleSidebarClick = (property: CmaProperty) => {
+    setSelectedPropertyId(property.id);
+    setDetailModalOpen(false);
+  };
+
+  const handleViewClick = () => {
+    setDetailModalOpen(true);
+  };
+
+  const handleCloseCard = () => {
+    setSelectedPropertyId(null);
+    setDetailModalOpen(false);
+  };
+
+  const handleCloseModal = () => {
+    setDetailModalOpen(false);
+  };
 
   const closedComps = useMemo(() =>
     comparables.filter(c => {
@@ -550,11 +833,6 @@ export function TimeToSellWidget({
           <p className="text-xs text-muted-foreground">
             Price: {formatPrice(data.currentPrice)}
           </p>
-          {data.originalPrice !== data.currentPrice && (
-            <p className="text-xs text-muted-foreground">
-              Original: {formatPrice(data.originalPrice)}
-            </p>
-          )}
         </div>
       );
     }
@@ -565,16 +843,16 @@ export function TimeToSellWidget({
     <div className="flex flex-col h-full bg-background" data-testid="time-to-sell-widget">
       <TimeToSellInfoModal isOpen={showInfoModal} onClose={() => setShowInfoModal(false)} />
       
-      {selectedProperty && (
-        <TimeToSellPropertyModal
+      {detailModalOpen && selectedProperty && (
+        <PropertyDetailModal
           property={selectedProperty}
           subjectProperty={subjectProperty}
-          onClose={() => setSelectedProperty(null)}
+          onClose={handleCloseModal}
         />
       )}
 
-      <div className="flex-1 overflow-auto">
-        <div className="p-6 border-b">
+      <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="p-6 border-b flex-shrink-0">
           <div className="flex items-center justify-center gap-4 mb-4 flex-wrap">
             <div className="text-center">
               <span className="text-4xl font-bold text-foreground">{calculatedAvgDaysOnMarket}</span>
@@ -605,8 +883,8 @@ export function TimeToSellWidget({
           </p>
         </div>
 
-        <div className="flex flex-col md:flex-row min-h-[400px]">
-          <div className="w-full md:w-64 lg:w-72 border-r overflow-auto max-h-[500px] flex-shrink-0">
+        <div className="flex-1 flex overflow-hidden">
+          <div className="w-64 lg:w-72 border-r overflow-y-auto flex-shrink-0">
             {closedComps.length > 0 && (
               <div className="p-3">
                 <div className="flex items-center gap-2 mb-2">
@@ -620,7 +898,8 @@ export function TimeToSellWidget({
                     key={comp.id}
                     property={comp}
                     showPercentOfList={true}
-                    onClick={() => setSelectedProperty(comp)}
+                    isSelected={selectedPropertyId === comp.id}
+                    onClick={() => handleSidebarClick(comp)}
                   />
                 ))}
               </div>
@@ -638,8 +917,8 @@ export function TimeToSellWidget({
                   <PropertySidebarItem
                     key={comp.id}
                     property={comp}
-                    showPercentOfList={false}
-                    onClick={() => setSelectedProperty(comp)}
+                    isSelected={selectedPropertyId === comp.id}
+                    onClick={() => handleSidebarClick(comp)}
                   />
                 ))}
               </div>
@@ -657,8 +936,8 @@ export function TimeToSellWidget({
                   <PropertySidebarItem
                     key={comp.id}
                     property={comp}
-                    showPercentOfList={false}
-                    onClick={() => setSelectedProperty(comp)}
+                    isSelected={selectedPropertyId === comp.id}
+                    onClick={() => handleSidebarClick(comp)}
                   />
                 ))}
               </div>
@@ -676,8 +955,8 @@ export function TimeToSellWidget({
                   <PropertySidebarItem
                     key={comp.id}
                     property={comp}
-                    showPercentOfList={false}
-                    onClick={() => setSelectedProperty(comp)}
+                    isSelected={selectedPropertyId === comp.id}
+                    onClick={() => handleSidebarClick(comp)}
                   />
                 ))}
               </div>
@@ -690,7 +969,16 @@ export function TimeToSellWidget({
             )}
           </div>
 
-          <div className="flex-1 p-4 flex flex-col">
+          {selectedProperty && !detailModalOpen && (
+            <PropertyCardPanel
+              property={selectedProperty}
+              subjectProperty={subjectProperty}
+              onClose={handleCloseCard}
+              onViewClick={handleViewClick}
+            />
+          )}
+
+          <div className="flex-1 p-4 flex flex-col overflow-hidden">
             {chartData.length >= 3 ? (
               <>
                 <div className="flex-1 min-h-[300px]">
@@ -727,7 +1015,7 @@ export function TimeToSellWidget({
                   </ResponsiveContainer>
                 </div>
 
-                <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t flex-wrap">
+                <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t flex-wrap flex-shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-red-500" />
                     <span className="text-sm text-muted-foreground">Closed</span>
