@@ -1,0 +1,299 @@
+# Replit Agent Task: Fix Missing Comparable Lot Data in Average Price/Acre Slide
+
+## Problem
+
+The Subject Property (blue diamond) shows correctly on the scatter plot at ~0.15 acres, but:
+- ❌ Left sidebar shows "No properties with acreage data"
+- ❌ No comparable markers (red/green/yellow dots) on chart
+- ❌ "$0 / ACRE" in header (no data to calculate average)
+
+**Root Cause:** The subject property lot data is being mapped correctly, but the **comparables are NOT getting their lot size data**.
+
+---
+
+## Diagnosis
+
+The lot size mapping is working for the subject property but missing for comparables. This means:
+
+1. ✅ Subject property mapping includes `lotSizeAcres` (working)
+2. ❌ Comparables mapping is missing `lotSizeAcres` (broken)
+
+---
+
+## Fix: Add Lot Data to Comparables Mapping
+
+### Step 1: Find where comparables are mapped
+
+Search for the comparables mapping code:
+
+```bash
+grep -rn "comparables\|CmaProperty\|mapComparable" --include="*.ts" --include="*.tsx" client/src/ server/
+```
+
+Look for code that maps comparables array - it's likely in one of these files:
+- `server/repliers.ts`
+- `client/src/components/cma-tab.tsx`
+- `client/src/pages/cma-presentation.tsx`
+
+### Step 2: Add lot fields to comparables mapping
+
+Find the comparables mapping function and ADD the lot size fields:
+
+```typescript
+// BEFORE (missing lot data):
+const mapComparable = (comp: any) => ({
+  mlsNumber: comp.mlsNumber,
+  address: comp.address,
+  listPrice: comp.listPrice,
+  soldPrice: comp.soldPrice,
+  status: comp.status,
+  // ... other fields
+  // ❌ NO LOT SIZE FIELDS
+});
+
+// AFTER (with lot data):
+const mapComparable = (comp: any) => {
+  // Calculate normalized acres
+  const acres = comp.lot?.acres || 
+                (comp.lot?.squareFeet ? comp.lot.squareFeet / 43560 : null) ||
+                (comp.lotSize ? (comp.lotSize > 100 ? comp.lotSize / 43560 : comp.lotSize) : null);
+  
+  const price = comp.soldPrice || comp.listPrice;
+  const pricePerAcre = acres && acres > 0 && price ? Math.round(price / acres) : null;
+  
+  return {
+    mlsNumber: comp.mlsNumber,
+    address: comp.address,
+    listPrice: comp.listPrice,
+    soldPrice: comp.soldPrice,
+    status: comp.status,
+    // ... other existing fields
+    
+    // ✅ ADD THESE LOT SIZE FIELDS
+    lot: comp.lot || null,
+    lotSizeAcres: acres,
+    lotSizeSquareFeet: comp.lot?.squareFeet || null,
+    pricePerAcre: pricePerAcre,
+  };
+};
+```
+
+### Step 3: Verify the Repliers API is returning lot data for comps
+
+Add debug logging to see what's coming from the API:
+
+```typescript
+// Add this where comparables are fetched/processed
+console.log('[DEBUG] First 3 comparables raw lot data:', 
+  comparables.slice(0, 3).map(c => ({
+    mlsNumber: c.mlsNumber,
+    lot: c.lot,
+    lotSize: c.lotSize,
+    lotSizeArea: c.lotSizeArea,
+  }))
+);
+```
+
+---
+
+## Likely Location of the Bug
+
+### Check `cma-tab.tsx` (most likely)
+
+Around lines 281-312, there's probably a mapping for comparables. Look for something like:
+
+```typescript
+// Find this pattern and add lot fields
+const processedComparables = comparables.map(c => ({
+  mlsNumber: c.mlsNumber,
+  address: c.address,
+  // ... 
+  // ❌ Missing: lotSizeAcres, pricePerAcre
+}));
+```
+
+### Or check `server/repliers.ts`
+
+There might be separate mapping functions for subject vs comparables:
+
+```typescript
+// Subject property mapping (working)
+const mapSubjectProperty = (listing) => ({
+  // ... includes lotSizeAcres ✅
+});
+
+// Comparables mapping (missing lot data)
+const mapComparable = (listing) => ({
+  // ... missing lotSizeAcres ❌
+});
+```
+
+---
+
+## Complete Fix Code
+
+### Utility function (if not already created)
+
+```typescript
+// Add to server/utils/lotSize.ts or inline
+export function normalizedAcres(listing: any): number | null {
+  if (listing.lot?.acres && listing.lot.acres > 0) {
+    return listing.lot.acres;
+  }
+  if (listing.lot?.squareFeet && listing.lot.squareFeet > 0) {
+    return listing.lot.squareFeet / 43560;
+  }
+  if (listing.lotSize && listing.lotSize > 0) {
+    return listing.lotSize > 100 ? listing.lotSize / 43560 : listing.lotSize;
+  }
+  return null;
+}
+
+export function calculatePricePerAcre(price: number, acres: number | null): number | null {
+  if (!acres || acres <= 0 || !price) return null;
+  return Math.round(price / acres);
+}
+```
+
+### Update comparables mapping
+
+```typescript
+// Wherever comparables are processed, ensure this mapping exists:
+const processedComparables = rawComparables.map(comp => {
+  const acres = normalizedAcres(comp);
+  const price = comp.soldPrice || comp.listPrice;
+  
+  return {
+    // ... all existing fields ...
+    mlsNumber: comp.mlsNumber,
+    address: comp.address,
+    city: comp.city,
+    state: comp.state,
+    listPrice: comp.listPrice,
+    soldPrice: comp.soldPrice,
+    originalPrice: comp.originalPrice,
+    status: comp.status,
+    beds: comp.beds,
+    baths: comp.baths,
+    sqft: comp.sqft,
+    photos: comp.photos || comp.images || [],
+    daysOnMarket: comp.daysOnMarket,
+    
+    // ✅ ADD THESE LOT FIELDS (same as subject property)
+    lot: comp.lot || null,
+    lotSizeAcres: acres,
+    lotSizeSquareFeet: comp.lot?.squareFeet || null,
+    pricePerAcre: calculatePricePerAcre(price, acres),
+  };
+});
+```
+
+---
+
+## Verification
+
+After applying the fix, check:
+
+### Console logs should show:
+```
+[DEBUG] Comparables with lot data:
+- Total comparables: 10
+- With lotSizeAcres: 8
+- Sample: [
+    { mlsNumber: 'ACT123', lotSizeAcres: 0.25, pricePerAcre: 1800000 },
+    { mlsNumber: 'ACT456', lotSizeAcres: 0.18, pricePerAcre: 2200000 },
+    ...
+  ]
+```
+
+### UI should show:
+- ☐ Left sidebar populated with properties grouped by status
+- ☐ Each property shows "$/acre" value
+- ☐ Scatter plot has colored dots (red/green/yellow/blue)
+- ☐ Header shows calculated average (e.g., "$4,957,228 / ACRE")
+- ☐ Trendline visible through sold listings
+
+---
+
+## Quick Debugging Steps
+
+### 1. Check if lot data exists in raw API response
+
+```typescript
+// In server/repliers.ts after fetching comparables
+console.log('[REPLIERS] Raw comparable lot fields:', 
+  response.data.listings.slice(0, 3).map(l => ({
+    mlsNumber: l.mlsNumber,
+    'lot.acres': l.lot?.acres,
+    'lot.squareFeet': l.lot?.squareFeet,
+  }))
+);
+```
+
+### 2. Check if lot data is passed to frontend
+
+```typescript
+// In the component receiving comparables
+console.log('[FRONTEND] Comparables lot data:', 
+  comparables.slice(0, 3).map(c => ({
+    mlsNumber: c.mlsNumber,
+    lotSizeAcres: c.lotSizeAcres,
+    pricePerAcre: c.pricePerAcre,
+  }))
+);
+```
+
+### 3. Check the filter in the slide component
+
+```typescript
+// In AveragePricePerAcreSlide.tsx
+const propertiesWithAcreage = comparables.filter(p => 
+  p.lotSizeAcres && p.lotSizeAcres > 0
+);
+
+console.log('[SLIDE] Properties with acreage:', {
+  totalComparables: comparables.length,
+  withAcreage: propertiesWithAcreage.length,
+  sample: propertiesWithAcreage.slice(0, 2).map(p => ({
+    address: p.address,
+    acres: p.lotSizeAcres,
+  })),
+});
+```
+
+---
+
+## Expected Result After Fix
+
+```
+┌─────────────────────┬──────────────────────────────────────────────────────┐
+│                     │                                                      │
+│ 6 Closed            │   $4,957,228 / ACRE                                  │
+│ ┌─────────────────┐ │   Comparable land sold for an average of $4.9M/acre  │
+│ │🏠 2502 Spring   │ │                                                      │
+│ │ $5,220,522/acre │ │              ●                              $1.75M   │
+│ └─────────────────┘ │                   ●    ●                             │
+│ ┌─────────────────┐ │       ●                    ● ◆                       │
+│ │🏠 2112 Matter   │ │          ●   ─────────────────────  $1.17M           │
+│ │ $6,203,532/acre │ │       ●            ●                                 │
+│ └─────────────────┘ │                              ●         $875K         │
+│                     │   ────────────────────────────────────               │
+│ 1 Under Contract    │   0.22      0.27      0.32      0.38   Acres         │
+│ ...                 │                                                      │
+└─────────────────────┴──────────────────────────────────────────────────────┘
+```
+
+---
+
+## Summary
+
+**The fix is simple:** Find where comparables are mapped and add the same lot size fields that are working for the subject property:
+
+```typescript
+// Add these to the comparables mapping:
+lot: comp.lot,
+lotSizeAcres: normalizedAcres(comp),
+pricePerAcre: calculatePricePerAcre(price, normalizedAcres(comp)),
+```
+
+The subject property is working, so copy that pattern to the comparables mapping.

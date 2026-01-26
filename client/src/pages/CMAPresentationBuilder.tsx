@@ -240,11 +240,32 @@ export default function CMAPresentationBuilder() {
   }, []);
 
   // Transform CMAComparable[] into Property-compatible objects (memoized)
-  // Try cma.propertiesData first, fall back to transaction.cmaData if empty
+  // Try cma.propertiesData first, but prefer transaction.cmaData if it has lot data
+  // and propertiesData doesn't (to support Average Price/Acre widget)
   const properties = useMemo(() => {
-    const rawComparables = (cma?.propertiesData && (cma.propertiesData as any[]).length > 0)
-      ? (cma.propertiesData as any[])
-      : (linkedTransaction?.cmaData || []) as any[];
+    const propertiesData = (cma?.propertiesData || []) as any[];
+    const transactionCmaData = (linkedTransaction?.cmaData || []) as any[];
+    
+    // Check if propertiesData has lot fields
+    const hasLotDataInProperties = propertiesData.length > 0 && 
+      propertiesData.some((c: any) => c.lotSizeAcres || c.lot?.acres || c.lotSizeSquareFeet);
+    
+    // Check if transaction.cmaData has lot fields  
+    const hasLotDataInTransaction = transactionCmaData.length > 0 &&
+      transactionCmaData.some((c: any) => c.lotSizeAcres || c.lot?.acres || c.lotSizeSquareFeet);
+    
+    // Prefer data source with lot fields, otherwise use propertiesData if available
+    let rawComparables: any[];
+    if (propertiesData.length > 0 && hasLotDataInProperties) {
+      rawComparables = propertiesData;
+    } else if (transactionCmaData.length > 0 && hasLotDataInTransaction) {
+      // Use transaction.cmaData if it has lot data and propertiesData doesn't
+      rawComparables = transactionCmaData;
+    } else if (propertiesData.length > 0) {
+      rawComparables = propertiesData;
+    } else {
+      rawComparables = transactionCmaData;
+    }
     
     return rawComparables.map((comp: any, index: number) => {
     const resolvedAddress = comp.unparsedAddress || comp.streetAddress || comp.address || 
@@ -261,6 +282,17 @@ export default function CMAPresentationBuilder() {
       comp.coordinates?.latitude || comp.coordinates?.lat || comp.geo?.lat;
     const lng = comp.longitude || comp.lng || comp.map?.longitude || comp.map?.lng || 
       comp.coordinates?.longitude || comp.coordinates?.lng || comp.geo?.lng;
+    
+    // Calculate lot size - normalize from various field formats
+    const lotAcres = comp.lotSizeAcres ?? comp.lot?.acres ?? 
+      (comp.lotSizeSquareFeet ? comp.lotSizeSquareFeet / 43560 : null) ??
+      (comp.lotSize && comp.lotSize > 100 ? comp.lotSize / 43560 : comp.lotSize) ?? null;
+    const lotSqft = comp.lotSizeSquareFeet ?? comp.lot?.squareFeet ?? 
+      (lotAcres ? lotAcres * 43560 : null);
+    const effectivePrice = comp.soldPrice || comp.closePrice || parsedPrice;
+    const calculatedPricePerAcre = lotAcres && lotAcres > 0 && effectivePrice > 0 
+      ? Math.round(effectivePrice / lotAcres) 
+      : null;
     
     return {
       id: comp.mlsNumber || `comp-${index}`,
@@ -288,6 +320,12 @@ export default function CMAPresentationBuilder() {
       // Square footage - multiple aliases
       livingArea: parsedSqft,
       sqft: parsedSqft,
+      // Lot size fields - multiple aliases for Average Price/Acre widget
+      lot: comp.lot || (lotAcres ? { acres: lotAcres, squareFeet: lotSqft } : null),
+      lotSizeAcres: lotAcres,
+      lotSizeSquareFeet: lotSqft,
+      pricePerAcre: comp.pricePerAcre ?? calculatedPricePerAcre,
+      acres: lotAcres,
       // Other fields
       simpleDaysOnMarket: comp.daysOnMarket || comp.dom || 0,
       daysOnMarket: comp.daysOnMarket || comp.dom || 0,
@@ -309,6 +347,17 @@ export default function CMAPresentationBuilder() {
     const rawSubject = linkedTransaction?.mlsData as any;
     if (!rawSubject) return null;
     
+    // Calculate lot size for subject property
+    const lotAcres = rawSubject.lotSizeAcres ?? rawSubject.lot?.acres ?? 
+      (rawSubject.lotSizeSquareFeet ? rawSubject.lotSizeSquareFeet / 43560 : null) ??
+      (rawSubject.lotSize && rawSubject.lotSize > 100 ? rawSubject.lotSize / 43560 : rawSubject.lotSize) ?? null;
+    const lotSqft = rawSubject.lotSizeSquareFeet ?? rawSubject.lot?.squareFeet ?? 
+      (lotAcres ? lotAcres * 43560 : null);
+    const subjectPrice = rawSubject.listPrice || rawSubject.price || 0;
+    const calculatedPricePerAcre = lotAcres && lotAcres > 0 && subjectPrice > 0 
+      ? Math.round(subjectPrice / lotAcres) 
+      : null;
+    
     return {
     ...rawSubject,
     // Address aliases
@@ -324,6 +373,12 @@ export default function CMAPresentationBuilder() {
     // Sqft aliases (mlsData uses sqft as string)
     livingArea: typeof rawSubject.sqft === 'string' ? parseFloat(rawSubject.sqft) : (rawSubject.sqft || rawSubject.livingArea || 0),
     sqft: typeof rawSubject.sqft === 'string' ? parseFloat(rawSubject.sqft) : (rawSubject.sqft || rawSubject.livingArea || 0),
+    // Lot size fields - multiple aliases for Average Price/Acre widget
+    lot: rawSubject.lot || (lotAcres ? { acres: lotAcres, squareFeet: lotSqft } : null),
+    lotSizeAcres: lotAcres,
+    lotSizeSquareFeet: lotSqft,
+    pricePerAcre: rawSubject.pricePerAcre ?? calculatedPricePerAcre,
+    acres: lotAcres,
     // Status normalization
     standardStatus: normalizeStatus(rawSubject.standardStatus || rawSubject.status),
     status: normalizeStatus(rawSubject.status || rawSubject.standardStatus),
