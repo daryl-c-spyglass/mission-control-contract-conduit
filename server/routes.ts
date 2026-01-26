@@ -3433,7 +3433,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
         const result = {
           available: true,
           images: data.imageInsights.images.map((insight: any, index: number) => ({
-            url: ensureFullUrl(photos[index] || insight.url),
+            url: ensureFullUrl(insight.image || photos[index] || insight.url),
             originalIndex: index,
             classification: {
               imageOf: insight.classification?.imageOf || null,
@@ -3441,7 +3441,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
               confidence: insight.classification?.confidence || null,
             },
             quality: {
-              score: insight.quality?.score || null,
+              quantitative: insight.quality?.quantitative || null,
               qualitative: insight.quality?.qualitative || null,
             },
           })),
