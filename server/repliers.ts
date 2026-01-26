@@ -525,9 +525,16 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
         const compPhotos = normalizeImageUrls(comp.images || comp.media || comp.photos);
         const compLat = comp.map?.latitude || comp.address?.latitude || comp.latitude;
         const compLng = comp.map?.longitude || comp.address?.longitude || comp.longitude;
+        const lotData = buildLotSizeData(comp);
+        const listPrice = parseFloat(comp.listPrice) || 0;
+        const soldPrice = comp.soldPrice ? parseFloat(comp.soldPrice) : null;
+        const effectivePrice = soldPrice || listPrice;
+        
         return {
           address: comp.address?.full || compStreetAddress || "",
-          price: parseFloat(comp.listPrice) || parseFloat(comp.soldPrice) || 0,
+          price: effectivePrice,
+          listPrice: listPrice,
+          soldPrice: soldPrice,
           bedrooms: comp.bedroomsTotal || comp.details?.numBedrooms || comp.beds || 0,
           bathrooms: comp.bathroomsFull || comp.details?.numBathrooms || comp.baths || 0,
           sqft: comp.livingArea || comp.buildingAreaTotal || comp.details?.sqft || comp.sqft || 0,
@@ -538,10 +545,16 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
           mlsNumber: comp.mlsNumber || "",
           status: comp.standardStatus || comp.status || "",
           listDate: comp.listDate || "",
+          soldDate: comp.soldDate || comp.closeDate || null,
           map: (compLat && compLng) ? {
             latitude: parseFloat(compLat),
             longitude: parseFloat(compLng),
           } : undefined,
+          lot: lotData,
+          lotSizeAcres: lotData.acres,
+          lotSizeSquareFeet: lotData.squareFeet,
+          pricePerAcre: calculatePricePerAcre(effectivePrice, lotData.acres),
+          type: 'Sale',
         };
       });
     }

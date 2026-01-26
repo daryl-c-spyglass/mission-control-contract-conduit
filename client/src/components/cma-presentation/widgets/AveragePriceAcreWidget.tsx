@@ -390,7 +390,10 @@ export function AveragePriceAcreWidget({
             
             {propertiesWithAcreage.length === 0 && (
               <div className="text-center text-muted-foreground text-sm p-4">
-                No properties with acreage data
+                <p className="font-medium mb-1">No Lot Data Available</p>
+                <p className="text-xs text-muted-foreground/70">
+                  Lot size not reported in MLS for this area
+                </p>
               </div>
             )}
           </div>
