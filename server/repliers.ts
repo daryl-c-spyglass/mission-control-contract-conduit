@@ -592,9 +592,16 @@ export async function fetchSimilarListings(mlsNumber: string, radius: number = 5
       const listingPhotos = normalizeImageUrls(listing.media || listing.images || listing.photos);
       const listingLat = listing.map?.latitude || listing.address?.latitude || listing.latitude;
       const listingLng = listing.map?.longitude || listing.address?.longitude || listing.longitude;
+      const lotData = buildLotSizeData(listing);
+      const listPrice = parseFloat(listing.listPrice) || 0;
+      const soldPrice = listing.soldPrice ? parseFloat(listing.soldPrice) : null;
+      const effectivePrice = soldPrice || listPrice;
+      
       return {
         address: displayAddress,
-        price: parseFloat(listing.listPrice) || parseFloat(listing.soldPrice) || 0,
+        price: effectivePrice,
+        listPrice: listPrice,
+        soldPrice: soldPrice,
         bedrooms: listing.bedroomsTotal || listing.details?.numBedrooms || listing.beds || 0,
         bathrooms: listing.bathroomsFull || listing.details?.numBathrooms || listing.baths || 0,
         sqft: listing.livingArea || listing.details?.sqft || listing.sqft || 0,
@@ -609,6 +616,11 @@ export async function fetchSimilarListings(mlsNumber: string, radius: number = 5
           latitude: parseFloat(listingLat),
           longitude: parseFloat(listingLng),
         } : undefined,
+        lot: lotData,
+        lotSizeAcres: lotData.acres,
+        lotSizeSquareFeet: lotData.squareFeet,
+        pricePerAcre: calculatePricePerAcre(effectivePrice, lotData.acres),
+        type: 'Sale',
       };
     });
   } catch (error) {
@@ -1322,10 +1334,17 @@ export async function searchNearbyComparables(
         ? `${fullAddress}, ${city}, ${state}`
         : fullAddress || '';
 
+      const lotData = buildLotSizeData(listing);
+      const price = parseFloat(listing.listPrice) || 0;
+      const soldPrice = listing.soldPrice ? parseFloat(listing.soldPrice) : null;
+      const effectivePrice = soldPrice || price;
+      
       return {
         mlsNumber: listing.mlsNumber,
         address: displayAddress,
-        price: parseFloat(listing.listPrice) || 0,
+        price: price,
+        listPrice: price,
+        soldPrice: soldPrice,
         bedrooms: parseInt(listing.details?.numBedrooms || listing.numBedrooms || '0'),
         bathrooms: parseInt(listing.details?.numBathrooms || listing.numBathrooms || '0'),
         sqft: typeof sqft === 'string' ? parseInt(sqft) || 0 : sqft,
@@ -1339,6 +1358,11 @@ export async function searchNearbyComparables(
           latitude: parseFloat(listingLat),
           longitude: parseFloat(listingLng),
         } : undefined,
+        lot: lotData,
+        lotSizeAcres: lotData.acres,
+        lotSizeSquareFeet: lotData.squareFeet,
+        pricePerAcre: calculatePricePerAcre(effectivePrice, lotData.acres),
+        type: 'Sale',
       };
     });
 

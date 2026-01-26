@@ -209,20 +209,47 @@ export function AveragePriceAcreWidget({
   const [showTrendline, setShowTrendline] = useState(true);
 
   const propertiesWithAcreage = useMemo<PropertyWithAcreage[]>(() => {
-    return comparables
+    console.log('=== [AVERAGE PRICE/ACRE] Widget Data Pipeline ===');
+    console.log('Total comparables received:', comparables.length);
+    
+    const withAcreage = comparables
       .filter(p => {
-        const acres = p.acres || (p.lotSize ? p.lotSize / 43560 : 0);
-        return acres > 0;
+        if (p.type === 'Lease') return false;
+        const acres = p.lotSizeAcres ?? p.lot?.acres ?? p.acres ?? (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : 0) ?? (p.lotSize ? p.lotSize / 43560 : 0);
+        return acres !== null && acres !== undefined && acres > 0;
       })
       .map(p => {
-        const acres = p.acres || (p.lotSize ? p.lotSize / 43560 : 0);
+        const acres = p.lotSizeAcres ?? p.lot?.acres ?? p.acres ?? (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : 0) ?? (p.lotSize ? p.lotSize / 43560 : 0);
         const price = p.soldPrice || p.price;
+        const pricePerAcre = p.pricePerAcre ?? (acres && acres > 0 ? Math.round(price / acres) : 0);
         return {
           ...p,
-          lotSizeAcres: acres,
-          pricePerAcre: Math.round(price / acres),
+          lotSizeAcres: acres as number,
+          pricePerAcre: pricePerAcre as number,
         };
       });
+    
+    console.log('Properties with valid acreage:', withAcreage.length);
+    if (withAcreage.length > 0) {
+      console.log('Sample acreage data:', withAcreage.slice(0, 3).map(p => ({
+        mlsNumber: p.mlsNumber,
+        acres: p.lotSizeAcres?.toFixed(2),
+        price: p.soldPrice || p.price,
+        pricePerAcre: p.pricePerAcre,
+        status: p.status,
+      })));
+    } else if (comparables.length > 0) {
+      console.log('⚠️ NO PROPERTIES WITH ACREAGE DATA');
+      console.log('Sample lot fields:', comparables.slice(0, 3).map(p => ({
+        mlsNumber: p.mlsNumber,
+        lotSizeAcres: p.lotSizeAcres,
+        lot: p.lot,
+        acres: p.acres,
+        lotSize: p.lotSize,
+      })));
+    }
+    
+    return withAcreage;
   }, [comparables]);
 
   const groupedProperties = useMemo(() => {
@@ -246,13 +273,14 @@ export function AveragePriceAcreWidget({
 
   const subjectWithAcreage = useMemo<PropertyWithAcreage | null>(() => {
     if (!subjectProperty) return null;
-    const acres = subjectProperty.acres || (subjectProperty.lotSize ? subjectProperty.lotSize / 43560 : 0);
-    if (acres <= 0) return null;
+    const acres = subjectProperty.lotSizeAcres ?? subjectProperty.lot?.acres ?? subjectProperty.acres ?? (subjectProperty.lotSizeSquareFeet ? subjectProperty.lotSizeSquareFeet / 43560 : 0) ?? (subjectProperty.lotSize ? subjectProperty.lotSize / 43560 : 0);
+    console.log('[AVERAGE PRICE/ACRE] Subject property acres:', acres, 'lotSizeAcres:', subjectProperty.lotSizeAcres, 'lot:', subjectProperty.lot);
+    if (!acres || acres <= 0) return null;
     const price = subjectProperty.soldPrice || subjectProperty.price || (avgPricePerAcre * acres);
     return {
       ...subjectProperty,
-      lotSizeAcres: acres,
-      pricePerAcre: Math.round(price / acres),
+      lotSizeAcres: acres as number,
+      pricePerAcre: subjectProperty.pricePerAcre ?? Math.round(price / acres),
       isSubject: true,
     };
   }, [subjectProperty, avgPricePerAcre]);
