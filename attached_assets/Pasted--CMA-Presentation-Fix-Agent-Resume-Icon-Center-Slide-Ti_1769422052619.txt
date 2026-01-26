@@ -1,0 +1,188 @@
+# CMA Presentation — Fix Agent Resume Icon & Center Slide Titles
+
+## Issues to Fix
+
+| # | Issue | Location |
+|---|-------|----------|
+| 1 | Orange "i" icon badge on Agent Resume card | Home view - Agent Resume card |
+| 2 | Slide title headers not centered | All slide headers |
+
+---
+
+## Fix 1: Remove Orange Icon Badge from Agent Resume Card
+
+The Agent Resume card on the home grid shows an unwanted orange "i" icon badge overlapping the profile photo.
+
+### Find the SectionCard or Agent Resume card component:
+
+```bash
+grep -rn "agent.*resume\|SectionCard\|icon.*badge" --include="*.tsx" client/src/components/cma-presentation/
+```
+
+### Remove the badge:
+
+```tsx
+// In SectionCard.tsx or wherever the Agent Resume card is rendered
+
+// BEFORE (with badge):
+<div className="relative">
+  <img src={agentPhoto} className="w-16 h-16 rounded-full" />
+  <div className="absolute -top-1 -right-1 w-5 h-5 bg-[#EF4923] rounded-full flex items-center justify-center">
+    <span className="text-white text-xs">i</span>
+  </div>
+</div>
+
+// AFTER (no badge):
+<div className="relative">
+  <img src={agentPhoto} className="w-16 h-16 rounded-full" />
+  {/* REMOVED: Orange badge icon */}
+</div>
+```
+
+### Or if it's conditional, just remove for Agent Resume:
+
+```tsx
+// Only show badge for widgets that need count (like Comps)
+{widget.showBadge && widget.badgeCount && (
+  <div className="absolute -top-1 -right-1 ...">
+    {widget.badgeCount}
+  </div>
+)}
+```
+
+---
+
+## Fix 2: Center Slide Title Headers
+
+The slide titles appear off-center because the agent profile on the right side isn't being accounted for in the layout.
+
+### Current Issue:
+- Left side has hamburger menu + logo
+- Center has title (but it's not truly centered)
+- Right side has icons + agent profile (wider than left)
+
+### Fix - Use absolute positioning for true center:
+
+```tsx
+// In SlideHeader.tsx or Header component for slides
+
+<header className="relative h-[60px] bg-[#1a1a2e] flex items-center px-4">
+  {/* Left - Hamburger + Logo */}
+  <div className="flex items-center gap-3 z-10">
+    <button onClick={onMenuToggle} className="min-w-[44px] min-h-[44px] p-2">
+      <Menu className="w-6 h-6 text-white" />
+    </button>
+    <img src="/logos/spyglass-logo-white.png" alt="Spyglass" className="h-6" />
+  </div>
+  
+  {/* Center - Title (absolutely positioned for TRUE center) */}
+  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+    <div className="text-center">
+      <h1 className="text-white text-lg font-bold tracking-wider uppercase">
+        {slideTitle}
+      </h1>
+      <p className="text-white/60 text-sm">{currentSlide} / {totalSlides}</p>
+    </div>
+  </div>
+  
+  {/* Right - Icons + Agent Profile */}
+  <div className="ml-auto flex items-center gap-2 z-10">
+    <button className="min-w-[44px] min-h-[44px] p-2">
+      <Search className="w-5 h-5 text-white" />
+    </button>
+    {/* ... other icons ... */}
+    <div className="flex items-center gap-2">
+      <div className="text-right hidden md:block">
+        <p className="text-white text-sm">{agentName}</p>
+        <p className="text-white/70 text-xs">{company}</p>
+      </div>
+      <img src={agentPhoto} className="w-9 h-9 rounded-full" />
+    </div>
+  </div>
+</header>
+```
+
+### Key CSS for true centering:
+
+```css
+/* Parent container */
+position: relative;
+
+/* Center element */
+position: absolute;
+inset: 0; /* or top: 0; left: 0; right: 0; bottom: 0; */
+display: flex;
+align-items: center;
+justify-content: center;
+pointer-events: none; /* So clicks pass through to buttons */
+```
+
+---
+
+## Copy/Paste for Replit
+
+```
+Fix two issues in CMA Presentation:
+
+## 1. REMOVE ORANGE ICON BADGE FROM AGENT RESUME CARD
+
+On the home view grid, the Agent Resume card shows an orange "i" icon badge next to the profile photo. Remove this badge.
+
+Find in SectionCard.tsx or wherever Agent Resume card renders the icon.
+Look for: absolute positioned div with bg-[#EF4923] or similar orange background
+Remove: The badge overlay element entirely for Agent Resume
+
+The badge should ONLY appear on widgets that show counts (like Comps showing "10").
+
+## 2. CENTER SLIDE TITLE HEADERS
+
+The slide titles (like "LISTING WITH SPYGLASS REALTY") are not truly centered - they're offset because the right side (agent profile) is wider than the left side (hamburger + logo).
+
+Fix by using absolute positioning for the title:
+
+<header className="relative ...">
+  {/* Left side - z-10 */}
+  <div className="flex items-center gap-3 z-10">...</div>
+  
+  {/* Center - absolute for TRUE center */}
+  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+    <div className="text-center">
+      <h1>{slideTitle}</h1>
+      <p>{currentSlide} / {totalSlides}</p>
+    </div>
+  </div>
+  
+  {/* Right side - ml-auto z-10 */}
+  <div className="ml-auto flex items-center gap-2 z-10">...</div>
+</header>
+
+Key classes for center element:
+- absolute inset-0 (fills parent)
+- flex items-center justify-center (centers content)
+- pointer-events-none (allows clicks on buttons underneath)
+- z-10 on left/right elements (so they stay above center layer)
+```
+
+---
+
+## Expected Result
+
+**Agent Resume Card (Home View):**
+```
+    ┌─────────────┐
+    │   [Photo]   │  <-- No orange badge
+    │             │
+    │ AGENT RESUME│
+    │ Daryl C.    │
+    └─────────────┘
+```
+
+**Slide Header:**
+```
+┌────────────────────────────────────────────────────────────────┐
+│ ☰ [Logo]       LISTING WITH SPYGLASS REALTY        Agent [📷] │
+│                         2 / 33                                 │
+└────────────────────────────────────────────────────────────────┘
+                           ↑
+                    Truly centered
+```

@@ -97,8 +97,8 @@ export function SlideViewer({
           background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%)'
         }}
       >
-        <div className="flex items-center justify-between p-3">
-          <div className="flex items-center gap-2">
+        <div className="relative flex items-center justify-between p-3">
+          <div className="flex items-center gap-2 z-10">
             <Button
               variant="ghost"
               size="icon"
@@ -115,7 +115,7 @@ export function SlideViewer({
             />
           </div>
 
-          <div className="text-center flex-1">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <h1 
               className="text-white text-lg md:text-xl font-bold uppercase tracking-wide"
               data-testid="text-slide-title"
@@ -124,7 +124,7 @@ export function SlideViewer({
             </h1>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 z-10">
             <div className="text-right hidden md:block">
               <p className="text-white text-sm font-medium" data-testid="text-agent-name">
                 {agent.name || 'Agent'}

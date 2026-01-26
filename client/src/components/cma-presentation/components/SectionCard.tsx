@@ -34,27 +34,15 @@ export function SectionCard({ widget, onClick, badge, agentPhoto, agentName }: S
         // Show agent photo if available, otherwise show user icon
         if (agentPhoto && !photoError) {
           return (
-            <div className="relative">
-              <img 
-                src={agentPhoto}
-                alt={agentName || 'Agent'}
-                className="w-12 h-12 rounded-full object-cover border-2 border-border"
-                onError={() => setPhotoError(true)}
-              />
-              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#EF4923] rounded-full flex items-center justify-center border-2 border-background">
-                <span className="text-white text-[10px] font-bold">i</span>
-              </div>
-            </div>
+            <img 
+              src={agentPhoto}
+              alt={agentName || 'Agent'}
+              className="w-12 h-12 rounded-full object-cover border-2 border-border"
+              onError={() => setPhotoError(true)}
+            />
           );
         }
-        return (
-          <div className="relative">
-            <User className={iconClass} />
-            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#EF4923] rounded-full flex items-center justify-center">
-              <span className="text-white text-[10px] font-bold">i</span>
-            </div>
-          </div>
-        );
+        return <User className={iconClass} />;
       case 'spyglass':
         if (logoError) {
           return (
