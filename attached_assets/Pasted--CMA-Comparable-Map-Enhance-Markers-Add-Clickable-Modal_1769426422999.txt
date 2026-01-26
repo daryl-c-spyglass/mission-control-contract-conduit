@@ -1,0 +1,301 @@
+# CMA Comparable Map — Enhance Markers & Add Clickable Modal
+
+## Objective
+
+Enhance the Map view in CMA Comparables to:
+1. Show property **address** on map markers (not just price)
+2. When clicking a marker, show a **popup card** with property preview
+3. Make the popup card **clickable** to open the full property detail modal with photo navigation
+
+---
+
+## Current vs Target
+
+| Feature | Current | Target |
+|---------|---------|--------|
+| Marker label | Price only ($2.05M) | Price + Address |
+| Marker click | Nothing or basic popup | Shows property preview card |
+| Preview card | Static or none | Clickable to open full modal |
+| Modal | None | Full property modal with photo gallery |
+
+---
+
+## Implementation
+
+### Step 1: Enhanced Map Markers with Address
+
+```tsx
+// Map marker with price AND address
+const createMarkerElement = (property: CmaProperty) => {
+  const el = document.createElement('div');
+  el.className = 'map-marker';
+  el.innerHTML = `
+    <div class="flex flex-col items-center">
+      <div class="px-2 py-1 bg-white rounded-lg shadow-lg border border-gray-200 text-center min-w-[80px]">
+        <p class="text-sm font-bold text-gray-900">${formatPrice(property.price)}</p>
+        <p class="text-xs text-gray-600 truncate max-w-[100px]">${property.address}</p>
+      </div>
+      <div class="w-0 h-0 border-l-[8px] border-r-[8px] border-t-[8px] 
+                  border-l-transparent border-r-transparent border-t-white 
+                  -mt-[1px] drop-shadow-sm"></div>
+    </div>
+  `;
+  return el;
+};
+
+// Or for Mapbox with custom HTML markers
+new mapboxgl.Marker({
+  element: createMarkerElement(property),
+})
+  .setLngLat([property.longitude, property.latitude])
+  .addTo(map);
+```
+
+### Step 2: Popup Card on Marker Click
+
+```tsx
+// State for selected property and popup
+const [selectedMapProperty, setSelectedMapProperty] = useState<CmaProperty | null>(null);
+const [popupPosition, setPopupPosition] = useState<{ x: number; y: number } | null>(null);
+
+// Marker click handler
+const handleMarkerClick = (property: CmaProperty, event: MapMouseEvent) => {
+  setSelectedMapProperty(property);
+  // Position popup near the click
+  setPopupPosition({ x: event.point.x, y: event.point.y });
+};
+
+// Or use Mapbox Popup
+marker.getElement().addEventListener('click', () => {
+  // Create popup with property card
+  new mapboxgl.Popup({
+    closeButton: true,
+    closeOnClick: true,
+    maxWidth: '280px',
+    className: 'property-popup',
+  })
+    .setLngLat([property.longitude, property.latitude])
+    .setHTML(createPopupHTML(property))
+    .addTo(map);
+});
+```
+
+### Step 3: Property Preview Card (Popup Content)
+
+```tsx
+// Popup card component
+function MapPropertyPopup({ 
+  property, 
+  onClose, 
+  onViewDetails 
+}: { 
+  property: CmaProperty; 
+  onClose: () => void;
+  onViewDetails: () => void;
+}) {
+  return (
+    <div className="bg-white rounded-lg shadow-xl overflow-hidden w-[260px]">
+      {/* Close Button */}
+      <button
+        onClick={onClose}
+        className="absolute top-2 right-2 min-w-[32px] min-h-[32px] 
+                   bg-white/90 hover:bg-white rounded-full 
+                   flex items-center justify-center shadow-md z-10"
+      >
+        <X className="w-4 h-4 text-gray-600" />
+      </button>
+      
+      {/* Clickable Card */}
+      <button
+        onClick={onViewDetails}
+        className="w-full text-left hover:bg-gray-50 transition-colors"
+      >
+        {/* Property Image */}
+        <div className="relative aspect-[4/3]">
+          <img
+            src={property.photos?.[0] || '/placeholder-property.jpg'}
+            alt={property.address}
+            className="w-full h-full object-cover"
+          />
+        </div>
+        
+        {/* Property Details */}
+        <div className="p-3">
+          <p className="text-xl font-bold text-gray-900">
+            {formatCurrency(property.price)}
+          </p>
+          
+          {/* Status Badge */}
+          <span className={`inline-block px-2 py-0.5 text-xs font-medium text-white rounded mt-1 ${getStatusColor(property.status)}`}>
+            {property.status}
+          </span>
+          
+          <p className="text-sm text-gray-700 mt-2 truncate">
+            {property.address}
+          </p>
+          
+          <div className="flex items-center gap-3 mt-2 text-sm text-gray-600">
+            <span>{property.beds} bd</span>
+            <span>{property.baths} ba</span>
+            <span>{property.sqft.toLocaleString()} sqft</span>
+          </div>
+        </div>
+      </button>
+    </div>
+  );
+}
+```
+
+### Step 4: Connect Popup to Full Modal
+
+```tsx
+// In the Map component
+const [showPropertyModal, setShowPropertyModal] = useState(false);
+const [modalProperty, setModalProperty] = useState<CmaProperty | null>(null);
+
+const handleViewDetails = (property: CmaProperty) => {
+  setModalProperty(property);
+  setShowPropertyModal(true);
+  setSelectedMapProperty(null); // Close popup
+};
+
+return (
+  <div className="relative h-full">
+    {/* Map Container */}
+    <div ref={mapContainer} className="w-full h-full" />
+    
+    {/* Property Popup (on marker click) */}
+    {selectedMapProperty && (
+      <MapPropertyPopup
+        property={selectedMapProperty}
+        onClose={() => setSelectedMapProperty(null)}
+        onViewDetails={() => handleViewDetails(selectedMapProperty)}
+      />
+    )}
+    
+    {/* Full Property Modal */}
+    {showPropertyModal && modalProperty && (
+      <PropertyDetailModal
+        property={modalProperty}
+        onClose={() => {
+          setShowPropertyModal(false);
+          setModalProperty(null);
+        }}
+      />
+    )}
+  </div>
+);
+```
+
+---
+
+## Marker Styling Options
+
+### Option A: Simple Label Marker
+```
+┌─────────────┐
+│  $2.05M     │
+│ 321 Delayne │
+└──────┬──────┘
+       ▼
+```
+
+### Option B: Status-Colored Marker
+```
+┌─────────────┐
+│ 🟢 $2.05M   │  ← Green dot for Closed
+│ 321 Delayne │
+└──────┬──────┘
+       ▼
+```
+
+### Option C: Circular Price Marker (current) + Address Tooltip
+- Keep circular price markers
+- Show address on hover tooltip
+
+---
+
+## Copy/Paste for Replit
+
+```
+Enhance the Map view in CMA Comparables:
+1. Show property ADDRESS on map markers (in addition to price)
+2. When clicking a marker, show a popup preview card
+3. Make the popup card CLICKABLE to open full property modal with photo navigation
+
+## MARKER ENHANCEMENT:
+Show both price AND address on marker labels:
+
+<div className="bg-white rounded-lg shadow-lg px-2 py-1 text-center">
+  <p className="text-sm font-bold">$2,050,000</p>
+  <p className="text-xs text-gray-600 truncate max-w-[100px]">321 Delayne DR</p>
+</div>
+
+## POPUP CARD ON MARKER CLICK (see 2nd screenshot):
+When user clicks a marker, show a popup card with:
+- Property photo (aspect-[4/3])
+- Price: $2,050,000
+- Status badge: [Closed] (green)
+- Address: 321 Delayne DR
+- Details: 4 bd  4 ba  3,578 sqft
+- Close X button in top-right
+
+## MAKE POPUP CLICKABLE:
+Clicking the popup card should open the PropertyDetailModal with:
+- Full photo gallery with navigation arrows
+- All property details
+- Same modal used in Compare grid view
+
+## STATE MANAGEMENT:
+const [selectedMapProperty, setSelectedMapProperty] = useState<CmaProperty | null>(null);
+const [showPropertyModal, setShowPropertyModal] = useState(false);
+
+## FLOW:
+1. Click marker → Show popup card
+2. Click popup card → Open full PropertyDetailModal
+3. Click X on popup → Close popup
+4. Click outside → Close popup
+
+## MOBILE:
+- Popup card: min touch targets 44x44px
+- Works on touch devices
+- Photo in popup should be tappable
+
+I've attached screenshots showing:
+1. Current map with price markers
+2. Target popup card design when marker is clicked
+```
+
+---
+
+## Expected Result
+
+**Map View:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│  [10 comparables + Subject]                                 │
+│                                                             │
+│         ┌───────────┐                                       │
+│         │  $965K    │                                       │
+│         │ 123 Main  │    ┌─────────────┐                   │
+│         └─────┬─────┘    │  $2.05M     │                   │
+│               ▼          │ 321 Delayne │                   │
+│               •          └─────┬───────┘                   │
+│                                ▼                           │
+│                            🔴 (Subject)                     │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Popup on Marker Click:**
+```
+┌─────────────────────────────────────────┐
+│ [  Property Photo  ]                 X  │
+│                                         │
+│ $2,050,000                              │
+│ [Closed]                                │
+│ 321 Delayne DR                          │
+│ 4 bd  4 ba  3,578 sqft                  │
+└─────────────────────────────────────────┘
+         ↓ Click to open full modal
+```

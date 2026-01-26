@@ -4,7 +4,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { useTheme } from '@/hooks/use-theme';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Locate, Maximize2, Map, Satellite } from 'lucide-react';
+import { X, Locate, Maximize2, Map, Satellite, Bed, Bath, Square, ChevronRight, Home } from 'lucide-react';
 import type { Property } from '@shared/schema';
 import {
   buildCmaMapModel,
@@ -17,6 +17,7 @@ import {
   type CmaPointProperties,
   type NormalizedStatus,
 } from '@/lib/cma-map-data';
+import { PropertyDetailModal } from '@/components/cma/PropertyDetailModal';
 
 const MAPBOX_STYLES = {
   STREETS: 'mapbox://styles/mapbox/streets-v11',
@@ -189,13 +190,22 @@ function addSymbolLayers(
         source: SOURCE_IDS.comps,
         filter: ['!', ['has', 'point_count']],
         layout: {
-          'text-field': ['coalesce', ['get', 'priceFormatted'], ''],
+          'text-field': [
+            'format',
+            ['coalesce', ['get', 'priceFormatted'], ''],
+            { 'font-scale': 1.0 },
+            '\n',
+            {},
+            ['coalesce', ['slice', ['get', 'address'], 0, 18], ''],
+            { 'font-scale': 0.85 },
+          ],
           'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
           'text-size': 11,
-          'text-offset': [0, -1.8],
+          'text-offset': [0, -2.2],
           'text-anchor': 'bottom',
           'text-allow-overlap': false,
           'text-ignore-placement': false,
+          'text-max-width': 10,
         },
         paint: {
           'text-color': tuning.labelTextColor,
@@ -211,13 +221,26 @@ function addSymbolLayers(
         type: 'symbol',
         source: SOURCE_IDS.subject,
         layout: {
-          'text-field': ['concat', 'SUBJECT\n', ['coalesce', ['get', 'priceFormatted'], '']],
+          'text-field': [
+            'format',
+            'SUBJECT',
+            { 'font-scale': 0.9 },
+            '\n',
+            {},
+            ['coalesce', ['get', 'priceFormatted'], ''],
+            { 'font-scale': 1.0 },
+            '\n',
+            {},
+            ['coalesce', ['slice', ['get', 'address'], 0, 18], ''],
+            { 'font-scale': 0.85 },
+          ],
           'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
           'text-size': 12,
-          'text-offset': [0, -2.2],
+          'text-offset': [0, -2.6],
           'text-anchor': 'bottom',
           'text-allow-overlap': true,
           'text-ignore-placement': true,
+          'text-max-width': 10,
         },
         paint: {
           'text-color': tuning.subjectLabelTextColor,
@@ -390,6 +413,7 @@ export function CMAMap({
   const [error, setError] = useState<string | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<CmaPointProperties | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [showPropertyModal, setShowPropertyModal] = useState(false);
 
   useEffect(() => {
     showPolygonRef.current = showPolygon;
@@ -860,6 +884,16 @@ export function CMAMap({
     setSelectedProperty(null);
   }, []);
 
+  const handleViewPropertyDetails = useCallback(() => {
+    if (selectedProperty) {
+      setShowPropertyModal(true);
+    }
+  }, [selectedProperty]);
+
+  const handleClosePropertyModal = useCallback(() => {
+    setShowPropertyModal(false);
+  }, []);
+
   if (error) {
     return (
       <div className="w-full h-[550px] rounded-lg border flex items-center justify-center bg-muted">
@@ -997,64 +1031,111 @@ export function CMAMap({
 
       {selectedProperty && (
         <div
-          className="absolute top-4 right-14 bg-background rounded-lg shadow-lg p-4 max-w-xs border"
+          className="absolute top-4 right-14 bg-background rounded-lg shadow-xl overflow-hidden max-w-[280px] border"
           data-testid="selected-property-popup"
         >
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-1 right-1 h-6 w-6"
+          <button
             onClick={closePropertyPopup}
+            className="absolute top-2 right-2 z-20
+                       min-w-[32px] min-h-[32px] 
+                       bg-black/50 hover:bg-black/70 
+                       text-white rounded-full 
+                       flex items-center justify-center
+                       transition-all duration-200
+                       shadow-md"
+            aria-label="Close popup"
             data-testid="button-close-property-popup"
           >
-            <X className="h-4 w-4" />
-          </Button>
+            <X className="w-4 h-4" />
+          </button>
+          
+          <button
+            onClick={handleViewPropertyDetails}
+            className="w-full text-left hover:bg-muted/50 transition-colors group"
+            data-testid="button-view-property-details"
+          >
+            <div className="relative aspect-[4/3]">
+              {selectedProperty.photos?.[0] ? (
+                <img
+                  src={selectedProperty.photos[0]}
+                  alt={selectedProperty.address}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-muted flex items-center justify-center">
+                  <Home className="w-12 h-12 text-muted-foreground" />
+                </div>
+              )}
+              
+              <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span>View Details</span>
+                <ChevronRight className="w-3 h-3" />
+              </div>
+            </div>
+            
+            <div className="p-3">
+              <p className="text-xl font-bold">
+                {formatFullPrice(selectedProperty.price)}
+              </p>
 
-          {selectedProperty.photos?.[0] && (
-            <img
-              src={selectedProperty.photos[0]}
-              alt="Property"
-              className="w-full h-24 object-cover rounded mb-2"
-            />
-          )}
+              <Badge
+                className="text-xs mt-1 border-0"
+                style={{
+                  backgroundColor:
+                    STATUS_COLORS[selectedProperty.status as NormalizedStatus] ||
+                    STATUS_COLORS.UNKNOWN,
+                  color: '#fff',
+                }}
+              >
+                {STATUS_LABELS[selectedProperty.status as NormalizedStatus] ||
+                  STATUS_LABELS.UNKNOWN}
+              </Badge>
 
-          <p className="font-semibold text-sm">
-            {formatFullPrice(selectedProperty.price)}
-          </p>
+              <p className="text-sm text-muted-foreground mt-2 truncate">
+                {selectedProperty.address}
+              </p>
 
-          <div className="flex items-center gap-1 mt-1">
-            <Badge
-              className="text-[10px] px-1.5 py-0"
-              style={{
-                backgroundColor:
-                  STATUS_COLORS[selectedProperty.status as NormalizedStatus] ||
-                  STATUS_COLORS.UNKNOWN,
-                color: '#fff',
-              }}
-            >
-              {STATUS_LABELS[selectedProperty.status as NormalizedStatus] ||
-                STATUS_LABELS.UNKNOWN}
-            </Badge>
-          </div>
+              <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Bed className="w-4 h-4" />
+                  {selectedProperty.beds ?? '-'}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Bath className="w-4 h-4" />
+                  {selectedProperty.baths ?? '-'}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Square className="w-4 h-4" />
+                  {selectedProperty.sqft?.toLocaleString() ?? '-'}
+                </span>
+              </div>
 
-          <p className="text-xs text-muted-foreground mt-1 truncate">
-            {selectedProperty.address}
-          </p>
-
-          <div className="flex gap-2 mt-1 text-xs text-muted-foreground">
-            <span>{selectedProperty.beds ?? '-'} bd</span>
-            <span>{selectedProperty.baths ?? '-'} ba</span>
-            <span>
-              {selectedProperty.sqft?.toLocaleString() ?? '-'} sqft
-            </span>
-          </div>
-
-          {selectedProperty.dom != null && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {selectedProperty.dom} days on market
-            </p>
-          )}
+              {selectedProperty.dom != null && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  {selectedProperty.dom} days on market
+                </p>
+              )}
+            </div>
+          </button>
         </div>
+      )}
+
+      {showPropertyModal && selectedProperty && (
+        <PropertyDetailModal
+          isOpen={showPropertyModal}
+          onClose={handleClosePropertyModal}
+          property={{
+            mlsNumber: selectedProperty.mlsNumber || undefined,
+            address: selectedProperty.address,
+            price: selectedProperty.price,
+            beds: selectedProperty.beds ?? undefined,
+            baths: selectedProperty.baths ?? undefined,
+            sqft: selectedProperty.sqft ?? undefined,
+            daysOnMarket: selectedProperty.dom ?? undefined,
+            status: STATUS_LABELS[selectedProperty.status as NormalizedStatus] || selectedProperty.status,
+            photos: selectedProperty.photos || [],
+          }}
+        />
       )}
     </div>
   );
