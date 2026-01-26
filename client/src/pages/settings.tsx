@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Trash2, Loader2, UserPlus, Save, Mail, CheckCircle2, ExternalLink, User, Camera, Bell, FileText, Sparkles, Link as LinkIcon } from "lucide-react";
+import { Plus, Trash2, Loader2, UserPlus, Save, Mail, CheckCircle2, ExternalLink, User, Camera, Bell, FileText, Sparkles, Link as LinkIcon, Upload, GripVertical, Pencil, FolderOpen } from "lucide-react";
 import { SiFacebook, SiInstagram, SiLinkedin, SiX } from "react-icons/si";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
-import type { AgentProfile } from "@shared/schema";
+import type { AgentProfile, AgentResource } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -190,6 +190,140 @@ export default function Settings() {
       });
     }
   }, [savedNotificationSettings]);
+
+  // CMA Resources state
+  const [showAddLinkDialog, setShowAddLinkDialog] = useState(false);
+  const [newLinkName, setNewLinkName] = useState("");
+  const [newLinkUrl, setNewLinkUrl] = useState("");
+  const [editingResource, setEditingResource] = useState<AgentResource | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const resourceFileInputRef = useRef<HTMLInputElement>(null);
+
+  // CMA Resources query
+  const { data: agentResources = [], isLoading: resourcesLoading } = useQuery<AgentResource[]>({
+    queryKey: ["/api/agent/resources"],
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
+  });
+
+  // Create resource mutation
+  const createResourceMutation = useMutation({
+    mutationFn: async (data: { name: string; type: string; url?: string; fileUrl?: string; fileName?: string }) => {
+      const res = await apiRequest("POST", "/api/agent/resources", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Resource added", description: "Your resource has been added successfully." });
+      queryClient.invalidateQueries({ queryKey: ["/api/agent/resources"] });
+      setShowAddLinkDialog(false);
+      setNewLinkName("");
+      setNewLinkUrl("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to add resource", variant: "destructive" });
+    },
+  });
+
+  // Update resource mutation
+  const updateResourceMutation = useMutation({
+    mutationFn: async (data: { id: string; name?: string; url?: string; isActive?: boolean }) => {
+      const { id, ...updateData } = data;
+      const res = await apiRequest("PATCH", `/api/agent/resources/${id}`, updateData);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Resource updated", description: "Your resource has been updated." });
+      queryClient.invalidateQueries({ queryKey: ["/api/agent/resources"] });
+      setEditingResource(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to update resource", variant: "destructive" });
+    },
+  });
+
+  // Delete resource mutation
+  const deleteResourceMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/agent/resources/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Resource deleted", description: "Your resource has been removed." });
+      queryClient.invalidateQueries({ queryKey: ["/api/agent/resources"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to delete resource", variant: "destructive" });
+    },
+  });
+
+  // Handle file upload for resources
+  const handleResourceFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({ title: "Invalid file type", description: "Please upload a PDF or Word document", variant: "destructive" });
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Please upload a file smaller than 10MB", variant: "destructive" });
+      return;
+    }
+
+    setIsUploadingFile(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/agent/resources/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Upload failed');
+      }
+
+      const { fileUrl, fileName } = await res.json();
+
+      // Create the resource with the uploaded file
+      await createResourceMutation.mutateAsync({
+        name: file.name.replace(/\.[^/.]+$/, ''), // Remove extension for display name
+        type: 'file',
+        fileUrl,
+        fileName,
+      });
+    } catch (error: any) {
+      toast({ title: "Upload failed", description: error.message || "Failed to upload file", variant: "destructive" });
+    } finally {
+      setIsUploadingFile(false);
+      if (resourceFileInputRef.current) {
+        resourceFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Handle add link
+  const handleAddLink = () => {
+    if (!newLinkName.trim() || !newLinkUrl.trim()) {
+      toast({ title: "Required fields", description: "Please enter a name and URL", variant: "destructive" });
+      return;
+    }
+
+    let url = newLinkUrl.trim();
+    if (!url.match(/^https?:\/\//i)) {
+      url = `https://${url}`;
+    }
+
+    createResourceMutation.mutate({
+      name: newLinkName.trim(),
+      type: 'link',
+      url,
+    });
+  };
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: { slackUserId: string }) => {
@@ -728,6 +862,246 @@ export default function Settings() {
           </div>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#EF4923]/10">
+              <FolderOpen className="h-5 w-5 text-[#EF4923]" />
+            </div>
+            <div>
+              <CardTitle>CMA Resources & Links</CardTitle>
+              <CardDescription>
+                Manage resources that appear in the "Spyglass Resources and Links" slide of your CMA presentations
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex gap-3 flex-wrap">
+              <label className="flex-1 min-w-[200px] cursor-pointer">
+                <div className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-muted-foreground/30 rounded-lg hover:border-[#EF4923] hover:bg-[#EF4923]/5 transition-colors">
+                  {isUploadingFile ? (
+                    <Loader2 className="w-5 h-5 text-[#EF4923] animate-spin" />
+                  ) : (
+                    <Upload className="w-5 h-5 text-muted-foreground" />
+                  )}
+                  <span className="text-sm text-muted-foreground">
+                    {isUploadingFile ? "Uploading..." : "Upload PDF/Document"}
+                  </span>
+                </div>
+                <input
+                  ref={resourceFileInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  className="hidden"
+                  onChange={handleResourceFileUpload}
+                  disabled={isUploadingFile}
+                  data-testid="input-resource-file-upload"
+                />
+              </label>
+
+              <div 
+                className="flex-1 min-w-[200px] flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-muted-foreground/30 rounded-lg hover-elevate cursor-pointer"
+                onClick={() => setShowAddLinkDialog(true)}
+                data-testid="button-add-resource-link"
+              >
+                <LinkIcon className="w-5 h-5 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Add External Link</span>
+              </div>
+            </div>
+
+            <div className="border rounded-lg divide-y">
+              <div className="px-4 py-2 bg-muted/50">
+                <span className="text-sm font-medium">Your Resources</span>
+              </div>
+
+              {resourcesLoading ? (
+                <div className="px-4 py-8 text-center">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+                </div>
+              ) : agentResources.length > 0 ? (
+                agentResources.map((resource) => (
+                  <div
+                    key={resource.id}
+                    className="flex items-center gap-3 px-4 py-3"
+                    data-testid={`resource-item-${resource.id}`}
+                  >
+                    <div className="text-muted-foreground cursor-grab">
+                      <GripVertical className="w-4 h-4" />
+                    </div>
+
+                    <div className={`w-8 h-8 rounded flex items-center justify-center flex-shrink-0 ${
+                      resource.type === 'file' ? 'bg-red-100 dark:bg-red-900/30' : 'bg-blue-100 dark:bg-blue-900/30'
+                    }`}>
+                      {resource.type === 'file' ? (
+                        <FileText className="w-4 h-4 text-red-500" />
+                      ) : (
+                        <ExternalLink className="w-4 h-4 text-blue-500" />
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{resource.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {resource.type === 'file' ? resource.fileName : resource.url}
+                      </p>
+                    </div>
+
+                    <Switch
+                      checked={resource.isActive ?? true}
+                      onCheckedChange={(checked) =>
+                        updateResourceMutation.mutate({ id: resource.id, isActive: checked })
+                      }
+                      data-testid={`switch-resource-active-${resource.id}`}
+                    />
+
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setEditingResource(resource)}
+                        data-testid={`button-edit-resource-${resource.id}`}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => deleteResourceMutation.mutate(resource.id)}
+                        disabled={deleteResourceMutation.isPending}
+                        data-testid={`button-delete-resource-${resource.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="px-4 py-8 text-center">
+                  <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">No resources added yet</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    Upload documents or add links to display in your CMA presentations
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Resources will appear in the "Spyglass Resources and Links" slide of all your CMA presentations.
+              Toggle visibility with the switch.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={showAddLinkDialog} onOpenChange={setShowAddLinkDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add External Link</DialogTitle>
+            <DialogDescription>
+              Add a link that will appear in your CMA presentations
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="linkName">Display Name</Label>
+              <Input
+                id="linkName"
+                placeholder="e.g., Spyglass Listing Presentation"
+                value={newLinkName}
+                onChange={(e) => setNewLinkName(e.target.value)}
+                data-testid="input-new-link-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="linkUrl">URL</Label>
+              <Input
+                id="linkUrl"
+                placeholder="https://..."
+                value={newLinkUrl}
+                onChange={(e) => setNewLinkUrl(e.target.value)}
+                data-testid="input-new-link-url"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setShowAddLinkDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddLink}
+              disabled={createResourceMutation.isPending || !newLinkName.trim() || !newLinkUrl.trim()}
+              style={{ backgroundColor: '#EF4923' }}
+              data-testid="button-save-new-link"
+            >
+              {createResourceMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : null}
+              Add Link
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingResource} onOpenChange={(open) => !open && setEditingResource(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Resource</DialogTitle>
+            <DialogDescription>
+              Update the resource details
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="editLinkName">Display Name</Label>
+              <Input
+                id="editLinkName"
+                value={editingResource?.name || ''}
+                onChange={(e) => setEditingResource(prev => prev ? { ...prev, name: e.target.value } : null)}
+                data-testid="input-edit-resource-name"
+              />
+            </div>
+            {editingResource?.type === 'link' && (
+              <div className="space-y-2">
+                <Label htmlFor="editLinkUrl">URL</Label>
+                <Input
+                  id="editLinkUrl"
+                  value={editingResource?.url || ''}
+                  onChange={(e) => setEditingResource(prev => prev ? { ...prev, url: e.target.value } : null)}
+                  data-testid="input-edit-resource-url"
+                />
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setEditingResource(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (editingResource) {
+                  updateResourceMutation.mutate({
+                    id: editingResource.id,
+                    name: editingResource.name,
+                    url: editingResource.url || undefined,
+                  });
+                }
+              }}
+              disabled={updateResourceMutation.isPending}
+              style={{ backgroundColor: '#EF4923' }}
+              data-testid="button-save-edit-resource"
+            >
+              {updateResourceMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : null}
+              Save Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader>

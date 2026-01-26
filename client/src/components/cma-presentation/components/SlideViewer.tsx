@@ -51,6 +51,7 @@ interface SlideViewerProps {
   comparables: CmaProperty[];
   subjectProperty?: CmaProperty;
   averageDaysOnMarket: number;
+  cmaToken?: string; // Optional token for public CMA share access
 }
 
 export function SlideViewer({
@@ -64,6 +65,7 @@ export function SlideViewer({
   comparables,
   subjectProperty,
   averageDaysOnMarket,
+  cmaToken,
 }: SlideViewerProps) {
   const widget = WIDGETS[currentIndex];
   const totalSlides = WIDGETS.length;
@@ -95,7 +97,7 @@ export function SlideViewer({
       case 'listing_action_plan':
         return <ListingActionPlanWidget />;
       case 'spyglass_resources':
-        return <SpyglassResourcesWidget />;
+        return <SpyglassResourcesWidget cmaToken={cmaToken} />;
       case 'average_price_acre':
         return <AveragePriceAcreWidget comparables={comparables} subjectProperty={subjectProperty} />;
       default:

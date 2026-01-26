@@ -2345,6 +2345,31 @@ export async function registerRoutes(
     }
   });
 
+  // Get agent resources for a shared CMA (no auth required for public sharing)
+  app.get("/api/shared/cma/:token/resources", async (req, res) => {
+    try {
+      const cma = await storage.getCmaByShareToken(req.params.token);
+      if (!cma) {
+        return res.status(404).json({ message: "CMA not found or link expired" });
+      }
+      // Check expiration
+      if (cma.expiresAt && new Date(cma.expiresAt) < new Date()) {
+        return res.status(410).json({ message: "This CMA link has expired" });
+      }
+      
+      if (!cma.userId) {
+        return res.json([]);
+      }
+      
+      const resources = await storage.getAgentResources(cma.userId);
+      // Only return active resources (filter out inactive ones)
+      const activeResources = resources.filter(r => r.isActive !== false);
+      res.json(activeResources);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch resources" });
+    }
+  });
+
   // Create a new CMA
   app.post("/api/cmas", isAuthenticated, async (req: any, res) => {
     try {
@@ -4492,6 +4517,193 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
     } catch (error: any) {
       console.error("[AI Cover Letter] Error:", error.message);
       res.status(500).json({ error: "Failed to generate cover letter" });
+    }
+  });
+
+  // ============ Agent Resources ============
+
+  // Get all resources for the current user
+  app.get("/api/agent/resources", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const resources = await storage.getAgentResources(userId);
+      res.json(resources);
+    } catch (error: any) {
+      console.error("[Agent Resources] Error fetching:", error.message);
+      res.status(500).json({ error: "Failed to fetch resources" });
+    }
+  });
+
+  // Create a new resource
+  app.post("/api/agent/resources", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { name, type, url, fileUrl, fileName } = req.body;
+
+      if (!name || !type) {
+        return res.status(400).json({ error: "Name and type are required" });
+      }
+
+      if (!['link', 'file'].includes(type)) {
+        return res.status(400).json({ error: "Type must be 'link' or 'file'" });
+      }
+
+      const resource = await storage.createAgentResource({
+        userId,
+        name,
+        type,
+        url: url || null,
+        fileUrl: fileUrl || null,
+        fileName: fileName || null,
+        isActive: true,
+      });
+
+      res.json(resource);
+    } catch (error: any) {
+      console.error("[Agent Resources] Error creating:", error.message);
+      res.status(500).json({ error: "Failed to create resource" });
+    }
+  });
+
+  // Update a resource
+  app.patch("/api/agent/resources/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { id } = req.params;
+      const { name, url, isActive } = req.body;
+
+      // Verify ownership
+      const existing = await storage.getAgentResource(id);
+      if (!existing || existing.userId !== userId) {
+        return res.status(404).json({ error: "Resource not found" });
+      }
+
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = name;
+      if (url !== undefined) updateData.url = url;
+      if (isActive !== undefined) updateData.isActive = isActive;
+
+      const updated = await storage.updateAgentResource(id, updateData);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[Agent Resources] Error updating:", error.message);
+      res.status(500).json({ error: "Failed to update resource" });
+    }
+  });
+
+  // Delete a resource
+  app.delete("/api/agent/resources/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { id } = req.params;
+
+      // Verify ownership
+      const existing = await storage.getAgentResource(id);
+      if (!existing || existing.userId !== userId) {
+        return res.status(404).json({ error: "Resource not found" });
+      }
+
+      await storage.deleteAgentResource(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Agent Resources] Error deleting:", error.message);
+      res.status(500).json({ error: "Failed to delete resource" });
+    }
+  });
+
+  // Reorder resources
+  app.patch("/api/agent/resources/reorder", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { orderedIds } = req.body;
+
+      if (!Array.isArray(orderedIds)) {
+        return res.status(400).json({ error: "orderedIds must be an array" });
+      }
+
+      await storage.reorderAgentResources(userId, orderedIds);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Agent Resources] Error reordering:", error.message);
+      res.status(500).json({ error: "Failed to reorder resources" });
+    }
+  });
+
+  // Upload file for resource
+  app.post("/api/agent/resources/upload", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      // Handle multipart upload - reuse existing object storage upload logic
+      const { Client } = await import("@replit/object-storage");
+      const multer = (await import("multer")).default;
+      const upload = multer({ storage: multer.memoryStorage() });
+
+      // Use single file upload middleware
+      upload.single('file')(req, res, async (err) => {
+        if (err) {
+          console.error("[Agent Resources] Upload error:", err);
+          return res.status(400).json({ error: "File upload failed" });
+        }
+
+        if (!req.file) {
+          return res.status(400).json({ error: "No file provided" });
+        }
+
+        // Validate file type
+        const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+        if (!allowedTypes.includes(req.file.mimetype)) {
+          return res.status(400).json({ error: "Only PDF and Word documents are allowed" });
+        }
+
+        // Validate file size (max 10MB)
+        if (req.file.size > 10 * 1024 * 1024) {
+          return res.status(400).json({ error: "File size must be less than 10MB" });
+        }
+
+        try {
+          const client = new Client();
+          const timestamp = Date.now();
+          const safeFileName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const objectKey = `.private/resources/${userId}/${timestamp}-${safeFileName}`;
+
+          await client.uploadFromBytes(objectKey, req.file.buffer);
+
+          res.json({
+            fileUrl: `/objects/${objectKey}`,
+            fileName: req.file.originalname,
+          });
+        } catch (uploadErr: any) {
+          console.error("[Agent Resources] Storage upload error:", uploadErr);
+          res.status(500).json({ error: "Failed to upload file to storage" });
+        }
+      });
+    } catch (error: any) {
+      console.error("[Agent Resources] Error uploading:", error.message);
+      res.status(500).json({ error: "Failed to upload file" });
     }
   });
 

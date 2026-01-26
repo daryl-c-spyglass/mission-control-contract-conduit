@@ -1,0 +1,701 @@
+# Replit Agent Task: Redesign Spyglass Resources and Links with Settings Upload
+
+## Overview
+
+Redesign the "SPYGLASS RESOURCES AND LINKS" slide to match CloudCMA's simple design, with resources managed via Settings that sync to the CMA Presentation.
+
+---
+
+## Current vs Target State
+
+### Current State (Too Complex)
+```
+┌─────────────────────────────────────────────┐
+│     SPYGLASS RESOURCES AND LINKS            │
+│                  9 / 33                     │
+├─────────────────────────────────────────────┤
+│ Access helpful resources and documents...   │
+│                                             │
+│ ┌─────────────────────────────────────────┐ │
+│ │ 📄 Spyglass Listing Presentation    ↗️  │ │
+│ └─────────────────────────────────────────┘ │
+│ ┌─────────────────────────────────────────┐ │
+│ │ 📄 Listing Agreement                ⬇️  │ │
+│ └─────────────────────────────────────────┘ │
+│ ┌─────────────────────────────────────────┐ │
+│ │ 📄 Seller Disclosure                ⬇️  │ │
+│ └─────────────────────────────────────────┘ │
+│ ... more items ...                          │
+└─────────────────────────────────────────────┘
+```
+
+### Target State (Clean Like CloudCMA)
+```
+┌─────────────────────────────────────────────┐
+│     SPYGLASS RESOURCES AND LINKS            │
+├─────────────────────────────────────────────┤
+│                                             │
+│                                             │
+│         Spyglass Listing Presentation       │
+│                    ↓                        │
+│             Listing Agreement               │
+│                                             │
+│                                             │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## Part 1: Settings Page - Resource Management
+
+### Create Resources Settings Section
+
+**Location:** Settings → Resources (or Settings → CMA Resources)
+
+```tsx
+// client/src/pages/settings/ResourcesSettings.tsx
+
+interface Resource {
+  id: string;
+  name: string;
+  type: 'link' | 'file';
+  url?: string;           // For external links
+  fileUrl?: string;       // For uploaded files
+  fileName?: string;      // Original file name
+  isActive: boolean;      // Show/hide in presentation
+  order: number;          // Display order
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function ResourcesSettings() {
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  
+  return (
+    <div className="max-w-2xl mx-auto p-6">
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold text-gray-900">CMA Resources & Links</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          Manage resources that appear in the "Spyglass Resources and Links" slide of your CMA presentations.
+        </p>
+      </div>
+      
+      {/* Add Resource Section */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+        <h3 className="text-sm font-medium text-gray-700 mb-3">Add New Resource</h3>
+        
+        <div className="flex gap-3">
+          {/* Upload File Button */}
+          <label className="flex-1 cursor-pointer">
+            <div className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed 
+                            border-gray-300 rounded-lg hover:border-[#EF4923] hover:bg-[#EF4923]/5 
+                            transition-colors">
+              <Upload className="w-5 h-5 text-gray-400" />
+              <span className="text-sm text-gray-600">Upload PDF/Document</span>
+            </div>
+            <input 
+              type="file" 
+              accept=".pdf,.doc,.docx"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+          </label>
+          
+          {/* Add Link Button */}
+          <button 
+            onClick={() => setShowLinkModal(true)}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed 
+                       border-gray-300 rounded-lg hover:border-[#EF4923] hover:bg-[#EF4923]/5 
+                       transition-colors"
+          >
+            <Link className="w-5 h-5 text-gray-400" />
+            <span className="text-sm text-gray-600">Add External Link</span>
+          </button>
+        </div>
+      </div>
+      
+      {/* Resources List */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <div className="px-4 py-3 border-b border-gray-200">
+          <h3 className="text-sm font-medium text-gray-700">Your Resources</h3>
+        </div>
+        
+        {resources.length > 0 ? (
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="resources">
+              {(provided) => (
+                <div ref={provided.innerRef} {...provided.droppableProps}>
+                  {resources.map((resource, index) => (
+                    <ResourceItem 
+                      key={resource.id}
+                      resource={resource}
+                      index={index}
+                      onToggle={handleToggle}
+                      onDelete={handleDelete}
+                      onEdit={handleEdit}
+                    />
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
+        ) : (
+          <div className="px-4 py-8 text-center">
+            <FileText className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <p className="text-sm text-gray-500">No resources added yet</p>
+            <p className="text-xs text-gray-400 mt-1">
+              Upload documents or add links to display in your CMA presentations
+            </p>
+          </div>
+        )}
+      </div>
+      
+      {/* Help Text */}
+      <p className="text-xs text-gray-400 mt-4">
+        Resources will appear in the "Spyglass Resources and Links" slide of all your CMA presentations.
+        Drag to reorder. Toggle visibility with the switch.
+      </p>
+    </div>
+  );
+}
+```
+
+### Resource Item Component
+
+```tsx
+interface ResourceItemProps {
+  resource: Resource;
+  index: number;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+  onEdit: (resource: Resource) => void;
+}
+
+function ResourceItem({ resource, index, onToggle, onDelete, onEdit }: ResourceItemProps) {
+  return (
+    <Draggable draggableId={resource.id} index={index}>
+      {(provided, snapshot) => (
+        <div 
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          className={`flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-b-0
+                      ${snapshot.isDragging ? 'bg-gray-50 shadow-lg' : ''}`}
+        >
+          {/* Drag Handle */}
+          <div {...provided.dragHandleProps} className="cursor-grab text-gray-400">
+            <GripVertical className="w-4 h-4" />
+          </div>
+          
+          {/* Icon */}
+          <div className={`w-8 h-8 rounded flex items-center justify-center flex-shrink-0
+                          ${resource.type === 'file' ? 'bg-red-100' : 'bg-blue-100'}`}>
+            {resource.type === 'file' ? (
+              <FileText className="w-4 h-4 text-red-500" />
+            ) : (
+              <ExternalLink className="w-4 h-4 text-blue-500" />
+            )}
+          </div>
+          
+          {/* Name */}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 truncate">{resource.name}</p>
+            <p className="text-xs text-gray-400 truncate">
+              {resource.type === 'file' ? resource.fileName : resource.url}
+            </p>
+          </div>
+          
+          {/* Toggle Active */}
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={resource.isActive}
+              onChange={() => onToggle(resource.id)}
+              className="sr-only peer"
+            />
+            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer 
+                            peer-checked:after:translate-x-full peer-checked:after:border-white 
+                            after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
+                            after:bg-white after:border-gray-300 after:border after:rounded-full 
+                            after:h-4 after:w-4 after:transition-all peer-checked:bg-[#EF4923]">
+            </div>
+          </label>
+          
+          {/* Actions */}
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={() => onEdit(resource)}
+              className="p-1.5 text-gray-400 hover:text-gray-600 rounded"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => onDelete(resource.id)}
+              className="p-1.5 text-gray-400 hover:text-red-500 rounded"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+    </Draggable>
+  );
+}
+```
+
+### Add Link Modal
+
+```tsx
+function AddLinkModal({ isOpen, onClose, onSave }) {
+  const [name, setName] = useState('');
+  const [url, setUrl] = useState('');
+  
+  const handleSave = () => {
+    if (!name.trim() || !url.trim()) return;
+    
+    onSave({
+      name: name.trim(),
+      type: 'link',
+      url: url.trim(),
+      isActive: true,
+    });
+    
+    setName('');
+    setUrl('');
+    onClose();
+  };
+  
+  return (
+    <Dialog open={isOpen} onClose={onClose}>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg w-full max-w-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Add External Link</h3>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Display Name
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g., Spyglass Listing Presentation"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 
+                           focus:ring-[#EF4923] focus:border-transparent"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                URL
+              </label>
+              <input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 
+                           focus:ring-[#EF4923] focus:border-transparent"
+              />
+            </div>
+          </div>
+          
+          <div className="flex justify-end gap-3 mt-6">
+            <button 
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={handleSave}
+              disabled={!name.trim() || !url.trim()}
+              className="px-4 py-2 text-sm bg-[#EF4923] text-white rounded-lg hover:bg-[#d43d1c] 
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Add Link
+            </button>
+          </div>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+```
+
+---
+
+## Part 2: Backend API
+
+### Database Schema
+
+```sql
+-- Add resources table
+CREATE TABLE agent_resources (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  type VARCHAR(20) NOT NULL CHECK (type IN ('link', 'file')),
+  url TEXT,                    -- For external links
+  file_url TEXT,               -- For uploaded files (S3/storage URL)
+  file_name VARCHAR(255),      -- Original file name
+  is_active BOOLEAN DEFAULT true,
+  display_order INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_agent_resources_user ON agent_resources(user_id);
+```
+
+### API Endpoints
+
+```typescript
+// server/routes/resources.ts
+
+// GET /api/resources - Get all resources for current user
+router.get('/resources', async (req, res) => {
+  const userId = req.user.id;
+  const resources = await db.query(`
+    SELECT * FROM agent_resources 
+    WHERE user_id = $1 
+    ORDER BY display_order ASC, created_at ASC
+  `, [userId]);
+  res.json(resources.rows);
+});
+
+// POST /api/resources - Create new resource
+router.post('/resources', async (req, res) => {
+  const userId = req.user.id;
+  const { name, type, url, fileUrl, fileName } = req.body;
+  
+  // Get max order
+  const maxOrder = await db.query(`
+    SELECT COALESCE(MAX(display_order), 0) + 1 as next_order 
+    FROM agent_resources WHERE user_id = $1
+  `, [userId]);
+  
+  const result = await db.query(`
+    INSERT INTO agent_resources (user_id, name, type, url, file_url, file_name, display_order)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING *
+  `, [userId, name, type, url, fileUrl, fileName, maxOrder.rows[0].next_order]);
+  
+  res.json(result.rows[0]);
+});
+
+// PATCH /api/resources/:id - Update resource
+router.patch('/resources/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, url, isActive } = req.body;
+  
+  const result = await db.query(`
+    UPDATE agent_resources 
+    SET name = COALESCE($1, name),
+        url = COALESCE($2, url),
+        is_active = COALESCE($3, is_active),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = $4 AND user_id = $5
+    RETURNING *
+  `, [name, url, isActive, id, req.user.id]);
+  
+  res.json(result.rows[0]);
+});
+
+// DELETE /api/resources/:id - Delete resource
+router.delete('/resources/:id', async (req, res) => {
+  await db.query(`
+    DELETE FROM agent_resources WHERE id = $1 AND user_id = $2
+  `, [req.params.id, req.user.id]);
+  res.json({ success: true });
+});
+
+// PATCH /api/resources/reorder - Reorder resources
+router.patch('/resources/reorder', async (req, res) => {
+  const { orderedIds } = req.body; // Array of IDs in new order
+  
+  for (let i = 0; i < orderedIds.length; i++) {
+    await db.query(`
+      UPDATE agent_resources SET display_order = $1 WHERE id = $2 AND user_id = $3
+    `, [i, orderedIds[i], req.user.id]);
+  }
+  
+  res.json({ success: true });
+});
+
+// POST /api/resources/upload - Upload file
+router.post('/resources/upload', upload.single('file'), async (req, res) => {
+  // Handle file upload to S3 or local storage
+  const fileUrl = await uploadToStorage(req.file);
+  
+  res.json({
+    fileUrl,
+    fileName: req.file.originalname,
+  });
+});
+```
+
+---
+
+## Part 3: Redesign the Slide (Simple Like CloudCMA)
+
+### SpyglassResourcesSlide.tsx
+
+```tsx
+interface Props {
+  resources: Resource[];
+}
+
+export function SpyglassResourcesSlide({ resources }: Props) {
+  // Filter to only active resources
+  const activeResources = resources.filter(r => r.isActive);
+  
+  return (
+    <div className="h-full w-full flex flex-col">
+      {/* Header */}
+      <div className="bg-gray-900 text-white py-4 px-6 text-center">
+        <h1 className="text-xl font-semibold tracking-wide uppercase">
+          Spyglass Resources and Links
+        </h1>
+      </div>
+      
+      {/* Content */}
+      <div className="flex-1 flex items-center justify-center bg-gray-50 p-8">
+        {activeResources.length > 0 ? (
+          <div className="text-center space-y-4">
+            {activeResources.map((resource) => (
+              <a
+                key={resource.id}
+                href={resource.type === 'file' ? resource.fileUrl : resource.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-lg text-gray-700 hover:text-[#EF4923] transition-colors 
+                           underline underline-offset-4 decoration-gray-300 hover:decoration-[#EF4923]"
+              >
+                {resource.name}
+              </a>
+            ))}
+          </div>
+        ) : (
+          /* Empty State Placeholder */
+          <div className="text-center max-w-md">
+            <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FileText className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-700 mb-2">
+              No Resources Added
+            </h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Add helpful documents and links for your clients in Settings → Resources.
+            </p>
+            <a 
+              href="/settings/resources"
+              className="inline-flex items-center gap-2 text-sm text-[#EF4923] hover:underline"
+            >
+              <Settings className="w-4 h-4" />
+              Go to Settings
+            </a>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## Part 4: Sync Resources to CMA Presentation
+
+### Fetch Resources in CMAPresentationBuilder
+
+```typescript
+// In CMAPresentationBuilder.tsx or the parent component
+
+const [agentResources, setAgentResources] = useState<Resource[]>([]);
+
+useEffect(() => {
+  const fetchResources = async () => {
+    try {
+      const response = await fetch('/api/resources');
+      const data = await response.json();
+      setAgentResources(data);
+    } catch (error) {
+      console.error('Failed to fetch resources:', error);
+    }
+  };
+  
+  fetchResources();
+}, []);
+
+// Pass to the slide
+<SpyglassResourcesSlide resources={agentResources} />
+```
+
+### Or via Context/Store
+
+```typescript
+// Create a ResourcesContext for app-wide access
+const ResourcesContext = createContext<Resource[]>([]);
+
+export function ResourcesProvider({ children }) {
+  const [resources, setResources] = useState<Resource[]>([]);
+  
+  useEffect(() => {
+    fetchResources().then(setResources);
+  }, []);
+  
+  return (
+    <ResourcesContext.Provider value={resources}>
+      {children}
+    </ResourcesContext.Provider>
+  );
+}
+
+// Use in any component
+const resources = useContext(ResourcesContext);
+```
+
+---
+
+## Part 5: Default Resources (Optional)
+
+Pre-populate with common Spyglass resources:
+
+```typescript
+// When user account is created or on first load
+const DEFAULT_RESOURCES = [
+  {
+    name: 'Spyglass Listing Presentation',
+    type: 'link',
+    url: 'https://spyglassrealty.com/listing-presentation',
+    isActive: true,
+  },
+  {
+    name: 'Listing Agreement',
+    type: 'link',
+    url: 'https://spyglassrealty.com/listing-agreement',
+    isActive: true,
+  },
+];
+
+// Check if user has resources, if not, add defaults
+const initializeDefaultResources = async (userId: string) => {
+  const existing = await db.query(
+    'SELECT COUNT(*) FROM agent_resources WHERE user_id = $1',
+    [userId]
+  );
+  
+  if (parseInt(existing.rows[0].count) === 0) {
+    for (const resource of DEFAULT_RESOURCES) {
+      await db.query(`
+        INSERT INTO agent_resources (user_id, name, type, url, is_active, display_order)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [userId, resource.name, resource.type, resource.url, resource.isActive, 0]);
+    }
+  }
+};
+```
+
+---
+
+## Visual Summary
+
+### Settings Page
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Settings > CMA Resources                                    │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ CMA Resources & Links                                       │
+│ Manage resources that appear in your CMA presentations.    │
+│                                                             │
+│ ┌─────────────────────┐  ┌─────────────────────┐           │
+│ │  📤 Upload PDF      │  │  🔗 Add Link        │           │
+│ └─────────────────────┘  └─────────────────────┘           │
+│                                                             │
+│ Your Resources                                              │
+│ ┌─────────────────────────────────────────────────────────┐│
+│ │ ⋮⋮ 📄 Spyglass Listing Presentation    [✓]  ✏️ 🗑️    ││
+│ ├─────────────────────────────────────────────────────────┤│
+│ │ ⋮⋮ 📄 Listing Agreement                [✓]  ✏️ 🗑️    ││
+│ └─────────────────────────────────────────────────────────┘│
+│                                                             │
+│ Drag to reorder • Toggle to show/hide in presentations     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### CMA Slide (With Resources)
+```
+┌─────────────────────────────────────────────────────────────┐
+│          SPYGLASS RESOURCES AND LINKS                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│                                                             │
+│              Spyglass Listing Presentation                  │
+│                                                             │
+│                   Listing Agreement                         │
+│                                                             │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### CMA Slide (Empty State)
+```
+┌─────────────────────────────────────────────────────────────┐
+│          SPYGLASS RESOURCES AND LINKS                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│                        📄                                   │
+│                                                             │
+│               No Resources Added                            │
+│                                                             │
+│    Add helpful documents and links for your clients         │
+│              in Settings → Resources.                       │
+│                                                             │
+│              ⚙️ Go to Settings                              │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Verification Checklist
+
+### Settings Page
+- [ ] Upload PDF/document works
+- [ ] Add external link works
+- [ ] Drag-and-drop reordering works
+- [ ] Toggle show/hide works
+- [ ] Edit resource works
+- [ ] Delete resource works
+- [ ] Empty state shows helpful message
+
+### CMA Slide
+- [ ] Shows active resources as simple text links
+- [ ] Links open in new tab
+- [ ] File downloads work
+- [ ] Empty state shows placeholder with link to settings
+- [ ] Matches CloudCMA simple design
+
+### Sync
+- [ ] Changes in settings reflect immediately in CMA
+- [ ] Order matches settings order
+- [ ] Inactive resources don't appear in CMA
+
+---
+
+## Mobile Responsive
+
+### Settings Page
+- [ ] Full-width upload buttons on mobile
+- [ ] Touch-friendly drag handles
+- [ ] 44px minimum touch targets
+- [ ] Modal fits mobile screen
+
+### CMA Slide
+- [ ] Links have adequate spacing for touch
+- [ ] Text is readable on small screens
+- [ ] Empty state message is concise

@@ -292,6 +292,21 @@ export const agentProfiles = pgTable("agent_profiles", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Agent resources for CMA presentations
+export const agentResources = pgTable("agent_resources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // 'link' or 'file'
+  url: text("url"), // For external links
+  fileUrl: text("file_url"), // For uploaded files (object storage URL)
+  fileName: text("file_name"), // Original file name
+  isActive: boolean("is_active").default(true),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
   id: true,
@@ -351,6 +366,12 @@ export const insertSentNotificationSchema = createInsertSchema(sentNotifications
 });
 
 export const insertAgentProfileSchema = createInsertSchema(agentProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAgentResourceSchema = createInsertSchema(agentResources).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -433,6 +454,9 @@ export type InsertSentNotification = z.infer<typeof insertSentNotificationSchema
 export type AgentProfile = typeof agentProfiles.$inferSelect;
 export type InsertAgentProfile = z.infer<typeof insertAgentProfileSchema>;
 export type UpdateAgentProfile = z.infer<typeof updateAgentProfileSchema>;
+
+export type AgentResource = typeof agentResources.$inferSelect;
+export type InsertAgentResource = z.infer<typeof insertAgentResourceSchema>;
 
 // CMA Statistics Types
 export interface CmaStatRange {

@@ -21,6 +21,8 @@ import {
   type InsertNotificationSetting,
   type AgentProfile,
   type UpdateAgentProfile,
+  type AgentResource,
+  type InsertAgentResource,
   transactions,
   coordinators,
   integrationSettings,
@@ -32,6 +34,7 @@ import {
   cmaReportTemplates,
   notificationSettings,
   agentProfiles,
+  agentResources,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, isNull, and } from "drizzle-orm";
@@ -106,6 +109,14 @@ export interface IStorage {
   // Agent Profiles
   getAgentProfile(userId: string): Promise<AgentProfile | undefined>;
   updateAgentProfile(userId: string, profile: UpdateAgentProfile): Promise<AgentProfile | undefined>;
+
+  // Agent Resources
+  getAgentResources(userId: string): Promise<AgentResource[]>;
+  getAgentResource(id: string): Promise<AgentResource | undefined>;
+  createAgentResource(resource: InsertAgentResource): Promise<AgentResource>;
+  updateAgentResource(id: string, resource: Partial<InsertAgentResource>): Promise<AgentResource | undefined>;
+  deleteAgentResource(id: string): Promise<boolean>;
+  reorderAgentResources(userId: string, orderedIds: string[]): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -522,6 +533,67 @@ export class DatabaseStorage implements IStorage {
       .where(eq(agentProfiles.userId, userId))
       .returning();
     return updated;
+  }
+
+  // Agent Resources
+  async getAgentResources(userId: string): Promise<AgentResource[]> {
+    return await db
+      .select()
+      .from(agentResources)
+      .where(eq(agentResources.userId, userId))
+      .orderBy(agentResources.displayOrder);
+  }
+
+  async getAgentResource(id: string): Promise<AgentResource | undefined> {
+    const [resource] = await db
+      .select()
+      .from(agentResources)
+      .where(eq(agentResources.id, id))
+      .limit(1);
+    return resource;
+  }
+
+  async createAgentResource(resource: InsertAgentResource): Promise<AgentResource> {
+    // Get the next display order
+    const existing = await this.getAgentResources(resource.userId);
+    const maxOrder = existing.length > 0 
+      ? Math.max(...existing.map(r => r.displayOrder ?? 0)) + 1 
+      : 0;
+    
+    const [created] = await db
+      .insert(agentResources)
+      .values({ ...resource, displayOrder: maxOrder })
+      .returning();
+    return created;
+  }
+
+  async updateAgentResource(id: string, resource: Partial<InsertAgentResource>): Promise<AgentResource | undefined> {
+    const [updated] = await db
+      .update(agentResources)
+      .set({ ...resource, updatedAt: new Date() })
+      .where(eq(agentResources.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteAgentResource(id: string): Promise<boolean> {
+    const result = await db
+      .delete(agentResources)
+      .where(eq(agentResources.id, id));
+    return true;
+  }
+
+  async reorderAgentResources(userId: string, orderedIds: string[]): Promise<boolean> {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await db
+        .update(agentResources)
+        .set({ displayOrder: i, updatedAt: new Date() })
+        .where(and(
+          eq(agentResources.id, orderedIds[i]),
+          eq(agentResources.userId, userId)
+        ));
+    }
+    return true;
   }
 }
 

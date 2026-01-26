@@ -1,55 +1,92 @@
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { ExternalLink, FileText, Download } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { FileText, Settings } from 'lucide-react';
+import { Link } from 'wouter';
+import type { AgentResource } from '@shared/schema';
 
-interface Resource {
-  title: string;
-  url?: string;
-  type: 'link' | 'download';
+interface SpyglassResourcesWidgetProps {
+  cmaToken?: string; // Optional token for public CMA access
 }
 
-const RESOURCES: Resource[] = [
-  { title: 'Spyglass Listing Presentation', type: 'link' },
-  { title: 'Listing Agreement', type: 'download' },
-  { title: 'Seller Disclosure', type: 'download' },
-  { title: 'Home Warranty Information', type: 'link' },
-  { title: 'Moving Checklist', type: 'download' },
-];
+export function SpyglassResourcesWidget({ cmaToken }: SpyglassResourcesWidgetProps) {
+  // Use different endpoint based on whether we have a public token or are authenticated
+  const queryKey = cmaToken 
+    ? [`/api/shared/cma/${cmaToken}/resources`]
+    : ["/api/agent/resources"];
 
-export function SpyglassResourcesWidget() {
+  const { data: resources = [], isLoading, isError } = useQuery<AgentResource[]>({
+    queryKey,
+    staleTime: 60000,
+    retry: false, // Don't retry on auth failures
+  });
+
+  // Filter to only active resources (treat undefined/null as active)
+  const activeResources = resources.filter(r => r.isActive !== false);
+
   return (
-    <div className="flex flex-col h-full bg-background" data-testid="spyglass-resources-widget">
-      <div className="flex-1 overflow-auto p-6 md:p-8">
-        <div className="max-w-2xl mx-auto space-y-4">
-          <p className="text-center text-muted-foreground mb-6">
-            Access helpful resources and documents for your listing process.
-          </p>
-
-          {RESOURCES.map((resource, index) => (
-            <Card 
-              key={index} 
-              className="p-4 flex items-center justify-between cursor-pointer hover-elevate"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[#EF4923]/10 flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-[#EF4923]" />
-                </div>
-                <span className="font-medium">{resource.title}</span>
-              </div>
-              <Button variant="ghost" size="icon">
-                {resource.type === 'link' ? (
-                  <ExternalLink className="w-5 h-5" />
-                ) : (
-                  <Download className="w-5 h-5" />
+    <div className="h-full w-full flex flex-col" data-testid="spyglass-resources-widget">
+      {/* Content */}
+      <div className="flex-1 flex items-center justify-center bg-background p-8">
+        {isLoading ? (
+          <div className="text-center">
+            <div className="w-6 h-6 border-2 border-[#EF4923] border-t-transparent rounded-full animate-spin mx-auto" />
+          </div>
+        ) : isError ? (
+          /* Error state - show empty placeholder for public viewers */
+          <div className="text-center max-w-md">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+              <FileText className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium text-foreground mb-2">
+              Resources Unavailable
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Resources could not be loaded at this time.
+            </p>
+          </div>
+        ) : activeResources.length > 0 ? (
+          <div className="text-center space-y-6 max-w-lg">
+            {activeResources.map((resource) => (
+              <a
+                key={resource.id}
+                href={resource.type === 'file' ? resource.fileUrl || '#' : resource.url || '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-lg text-foreground hover:text-[#EF4923] transition-colors 
+                           underline underline-offset-4 decoration-muted-foreground/30 hover:decoration-[#EF4923]"
+                data-testid={`resource-link-${resource.id}`}
+              >
+                {resource.name}
+                {resource.type === 'file' && (
+                  <span className="inline-block ml-2 text-muted-foreground text-sm">(Download)</span>
                 )}
-              </Button>
-            </Card>
-          ))}
-
-          <p className="text-center text-sm text-muted-foreground mt-8">
-            Additional resources can be configured in settings.
-          </p>
-        </div>
+              </a>
+            ))}
+          </div>
+        ) : (
+          /* Empty State Placeholder */
+          <div className="text-center max-w-md">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+              <FileText className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium text-foreground mb-2">
+              No Resources Added
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {cmaToken 
+                ? "No resources are available for this presentation."
+                : "Add helpful documents and links for your clients in Settings."}
+            </p>
+            {!cmaToken && (
+              <Link
+                href="/settings"
+                className="inline-flex items-center gap-2 text-sm text-[#EF4923] hover:underline"
+              >
+                <Settings className="w-4 h-4" />
+                Go to Settings
+              </Link>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
