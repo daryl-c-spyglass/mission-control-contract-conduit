@@ -1,0 +1,183 @@
+# Replit Agent Task: Fix Time to Sell Modal - Remove Redundant ", TX" + Debug Description
+
+## Issue 1: Remove Redundant ", TX" Below Address
+
+### Problem
+The modal header shows:
+```
+7806 Song Sparrow DR, Austin, TX    ← Main title (correct)
+, TX                                 ← REMOVE THIS (redundant/wrong)
+MLS# ACT1262805                      ← Keep or move up
+```
+
+### Fix
+
+**File:** `client/src/components/cma-presentation/widgets/PropertyDetailModal.tsx`
+
+Find the header section and fix the layout. Look for code like:
+
+```tsx
+{/* Current broken code - something like: */}
+<h2>{property.address}, {property.city}, {property.state}</h2>
+<span>, {property.state}</span>  {/* ← DELETE THIS LINE */}
+<span>MLS# {property.mlsNumber}</span>
+```
+
+**Change to:**
+
+```tsx
+{/* Header */}
+<div className="...">
+  <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+    {property.address}, {property.city}, {property.state}
+  </h2>
+  <span className="text-sm text-gray-500 dark:text-gray-400">
+    MLS# {property.mlsNumber}
+  </span>
+</div>
+```
+
+The header should show:
+```
+7806 Song Sparrow DR, Austin, TX
+MLS# ACT1262805
+```
+
+No redundant ", TX" on a separate line.
+
+---
+
+## Issue 2: Property Description Still Not Showing
+
+### Debug Step 1: Add Console Log
+
+In `PropertyDetailModal.tsx`, at the start of the component, add:
+
+```tsx
+export function PropertyDetailModal({ property, subjectProperty, onClose }: Props) {
+  // ADD THIS DEBUG LOG
+  console.log('[PropertyDetailModal] Property data:', {
+    mlsNumber: property.mlsNumber,
+    address: property.address,
+    description: property.description,
+    descriptionLength: property.description?.length || 0,
+    hasDescription: !!property.description,
+    allKeys: Object.keys(property)
+  });
+  
+  // ... rest of component
+}
+```
+
+### Debug Step 2: Check if Description Section Exists in JSX
+
+Search for "Property Description" or "description" in the modal file:
+
+```bash
+grep -n "description\|Description" client/src/components/cma-presentation/widgets/PropertyDetailModal.tsx
+```
+
+### Debug Step 3: Force Show Description Section
+
+Temporarily change the description section to ALWAYS render (remove the conditional):
+
+**Find this:**
+```tsx
+{property.description && (
+  <div className="...">
+    <h3>Property Description</h3>
+    <p>{property.description}</p>
+  </div>
+)}
+```
+
+**Change to this (temporary):**
+```tsx
+{/* TEMPORARY: Force render to debug */}
+<div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+    Property Description
+  </h3>
+  <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+    {property.description || `DEBUG: description is "${property.description}" (type: ${typeof property.description})`}
+  </p>
+</div>
+```
+
+This will tell us:
+- If the section renders at all
+- What value `property.description` actually has
+
+### Debug Step 4: Check Data Flow in cma-tab.tsx
+
+Verify the description mapping is correct. In `cma-tab.tsx`, add logging:
+
+```tsx
+// Around line 309 where comparables are mapped
+console.log('[cma-tab] Mapping comparable:', {
+  mlsNumber: c.mlsNumber,
+  rawDescription: c.description,
+  rawRemarks: c.remarks,
+  rawPublicRemarks: c.publicRemarks,
+});
+
+return {
+  // ... other fields
+  description: c.description || c.remarks || c.publicRemarks || '',
+};
+```
+
+---
+
+## Expected Outcome
+
+After these changes:
+
+1. **Header should show:**
+   ```
+   7806 Song Sparrow DR, Austin, TX
+   MLS# ACT1262805
+   ```
+   (No redundant ", TX")
+
+2. **Console should show** whether description data exists
+
+3. **Description section should appear** (even if empty, for debugging)
+
+---
+
+## Quick Fix Summary
+
+### For ", TX" issue:
+
+Find and remove the redundant state display. The structure should be:
+
+```tsx
+{/* Modal Header */}
+<div className="flex items-start justify-between p-4 border-b">
+  <div>
+    <h2 className="text-lg font-bold">{property.address}, {property.city}, {property.state}</h2>
+    <p className="text-sm text-gray-500">MLS# {property.mlsNumber}</p>
+  </div>
+  <button onClick={onClose}>
+    <X className="w-5 h-5" />
+  </button>
+</div>
+```
+
+NOT:
+```tsx
+<h2>{property.address}, {property.city}, {property.state}</h2>
+<p>, {property.state}</p>  {/* ← WRONG - DELETE */}
+<p>MLS# {property.mlsNumber}</p>
+```
+
+---
+
+## Report Back
+
+After making these changes, please tell me:
+
+1. What does the console log show for `property.description`?
+2. Does the description section now appear (even with debug text)?
+3. Is the ", TX" removed from the header?

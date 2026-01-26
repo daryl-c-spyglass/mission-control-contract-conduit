@@ -42,6 +42,15 @@ function DetailItem({ label, value, icon }: { label: string; value: string; icon
 }
 
 export function PropertyDetailModal({ property, onClose }: PropertyDetailModalProps) {
+  // Debug logging for description data
+  console.log('[PropertyDetailModal] Property data:', {
+    mlsNumber: property.mlsNumber,
+    address: property.address,
+    description: property.description,
+    descriptionLength: property.description?.length || 0,
+    hasDescription: !!property.description,
+  });
+  
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [fullscreenPhoto, setFullscreenPhoto] = useState(false);
   const photos = property.photos || [];
@@ -95,11 +104,8 @@ export function PropertyDetailModal({ property, onClose }: PropertyDetailModalPr
             <h2 id="modal-title" className="text-xl font-bold truncate" data-testid="modal-address">
               {property.address}
             </h2>
-            <p className="text-sm text-muted-foreground" data-testid="modal-location">
-              {property.city}, {property.state} {property.zipCode}
-            </p>
-            <p className="text-xs text-muted-foreground" data-testid="modal-mls">
-              MLS# {property.id}
+            <p className="text-sm text-muted-foreground" data-testid="modal-mls">
+              MLS# {property.mlsNumber || property.id}
             </p>
           </div>
           <Button
