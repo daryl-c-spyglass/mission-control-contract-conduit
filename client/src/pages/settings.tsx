@@ -39,6 +39,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Coordinator } from "@shared/schema";
+import { NotificationPreferences } from "@/components/settings/NotificationPreferences";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -1254,119 +1255,7 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-amber-500/10">
-              <Bell className="h-5 w-5 text-amber-500" />
-            </div>
-            <div>
-              <CardTitle>Slack Notifications</CardTitle>
-              <CardDescription>
-                Control what notifications are sent to transaction Slack channels
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium">Notification Types</h4>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="documentUploads">Document Uploads</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Receive notifications when documents are uploaded
-                    </p>
-                  </div>
-                  <Switch
-                    id="documentUploads"
-                    checked={notificationSettings.documentUploads}
-                    onCheckedChange={(checked) => handleNotificationToggle('documentUploads', checked)}
-                    data-testid="switch-document-uploads"
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="closingReminders">Closing Date Reminders</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Receive reminders as the closing date approaches
-                    </p>
-                  </div>
-                  <Switch
-                    id="closingReminders"
-                    checked={notificationSettings.closingReminders}
-                    onCheckedChange={(checked) => handleNotificationToggle('closingReminders', checked)}
-                    data-testid="switch-closing-reminders"
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="marketingAssets">Marketing Assets</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Receive notifications when marketing materials are created
-                    </p>
-                  </div>
-                  <Switch
-                    id="marketingAssets"
-                    checked={notificationSettings.marketingAssets}
-                    onCheckedChange={(checked) => handleNotificationToggle('marketingAssets', checked)}
-                    data-testid="switch-marketing-assets"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {notificationSettings.closingReminders && (
-              <div className="space-y-4 border-t pt-4">
-                <h4 className="text-sm font-medium">Reminder Schedule</h4>
-                <p className="text-xs text-muted-foreground">
-                  Choose which closing date reminders to receive
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <Label htmlFor="reminder14Days" className="text-sm">14 days before</Label>
-                    <Switch
-                      id="reminder14Days"
-                      checked={notificationSettings.reminder14Days}
-                      onCheckedChange={(checked) => handleNotificationToggle('reminder14Days', checked)}
-                      data-testid="switch-reminder-14"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <Label htmlFor="reminder7Days" className="text-sm">7 days before</Label>
-                    <Switch
-                      id="reminder7Days"
-                      checked={notificationSettings.reminder7Days}
-                      onCheckedChange={(checked) => handleNotificationToggle('reminder7Days', checked)}
-                      data-testid="switch-reminder-7"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <Label htmlFor="reminder3Days" className="text-sm">3 days before</Label>
-                    <Switch
-                      id="reminder3Days"
-                      checked={notificationSettings.reminder3Days}
-                      onCheckedChange={(checked) => handleNotificationToggle('reminder3Days', checked)}
-                      data-testid="switch-reminder-3"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <Label htmlFor="reminderDayOf" className="text-sm">Day of closing</Label>
-                    <Switch
-                      id="reminderDayOf"
-                      checked={notificationSettings.reminderDayOf}
-                      onCheckedChange={(checked) => handleNotificationToggle('reminderDayOf', checked)}
-                      data-testid="switch-reminder-day-of"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <NotificationPreferences />
 
       <Card>
         <CardHeader>
