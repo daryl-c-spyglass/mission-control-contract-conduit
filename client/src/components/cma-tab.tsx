@@ -322,6 +322,7 @@ export function CMATab({ transaction }: CMATabProps) {
     const lng = mlsData.coordinates?.longitude || mlsData.map?.longitude || mlsData.longitude;
     return {
       id: transaction.mlsNumber || transaction.id,
+      mlsNumber: transaction.mlsNumber || mlsData.mlsNumber || '',
       address: transaction.propertyAddress || mlsData.address || '',
       city: mlsData.city || '',
       state: mlsData.state || 'TX',

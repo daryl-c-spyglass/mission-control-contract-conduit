@@ -91,7 +91,7 @@ export function SlideViewer({
       case 'time_to_sell':
         return <TimeToSellWidget comparables={comparables} averageDaysOnMarket={averageDaysOnMarket} />;
       case 'suggested_list_price':
-        return <SuggestedPriceWidget comparables={comparables} subjectProperty={subjectProperty} />;
+        return <SuggestedPriceWidget comparables={comparables} subjectProperty={subjectProperty} mlsNumber={subjectProperty?.mlsNumber} />;
       case 'listing_action_plan':
         return <ListingActionPlanWidget />;
       case 'spyglass_resources':
