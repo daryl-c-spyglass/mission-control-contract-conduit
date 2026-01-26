@@ -1,0 +1,319 @@
+# Replit Agent Task: Fix Time to Sell Modal - Property Description & Photo Expand
+
+## Overview
+
+Based on diagnostic findings, we need to fix two issues in the Time to Sell modal:
+
+1. **Property Description not showing** - Data exists in API but not mapped/rendered
+2. **Photo Expand feature missing** - Users need fullscreen photo viewing
+
+---
+
+## ISSUE 1: Property Description
+
+### Root Cause (Two Problems)
+
+**Problem A:** `cma-tab.tsx` does NOT map `description` when building property objects
+**Problem B:** `PropertyDetailModal.tsx` does NOT render the description
+
+### Fix A: Add Description Mapping in `cma-tab.tsx`
+
+**File:** `client/src/components/cma-tab.tsx`
+
+**Location 1: presentationComparables mapping (around lines 281-312)**
+
+Find the return statement that maps comparable properties and add `description`:
+
+```typescript
+// Around line 281-312, find the return object and ADD:
+return {
+  id: c.mlsNumber || `comp-${index}`,
+  address: c.address || '',
+  city: c.city || '',
+  state: c.state || '',
+  zip: c.zip || '',
+  // ... existing mapped fields ...
+  
+  // ADD THIS LINE:
+  description: c.description || c.remarks || c.publicRemarks || '',
+};
+```
+
+**Location 2: subjectProperty mapping (around lines 314-342)**
+
+Find the subject property mapping and add `description`:
+
+```typescript
+// Around line 314-342, find the subjectProperty object and ADD:
+const subjectProperty = {
+  id: mlsData.mlsNumber || 'subject',
+  address: mlsData.address || '',
+  // ... existing mapped fields ...
+  
+  // ADD THIS LINE:
+  description: mlsData.description || mlsData.publicRemarks || mlsData.remarks || '',
+};
+```
+
+### Fix B: Add Description UI in `PropertyDetailModal.tsx`
+
+**File:** `client/src/components/cma-presentation/widgets/PropertyDetailModal.tsx`
+
+Add a "Property Description" section after the Property Details grid. Find the Property Details section and add this below it:
+
+```tsx
+{/* Property Description - ADD THIS SECTION */}
+{property.description && (
+  <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+      Property Description
+    </h3>
+    <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+      {property.description}
+    </p>
+  </div>
+)}
+```
+
+**Alternative: Collapsible Description (for long text)**
+
+```tsx
+{/* Property Description - Collapsible Version */}
+{property.description && (
+  <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+    <details className="group">
+      <summary className="flex items-center justify-between cursor-pointer list-none">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+          Property Description
+        </h3>
+        <ChevronDown className="w-4 h-4 text-gray-500 group-open:rotate-180 transition-transform" />
+      </summary>
+      <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mt-2">
+        {property.description}
+      </p>
+    </details>
+  </div>
+)}
+```
+
+---
+
+## ISSUE 2: Photo Expand/Fullscreen Feature
+
+### Implementation
+
+Add fullscreen photo viewing capability to the PropertyDetailModal.
+
+**File:** `client/src/components/cma-presentation/widgets/PropertyDetailModal.tsx`
+
+### Step 1: Add State for Fullscreen
+
+At the top of the component, add state:
+
+```tsx
+const [fullscreenPhoto, setFullscreenPhoto] = useState(false);
+```
+
+### Step 2: Add Expand Button to Photo
+
+Find the photo section and add an expand button. Look for the photo container with the navigation arrows and add:
+
+```tsx
+{/* Photo Section */}
+<div className="relative">
+  {/* Existing photo */}
+  <img 
+    src={photos[currentPhotoIndex]} 
+    alt={`Property photo ${currentPhotoIndex + 1}`}
+    className="w-full h-auto object-cover cursor-pointer"
+    onClick={() => setFullscreenPhoto(true)}  {/* ADD: Click to expand */}
+  />
+  
+  {/* Existing navigation arrows... */}
+  
+  {/* ADD: Expand Button - Top Right */}
+  <button
+    onClick={() => setFullscreenPhoto(true)}
+    className="absolute top-3 right-3 min-w-[40px] min-h-[40px] 
+               bg-black/50 hover:bg-black/70 text-white rounded-full 
+               flex items-center justify-center transition-colors z-10"
+    aria-label="View fullscreen"
+  >
+    <Maximize className="w-5 h-5" />
+  </button>
+  
+  {/* Existing photo counter... */}
+</div>
+```
+
+### Step 3: Add Fullscreen Dialog
+
+Add the fullscreen photo viewer dialog at the end of the component, before the closing fragment:
+
+```tsx
+{/* Fullscreen Photo Viewer */}
+{fullscreenPhoto && (
+  <div 
+    className="fixed inset-0 z-[100] bg-black flex items-center justify-center"
+    onClick={() => setFullscreenPhoto(false)}
+  >
+    {/* Close Button */}
+    <button
+      onClick={() => setFullscreenPhoto(false)}
+      className="absolute top-4 right-4 min-w-[44px] min-h-[44px] 
+                 bg-white/10 hover:bg-white/20 text-white rounded-full 
+                 flex items-center justify-center transition-colors z-10"
+      aria-label="Close fullscreen"
+    >
+      <X className="w-6 h-6" />
+    </button>
+    
+    {/* Photo Counter */}
+    <div className="absolute top-4 left-4 px-3 py-1.5 bg-black/60 text-white text-sm rounded-full">
+      {currentPhotoIndex + 1} / {photos.length}
+    </div>
+    
+    {/* Main Photo */}
+    <img 
+      src={photos[currentPhotoIndex]} 
+      alt={`Property photo ${currentPhotoIndex + 1}`}
+      className="max-w-full max-h-full object-contain"
+      onClick={(e) => e.stopPropagation()}
+    />
+    
+    {/* Navigation Arrows */}
+    {photos.length > 1 && (
+      <>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setCurrentPhotoIndex(i => i === 0 ? photos.length - 1 : i - 1);
+          }}
+          className="absolute left-4 top-1/2 -translate-y-1/2 min-w-[48px] min-h-[48px] 
+                     bg-white/10 hover:bg-white/20 text-white rounded-full 
+                     flex items-center justify-center transition-colors"
+          aria-label="Previous photo"
+        >
+          <ChevronLeft className="w-8 h-8" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setCurrentPhotoIndex(i => i === photos.length - 1 ? 0 : i + 1);
+          }}
+          className="absolute right-4 top-1/2 -translate-y-1/2 min-w-[48px] min-h-[48px] 
+                     bg-white/10 hover:bg-white/20 text-white rounded-full 
+                     flex items-center justify-center transition-colors"
+          aria-label="Next photo"
+        >
+          <ChevronRight className="w-8 h-8" />
+        </button>
+      </>
+    )}
+  </div>
+)}
+```
+
+### Step 4: Add Keyboard Navigation for Fullscreen
+
+Update the existing keyboard handler (or add one) to handle fullscreen:
+
+```tsx
+useEffect(() => {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    // Close fullscreen on Escape
+    if (e.key === 'Escape') {
+      if (fullscreenPhoto) {
+        setFullscreenPhoto(false);
+      } else {
+        onClose();
+      }
+    }
+    
+    // Photo navigation
+    if (photos.length > 1) {
+      if (e.key === 'ArrowLeft') {
+        setCurrentPhotoIndex(i => i === 0 ? photos.length - 1 : i - 1);
+      }
+      if (e.key === 'ArrowRight') {
+        setCurrentPhotoIndex(i => i === photos.length - 1 ? 0 : i + 1);
+      }
+    }
+  };
+  
+  window.addEventListener('keydown', handleKeyDown);
+  return () => window.removeEventListener('keydown', handleKeyDown);
+}, [photos.length, fullscreenPhoto, onClose]);
+```
+
+### Step 5: Add Icon Imports
+
+Make sure these icons are imported at the top of the file:
+
+```tsx
+import { X, ChevronLeft, ChevronRight, Maximize } from 'lucide-react';
+```
+
+---
+
+## ALSO FIX: TimeToSellWidget.tsx Inline Modal
+
+The Time to Sell slide has an **INLINE** modal in `TimeToSellWidget.tsx` that also needs these fixes.
+
+**File:** `client/src/components/cma-presentation/widgets/TimeToSellWidget.tsx`
+
+Apply the same changes:
+
+1. **Add description to property mapping** (if not already done via cma-tab.tsx)
+2. **Add Property Description section** to the inline PropertyDetailModal (around lines 426-708)
+3. **Add fullscreen state and expand button** to the photo section
+4. **Add fullscreen photo dialog**
+
+---
+
+## Summary of Changes
+
+### Files to Modify:
+
+| File | Changes |
+|------|---------|
+| `client/src/components/cma-tab.tsx` | Add `description` mapping at lines ~309 and ~340 |
+| `client/src/components/cma-presentation/widgets/PropertyDetailModal.tsx` | Add description section + fullscreen photo feature |
+| `client/src/components/cma-presentation/widgets/TimeToSellWidget.tsx` | Same changes to inline modal (if it has its own) |
+
+### New Features:
+
+1. ✅ Property Description displays from Repliers `publicRemarks`/`remarks`
+2. ✅ Expand button on photos (Maximize icon, top-right)
+3. ✅ Fullscreen photo viewer with black background
+4. ✅ Navigation arrows in fullscreen
+5. ✅ Keyboard navigation (ESC to close, arrows to navigate)
+6. ✅ Click outside photo to close fullscreen
+
+---
+
+## Verification Checklist
+
+After implementation, verify:
+
+- [ ] Property Description shows in modal (if available from Repliers)
+- [ ] Expand button (⛶) appears on photo top-right corner
+- [ ] Clicking expand opens fullscreen black overlay
+- [ ] Photo displays large in fullscreen
+- [ ] Navigation arrows work in fullscreen
+- [ ] Photo counter shows in fullscreen
+- [ ] ESC key closes fullscreen
+- [ ] Clicking outside photo closes fullscreen
+- [ ] X button closes fullscreen
+- [ ] Arrow keys navigate photos
+- [ ] Works on both COMPS and Time to Sell modals
+- [ ] Touch targets are 44px+ for mobile
+
+---
+
+## Mobile Considerations
+
+All buttons should have:
+- `min-w-[44px] min-h-[44px]` for touch targets
+- Proper spacing from edges for thumb reach
+- Semi-transparent backgrounds for visibility on any photo

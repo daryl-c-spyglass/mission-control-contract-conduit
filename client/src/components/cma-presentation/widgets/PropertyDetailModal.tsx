@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, ChevronLeft, ChevronRight, Bed, Bath, Square, Clock, Calendar } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Bed, Bath, Square, Clock, Calendar, Maximize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { CmaProperty } from '../types';
@@ -43,6 +43,7 @@ function DetailItem({ label, value, icon }: { label: string; value: string; icon
 
 export function PropertyDetailModal({ property, onClose }: PropertyDetailModalProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [fullscreenPhoto, setFullscreenPhoto] = useState(false);
   const photos = property.photos || [];
   
   const handlePrevPhoto = () => {
@@ -55,13 +56,19 @@ export function PropertyDetailModal({ property, onClose }: PropertyDetailModalPr
   
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        if (fullscreenPhoto) {
+          setFullscreenPhoto(false);
+        } else {
+          onClose();
+        }
+      }
       if (e.key === 'ArrowLeft' && photos.length > 1) handlePrevPhoto();
       if (e.key === 'ArrowRight' && photos.length > 1) handleNextPhoto();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [photos.length]);
+  }, [photos.length, fullscreenPhoto, onClose]);
   
   const pricePerSqft = property.pricePerSqft || 
     (property.sqft > 0 ? Math.round((property.soldPrice || property.price) / property.sqft) : 0);
@@ -114,9 +121,19 @@ export function PropertyDetailModal({ property, onClose }: PropertyDetailModalPr
                 <img 
                   src={photos[currentPhotoIndex]} 
                   alt={`${property.address} - Photo ${currentPhotoIndex + 1}`}
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-contain cursor-pointer"
+                  onClick={() => setFullscreenPhoto(true)}
                   data-testid="modal-main-photo"
                 />
+                
+                <button
+                  onClick={() => setFullscreenPhoto(true)}
+                  className="absolute top-2 right-2 z-10 min-w-[40px] min-h-[40px] bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors"
+                  aria-label="View fullscreen"
+                  data-testid="button-expand-photo"
+                >
+                  <Maximize className="w-5 h-5" />
+                </button>
                 
                 {photos.length > 1 && (
                   <>
@@ -257,8 +274,73 @@ export function PropertyDetailModal({ property, onClose }: PropertyDetailModalPr
             )}
             </div>
           </div>
+          
+          {property.description && (
+            <div className="p-4 border-t" data-testid="property-description-section">
+              <h3 className="text-sm font-medium mb-2 text-muted-foreground">Property Description</h3>
+              <p className="text-sm text-foreground leading-relaxed" data-testid="property-description-text">
+                {property.description}
+              </p>
+            </div>
+          )}
         </div>
       </div>
+      
+      {fullscreenPhoto && photos.length > 0 && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black flex items-center justify-center"
+          onClick={() => setFullscreenPhoto(false)}
+          data-testid="fullscreen-photo-overlay"
+        >
+          <button
+            onClick={() => setFullscreenPhoto(false)}
+            className="absolute top-4 right-4 min-w-[44px] min-h-[44px] bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-colors z-10"
+            aria-label="Close fullscreen"
+            data-testid="button-close-fullscreen"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          
+          <div className="absolute top-4 left-4 px-3 py-1.5 bg-black/60 text-white text-sm rounded-full" data-testid="fullscreen-photo-counter">
+            {currentPhotoIndex + 1} / {photos.length}
+          </div>
+          
+          <img 
+            src={photos[currentPhotoIndex]} 
+            alt={`${property.address} - Photo ${currentPhotoIndex + 1}`}
+            className="max-w-full max-h-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+            data-testid="fullscreen-photo"
+          />
+          
+          {photos.length > 1 && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePrevPhoto();
+                }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 min-w-[48px] min-h-[48px] bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-colors"
+                aria-label="Previous photo"
+                data-testid="button-fullscreen-prev"
+              >
+                <ChevronLeft className="w-8 h-8" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNextPhoto();
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 min-w-[48px] min-h-[48px] bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-colors"
+                aria-label="Next photo"
+                data-testid="button-fullscreen-next"
+              >
+                <ChevronRight className="w-8 h-8" />
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </>
   );
 }

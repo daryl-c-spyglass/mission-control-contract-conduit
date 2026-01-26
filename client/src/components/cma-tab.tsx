@@ -307,6 +307,7 @@ export function CMATab({ transaction }: CMATabProps) {
         latitude: c.map?.latitude || c.latitude,
         longitude: c.map?.longitude || c.longitude,
         acres: c.acres,
+        description: c.description || c.remarks || c.publicRemarks || '',
       };
     });
   }, [cmaData]);
@@ -338,6 +339,7 @@ export function CMATab({ transaction }: CMATabProps) {
       isSubject: true,
       latitude: lat,
       longitude: lng,
+      description: mlsData.description || mlsData.publicRemarks || mlsData.remarks || '',
     };
   }, [mlsData, transaction, mlsStatus]);
 
