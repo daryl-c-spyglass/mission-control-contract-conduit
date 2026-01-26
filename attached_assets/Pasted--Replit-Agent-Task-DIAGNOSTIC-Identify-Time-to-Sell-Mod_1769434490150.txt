@@ -1,0 +1,109 @@
+# Replit Agent Task: DIAGNOSTIC - Identify Time to Sell Modal Components
+
+## Problem
+The property detail modal inside the **Time to Sell slide** is not being updated. We need to identify the exact file and component structure before making changes.
+
+## What I Need You To Do
+
+### Step 1: Search for Time to Sell Related Files
+
+Run these searches and report the results:
+
+```bash
+# Find all files related to Time to Sell
+find . -type f -name "*.tsx" | xargs grep -l -i "time.*to.*sell\|timetosell" 2>/dev/null
+
+# Find all modal components
+find . -type f -name "*.tsx" | xargs grep -l -i "modal" 2>/dev/null
+
+# Find property detail related files
+find . -type f -name "*.tsx" | xargs grep -l -i "PropertyDetail\|property.*detail" 2>/dev/null
+```
+
+### Step 2: Identify the Component Hierarchy
+
+For the Time to Sell slide, tell me:
+
+1. **Main Time to Sell slide component** - What file is it in?
+2. **Property sidebar/list component** - What renders the list of properties on the left?
+3. **Property card panel** - What appears when you click a property in the sidebar?
+4. **Property detail modal** - What opens when you click "View" or the full card?
+
+### Step 3: Report the File Structure
+
+Please provide a tree view of the relevant files:
+
+```
+client/src/
+├── components/
+│   ├── cma/
+│   │   ├── slides/
+│   │   │   └── TimeToSellSlide.tsx  (or similar)
+│   │   └── ...
+│   └── modals/
+│       └── PropertyDetailModal.tsx  (or similar)
+└── ...
+```
+
+### Step 4: Show Me the Import Chain
+
+For the Time to Sell slide, show me:
+
+1. What modal component does it import?
+2. What is the exact import path?
+
+Example:
+```tsx
+// In TimeToSellSlide.tsx
+import { PropertyDetailModal } from '../modals/PropertyDetailModal';
+// or
+import { PropertyCardPanel } from './PropertyCardPanel';
+```
+
+### Step 5: Identify Modal Trigger
+
+Show me the code where the modal is triggered when clicking a property. Look for:
+- `onClick` handlers
+- State like `selectedProperty`, `showModal`, `isOpen`
+- Conditional rendering of modal components
+
+---
+
+## Expected Response Format
+
+Please respond with:
+
+```
+## Time to Sell Component Structure
+
+### Files Found:
+1. [file path] - [description]
+2. [file path] - [description]
+
+### Component Hierarchy:
+- TimeToSellSlide (client/src/components/cma/slides/TimeToSellSlide.tsx)
+  └── PropertySidebar (inline or separate file?)
+      └── PropertyCardPanel (what file?)
+          └── PropertyDetailModal (what file?)
+
+### Import Chain:
+[Show the actual imports from the files]
+
+### Modal Trigger Code:
+[Show the onClick and state management code]
+
+### Current Modal Component Location:
+The modal that opens from Time to Sell slide is: [exact file path]
+```
+
+---
+
+## DO NOT Make Any Changes Yet
+
+This is a **diagnostic task only**. Do not modify any files. Just report the findings so we can identify the correct component to update.
+
+---
+
+## After You Report
+
+Once you've identified the correct files, I will provide the updated implementation for the specific modal component used in the Time to Sell slide.
