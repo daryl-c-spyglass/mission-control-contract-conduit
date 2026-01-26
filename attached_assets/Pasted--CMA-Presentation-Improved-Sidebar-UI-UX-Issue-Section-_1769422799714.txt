@@ -1,0 +1,325 @@
+# CMA Presentation — Improved Sidebar UI/UX
+
+## Issue
+
+Section titles in the sidebar are getting cut off:
+- "SPYGLASS RESOURCES AND LINK..." 
+- "LEADINGRE NETWORK STRENGT..."
+- "FEATURED PROPERTY PROGRAM..."
+
+---
+
+## Recommended Solution: Wider Sidebar + Text Wrapping + Tooltips
+
+### Design Improvements:
+
+| Feature | Current | Improved |
+|---------|---------|----------|
+| Sidebar width | ~250px (too narrow) | 320px desktop, full-width mobile |
+| Long titles | Cut off | Wrap to 2 lines max with ellipsis |
+| Hover | None | Show full title tooltip |
+| Numbers | Plain | Styled badge/circle |
+| Active state | Unknown | Clear highlight |
+| Scrolling | Basic | Smooth with visible scrollbar |
+
+---
+
+## Improved Sidebar Component
+
+```tsx
+// components/cma-presentation/components/Sidebar.tsx
+
+import { X } from 'lucide-react';
+import { useState } from 'react';
+
+interface Section {
+  id: number;
+  title: string;
+}
+
+interface SidebarProps {
+  sections: Section[];
+  currentSection: number;
+  onSelectSection: (id: number) => void;
+  onClose: () => void;
+  isOpen: boolean;
+}
+
+export function Sidebar({ 
+  sections, 
+  currentSection, 
+  onSelectSection, 
+  onClose,
+  isOpen 
+}: SidebarProps) {
+  return (
+    <>
+      {/* Backdrop (mobile) */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+      
+      {/* Sidebar Panel */}
+      <aside 
+        className={`
+          fixed top-0 left-0 h-full bg-white z-50
+          transform transition-transform duration-300 ease-in-out
+          w-[320px] max-w-[85vw]
+          shadow-xl
+          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:translate-x-0 lg:relative lg:shadow-none
+        `}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Sections</h2>
+          <button
+            onClick={onClose}
+            className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-gray-100 
+                       transition-colors lg:hidden"
+            aria-label="Close menu"
+          >
+            <X className="w-5 h-5 text-gray-600" />
+          </button>
+        </div>
+        
+        {/* Sections List */}
+        <nav className="overflow-y-auto h-[calc(100%-65px)] overscroll-contain">
+          <ul className="py-2">
+            {sections.map((section) => (
+              <SectionItem
+                key={section.id}
+                section={section}
+                isActive={currentSection === section.id}
+                onClick={() => {
+                  onSelectSection(section.id);
+                  onClose(); // Close on mobile after selection
+                }}
+              />
+            ))}
+          </ul>
+        </nav>
+      </aside>
+    </>
+  );
+}
+
+function SectionItem({ 
+  section, 
+  isActive, 
+  onClick 
+}: { 
+  section: Section; 
+  isActive: boolean; 
+  onClick: () => void;
+}) {
+  return (
+    <li>
+      <button
+        onClick={onClick}
+        title={section.title} // Tooltip shows full title on hover
+        className={`
+          w-full flex items-start gap-3 px-4 py-3 text-left
+          transition-colors min-h-[44px]
+          hover:bg-gray-50
+          ${isActive 
+            ? 'bg-[#EF4923]/10 border-l-4 border-[#EF4923]' 
+            : 'border-l-4 border-transparent'
+          }
+        `}
+      >
+        {/* Number Badge */}
+        <span 
+          className={`
+            flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center
+            text-sm font-medium
+            ${isActive 
+              ? 'bg-[#EF4923] text-white' 
+              : 'bg-gray-100 text-gray-600'
+            }
+          `}
+        >
+          {section.id}
+        </span>
+        
+        {/* Title - Wraps to 2 lines max */}
+        <span 
+          className={`
+            text-sm leading-snug
+            line-clamp-2
+            ${isActive ? 'text-[#EF4923] font-medium' : 'text-gray-700'}
+          `}
+        >
+          {section.title}
+        </span>
+      </button>
+    </li>
+  );
+}
+```
+
+---
+
+## Key CSS Classes Explained
+
+### Text Wrapping (2 lines max):
+```css
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+```
+
+### Active State:
+```css
+/* Active section */
+bg-[#EF4923]/10      /* Light orange background */
+border-l-4           /* Left border indicator */
+border-[#EF4923]     /* Orange border */
+```
+
+### Smooth Scrolling:
+```css
+overflow-y-auto
+overscroll-contain   /* Prevents scroll chaining */
+```
+
+---
+
+## Alternative: Collapsible Groups
+
+If there are many sections, group them:
+
+```tsx
+const SECTION_GROUPS = [
+  {
+    name: 'Overview',
+    sections: [1, 2, 3, 4, 5, 6, 7] // Agent Resume through Suggested List Price
+  },
+  {
+    name: 'Marketing',
+    sections: [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] // Marketing related
+  },
+  {
+    name: 'Resources',
+    sections: [21, 22, 23, 24, 25, ...] // Resources and tools
+  }
+];
+
+// Render with collapsible accordions
+<Accordion>
+  {SECTION_GROUPS.map(group => (
+    <AccordionItem key={group.name} title={group.name}>
+      {group.sections.map(id => <SectionItem ... />)}
+    </AccordionItem>
+  ))}
+</Accordion>
+```
+
+---
+
+## Copy/Paste for Replit
+
+```
+Improve the Sidebar UI/UX in CMA Presentation - section titles are getting cut off.
+
+## CHANGES:
+
+### 1. INCREASE SIDEBAR WIDTH
+- Desktop: w-[320px]
+- Mobile: max-w-[85vw] (slide-out menu)
+
+### 2. TEXT WRAPPING FOR LONG TITLES
+Add line-clamp-2 class to allow titles to wrap to 2 lines max:
+className="text-sm leading-snug line-clamp-2"
+
+If line-clamp-2 doesn't work, add this CSS:
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+### 3. ADD TOOLTIP FOR FULL TITLE
+Add title attribute to show full text on hover:
+<button title={section.title} ...>
+
+### 4. BETTER ACTIVE STATE
+Active section styling:
+- Background: bg-[#EF4923]/10 (light orange)
+- Left border: border-l-4 border-[#EF4923]
+- Text color: text-[#EF4923] font-medium
+- Number badge: bg-[#EF4923] text-white (filled circle)
+
+Inactive section:
+- Number badge: bg-gray-100 text-gray-600
+- Text: text-gray-700
+
+### 5. NUMBER BADGES
+Style numbers as circular badges:
+<span className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-medium bg-gray-100 text-gray-600">
+  {section.id}
+</span>
+
+### 6. LAYOUT
+Each section item:
+<button className="w-full flex items-start gap-3 px-4 py-3 min-h-[44px] hover:bg-gray-50">
+  <span className="number-badge">7</span>
+  <span className="line-clamp-2">SUGGESTED LIST PRICE</span>
+</button>
+
+### 7. MOBILE
+- Sidebar slides in from left
+- Backdrop overlay behind (bg-black/50)
+- Close button in header
+- Auto-close after selecting section
+```
+
+---
+
+## Expected Result
+
+```
+┌──────────────────────────────────┐
+│ Sections                      X  │
+├──────────────────────────────────┤
+│                                  │
+│  (7)  SUGGESTED LIST PRICE       │  ← Active (orange bg, orange border)
+│                                  │
+│  (8)  LISTING ACTION PLAN        │
+│                                  │
+│  (9)  SPYGLASS RESOURCES         │  ← Wraps to 2 lines
+│       AND LINKS                  │
+│                                  │
+│  (10) AVERAGE PRICE/ACRE         │
+│                                  │
+│  (11) HOME SELLING SYSTEM        │
+│                                  │
+│  (23) LEADINGRE NETWORK          │  ← Wraps to 2 lines
+│       STRENGTH                   │
+│                                  │
+│  (24) FEATURED PROPERTY          │  ← Wraps to 2 lines
+│       PROGRAM                    │
+│                                  │
+└──────────────────────────────────┘
+        ↑
+   320px wide, text wraps, hover shows full title
+```
+
+---
+
+## Visual Comparison
+
+| Before | After |
+|--------|-------|
+| "SPYGLASS RESOURCES AND LINK..." | "SPYGLASS RESOURCES" (line 1) "AND LINKS" (line 2) |
+| "LEADINGRE NETWORK STRENGT..." | "LEADINGRE NETWORK" (line 1) "STRENGTH" (line 2) |
+| Plain numbers | Circular badges with active state |
+| No hover | Tooltip shows full title |
+| Narrow sidebar | 320px comfortable width |
