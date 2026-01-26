@@ -1,0 +1,178 @@
+# CRITICAL FIX: Server Crashing on Render - import.meta Undefined
+
+## Current Status: APP IS DOWN ❌
+
+The server crashes immediately on startup because `import.meta` is completely undefined in CommonJS (`.cjs`) builds.
+
+---
+
+## THE FIX
+
+### In `server/index.ts`, find ALL uses of `import.meta` and replace with `process.cwd()`
+
+**Search for these patterns:**
+```bash
+grep -n "import.meta" server/index.ts
+```
+
+**Replace ALL occurrences:**
+
+```typescript
+// ❌ BROKEN - import.meta doesn't exist in CommonJS
+const publicPath = path.resolve(import.meta.dirname, "..", "public");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// ✅ FIXED - Use process.cwd() which works everywhere
+const publicPath = path.resolve(process.cwd(), "public");
+const distPath = path.resolve(process.cwd(), "dist");
+const uploadsPath = path.resolve(process.cwd(), "uploads");
+```
+
+---
+
+## Complete Fix for server/index.ts
+
+### Step 1: Remove these imports if present
+```typescript
+// REMOVE these if they exist - not needed with process.cwd()
+// import { fileURLToPath } from 'url';
+// import { dirname } from 'path';
+```
+
+### Step 2: Replace ALL path resolutions
+
+Find any code like this:
+```typescript
+// ANY of these patterns are BROKEN in CJS:
+import.meta.dirname
+import.meta.url
+fileURLToPath(import.meta.url)
+```
+
+Replace with:
+```typescript
+// Use process.cwd() - works in ALL environments
+process.cwd()
+```
+
+### Step 3: Common replacements needed
+
+```typescript
+// BEFORE (broken)
+const publicPath = path.resolve(import.meta.dirname, "..", "public");
+
+// AFTER (works)
+const publicPath = path.resolve(process.cwd(), "public");
+```
+
+```typescript
+// BEFORE (broken)
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const staticPath = path.resolve(__dirname, "..", "public");
+
+// AFTER (works)  
+const staticPath = path.resolve(process.cwd(), "public");
+```
+
+```typescript
+// BEFORE (broken)
+app.use(express.static(path.resolve(import.meta.dirname, "..", "dist", "public")));
+
+// AFTER (works)
+app.use(express.static(path.resolve(process.cwd(), "dist", "public")));
+```
+
+---
+
+## Full Example Fix
+
+If your server/index.ts has something like this:
+
+```typescript
+// BROKEN CODE
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const publicPath = path.resolve(__dirname, "..", "public");
+app.use(express.static(publicPath));
+```
+
+Replace with:
+
+```typescript
+// FIXED CODE
+import path from 'path';
+
+// Serve static files from public folder
+const publicPath = path.resolve(process.cwd(), "public");
+app.use(express.static(publicPath));
+
+// For production, also serve from dist/public if needed
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.resolve(process.cwd(), "dist", "public")));
+}
+```
+
+---
+
+## Why This Happens
+
+| Feature | ESM (.mjs) | CommonJS (.cjs) |
+|---------|------------|-----------------|
+| `import.meta.url` | ✅ Works | ❌ undefined |
+| `import.meta.dirname` | ✅ Works | ❌ undefined |
+| `__dirname` | ❌ Not available | ✅ Works |
+| `process.cwd()` | ✅ Works | ✅ Works |
+
+Your build outputs `.cjs` (CommonJS), so use `process.cwd()` which works in both.
+
+---
+
+## After Fixing Code, Fix Database
+
+Once the server starts, you'll still need to add the missing columns:
+
+```sql
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS half_baths INTEGER;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS full_baths INTEGER;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS bedrooms INTEGER;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS sqft INTEGER;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS is_off_market BOOLEAN DEFAULT false;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS lot_size_acres DECIMAL(10, 2);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS property_type VARCHAR(50);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS listing_price INTEGER;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS listing_description TEXT;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS off_market_listing_date TIMESTAMP;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS is_under_contract BOOLEAN DEFAULT true;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS is_company_lead BOOLEAN DEFAULT false;
+```
+
+---
+
+## Quick Command for Replit
+
+Tell Replit:
+
+> "The server is crashing on Render because `import.meta` is undefined in CommonJS builds. 
+> 
+> Search for ALL uses of `import.meta.dirname`, `import.meta.url`, and `fileURLToPath(import.meta.url)` in server/index.ts and replace them with `process.cwd()`.
+>
+> For example, change:
+> `const publicPath = path.resolve(import.meta.dirname, "..", "public");`
+> To:
+> `const publicPath = path.resolve(process.cwd(), "public");`
+>
+> Remove any imports of `fileURLToPath` from 'url' if no longer needed."
+
+---
+
+## Verification
+
+After deploying the fix:
+
+1. Check Render logs - server should start without TypeError
+2. You should see "Server running on port XXXX" 
+3. Then run the SQL migration for the `half_baths` column
