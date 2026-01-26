@@ -512,8 +512,8 @@ export function SuggestedPriceWidget({
             )}
             
             {hasCoordinates && (
-              <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm text-white 
-                              px-2 py-1 rounded text-[10px] font-mono">
+              <div className="absolute bottom-2 right-2 bg-black/70 backdrop-blur-sm text-white 
+                              px-2 py-1 rounded text-[10px] font-mono z-10">
                 {subjectProperty?.latitude?.toFixed(4)}°N, {Math.abs(subjectProperty?.longitude || 0).toFixed(4)}°W
               </div>
             )}
