@@ -1,0 +1,744 @@
+# Replit Agent Task: Fix AVERAGE PRICE/ACRE Slide - Scatter Plot + Property List + Modal
+
+## Overview
+
+The AVERAGE PRICE/ACRE slide currently shows a placeholder. We need to implement:
+1. **Left Sidebar**: Property list grouped by status (like TIME TO SELL slide)
+2. **Main Area**: Scatter plot showing Price vs Acres
+3. **Clickable Markers**: Both in sidebar and on chart open property detail modal
+4. **Property Modal**: Detailed view with photo, map, stats, description
+
+---
+
+## Target Layout
+
+```
+┌────────────────────────────────────────────────────────────────────────────────┐
+│                           AVERAGE PRICE/ACRE                         10 / 33   │
+├───────────────────────┬────────────────────────────────────────────────────────┤
+│ ▲ Scroll              │                                                        │
+│                       │   $4,957,228 / ACRE                                    │
+│ 6 Closed              │   Comparable land sold for an average of $4,957,228    │
+│ ┌─────────────────┐   │                                                        │
+│ │ 🏠 2502 Spring  │   │              Scatter Plot                              │
+│ │ $5,220,522/acre │   │         ●                              $1.75M          │
+│ └─────────────────┘   │                    ●                                   │
+│ ┌─────────────────┐   │    ●                   ●     ●                         │
+│ │ 🏠 2112 Matter  │   │         ●        ─────────────────●──── $1.17M         │
+│ │ $6,203,532/acre │   │    ●                         ◆                         │
+│ └─────────────────┘   │              ●                                         │
+│ ...                   │                                        ●    $875K      │
+│                       │   ────────────────────────────────────────────         │
+│ 1 Under Contract      │   0.22        0.27        0.32        0.38  Acres      │
+│ ┌─────────────────┐   │                                                        │
+│ │ 🏠 2400 Rocking │   │   ☑ ◆ Subject Property                                 │
+│ │ $3,593,466/acre │   │   ☑ ─ Trendline (avg price/acre of SOLD)               │
+│ └─────────────────┘   │                                                        │
+│                       │   Legend: ● Closed  ● Active  ● Under Contract         │
+│ 4 Active              │                                                        │
+│ ┌─────────────────┐   │                                                        │
+│ │ 🏠 2505 Barton  │   │                                                        │
+│ │ $4,134,965/acre │   │                                                        │
+│ └─────────────────┘   │                                                        │
+│ ▼ Scroll              │                                                        │
+└───────────────────────┴────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Data Requirements
+
+### Repliers API Fields for Price/Acre
+
+```typescript
+interface PropertyWithAcreage {
+  mlsNumber: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  
+  // Pricing
+  listPrice: number;
+  soldPrice?: number;
+  originalPrice?: number;
+  
+  // Lot/Acreage
+  lotSize?: number;           // In square feet from Repliers
+  lotSizeAcres?: number;      // Calculated: lotSize / 43560
+  
+  // Calculated
+  pricePerAcre?: number;      // (soldPrice || listPrice) / lotSizeAcres
+  
+  // Status
+  status: 'Active' | 'Closed' | 'Under Contract';
+  daysOnMarket?: number;
+  soldDate?: string;
+  
+  // Property Details
+  beds?: number;
+  baths?: number;
+  sqft?: number;
+  yearBuilt?: number;
+  garageSpaces?: number;
+  
+  // Photos
+  photos: string[];
+  
+  // Location
+  coordinates?: { lat: number; lng: number };
+  
+  // Description
+  description?: string;
+}
+```
+
+### Calculate Acres from Lot Size
+
+```typescript
+// Repliers returns lotSize in square feet
+// 1 acre = 43,560 square feet
+const calculateAcres = (lotSizeSqFt: number): number => {
+  return lotSizeSqFt / 43560;
+};
+
+const calculatePricePerAcre = (price: number, acres: number): number => {
+  if (acres <= 0) return 0;
+  return Math.round(price / acres);
+};
+
+// Process properties
+const propertiesWithAcreage = comparables
+  .filter(p => p.lotSize && p.lotSize > 0)
+  .map(p => {
+    const acres = calculateAcres(p.lotSize);
+    const price = p.soldPrice || p.listPrice;
+    return {
+      ...p,
+      lotSizeAcres: acres,
+      pricePerAcre: calculatePricePerAcre(price, acres),
+    };
+  });
+```
+
+---
+
+## Component Implementation
+
+### File Structure
+
+```
+client/src/components/cma-presentation/slides/
+├── AveragePricePerAcreSlide.tsx    ← Main slide component
+└── components/
+    ├── PriceAcreScatterChart.tsx   ← Recharts scatter plot
+    ├── PropertySidebar.tsx          ← Reuse from TIME TO SELL
+    └── PropertyDetailModal.tsx      ← Reuse existing modal
+```
+
+---
+
+## Main Slide Component
+
+```tsx
+import { useState, useMemo } from 'react';
+import { PropertyDetailModal } from '../widgets/PropertyDetailModal';
+
+interface AveragePricePerAcreSlideProps {
+  subjectProperty: SubjectProperty;
+  comparables: CmaProperty[];
+}
+
+export function AveragePricePerAcreSlide({ 
+  subjectProperty, 
+  comparables 
+}: AveragePricePerAcreSlideProps) {
+  const [selectedProperty, setSelectedProperty] = useState<CmaProperty | null>(null);
+  
+  // Filter properties with valid acreage data
+  const propertiesWithAcreage = useMemo(() => {
+    return comparables
+      .filter(p => p.lotSize && p.lotSize > 0)
+      .map(p => {
+        const acres = p.lotSize! / 43560;
+        const price = p.soldPrice || p.listPrice;
+        return {
+          ...p,
+          lotSizeAcres: acres,
+          pricePerAcre: Math.round(price / acres),
+        };
+      });
+  }, [comparables]);
+  
+  // Group by status
+  const groupedProperties = useMemo(() => {
+    const closed = propertiesWithAcreage.filter(p => p.status === 'Closed');
+    const underContract = propertiesWithAcreage.filter(p => p.status === 'Under Contract');
+    const active = propertiesWithAcreage.filter(p => p.status === 'Active');
+    return { closed, underContract, active };
+  }, [propertiesWithAcreage]);
+  
+  // Calculate average price per acre (from SOLD only)
+  const avgPricePerAcre = useMemo(() => {
+    const soldProps = propertiesWithAcreage.filter(p => p.status === 'Closed');
+    if (soldProps.length === 0) return 0;
+    const total = soldProps.reduce((sum, p) => sum + p.pricePerAcre, 0);
+    return Math.round(total / soldProps.length);
+  }, [propertiesWithAcreage]);
+  
+  // Subject property acreage
+  const subjectAcres = subjectProperty.lotSize ? subjectProperty.lotSize / 43560 : 0;
+  
+  // Format helpers
+  const formatPrice = (price: number) => 
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(price);
+  
+  const formatAcres = (acres: number) => acres.toFixed(2);
+
+  return (
+    <div className="h-full w-full flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
+      {/* Main Content */}
+      <div className="flex-1 min-h-0 flex">
+        
+        {/* Left Sidebar - Property List */}
+        <div className="w-64 lg:w-72 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 
+                        bg-white dark:bg-gray-800 overflow-y-auto">
+          <PropertySidebar 
+            groupedProperties={groupedProperties}
+            selectedProperty={selectedProperty}
+            onSelectProperty={setSelectedProperty}
+            priceLabel="/ acre"
+          />
+        </div>
+        
+        {/* Main Area - Chart */}
+        <div className="flex-1 min-w-0 p-4 lg:p-6 flex flex-col">
+          {/* Header */}
+          <div className="mb-4">
+            <h2 className="text-4xl lg:text-5xl font-bold text-[#EF4923]">
+              {formatPrice(avgPricePerAcre)} <span className="text-2xl text-gray-500">/ ACRE</span>
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Comparable land sold for an average of <span className="text-[#EF4923] font-medium">{formatPrice(avgPricePerAcre)}</span> / acre.
+            </p>
+          </div>
+          
+          {/* Scatter Chart */}
+          <div className="flex-1 min-h-0 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            {propertiesWithAcreage.length > 0 ? (
+              <PriceAcreScatterChart
+                properties={propertiesWithAcreage}
+                subjectProperty={{
+                  ...subjectProperty,
+                  lotSizeAcres: subjectAcres,
+                }}
+                avgPricePerAcre={avgPricePerAcre}
+                onPropertyClick={setSelectedProperty}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-400">
+                <div className="text-center">
+                  <p className="text-lg font-medium">No Acreage Data Available</p>
+                  <p className="text-sm">Properties need lot size information to display this chart</p>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Legend */}
+          <div className="mt-3 flex flex-wrap items-center gap-4 text-xs">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" defaultChecked className="rounded" />
+              <span className="w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow"></span>
+              <span className="text-gray-600 dark:text-gray-400">Subject Property</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" defaultChecked className="rounded" />
+              <span className="w-8 h-0.5 bg-gray-400"></span>
+              <span className="text-gray-600 dark:text-gray-400">Trendline (avg price/acre of SOLD)</span>
+            </label>
+            <div className="flex items-center gap-4 ml-auto">
+              <div className="flex items-center gap-1">
+                <span className="w-3 h-3 bg-red-500 rounded-full"></span>
+                <span className="text-gray-500">Closed</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-3 h-3 bg-yellow-500 rounded-full"></span>
+                <span className="text-gray-500">Under Contract</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+                <span className="text-gray-500">Active</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Property Detail Modal */}
+      {selectedProperty && (
+        <PropertyDetailModal
+          property={selectedProperty}
+          subjectProperty={subjectProperty}
+          onClose={() => setSelectedProperty(null)}
+        />
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## Scatter Chart Component (Recharts)
+
+```tsx
+import { 
+  ScatterChart, 
+  Scatter, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  ReferenceLine,
+  Cell
+} from 'recharts';
+
+interface PriceAcreScatterChartProps {
+  properties: PropertyWithAcreage[];
+  subjectProperty: { lotSizeAcres: number; listPrice?: number };
+  avgPricePerAcre: number;
+  onPropertyClick: (property: PropertyWithAcreage) => void;
+}
+
+export function PriceAcreScatterChart({
+  properties,
+  subjectProperty,
+  avgPricePerAcre,
+  onPropertyClick,
+}: PriceAcreScatterChartProps) {
+  
+  // Prepare data for chart
+  const chartData = properties.map(p => ({
+    ...p,
+    x: p.lotSizeAcres,
+    y: p.soldPrice || p.listPrice,
+    name: p.address,
+  }));
+  
+  // Subject property data point
+  const subjectData = subjectProperty.lotSizeAcres > 0 ? [{
+    x: subjectProperty.lotSizeAcres,
+    y: subjectProperty.listPrice || avgPricePerAcre * subjectProperty.lotSizeAcres,
+    name: 'Subject Property',
+    isSubject: true,
+  }] : [];
+  
+  // Get color by status
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Closed': return '#EF4444';      // Red
+      case 'Under Contract': return '#F59E0B'; // Yellow/Orange
+      case 'Active': return '#22C55E';      // Green
+      default: return '#6B7280';            // Gray
+    }
+  };
+  
+  // Format Y axis (price)
+  const formatYAxis = (value: number) => {
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+    return `$${value}`;
+  };
+  
+  // Custom tooltip
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+          <p className="font-semibold text-gray-900 dark:text-gray-100">{data.name}</p>
+          {!data.isSubject && (
+            <>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Price: <span className="font-medium">${(data.y).toLocaleString()}</span>
+              </p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Acres: <span className="font-medium">{data.x.toFixed(2)}</span>
+              </p>
+              <p className="text-sm text-[#EF4923]">
+                ${Math.round(data.y / data.x).toLocaleString()} / acre
+              </p>
+            </>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+  
+  // Calculate trendline (average price per acre line)
+  const minAcres = Math.min(...chartData.map(d => d.x), subjectProperty.lotSizeAcres || Infinity) * 0.9;
+  const maxAcres = Math.max(...chartData.map(d => d.x), subjectProperty.lotSizeAcres || 0) * 1.1;
+  
+  const trendlineData = [
+    { x: minAcres, y: avgPricePerAcre * minAcres },
+    { x: maxAcres, y: avgPricePerAcre * maxAcres },
+  ];
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+        
+        <XAxis 
+          type="number" 
+          dataKey="x" 
+          name="Acres"
+          domain={[minAcres, maxAcres]}
+          tickFormatter={(v) => v.toFixed(2)}
+          label={{ value: 'Acres', position: 'bottom', offset: 0 }}
+          tick={{ fontSize: 12 }}
+        />
+        
+        <YAxis 
+          type="number" 
+          dataKey="y" 
+          name="Price"
+          tickFormatter={formatYAxis}
+          tick={{ fontSize: 12 }}
+          width={70}
+        />
+        
+        <Tooltip content={<CustomTooltip />} />
+        
+        {/* Trendline (average price/acre) */}
+        <Scatter 
+          data={trendlineData} 
+          line={{ stroke: '#9CA3AF', strokeWidth: 1, strokeDasharray: '5 5' }}
+          shape={() => null}
+        />
+        
+        {/* Property points */}
+        <Scatter
+          data={chartData}
+          onClick={(data) => onPropertyClick(data)}
+          cursor="pointer"
+        >
+          {chartData.map((entry, index) => (
+            <Cell 
+              key={`cell-${index}`} 
+              fill={getStatusColor(entry.status)}
+              stroke="#fff"
+              strokeWidth={2}
+              r={8}
+            />
+          ))}
+        </Scatter>
+        
+        {/* Subject Property point */}
+        {subjectData.length > 0 && (
+          <Scatter
+            data={subjectData}
+            shape="diamond"
+            fill="#3B82F6"
+            stroke="#fff"
+            strokeWidth={2}
+          >
+            <Cell r={10} />
+          </Scatter>
+        )}
+      </ScatterChart>
+    </ResponsiveContainer>
+  );
+}
+```
+
+---
+
+## Property Sidebar Component
+
+Reuse the pattern from TIME TO SELL, but show price/acre instead of price:
+
+```tsx
+interface PropertySidebarProps {
+  groupedProperties: {
+    closed: PropertyWithAcreage[];
+    underContract: PropertyWithAcreage[];
+    active: PropertyWithAcreage[];
+  };
+  selectedProperty: PropertyWithAcreage | null;
+  onSelectProperty: (property: PropertyWithAcreage) => void;
+  priceLabel?: string;
+}
+
+export function PropertySidebar({
+  groupedProperties,
+  selectedProperty,
+  onSelectProperty,
+  priceLabel = '',
+}: PropertySidebarProps) {
+  const formatPrice = (price: number) => 
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(price);
+
+  const renderPropertyItem = (property: PropertyWithAcreage) => {
+    const isSelected = selectedProperty?.mlsNumber === property.mlsNumber;
+    
+    return (
+      <button
+        key={property.mlsNumber}
+        onClick={() => onSelectProperty(property)}
+        className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors text-left
+          ${isSelected 
+            ? 'bg-[#EF4923]/10 border-l-4 border-[#EF4923]' 
+            : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+      >
+        {/* Thumbnail */}
+        <div className="w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden bg-gray-200">
+          {property.photos?.[0] ? (
+            <img 
+              src={property.photos[0]} 
+              alt={property.address}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-400">
+              <Home className="w-5 h-5" />
+            </div>
+          )}
+        </div>
+        
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+            {property.address}
+          </p>
+          <p className="text-xs text-[#EF4923] font-semibold">
+            {formatPrice(property.pricePerAcre)} {priceLabel}
+          </p>
+        </div>
+      </button>
+    );
+  };
+
+  const renderGroup = (title: string, properties: PropertyWithAcreage[], color: string) => {
+    if (properties.length === 0) return null;
+    
+    return (
+      <div className="mb-4">
+        <div className="flex items-center gap-2 px-2 mb-2">
+          <span className={`w-2 h-2 rounded-full ${color}`}></span>
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            {properties.length} {title}
+          </span>
+        </div>
+        <div className="space-y-1">
+          {properties.map(renderPropertyItem)}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="p-3">
+      {renderGroup('Closed', groupedProperties.closed, 'bg-red-500')}
+      {renderGroup('Under Contract', groupedProperties.underContract, 'bg-yellow-500')}
+      {renderGroup('Active', groupedProperties.active, 'bg-green-500')}
+      
+      {groupedProperties.closed.length === 0 && 
+       groupedProperties.underContract.length === 0 && 
+       groupedProperties.active.length === 0 && (
+        <div className="text-center py-8 text-gray-400">
+          <p className="text-sm">No properties with acreage data</p>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## Property Detail Modal
+
+Reuse the existing `PropertyDetailModal` from TIME TO SELL. It should already include:
+- Photo gallery with navigation
+- Property address and MLS#
+- Property details grid (beds, baths, sqft, lot size, etc.)
+- Listing details (Original Price, List Price, Sold Price, etc.)
+- Property description
+- Map with Mapbox
+
+**Additional fields for Price/Acre modal:**
+
+```tsx
+{/* Add to the modal's listing details section */}
+<div className="grid grid-cols-2 gap-2 text-sm">
+  <div className="text-gray-500">Lot Size</div>
+  <div className="font-medium">{property.lotSize?.toLocaleString()} sq ft</div>
+  
+  <div className="text-gray-500">Acres</div>
+  <div className="font-medium">{(property.lotSize / 43560).toFixed(2)}</div>
+  
+  <div className="text-gray-500">Price / Acre</div>
+  <div className="font-medium text-[#EF4923]">
+    {formatPrice(property.pricePerAcre)}
+  </div>
+</div>
+```
+
+---
+
+## Status Color Mapping
+
+Consistent across sidebar, chart, and legend:
+
+```typescript
+const STATUS_COLORS = {
+  'Closed': {
+    bg: 'bg-red-500',
+    hex: '#EF4444',
+    label: 'Closed'
+  },
+  'Under Contract': {
+    bg: 'bg-yellow-500', 
+    hex: '#F59E0B',
+    label: 'Under Contract'
+  },
+  'Active': {
+    bg: 'bg-green-500',
+    hex: '#22C55E', 
+    label: 'Active'
+  }
+};
+
+const SUBJECT_COLOR = {
+  bg: 'bg-blue-500',
+  hex: '#3B82F6',
+  label: 'Subject Property'
+};
+```
+
+---
+
+## Mobile Responsive Layout
+
+```tsx
+{/* Mobile: Stack vertically, hide sidebar behind drawer */}
+<div className="flex-1 min-h-0 flex flex-col lg:flex-row">
+  
+  {/* Mobile: Drawer trigger */}
+  <div className="lg:hidden p-2 border-b border-gray-200 dark:border-gray-700">
+    <button 
+      onClick={() => setShowSidebar(true)}
+      className="flex items-center gap-2 text-sm text-gray-600"
+    >
+      <List className="w-4 h-4" />
+      View Properties ({propertiesWithAcreage.length})
+    </button>
+  </div>
+  
+  {/* Sidebar - Hidden on mobile, shown in drawer */}
+  <div className={`
+    ${showSidebar ? 'fixed inset-0 z-50 lg:relative lg:inset-auto' : 'hidden lg:block'}
+    w-full lg:w-64 xl:w-72 flex-shrink-0
+  `}>
+    {/* Mobile backdrop */}
+    <div 
+      className="absolute inset-0 bg-black/50 lg:hidden"
+      onClick={() => setShowSidebar(false)}
+    />
+    
+    {/* Sidebar content */}
+    <div className="relative h-full w-72 lg:w-full bg-white dark:bg-gray-800 
+                    border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
+      {/* Mobile close button */}
+      <div className="lg:hidden flex items-center justify-between p-3 border-b">
+        <span className="font-medium">Properties</span>
+        <button onClick={() => setShowSidebar(false)}>
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+      
+      <PropertySidebar {...sidebarProps} />
+    </div>
+  </div>
+  
+  {/* Main chart area */}
+  <div className="flex-1 min-w-0 p-4 lg:p-6 flex flex-col">
+    {/* ... chart content ... */}
+  </div>
+</div>
+```
+
+---
+
+## Verification Checklist
+
+### Data
+- [ ] Properties filtered to only those with lotSize > 0
+- [ ] Acres calculated correctly (lotSize / 43560)
+- [ ] Price per acre calculated (price / acres)
+- [ ] Average price per acre from SOLD properties only
+
+### Left Sidebar
+- [ ] Properties grouped by status (Closed, Under Contract, Active)
+- [ ] Each item shows: thumbnail, address, price/acre
+- [ ] Clicking item opens modal
+- [ ] Clicking item highlights in sidebar
+- [ ] Scrollable if many properties
+
+### Scatter Chart
+- [ ] X-axis shows Acres
+- [ ] Y-axis shows Price
+- [ ] Points colored by status (red=closed, yellow=UC, green=active)
+- [ ] Subject property shown as blue diamond
+- [ ] Trendline shows average price/acre slope
+- [ ] Clicking points opens modal
+- [ ] Tooltip shows property details on hover
+
+### Legend
+- [ ] Checkbox for Subject Property visibility
+- [ ] Checkbox for Trendline visibility
+- [ ] Color key for statuses
+
+### Modal
+- [ ] Opens when clicking sidebar item
+- [ ] Opens when clicking chart point
+- [ ] Shows full property details
+- [ ] Shows lot size in sq ft and acres
+- [ ] Shows price per acre
+- [ ] Photo gallery works
+- [ ] Map shows property location
+
+### Mobile
+- [ ] Sidebar collapses to drawer on mobile
+- [ ] Chart is responsive
+- [ ] Touch targets 44px minimum
+- [ ] Modal is full-screen on mobile
+
+---
+
+## Dependencies
+
+Ensure Recharts is installed:
+
+```bash
+npm install recharts
+```
+
+Import in component:
+
+```tsx
+import { 
+  ScatterChart, 
+  Scatter, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  Cell 
+} from 'recharts';
+```

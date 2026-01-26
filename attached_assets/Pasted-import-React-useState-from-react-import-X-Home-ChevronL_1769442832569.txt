@@ -1,0 +1,329 @@
+import React, { useState } from 'react';
+import { X, Home, ChevronLeft, ChevronRight, MapPin, Calendar, Clock, TrendingUp } from 'lucide-react';
+
+export default function AveragePriceAcreVisual() {
+  const [selectedProperty, setSelectedProperty] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [currentPhoto, setCurrentPhoto] = useState(0);
+
+  const formatPrice = (p) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(p);
+
+  // Sample data
+  const properties = {
+    closed: [
+      { id: 1, address: '2502 Spring Creek Drive', pricePerAcre: 5220522, price: 1160000, acres: 0.22, status: 'Closed', beds: 3, baths: 2, sqft: 2042, dom: 119, soldDate: '10/31/2025', photo: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=200' },
+      { id: 2, address: '2112 Matterhorn Lane', pricePerAcre: 6203532, price: 1595000, acres: 0.26, status: 'Closed', beds: 4, baths: 4, sqft: 3200, dom: 6, soldDate: '01/16/2026', photo: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=200' },
+      { id: 3, address: '2304 Fortune Drive', pricePerAcre: 5670816, price: 1450000, acres: 0.26, status: 'Closed', beds: 4, baths: 3, sqft: 2800, dom: 45, soldDate: '12/01/2025', photo: 'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=200' },
+      { id: 4, address: '2700 Rockingham Drive', pricePerAcre: 5022056, price: 1295000, acres: 0.26, status: 'Closed', beds: 3, baths: 2, sqft: 2100, dom: 30, soldDate: '11/15/2025', photo: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=200' },
+      { id: 5, address: '2601 Clear Cove', pricePerAcre: 2594899, price: 895000, acres: 0.35, status: 'Closed', beds: 3, baths: 2, sqft: 1800, dom: 60, soldDate: '10/01/2025', photo: 'https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=200' },
+      { id: 6, address: '2615 Barton Hills Drive', pricePerAcre: 5031546, price: 1595000, acres: 0.32, status: 'Closed', beds: 4, baths: 4, sqft: 1988, dom: 6, soldDate: '01/16/2026', photo: 'https://images.unsplash.com/photo-1600573472591-ee6b68d14c68?w=200' },
+    ],
+    underContract: [
+      { id: 7, address: '2400 Rockingham Circle', pricePerAcre: 3593466, price: 1150000, acres: 0.32, status: 'Under Contract', beds: 4, baths: 3, sqft: 2500, dom: 15, photo: 'https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=200' },
+    ],
+    active: [
+      { id: 8, address: '2505 Barton Hills Drive', pricePerAcre: 4134965, price: 1295000, acres: 0.31, status: 'Active', beds: 3, baths: 2, sqft: 2200, dom: 5, photo: 'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=200' },
+      { id: 9, address: '2713 Tether Trail', pricePerAcre: 6676575, price: 1750000, acres: 0.26, status: 'Active', beds: 5, baths: 4, sqft: 3500, dom: 10, photo: 'https://images.unsplash.com/photo-1600210492493-0946911123ea?w=200' },
+      { id: 10, address: '2401 Homedale Circle', pricePerAcre: 3307753, price: 1050000, acres: 0.32, status: 'Active', beds: 3, baths: 2, sqft: 1900, dom: 20, photo: 'https://images.unsplash.com/photo-1600607687644-c7171b42498f?w=200' },
+      { id: 11, address: '2318 Woodward Street', pricePerAcre: 4250000, price: 1100000, acres: 0.26, status: 'Active', beds: 3, baths: 2, sqft: 2000, dom: 8, photo: 'https://images.unsplash.com/photo-1600573472591-ee6b68d14c68?w=200' },
+    ],
+  };
+
+  const avgPricePerAcre = 4957228;
+
+  // Scatter plot data points (simplified SVG)
+  const scatterPoints = [
+    { x: 80, y: 50, color: '#22C55E', acres: 0.22, price: 1595000 },   // Green - Active
+    { x: 120, y: 180, color: '#EF4444', acres: 0.24, price: 1150000 }, // Red - Closed
+    { x: 150, y: 220, color: '#EF4444', acres: 0.25, price: 1050000 }, // Red - Closed
+    { x: 200, y: 160, color: '#F59E0B', acres: 0.27, price: 1100000 }, // Yellow - UC
+    { x: 280, y: 100, color: '#EF4444', acres: 0.30, price: 1450000 }, // Red - Closed
+    { x: 320, y: 80, color: '#EF4444', acres: 0.31, price: 1595000 },  // Red - Closed
+    { x: 350, y: 120, color: '#22C55E', acres: 0.32, price: 1295000 }, // Green - Active
+    { x: 400, y: 90, color: '#22C55E', acres: 0.34, price: 1450000 },  // Green - Active
+    { x: 480, y: 60, color: '#22C55E', acres: 0.38, price: 1750000 },  // Green - Active
+    { x: 500, y: 280, color: '#EF4444', acres: 0.39, price: 895000 },  // Red - Closed
+  ];
+
+  const handlePropertyClick = (property) => {
+    setSelectedProperty(property);
+    setShowModal(true);
+    setCurrentPhoto(0);
+  };
+
+  const PropertyItem = ({ property, isSelected }) => (
+    <button
+      onClick={() => handlePropertyClick(property)}
+      className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors text-left
+        ${isSelected ? 'bg-orange-100 border-l-4 border-orange-500' : 'hover:bg-gray-100'}`}
+    >
+      <div className="w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden bg-gray-200">
+        <img src={property.photo} alt="" className="w-full h-full object-cover" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-900 truncate">{property.address}</p>
+        <p className="text-xs text-orange-500 font-semibold">{formatPrice(property.pricePerAcre)} / acre</p>
+      </div>
+    </button>
+  );
+
+  const StatusGroup = ({ title, items, color, count }) => (
+    items.length > 0 && (
+      <div className="mb-4">
+        <div className="flex items-center gap-2 px-2 mb-2">
+          <span className={`w-2 h-2 rounded-full ${color}`}></span>
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            {count} {title}
+          </span>
+        </div>
+        <div className="space-y-1">
+          {items.map(p => (
+            <PropertyItem 
+              key={p.id} 
+              property={p} 
+              isSelected={selectedProperty?.id === p.id}
+            />
+          ))}
+        </div>
+      </div>
+    )
+  );
+
+  return (
+    <div className="h-screen bg-gray-900 flex flex-col">
+      {/* Browser Chrome */}
+      <div className="bg-gray-800 px-4 py-2 flex items-center gap-2 border-b border-gray-700">
+        <div className="flex gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-red-500"></div>
+          <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+          <div className="w-3 h-3 rounded-full bg-green-500"></div>
+        </div>
+        <div className="flex-1 mx-4">
+          <div className="bg-gray-700 rounded-md px-3 py-1 text-gray-400 text-xs">
+            mission-control.spyglassrealty.com/presentation/cma/10
+          </div>
+        </div>
+      </div>
+
+      {/* Slide Container */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex-shrink-0 bg-gray-900 text-white py-2 px-4 flex justify-between items-center">
+          <span className="text-sm font-medium tracking-wide">AVERAGE PRICE/ACRE</span>
+          <span className="text-sm text-gray-400">10 / 33</span>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 flex bg-gray-50 overflow-hidden">
+          {/* Left Sidebar */}
+          <div className="w-64 flex-shrink-0 bg-white border-r border-gray-200 overflow-y-auto">
+            <div className="p-3">
+              <StatusGroup title="Closed" items={properties.closed} color="bg-red-500" count={6} />
+              <StatusGroup title="Under Contract" items={properties.underContract} color="bg-yellow-500" count={1} />
+              <StatusGroup title="Active" items={properties.active} color="bg-green-500" count={4} />
+            </div>
+          </div>
+
+          {/* Main Chart Area */}
+          <div className="flex-1 p-6 flex flex-col min-w-0">
+            {/* Header */}
+            <div className="mb-4">
+              <h2 className="text-4xl font-bold text-orange-500">
+                {formatPrice(avgPricePerAcre)} <span className="text-xl text-gray-500">/ ACRE</span>
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Comparable land sold for an average of <span className="text-orange-500 font-medium">{formatPrice(avgPricePerAcre)}</span> / acre.
+              </p>
+            </div>
+
+            {/* Scatter Chart */}
+            <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 p-4 relative">
+              <svg className="w-full h-full" viewBox="0 0 600 350">
+                {/* Grid lines */}
+                <defs>
+                  <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+                    <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#E5E7EB" strokeWidth="0.5"/>
+                  </pattern>
+                </defs>
+                <rect width="520" height="300" x="60" y="20" fill="url(#grid)" />
+                
+                {/* Y-axis labels */}
+                <text x="50" y="35" textAnchor="end" className="text-xs fill-gray-500">$1.75M</text>
+                <text x="50" y="110" textAnchor="end" className="text-xs fill-gray-500">$1.46M</text>
+                <text x="50" y="185" textAnchor="end" className="text-xs fill-gray-500">$1.17M</text>
+                <text x="50" y="260" textAnchor="end" className="text-xs fill-gray-500">$875K</text>
+                
+                {/* X-axis labels */}
+                <text x="100" y="335" textAnchor="middle" className="text-xs fill-gray-500">0.22</text>
+                <text x="220" y="335" textAnchor="middle" className="text-xs fill-gray-500">0.27</text>
+                <text x="380" y="335" textAnchor="middle" className="text-xs fill-gray-500">0.32</text>
+                <text x="520" y="335" textAnchor="middle" className="text-xs fill-gray-500">0.38</text>
+                <text x="300" y="348" textAnchor="middle" className="text-xs fill-gray-400">Acres</text>
+                
+                {/* Trendline */}
+                <line x1="70" y1="250" x2="550" y2="80" stroke="#9CA3AF" strokeWidth="1.5" strokeDasharray="5,5" />
+                
+                {/* Data points */}
+                {scatterPoints.map((point, idx) => (
+                  <g key={idx} className="cursor-pointer hover:opacity-80">
+                    <circle 
+                      cx={point.x + 60} 
+                      cy={point.y + 20} 
+                      r="10" 
+                      fill={point.color}
+                      stroke="white"
+                      strokeWidth="2"
+                    />
+                  </g>
+                ))}
+                
+                {/* Subject Property (diamond) */}
+                <g className="cursor-pointer">
+                  <polygon 
+                    points="370,145 380,155 370,165 360,155" 
+                    fill="#3B82F6"
+                    stroke="white"
+                    strokeWidth="2"
+                  />
+                </g>
+              </svg>
+            </div>
+
+            {/* Legend */}
+            <div className="mt-3 flex flex-wrap items-center gap-4 text-xs">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" defaultChecked className="rounded border-gray-300" />
+                <span className="w-3 h-3 bg-blue-500 rounded-sm rotate-45"></span>
+                <span className="text-gray-600">Subject Property</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" defaultChecked className="rounded border-gray-300" />
+                <span className="w-6 h-0.5 bg-gray-400 border-t border-dashed border-gray-400"></span>
+                <span className="text-gray-600">Trendline (avg price/acre of SOLD)</span>
+              </label>
+              <div className="flex items-center gap-4 ml-auto">
+                <div className="flex items-center gap-1">
+                  <span className="w-3 h-3 bg-red-500 rounded-full"></span>
+                  <span className="text-gray-500">Closed</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-3 h-3 bg-yellow-500 rounded-full"></span>
+                  <span className="text-gray-500">Under Contract</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+                  <span className="text-gray-500">Active</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Property Detail Modal */}
+      {showModal && selectedProperty && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <div>
+                <h3 className="font-bold text-gray-900">{selectedProperty.address}</h3>
+                <p className="text-sm text-gray-500">Austin, TX 78704</p>
+              </div>
+              <button 
+                onClick={() => setShowModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Photo */}
+            <div className="relative h-48 bg-gray-200">
+              <img 
+                src={selectedProperty.photo} 
+                alt={selectedProperty.address}
+                className="w-full h-full object-cover"
+              />
+              <div className={`absolute top-3 right-3 px-2 py-1 rounded text-xs font-medium text-white
+                ${selectedProperty.status === 'Closed' ? 'bg-red-500' : 
+                  selectedProperty.status === 'Active' ? 'bg-green-500' : 'bg-yellow-500'}`}>
+                {selectedProperty.status}
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 space-y-4 overflow-y-auto max-h-[40vh]">
+              {/* Price */}
+              <div className="flex items-baseline justify-between">
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">{formatPrice(selectedProperty.price)}</p>
+                  <p className="text-sm text-gray-500">{formatPrice(Math.round(selectedProperty.price / selectedProperty.sqft))}/sqft</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-orange-500">{formatPrice(selectedProperty.pricePerAcre)}</p>
+                  <p className="text-xs text-gray-500">per acre</p>
+                </div>
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-4 gap-3">
+                <div className="text-center p-2 bg-gray-50 rounded-lg">
+                  <p className="text-lg font-bold text-gray-900">{selectedProperty.beds}</p>
+                  <p className="text-xs text-gray-500">Beds</p>
+                </div>
+                <div className="text-center p-2 bg-gray-50 rounded-lg">
+                  <p className="text-lg font-bold text-gray-900">{selectedProperty.baths}</p>
+                  <p className="text-xs text-gray-500">Baths</p>
+                </div>
+                <div className="text-center p-2 bg-gray-50 rounded-lg">
+                  <p className="text-lg font-bold text-gray-900">{selectedProperty.sqft.toLocaleString()}</p>
+                  <p className="text-xs text-gray-500">Sq Ft</p>
+                </div>
+                <div className="text-center p-2 bg-gray-50 rounded-lg">
+                  <p className="text-lg font-bold text-gray-900">{selectedProperty.acres}</p>
+                  <p className="text-xs text-gray-500">Acres</p>
+                </div>
+              </div>
+
+              {/* Listing Details */}
+              <div className="space-y-2">
+                <h4 className="font-semibold text-gray-900">Listing Details</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">List Price</span>
+                    <span className="font-medium">{formatPrice(selectedProperty.price)}</span>
+                  </div>
+                  {selectedProperty.status === 'Closed' && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Sold Price</span>
+                        <span className="font-medium">{formatPrice(selectedProperty.price)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Sold Date</span>
+                        <span className="font-medium">{selectedProperty.soldDate}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Days on Market</span>
+                    <span className="font-medium">{selectedProperty.dom}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Lot Size (Acres)</span>
+                    <span className="font-medium">{selectedProperty.acres}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Price / Acre</span>
+                    <span className="font-medium text-orange-500">{formatPrice(selectedProperty.pricePerAcre)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
