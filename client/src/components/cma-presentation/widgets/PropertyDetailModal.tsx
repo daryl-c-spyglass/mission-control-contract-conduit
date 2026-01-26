@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, ChevronLeft, ChevronRight, Bed, Bath, Square, Calendar, Car, Maximize, Camera, Navigation } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Bed, Bath, Square, Calendar, Car, Maximize, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { CmaProperty } from '../types';
 import mapboxgl from 'mapbox-gl';
@@ -35,6 +35,19 @@ const getStatusLabel = (status: string, isSubject?: boolean) => {
   if (isSubject) return 'Subject';
   return status || 'Unknown';
 };
+
+function formatCoordinatesDMS(lat: number, lng: number): string {
+  const formatDMS = (decimal: number, pos: string, neg: string) => {
+    const dir = decimal >= 0 ? pos : neg;
+    const abs = Math.abs(decimal);
+    const deg = Math.floor(abs);
+    const minFloat = (abs - deg) * 60;
+    const min = Math.floor(minFloat);
+    const sec = ((minFloat - min) * 60).toFixed(1);
+    return `${deg}°${min.toString().padStart(2, '0')}'${sec}"${dir}`;
+  };
+  return `${formatDMS(lat, 'N', 'S')} ${formatDMS(lng, 'E', 'W')}`;
+}
 
 export function PropertyDetailModal({ property, subjectProperty, onClose }: PropertyDetailModalProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
@@ -75,6 +88,7 @@ export function PropertyDetailModal({ property, subjectProperty, onClose }: Prop
       .addTo(map.current);
     
     map.current.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+    map.current.addControl(new mapboxgl.FullscreenControl(), 'bottom-right');
     
     return () => {
       map.current?.remove();
@@ -119,6 +133,7 @@ export function PropertyDetailModal({ property, subjectProperty, onClose }: Prop
         aria-labelledby="modal-title"
         data-testid="property-detail-modal"
       >
+        {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0">
           <Button
             variant="ghost"
@@ -140,30 +155,23 @@ export function PropertyDetailModal({ property, subjectProperty, onClose }: Prop
           </div>
         </div>
         
+        {/* Main Content - 2 Column Layout */}
         <div className="flex-1 overflow-hidden">
-          <div className="grid grid-cols-12 h-full">
+          <div className="grid grid-cols-1 lg:grid-cols-5 h-full">
             
-            {/* LEFT COLUMN - Map + Stats + Description */}
-            <div className="col-span-12 lg:col-span-4 border-r overflow-y-auto">
+            {/* LEFT COLUMN (40%) - Map, Stats, Description, Listing Details, MLS */}
+            <div className="col-span-1 lg:col-span-2 border-r overflow-y-auto">
               
               {/* Mapbox Map */}
-              <div className="relative h-48 border-b">
+              <div className="relative h-48 lg:h-56 border-b">
                 {hasCoordinates ? (
                   <>
                     <div ref={mapContainer} className="w-full h-full" />
-                    <div className="absolute top-2 left-2 bg-background/95 backdrop-blur rounded shadow-md p-2 text-xs z-10" data-testid="map-coordinates-overlay">
+                    {/* Coordinates Overlay */}
+                    <div className="absolute top-2 left-2 bg-background/95 backdrop-blur-sm rounded-lg shadow-md p-2 text-xs z-10" data-testid="map-coordinates-overlay">
                       <div className="font-mono text-muted-foreground" data-testid="text-coordinates">
-                        {property.latitude!.toFixed(4)}°N {Math.abs(property.longitude!).toFixed(4)}°W
+                        {formatCoordinatesDMS(property.latitude!, property.longitude!)}
                       </div>
-                      <a 
-                        href={`https://www.google.com/maps/dir/?api=1&destination=${property.latitude},${property.longitude}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline flex items-center gap-1 mt-1"
-                        data-testid="link-directions"
-                      >
-                        <Navigation className="w-3 h-3" /> Directions
-                      </a>
                     </div>
                   </>
                 ) : (
@@ -237,7 +245,7 @@ export function PropertyDetailModal({ property, subjectProperty, onClose }: Prop
               
               {/* Property Description */}
               {property.description && (
-                <div className="p-4" data-testid="description-section">
+                <div className="p-4 border-b" data-testid="description-section">
                   <h3 className="text-sm font-semibold mb-2">
                     Property Description
                   </h3>
@@ -246,106 +254,13 @@ export function PropertyDetailModal({ property, subjectProperty, onClose }: Prop
                   </p>
                 </div>
               )}
-            </div>
-            
-            {/* MIDDLE COLUMN - Photo Gallery */}
-            <div className="col-span-12 lg:col-span-5 bg-muted/50 relative flex items-center justify-center">
-              {photos.length > 0 ? (
-                <>
-                  <img 
-                    src={photos[currentPhotoIndex]} 
-                    alt={`${property.address} - Photo ${currentPhotoIndex + 1}`}
-                    className="w-full h-full object-contain"
-                    data-testid="modal-main-photo"
-                  />
-                  
-                  {photos.length > 1 && (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handlePrevPhoto}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full"
-                        aria-label="Previous photo"
-                        data-testid="button-prev-photo"
-                      >
-                        <ChevronLeft className="w-6 h-6" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleNextPhoto}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full"
-                        aria-label="Next photo"
-                        data-testid="button-next-photo"
-                      >
-                        <ChevronRight className="w-6 h-6" />
-                      </Button>
-                    </>
-                  )}
-                  
-                  <div className="absolute bottom-3 left-3 flex items-center gap-1 px-2 py-1 bg-black/60 text-white text-sm rounded" data-testid="photo-count-badge">
-                    <Camera className="w-4 h-4" />
-                    <span data-testid="text-photo-count">{photos.length}</span>
-                  </div>
-                  
-                  <div className="absolute bottom-3 right-3 px-2 py-1 bg-black/60 text-white text-sm rounded" data-testid="photo-counter">
-                    <span data-testid="text-photo-current">{currentPhotoIndex + 1}</span> / <span data-testid="text-photo-total">{photos.length}</span>
-                  </div>
-                </>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-muted-foreground" data-testid="no-photos-placeholder">
-                  No photos available
-                </div>
-              )}
-            </div>
-            
-            {/* RIGHT COLUMN - Pricing & Details */}
-            <div className="col-span-12 lg:col-span-3 bg-muted/30 overflow-y-auto">
               
-              {/* Status + Price Header */}
-              <div className="p-4 border-b bg-background" data-testid="price-section">
-                <div className="flex items-center gap-2 mb-2">
-                  <span 
-                    className={`px-2 py-1 ${getStatusColor(property.status, property.isSubject)} text-white text-xs font-semibold rounded`}
-                    data-testid="status-badge"
-                  >
-                    {getStatusLabel(property.status, property.isSubject)}
-                  </span>
-                  <span className="text-sm text-muted-foreground" data-testid="days-on-market">
-                    {property.daysOnMarket} DAYS
-                  </span>
-                </div>
-                <div className="text-2xl font-bold" data-testid="text-price">
-                  {formatCurrency(property.soldPrice || property.price)}
-                </div>
-                <div className="text-sm text-muted-foreground" data-testid="text-price-per-sqft">
-                  ${pricePerSqft}/sqft
-                </div>
-                <div className="text-sm text-muted-foreground mt-2" data-testid="text-property-summary">
-                  {property.beds} beds · {property.baths} baths · {property.sqft?.toLocaleString()} sqft
-                </div>
-                {property.soldDate && (
-                  <div className="text-sm text-muted-foreground mt-1" data-testid="row-header-sold-date">
-                    Sold: <span data-testid="text-header-sold-date">{new Date(property.soldDate).toLocaleDateString()}</span>
-                  </div>
-                )}
-              </div>
-              
-              {/* Price History */}
-              <div className="p-4 border-b bg-background" data-testid="price-history-section">
+              {/* Listing Details */}
+              <div className="p-4 border-b" data-testid="listing-details-section">
                 <h3 className="text-sm font-semibold mb-3">
-                  Price History
+                  Listing Details
                 </h3>
                 <div className="space-y-2">
-                  {property.originalPrice && property.originalPrice !== property.listPrice && (
-                    <div className="flex justify-between text-sm" data-testid="row-original-price">
-                      <span className="text-muted-foreground">Orig. Price</span>
-                      <span className="font-medium" data-testid="text-original-price">
-                        {formatCurrency(property.originalPrice)}
-                      </span>
-                    </div>
-                  )}
                   {property.listPrice && (
                     <div className="flex justify-between text-sm" data-testid="row-list-price">
                       <span className="text-muted-foreground">List Price</span>
@@ -362,34 +277,19 @@ export function PropertyDetailModal({ property, subjectProperty, onClose }: Prop
                       </span>
                     </div>
                   )}
-                </div>
-              </div>
-              
-              {/* Listing Details */}
-              <div className="p-4 border-b bg-background" data-testid="listing-details-section">
-                <h3 className="text-sm font-semibold mb-3">
-                  Listing Details
-                </h3>
-                <div className="space-y-2">
                   <div className="flex justify-between text-sm" data-testid="row-price-sqft">
                     <span className="text-muted-foreground">Price/Sq Ft</span>
-                    <span className="font-medium" data-testid="text-details-price-sqft">${pricePerSqft}</span>
+                    <span className="font-medium" data-testid="text-details-price-sqft">
+                      {pricePerSqft > 0 ? `$${pricePerSqft}` : 'N/A'}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm" data-testid="row-dom">
                     <span className="text-muted-foreground">Days on Market</span>
-                    <span className="font-medium" data-testid="text-details-dom">{property.daysOnMarket}</span>
+                    <span className="font-medium" data-testid="text-details-dom">{property.daysOnMarket ?? 0}</span>
                   </div>
-                  {property.listDate && (
-                    <div className="flex justify-between text-sm" data-testid="row-list-date">
-                      <span className="text-muted-foreground">Listed</span>
-                      <span className="font-medium" data-testid="text-list-date">
-                        {new Date(property.listDate).toLocaleDateString()}
-                      </span>
-                    </div>
-                  )}
                   {property.soldDate && (
                     <div className="flex justify-between text-sm" data-testid="row-sold-date">
-                      <span className="text-muted-foreground">Sold</span>
+                      <span className="text-muted-foreground">Sold Date</span>
                       <span className="font-medium" data-testid="text-sold-date">
                         {new Date(property.soldDate).toLocaleDateString()}
                       </span>
@@ -398,16 +298,134 @@ export function PropertyDetailModal({ property, subjectProperty, onClose }: Prop
                 </div>
               </div>
               
-              {/* MLS Info */}
-              <div className="p-4 bg-background" data-testid="mls-info-section">
-                <div className="text-sm text-muted-foreground" data-testid="text-mls-number">
-                  MLS# {property.mlsNumber || property.id}
-                </div>
-                {property.city && property.zipCode && (
-                  <div className="text-sm text-muted-foreground mt-1" data-testid="text-mls-location">
-                    {property.city}, {property.state} {property.zipCode}
+            </div>
+            
+            {/* RIGHT COLUMN (60%) - Photo Gallery with Pricing Info */}
+            <div className="col-span-1 lg:col-span-3 flex flex-col">
+              
+              {/* Photo Gallery - Takes most of the space */}
+              <div className="flex-1 bg-muted/50 relative flex items-center justify-center min-h-[300px]">
+                {photos.length > 0 ? (
+                  <>
+                    <img 
+                      src={photos[currentPhotoIndex]} 
+                      alt={`${property.address} - Photo ${currentPhotoIndex + 1}`}
+                      className="w-full h-full object-contain"
+                      data-testid="modal-main-photo"
+                    />
+                    
+                    {photos.length > 1 && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handlePrevPhoto}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full min-w-[44px] min-h-[44px]"
+                          aria-label="Previous photo"
+                          data-testid="button-prev-photo"
+                        >
+                          <ChevronLeft className="w-6 h-6" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleNextPhoto}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full min-w-[44px] min-h-[44px]"
+                          aria-label="Next photo"
+                          data-testid="button-next-photo"
+                        >
+                          <ChevronRight className="w-6 h-6" />
+                        </Button>
+                      </>
+                    )}
+                    
+                    <div className="absolute bottom-3 left-3 flex items-center gap-1 px-2 py-1 bg-black/60 text-white text-sm rounded" data-testid="photo-count-badge">
+                      <Camera className="w-4 h-4" />
+                      <span data-testid="text-photo-count">{photos.length}</span>
+                    </div>
+                    
+                    <div className="absolute bottom-3 right-3 px-2 py-1 bg-black/60 text-white text-sm rounded" data-testid="photo-counter">
+                      <span data-testid="text-photo-current">{currentPhotoIndex + 1}</span> / <span data-testid="text-photo-total">{photos.length}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground" data-testid="no-photos-placeholder">
+                    No photos available
                   </div>
                 )}
+              </div>
+              
+              {/* Status + Price Info below photo */}
+              <div className="p-4 border-t bg-background" data-testid="price-section">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span 
+                      className={`px-2 py-1 ${getStatusColor(property.status, property.isSubject)} text-white text-xs font-semibold rounded`}
+                      data-testid="status-badge"
+                    >
+                      {getStatusLabel(property.status, property.isSubject)}
+                    </span>
+                    <span className="text-sm text-muted-foreground" data-testid="days-on-market">
+                      {property.daysOnMarket ?? 0} DAYS
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold" data-testid="text-price">
+                      {formatCurrency(property.soldPrice || property.price)}
+                    </div>
+                    <div className="text-sm text-muted-foreground" data-testid="text-price-per-sqft">
+                      {pricePerSqft > 0 ? `$${pricePerSqft}/sqft` : 'N/A'}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-sm text-muted-foreground mt-2" data-testid="text-property-summary">
+                  {property.beds} beds · {property.baths} baths · {property.sqft?.toLocaleString() ?? 'N/A'} sqft
+                </div>
+                {property.soldDate && (
+                  <div className="text-sm text-muted-foreground mt-1" data-testid="row-header-sold-date">
+                    Sold: <span data-testid="text-header-sold-date">{new Date(property.soldDate).toLocaleDateString()}</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Price History */}
+              <div className="p-4 border-t bg-background" data-testid="price-history-section">
+                <h3 className="text-sm font-semibold mb-3">
+                  Price History
+                </h3>
+                <div className="flex flex-wrap gap-x-6 gap-y-2">
+                  {property.originalPrice && property.originalPrice !== property.listPrice && (
+                    <div className="flex gap-2 text-sm" data-testid="row-original-price">
+                      <span className="text-muted-foreground">Orig. Price:</span>
+                      <span className="font-medium" data-testid="text-original-price">
+                        {formatCurrency(property.originalPrice)}
+                      </span>
+                    </div>
+                  )}
+                  {property.listPrice && (
+                    <div className="flex gap-2 text-sm" data-testid="row-list-price-history">
+                      <span className="text-muted-foreground">List Price:</span>
+                      <span className="font-medium" data-testid="text-list-price-history">
+                        {formatCurrency(property.listPrice)}
+                      </span>
+                    </div>
+                  )}
+                  {property.soldPrice && (
+                    <div className="flex gap-2 text-sm" data-testid="row-sold-price-history">
+                      <span className="text-muted-foreground">Sold Price:</span>
+                      <span className="font-medium text-[#EF4923]" data-testid="text-sold-price-history">
+                        {formatCurrency(property.soldPrice)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* MLS# at bottom */}
+              <div className="px-4 pb-4 bg-background" data-testid="mls-footer">
+                <div className="text-sm text-muted-foreground" data-testid="text-mls-number-footer">
+                  MLS# {property.mlsNumber || property.id}
+                </div>
               </div>
             </div>
           </div>

@@ -1,0 +1,742 @@
+# Replit Agent Task: Property Detail Modal - Final Layout with Mapbox
+
+## Overview
+Fix the property detail modal to:
+1. Use **Mapbox ONLY** (remove Google Maps completely)
+2. Move all details to the **LEFT column** (no content on lower right)
+3. Add **Property Description** from Repliers
+4. **Photo takes full right side** of the modal
+5. Avoid duplicate/redundant information
+
+---
+
+## CORRECT LAYOUT (2-Column)
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  ✕  321 Delayne DR , TX                                                          │
+├─────────────────────────────────────┬────────────────────────────────────────────┤
+│        LEFT COLUMN (40%)            │           RIGHT COLUMN (60%)               │
+│                                     │                                            │
+│  ┌───────────────────────────────┐  │  ┌──────────────────────────────────────┐  │
+│  │                               │  │  │                                      │  │
+│  │         MAPBOX MAP            │  │  │                                      │  │
+│  │           📍                  │  │  │                                      │  │
+│  │   30°08'55.7"N 97°56'32.7"W   │  │  │                                      │  │
+│  │   Directions ↗                │  │  │         PROPERTY PHOTO               │  │
+│  │                               │  │  │                                      │  │
+│  └───────────────────────────────┘  │  │           ←  [IMG]  →                │  │
+│                                     │  │                                      │  │
+│  ┌──────────┬──────────┐            │  │                                      │  │
+│  │ BEDROOMS │ BATHROOMS│            │  │         📷 40           1/40         │  │
+│  │    4     │    4     │            │  │                                      │  │
+│  ├──────────┼──────────┤            │  └──────────────────────────────────────┘  │
+│  │HOME SIZE │YEAR BUILT│            │                                            │
+│  │ 3,578    │   N/A    │            │  ┌──────────────────────────────────────┐  │
+│  ├──────────┼──────────┤            │  │ [Closed]  0 DAYS       $2,050,000    │  │
+│  │ GARAGES  │ LOT SIZE │            │  │                        $573/sqft     │  │
+│  │   N/A    │   N/A    │            │  │ 4 beds · 4 baths · 3,578 sqft        │  │
+│  └──────────┴──────────┘            │  │ Sold: 10/18/2025                     │  │
+│                                     │  └──────────────────────────────────────┘  │
+│  ┌───────────────────────────────┐  │                                            │
+│  │ Property Description          │  │  ┌──────────────────────────────────────┐  │
+│  │                               │  │  │ Price History                        │  │
+│  │ Stunning modern farmhouse in  │  │  │──────────────────────────────────────│  │
+│  │ the heart of Hill Country...  │  │  │ List Price              $2,099,900   │  │
+│  │                               │  │  │ Sold Price              $2,050,000   │  │
+│  └───────────────────────────────┘  │  └──────────────────────────────────────┘  │
+│                                     │                                            │
+│  ┌───────────────────────────────┐  │  ┌──────────────────────────────────────┐  │
+│  │ Listing Details               │  │  │ MLS# ACT3841116                      │  │
+│  │─────────────────────────────  │  │  └──────────────────────────────────────┘  │
+│  │ List Price        $2,099,900  │  │                                            │
+│  │ Sold Price        $2,050,000  │  │                                            │
+│  │ Price/Sq Ft            $573   │  │                                            │
+│  │ Days on Market            0   │  │                                            │
+│  │ Sold Date        10/18/2025   │  │                                            │
+│  │ MLS#             ACT3841116   │  │                                            │
+│  └───────────────────────────────┘  │                                            │
+└─────────────────────────────────────┴────────────────────────────────────────────┘
+```
+
+**WAIT - User wants simpler layout. Let me revise based on their screenshots:**
+
+---
+
+## REVISED LAYOUT (Based on User Screenshots)
+
+Looking at the screenshots more carefully:
+
+**Image 1 (Card Panel):** Shows the simplified property card with photo, basic stats, listing details
+**Image 2 (Full Modal):** Map on left, large photo on right, stats below map
+**Image 3 (Bottom of Modal):** Price History and MLS# at the bottom
+
+The user wants:
+- Map on LEFT (Mapbox only)
+- Stats grid below map (2x3 grid)
+- Property Description below stats
+- Listing Details below description (List Price, Sold Price, Price/Sq Ft, DOM, Sold Date)
+- MLS# at bottom
+- Large Photo on RIGHT (takes ~60% width)
+- Status badge + Price + beds/baths/sqft below photo
+
+---
+
+## FINAL CORRECT LAYOUT
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  ✕  321 Delayne DR , TX                                                          │
+├─────────────────────────────────────┬────────────────────────────────────────────┤
+│        LEFT COLUMN (40%)            │           RIGHT COLUMN (60%)               │
+│        (Scrollable)                 │                                            │
+│                                     │  ┌──────────────────────────────────────┐  │
+│  ┌───────────────────────────────┐  │  │                                      │  │
+│  │         MAPBOX MAP            │  │  │                                      │  │
+│  │           📍                  │  │  │                                      │  │
+│  │   30°08'55.7"N 97°56'32.7"W   │  │  │         PROPERTY PHOTO               │  │
+│  │   Directions ↗                │  │  │                                      │  │
+│  └───────────────────────────────┘  │  │           ←  [IMG]  →                │  │
+│                                     │  │                                      │  │
+│  ┌──────────┬──────────┐            │  │                                      │  │
+│  │ BEDROOMS │ BATHROOMS│            │  │         📷 40           1/40         │  │
+│  │    4     │    4     │            │  └──────────────────────────────────────┘  │
+│  ├──────────┼──────────┤            │                                            │
+│  │HOME SIZE │YEAR BUILT│            │  ┌──────────────────────────────────────┐  │
+│  │ 3,578    │   N/A    │            │  │ [Closed]  0 DAYS       $2,050,000    │  │
+│  ├──────────┼──────────┤            │  │                        $573/sqft     │  │
+│  │ GARAGES  │ LOT SIZE │            │  │ 4 beds · 4 baths · 3,578 sqft        │  │
+│  │   N/A    │   N/A    │            │  │ Sold: 10/18/2025                     │  │
+│  └──────────┴──────────┘            │  └──────────────────────────────────────┘  │
+│                                     │                                            │
+│  ┌───────────────────────────────┐  │  ┌──────────────────────────────────────┐  │
+│  │ Property Description          │  │  │ Price History                        │  │
+│  │─────────────────────────────  │  │  │──────────────────────────────────────│  │
+│  │ Stunning modern farmhouse...  │  │  │ List Price              $2,099,900   │  │
+│  │ (from Repliers remarks)       │  │  │ Sold Price              $2,050,000   │  │
+│  └───────────────────────────────┘  │  └──────────────────────────────────────┘  │
+│                                     │                                            │
+│  ┌───────────────────────────────┐  │  ┌──────────────────────────────────────┐  │
+│  │ Listing Details               │  │  │ MLS# ACT3841116                      │  │
+│  │─────────────────────────────  │  │  └──────────────────────────────────────┘  │
+│  │ Price/Sq Ft            $573   │  │                                            │
+│  │ Days on Market            0   │  │                                            │
+│  │ Sold Date        10/18/2025   │  │                                            │
+│  └───────────────────────────────┘  │                                            │
+│                                     │                                            │
+│  ┌───────────────────────────────┐  │                                            │
+│  │ MLS# ACT3841116               │  │                                            │
+│  └───────────────────────────────┘  │                                            │
+└─────────────────────────────────────┴────────────────────────────────────────────┘
+```
+
+---
+
+## REPLIERS API FIELD MAPPING (STRICT)
+
+### Endpoint
+```
+GET https://api.repliers.io/listings/{mlsNumber}
+```
+
+### Field Mapping Table
+
+| UI Field | Repliers Field | Notes |
+|----------|----------------|-------|
+| **Address** | `address.streetNumber` + `address.streetName` + `address.streetSuffix` | Concatenate |
+| **City** | `address.city` | |
+| **State** | `address.state` | |
+| **Zip** | `address.zip` | |
+| **Status** | Derived from `soldDate` + `soldPrice` | If both exist → "Closed" |
+| **Beds** | `details.numBedrooms` | |
+| **Baths** | `details.numBathrooms` | Decimal supported |
+| **Sq Ft** | `details.sqft` | String → parse to number |
+| **Lot Size** | `lot.squareFeet` | Preferred. Fallback: `lot.acres × 43560` |
+| **Garage** | `details.numGarageSpaces` | |
+| **Year Built** | `details.yearBuilt` | |
+| **Original Price** | `originalPrice` | Initial MLS list price |
+| **List Price** | `listPrice` | Most recent list price |
+| **Sold Price** | `soldPrice` (from `ClosePrice`) | Authoritative closed value |
+| **Sold Date** | `soldDate` (from `ClosedDate`) | ISO date |
+| **Days on Market** | `simpleDaysOnMarket` | **USE THIS ONLY** for display |
+| **Property Description** | `remarks` or `publicRemarks` | Full MLS description text |
+| **Coordinates** | `map.latitude`, `map.longitude` | For Mapbox marker |
+| **Photos** | `images[].url` | Sort by `sequence` |
+| **MLS#** | `mlsNumber` | |
+
+### Computed Fields (Client-Side)
+
+| UI Field | Formula | Source Fields |
+|----------|---------|---------------|
+| Price per Sq Ft | `soldPrice / sqft` (Closed) or `listPrice / sqft` (Active) | `soldPrice`, `listPrice`, `details.sqft` |
+| Sold % | `(soldPrice / originalPrice) × 100` | `soldPrice`, `originalPrice` |
+
+**Rules:**
+- If `sqft` is missing or 0 → show `N/A`
+- No silent fallbacks to `0`
+
+---
+
+## MAPBOX INTEGRATION (STRICT - NO GOOGLE MAPS)
+
+### Remove Google Maps Completely
+Delete any Google Maps imports, iframes, or API calls.
+
+### Install Mapbox GL JS
+```bash
+npm install mapbox-gl
+```
+
+### Add CSS (in main.tsx or App.tsx)
+```tsx
+import 'mapbox-gl/dist/mapbox-gl.css';
+```
+
+### Environment Variable
+Use existing Replit secret:
+```
+VITE_MAPBOX_ACCESS_TOKEN=pk.xxxxx
+```
+
+### Mapbox Component
+
+```tsx
+import { useEffect, useRef } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+interface MapboxMapProps {
+  coordinates: { lat: number; lng: number };
+  address: string;
+}
+
+export function MapboxMap({ coordinates, address }: MapboxMapProps) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  
+  useEffect(() => {
+    if (!mapContainer.current || map.current) return;
+    
+    // STRICT: Use Mapbox token from environment
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+    
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [coordinates.lng, coordinates.lat],
+      zoom: 14,
+      attributionControl: true,
+    });
+    
+    // Add marker with Spyglass orange color
+    new mapboxgl.Marker({ color: '#EF4923' })
+      .setLngLat([coordinates.lng, coordinates.lat])
+      .setPopup(new mapboxgl.Popup().setHTML(`<strong>${address}</strong>`))
+      .addTo(map.current);
+    
+    // Add navigation controls
+    map.current.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+    
+    // Add fullscreen control
+    map.current.addControl(new mapboxgl.FullscreenControl(), 'bottom-right');
+    
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, [coordinates, address]);
+  
+  return <div ref={mapContainer} className="w-full h-full" />;
+}
+```
+
+### Coordinates Overlay
+
+```tsx
+{/* Coordinates Overlay - positioned on map */}
+<div className="absolute top-2 left-2 bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-2 text-xs z-10 max-w-[200px]">
+  <div className="font-mono text-gray-700">
+    {formatCoordinates(coordinates.lat, coordinates.lng)}
+  </div>
+  <div className="text-gray-500 text-[10px] mt-0.5">
+    {getPlusCode(coordinates)} {/* Optional: Plus code like 43X5+G28 */}
+  </div>
+  <a 
+    href={`https://www.google.com/maps/dir/?api=1&destination=${coordinates.lat},${coordinates.lng}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="text-blue-600 hover:underline flex items-center gap-1 mt-1"
+  >
+    <Navigation className="w-3 h-3" /> Directions
+  </a>
+  <a 
+    href={`https://www.google.com/maps/@${coordinates.lat},${coordinates.lng},15z`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="text-blue-600 hover:underline text-[10px] mt-0.5 block"
+  >
+    View larger map
+  </a>
+</div>
+
+// Helper function
+function formatCoordinates(lat: number, lng: number): string {
+  const latDir = lat >= 0 ? 'N' : 'S';
+  const lngDir = lng >= 0 ? 'E' : 'W';
+  
+  const formatDMS = (decimal: number) => {
+    const abs = Math.abs(decimal);
+    const deg = Math.floor(abs);
+    const minFloat = (abs - deg) * 60;
+    const min = Math.floor(minFloat);
+    const sec = ((minFloat - min) * 60).toFixed(1);
+    return `${deg}°${min.toString().padStart(2, '0')}'${sec}"`;
+  };
+  
+  return `${formatDMS(lat)}${latDir} ${formatDMS(lng)}${lngDir}`;
+}
+```
+
+---
+
+## COMPLETE MODAL COMPONENT
+
+```tsx
+import { useState, useEffect, useRef } from 'react';
+import { X, ChevronLeft, ChevronRight, Bed, Bath, Square, Calendar, Car, Maximize, Camera, Navigation, ExternalLink } from 'lucide-react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+interface NormalizedListing {
+  mlsNumber: string;
+  address: { full: string; city: string; state: string; zip: string };
+  coordinates: { lat: number; lng: number } | null;
+  statusLabel: string;
+  statusColor: 'red' | 'green' | 'orange' | 'blue';
+  beds: number | null;
+  baths: number | null;
+  sqft: number | null;
+  yearBuilt: number | null;
+  garageSpaces: number | null;
+  lotSqFt: number | null;
+  prices: { original: number | null; list: number; sold: number | null };
+  soldDate: string | null;
+  dom: { simple: number };
+  pricePerSqft: number | null;
+  description: string | null;  // From Repliers remarks/publicRemarks
+  photos: string[];
+  photoCount: number;
+}
+
+interface PropertyDetailModalProps {
+  property: NormalizedListing;
+  onClose: () => void;
+}
+
+export function PropertyDetailModal({ property, onClose }: PropertyDetailModalProps) {
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  
+  const photos = property.photos || [];
+  
+  // Initialize Mapbox (STRICT: NO GOOGLE MAPS)
+  useEffect(() => {
+    if (!mapContainer.current || map.current || !property.coordinates) return;
+    
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+    
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [property.coordinates.lng, property.coordinates.lat],
+      zoom: 14,
+    });
+    
+    // Spyglass orange marker
+    new mapboxgl.Marker({ color: '#EF4923' })
+      .setLngLat([property.coordinates.lng, property.coordinates.lat])
+      .addTo(map.current);
+    
+    map.current.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+    map.current.addControl(new mapboxgl.FullscreenControl(), 'bottom-right');
+    
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, [property.coordinates]);
+  
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft' && photos.length > 1) {
+        setCurrentPhotoIndex(i => i === 0 ? photos.length - 1 : i - 1);
+      }
+      if (e.key === 'ArrowRight' && photos.length > 1) {
+        setCurrentPhotoIndex(i => i === photos.length - 1 ? 0 : i + 1);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [photos.length, onClose]);
+  
+  // Format coordinates to DMS
+  const formatCoords = (lat: number, lng: number) => {
+    const formatDMS = (d: number, pos: string, neg: string) => {
+      const dir = d >= 0 ? pos : neg;
+      const abs = Math.abs(d);
+      const deg = Math.floor(abs);
+      const min = Math.floor((abs - deg) * 60);
+      const sec = (((abs - deg) * 60 - min) * 60).toFixed(1);
+      return `${deg}°${min.toString().padStart(2, '0')}'${sec}"${dir}`;
+    };
+    return `${formatDMS(lat, 'N', 'S')} ${formatDMS(lng, 'E', 'W')}`;
+  };
+  
+  const statusBgClass = {
+    red: 'bg-red-500',
+    green: 'bg-green-500',
+    orange: 'bg-orange-500',
+    blue: 'bg-blue-500',
+  }[property.statusColor];
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/70 z-50" onClick={onClose} />
+      
+      {/* Modal */}
+      <div className="fixed inset-4 lg:inset-8 bg-white dark:bg-gray-900 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col">
+        
+        {/* Header */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">{property.address.full}</h2>
+          <span className="text-gray-500 dark:text-gray-400">, {property.address.state}</span>
+        </div>
+        
+        {/* Main Content - 2 Column Grid */}
+        <div className="flex-1 overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-5 h-full">
+            
+            {/* LEFT COLUMN - Map, Stats, Description, Details (2/5 = 40%) */}
+            <div className="col-span-1 lg:col-span-2 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
+              
+              {/* Mapbox Map */}
+              <div className="relative h-48 lg:h-56 border-b border-gray-200 dark:border-gray-700">
+                {property.coordinates ? (
+                  <>
+                    <div ref={mapContainer} className="w-full h-full" />
+                    {/* Coordinates Overlay */}
+                    <div className="absolute top-2 left-2 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-lg shadow-md p-2 text-xs z-10">
+                      <div className="font-mono text-gray-700 dark:text-gray-300">
+                        {formatCoords(property.coordinates.lat, property.coordinates.lng)}
+                      </div>
+                      <a 
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${property.coordinates.lat},${property.coordinates.lng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline flex items-center gap-1 mt-1"
+                      >
+                        <Navigation className="w-3 h-3" /> Directions
+                      </a>
+                      <a 
+                        href={`https://www.google.com/maps/@${property.coordinates.lat},${property.coordinates.lng},15z`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline text-[10px] mt-0.5 block"
+                      >
+                        View larger map
+                      </a>
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full h-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400">
+                    No location data
+                  </div>
+                )}
+              </div>
+              
+              {/* Stats Grid - 2x3 */}
+              <div className="grid grid-cols-2 border-b border-gray-200 dark:border-gray-700">
+                <div className="p-3 border-r border-b border-gray-200 dark:border-gray-700 text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Bed className="w-3 h-3" /> BEDROOMS
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.beds ?? 'N/A'}
+                  </div>
+                </div>
+                <div className="p-3 border-b border-gray-200 dark:border-gray-700 text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Bath className="w-3 h-3" /> BATHROOMS
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.baths ?? 'N/A'}
+                  </div>
+                </div>
+                <div className="p-3 border-r border-b border-gray-200 dark:border-gray-700 text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Square className="w-3 h-3" /> HOME SIZE
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.sqft?.toLocaleString() ?? 'N/A'} <span className="text-sm font-normal">sq.ft.</span>
+                  </div>
+                </div>
+                <div className="p-3 border-b border-gray-200 dark:border-gray-700 text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Calendar className="w-3 h-3" /> YEAR BUILT
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.yearBuilt ?? 'N/A'}
+                  </div>
+                </div>
+                <div className="p-3 border-r border-gray-200 dark:border-gray-700 text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Car className="w-3 h-3" /> GARAGES
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.garageSpaces ?? 'N/A'}
+                  </div>
+                </div>
+                <div className="p-3 text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Maximize className="w-3 h-3" /> LOT SIZE
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.lotSqFt?.toLocaleString() ?? 'N/A'}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Property Description (from Repliers remarks/publicRemarks) */}
+              {property.description && (
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                    Property Description
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                    {property.description}
+                  </p>
+                </div>
+              )}
+              
+              {/* Listing Details */}
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                  Listing Details
+                </h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">List Price</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
+                      ${property.prices.list.toLocaleString()}
+                    </span>
+                  </div>
+                  {property.prices.sold && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Sold Price</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        ${property.prices.sold.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  {property.pricePerSqft && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Price per Sq. Ft.</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        ${property.pricePerSqft}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">Days on Market</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
+                      {property.dom.simple}
+                    </span>
+                  </div>
+                  {property.soldDate && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Sold Date</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        {new Date(property.soldDate).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* MLS# */}
+              <div className="p-4">
+                <div className="text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">MLS# </span>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">
+                    {property.mlsNumber}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            {/* RIGHT COLUMN - Photo Gallery + Status/Price (3/5 = 60%) */}
+            <div className="col-span-1 lg:col-span-3 flex flex-col">
+              
+              {/* Photo Gallery - Takes most space */}
+              <div className="flex-1 relative bg-gray-900 min-h-[300px]">
+                {photos.length > 0 ? (
+                  <>
+                    <img 
+                      src={photos[currentPhotoIndex]} 
+                      alt={`${property.address.full} - Photo ${currentPhotoIndex + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    
+                    {/* Navigation Arrows */}
+                    {photos.length > 1 && (
+                      <>
+                        <button
+                          onClick={() => setCurrentPhotoIndex(i => i === 0 ? photos.length - 1 : i - 1)}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors"
+                        >
+                          <ChevronLeft className="w-6 h-6" />
+                        </button>
+                        <button
+                          onClick={() => setCurrentPhotoIndex(i => i === photos.length - 1 ? 0 : i + 1)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors"
+                        >
+                          <ChevronRight className="w-6 h-6" />
+                        </button>
+                      </>
+                    )}
+                    
+                    {/* Photo Count Badge - Bottom Left */}
+                    <div className="absolute bottom-3 left-3 flex items-center gap-1 px-2 py-1 bg-black/60 text-white text-sm rounded">
+                      <Camera className="w-4 h-4" />
+                      <span>{property.photoCount}</span>
+                    </div>
+                    
+                    {/* Photo Counter - Bottom Right */}
+                    <div className="absolute bottom-3 right-3 px-2 py-1 bg-black/60 text-white text-sm rounded">
+                      {currentPhotoIndex + 1} / {photos.length}
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-500">
+                    No photos available
+                  </div>
+                )}
+              </div>
+              
+              {/* Status + Price Bar - Below Photo */}
+              <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <div className="flex items-start justify-between">
+                  {/* Left: Status + Summary */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`px-2 py-1 ${statusBgClass} text-white text-xs font-semibold rounded`}>
+                        {property.statusLabel}
+                      </span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {property.dom.simple} DAYS
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      {property.beds} beds · {property.baths} baths · {property.sqft?.toLocaleString()} sqft
+                    </div>
+                    {property.soldDate && (
+                      <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Sold: {new Date(property.soldDate).toLocaleDateString()}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Right: Price */}
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      ${(property.prices.sold || property.prices.list).toLocaleString()}
+                    </div>
+                    {property.pricePerSqft && (
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        ${property.pricePerSqft}/sqft
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+```
+
+---
+
+## DATA NORMALIZATION FUNCTION
+
+```typescript
+// Get description from Repliers
+function normalizeRepliersListing(raw: RepliersListing): NormalizedListing {
+  // ... other fields ...
+  
+  return {
+    // ...
+    
+    // Property Description from Repliers
+    description: raw.remarks || raw.publicRemarks || null,
+    
+    // Coordinates for Mapbox
+    coordinates: raw.map?.latitude && raw.map?.longitude
+      ? { lat: raw.map.latitude, lng: raw.map.longitude }
+      : null,
+    
+    // DOM - USE simpleDaysOnMarket ONLY
+    dom: {
+      simple: raw.simpleDaysOnMarket,
+    },
+    
+    // ...
+  };
+}
+```
+
+---
+
+## CHECKLIST
+
+- [ ] **Mapbox ONLY** - No Google Maps iframe, imports, or API calls
+- [ ] Map uses `VITE_MAPBOX_ACCESS_TOKEN` from Replit secrets
+- [ ] Marker color is Spyglass orange `#EF4923`
+- [ ] Coordinates overlay with Directions link
+- [ ] Property Description from Repliers `remarks` or `publicRemarks`
+- [ ] Stats grid: Beds, Baths, Home Size, Year Built, Garages, Lot Size
+- [ ] Listing Details: List Price, Sold Price, Price/SqFt, DOM, Sold Date
+- [ ] MLS# at bottom of left column
+- [ ] Photo gallery takes 60% width on right
+- [ ] Status badge + Price below photo
+- [ ] **No duplicate information** - Each data point appears once
+- [ ] DOM uses `simpleDaysOnMarket` ONLY
+- [ ] All touch targets 44px minimum
+- [ ] Dark mode support
+- [ ] Mobile responsive
+
+---
+
+## MOBILE LAYOUT
+
+On mobile (`< lg`), stacks vertically:
+1. Photo (full width)
+2. Status + Price bar
+3. Map
+4. Stats grid
+5. Description
+6. Listing Details
+7. MLS#
