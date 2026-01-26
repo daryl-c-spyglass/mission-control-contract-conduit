@@ -280,6 +280,7 @@ export function CMATab({ transaction }: CMATabProps) {
 
   const presentationComparables: CmaProperty[] = useMemo(() => {
     if (!cmaData || cmaData.length === 0) return [];
+    
     return cmaData.map((comp, index) => {
       const c = comp as any;
       const sqft = typeof c.sqft === 'number' ? c.sqft : parseFloat(c.sqft as string) || 0;
@@ -294,7 +295,7 @@ export function CMATab({ transaction }: CMATabProps) {
         city: c.city || '',
         state: c.state || 'TX',
         zipCode: c.zipCode || '',
-        price: c.price,
+        price: price, // Use calculated price (soldPrice || closePrice || price)
         listPrice: c.listPrice || c.price,
         soldPrice: c.soldPrice || c.closePrice,
         originalPrice: c.originalPrice || c.listPrice,

@@ -1,0 +1,315 @@
+# Replit Agent Task: DIAGNOSTIC - Why Lot Data Missing for 154 Pettigrew Comparables
+
+## Problem
+
+**Property:** 154 Pettigrew, Buda, TX 78610 (MLS# ACT2451173)
+
+**Issue:** 
+- TIME TO SELL slide shows **10 Closed** comparables with data (days on market, list-to-sale %)
+- AVERAGE PRICE/ACRE slide shows **"No properties with acreage data"**
+
+**The comparables EXIST** but their `lotSizeAcres` field is null/undefined.
+
+---
+
+## Step 1: Check if Repliers Returns Lot Data
+
+Add debug logging to see what Repliers returns for these comparables:
+
+```typescript
+// In server/repliers.ts or wherever comparables are fetched
+
+// After fetching comparables for this MLS
+console.log('[LOT DATA DEBUG] MLS# ACT2451173 Comparables:', 
+  comparables.slice(0, 3).map(c => ({
+    mlsNumber: c.mlsNumber,
+    address: c.address,
+    // Raw lot fields from Repliers
+    'lot': c.lot,
+    'lot.acres': c.lot?.acres,
+    'lot.squareFeet': c.lot?.squareFeet,
+    // Calculated fields
+    'lotSizeAcres': c.lotSizeAcres,
+    'pricePerAcre': c.pricePerAcre,
+  }))
+);
+```
+
+### Expected Result A: Repliers has lot data
+```
+{
+  mlsNumber: 'ACT123',
+  lot: { acres: 0.25, squareFeet: 10890 },
+  lotSizeAcres: null  // ← Not being calculated!
+}
+```
+**Fix:** Add lot size normalization to the mapping.
+
+### Expected Result B: Repliers has NO lot data
+```
+{
+  mlsNumber: 'ACT123',
+  lot: null,           // ← No data from API
+  lotSizeAcres: null
+}
+```
+**Issue:** The MLS doesn't have lot size data for these properties (common for some areas).
+
+---
+
+## Step 2: Check Comparable Mapping in CMAPresentationBuilder
+
+The fix from earlier may not be applied, or there's a different code path for this CMA.
+
+### Check CMAPresentationBuilder.tsx
+
+Look for where comparables are mapped (around lines 265-310):
+
+```typescript
+// Look for this pattern
+const processedComparables = comparables.map(c => ({
+  // ... existing fields
+  
+  // ARE THESE PRESENT?
+  lot: c.lot,
+  lotSizeAcres: c.lotSizeAcres || c.lot?.acres || (c.lot?.squareFeet ? c.lot.squareFeet / 43560 : null),
+  pricePerAcre: c.pricePerAcre,
+}));
+```
+
+### If lot fields are missing, add them:
+
+```typescript
+// In the comparables mapping
+const normalizeAcres = (comp: any): number | null => {
+  if (comp.lotSizeAcres && comp.lotSizeAcres > 0) return comp.lotSizeAcres;
+  if (comp.lot?.acres && comp.lot.acres > 0) return comp.lot.acres;
+  if (comp.lot?.squareFeet && comp.lot.squareFeet > 0) return comp.lot.squareFeet / 43560;
+  if (comp.acres && comp.acres > 0) return comp.acres;
+  return null;
+};
+
+const processedComparables = comparables.map(c => {
+  const acres = normalizeAcres(c);
+  const price = c.soldPrice || c.listPrice;
+  
+  return {
+    ...c,  // Keep all existing fields
+    
+    // Ensure lot data is included
+    lot: c.lot || null,
+    lotSizeAcres: acres,
+    lotSizeSquareFeet: c.lot?.squareFeet || null,
+    pricePerAcre: acres && acres > 0 && price ? Math.round(price / acres) : null,
+    acres: acres,  // Some components use 'acres' instead of 'lotSizeAcres'
+  };
+});
+```
+
+---
+
+## Step 3: Check AveragePriceAcreWidget Filter
+
+The widget might be filtering incorrectly. Check what field it's looking for:
+
+```typescript
+// In AveragePriceAcreWidget.tsx
+
+// Current filter (check what field name it uses)
+const propertiesWithAcreage = comparables.filter(p => 
+  p.lotSizeAcres && p.lotSizeAcres > 0  // Is this the right field?
+);
+
+// Debug log
+console.log('[PRICE/ACRE WIDGET] Filter check:', {
+  totalComparables: comparables.length,
+  withLotSizeAcres: comparables.filter(p => p.lotSizeAcres > 0).length,
+  withLotAcres: comparables.filter(p => p.lot?.acres > 0).length,
+  withAcres: comparables.filter(p => p.acres > 0).length,
+  sampleComp: comparables[0] ? {
+    mlsNumber: comparables[0].mlsNumber,
+    lotSizeAcres: comparables[0].lotSizeAcres,
+    'lot.acres': comparables[0].lot?.acres,
+    acres: comparables[0].acres,
+  } : 'no comps',
+});
+```
+
+### Fix: Check multiple possible field names
+
+```typescript
+// Update the filter to check multiple possible field names
+const propertiesWithAcreage = comparables.filter(p => {
+  const acres = p.lotSizeAcres || p.lot?.acres || p.acres || 
+                (p.lot?.squareFeet ? p.lot.squareFeet / 43560 : null);
+  return acres && acres > 0;
+});
+```
+
+---
+
+## Step 4: Check Data Source Priority
+
+From earlier fix, the CMAPresentationBuilder should prefer data with lot fields:
+
+```typescript
+// Check if this logic is in place
+const hasLotData = (data: any) => {
+  if (!data?.comparables) return false;
+  return data.comparables.some(c => 
+    c.lotSizeAcres > 0 || c.lot?.acres > 0 || c.lot?.squareFeet > 0
+  );
+};
+
+// Prefer transaction.cmaData if it has lot data
+const sourceData = hasLotData(linkedTransaction?.cmaData) 
+  ? linkedTransaction.cmaData 
+  : cma.propertiesData;
+```
+
+---
+
+## Step 5: Force Refresh CMA Data
+
+If the CMA was created before lot mapping was added, the stored data won't have lot fields.
+
+### Option A: Re-fetch from Repliers
+
+Add a "Refresh MLS Data" button that re-fetches comparables with lot data:
+
+```typescript
+const handleRefreshMLSData = async () => {
+  try {
+    // Re-fetch comparables from Repliers
+    const freshData = await fetchComparablesFromRepliers(subjectProperty.mlsNumber);
+    
+    // Update the CMA with fresh data including lot fields
+    await updateCMA(cmaId, { propertiesData: freshData });
+    
+    // Reload the presentation
+    window.location.reload();
+  } catch (error) {
+    console.error('Failed to refresh MLS data:', error);
+  }
+};
+```
+
+### Option B: Migrate existing CMAs
+
+Run a migration to update old CMAs with lot data:
+
+```typescript
+// Backend migration script
+const migrateCMAsWithLotData = async () => {
+  const cmasWithoutLotData = await db.query(`
+    SELECT id, properties_data 
+    FROM cmas 
+    WHERE properties_data IS NOT NULL
+    AND properties_data::text NOT LIKE '%lotSizeAcres%'
+  `);
+  
+  for (const cma of cmasWithoutLotData) {
+    // Re-fetch or calculate lot data
+    // Update the CMA
+  }
+};
+```
+
+---
+
+## Quick Fix: Ensure Lot Data in AveragePriceAcreWidget
+
+If the data exists somewhere but isn't in the expected field, add a normalization step in the widget:
+
+```typescript
+// At the top of AveragePriceAcreWidget.tsx
+
+// Normalize comparables to ensure lot data is in expected fields
+const normalizedComparables = useMemo(() => {
+  return comparables.map(comp => {
+    // Try to find acres from various possible fields
+    let acres = comp.lotSizeAcres;
+    
+    if (!acres || acres <= 0) {
+      if (comp.lot?.acres && comp.lot.acres > 0) {
+        acres = comp.lot.acres;
+      } else if (comp.lot?.squareFeet && comp.lot.squareFeet > 0) {
+        acres = comp.lot.squareFeet / 43560;
+      } else if (comp.acres && comp.acres > 0) {
+        acres = comp.acres;
+      } else if (comp.lotSize && comp.lotSize > 0) {
+        // Assume sqft if > 1
+        acres = comp.lotSize > 1 ? comp.lotSize / 43560 : comp.lotSize;
+      }
+    }
+    
+    const price = comp.soldPrice || comp.listPrice;
+    
+    return {
+      ...comp,
+      lotSizeAcres: acres || null,
+      pricePerAcre: acres && acres > 0 && price ? Math.round(price / acres) : null,
+    };
+  });
+}, [comparables]);
+
+// Then use normalizedComparables instead of comparables
+const propertiesWithAcreage = normalizedComparables.filter(p => 
+  p.lotSizeAcres && p.lotSizeAcres > 0
+);
+```
+
+---
+
+## Verification
+
+After applying fixes, test with:
+
+**Property:** 154 Pettigrew, Buda, TX 78610 (MLS# ACT2451173)
+
+### Expected Results:
+
+1. Console logs show lot data is present (or identify where it's missing)
+2. AVERAGE PRICE/ACRE slide shows:
+   - Properties in left sidebar
+   - Colored dots on scatter chart
+   - Calculated average $/acre
+   - Trendline through sold listings
+
+### Debug Output to Look For:
+
+```
+[LOT DATA DEBUG] Comparables:
+- 321 Delayne DR: lot.acres = 0.25, lotSizeAcres = 0.25 ✓
+- 140 Hawthorne LOOP: lot.acres = 0.18, lotSizeAcres = 0.18 ✓
+
+[PRICE/ACRE WIDGET] Filter:
+- totalComparables: 10
+- withAcreage: 10 ✓
+```
+
+OR if lot data is missing from Repliers:
+
+```
+[LOT DATA DEBUG] Comparables:
+- 321 Delayne DR: lot = null ✗
+- 140 Hawthorne LOOP: lot = null ✗
+
+→ This area's MLS does not include lot size data
+→ Show message: "Lot size data is not available from MLS for this area"
+```
+
+---
+
+## Summary
+
+The issue is one of these:
+
+| Cause | Fix |
+|-------|-----|
+| Lot data exists but not mapped | Add `lotSizeAcres` to comparables mapping |
+| Widget checking wrong field | Update filter to check multiple field names |
+| Old CMA without lot data | Re-fetch from Repliers or migrate |
+| Repliers doesn't have lot data | Show "Lot data unavailable" message |
+
+Run the debug logs first to identify which case this is.

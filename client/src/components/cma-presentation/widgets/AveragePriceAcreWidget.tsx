@@ -239,9 +239,6 @@ export function AveragePriceAcreWidget({
   }, [allPropertiesWithAcreage]);
 
   const propertiesWithAcreage = useMemo<PropertyWithAcreage[]>(() => {
-    console.log('=== [AVERAGE PRICE/ACRE] Widget Data Pipeline ===');
-    console.log('Total comparables received:', comparables.length);
-    
     const withAcreage = comparables
       .filter(p => {
         if (p.type === 'Lease') return false;
@@ -260,25 +257,6 @@ export function AveragePriceAcreWidget({
           pricePerAcre: pricePerAcre as number,
         };
       });
-    
-    console.log('[Price/Acre Filter]', {
-      totalComparables: comparables.length,
-      withLotData: allPropertiesWithAcreage.length,
-      excludedSmallLots: excludedSmallLotCount,
-      validForChart: withAcreage.length,
-    });
-    
-    if (withAcreage.length > 0) {
-      console.log('Sample acreage data:', withAcreage.slice(0, 3).map(p => ({
-        mlsNumber: p.mlsNumber,
-        acres: p.lotSizeAcres?.toFixed(2),
-        price: p.soldPrice || p.price,
-        pricePerAcre: p.pricePerAcre,
-        status: p.status,
-      })));
-    } else if (comparables.length > 0) {
-      console.log('⚠️ NO PROPERTIES WITH VALID ACREAGE DATA (min: 0.05 acres)');
-    }
     
     return withAcreage;
   }, [comparables, allPropertiesWithAcreage.length, excludedSmallLotCount]);
@@ -305,7 +283,6 @@ export function AveragePriceAcreWidget({
   const subjectWithAcreage = useMemo<PropertyWithAcreage | null>(() => {
     if (!subjectProperty) return null;
     const acres = subjectProperty.lotSizeAcres ?? subjectProperty.lot?.acres ?? subjectProperty.acres ?? (subjectProperty.lotSizeSquareFeet ? subjectProperty.lotSizeSquareFeet / 43560 : 0) ?? (subjectProperty.lotSize ? subjectProperty.lotSize / 43560 : 0);
-    console.log('[AVERAGE PRICE/ACRE] Subject property acres:', acres, 'lotSizeAcres:', subjectProperty.lotSizeAcres, 'lot:', subjectProperty.lot);
     if (!acres || acres <= 0) return null;
     const price = subjectProperty.soldPrice || subjectProperty.price || (avgPricePerAcre * acres);
     return {
