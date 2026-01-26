@@ -1,9 +1,11 @@
 // Centralized status color system for CMA
 
+// Contract Conduit Standard Status Colors:
+// Subject = BLUE, Closed/Sold = RED, Active = GREEN, Under Contract = ORANGE, Pending = GRAY
 export const STATUS_COLORS = {
   subject: { hex: '#3b82f6', tailwind: 'bg-blue-500', text: 'text-blue-500', label: 'Subject Property' },
   active: { hex: '#22c55e', tailwind: 'bg-green-500', text: 'text-green-500', label: 'Active' },
-  underContract: { hex: '#f97316', tailwind: 'bg-[#EF4923]', text: 'text-[#EF4923]', label: 'Under Contract' },
+  underContract: { hex: '#f97316', tailwind: 'bg-orange-500', text: 'text-orange-500', label: 'Under Contract' },
   closed: { hex: '#ef4444', tailwind: 'bg-red-500', text: 'text-red-500', label: 'Closed' },
   pending: { hex: '#6b7280', tailwind: 'bg-gray-500', text: 'text-gray-500', label: 'Pending' },
 };

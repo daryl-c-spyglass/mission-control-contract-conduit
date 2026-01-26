@@ -86,19 +86,24 @@ export function PropertyDetailModal({ isOpen, onClose, property }: PropertyDetai
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="w-[95vw] max-w-2xl p-0 overflow-hidden bg-zinc-900 border-zinc-700 [&>button]:hidden">
         <div className="relative">
+          {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 z-20 bg-black/50 hover:bg-black/70 rounded-full p-1.5 transition-colors touch-target-44"
+            className="absolute top-3 right-3 z-30 bg-black/50 hover:bg-black/70 rounded-full p-1.5 transition-colors touch-target-44"
             data-testid="button-close-property-modal"
           >
             <X className="h-5 w-5 text-white" />
           </button>
           
-          <Badge className={`absolute top-3 left-3 z-10 ${getStatusColor(property.status)} text-white border-0 shadow-lg px-3 py-1.5 text-sm font-bold`}>
-            {property.status}
-          </Badge>
-          
+          {/* Photo container */}
           <div className="relative h-72 bg-zinc-800">
+            {/* Status badge positioned INSIDE the photo area with proper spacing */}
+            <div className="absolute top-4 left-4 z-20">
+              <span className={`px-3 py-1.5 text-sm font-bold rounded shadow-lg ${getStatusColor(property.status)} text-white`}>
+                {property.status}
+              </span>
+            </div>
+            
             {photos.length > 0 ? (
               <img
                 src={photos[safePhotoIndex]}

@@ -19,11 +19,13 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-const getStatusColor = (status: string) => {
-  const s = status.toLowerCase();
-  if (s.includes('closed')) return 'bg-green-500';
-  if (s.includes('active') && !s.includes('under')) return 'bg-red-500';
-  if (s.includes('pending') || s.includes('under')) return 'bg-yellow-500';
+const getStatusColor = (status: string, isSubject?: boolean) => {
+  if (isSubject) return 'bg-blue-500';  // BLUE for Subject
+  const s = status?.toLowerCase() || '';
+  if (s.includes('closed') || s.includes('sold')) return 'bg-red-500';  // RED for Closed/Sold
+  if (s.includes('active under') || s.includes('under contract')) return 'bg-orange-500';  // ORANGE for Under Contract
+  if (s.includes('active')) return 'bg-green-500';  // GREEN for Active
+  if (s.includes('pending')) return 'bg-gray-500';  // GRAY for Pending
   return 'bg-gray-500';
 };
 
@@ -228,7 +230,7 @@ export function PropertyDetailModal({ property, onClose }: PropertyDetailModalPr
             />
             <div data-testid="detail-status">
               <p className="text-sm text-muted-foreground">Status</p>
-              <Badge className={`${property.isSubject ? 'bg-[#EF4923]' : getStatusColor(property.status)} text-white mt-1`}>
+              <Badge className={`${getStatusColor(property.status, property.isSubject)} text-white mt-1`}>
                 {property.isSubject ? 'Subject' : property.status}
               </Badge>
             </div>

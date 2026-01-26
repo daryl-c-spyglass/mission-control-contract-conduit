@@ -23,18 +23,18 @@ export const getStatusConfig = (status: string): StatusConfig => {
   if (normalized.includes('under') || normalized.includes('contract') || normalized.includes('incontract')) {
     return {
       label: 'Under Contract',
-      badge: 'bg-amber-500 text-white',
-      dot: 'bg-amber-500',
-      marker: '#f59e0b',
+      badge: 'bg-orange-500 text-white',
+      dot: 'bg-orange-500',
+      marker: '#f97316',
     };
   }
   
   if (normalized.includes('closed') || normalized.includes('sold')) {
     return {
       label: 'Closed',
-      badge: 'bg-gray-500 text-white',
-      dot: 'bg-gray-500',
-      marker: '#6b7280',
+      badge: 'bg-red-500 text-white',
+      dot: 'bg-red-500',
+      marker: '#ef4444',
     };
   }
   
@@ -50,9 +50,9 @@ export const getStatusConfig = (status: string): StatusConfig => {
   if (normalized.includes('pending')) {
     return {
       label: 'Pending',
-      badge: 'bg-yellow-500 text-white',
-      dot: 'bg-yellow-500',
-      marker: '#eab308',
+      badge: 'bg-gray-500 text-white',
+      dot: 'bg-gray-500',
+      marker: '#6b7280',
     };
   }
   
