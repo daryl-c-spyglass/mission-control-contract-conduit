@@ -108,7 +108,7 @@ export function PropertyDetailModal({ property, onClose }: PropertyDetailModalPr
         </div>
         
         <div className="flex-1 overflow-y-auto">
-          <div className="relative w-full aspect-video bg-muted">
+          <div className="relative w-full aspect-video bg-muted overflow-hidden">
             {photos.length > 0 ? (
               <>
                 <img 
@@ -124,7 +124,7 @@ export function PropertyDetailModal({ property, onClose }: PropertyDetailModalPr
                       variant="ghost"
                       size="icon"
                       onClick={handlePrevPhoto}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white rounded-full min-w-[44px] min-h-[44px]"
                       aria-label="Previous photo"
                       data-testid="button-prev-photo"
                     >
@@ -134,14 +134,14 @@ export function PropertyDetailModal({ property, onClose }: PropertyDetailModalPr
                       variant="ghost"
                       size="icon"
                       onClick={handleNextPhoto}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white rounded-full min-w-[44px] min-h-[44px]"
                       aria-label="Next photo"
                       data-testid="button-next-photo"
                     >
                       <ChevronRight className="w-5 h-5" />
                     </Button>
                     <div 
-                      className="absolute bottom-2 right-2 bg-black/50 text-white text-sm px-2 py-1 rounded"
+                      className="absolute bottom-2 right-2 z-10 bg-black/50 text-white text-sm px-2 py-1 rounded"
                       data-testid="photo-counter"
                     >
                       {currentPhotoIndex + 1} / {photos.length}
