@@ -1,9 +1,34 @@
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Menu, X } from 'lucide-react';
 import type { AgentProfile, CmaProperty } from '../types';
 import { WIDGETS } from '../constants/widgets';
 
 import { StaticImageWidget } from '../widgets/StaticImageWidget';
+
+const imageCache = new Set<string>();
+
+function preloadImage(src: string) {
+  if (imageCache.has(src)) return;
+  const img = new Image();
+  img.src = src;
+  imageCache.add(src);
+}
+
+function preloadAdjacentSlides(currentIndex: number) {
+  const indicesToPreload = [
+    currentIndex - 1,
+    currentIndex + 1,
+    currentIndex + 2,
+  ].filter(i => i >= 0 && i < WIDGETS.length);
+
+  indicesToPreload.forEach(index => {
+    const widget = WIDGETS[index];
+    if (widget.type === 'static' && widget.imagePath) {
+      preloadImage(widget.imagePath);
+    }
+  });
+}
 import { AgentResumeWidget } from '../widgets/AgentResumeWidget';
 import { ListingWithSpyglassWidget } from '../widgets/ListingWithSpyglassWidget';
 import { ClientTestimonialsWidget } from '../widgets/ClientTestimonialsWidget';
@@ -42,6 +67,10 @@ export function SlideViewer({
 }: SlideViewerProps) {
   const widget = WIDGETS[currentIndex];
   const totalSlides = WIDGETS.length;
+
+  useEffect(() => {
+    preloadAdjacentSlides(currentIndex);
+  }, [currentIndex]);
 
   const renderWidget = () => {
     if (widget.type === 'static' && widget.imagePath) {
