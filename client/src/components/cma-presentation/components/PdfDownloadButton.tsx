@@ -73,9 +73,10 @@ export function PdfDownloadButton({
       });
     } catch (error) {
       console.error('PDF generation error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       toast({
         title: 'Download Failed',
-        description: 'Unable to generate PDF. Please try again.',
+        description: `Unable to generate PDF: ${errorMessage.slice(0, 100)}`,
         variant: 'destructive',
       });
     } finally {

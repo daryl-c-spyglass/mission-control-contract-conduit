@@ -29,9 +29,16 @@ const formatNumber = (num: number): string => {
 const calculateStats = (comparables: CmaProperty[]) => {
   if (!comparables.length) return null;
   
-  const prices = comparables.map(c => c.soldPrice || c.price).filter(p => p > 0);
-  const pricesPerSqft = comparables.map(c => c.pricePerSqft).filter(p => p > 0);
-  const daysOnMarket = comparables.map(c => c.daysOnMarket).filter(d => d >= 0);
+  // Filter to valid numeric values only to prevent NaN
+  const prices = comparables
+    .map(c => c.soldPrice ?? c.price ?? c.listPrice)
+    .filter((p): p is number => p !== undefined && p !== null && !isNaN(p) && p > 0);
+  const pricesPerSqft = comparables
+    .map(c => c.pricePerSqft)
+    .filter((p): p is number => p !== undefined && p !== null && !isNaN(p) && p > 0);
+  const daysOnMarket = comparables
+    .map(c => c.daysOnMarket)
+    .filter((d): d is number => d !== undefined && d !== null && !isNaN(d) && d >= 0);
   
   const avgPrice = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
   const avgPricePerSqft = pricesPerSqft.length ? pricesPerSqft.reduce((a, b) => a + b, 0) / pricesPerSqft.length : 0;
@@ -68,10 +75,7 @@ const PageFooter = ({ propertyAddress }: { propertyAddress: string }) => (
 const CoverPage = ({ propertyAddress, agent, preparedFor }: { propertyAddress: string; agent: AgentProfile; preparedFor?: string }) => (
   <Page size="LETTER" orientation="landscape" style={styles.darkPage}>
     <View style={styles.coverPage}>
-      <Image 
-        src="/logos/SpyglassRealty_Logo_White.png" 
-        style={styles.coverLogo}
-      />
+      <Text style={{ color: COLORS.white, fontSize: 28, fontWeight: 700, marginBottom: 20 }}>SPYGLASS REALTY</Text>
       <Text style={styles.coverTitle}>Comparative Market Analysis</Text>
       {preparedFor && (
         <Text style={styles.coverSubtitle}>Prepared for {preparedFor}</Text>
@@ -96,9 +100,6 @@ const AgentResumePage = ({ agent, slideNumber, totalSlides }: { agent: AgentProf
     <PageHeader title="AGENT RESUME" slideNumber={slideNumber} totalSlides={totalSlides} />
     <View style={styles.content}>
       <View style={styles.agentCard}>
-        {agent.photo && (
-          <Image src={agent.photo} style={styles.agentPhoto} />
-        )}
         <View style={styles.agentInfo}>
           <Text style={styles.agentName}>{agent.name}</Text>
           <Text style={styles.agentCompany}>{agent.company || 'Spyglass Realty'}</Text>
@@ -198,9 +199,6 @@ const PropertyDetailPage = ({
     <View style={styles.content}>
       <View style={{ flexDirection: 'row', gap: 30 }}>
         <View style={{ flex: 1 }}>
-          {property.photos?.[0] && (
-            <Image src={property.photos[0]} style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: 8, marginBottom: 15 }} />
-          )}
           <Text style={styles.propertyAddress}>{property.address}</Text>
           <Text style={{ fontSize: 10, color: COLORS.textSecondary, marginBottom: 10 }}>
             {property.city}, {property.state} {property.zipCode}
@@ -656,16 +654,12 @@ const StaticImagePage = ({
   <Page size="LETTER" orientation="landscape" style={styles.page}>
     <PageHeader title={widget.title} slideNumber={slideNumber} totalSlides={totalSlides} />
     <View style={{ flex: 1, padding: 20 }}>
-      {widget.imagePath ? (
-        <Image src={widget.imagePath} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-      ) : (
-        <View style={styles.centeredContent}>
-          <Text style={{ fontSize: 24, fontWeight: 700, color: COLORS.textPrimary }}>{widget.title}</Text>
-          <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 10 }}>
-            Interactive content - view in presentation
-          </Text>
-        </View>
-      )}
+      <View style={styles.centeredContent}>
+        <Text style={{ fontSize: 24, fontWeight: 700, color: COLORS.textPrimary }}>{widget.title}</Text>
+        <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 10 }}>
+          View full content in presentation mode
+        </Text>
+      </View>
     </View>
     <PageFooter propertyAddress={propertyAddress} />
   </Page>
