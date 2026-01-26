@@ -26,13 +26,13 @@ export function Sidebar({
   return (
     <>
       <div 
-        className="fixed inset-0 bg-black/50 z-40"
+        className="fixed inset-0 bg-black/50 z-[60]"
         onClick={onClose}
         data-testid="sidebar-overlay"
       />
       
       <div 
-        className="fixed left-0 top-0 bottom-0 w-80 max-w-[85vw] bg-background z-50 flex flex-col shadow-xl"
+        className="fixed left-0 top-0 bottom-0 w-80 max-w-[85vw] bg-background z-[70] flex flex-col shadow-xl"
         style={{
           paddingTop: 'env(safe-area-inset-top)',
           paddingBottom: 'env(safe-area-inset-bottom)',
