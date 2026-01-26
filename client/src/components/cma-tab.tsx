@@ -1429,15 +1429,22 @@ export function CMATab({ transaction }: CMATabProps) {
       </Dialog>
       
       <Dialog open={fullscreenPhoto} onOpenChange={setFullscreenPhoto}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-4 top-4 z-50 text-white hover:bg-white/20"
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black [&>button]:hidden">
+          <button
+            className="absolute right-4 top-4 z-50 
+                       min-w-[44px] min-h-[44px] 
+                       bg-black/50 hover:bg-black/70 
+                       text-white rounded-full 
+                       flex items-center justify-center
+                       transition-all duration-200
+                       shadow-lg
+                       focus:outline-none focus:ring-2 focus:ring-white/50"
             onClick={() => setFullscreenPhoto(false)}
+            aria-label="Close"
+            data-testid="button-close-fullscreen"
           >
-            <X className="h-6 w-6" />
-          </Button>
+            <X className="w-6 h-6" />
+          </button>
           
           {selectedProperty && currentPhotos.length > 0 && (
             <div className="relative w-full h-[90vh] flex items-center justify-center">
@@ -1448,23 +1455,37 @@ export function CMATab({ transaction }: CMATabProps) {
               />
               {currentPhotos.length > 1 && (
                 <>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white"
+                  <button
+                    className="absolute left-4 top-1/2 -translate-y-1/2 
+                               min-w-[48px] min-h-[48px] 
+                               bg-black/50 hover:bg-black/70 
+                               text-white rounded-full 
+                               flex items-center justify-center
+                               transition-all duration-200
+                               shadow-lg z-10
+                               focus:outline-none focus:ring-2 focus:ring-white/50"
                     onClick={() => setPhotoIndex(prev => prev === 0 ? currentPhotos.length - 1 : prev - 1)}
+                    aria-label="Previous photo"
+                    data-testid="button-fullscreen-prev"
                   >
-                    <ChevronLeft className="h-8 w-8" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white"
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  <button
+                    className="absolute right-4 top-1/2 -translate-y-1/2 
+                               min-w-[48px] min-h-[48px] 
+                               bg-black/50 hover:bg-black/70 
+                               text-white rounded-full 
+                               flex items-center justify-center
+                               transition-all duration-200
+                               shadow-lg z-10
+                               focus:outline-none focus:ring-2 focus:ring-white/50"
                     onClick={() => setPhotoIndex(prev => prev === currentPhotos.length - 1 ? 0 : prev + 1)}
+                    aria-label="Next photo"
+                    data-testid="button-fullscreen-next"
                   >
-                    <ChevronRight className="h-8 w-8" />
-                  </Button>
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-sm px-3 py-1.5 rounded">
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-4 py-2 rounded-full">
                     {photoIndex + 1} / {currentPhotos.length}
                   </div>
                 </>
