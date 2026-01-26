@@ -207,6 +207,32 @@ export function AveragePriceAcreWidget({
   const [showSubject, setShowSubject] = useState(true);
   const [showTrendline, setShowTrendline] = useState(true);
 
+  // Minimum lot size to exclude condos/townhomes with artificially high $/acre
+  const MIN_LOT_SIZE_ACRES = 0.05; // 2,178 sqft
+
+  // Helper to calculate acres from various field formats
+  const getAcres = (p: CmaProperty) => {
+    return p.lotSizeAcres ?? p.lot?.acres ?? p.acres ?? 
+      (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : 0) ?? 
+      (p.lotSize ? p.lotSize / 43560 : 0);
+  };
+
+  // All properties with any acreage data (for tracking excluded count)
+  const allPropertiesWithAcreage = useMemo(() => {
+    return comparables
+      .filter(p => p.type !== 'Lease')
+      .map(p => {
+        const acres = getAcres(p);
+        return { ...p, calculatedAcres: acres };
+      })
+      .filter(p => p.calculatedAcres > 0);
+  }, [comparables]);
+
+  // Count excluded small-lot properties
+  const excludedSmallLotCount = useMemo(() => {
+    return allPropertiesWithAcreage.filter(p => p.calculatedAcres < MIN_LOT_SIZE_ACRES).length;
+  }, [allPropertiesWithAcreage]);
+
   const propertiesWithAcreage = useMemo<PropertyWithAcreage[]>(() => {
     console.log('=== [AVERAGE PRICE/ACRE] Widget Data Pipeline ===');
     console.log('Total comparables received:', comparables.length);
@@ -214,11 +240,13 @@ export function AveragePriceAcreWidget({
     const withAcreage = comparables
       .filter(p => {
         if (p.type === 'Lease') return false;
-        const acres = p.lotSizeAcres ?? p.lot?.acres ?? p.acres ?? (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : 0) ?? (p.lotSize ? p.lotSize / 43560 : 0);
-        return acres !== null && acres !== undefined && acres > 0;
+        const acres = getAcres(p);
+        // Exclude properties with lots < 0.05 acres (condos, tiny lots)
+        if (acres < MIN_LOT_SIZE_ACRES) return false;
+        return acres > 0;
       })
       .map(p => {
-        const acres = p.lotSizeAcres ?? p.lot?.acres ?? p.acres ?? (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : 0) ?? (p.lotSize ? p.lotSize / 43560 : 0);
+        const acres = getAcres(p);
         const price = p.soldPrice || p.price;
         const pricePerAcre = p.pricePerAcre ?? (acres && acres > 0 ? Math.round(price / acres) : 0);
         return {
@@ -228,7 +256,13 @@ export function AveragePriceAcreWidget({
         };
       });
     
-    console.log('Properties with valid acreage:', withAcreage.length);
+    console.log('[Price/Acre Filter]', {
+      totalComparables: comparables.length,
+      withLotData: allPropertiesWithAcreage.length,
+      excludedSmallLots: excludedSmallLotCount,
+      validForChart: withAcreage.length,
+    });
+    
     if (withAcreage.length > 0) {
       console.log('Sample acreage data:', withAcreage.slice(0, 3).map(p => ({
         mlsNumber: p.mlsNumber,
@@ -238,18 +272,11 @@ export function AveragePriceAcreWidget({
         status: p.status,
       })));
     } else if (comparables.length > 0) {
-      console.log('⚠️ NO PROPERTIES WITH ACREAGE DATA');
-      console.log('Sample lot fields:', comparables.slice(0, 3).map(p => ({
-        mlsNumber: p.mlsNumber,
-        lotSizeAcres: p.lotSizeAcres,
-        lot: p.lot,
-        acres: p.acres,
-        lotSize: p.lotSize,
-      })));
+      console.log('⚠️ NO PROPERTIES WITH VALID ACREAGE DATA (min: 0.05 acres)');
     }
     
     return withAcreage;
-  }, [comparables]);
+  }, [comparables, allPropertiesWithAcreage.length, excludedSmallLotCount]);
 
   const groupedProperties = useMemo(() => {
     const closed = propertiesWithAcreage.filter(p => getStatusCategory(p.status) === 'closed');
@@ -395,6 +422,11 @@ export function AveragePriceAcreWidget({
             <p className="text-sm text-muted-foreground mt-1">
               Comparable land sold for an average of <span className="text-[#EF4923] font-medium">{formatFullPrice(avgPricePerAcre)}</span> / acre.
             </p>
+            {excludedSmallLotCount > 0 && (
+              <p className="text-xs text-muted-foreground/70 mt-1">
+                {excludedSmallLotCount} propert{excludedSmallLotCount === 1 ? 'y' : 'ies'} excluded (lots under 0.05 acres)
+              </p>
+            )}
           </div>
 
           <Card className="flex-1 min-h-0 p-3 lg:p-4 overflow-hidden">
@@ -437,7 +469,7 @@ export function AveragePriceAcreWidget({
                         strokeWidth: 2,
                         strokeDasharray: '8 4',
                       }}
-                      shape={() => null}
+                      shape={() => <></>}
                       isAnimationActive={false}
                       legendType="none"
                     />

@@ -1,0 +1,308 @@
+# Replit Agent Task: Filter Outliers from Average Price/Acre Chart
+
+## Problem
+
+The Average Price/Acre chart shows **$111,316,319 / acre** which is unrealistic. Looking at the data:
+
+| Property | $/Acre | Issue |
+|----------|--------|-------|
+| 501 West Ave | $527,777,778 | Likely condo with tiny lot |
+| 800 Embassy DR | $51,526,718 | Likely condo with tiny lot |
+| 601 Hearn ST | $15,588,235 | Likely small lot |
+
+**Root Cause:** Properties with very small lots (condos, townhomes, high-rises) have artificially inflated $/acre values because they're dividing the unit price by a tiny shared lot allocation.
+
+---
+
+## Solution: Add Minimum Lot Size Filter
+
+### Filter Properties with Lot Size < 0.05 Acres
+
+Properties with less than 0.05 acres (2,178 sq ft) are likely:
+- Condos with allocated lot shares
+- Townhomes
+- High-rise units
+
+These should be **excluded from the price/acre calculation** but can optionally still appear on the chart in a different style.
+
+---
+
+## Implementation
+
+### In `AveragePriceAcreWidget.tsx` or slide component
+
+```typescript
+// Minimum lot size threshold (0.05 acres = 2,178 sqft)
+const MIN_LOT_SIZE_ACRES = 0.05;
+
+// Filter properties for the price/acre calculation
+const propertiesWithValidAcreage = useMemo(() => {
+  return comparables.filter(p => {
+    // Must have lot size data
+    if (!p.lotSizeAcres || p.lotSizeAcres <= 0) return false;
+    
+    // Must meet minimum lot size (exclude condos/tiny lots)
+    if (p.lotSizeAcres < MIN_LOT_SIZE_ACRES) return false;
+    
+    // Must be a Sale (not Lease)
+    if (p.type === 'Lease') return false;
+    
+    return true;
+  });
+}, [comparables]);
+
+// Calculate average from SOLD properties with valid lot sizes
+const avgPricePerAcre = useMemo(() => {
+  const soldWithValidLots = propertiesWithValidAcreage.filter(p => 
+    p.status === 'Closed' && 
+    p.soldPrice && p.soldPrice > 0
+  );
+  
+  if (soldWithValidLots.length === 0) return null;
+  
+  const total = soldWithValidLots.reduce((sum, p) => 
+    sum + (p.soldPrice! / p.lotSizeAcres!), 0
+  );
+  
+  return Math.round(total / soldWithValidLots.length);
+}, [propertiesWithValidAcreage]);
+```
+
+### Alternative: Use Statistical Outlier Filtering
+
+Instead of a hard minimum, use IQR (Interquartile Range) to filter outliers:
+
+```typescript
+const filterOutliers = (properties: CmaProperty[]) => {
+  const pricesPerAcre = properties
+    .filter(p => p.lotSizeAcres && p.lotSizeAcres > 0)
+    .map(p => (p.soldPrice || p.listPrice) / p.lotSizeAcres!)
+    .sort((a, b) => a - b);
+  
+  if (pricesPerAcre.length < 4) return properties;
+  
+  const q1Index = Math.floor(pricesPerAcre.length * 0.25);
+  const q3Index = Math.floor(pricesPerAcre.length * 0.75);
+  const q1 = pricesPerAcre[q1Index];
+  const q3 = pricesPerAcre[q3Index];
+  const iqr = q3 - q1;
+  
+  const lowerBound = q1 - 1.5 * iqr;
+  const upperBound = q3 + 1.5 * iqr;
+  
+  return properties.filter(p => {
+    if (!p.lotSizeAcres || p.lotSizeAcres <= 0) return false;
+    const ppa = (p.soldPrice || p.listPrice) / p.lotSizeAcres;
+    return ppa >= lowerBound && ppa <= upperBound;
+  });
+};
+```
+
+---
+
+## Option 1: Simple Minimum Lot Size (Recommended)
+
+### Update the filtering logic
+
+```typescript
+// Constants
+const MIN_LOT_SIZE_ACRES = 0.05;  // Exclude lots < 2,178 sqft
+const MAX_PRICE_PER_ACRE = 50000000;  // Cap at $50M/acre as sanity check
+
+// Filter for chart display
+const propertiesForChart = comparables.filter(p => {
+  if (!p.lotSizeAcres || p.lotSizeAcres <= 0) return false;
+  if (p.lotSizeAcres < MIN_LOT_SIZE_ACRES) return false;
+  
+  // Optional: cap extreme values
+  const ppa = (p.soldPrice || p.listPrice) / p.lotSizeAcres;
+  if (ppa > MAX_PRICE_PER_ACRE) return false;
+  
+  return true;
+});
+
+// Show filtered count to user
+const excludedCount = comparables.filter(p => 
+  p.lotSizeAcres && p.lotSizeAcres > 0 && p.lotSizeAcres < MIN_LOT_SIZE_ACRES
+).length;
+```
+
+### Update the sidebar to show exclusion note
+
+```tsx
+{excludedCount > 0 && (
+  <div className="px-3 py-2 text-xs text-gray-500 border-t border-gray-200">
+    <span className="italic">
+      {excludedCount} properties excluded (lot &lt; 0.05 acres)
+    </span>
+  </div>
+)}
+```
+
+---
+
+## Option 2: Show Outliers Differently (Alternative)
+
+Keep outliers on the chart but style them differently:
+
+```typescript
+// Classify properties
+const classifyProperty = (p: CmaProperty) => {
+  if (!p.lotSizeAcres || p.lotSizeAcres <= 0) return 'no-data';
+  if (p.lotSizeAcres < MIN_LOT_SIZE_ACRES) return 'outlier';
+  return 'valid';
+};
+
+// In the Scatter component
+<Scatter data={chartData}>
+  {chartData.map((entry, index) => {
+    const isOutlier = entry.lotSizeAcres < MIN_LOT_SIZE_ACRES;
+    return (
+      <Cell 
+        key={`cell-${index}`} 
+        fill={isOutlier ? '#D1D5DB' : getStatusColor(entry.status)}  // Gray for outliers
+        stroke={isOutlier ? '#9CA3AF' : '#fff'}
+        strokeWidth={isOutlier ? 1 : 2}
+        r={isOutlier ? 6 : 10}  // Smaller dots for outliers
+        opacity={isOutlier ? 0.5 : 1}
+      />
+    );
+  })}
+</Scatter>
+```
+
+---
+
+## Full Updated Code
+
+```typescript
+// In AveragePriceAcreWidget.tsx
+
+const MIN_LOT_SIZE_ACRES = 0.05;
+
+export function AveragePriceAcreWidget({
+  subjectProperty,
+  comparables,
+}: Props) {
+  // Filter to valid properties (exclude tiny lots)
+  const validProperties = useMemo(() => {
+    return comparables.filter(p => 
+      p.lotSizeAcres && 
+      p.lotSizeAcres >= MIN_LOT_SIZE_ACRES &&
+      p.type !== 'Lease'
+    );
+  }, [comparables]);
+  
+  // Count excluded
+  const excludedCount = comparables.filter(p => 
+    p.lotSizeAcres && 
+    p.lotSizeAcres > 0 && 
+    p.lotSizeAcres < MIN_LOT_SIZE_ACRES
+  ).length;
+  
+  // Group by status (from valid properties only)
+  const groupedProperties = useMemo(() => ({
+    closed: validProperties.filter(p => p.status === 'Closed'),
+    underContract: validProperties.filter(p => p.status === 'Under Contract'),
+    active: validProperties.filter(p => p.status === 'Active'),
+  }), [validProperties]);
+  
+  // Calculate average $/acre from SOLD with valid lots
+  const avgPricePerAcre = useMemo(() => {
+    const sold = groupedProperties.closed.filter(p => 
+      p.soldPrice && p.soldPrice > 0
+    );
+    
+    if (sold.length === 0) return null;
+    
+    const total = sold.reduce((sum, p) => 
+      sum + (p.soldPrice! / p.lotSizeAcres!), 0
+    );
+    
+    return Math.round(total / sold.length);
+  }, [groupedProperties.closed]);
+  
+  // ... rest of component
+  
+  return (
+    <div>
+      {/* Header */}
+      <div>
+        <h2 className="text-4xl font-bold text-[#EF4923]">
+          {avgPricePerAcre ? formatPrice(avgPricePerAcre) : 'N/A'} 
+          <span className="text-xl text-gray-500"> / ACRE</span>
+        </h2>
+        <p className="text-sm text-gray-600">
+          {avgPricePerAcre 
+            ? `Comparable land sold for an average of ${formatPrice(avgPricePerAcre)} / acre.`
+            : 'No sold properties with valid lot sizes.'
+          }
+        </p>
+        {excludedCount > 0 && (
+          <p className="text-xs text-gray-400 mt-1">
+            {excludedCount} properties excluded (lots under 0.05 acres)
+          </p>
+        )}
+      </div>
+      
+      {/* Sidebar */}
+      <div className="sidebar">
+        {/* ... property groups ... */}
+        
+        {excludedCount > 0 && (
+          <div className="px-3 py-2 text-xs text-gray-400 border-t">
+            {excludedCount} excluded (condos/small lots)
+          </div>
+        )}
+      </div>
+      
+      {/* Chart */}
+      {/* ... chart with validProperties ... */}
+    </div>
+  );
+}
+```
+
+---
+
+## Verification
+
+After applying the fix:
+
+### Before Filter:
+- Average: $111,316,319 / acre
+- Y-axis: $239K - $32.93M (huge range)
+- Properties like "501 West Ave" at $527M/acre included
+
+### After Filter:
+- Average: ~$3-8M / acre (realistic for Austin)
+- Y-axis: More reasonable range
+- Only single-family homes with real lots included
+- Note showing "X properties excluded (lots under 0.05 acres)"
+
+---
+
+## Debug Logging
+
+```typescript
+console.log('[Price/Acre Filter]', {
+  totalComparables: comparables.length,
+  withLotData: comparables.filter(p => p.lotSizeAcres > 0).length,
+  excludedSmallLots: excludedCount,
+  validForChart: validProperties.length,
+  soldForAverage: groupedProperties.closed.length,
+  calculatedAvg: avgPricePerAcre,
+});
+```
+
+Expected output:
+```
+[Price/Acre Filter] {
+  totalComparables: 10,
+  withLotData: 10,
+  excludedSmallLots: 3,
+  validForChart: 7,
+  soldForAverage: 4,
+  calculatedAvg: 4500000
+}
+```
