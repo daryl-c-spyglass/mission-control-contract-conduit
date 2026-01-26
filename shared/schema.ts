@@ -273,6 +273,24 @@ export const sentNotifications = pgTable("sent_notifications", {
   messageTs: varchar("message_ts", { length: 50 }), // Slack message timestamp for reference
 });
 
+// User Notification Preferences (per-agent settings for Slack notifications)
+export const userNotificationPreferences = pgTable("user_notification_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(), // Links to Replit Auth user
+  
+  // Slack Notification Types (3 toggles)
+  notifyDocumentUploads: boolean("notify_document_uploads").default(false),
+  notifyClosingReminders: boolean("notify_closing_reminders").default(false),
+  notifyMarketingAssets: boolean("notify_marketing_assets").default(false),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Types for user notification preferences
+export type UserNotificationPreferences = typeof userNotificationPreferences.$inferSelect;
+export type InsertUserNotificationPreferences = typeof userNotificationPreferences.$inferInsert;
+
 // Agent profiles for CMA reports and marketing
 export const agentProfiles = pgTable("agent_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

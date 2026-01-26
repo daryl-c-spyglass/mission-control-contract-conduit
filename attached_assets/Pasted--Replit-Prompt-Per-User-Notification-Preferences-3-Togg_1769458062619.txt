@@ -1,0 +1,408 @@
+ Replit Prompt: Per-User Notification Preferences (3 Toggles)
+Overview
+Implement user-level Slack notification preferences in the Settings section. Each Spyglass agent has their own notification settings that only affect notifications sent to them. Settings are stored per-user and auto-save on toggle.
+Notification Types (3 total):
+
+Document Uploads
+Closing Date Reminders
+Marketing Assets
+
+
+📁 Files to Modify/Create
+Database Schema:
+
+shared/schema.ts - Add user notification preferences table
+
+Backend:
+
+server/storage.ts - Add storage methods for preferences
+server/routes.ts - Add API endpoints
+
+Frontend:
+
+client/src/components/settings/NotificationPreferences.tsx - New component
+client/src/pages/Settings.tsx - Import and add component
+
+
+🗄️ Step 1: Database Schema
+In shared/schema.ts, add after existing tables:
+typescript// User Notification Preferences (per-agent settings)
+export const userNotificationPreferences = pgTable("user_notification_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(), // Links to Replit Auth user
+  
+  // Slack Notification Types (3 toggles)
+  notifyDocumentUploads: boolean("notify_document_uploads").default(false),
+  notifyClosingReminders: boolean("notify_closing_reminders").default(false),
+  notifyMarketingAssets: boolean("notify_marketing_assets").default(false),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Types
+export type UserNotificationPreferences = typeof userNotificationPreferences.$inferSelect;
+export type InsertUserNotificationPreferences = typeof userNotificationPreferences.$inferInsert;
+
+🔧 Step 2: Storage Methods
+In server/storage.ts, add to the DatabaseStorage class:
+typescript// Add import at top
+import { userNotificationPreferences, UserNotificationPreferences } from "@shared/schema";
+
+// Add these methods to DatabaseStorage class:
+
+async getUserNotificationPreferences(userId: string): Promise<UserNotificationPreferences | null> {
+  const [prefs] = await db
+    .select()
+    .from(userNotificationPreferences)
+    .where(eq(userNotificationPreferences.userId, userId))
+    .limit(1);
+  return prefs || null;
+}
+
+async upsertUserNotificationPreferences(
+  userId: string, 
+  data: Partial<Omit<UserNotificationPreferences, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>
+): Promise<UserNotificationPreferences> {
+  const existing = await this.getUserNotificationPreferences(userId);
+  
+  if (existing) {
+    const [updated] = await db
+      .update(userNotificationPreferences)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(userNotificationPreferences.userId, userId))
+      .returning();
+    return updated;
+  } else {
+    const [created] = await db
+      .insert(userNotificationPreferences)
+      .values({ userId, ...data })
+      .returning();
+    return created;
+  }
+}
+
+🛣️ Step 3: API Routes
+In server/routes.ts, add these endpoints:
+typescript// GET user notification preferences
+app.get("/api/user/notification-preferences", async (req, res) => {
+  try {
+    const userId = req.headers["x-replit-user-id"] as string;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    let prefs = await storage.getUserNotificationPreferences(userId);
+    
+    // Return defaults if no preferences exist yet
+    if (!prefs) {
+      return res.json({
+        userId,
+        notifyDocumentUploads: false,
+        notifyClosingReminders: false,
+        notifyMarketingAssets: false,
+      });
+    }
+    
+    res.json(prefs);
+  } catch (error) {
+    console.error("Error fetching notification preferences:", error);
+    res.status(500).json({ message: "Failed to fetch notification preferences" });
+  }
+});
+
+// PUT update user notification preferences
+app.put("/api/user/notification-preferences", async (req, res) => {
+  try {
+    const userId = req.headers["x-replit-user-id"] as string;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    const prefs = await storage.upsertUserNotificationPreferences(userId, req.body);
+    res.json(prefs);
+  } catch (error) {
+    console.error("Error updating notification preferences:", error);
+    res.status(500).json({ message: "Failed to update notification preferences" });
+  }
+});
+
+🎨 Step 4: Frontend Component
+Create client/src/components/settings/NotificationPreferences.tsx:
+tsximport { useState, useEffect } from "react";
+import { Bell, FileText, Calendar, Image, User, Check } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+
+interface NotificationPrefs {
+  notifyDocumentUploads: boolean;
+  notifyClosingReminders: boolean;
+  notifyMarketingAssets: boolean;
+}
+
+export function NotificationPreferences() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [prefs, setPrefs] = useState<NotificationPrefs>({
+    notifyDocumentUploads: false,
+    notifyClosingReminders: false,
+    notifyMarketingAssets: false,
+  });
+
+  useEffect(() => {
+    fetchPreferences();
+  }, []);
+
+  const fetchPreferences = async () => {
+    try {
+      const res = await fetch("/api/user/notification-preferences");
+      if (res.ok) {
+        const data = await res.json();
+        setPrefs({
+          notifyDocumentUploads: data.notifyDocumentUploads ?? false,
+          notifyClosingReminders: data.notifyClosingReminders ?? false,
+          notifyMarketingAssets: data.notifyMarketingAssets ?? false,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch preferences:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updatePreference = async (key: keyof NotificationPrefs, value: boolean) => {
+    const previousPrefs = { ...prefs };
+    const newPrefs = { ...prefs, [key]: value };
+    setPrefs(newPrefs);
+    setSaving(true);
+    
+    try {
+      const res = await fetch("/api/user/notification-preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: value }),
+      });
+      
+      if (!res.ok) {
+        throw new Error("Failed to save");
+      }
+      
+      toast({
+        title: "Preferences saved",
+        description: "Your notification settings have been updated.",
+      });
+    } catch (error) {
+      // Revert on error
+      setPrefs(previousPrefs);
+      toast({
+        title: "Error",
+        description: "Failed to save preferences. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Card className="bg-zinc-900 border-zinc-800">
+        <CardContent className="p-6">
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 bg-zinc-800 rounded w-1/3"></div>
+            <div className="h-12 bg-zinc-800 rounded"></div>
+            <div className="h-12 bg-zinc-800 rounded"></div>
+            <div className="h-12 bg-zinc-800 rounded"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const notificationOptions = [
+    {
+      key: "notifyDocumentUploads" as const,
+      icon: FileText,
+      title: "Document Uploads",
+      description: "Receive notifications when documents are uploaded",
+    },
+    {
+      key: "notifyClosingReminders" as const,
+      icon: Calendar,
+      title: "Closing Date Reminders",
+      description: "Receive reminders as the closing date approaches",
+    },
+    {
+      key: "notifyMarketingAssets" as const,
+      icon: Image,
+      title: "Marketing Assets",
+      description: "Receive notifications when marketing materials are created",
+    },
+  ];
+
+  // Count active notifications
+  const activeCount = Object.values(prefs).filter(Boolean).length;
+
+  return (
+    <Card className="bg-zinc-900 border-zinc-800">
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-[#EF4923]/10 rounded-lg">
+            <Bell className="h-5 w-5 text-[#EF4923]" />
+          </div>
+          <div>
+            <CardTitle className="text-white">Slack Notifications</CardTitle>
+            <CardDescription className="text-zinc-400">
+              Control what notifications are sent to transaction Slack channels
+            </CardDescription>
+          </div>
+        </div>
+        
+        {/* Personal Preferences Info Banner */}
+        <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-start gap-2">
+          <User className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+          <span className="text-sm text-blue-400">
+            These are your personal notification preferences. Other team members have their own settings.
+          </span>
+        </div>
+      </CardHeader>
+      
+      <CardContent className="space-y-4">
+        <p className="text-sm text-zinc-400 uppercase tracking-wide font-medium">
+          Notification Types
+        </p>
+        
+        {/* Notification Options */}
+        {notificationOptions.map((option) => (
+          <div
+            key={option.key}
+            className="flex items-center justify-between p-4 bg-zinc-800/30 rounded-lg hover:bg-zinc-800/50 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <option.icon className="h-5 w-5 text-zinc-400" />
+              <div>
+                <Label className="text-white font-medium cursor-pointer">
+                  {option.title}
+                </Label>
+                <p className="text-sm text-zinc-500 mt-0.5">{option.description}</p>
+              </div>
+            </div>
+            <Switch
+              checked={prefs[option.key]}
+              onCheckedChange={(checked) => updatePreference(option.key, checked)}
+              disabled={saving}
+              className="data-[state=checked]:bg-[#EF4923]"
+            />
+          </div>
+        ))}
+
+        {/* Auto-save Indicator */}
+        <div className="pt-4 border-t border-zinc-800">
+          <div className="flex items-center gap-2 text-sm text-zinc-500">
+            <Check className="w-4 h-4 text-green-500" />
+            <span>Changes saved automatically to your account</span>
+          </div>
+        </div>
+
+        {/* Active Notifications Summary */}
+        {activeCount > 0 && (
+          <div className="p-4 bg-zinc-800/20 rounded-lg">
+            <p className="text-sm text-zinc-400 mb-2">
+              <span className="text-white font-medium">Your Active Notifications:</span>
+            </p>
+            <div className="space-y-1">
+              {prefs.notifyDocumentUploads && (
+                <div className="flex items-center gap-2 text-sm text-green-400">
+                  <Check className="w-3 h-3" />
+                  Document Upload notifications
+                </div>
+              )}
+              {prefs.notifyClosingReminders && (
+                <div className="flex items-center gap-2 text-sm text-green-400">
+                  <Check className="w-3 h-3" />
+                  Closing Date Reminder notifications
+                </div>
+              )}
+              {prefs.notifyMarketingAssets && (
+                <div className="flex items-center gap-2 text-sm text-green-400">
+                  <Check className="w-3 h-3" />
+                  Marketing Asset notifications
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+🔗 Step 5: Add to Settings Page
+In client/src/pages/Settings.tsx:
+
+Add import at top:
+
+tsximport { NotificationPreferences } from "@/components/settings/NotificationPreferences";
+
+Add the component in the settings layout (place it after Gmail Integration section):
+
+tsx<NotificationPreferences />
+
+🗄️ Step 6: Database Migration
+Run this SQL in Render's psql shell:
+sqlCREATE TABLE IF NOT EXISTS user_notification_preferences (
+  id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id VARCHAR NOT NULL UNIQUE,
+  notify_document_uploads BOOLEAN DEFAULT false,
+  notify_closing_reminders BOOLEAN DEFAULT false,
+  notify_marketing_assets BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_notif_prefs_user_id 
+ON user_notification_preferences(user_id);
+
+📱 Mobile Optimization Requirements
+DeviceBrowserScreen SizeiPad ProSafari1024 x 1366iPad Air/MiniSafari768 x 1024iPhone 14/15 ProSafari393 x 852iPhone SESafari375 x 667Android TabletChrome800 x 1280Android PhoneChrome360 x 800
+Mobile UX Checklist:
+
+ Touch targets minimum 44x44px for all switches
+ Notification rows have adequate padding for touch
+ Info banner text wraps properly on small screens
+ No horizontal overflow on any screen size
+ Font sizes readable (min 16px body text)
+
+
+✅ Testing Checklist
+Database:
+
+ Table created successfully
+ Unique constraint on user_id works
+
+API:
+
+ GET returns defaults for new users
+ GET returns saved preferences for existing users
+ PUT creates new record for first-time users
+ PUT updates existing preferences
+ Unauthorized requests return 401
+
+Frontend:
+
+ Loading skeleton displays while fetching
+ Each toggle saves immediately on change
+ Toast confirms save success
+ Error toast shows on save failure
+ Preferences persist after page refresh
+ Active notifications summary updates correctly
+
+Per-User Verification:
+
+ User A's preferences don't affect User B
+ Logging in as different user shows their preferences
+ Each user's settings are independent

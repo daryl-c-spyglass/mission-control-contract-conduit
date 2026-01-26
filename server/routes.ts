@@ -4733,5 +4733,50 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
     }
   });
 
+  // ============ User Notification Preferences ============
+
+  // GET user notification preferences
+  app.get("/api/user/notification-preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      let prefs = await storage.getUserNotificationPreferences(userId);
+      
+      // Return defaults if no preferences exist yet
+      if (!prefs) {
+        return res.json({
+          userId,
+          notifyDocumentUploads: false,
+          notifyClosingReminders: false,
+          notifyMarketingAssets: false,
+        });
+      }
+      
+      res.json(prefs);
+    } catch (error) {
+      console.error("Error fetching notification preferences:", error);
+      res.status(500).json({ message: "Failed to fetch notification preferences" });
+    }
+  });
+
+  // PUT update user notification preferences
+  app.put("/api/user/notification-preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const prefs = await storage.upsertUserNotificationPreferences(userId, req.body);
+      res.json(prefs);
+    } catch (error) {
+      console.error("Error updating notification preferences:", error);
+      res.status(500).json({ message: "Failed to update notification preferences" });
+    }
+  });
+
   return httpServer;
 }

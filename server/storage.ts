@@ -23,6 +23,7 @@ import {
   type UpdateAgentProfile,
   type AgentResource,
   type InsertAgentResource,
+  type UserNotificationPreferences,
   transactions,
   coordinators,
   integrationSettings,
@@ -35,6 +36,7 @@ import {
   notificationSettings,
   agentProfiles,
   agentResources,
+  userNotificationPreferences,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, isNull, and } from "drizzle-orm";
@@ -117,6 +119,13 @@ export interface IStorage {
   updateAgentResource(id: string, resource: Partial<InsertAgentResource>): Promise<AgentResource | undefined>;
   deleteAgentResource(id: string): Promise<boolean>;
   reorderAgentResources(userId: string, orderedIds: string[]): Promise<boolean>;
+
+  // User Notification Preferences
+  getUserNotificationPreferences(userId: string): Promise<UserNotificationPreferences | null>;
+  upsertUserNotificationPreferences(
+    userId: string, 
+    data: Partial<Omit<UserNotificationPreferences, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>
+  ): Promise<UserNotificationPreferences>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -594,6 +603,38 @@ export class DatabaseStorage implements IStorage {
         ));
     }
     return true;
+  }
+
+  // User Notification Preferences
+  async getUserNotificationPreferences(userId: string): Promise<UserNotificationPreferences | null> {
+    const [prefs] = await db
+      .select()
+      .from(userNotificationPreferences)
+      .where(eq(userNotificationPreferences.userId, userId))
+      .limit(1);
+    return prefs || null;
+  }
+
+  async upsertUserNotificationPreferences(
+    userId: string, 
+    data: Partial<Omit<UserNotificationPreferences, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>
+  ): Promise<UserNotificationPreferences> {
+    const existing = await this.getUserNotificationPreferences(userId);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(userNotificationPreferences)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(userNotificationPreferences.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(userNotificationPreferences)
+        .values({ userId, ...data })
+        .returning();
+      return created;
+    }
   }
 }
 
