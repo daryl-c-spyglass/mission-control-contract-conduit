@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useState, useRef, useEffect } from 'react';
 import { Edit2, Check, X, Info, Star, Camera, MapPin, BarChart3, Home, TrendingUp, Lightbulb, Undo2 } from 'lucide-react';
 import mapboxgl from 'mapbox-gl';
@@ -21,7 +22,7 @@ interface SuggestedPriceWidgetProps {
   mlsNumber?: string;
 }
 
-function PriceTooltip({ 
+function PriceTooltipContent({ 
   suggestedPrice, 
   avgCompPrice, 
   sqft, 
@@ -29,7 +30,6 @@ function PriceTooltip({
   baths, 
   avgDom, 
   listToSaleRatio,
-  onClose
 }: { 
   suggestedPrice: number;
   avgCompPrice: number;
@@ -38,89 +38,72 @@ function PriceTooltip({
   baths: number;
   avgDom: number;
   listToSaleRatio: number;
-  onClose: () => void;
 }) {
   const adjustmentFactor = avgCompPrice > 0 ? (suggestedPrice / avgCompPrice).toFixed(3) : '1.000';
   
   return (
-    <>
-      <div className="fixed inset-0 z-[90]" onClick={onClose} />
-      <div className="absolute z-[100] bottom-full left-1/2 -translate-x-1/2 mb-2 
-                      w-80 sm:w-96 bg-card rounded-xl shadow-2xl 
-                      border border-border overflow-hidden max-h-[70vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-4 py-3 bg-muted border-b border-border">
-          <h4 className="font-semibold text-foreground flex items-center gap-2">
-            <Info className="w-4 h-4 text-[#EF4923]" />
-            How is this price calculated?
-          </h4>
-          <Button 
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            data-testid="button-close-tooltip"
-          >
-            <X className="w-4 h-4" />
-          </Button>
+    <div className="space-y-2 text-xs">
+      <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground border-b border-border pb-2">
+        <Info className="w-3.5 h-3.5 text-[#EF4923]" />
+        How is this price calculated?
+      </div>
+      
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <h5 className="font-medium text-foreground flex items-center gap-1 mb-0.5 text-xs">
+            <BarChart3 className="w-3 h-3 text-[#EF4923]" /> Sales Analysis
+          </h5>
+          <ul className="text-muted-foreground space-y-0 ml-4" style={{ fontSize: '10px' }}>
+            <li>• Avg sold price of comps</li>
+            <li>• Size/age adjustments</li>
+          </ul>
         </div>
         
-        <div className="p-4 space-y-3 text-sm max-h-[50vh] overflow-y-auto">
-          <div>
-            <h5 className="font-medium text-foreground flex items-center gap-2 mb-1">
-              <BarChart3 className="w-4 h-4 text-[#EF4923]" /> Comparable Sales Analysis
-            </h5>
-            <ul className="text-muted-foreground space-y-0.5 ml-6 text-xs">
-              <li>• Average sold price of similar properties</li>
-              <li>• Adjusted for size, age, and features</li>
-            </ul>
-          </div>
-          
-          <div>
-            <h5 className="font-medium text-foreground flex items-center gap-2 mb-1">
-              <MapPin className="w-4 h-4 text-[#EF4923]" /> Location Factors
-            </h5>
-            <ul className="text-muted-foreground space-y-0.5 ml-6 text-xs">
-              <li>• Neighborhood market trends</li>
-              <li>• Recent sales within search radius</li>
-            </ul>
-          </div>
-          
-          <div>
-            <h5 className="font-medium text-foreground flex items-center gap-2 mb-1">
-              <Home className="w-4 h-4 text-[#EF4923]" /> Property Characteristics
-            </h5>
-            <ul className="text-muted-foreground space-y-0.5 ml-6 text-xs">
-              <li>• Square footage: {sqft.toLocaleString()} sq ft</li>
-              <li>• Beds/Baths: {beds} bed / {baths} bath</li>
-            </ul>
-          </div>
-          
-          <div>
-            <h5 className="font-medium text-foreground flex items-center gap-2 mb-1">
-              <TrendingUp className="w-4 h-4 text-[#EF4923]" /> Market Conditions
-            </h5>
-            <ul className="text-muted-foreground space-y-0.5 ml-6 text-xs">
-              <li>• Average days on market: {avgDom} days</li>
-              <li>• List-to-sale price ratio: {(listToSaleRatio * 100).toFixed(0)}%</li>
-            </ul>
-          </div>
-          
-          <div className="pt-2 border-t border-border">
-            <h5 className="font-medium text-foreground mb-1 text-xs">Calculation</h5>
-            <div className="bg-muted rounded-lg p-2 font-mono text-xs">
-              <div className="text-muted-foreground">Avg Comp Price × Adjustment</div>
-              <div className="text-foreground font-semibold">
-                ${avgCompPrice.toLocaleString()} × {adjustmentFactor} = ${suggestedPrice.toLocaleString()}
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex items-start gap-2 text-xs text-muted-foreground bg-[#EF4923]/10 rounded-lg p-2">
-            <Lightbulb className="w-4 h-4 flex-shrink-0 text-[#EF4923]" />
-            <span>This is a suggested starting point. Click "Edit Price" to adjust.</span>
+        <div>
+          <h5 className="font-medium text-foreground flex items-center gap-1 mb-0.5 text-xs">
+            <MapPin className="w-3 h-3 text-[#EF4923]" /> Location
+          </h5>
+          <ul className="text-muted-foreground space-y-0 ml-4" style={{ fontSize: '10px' }}>
+            <li>• Market trends</li>
+            <li>• Recent area sales</li>
+          </ul>
+        </div>
+        
+        <div>
+          <h5 className="font-medium text-foreground flex items-center gap-1 mb-0.5 text-xs">
+            <Home className="w-3 h-3 text-[#EF4923]" /> Property
+          </h5>
+          <ul className="text-muted-foreground space-y-0 ml-4" style={{ fontSize: '10px' }}>
+            <li>• {sqft.toLocaleString()} sq ft</li>
+            <li>• {beds} bed / {baths} bath</li>
+          </ul>
+        </div>
+        
+        <div>
+          <h5 className="font-medium text-foreground flex items-center gap-1 mb-0.5 text-xs">
+            <TrendingUp className="w-3 h-3 text-[#EF4923]" /> Market
+          </h5>
+          <ul className="text-muted-foreground space-y-0 ml-4" style={{ fontSize: '10px' }}>
+            <li>• {avgDom} days avg DOM</li>
+            <li>• {(listToSaleRatio * 100).toFixed(0)}% list-to-sale</li>
+          </ul>
+        </div>
+      </div>
+      
+      <div className="pt-1.5 border-t border-border">
+        <div className="bg-muted rounded p-1.5 font-mono" style={{ fontSize: '10px' }}>
+          <div className="text-muted-foreground">Avg Comp × Adjustment</div>
+          <div className="text-foreground font-semibold">
+            ${avgCompPrice.toLocaleString()} × {adjustmentFactor} = ${suggestedPrice.toLocaleString()}
           </div>
         </div>
       </div>
-    </>
+      
+      <div className="flex items-start gap-1.5 text-muted-foreground bg-[#EF4923]/10 rounded p-1.5" style={{ fontSize: '10px' }}>
+        <Lightbulb className="w-3 h-3 flex-shrink-0 text-[#EF4923] mt-0.5" />
+        <span>Suggested starting point. Click "Edit" to adjust.</span>
+      </div>
+    </div>
   );
 }
 
@@ -433,20 +416,26 @@ export function SuggestedPriceWidget({
                   <p className="text-[10px] sm:text-xs text-muted-foreground">Suggested List Price</p>
                   
                   <div className="flex items-center justify-center gap-1 mt-1">
-                    <div className="relative">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setShowTooltip(!showTooltip)}
-                        className="text-muted-foreground"
-                        aria-label="How is this price calculated?"
-                        data-testid="button-price-info"
+                    <Popover open={showTooltip} onOpenChange={setShowTooltip}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground"
+                          aria-label="How is this price calculated?"
+                          data-testid="button-price-info"
+                        >
+                          <Info className="w-4 h-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent 
+                        className="w-80 p-3" 
+                        side="top"
+                        sideOffset={5}
+                        collisionPadding={16}
+                        avoidCollisions={true}
                       >
-                        <Info className="w-4 h-4" />
-                      </Button>
-                      
-                      {showTooltip && (
-                        <PriceTooltip
+                        <PriceTooltipContent
                           suggestedPrice={displayPrice}
                           avgCompPrice={avgPrice}
                           sqft={subjectProperty?.sqft || 0}
@@ -454,10 +443,9 @@ export function SuggestedPriceWidget({
                           baths={subjectProperty?.baths || 0}
                           avgDom={avgDom}
                           listToSaleRatio={listToSaleRatio}
-                          onClose={() => setShowTooltip(false)}
                         />
-                      )}
-                    </div>
+                      </PopoverContent>
+                    </Popover>
                     
                     <Button
                       variant="ghost"
