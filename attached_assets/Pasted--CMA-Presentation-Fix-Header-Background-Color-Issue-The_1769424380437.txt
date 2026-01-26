@@ -1,0 +1,120 @@
+# CMA Presentation — Fix Header Background Color
+
+## Issue
+
+The header background has an inconsistent color or gap at the top (see red arrow in screenshot). The header should use **Spyglass black (#222222)** consistently across the full header area on Home and all slides.
+
+---
+
+## Current vs Target
+
+| Current | Target |
+|---------|--------|
+| Gap or different color at top | Solid Spyglass black (#222222) |
+| May be using navy (#1a1a2e) | Should be brand black (#222222) |
+
+---
+
+## Fix
+
+### Find the Header Component:
+
+```bash
+grep -rn "header\|Header" --include="*.tsx" client/src/components/cma-presentation/
+```
+
+### Update Background Color:
+
+```tsx
+// BEFORE (may have gap or wrong color)
+<header className="bg-[#1a1a2e] ...">
+
+// AFTER (Spyglass brand black, full coverage)
+<header className="bg-[#222222] ...">
+```
+
+### Ensure Full Coverage (no gap):
+
+```tsx
+// Make sure header extends to top of viewport
+<header className="fixed top-0 left-0 right-0 h-[60px] bg-[#222222] z-50">
+  {/* Header content */}
+</header>
+
+// Or if using safe-area-inset for notched devices:
+<header className="fixed top-0 left-0 right-0 bg-[#222222] z-50 pt-safe">
+  <div className="h-[60px] px-4 flex items-center">
+    {/* Header content */}
+  </div>
+</header>
+```
+
+### Check for Parent Container Issues:
+
+```tsx
+// If there's a wrapper causing the gap, ensure it also has the background
+<div className="min-h-screen bg-[#222222]">
+  <header className="bg-[#222222]">...</header>
+  <main className="bg-white">...</main>
+</div>
+```
+
+---
+
+## Copy/Paste for Replit
+
+```
+Fix the CMA Presentation header background color - there's a gap/inconsistency at the top.
+
+## ISSUE:
+Header background has a gap or different color at the top (see attached screenshot with red arrow).
+
+## FIX:
+
+1. Find header component in:
+   client/src/components/cma-presentation/
+
+2. Change background color to Spyglass black:
+   - FROM: bg-[#1a1a2e] or any other color
+   - TO: bg-[#222222]
+
+3. Ensure header covers full top area:
+   <header className="fixed top-0 left-0 right-0 bg-[#222222] z-50">
+
+4. If using safe-area-inset for notched devices, wrap properly:
+   <header className="fixed top-0 left-0 right-0 bg-[#222222] z-50">
+     <div className="pt-safe">
+       <div className="h-[60px] px-4 flex items-center">
+         {/* content */}
+       </div>
+     </div>
+   </header>
+
+5. Check parent containers don't have different background causing the gap.
+
+## APPLY TO:
+- Home view header
+- All slide view headers
+- Any other header variations
+
+## SPYGLASS BRAND COLOR:
+Black: #222222 (not navy #1a1a2e)
+```
+
+---
+
+## Expected Result
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│████████████████████████████████████████████████████████████│ ← No gap, solid #222222
+│ ☰ [SPYGLASS]     COMPARATIVE MARKET...    Daryl C. [📷] X │
+│████████████████████████████████████████████████████████████│
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│                    [Content Area]                           │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+The header should be solid **Spyglass black (#222222)** with no gaps or color inconsistencies.

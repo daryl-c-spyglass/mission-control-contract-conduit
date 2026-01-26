@@ -94,10 +94,7 @@ export function SlideViewer({
       data-testid="slide-viewer"
     >
       <div 
-        className="flex-shrink-0"
-        style={{
-          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%)'
-        }}
+        className="flex-shrink-0 bg-[#222222]"
       >
         <div className="relative flex items-center justify-between p-3">
           <div className="flex items-center gap-2 z-10">

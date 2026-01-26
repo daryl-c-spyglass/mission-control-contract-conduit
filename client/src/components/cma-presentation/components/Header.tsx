@@ -42,17 +42,14 @@ export function Header({
 
   return (
     <div className="relative h-40 md:h-48 flex-shrink-0" data-testid="presentation-header">
-      {/* Dark gradient background */}
+      {/* Spyglass black background */}
       <div 
-        className="absolute inset-0"
-        style={{
-          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%)'
-        }}
+        className="absolute inset-0 bg-[#222222]"
       />
       
       {/* Subtle pattern overlay for depth */}
       <div 
-        className="absolute inset-0 opacity-20"
+        className="absolute inset-0 opacity-10"
         style={{
           backgroundImage: `radial-gradient(circle at 25% 25%, rgba(255,255,255,0.1) 0%, transparent 50%),
                             radial-gradient(circle at 75% 75%, rgba(255,255,255,0.05) 0%, transparent 50%)`
