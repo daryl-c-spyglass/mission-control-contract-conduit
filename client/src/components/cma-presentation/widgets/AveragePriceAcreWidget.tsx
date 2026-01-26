@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Info, Home, TrendingUp } from 'lucide-react';
 import { 
   ScatterChart, 
   Scatter, 
@@ -187,14 +188,18 @@ interface SubjectDiamondProps {
 
 function SubjectDiamond({ cx, cy }: SubjectDiamondProps) {
   if (cx === undefined || cy === undefined) return null;
-  const size = 10;
+  const size = 14; // Increased from 10 for better visibility
   return (
-    <polygon
-      points={`${cx},${cy - size} ${cx + size},${cy} ${cx},${cy + size} ${cx - size},${cy}`}
-      fill={STATUS_COLORS.subject}
-      stroke="white"
-      strokeWidth={2}
-    />
+    <g>
+      {/* Invisible hit area for touch targets */}
+      <circle cx={cx} cy={cy} r={22} fill="transparent" />
+      <polygon
+        points={`${cx},${cy - size} ${cx + size},${cy} ${cx},${cy + size} ${cx - size},${cy}`}
+        fill={STATUS_COLORS.subject}
+        stroke="white"
+        strokeWidth={2}
+      />
+    </g>
   );
 }
 
@@ -416,17 +421,43 @@ export function AveragePriceAcreWidget({
 
         <div className="flex-1 min-w-0 p-4 lg:p-6 flex flex-col overflow-hidden">
           <div className="mb-3">
-            <h2 className="text-3xl lg:text-4xl font-bold text-[#EF4923]">
-              {formatFullPrice(avgPricePerAcre)} <span className="text-lg lg:text-xl text-muted-foreground">/ ACRE</span>
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Comparable land sold for an average of <span className="text-[#EF4923] font-medium">{formatFullPrice(avgPricePerAcre)}</span> / acre.
-            </p>
-            {excludedSmallLotCount > 0 && (
-              <p className="text-xs text-muted-foreground/70 mt-1">
-                {excludedSmallLotCount} propert{excludedSmallLotCount === 1 ? 'y' : 'ies'} excluded (lots under 0.05 acres)
-              </p>
-            )}
+            <div className="flex items-start gap-2">
+              <div>
+                <h2 className="text-3xl lg:text-4xl font-bold text-[#EF4923]">
+                  {formatFullPrice(avgPricePerAcre)} <span className="text-lg lg:text-xl text-muted-foreground">/ ACRE</span>
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Comparable land sold for an average of <span className="text-[#EF4923] font-medium">{formatFullPrice(avgPricePerAcre)}</span> / acre.
+                </p>
+                {excludedSmallLotCount > 0 && (
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    {excludedSmallLotCount} propert{excludedSmallLotCount === 1 ? 'y' : 'ies'} excluded (lots under 0.05 acres)
+                  </p>
+                )}
+              </div>
+              
+              <div className="relative group">
+                <button 
+                  className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                  data-testid="button-price-acre-info"
+                >
+                  <Info className="w-4 h-4" />
+                </button>
+                <div className="absolute left-0 top-full mt-1 w-64 p-3 bg-popover 
+                                rounded-lg shadow-lg border border-border
+                                opacity-0 invisible group-hover:opacity-100 group-hover:visible 
+                                transition-all z-50 text-xs text-muted-foreground">
+                  <p className="font-medium text-foreground mb-1">Price Per Acre Analysis</p>
+                  <p>
+                    This chart shows the relationship between property price and lot size (acres). 
+                    The trendline represents the average price per acre based on sold listings only.
+                  </p>
+                  <p className="mt-2 text-muted-foreground/70">
+                    Properties below the trendline may be undervalued; those above may be premium-priced.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <Card className="flex-1 min-h-0 p-3 lg:p-4 overflow-hidden">
@@ -488,7 +519,7 @@ export function AveragePriceAcreWidget({
                           fill={getStatusColor(entry.status)}
                           stroke="white"
                           strokeWidth={2}
-                          r={8}
+                          r={12}
                         />
                       ))}
                     </Scatter>
@@ -504,10 +535,22 @@ export function AveragePriceAcreWidget({
                 </ScatterChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <p className="text-lg font-medium">No Acreage Data Available</p>
-                  <p className="text-sm">Properties need lot size information to display this chart</p>
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center max-w-md px-4">
+                  <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <TrendingUp className="w-6 h-6 text-amber-500" />
+                  </div>
+                  <p className="text-lg font-medium text-foreground mb-1">Lot Size Data Unavailable</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Lot size information is not available for comparable properties in this area. 
+                    This data may not be reported in the MLS for this property type or location.
+                  </p>
+                  {comparables.length > 0 && (
+                    <p className="text-xs text-muted-foreground/70">
+                      {comparables.length} comparable{comparables.length !== 1 ? 's' : ''} found, 
+                      but none include lot size data.
+                    </p>
+                  )}
                 </div>
               </div>
             )}

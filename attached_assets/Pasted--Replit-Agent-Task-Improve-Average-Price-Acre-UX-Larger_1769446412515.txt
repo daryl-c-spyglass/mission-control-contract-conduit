@@ -1,0 +1,335 @@
+# Replit Agent Task: Improve Average Price/Acre UX - Larger Dots & Missing Data Message
+
+## Test Property
+**Address:** 154 Pettigrew, Buda, TX 78610  
+**MLS#:** ACT2451173
+
+---
+
+## Task 1: Increase Scatter Plot Dot Size
+
+### Current State
+The scatter plot dots are hard to see/click, especially on touch devices.
+
+### Fix
+Increase the dot radius from current size to **12px** for better visibility and touch targets.
+
+### In `AveragePriceAcreWidget.tsx` (or scatter chart component)
+
+Find the Scatter/Cell components and update the radius:
+
+```tsx
+{/* Property scatter points */}
+<Scatter
+  data={chartData}
+  onClick={(data) => onPropertyClick(data)}
+  cursor="pointer"
+>
+  {chartData.map((entry, index) => (
+    <Cell 
+      key={`cell-${index}`} 
+      fill={getStatusColor(entry.status)}
+      stroke="#fff"
+      strokeWidth={2}
+      r={12}  // ← INCREASE FROM 10 TO 12
+    />
+  ))}
+</Scatter>
+
+{/* Subject Property (blue diamond) - make slightly larger */}
+<Scatter
+  data={subjectData}
+  shape="diamond"
+>
+  <Cell 
+    fill="#3B82F6" 
+    stroke="#fff" 
+    strokeWidth={2} 
+    r={14}  // ← INCREASE FROM 12 TO 14
+  />
+</Scatter>
+```
+
+### Mobile Touch Target Compliance
+For accessibility, touch targets should be at least 44x44px. With r=12, the dot diameter is 24px. Add a transparent hit area:
+
+```tsx
+// Option: Use a custom shape with larger hit area
+const CustomDot = (props: any) => {
+  const { cx, cy, fill, stroke, strokeWidth, onClick, payload } = props;
+  return (
+    <g onClick={() => onClick?.(payload)} style={{ cursor: 'pointer' }}>
+      {/* Invisible hit area for touch */}
+      <circle cx={cx} cy={cy} r={22} fill="transparent" />
+      {/* Visible dot */}
+      <circle 
+        cx={cx} 
+        cy={cy} 
+        r={12} 
+        fill={fill} 
+        stroke={stroke} 
+        strokeWidth={strokeWidth} 
+      />
+    </g>
+  );
+};
+
+// Use in Scatter
+<Scatter
+  data={chartData}
+  shape={<CustomDot onClick={onPropertyClick} />}
+/>
+```
+
+---
+
+## Task 2: Add Placeholder Message When Lot Data is Missing
+
+### Scenarios to Handle
+
+| Scenario | Message to Display |
+|----------|-------------------|
+| No comparables at all | "No comparable properties found for this listing." |
+| Comparables exist but none have lot data | "Lot size data is not available for comparable properties in this area." |
+| Only subject property has lot data | "Lot size data is not available for comparable properties. Only the subject property is shown." |
+| Data is loading | Show loading spinner |
+| API error | "Unable to load comparable data. Please try refreshing." |
+
+### Implementation
+
+```tsx
+// In AveragePriceAcreWidget.tsx
+
+interface Props {
+  subjectProperty: CmaProperty;
+  comparables: CmaProperty[];
+  isLoading?: boolean;
+  error?: string;
+}
+
+export function AveragePriceAcreWidget({
+  subjectProperty,
+  comparables,
+  isLoading,
+  error,
+}: Props) {
+  
+  // Count properties with lot data
+  const comparablesWithLotData = comparables.filter(p => 
+    p.lotSizeAcres && p.lotSizeAcres > 0
+  );
+  
+  const subjectHasLotData = subjectProperty?.lotSizeAcres && subjectProperty.lotSizeAcres > 0;
+  
+  // Determine the state
+  const getDisplayState = () => {
+    if (isLoading) return 'loading';
+    if (error) return 'error';
+    if (comparables.length === 0) return 'no-comparables';
+    if (comparablesWithLotData.length === 0 && !subjectHasLotData) return 'no-lot-data';
+    if (comparablesWithLotData.length === 0 && subjectHasLotData) return 'subject-only';
+    return 'has-data';
+  };
+  
+  const displayState = getDisplayState();
+  
+  // Render placeholder for empty/error states
+  const renderPlaceholder = () => {
+    switch (displayState) {
+      case 'loading':
+        return (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-8 h-8 border-2 border-[#EF4923] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-sm text-gray-500">Loading property data...</p>
+            </div>
+          </div>
+        );
+        
+      case 'error':
+        return (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center max-w-md px-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <AlertCircle className="w-6 h-6 text-red-500" />
+              </div>
+              <p className="text-lg font-medium text-gray-900 mb-1">Unable to Load Data</p>
+              <p className="text-sm text-gray-500">{error || 'Please try refreshing the page.'}</p>
+            </div>
+          </div>
+        );
+        
+      case 'no-comparables':
+        return (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center max-w-md px-4">
+              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Home className="w-6 h-6 text-gray-400" />
+              </div>
+              <p className="text-lg font-medium text-gray-900 mb-1">No Comparable Properties</p>
+              <p className="text-sm text-gray-500">
+                No comparable properties were found for this listing. Try adjusting the search criteria.
+              </p>
+            </div>
+          </div>
+        );
+        
+      case 'no-lot-data':
+        return (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center max-w-md px-4">
+              <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <TrendingUp className="w-6 h-6 text-amber-500" />
+              </div>
+              <p className="text-lg font-medium text-gray-900 mb-1">Lot Size Data Unavailable</p>
+              <p className="text-sm text-gray-500 mb-3">
+                Lot size information is not available for comparable properties in this area. 
+                This data may not be reported in the MLS for this property type or location.
+              </p>
+              <p className="text-xs text-gray-400">
+                {comparables.length} comparable{comparables.length !== 1 ? 's' : ''} found, 
+                but none include lot size data.
+              </p>
+            </div>
+          </div>
+        );
+        
+      case 'subject-only':
+        return (
+          <div className="h-full flex flex-col">
+            {/* Show chart with just subject property */}
+            <div className="flex-1 relative">
+              {/* Render chart with only subject property diamond */}
+              <ScatterChartWithSubjectOnly subjectProperty={subjectProperty} />
+              
+              {/* Overlay message */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg p-4 shadow-lg max-w-sm text-center">
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    <span className="font-medium">Note:</span> Lot size data is not available 
+                    for comparable properties. Only the subject property is displayed.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+        
+      default:
+        return null;
+    }
+  };
+  
+  // Main render
+  if (displayState !== 'has-data' && displayState !== 'subject-only') {
+    return (
+      <div className="h-full w-full flex flex-col bg-gray-50 dark:bg-gray-900">
+        {/* Header - show even in empty state */}
+        <div className="p-4 lg:p-6">
+          <h2 className="text-4xl font-bold text-gray-300">
+            -- <span className="text-xl">/ ACRE</span>
+          </h2>
+          <p className="text-sm text-gray-400 mt-1">
+            Average price per acre data unavailable
+          </p>
+        </div>
+        
+        {/* Placeholder content */}
+        <div className="flex-1 min-h-0">
+          {renderPlaceholder()}
+        </div>
+        
+        {/* Legend - dimmed */}
+        <div className="p-4 opacity-50">
+          <div className="flex items-center gap-4 text-xs text-gray-400">
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 bg-blue-500 rounded-sm rotate-45"></span>
+              Subject Property
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 bg-red-500 rounded-full"></span>
+              Closed
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+              Active
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Normal render with data...
+  return (
+    // ... existing chart render
+  );
+}
+```
+
+---
+
+## Task 3: Add Info Icon with Explanation
+
+Add a small info icon next to the header that explains what this chart shows:
+
+```tsx
+import { Info } from 'lucide-react';
+
+// In the header section
+<div className="flex items-start gap-2">
+  <div>
+    <h2 className="text-4xl font-bold text-[#EF4923]">
+      {formatPrice(avgPricePerAcre)} <span className="text-xl text-gray-500">/ ACRE</span>
+    </h2>
+    <p className="text-sm text-gray-600 mt-1">
+      Comparable land sold for an average of {formatPrice(avgPricePerAcre)} / acre.
+    </p>
+  </div>
+  
+  {/* Info tooltip */}
+  <div className="relative group">
+    <button className="p-1 text-gray-400 hover:text-gray-600 transition-colors">
+      <Info className="w-4 h-4" />
+    </button>
+    <div className="absolute left-0 top-full mt-1 w-64 p-3 bg-white dark:bg-gray-800 
+                    rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 
+                    opacity-0 invisible group-hover:opacity-100 group-hover:visible 
+                    transition-all z-10 text-xs text-gray-600 dark:text-gray-300">
+      <p className="font-medium mb-1">Price Per Acre Analysis</p>
+      <p>
+        This chart shows the relationship between property price and lot size (acres). 
+        The trendline represents the average price per acre based on sold listings only.
+      </p>
+      <p className="mt-2 text-gray-400">
+        Properties below the trendline may be undervalued; those above may be premium-priced.
+      </p>
+    </div>
+  </div>
+</div>
+```
+
+---
+
+## Summary of Changes
+
+| Change | Description |
+|--------|-------------|
+| **Larger dots** | Increase radius from 10→12 for comparables, 12→14 for subject |
+| **Touch targets** | Add invisible 44px hit area for mobile accessibility |
+| **No data message** | "Lot size data is not available for comparable properties in this area" |
+| **Subject-only state** | Show subject diamond with overlay explanation |
+| **Error state** | Clear error message with refresh suggestion |
+| **Info tooltip** | Explain what the chart shows and how to interpret it |
+
+---
+
+## Verification Checklist
+
+- [ ] Dots are visibly larger on the scatter plot
+- [ ] Dots are easy to tap on mobile/tablet
+- [ ] Empty state shows helpful message when no lot data
+- [ ] Subject-only state shows diamond with explanation
+- [ ] Error state shows appropriate message
+- [ ] Info icon tooltip explains the chart
+- [ ] Test with property: 154 Pettigrew, Buda, TX (MLS# ACT2451173)
