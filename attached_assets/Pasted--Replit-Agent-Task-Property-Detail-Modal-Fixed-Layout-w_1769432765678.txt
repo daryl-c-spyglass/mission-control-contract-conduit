@@ -1,0 +1,662 @@
+# Replit Agent Task: Property Detail Modal - Fixed Layout with Mapbox
+
+## Problem
+The current modal layout is cutting off content and has empty space. Need to reorganize into a proper 3-column layout that fits everything on one screen.
+
+---
+
+## CORRECT LAYOUT (3-Column Grid)
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  ✕  321 Delayne DR , TX                                                          │
+├────────────────────┬─────────────────────────────┬───────────────────────────────┤
+│   LEFT COLUMN      │     MIDDLE COLUMN           │      RIGHT COLUMN             │
+│   (4/12 cols)      │     (5/12 cols)             │      (3/12 cols)              │
+│                    │                             │                               │
+│  ┌──────────────┐  │  ┌─────────────────────┐   │  ┌─────────────────────────┐  │
+│  │              │  │  │                     │   │  │ [Closed]  0 DAYS        │  │
+│  │   MAPBOX     │  │  │                     │   │  │                         │  │
+│  │    MAP       │  │  │   PROPERTY PHOTO    │   │  │ $2,050,000              │  │
+│  │              │  │  │                     │   │  │ $573/sqft               │  │
+│  │  📍          │  │  │    ← [img] →        │   │  │                         │  │
+│  │              │  │  │                     │   │  │ 4 beds · 4 baths ·      │  │
+│  └──────────────┘  │  │  📷 40      1/40    │   │  │ 3,578 sqft              │  │
+│                    │  └─────────────────────┘   │  │                         │  │
+│  ┌──────┬───────┐  │                            │  │ Sold: 10/18/2025        │  │
+│  │BEDS  │BATHS  │  │                            │  └─────────────────────────┘  │
+│  │  4   │  4    │  │                            │                               │
+│  ├──────┼───────┤  │                            │  ┌─────────────────────────┐  │
+│  │HOME  │YEAR   │  │                            │  │ Price History           │  │
+│  │SIZE  │BUILT  │  │                            │  │─────────────────────────│  │
+│  │3,578 │ N/A   │  │                            │  │ Orig. Price  $2,150,000 │  │
+│  ├──────┼───────┤  │                            │  │ List Price   $2,099,900 │  │
+│  │GARAGE│LOT    │  │                            │  │ Sold Price   $2,050,000 │  │
+│  │  2   │SIZE   │  │                            │  └─────────────────────────┘  │
+│  │      │9,679  │  │                            │                               │
+│  └──────┴───────┘  │                            │  ┌─────────────────────────┐  │
+│                    │                            │  │ Listing Details         │  │
+│  ┌──────────────┐  │                            │  │─────────────────────────│  │
+│  │Property      │  │                            │  │ Price/Sq Ft      $573   │  │
+│  │Description   │  │                            │  │ Days on Market     0    │  │
+│  │              │  │                            │  │ Listed       10/01/2025 │  │
+│  │Stunning      │  │                            │  │ Sold         10/18/2025 │  │
+│  │modern        │  │                            │  └─────────────────────────┘  │
+│  │farmhouse...  │  │                            │                               │
+│  │              │  │                            │  ┌─────────────────────────┐  │
+│  └──────────────┘  │                            │  │ MLS# ACT3841116         │  │
+│                    │                            │  └─────────────────────────┘  │
+└────────────────────┴─────────────────────────────┴───────────────────────────────┘
+```
+
+---
+
+## IMPLEMENTATION
+
+### Grid Structure (Tailwind CSS)
+
+```tsx
+<div className="grid grid-cols-12 h-full">
+  {/* LEFT: Map + Stats + Description */}
+  <div className="col-span-12 lg:col-span-4 border-r border-gray-200 overflow-y-auto">
+    {/* Map */}
+    {/* Stats Grid */}
+    {/* Description */}
+  </div>
+  
+  {/* MIDDLE: Photo Gallery */}
+  <div className="col-span-12 lg:col-span-5 bg-gray-900">
+    {/* Large photo with navigation */}
+  </div>
+  
+  {/* RIGHT: Pricing & Details */}
+  <div className="col-span-12 lg:col-span-3 bg-gray-50 overflow-y-auto">
+    {/* Status + Price */}
+    {/* Price History */}
+    {/* Listing Details */}
+    {/* MLS Info */}
+  </div>
+</div>
+```
+
+---
+
+## MAPBOX INTEGRATION
+
+### Environment Variable
+```
+MAPBOX_ACCESS_TOKEN=pk.xxxxx (already in Replit secrets)
+```
+
+### Install Mapbox GL JS
+```bash
+npm install mapbox-gl
+```
+
+### Map Component
+
+```tsx
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { useEffect, useRef } from 'react';
+
+interface MapboxMapProps {
+  coordinates: { lat: number; lng: number };
+  address: string;
+}
+
+export function MapboxMap({ coordinates, address }: MapboxMapProps) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  
+  useEffect(() => {
+    if (!mapContainer.current || map.current) return;
+    
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || process.env.MAPBOX_ACCESS_TOKEN;
+    
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12', // or 'mapbox://styles/mapbox/light-v11'
+      center: [coordinates.lng, coordinates.lat],
+      zoom: 14,
+    });
+    
+    // Add marker
+    new mapboxgl.Marker({ color: '#EF4923' })
+      .setLngLat([coordinates.lng, coordinates.lat])
+      .setPopup(new mapboxgl.Popup().setHTML(`<strong>${address}</strong>`))
+      .addTo(map.current);
+    
+    // Add navigation controls
+    map.current.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+    
+    // Cleanup
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, [coordinates, address]);
+  
+  return (
+    <div ref={mapContainer} className="w-full h-48" />
+  );
+}
+```
+
+### Use in Modal
+
+```tsx
+{/* Map Section */}
+<div className="relative h-48 border-b border-gray-200">
+  {property.coordinates ? (
+    <MapboxMap 
+      coordinates={property.coordinates}
+      address={property.address.full}
+    />
+  ) : (
+    <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400">
+      No location data available
+    </div>
+  )}
+  
+  {/* Coordinates Overlay */}
+  {property.coordinates && (
+    <div className="absolute top-2 left-2 bg-white/90 backdrop-blur rounded shadow-md p-2 text-xs z-10">
+      <div className="font-mono text-gray-700">
+        {property.coordinates.lat.toFixed(6)}°N {Math.abs(property.coordinates.lng).toFixed(6)}°W
+      </div>
+      <a 
+        href={`https://www.google.com/maps/dir/?api=1&destination=${property.coordinates.lat},${property.coordinates.lng}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-600 hover:underline flex items-center gap-1 mt-1"
+      >
+        <Navigation className="w-3 h-3" /> Directions
+      </a>
+    </div>
+  )}
+</div>
+```
+
+---
+
+## COMPLETE MODAL COMPONENT
+
+```tsx
+import { useState, useEffect, useRef } from 'react';
+import { X, ChevronLeft, ChevronRight, Bed, Bath, Square, Calendar, Car, Maximize, Camera, Navigation } from 'lucide-react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+interface PropertyDetailModalProps {
+  property: NormalizedListing;
+  subjectProperty?: NormalizedListing;
+  onClose: () => void;
+}
+
+export function PropertyDetailModal({ property, subjectProperty, onClose }: PropertyDetailModalProps) {
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  
+  const photos = property.photos || [];
+  
+  // Initialize Mapbox
+  useEffect(() => {
+    if (!mapContainer.current || map.current || !property.coordinates) return;
+    
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+    
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [property.coordinates.lng, property.coordinates.lat],
+      zoom: 14,
+    });
+    
+    new mapboxgl.Marker({ color: '#EF4923' })
+      .setLngLat([property.coordinates.lng, property.coordinates.lat])
+      .addTo(map.current);
+    
+    map.current.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+    
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, [property.coordinates]);
+  
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft' && photos.length > 1) {
+        setCurrentPhotoIndex(i => i === 0 ? photos.length - 1 : i - 1);
+      }
+      if (e.key === 'ArrowRight' && photos.length > 1) {
+        setCurrentPhotoIndex(i => i === photos.length - 1 ? 0 : i + 1);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [photos.length, onClose]);
+  
+  // Comparison calculations
+  const calcDiff = (propVal: number | null, subjectVal: number | null) => {
+    if (!propVal || !subjectVal || subjectVal === 0) return null;
+    const diff = ((propVal - subjectVal) / subjectVal) * 100;
+    return { text: `${diff >= 0 ? '↑' : '↓'}${Math.abs(diff).toFixed(0)}%`, positive: diff >= 0 };
+  };
+  
+  const sqftDiff = calcDiff(property.sqft, subjectProperty?.sqft ?? null);
+  const lotDiff = calcDiff(property.lotSqFt, subjectProperty?.lotSqFt ?? null);
+  
+  const statusColorClass = {
+    red: 'bg-red-500',
+    green: 'bg-green-500',
+    orange: 'bg-orange-500',
+    blue: 'bg-blue-500',
+  }[property.statusColor];
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/70 z-50" onClick={onClose} />
+      
+      {/* Modal */}
+      <div className="fixed inset-4 lg:inset-8 bg-white dark:bg-gray-900 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col">
+        
+        {/* Header */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">{property.address.full}</h2>
+          <span className="text-gray-500 dark:text-gray-400">, {property.address.state}</span>
+        </div>
+        
+        {/* Main Content - 3 Column Grid */}
+        <div className="flex-1 overflow-hidden">
+          <div className="grid grid-cols-12 h-full">
+            
+            {/* LEFT COLUMN - Map + Stats + Description */}
+            <div className="col-span-12 lg:col-span-4 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
+              
+              {/* Mapbox Map */}
+              <div className="relative h-48 border-b border-gray-200 dark:border-gray-700">
+                {property.coordinates ? (
+                  <>
+                    <div ref={mapContainer} className="w-full h-full" />
+                    {/* Coordinates Overlay */}
+                    <div className="absolute top-2 left-2 bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded shadow-md p-2 text-xs z-10">
+                      <div className="font-mono text-gray-700 dark:text-gray-300">
+                        {property.coordinates.lat.toFixed(4)}°N {Math.abs(property.coordinates.lng).toFixed(4)}°W
+                      </div>
+                      <a 
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${property.coordinates.lat},${property.coordinates.lng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline flex items-center gap-1 mt-1"
+                      >
+                        <Navigation className="w-3 h-3" /> Directions
+                      </a>
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full h-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400">
+                    No location data
+                  </div>
+                )}
+              </div>
+              
+              {/* Stats Grid - 2x3 */}
+              <div className="grid grid-cols-2 border-b border-gray-200 dark:border-gray-700">
+                {/* Bedrooms */}
+                <div className="p-3 border-r border-b border-gray-200 dark:border-gray-700 text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Bed className="w-3 h-3" /> BEDROOMS
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.beds ?? 'N/A'}
+                  </div>
+                </div>
+                {/* Bathrooms */}
+                <div className="p-3 border-b border-gray-200 dark:border-gray-700 text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Bath className="w-3 h-3" /> BATHROOMS
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.baths ?? 'N/A'}
+                  </div>
+                </div>
+                {/* Home Size */}
+                <div className="p-3 border-r border-b border-gray-200 dark:border-gray-700 text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Square className="w-3 h-3" /> HOME SIZE
+                    {sqftDiff && (
+                      <span className={sqftDiff.positive ? 'text-green-500' : 'text-red-500'}>
+                        {sqftDiff.text}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.sqft?.toLocaleString() ?? 'N/A'} <span className="text-sm font-normal">sq.ft.</span>
+                  </div>
+                </div>
+                {/* Year Built */}
+                <div className="p-3 border-b border-gray-200 dark:border-gray-700 text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Calendar className="w-3 h-3" /> YEAR BUILT
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.yearBuilt ?? 'N/A'}
+                  </div>
+                </div>
+                {/* Garages */}
+                <div className="p-3 border-r border-gray-200 dark:border-gray-700 text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Car className="w-3 h-3" /> GARAGES
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.garageSpaces ?? 'N/A'}
+                  </div>
+                </div>
+                {/* Lot Size */}
+                <div className="p-3 text-center">
+                  <div className="flex items-center justify-center gap-1 text-gray-500 dark:text-gray-400 text-xs mb-1">
+                    <Maximize className="w-3 h-3" /> LOT SIZE
+                    {lotDiff && (
+                      <span className={lotDiff.positive ? 'text-green-500' : 'text-red-500'}>
+                        {lotDiff.text}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {property.lotSqFt?.toLocaleString() ?? 'N/A'}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Property Description */}
+              {property.description && (
+                <div className="p-4">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                    Property Description
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                    {property.description}
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            {/* MIDDLE COLUMN - Photo Gallery */}
+            <div className="col-span-12 lg:col-span-5 bg-gray-900 relative">
+              {photos.length > 0 ? (
+                <>
+                  <img 
+                    src={photos[currentPhotoIndex]} 
+                    alt={`${property.address.full} - Photo ${currentPhotoIndex + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                  
+                  {/* Navigation Arrows */}
+                  {photos.length > 1 && (
+                    <>
+                      <button
+                        onClick={() => setCurrentPhotoIndex(i => i === 0 ? photos.length - 1 : i - 1)}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center"
+                      >
+                        <ChevronLeft className="w-6 h-6" />
+                      </button>
+                      <button
+                        onClick={() => setCurrentPhotoIndex(i => i === photos.length - 1 ? 0 : i + 1)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center"
+                      >
+                        <ChevronRight className="w-6 h-6" />
+                      </button>
+                    </>
+                  )}
+                  
+                  {/* Photo Count Badge */}
+                  <div className="absolute bottom-3 left-3 flex items-center gap-1 px-2 py-1 bg-black/60 text-white text-sm rounded">
+                    <Camera className="w-4 h-4" />
+                    <span>{property.photoCount}</span>
+                  </div>
+                  
+                  {/* Photo Counter */}
+                  <div className="absolute bottom-3 right-3 px-2 py-1 bg-black/60 text-white text-sm rounded">
+                    {currentPhotoIndex + 1} / {photos.length}
+                  </div>
+                </>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-500">
+                  No photos available
+                </div>
+              )}
+            </div>
+            
+            {/* RIGHT COLUMN - Pricing & Details */}
+            <div className="col-span-12 lg:col-span-3 bg-gray-50 dark:bg-gray-800/50 overflow-y-auto">
+              
+              {/* Status + Price Header */}
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`px-2 py-1 ${statusColorClass} text-white text-xs font-semibold rounded`}>
+                    {property.statusLabel}
+                  </span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    {property.dom.simple} DAYS
+                  </span>
+                </div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  ${(property.prices.sold || property.prices.list).toLocaleString()}
+                </div>
+                {property.pricePerSqft && (
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    ${property.pricePerSqft}/sqft
+                  </div>
+                )}
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                  {property.beds} beds · {property.baths} baths · {property.sqft?.toLocaleString()} sqft
+                </div>
+                {property.soldDate && (
+                  <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    Sold: {new Date(property.soldDate).toLocaleDateString()}
+                  </div>
+                )}
+              </div>
+              
+              {/* Price History */}
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                  Price History
+                </h3>
+                <div className="space-y-2">
+                  {property.prices.original && property.prices.original !== property.prices.list && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Orig. Price</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        ${property.prices.original.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">List Price</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
+                      ${property.prices.list.toLocaleString()}
+                    </span>
+                  </div>
+                  {property.prices.sold && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Sold Price</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        ${property.prices.sold.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Listing Details */}
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                  Listing Details
+                </h3>
+                <div className="space-y-2">
+                  {property.pricePerSqft && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Price per Sq. Ft.</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        ${property.pricePerSqft}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">Days on Market</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
+                      {property.dom.simple}
+                    </span>
+                  </div>
+                  {property.listDate && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Listed</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        {new Date(property.listDate).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                  {property.soldDate && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Sold</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        {new Date(property.soldDate).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* MLS Info */}
+              <div className="p-4 bg-white dark:bg-gray-900">
+                <div className="text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">MLS# </span>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">
+                    {property.mlsNumber}
+                  </span>
+                </div>
+                {property.lastUpdated && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Last Updated: {new Date(property.lastUpdated).toLocaleString()}
+                  </div>
+                )}
+              </div>
+            </div>
+            
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+```
+
+---
+
+## MAPBOX SETUP IN REPLIT
+
+### 1. Add to package.json
+
+```json
+{
+  "dependencies": {
+    "mapbox-gl": "^3.0.0"
+  }
+}
+```
+
+### 2. Add CSS Import (in main.tsx or App.tsx)
+
+```tsx
+import 'mapbox-gl/dist/mapbox-gl.css';
+```
+
+### 3. Environment Variable
+
+Ensure `VITE_MAPBOX_ACCESS_TOKEN` or `MAPBOX_ACCESS_TOKEN` is set in Replit Secrets.
+
+### 4. TypeScript Types (if needed)
+
+```bash
+npm install --save-dev @types/mapbox-gl
+```
+
+---
+
+## REPLIERS DATA MAPPING FOR MAP
+
+```typescript
+// From Repliers listing response
+coordinates: property.map?.latitude && property.map?.longitude
+  ? { lat: property.map.latitude, lng: property.map.longitude }
+  : null
+```
+
+---
+
+## MOBILE OPTIMIZATION
+
+On mobile (`< lg` breakpoint), the 3-column grid stacks vertically:
+
+```
+Mobile Layout:
+┌─────────────────────┐
+│  Photo Gallery      │
+│  (full width)       │
+├─────────────────────┤
+│  Status + Price     │
+├─────────────────────┤
+│  Map + Stats        │
+├─────────────────────┤
+│  Description        │
+├─────────────────────┤
+│  Price History      │
+├─────────────────────┤
+│  Listing Details    │
+├─────────────────────┤
+│  MLS Info           │
+└─────────────────────┘
+```
+
+The order changes on mobile to prioritize photo and pricing:
+
+```tsx
+<div className="grid grid-cols-12 h-full">
+  {/* On mobile: Photo first, then pricing, then map/stats */}
+  <div className="col-span-12 lg:col-span-5 order-1 lg:order-2">Photo</div>
+  <div className="col-span-12 lg:col-span-3 order-2 lg:order-3">Pricing</div>
+  <div className="col-span-12 lg:col-span-4 order-3 lg:order-1">Map/Stats</div>
+</div>
+```
+
+---
+
+## CHECKLIST
+
+- [ ] 3-column layout: Map+Stats (4/12) | Photo (5/12) | Pricing (3/12)
+- [ ] Mapbox integration with `VITE_MAPBOX_ACCESS_TOKEN`
+- [ ] Property marker on map with Spyglass orange (#EF4923)
+- [ ] Coordinates overlay with Directions link
+- [ ] Stats grid: Beds, Baths, Home Size, Year Built, Garages, Lot Size
+- [ ] Property Description section
+- [ ] Price History: Orig Price, List Price, Sold Price
+- [ ] Listing Details: Price/SqFt, DOM, Listed date, Sold date
+- [ ] MLS# with last updated timestamp
+- [ ] Photo gallery with navigation and count badges
+- [ ] All content fits in one screen (no scroll needed on desktop)
+- [ ] Mobile: Stacked layout with proper order
+- [ ] 44px touch targets on all buttons
+- [ ] Dark mode support
