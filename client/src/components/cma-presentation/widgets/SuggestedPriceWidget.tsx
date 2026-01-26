@@ -327,11 +327,12 @@ export function SuggestedPriceWidget({
                 />
                 
                 {currentPhoto.quality?.quantitative && currentPhoto.quality.quantitative > 0 && (
-                  <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-sm text-white 
-                                  px-2 py-1 rounded-full flex items-center gap-1.5 text-[10px] sm:text-xs">
-                    <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                    <span className="hidden sm:inline">AI Selected</span>
-                    <span className="bg-green-500 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                  <div className="absolute top-3 left-3 bg-black/80 backdrop-blur-sm text-white 
+                                  px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-medium shadow-lg"
+                       data-testid="ai-best-photo-badge">
+                    <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                    <span>AI Best Photo</span>
+                    <span className="bg-green-500 text-white px-1.5 py-0.5 rounded text-[10px] font-bold">
                       {Math.round(currentPhoto.quality.quantitative * 20)}%
                     </span>
                   </div>
