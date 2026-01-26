@@ -72,7 +72,7 @@ Preferred communication style: Simple, everyday language.
   - Database: `agentResources` table with id, userId, name, type (file/link), url, fileUrl, displayOrder, isActive, timestamps
   - API Endpoints: GET/POST `/api/agent/resources`, PATCH/DELETE `/api/agent/resources/:id`, POST `/api/agent/resources/reorder`, POST `/api/agent/resources/upload`
   - Public API: GET `/api/shared/cma/:token/resources` for shared CMA access
-  - File Upload: PDF/Word docs up to 10MB, stored at `.private/resources/{userId}/{timestamp}-{filename}`
+  - File Upload: PDF/Word docs up to 50MB, stored at `.private/resources/{userId}/{timestamp}-{filename}` via @replit/object-storage
   - Settings Page: Drag-to-reorder list, visibility toggles, edit/delete, file upload with dashed border drop zones
   - SpyglassResourcesWidget: CloudCMA-style underlined text links, supports authenticated and public contexts via optional `cmaToken` prop
 

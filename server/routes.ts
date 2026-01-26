@@ -4663,7 +4663,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       const upload = multer({ storage: multer.memoryStorage() });
 
       // Use single file upload middleware
-      upload.single('file')(req, res, async (err) => {
+      upload.single('file')(req, res, async (err: unknown) => {
         if (err) {
           console.error("[Agent Resources] Upload error:", err);
           return res.status(400).json({ error: "File upload failed" });
