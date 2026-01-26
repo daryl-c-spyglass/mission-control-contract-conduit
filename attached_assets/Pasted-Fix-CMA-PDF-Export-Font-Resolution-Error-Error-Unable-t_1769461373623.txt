@@ -1,0 +1,70 @@
+Fix CMA PDF Export - Font Resolution Error
+Error: Unable to generate PDF: Could not resolve font for Inter, fontWeight 400, fontStyle italic
+Cause: @react-pdf/renderer cannot find the Inter font with italic style. Custom fonts must be explicitly registered.
+
+Solution: Register Inter Font or Use System Fallback
+Option 1: Use System Font (Quick Fix)
+Find the PDF document component and replace Inter with Helvetica:
+typescript// In your PDF styles file (likely pdfStyles.ts or CmaPdfDocument.tsx)
+import { StyleSheet, Font } from '@react-pdf/renderer';
+
+// Remove any Inter font references and use Helvetica
+const styles = StyleSheet.create({
+  body: {
+    fontFamily: 'Helvetica',
+  },
+  bold: {
+    fontFamily: 'Helvetica-Bold',
+  },
+  italic: {
+    fontFamily: 'Helvetica-Oblique',
+  },
+  boldItalic: {
+    fontFamily: 'Helvetica-BoldOblique',
+  },
+});
+Option 2: Register Inter Font Properly (Recommended)
+typescriptimport { Font } from '@react-pdf/renderer';
+
+// Register Inter font family with all weights/styles
+Font.register({
+  family: 'Inter',
+  fonts: [
+    {
+      src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2',
+      fontWeight: 400,
+    },
+    {
+      src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuGKYAZ9hiJ-Ek-_EeA.woff2',
+      fontWeight: 600,
+    },
+    {
+      src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuFuYAZ9hiJ-Ek-_EeA.woff2',
+      fontWeight: 700,
+    },
+  ],
+});
+
+// For italic - Inter doesn't have true italic, use oblique or skip
+// If you need italic, use a different font or remove italic styles
+Option 3: Disable Hyphenation (Often Causes Italic Lookup)
+typescriptimport { Font } from '@react-pdf/renderer';
+
+// Disable hyphenation which can trigger italic font lookups
+Font.registerHyphenationCallback(word => [word]);
+
+Quick Search & Replace
+Find all instances of fontFamily: 'Inter' or fontFamily: "Inter" in PDF-related files and replace with fontFamily: 'Helvetica'.
+Search in:
+
+client/src/lib/pdfStyles.ts
+client/src/components/cma/CmaPdfDocument.tsx
+Any file with @react-pdf/renderer imports
+
+
+Verification
+After fix:
+
+ PDF export button works
+ PDF downloads without font errors
+ Text renders correctly in downloaded PDF
