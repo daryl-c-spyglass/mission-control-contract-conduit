@@ -4657,8 +4657,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      // Handle multipart upload - reuse existing object storage upload logic
-      const { Client } = await import("@replit/object-storage");
+      // Handle multipart upload
       const multer = (await import("multer")).default;
       const upload = multer({ storage: multer.memoryStorage() });
 
@@ -4685,15 +4684,42 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
         }
 
         try {
-          const client = new Client();
+          // Use the existing object storage integration
+          const privateObjectDir = process.env.PRIVATE_OBJECT_DIR;
+          if (!privateObjectDir) {
+            console.error("[Agent Resources] PRIVATE_OBJECT_DIR not set");
+            return res.status(500).json({ error: "Object storage not configured" });
+          }
+
+          // Parse bucket name from PRIVATE_OBJECT_DIR (format: /<bucket_name>/.private)
+          const pathParts = privateObjectDir.startsWith('/') 
+            ? privateObjectDir.slice(1).split('/') 
+            : privateObjectDir.split('/');
+          const bucketName = pathParts[0];
+          
           const timestamp = Date.now();
           const safeFileName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-          const objectKey = `.private/resources/${userId}/${timestamp}-${safeFileName}`;
+          const objectName = `resources/${userId}/${timestamp}-${safeFileName}`;
+          
+          // Full path for serving: .private/resources/...
+          const fullObjectPath = `.private/${objectName}`;
 
-          await client.uploadFromBytes(objectKey, req.file.buffer);
+          // Use existing objectStorageClient from object storage integration
+          const { objectStorageClient } = await import("./replit_integrations/object_storage/objectStorage");
+          const bucket = objectStorageClient.bucket(bucketName);
+          const file = bucket.file(fullObjectPath);
+
+          // Upload the file buffer
+          await file.save(req.file.buffer, {
+            contentType: req.file.mimetype,
+            metadata: {
+              originalName: req.file.originalname,
+              uploadedBy: userId,
+            },
+          });
 
           res.json({
-            fileUrl: `/objects/${objectKey}`,
+            fileUrl: `/objects/${objectName}`,
             fileName: req.file.originalname,
           });
         } catch (uploadErr: any) {
