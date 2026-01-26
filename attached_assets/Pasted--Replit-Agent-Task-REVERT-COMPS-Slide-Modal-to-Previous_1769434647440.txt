@@ -1,0 +1,70 @@
+# Replit Agent Task: REVERT COMPS Slide Modal to Previous Version
+
+## Problem
+The recent changes accidentally updated the **COMPS slide modal** instead of the Time to Sell slide modal. The COMPS slide was working correctly before and now needs to be reverted.
+
+## URGENT: Revert Changes
+
+### Step 1: Identify Changed Files
+
+Check git history for recently modified files related to the COMPS slide or PropertyDetailModal:
+
+```bash
+git diff HEAD~1 --name-only
+git log --oneline -5
+```
+
+### Step 2: Revert the COMPS Modal
+
+Revert the PropertyDetailModal (or whichever component renders the COMPS slide modal) to its previous working state:
+
+```bash
+# Option 1: Revert specific file
+git checkout HEAD~1 -- [path/to/PropertyDetailModal.tsx]
+
+# Option 2: If multiple files changed
+git checkout HEAD~1 -- client/src/components/cma/
+```
+
+### Step 3: Verify the Revert
+
+After reverting, confirm:
+1. The COMPS slide modal looks like it did before (3-column layout with map, photo, details)
+2. Google Maps embed is back (this was the original working version)
+3. All functionality works as before
+
+---
+
+## What the COMPS Slide Modal Should Look Like (Previous Working Version)
+
+The COMPS slide modal should have:
+
+**Header:**
+- X close button
+- Address + State
+
+**Layout (3-column or original layout):**
+- Map section (Google Maps embed was working fine)
+- Photo gallery with navigation
+- Property stats grid
+- Price details on the right side
+
+**DO NOT** apply the 2-column Mapbox layout to the COMPS slide - that was intended for the Time to Sell slide only.
+
+---
+
+## After Reverting
+
+Once the COMPS slide is back to its working state, please confirm:
+
+1. "COMPS slide modal has been reverted to previous version"
+2. Show me the file path that was reverted
+3. Confirm the layout is back to the original 3-column (or whatever it was before)
+
+---
+
+## IMPORTANT
+
+- **DO NOT** make any changes to the Time to Sell slide yet
+- **ONLY** revert the COMPS slide modal
+- Keep the COMPS slide exactly as it was before today's changes
