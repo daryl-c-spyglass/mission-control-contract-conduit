@@ -4,6 +4,7 @@ import { FileText, Settings } from 'lucide-react';
 import { Link } from 'wouter';
 import type { AgentResource } from '@shared/schema';
 import { DocumentPreviewModal } from '@/components/DocumentPreviewModal';
+import { Button } from '@/components/ui/button';
 
 interface SpyglassResourcesWidgetProps {
   cmaToken?: string;
@@ -40,7 +41,7 @@ export function SpyglassResourcesWidget({ cmaToken }: SpyglassResourcesWidgetPro
       <div className="flex-1 flex items-center justify-center bg-background p-8">
         {isLoading ? (
           <div className="text-center">
-            <div className="w-6 h-6 border-2 border-[#EF4923] border-t-transparent rounded-full animate-spin mx-auto" />
+            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
           </div>
         ) : isError ? (
           <div className="text-center max-w-md">
@@ -57,19 +58,18 @@ export function SpyglassResourcesWidget({ cmaToken }: SpyglassResourcesWidgetPro
         ) : activeResources.length > 0 ? (
           <div className="text-center space-y-6 max-w-lg">
             {activeResources.map((resource) => (
-              <button
+              <Button
                 key={resource.id}
+                variant="ghost"
                 onClick={(e) => handleResourceClick(resource, e)}
-                className="block w-full text-lg text-foreground hover:text-[#EF4923] transition-colors 
-                           underline underline-offset-4 decoration-muted-foreground/30 hover:decoration-[#EF4923]
-                           text-center"
+                className="block w-full text-lg underline underline-offset-4 text-center"
                 data-testid={`resource-link-${resource.id}`}
               >
                 {resource.name}
                 {resource.type === 'file' && (
                   <span className="inline-block ml-2 text-muted-foreground text-sm no-underline">(Preview)</span>
                 )}
-              </button>
+              </Button>
             ))}
           </div>
         ) : (
@@ -86,13 +86,17 @@ export function SpyglassResourcesWidget({ cmaToken }: SpyglassResourcesWidgetPro
                 : "Add helpful documents and links for your clients in Settings."}
             </p>
             {!cmaToken && (
-              <Link
-                href="/settings"
-                className="inline-flex items-center gap-2 text-sm text-[#EF4923] hover:underline"
+              <Button
+                variant="ghost"
+                asChild
+                className="underline underline-offset-4"
+                data-testid="link-settings"
               >
-                <Settings className="w-4 h-4" />
-                Go to Settings
-              </Link>
+                <Link href="/settings">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Go to Settings
+                </Link>
+              </Button>
             )}
           </div>
         )}

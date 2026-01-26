@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { X, Download, ExternalLink, FileText, Image, File, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface DocumentPreviewModalProps {
   isOpen: boolean;
@@ -49,6 +50,7 @@ export function DocumentPreviewModal({ isOpen, onClose, document }: DocumentPrev
   const fileType = getFileType();
 
   const handleDownload = () => {
+    if (!document.url) return;
     const link = window.document.createElement('a');
     link.href = document.url;
     link.download = document.name;
@@ -56,6 +58,7 @@ export function DocumentPreviewModal({ isOpen, onClose, document }: DocumentPrev
   };
 
   const handleOpenInNewTab = () => {
+    if (!document.url) return;
     window.open(document.url, '_blank');
   };
 
@@ -63,87 +66,83 @@ export function DocumentPreviewModal({ isOpen, onClose, document }: DocumentPrev
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"
       onClick={onClose}
-      data-testid="document-preview-modal"
+      data-testid="document-preview-modal-backdrop"
     >
       <div
-        className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] 
-                   flex flex-col overflow-hidden
-                   sm:rounded-xl"
+        className="bg-card rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] 
+                   flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
+        data-testid="document-preview-modal"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 
-                        dark:border-gray-700 bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border 
+                        bg-muted sticky top-0 z-10">
           <div className="flex items-center gap-3 min-w-0">
             <FileTypeIcon type={fileType} />
-            <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
+            <span className="font-medium text-foreground truncate" data-testid="document-name">
               {document.name}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleOpenInNewTab}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 
-                         hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 
-                         dark:hover:text-gray-100 dark:hover:bg-gray-700 rounded-lg 
-                         transition-colors min-h-[44px] min-w-[44px] justify-center"
-              title="Open in new tab"
+              disabled={!document.url}
               data-testid="button-open-new-tab"
             >
-              <ExternalLink className="w-4 h-4" />
+              <ExternalLink className="w-4 h-4 mr-1.5" />
               <span className="hidden sm:inline">Open</span>
-            </button>
+            </Button>
 
-            <button
+            <Button
+              size="sm"
               onClick={handleDownload}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#EF4923] text-white 
-                         hover:bg-[#d43d1c] rounded-lg transition-colors min-h-[44px] 
-                         min-w-[44px] justify-center"
+              disabled={!document.url}
               data-testid="button-download"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-4 h-4 mr-1.5" />
               <span className="hidden sm:inline">Download</span>
-            </button>
+            </Button>
 
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={onClose}
-              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 
-                         dark:hover:text-gray-300 dark:hover:bg-gray-700
-                         rounded-lg transition-colors ml-2 min-h-[44px] min-w-[44px] 
-                         flex items-center justify-center"
+              className="ml-2"
               data-testid="button-close-modal"
             >
               <X className="w-5 h-5" />
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Preview Content */}
-        <div className="flex-1 overflow-hidden bg-gray-100 dark:bg-gray-800 relative">
+        <div className="flex-1 overflow-hidden bg-muted relative" data-testid="preview-content">
           {isLoading && !error && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800 z-10">
+            <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
               <div className="text-center">
-                <div className="w-8 h-8 border-2 border-[#EF4923] border-t-transparent 
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent 
                                 rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">Loading preview...</p>
+                <p className="text-sm text-muted-foreground">Loading preview...</p>
               </div>
             </div>
           )}
 
           {error && (
-            <div className="h-full flex items-center justify-center">
+            <div className="h-full flex items-center justify-center" data-testid="preview-error">
               <div className="text-center max-w-md px-4">
                 <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
-                <p className="text-gray-700 dark:text-gray-300 mb-2">Unable to preview this file</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{error}</p>
-                <button
+                <p className="text-foreground mb-2">Unable to preview this file</p>
+                <p className="text-sm text-muted-foreground mb-4">{error}</p>
+                <Button
                   onClick={handleDownload}
-                  className="px-4 py-2 bg-[#EF4923] text-white rounded-lg hover:bg-[#d43d1c]"
+                  disabled={!document.url}
                   data-testid="button-download-fallback"
                 >
                   Download Instead
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -159,12 +158,13 @@ export function DocumentPreviewModal({ isOpen, onClose, document }: DocumentPrev
                 setError('PDF preview not available');
               }}
               title={document.name}
+              data-testid="preview-pdf"
             />
           )}
 
           {/* Image Preview */}
           {fileType === 'image' && !error && (
-            <div className="h-full flex items-center justify-center p-4 overflow-auto">
+            <div className="h-full flex items-center justify-center p-4 overflow-auto" data-testid="preview-image-container">
               <img
                 src={document.url}
                 alt={document.name}
@@ -174,6 +174,7 @@ export function DocumentPreviewModal({ isOpen, onClose, document }: DocumentPrev
                   setIsLoading(false);
                   setError('Image failed to load');
                 }}
+                data-testid="preview-image"
               />
             </div>
           )}
@@ -192,38 +193,47 @@ export function DocumentPreviewModal({ isOpen, onClose, document }: DocumentPrev
 
           {/* Office Documents - Use Google Docs Viewer */}
           {fileType === 'office' && !error && (
-            <iframe
-              src={`https://docs.google.com/viewer?url=${encodeURIComponent(document.url)}&embedded=true`}
-              className="w-full h-full border-0"
-              onLoad={() => setIsLoading(false)}
-              onError={() => {
-                setIsLoading(false);
-                setError('Document preview not available. Please download to view.');
-              }}
-              title={document.name}
-            />
+            <div className="h-full flex items-center justify-center" data-testid="preview-office">
+              <div className="text-center max-w-md px-4">
+                <File className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  Office Document
+                </h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Office documents require download to view.
+                </p>
+                <Button
+                  onClick={handleDownload}
+                  disabled={!document.url}
+                  data-testid="button-download-office"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download File
+                </Button>
+              </div>
+            </div>
           )}
 
           {/* Unknown/Unsupported Format */}
           {fileType === 'unknown' && !error && (
-            <div className="h-full flex items-center justify-center">
+            <div className="h-full flex items-center justify-center" data-testid="preview-unknown">
               <div className="text-center max-w-md px-4">
-                <File className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <File className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">
                   Preview Not Available
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                <p className="text-sm text-muted-foreground mb-6">
                   This file type cannot be previewed in the browser.
                   Please download to view.
                 </p>
-                <button
+                <Button
                   onClick={handleDownload}
-                  className="px-4 py-2 bg-[#EF4923] text-white rounded-lg hover:bg-[#d43d1c]"
+                  disabled={!document.url}
                   data-testid="button-download-unknown"
                 >
-                  <Download className="w-4 h-4 inline mr-2" />
+                  <Download className="w-4 h-4 mr-2" />
                   Download File
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -231,9 +241,8 @@ export function DocumentPreviewModal({ isOpen, onClose, document }: DocumentPrev
 
         {/* Footer for PDF */}
         {fileType === 'pdf' && !error && !isLoading && (
-          <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700 
-                          bg-gray-50 dark:bg-gray-800 text-center">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+          <div className="px-4 py-2 border-t border-border bg-muted text-center">
+            <p className="text-xs text-muted-foreground">
               Use scroll or PDF controls to navigate pages
             </p>
           </div>
@@ -247,26 +256,26 @@ function FileTypeIcon({ type }: { type: string }) {
   switch (type) {
     case 'pdf':
       return (
-        <div className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded flex items-center justify-center">
-          <FileText className="w-4 h-4 text-red-600 dark:text-red-400" />
+        <div className="w-8 h-8 bg-destructive/10 rounded flex items-center justify-center">
+          <FileText className="w-4 h-4 text-destructive" />
         </div>
       );
     case 'image':
       return (
-        <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded flex items-center justify-center">
-          <Image className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+        <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
+          <Image className="w-4 h-4 text-foreground" />
         </div>
       );
     case 'office':
       return (
-        <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded flex items-center justify-center">
-          <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+        <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
+          <FileText className="w-4 h-4 text-foreground" />
         </div>
       );
     default:
       return (
-        <div className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center">
-          <File className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+        <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
+          <File className="w-4 h-4 text-muted-foreground" />
         </div>
       );
   }
@@ -287,6 +296,11 @@ function TextPreview({
   const stableOnError = useCallback(onError, []);
 
   useEffect(() => {
+    if (!url) {
+      stableOnError('No URL provided');
+      return;
+    }
+    
     fetch(url)
       .then((res) => {
         if (!res.ok) throw new Error('Failed to load');
@@ -296,7 +310,7 @@ function TextPreview({
         setContent(text);
         stableOnLoad();
       })
-      .catch(() => stableOnError('Failed to load text file'));
+      .catch(() => stableOnError('Failed to load text file. Please download to view.'));
   }, [url, stableOnLoad, stableOnError]);
 
   const isCSV = url.toLowerCase().endsWith('.csv');
@@ -306,8 +320,10 @@ function TextPreview({
   }
 
   return (
-    <pre className="h-full overflow-auto p-4 text-sm font-mono text-gray-800 
-                    dark:text-gray-200 whitespace-pre-wrap">
+    <pre 
+      className="h-full overflow-auto p-4 text-sm font-mono text-foreground whitespace-pre-wrap"
+      data-testid="preview-text"
+    >
       {content}
     </pre>
   );
@@ -319,15 +335,14 @@ function CSVTable({ content }: { content: string }) {
   const data = rows.slice(1).filter((row) => row.some((cell) => cell.trim()));
 
   return (
-    <div className="h-full overflow-auto p-4">
-      <table className="min-w-full border-collapse bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
+    <div className="h-full overflow-auto p-4" data-testid="preview-csv">
+      <table className="min-w-full border-collapse bg-card rounded-lg overflow-hidden">
         <thead>
-          <tr className="bg-gray-100 dark:bg-gray-800">
+          <tr className="bg-muted">
             {headers.map((header, i) => (
               <th
                 key={i}
-                className="px-4 py-2 text-left text-sm font-medium text-gray-700 
-                           dark:text-gray-300 border border-gray-200 dark:border-gray-700"
+                className="px-4 py-2 text-left text-sm font-medium text-foreground border border-border"
               >
                 {header.trim()}
               </th>
@@ -336,15 +351,11 @@ function CSVTable({ content }: { content: string }) {
         </thead>
         <tbody>
           {data.map((row, i) => (
-            <tr
-              key={i}
-              className={i % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800/50'}
-            >
+            <tr key={i} className={i % 2 === 0 ? 'bg-card' : 'bg-muted/50'}>
               {row.map((cell, j) => (
                 <td
                   key={j}
-                  className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 
-                             border border-gray-200 dark:border-gray-700"
+                  className="px-4 py-2 text-sm text-muted-foreground border border-border"
                 >
                   {cell.trim()}
                 </td>
