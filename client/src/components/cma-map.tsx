@@ -1132,6 +1132,8 @@ export function CMAMap({
             baths: selectedProperty.baths ?? undefined,
             sqft: selectedProperty.sqft ?? undefined,
             daysOnMarket: selectedProperty.dom ?? undefined,
+            propertyType: selectedProperty.propertyType ?? undefined,
+            yearBuilt: selectedProperty.yearBuilt ?? undefined,
             status: STATUS_LABELS[selectedProperty.status as NormalizedStatus] || selectedProperty.status,
             photos: selectedProperty.photos || [],
           }}

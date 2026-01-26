@@ -35,6 +35,8 @@ export interface CmaPointProperties {
   dom: number | null;
   mlsNumber: string | null;
   photos: string[];
+  propertyType: string | null;
+  yearBuilt: number | null;
 }
 
 export type CmaPointFeature = Feature<Point, CmaPointProperties>;
@@ -251,6 +253,26 @@ function extractMlsNumber(property: any): string | null {
   return property?.mlsNumber || property?.listingId || null;
 }
 
+function extractPropertyType(property: any): string | null {
+  return property?.propertyType || 
+         property?.propertySubType || 
+         property?.type ||
+         property?.rawData?.propertyType ||
+         property?.rawData?.propertySubType ||
+         property?.details?.propertyType ||
+         null;
+}
+
+function extractYearBuilt(property: any): number | null {
+  const year = property?.yearBuilt || 
+               property?.yearConstructed ||
+               property?.builtYear ||
+               property?.rawData?.yearBuilt ||
+               property?.rawData?.yearConstructed ||
+               property?.details?.yearBuilt;
+  return year != null ? Number(year) : null;
+}
+
 export function buildSubjectFeature(subject: Property | null): CmaPointFeature | null {
   if (!subject) return null;
   const coords = extractCoordinates(subject);
@@ -272,6 +294,8 @@ export function buildSubjectFeature(subject: Property | null): CmaPointFeature |
       dom: extractDom(subject),
       mlsNumber: extractMlsNumber(subject),
       photos: extractPhotos(subject),
+      propertyType: extractPropertyType(subject),
+      yearBuilt: extractYearBuilt(subject),
     },
     geometry: {
       type: 'Point',
@@ -310,6 +334,8 @@ export function buildComparableFeatures(comparables: Property[]): CmaPointFeatur
         dom: extractDom(property),
         mlsNumber: extractMlsNumber(property),
         photos: extractPhotos(property),
+        propertyType: extractPropertyType(property),
+        yearBuilt: extractYearBuilt(property),
       },
       geometry: {
         type: 'Point',

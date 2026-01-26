@@ -57,10 +57,10 @@ export function PropertyDetailModal({ isOpen, onClose, property }: PropertyDetai
 
   const getStatusColor = (status: string) => {
     const normalized = status?.toLowerCase();
-    if (normalized === 'closed' || normalized === 'sold') return 'bg-red-500';
-    if (normalized === 'active') return 'bg-green-500';
-    if (normalized === 'pending') return 'bg-gray-500';
-    if (normalized === 'active under contract' || normalized === 'under contract') return 'bg-[#EF4923]';
+    if (normalized === 'closed' || normalized === 'sold') return 'bg-green-500';
+    if (normalized === 'active' && !normalized.includes('under')) return 'bg-emerald-500';
+    if (normalized === 'pending') return 'bg-yellow-400 !text-gray-900';
+    if (normalized.includes('under contract') || normalized.includes('under')) return 'bg-orange-500';
     return 'bg-gray-500';
   };
 
@@ -94,7 +94,7 @@ export function PropertyDetailModal({ isOpen, onClose, property }: PropertyDetai
             <X className="h-5 w-5 text-white" />
           </button>
           
-          <Badge className={`absolute top-3 left-3 z-10 ${getStatusColor(property.status)} text-white border-0`}>
+          <Badge className={`absolute top-3 left-3 z-10 ${getStatusColor(property.status)} text-white border-0 shadow-lg px-3 py-1.5 text-sm font-bold`}>
             {property.status}
           </Badge>
           

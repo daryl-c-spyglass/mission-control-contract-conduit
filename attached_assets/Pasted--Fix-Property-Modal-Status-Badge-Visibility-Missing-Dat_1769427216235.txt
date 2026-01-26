@@ -1,0 +1,248 @@
+# Fix Property Modal — Status Badge Visibility + Missing Data
+
+## Issues
+
+1. **Status badge not visible** - Dark red on dark background (see previous screenshot)
+2. **Missing property data** - Property Type, Year Built, Days on Market showing "—" instead of actual values
+
+---
+
+## Issue 1: Status Badge Not Visible
+
+### Fix:
+
+```tsx
+const getStatusColor = (status: string) => {
+  const s = status.toLowerCase();
+  if (s.includes('closed')) return 'bg-green-500 text-white';
+  if (s.includes('active') && !s.includes('under')) return 'bg-emerald-500 text-white';
+  if (s.includes('pending')) return 'bg-yellow-400 text-gray-900';
+  if (s.includes('under')) return 'bg-orange-500 text-white';
+  return 'bg-gray-500 text-white';
+};
+
+// Position badge OVER the photo
+<div className="relative">
+  <img src={photo} className="w-full" />
+  <div className="absolute top-3 left-3 z-10">
+    <span className={`px-3 py-1.5 text-sm font-bold rounded shadow-lg ${getStatusColor(status)}`}>
+      {status}
+    </span>
+  </div>
+</div>
+```
+
+---
+
+## Issue 2: Missing Property Data from Repliers API
+
+The modal shows "—" for Property Type, Year Built, and Days on Market. These fields need to be properly mapped from the Repliers API response.
+
+### Repliers API Field Mapping:
+
+Check these common Repliers API field names and ensure they're mapped correctly:
+
+```typescript
+// Repliers API typically returns these fields:
+interface RepliersProperty {
+  // Property Type
+  propertyType?: string;        // or "type", "propertySubType"
+  propertySubType?: string;
+  
+  // Year Built
+  yearBuilt?: number;           // or "yearConstructed", "builtYear"
+  
+  // Days on Market
+  daysOnMarket?: number;        // or "dom", "cumulativeDaysOnMarket"
+  
+  // Other common fields
+  mlsNumber?: string;           // or "listingId", "mlsId"
+  listDate?: string;
+  soldDate?: string;
+  status?: string;
+  
+  // May also be nested under "details" or "property"
+  details?: {
+    propertyType?: string;
+    yearBuilt?: number;
+    // ...
+  };
+}
+```
+
+### Check the Data Transformation:
+
+Find where Repliers data is transformed to CmaProperty:
+
+```bash
+grep -rn "propertyType\|yearBuilt\|daysOnMarket" --include="*.ts" --include="*.tsx" client/src/
+grep -rn "repliers\|Repliers" --include="*.ts" server/
+```
+
+### Ensure Correct Mapping:
+
+```typescript
+// In server/repliers.ts or similar transformation file
+
+function transformRepliersToProperty(repliersData: any): CmaProperty {
+  return {
+    id: repliersData.mlsNumber || repliersData.listingId,
+    address: repliersData.address?.streetAddress || repliersData.streetAddress,
+    price: repliersData.listPrice || repliersData.price,
+    beds: repliersData.bedrooms || repliersData.beds,
+    baths: repliersData.bathrooms || repliersData.baths,
+    sqft: repliersData.livingArea || repliersData.sqft || repliersData.squareFeet,
+    
+    // ENSURE THESE ARE MAPPED:
+    propertyType: repliersData.propertyType || repliersData.propertySubType || repliersData.type || '—',
+    yearBuilt: repliersData.yearBuilt || repliersData.yearConstructed || null,
+    daysOnMarket: repliersData.daysOnMarket || repliersData.dom || repliersData.cumulativeDaysOnMarket || 0,
+    
+    mlsNumber: repliersData.mlsNumber || repliersData.listingId,
+    status: repliersData.standardStatus || repliersData.status,
+    photos: repliersData.photos || repliersData.images || [],
+    // ...
+  };
+}
+```
+
+### Update CmaProperty Interface:
+
+```typescript
+// In types/index.ts or similar
+export interface CmaProperty {
+  id: string;
+  address: string;
+  price: number;
+  beds: number;
+  baths: number;
+  sqft: number;
+  
+  // Add these if missing:
+  propertyType?: string;
+  yearBuilt?: number | null;
+  daysOnMarket: number;
+  mlsNumber?: string;
+  listDate?: string;
+  
+  // ... other fields
+}
+```
+
+### Update Modal to Display Data:
+
+```tsx
+// In PropertyDetailModal or similar
+
+<div className="space-y-3">
+  <DetailRow 
+    label="Property Type" 
+    value={property.propertyType || '—'} 
+  />
+  <DetailRow 
+    label="Year Built" 
+    value={property.yearBuilt ? property.yearBuilt.toString() : '—'} 
+  />
+  <DetailRow 
+    label="Days on Market" 
+    value={property.daysOnMarket?.toString() || '0'} 
+  />
+  <DetailRow 
+    label="MLS #" 
+    value={property.mlsNumber || property.id} 
+  />
+</div>
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between items-center py-2 border-b border-gray-700">
+      <span className="text-gray-400">{label}</span>
+      <span className="text-white font-medium">{value}</span>
+    </div>
+  );
+}
+```
+
+---
+
+## Copy/Paste for Replit
+
+```
+Fix the CMA Presentation Comps property modal - two issues:
+
+## ISSUE 1: Status Badge Not Visible
+The status badge (e.g., "Closed") is dark on dark background - can't see it.
+
+FIX:
+- Use bright colors: bg-green-500 for Closed, bg-emerald-500 for Active
+- Position badge OVER the photo with shadow-lg
+- Add z-10 to ensure visibility
+
+const getStatusColor = (status: string) => {
+  const s = status.toLowerCase();
+  if (s.includes('closed')) return 'bg-green-500 text-white';
+  if (s.includes('active') && !s.includes('under')) return 'bg-emerald-500 text-white';
+  if (s.includes('pending')) return 'bg-yellow-400 text-gray-900';
+  if (s.includes('under')) return 'bg-orange-500 text-white';
+  return 'bg-gray-500 text-white';
+};
+
+## ISSUE 2: Missing Property Data
+Property Type, Year Built, Days on Market showing "—" instead of actual values.
+Data source is Repliers API - need to ensure proper field mapping.
+
+CHECK & FIX:
+1. Find where Repliers data is transformed (server/repliers.ts or similar)
+
+2. Ensure these fields are mapped from Repliers response:
+   - propertyType: repliersData.propertyType || repliersData.propertySubType || repliersData.type
+   - yearBuilt: repliersData.yearBuilt || repliersData.yearConstructed
+   - daysOnMarket: repliersData.daysOnMarket || repliersData.dom || repliersData.cumulativeDaysOnMarket
+
+3. Check Repliers API response structure:
+   - Fields may be at root level OR nested under "details" or "property"
+   - Log the raw response to see actual field names: console.log('Repliers data:', JSON.stringify(repliersData, null, 2))
+
+4. Update CmaProperty interface if needed to include:
+   propertyType?: string;
+   yearBuilt?: number | null;
+   daysOnMarket: number;
+
+5. In the modal component, handle null/undefined gracefully:
+   value={property.yearBuilt ? property.yearBuilt.toString() : '—'}
+
+## DEBUG:
+Add console.log in the Repliers transformation to see what fields are available:
+console.log('Raw Repliers property:', repliersData);
+console.log('Mapped property:', transformedProperty);
+
+I've attached screenshots showing the barely visible status badge and the missing data fields.
+```
+
+---
+
+## Expected Result After Fix
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  ┌─────────────────────────────────────────────────┐   │
+│  │ [Closed]  ← Bright green, visible              │   │
+│  │                                                 │   │
+│  │           [Property Photo]              < >    │   │
+│  │                                    5 / 33       │   │
+│  └─────────────────────────────────────────────────┘   │
+│                                                         │
+│  $1,200,000                                            │
+│  📍 1494 Bunker Ranch BLVD                             │
+│                                                         │
+│  ┌────────┐  ┌────────┐  ┌────────┐                   │
+│  │   4    │  │   4    │  │ 3,353  │                   │
+│  │  Beds  │  │ Baths  │  │  Sq Ft │                   │
+│  └────────┘  └────────┘  └────────┘                   │
+│                                                         │
+│  Property Type          Single Family Residence  ← Has data │
+│  Year Built             2019                     ← Has data │
+│  Days on Market         45                       ← Has data │
+│  MLS #                  ACT2180001                         │
+└─────────────────────────────────────────────────────────┘
+```
