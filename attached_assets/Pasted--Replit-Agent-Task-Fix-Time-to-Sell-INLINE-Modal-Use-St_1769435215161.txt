@@ -1,0 +1,268 @@
+# Replit Agent Task: Fix Time to Sell INLINE Modal - Use Standalone Mapbox Version
+
+## Problem Identified
+
+The **Time to Sell slide** has an **INLINE PropertyDetailModal** inside `TimeToSellWidget.tsx` (lines 426-708) that uses Google Maps iframe. Meanwhile, there's already an updated standalone `PropertyDetailModal.tsx` with Mapbox that's not being used.
+
+**File Location:**
+```
+client/src/components/cma-presentation/widgets/TimeToSellWidget.tsx
+```
+
+**Problem Code (lines 499-505):**
+```tsx
+<iframe
+  src={`https://www.google.com/maps?q=${property.latitude},${property.longitude}&z=15&output=embed`}
+  className="w-full h-full border-0"
+  allowFullScreen
+  loading="lazy"
+  title="Property Location"
+/>
+```
+
+---
+
+## Solution: Import the Standalone PropertyDetailModal
+
+Instead of maintaining two separate modal implementations, import the already-updated standalone version.
+
+### Step 1: Remove the Inline PropertyDetailModal Function
+
+In `TimeToSellWidget.tsx`, **DELETE** the inline `PropertyDetailModal` function (approximately lines 426-708).
+
+Look for something like:
+```tsx
+function PropertyDetailModal({ property, subjectProperty, onClose }: PropertyDetailModalProps) {
+  // ... 280+ lines of code ...
+}
+```
+
+Delete this entire function.
+
+### Step 2: Import the Standalone PropertyDetailModal
+
+At the top of `TimeToSellWidget.tsx`, add the import:
+
+```tsx
+import { PropertyDetailModal } from './PropertyDetailModal';
+```
+
+The standalone version is already at:
+```
+client/src/components/cma-presentation/widgets/PropertyDetailModal.tsx
+```
+
+### Step 3: Verify Props Match
+
+Ensure the standalone `PropertyDetailModal` accepts the same props:
+- `property` - The property object
+- `subjectProperty` - The subject property for comparisons (optional)
+- `onClose` - Callback to close the modal
+
+The existing usage in TimeToSellWidget.tsx (around line 779-784) should work:
+```tsx
+{selectedProperty && showDetailModal && (
+  <PropertyDetailModal 
+    property={selectedProperty}
+    subjectProperty={subjectProperty}
+    onClose={() => { setShowDetailModal(false); setSelectedProperty(null); }}
+  />
+)}
+```
+
+### Step 4: Verify Data Mapping
+
+The standalone PropertyDetailModal may expect slightly different property field names. Check that the `selectedProperty` object has all required fields:
+
+**Required fields for the modal:**
+```typescript
+interface PropertyForModal {
+  mlsNumber: string;
+  address: { full: string; city: string; state: string; zip: string };
+  coordinates?: { lat: number; lng: number };  // May need to map from latitude/longitude
+  statusLabel: string;
+  statusColor: 'red' | 'green' | 'orange' | 'blue';
+  beds: number | null;
+  baths: number | null;
+  sqft: number | null;
+  yearBuilt: number | null;
+  garageSpaces: number | null;
+  lotSqFt: number | null;
+  prices: { original: number | null; list: number; sold: number | null };
+  soldDate: string | null;
+  dom: { simple: number };
+  pricePerSqft: number | null;
+  description: string | null;
+  photos: string[];
+  photoCount: number;
+}
+```
+
+**If the TimeToSellWidget uses different field names**, create a mapping function:
+
+```tsx
+// Add this helper function in TimeToSellWidget.tsx
+function mapPropertyForModal(property: TimeToSellProperty): PropertyForModal {
+  return {
+    mlsNumber: property.mlsNumber,
+    address: {
+      full: property.address || property.streetAddress,
+      city: property.city,
+      state: property.state,
+      zip: property.zip,
+    },
+    coordinates: property.latitude && property.longitude
+      ? { lat: property.latitude, lng: property.longitude }
+      : undefined,
+    statusLabel: property.status || property.statusLabel,
+    statusColor: getStatusColor(property.status),
+    beds: property.beds ?? property.bedrooms ?? null,
+    baths: property.baths ?? property.bathrooms ?? null,
+    sqft: property.sqft ?? property.livingArea ?? null,
+    yearBuilt: property.yearBuilt ?? null,
+    garageSpaces: property.garageSpaces ?? null,
+    lotSqFt: property.lotSqFt ?? property.lotSize ?? null,
+    prices: {
+      original: property.originalPrice ?? null,
+      list: property.listPrice,
+      sold: property.soldPrice ?? null,
+    },
+    soldDate: property.soldDate ?? null,
+    dom: { simple: property.daysOnMarket ?? property.dom ?? 0 },
+    pricePerSqft: property.pricePerSqft ?? null,
+    description: property.description ?? property.remarks ?? null,
+    photos: property.photos ?? property.images ?? [],
+    photoCount: property.photoCount ?? property.photos?.length ?? 0,
+  };
+}
+
+// Then use it when rendering:
+{selectedProperty && showDetailModal && (
+  <PropertyDetailModal 
+    property={mapPropertyForModal(selectedProperty)}
+    subjectProperty={subjectProperty ? mapPropertyForModal(subjectProperty) : undefined}
+    onClose={() => { setShowDetailModal(false); setSelectedProperty(null); }}
+  />
+)}
+```
+
+---
+
+## Alternative: Update the Inline Modal Directly
+
+If the standalone PropertyDetailModal has different requirements or you prefer to keep them separate, update the inline modal in `TimeToSellWidget.tsx` directly.
+
+### Replace Google Maps iframe with Mapbox (lines 499-505)
+
+**Delete this:**
+```tsx
+<iframe
+  src={`https://www.google.com/maps?q=${property.latitude},${property.longitude}&z=15&output=embed`}
+  className="w-full h-full border-0"
+  allowFullScreen
+  loading="lazy"
+  title="Property Location"
+/>
+```
+
+**Replace with Mapbox component:**
+
+First, add imports at the top of the file:
+```tsx
+import { useEffect, useRef } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+```
+
+Then create a MapboxMap component (or import from shared):
+```tsx
+function MapboxMap({ lat, lng, address }: { lat: number; lng: number; address: string }) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  
+  useEffect(() => {
+    if (!mapContainer.current || map.current) return;
+    
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+    
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [lng, lat],
+      zoom: 14,
+    });
+    
+    new mapboxgl.Marker({ color: '#EF4923' })
+      .setLngLat([lng, lat])
+      .addTo(map.current);
+    
+    map.current.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+    
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, [lat, lng]);
+  
+  return <div ref={mapContainer} className="w-full h-full" />;
+}
+```
+
+Then in the modal, replace the iframe with:
+```tsx
+{property.latitude && property.longitude ? (
+  <MapboxMap 
+    lat={property.latitude} 
+    lng={property.longitude} 
+    address={property.address}
+  />
+) : (
+  <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400">
+    No location data
+  </div>
+)}
+```
+
+---
+
+## Recommended Approach: Option 1 (Import Standalone)
+
+**Why:**
+- Avoids duplicate code
+- Standalone version already has Mapbox implemented
+- Easier to maintain - one modal component for all CMA slides
+- Changes to the modal automatically apply everywhere
+
+**Implementation Summary:**
+1. Delete inline PropertyDetailModal function (lines 426-708) in TimeToSellWidget.tsx
+2. Add import: `import { PropertyDetailModal } from './PropertyDetailModal';`
+3. Add property mapping function if field names differ
+4. Test that the modal opens correctly with Mapbox
+
+---
+
+## Verification Checklist
+
+After making changes:
+
+- [ ] Time to Sell slide modal opens when clicking a property
+- [ ] Modal shows **Mapbox map** (NOT Google Maps iframe)
+- [ ] Spyglass orange marker (#EF4923) appears on map
+- [ ] Property details display correctly
+- [ ] Photo gallery navigation works
+- [ ] Close button (X) works
+- [ ] ESC key closes modal
+- [ ] COMPS slide modal still works (not affected)
+
+---
+
+## Files to Modify
+
+**Primary:**
+- `client/src/components/cma-presentation/widgets/TimeToSellWidget.tsx`
+  - Remove inline PropertyDetailModal (lines 426-708)
+  - Add import for standalone PropertyDetailModal
+  - Add property mapping function if needed
+
+**Reference (already updated, do not change):**
+- `client/src/components/cma-presentation/widgets/PropertyDetailModal.tsx`
