@@ -1,0 +1,749 @@
+# Replit Agent Task: Suggested List Price Slide - 3-Column Layout + Tooltip + 100% Viewport
+
+## Overview
+
+Redesign the SUGGESTED LIST PRICE slide with:
+1. **3-column layout** (Photo | Address+Price | Map)
+2. **Tooltip** explaining how price is calculated
+3. **100% viewport fit** - No scrolling, no zoom needed
+4. **AI-selected photo** using Repliers imageInsights
+5. **Editable price** for agents
+6. **Working Mapbox** with coordinates
+
+---
+
+## Layout Design (Must Fit 100% Viewport)
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                      SUGGESTED LIST PRICE                         7 / 33   │
+├────────────────────────┬────────────────────────┬──────────────────────────┤
+│                        │                        │                          │
+│   ┌────────────────┐   │   154 Pettigrew        │   ┌────────────────────┐ │
+│   │                │   │   Buda, TX 78610       │   │                    │ │
+│   │  PROPERTY      │   │                        │   │    MAPBOX MAP      │ │
+│   │  PHOTO         │   │  ┌──────────────────┐  │   │        📍          │ │
+│   │  ⭐ AI 98%     │   │  │   $1,296,232     │  │   │                    │ │
+│   │                │   │  │  Suggested Price │  │   │                    │ │
+│   │  [1] [2] [3]   │   │  │  ℹ️  ✏️ Edit     │  │   │  30°05'N 97°50'W   │ │
+│   └────────────────┘   │  └──────────────────┘  │   └────────────────────┘ │
+│                        │                        │                          │
+├────────────────────────┴────────────────────────┴──────────────────────────┤
+│  Compare pricing with the comps                    [All] [Sold] [Active]   │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐            │
+│  │ Avg Price  │  │ Avg $/sqft │  │Price Range │  │  # Comps   │            │
+│  │ $1,298,200 │  │    $378    │  │$1.1M-$1.5M │  │     8      │            │
+│  └────────────┘  └────────────┘  └────────────┘  └────────────┘            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Critical: 100% Viewport Fit
+
+### CSS Strategy
+
+```css
+/* Slide container must fit viewport exactly */
+.suggested-price-slide {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* If inside a presentation viewer with header */
+.slide-content {
+  height: calc(100vh - [header-height]);
+  max-height: calc(100vh - [header-height]);
+  overflow: hidden;
+}
+```
+
+### Tailwind Classes for Viewport Fit
+
+```tsx
+<div className="h-full max-h-full overflow-hidden flex flex-col">
+  {/* Header - fixed height */}
+  <div className="flex-shrink-0 h-12">Header</div>
+  
+  {/* Main content - fills remaining space */}
+  <div className="flex-1 min-h-0 overflow-hidden">
+    {/* Content here */}
+  </div>
+</div>
+```
+
+**Key Classes:**
+- `h-full` or `h-screen` - Full height
+- `max-h-full` or `max-h-screen` - Prevent overflow
+- `overflow-hidden` - No scrollbars
+- `flex-1 min-h-0` - Flex child that shrinks properly
+
+---
+
+## Tooltip: How Suggested Price is Calculated
+
+### Tooltip Content
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  ℹ️ How is this price calculated?                       │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  The Suggested List Price is calculated using:          │
+│                                                         │
+│  📊 Comparable Sales Analysis                           │
+│     • Average sold price of similar properties          │
+│     • Adjusted for size, age, and features              │
+│                                                         │
+│  📍 Location Factors                                    │
+│     • Neighborhood market trends                        │
+│     • Recent sales within 0.5 mile radius               │
+│                                                         │
+│  🏠 Property Characteristics                            │
+│     • Square footage: 3,432 sq ft                       │
+│     • Beds/Baths: 4 bed / 4 bath                        │
+│     • Lot size and amenities                            │
+│                                                         │
+│  📈 Market Conditions                                   │
+│     • Current inventory levels                          │
+│     • Average days on market: 42 days                   │
+│     • List-to-sale price ratio: 97%                     │
+│                                                         │
+│  ────────────────────────────────────────────────────   │
+│  Calculation: Avg Comp Price × Adjustments              │
+│  $1,298,200 × 0.998 = $1,296,232                        │
+│                                                         │
+│  💡 This is a suggested starting point.                 │
+│     Click "Edit Price" to adjust as needed.             │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Tooltip Implementation
+
+```tsx
+import { useState } from 'react';
+import { Info, X } from 'lucide-react';
+
+interface PriceTooltipProps {
+  suggestedPrice: number;
+  avgCompPrice: number;
+  sqft: number;
+  beds: number;
+  baths: number;
+  avgDom: number;
+  listToSaleRatio: number;
+}
+
+function PriceTooltip({ 
+  suggestedPrice, 
+  avgCompPrice, 
+  sqft, 
+  beds, 
+  baths, 
+  avgDom, 
+  listToSaleRatio 
+}: PriceTooltipProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const adjustmentFactor = (suggestedPrice / avgCompPrice).toFixed(3);
+  
+  return (
+    <div className="relative inline-block">
+      {/* Trigger Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="min-w-[44px] min-h-[44px] p-2 text-gray-500 hover:text-[#EF4923] 
+                   hover:bg-orange-50 rounded-full transition-colors"
+        aria-label="How is this price calculated?"
+      >
+        <Info className="w-5 h-5" />
+      </button>
+      
+      {/* Tooltip Popover */}
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setIsOpen(false)} 
+          />
+          
+          {/* Tooltip Content */}
+          <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 
+                          w-80 sm:w-96 bg-white dark:bg-gray-800 rounded-xl shadow-2xl 
+                          border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+              <h4 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                <Info className="w-4 h-4 text-[#EF4923]" />
+                How is this price calculated?
+              </h4>
+              <button 
+                onClick={() => setIsOpen(false)}
+                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+              >
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+            
+            {/* Body */}
+            <div className="p-4 space-y-4 text-sm max-h-[60vh] overflow-y-auto">
+              {/* Comparable Sales */}
+              <div>
+                <h5 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2 mb-1">
+                  📊 Comparable Sales Analysis
+                </h5>
+                <ul className="text-gray-600 dark:text-gray-400 space-y-1 ml-6">
+                  <li>• Average sold price of similar properties</li>
+                  <li>• Adjusted for size, age, and features</li>
+                </ul>
+              </div>
+              
+              {/* Location */}
+              <div>
+                <h5 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2 mb-1">
+                  📍 Location Factors
+                </h5>
+                <ul className="text-gray-600 dark:text-gray-400 space-y-1 ml-6">
+                  <li>• Neighborhood market trends</li>
+                  <li>• Recent sales within 0.5 mile radius</li>
+                </ul>
+              </div>
+              
+              {/* Property */}
+              <div>
+                <h5 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2 mb-1">
+                  🏠 Property Characteristics
+                </h5>
+                <ul className="text-gray-600 dark:text-gray-400 space-y-1 ml-6">
+                  <li>• Square footage: {sqft.toLocaleString()} sq ft</li>
+                  <li>• Beds/Baths: {beds} bed / {baths} bath</li>
+                  <li>• Lot size and amenities</li>
+                </ul>
+              </div>
+              
+              {/* Market */}
+              <div>
+                <h5 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2 mb-1">
+                  📈 Market Conditions
+                </h5>
+                <ul className="text-gray-600 dark:text-gray-400 space-y-1 ml-6">
+                  <li>• Average days on market: {avgDom} days</li>
+                  <li>• List-to-sale price ratio: {(listToSaleRatio * 100).toFixed(0)}%</li>
+                </ul>
+              </div>
+              
+              {/* Calculation */}
+              <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                <h5 className="font-medium text-gray-900 dark:text-gray-100 mb-2">
+                  Calculation
+                </h5>
+                <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 font-mono text-xs">
+                  <div className="text-gray-600 dark:text-gray-400">
+                    Avg Comp Price × Adjustment Factor
+                  </div>
+                  <div className="text-gray-900 dark:text-gray-100 font-semibold mt-1">
+                    ${avgCompPrice.toLocaleString()} × {adjustmentFactor} = ${suggestedPrice.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Note */}
+              <div className="flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+                <span>💡</span>
+                <span>This is a suggested starting point. Click "Edit Price" to adjust based on your market expertise.</span>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## Complete Component Implementation
+
+```tsx
+import { useState, useEffect, useRef } from 'react';
+import { Edit2, Check, X, Info, Star, Camera, MapPin } from 'lucide-react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+interface SubjectProperty {
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  sqft: number;
+  beds: number;
+  baths: number;
+  coordinates?: { lat: number; lng: number };
+  photos: Array<{
+    url: string;
+    imageInsights?: {
+      classification?: { imageOf?: string };
+      quality?: { score?: number };
+    };
+  }>;
+}
+
+interface Comparable {
+  listPrice: number;
+  soldPrice?: number;
+  sqft: number;
+  status: string;
+  daysOnMarket?: number;
+}
+
+interface SuggestedListPriceSlideProps {
+  subjectProperty: SubjectProperty;
+  suggestedPrice: number;
+  comparables: Comparable[];
+  onPriceUpdate?: (newPrice: number) => void;
+}
+
+export function SuggestedListPriceSlide({
+  subjectProperty,
+  suggestedPrice: initialPrice,
+  comparables,
+  onPriceUpdate,
+}: SuggestedListPriceSlideProps) {
+  // State
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedPrice, setEditedPrice] = useState(initialPrice);
+  const [displayPrice, setDisplayPrice] = useState(initialPrice);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'sold' | 'active'>('all');
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [showTooltip, setShowTooltip] = useState(false);
+  
+  // Refs
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  
+  // Get best photos using Repliers imageInsights
+  const bestPhotos = subjectProperty.photos
+    ?.filter(p => p.imageInsights?.quality?.score && p.imageInsights.quality.score > 70)
+    .sort((a, b) => (b.imageInsights?.quality?.score || 0) - (a.imageInsights?.quality?.score || 0))
+    .slice(0, 3) || [];
+  
+  // Fallback if no AI-rated photos
+  const displayPhotos = bestPhotos.length > 0 
+    ? bestPhotos 
+    : subjectProperty.photos?.slice(0, 3) || [];
+  
+  // Initialize Mapbox
+  useEffect(() => {
+    if (!mapContainer.current || map.current) return;
+    if (!subjectProperty.coordinates) return;
+    
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+    
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [subjectProperty.coordinates.lng, subjectProperty.coordinates.lat],
+      zoom: 14,
+    });
+    
+    new mapboxgl.Marker({ color: '#EF4923' })
+      .setLngLat([subjectProperty.coordinates.lng, subjectProperty.coordinates.lat])
+      .addTo(map.current);
+    
+    map.current.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+    
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, [subjectProperty.coordinates]);
+  
+  // Calculate stats
+  const filteredComps = comparables.filter(comp => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'sold') return comp.status === 'Closed';
+    if (activeFilter === 'active') return comp.status === 'Active';
+    return true;
+  });
+  
+  const avgPrice = filteredComps.length > 0
+    ? Math.round(filteredComps.reduce((sum, c) => sum + (c.soldPrice || c.listPrice), 0) / filteredComps.length)
+    : 0;
+    
+  const avgPricePerSqft = filteredComps.length > 0
+    ? Math.round(filteredComps.reduce((sum, c) => sum + ((c.soldPrice || c.listPrice) / c.sqft), 0) / filteredComps.length)
+    : 0;
+  
+  const avgDom = filteredComps.length > 0
+    ? Math.round(filteredComps.reduce((sum, c) => sum + (c.daysOnMarket || 0), 0) / filteredComps.length)
+    : 0;
+  
+  const prices = filteredComps.map(c => c.soldPrice || c.listPrice);
+  const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+  const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+  
+  const soldComps = comparables.filter(c => c.status === 'Closed' && c.soldPrice);
+  const listToSaleRatio = soldComps.length > 0
+    ? soldComps.reduce((sum, c) => sum + (c.soldPrice! / c.listPrice), 0) / soldComps.length
+    : 0.97;
+  
+  // Handlers
+  const handleSavePrice = () => {
+    setDisplayPrice(editedPrice);
+    setIsEditing(false);
+    onPriceUpdate?.(editedPrice);
+  };
+  
+  const formatPrice = (price: number) => 
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(price);
+  
+  const formatPriceShort = (price: number) => 
+    price >= 1000000 ? `$${(price / 1000000).toFixed(1)}M` : `$${(price / 1000).toFixed(0)}K`;
+  
+  const formatImageLabel = (imageOf?: string) => {
+    if (!imageOf) return 'Photo';
+    return imageOf.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  };
+
+  return (
+    <div className="h-full w-full flex flex-col bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 overflow-hidden">
+      
+      {/* Main Content - Must fit viewport */}
+      <div className="flex-1 min-h-0 flex flex-col p-3 sm:p-4 lg:p-6">
+        
+        {/* Top Section: 3-Column Grid */}
+        <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
+          
+          {/* Column 1: Property Photo */}
+          <div className="relative rounded-xl overflow-hidden shadow-lg bg-gray-200 dark:bg-gray-800 min-h-[180px] md:min-h-0">
+            {displayPhotos.length > 0 ? (
+              <>
+                <img
+                  src={displayPhotos[currentPhotoIndex]?.url}
+                  alt="Property"
+                  className="w-full h-full object-cover"
+                />
+                
+                {/* AI Badge */}
+                {displayPhotos[currentPhotoIndex]?.imageInsights?.quality?.score && (
+                  <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-sm text-white 
+                                  px-2 py-1 rounded-full flex items-center gap-1.5 text-xs">
+                    <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                    <span>AI Selected</span>
+                    <span className="bg-green-500 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                      {displayPhotos[currentPhotoIndex].imageInsights.quality.score}%
+                    </span>
+                  </div>
+                )}
+                
+                {/* Photo Label */}
+                <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm text-white 
+                                px-2 py-1 rounded text-xs">
+                  {formatImageLabel(displayPhotos[currentPhotoIndex]?.imageInsights?.classification?.imageOf)}
+                </div>
+                
+                {/* Thumbnails */}
+                {displayPhotos.length > 1 && (
+                  <div className="absolute bottom-2 right-2 flex gap-1">
+                    {displayPhotos.map((photo, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentPhotoIndex(idx)}
+                        className={`w-10 h-10 rounded overflow-hidden border-2 transition-all
+                          ${currentPhotoIndex === idx 
+                            ? 'border-[#EF4923] scale-105' 
+                            : 'border-white/50 opacity-70 hover:opacity-100'}`}
+                      >
+                        <img src={photo.url} alt="" className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                <Camera className="w-12 h-12" />
+              </div>
+            )}
+          </div>
+          
+          {/* Column 2: Address + Price */}
+          <div className="flex flex-col justify-center items-center text-center py-2">
+            {/* Address */}
+            <div className="mb-3">
+              <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100">
+                {subjectProperty.address}
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {subjectProperty.city}, {subjectProperty.state} {subjectProperty.zip}
+              </p>
+            </div>
+            
+            {/* Price Card */}
+            <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 
+                            rounded-2xl p-4 sm:p-5 w-full max-w-xs">
+              {isEditing ? (
+                <div className="space-y-3">
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg text-gray-400">$</span>
+                    <input
+                      type="number"
+                      value={editedPrice}
+                      onChange={(e) => setEditedPrice(Number(e.target.value))}
+                      className="w-full text-xl sm:text-2xl font-bold text-center text-[#EF4923] 
+                                 bg-white dark:bg-gray-800 border-2 border-[#EF4923] rounded-xl 
+                                 py-2 pl-8 focus:outline-none focus:ring-2 focus:ring-[#EF4923]"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-center">
+                    <button
+                      onClick={handleSavePrice}
+                      className="min-h-[40px] px-3 bg-green-500 hover:bg-green-600 text-white 
+                                 rounded-lg flex items-center gap-1 text-sm transition-colors"
+                    >
+                      <Check className="w-4 h-4" /> Save
+                    </button>
+                    <button
+                      onClick={() => { setEditedPrice(displayPrice); setIsEditing(false); }}
+                      className="min-h-[40px] px-3 bg-gray-400 hover:bg-gray-500 text-white 
+                                 rounded-lg flex items-center gap-1 text-sm transition-colors"
+                    >
+                      <X className="w-4 h-4" /> Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[#EF4923] mb-1">
+                    {formatPrice(displayPrice)}
+                  </div>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    Suggested List Price
+                  </p>
+                  
+                  {/* Tooltip + Edit Row */}
+                  <div className="flex items-center justify-center gap-1">
+                    {/* Tooltip Trigger */}
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowTooltip(!showTooltip)}
+                        className="min-w-[40px] min-h-[40px] p-2 text-gray-500 hover:text-[#EF4923] 
+                                   hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded-full transition-colors"
+                        aria-label="How is this calculated?"
+                      >
+                        <Info className="w-4 h-4" />
+                      </button>
+                      
+                      {/* Tooltip Popover */}
+                      {showTooltip && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setShowTooltip(false)} />
+                          <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 
+                                          w-72 sm:w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl 
+                                          border border-gray-200 dark:border-gray-700 text-left">
+                            <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900 
+                                            border-b border-gray-200 dark:border-gray-700 rounded-t-xl">
+                              <h4 className="font-semibold text-gray-900 dark:text-gray-100 text-sm flex items-center gap-2">
+                                <Info className="w-4 h-4 text-[#EF4923]" />
+                                How is this calculated?
+                              </h4>
+                              <button onClick={() => setShowTooltip(false)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
+                                <X className="w-3 h-3 text-gray-500" />
+                              </button>
+                            </div>
+                            <div className="p-3 space-y-2 text-xs max-h-[50vh] overflow-y-auto">
+                              <div>
+                                <p className="font-medium text-gray-900 dark:text-gray-100">📊 Comparable Sales</p>
+                                <p className="text-gray-500 ml-4">Average of {filteredComps.length} similar sold properties</p>
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900 dark:text-gray-100">🏠 Property Details</p>
+                                <p className="text-gray-500 ml-4">{subjectProperty.sqft?.toLocaleString()} sqft • {subjectProperty.beds} bed / {subjectProperty.baths} bath</p>
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900 dark:text-gray-100">📈 Market Data</p>
+                                <p className="text-gray-500 ml-4">Avg DOM: {avgDom} days • Sale ratio: {(listToSaleRatio * 100).toFixed(0)}%</p>
+                              </div>
+                              <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                                <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">Calculation</p>
+                                <div className="bg-gray-50 dark:bg-gray-900 rounded p-2 font-mono text-[10px]">
+                                  {formatPrice(avgPrice)} × {(displayPrice / avgPrice).toFixed(3)} = {formatPrice(displayPrice)}
+                                </div>
+                              </div>
+                              <p className="text-gray-400 text-[10px] pt-1">
+                                💡 This is a starting point. Adjust based on your expertise.
+                              </p>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    
+                    {/* Edit Button */}
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="min-h-[40px] px-3 text-sm text-[#EF4923] hover:bg-orange-100 
+                                 dark:hover:bg-orange-900/30 rounded-lg flex items-center gap-1 transition-colors"
+                    >
+                      <Edit2 className="w-4 h-4" /> Edit
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+          
+          {/* Column 3: Map */}
+          <div className="relative rounded-xl overflow-hidden shadow-lg bg-gray-200 dark:bg-gray-800 min-h-[180px] md:min-h-0">
+            {subjectProperty.coordinates ? (
+              <>
+                <div ref={mapContainer} className="w-full h-full" />
+                <div className="absolute top-2 left-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm 
+                                px-2 py-1 rounded text-xs text-gray-600 dark:text-gray-300">
+                  {subjectProperty.coordinates.lat.toFixed(4)}°N, {Math.abs(subjectProperty.coordinates.lng).toFixed(4)}°W
+                </div>
+              </>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                <div className="text-center">
+                  <MapPin className="w-8 h-8 mx-auto mb-2" />
+                  <p className="text-sm">Map unavailable</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Bottom Section: Stats */}
+        <div className="flex-shrink-0 mt-3 sm:mt-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-3 sm:p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+            {/* Title + Filters */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+              <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">
+                Compare pricing with the comps
+              </h3>
+              <div className="flex gap-1.5">
+                {(['all', 'sold', 'active'] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setActiveFilter(filter)}
+                    className={`min-h-[32px] px-3 py-1 text-xs sm:text-sm font-medium rounded-full transition-colors
+                      ${activeFilter === filter
+                        ? 'bg-[#EF4923] text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200'}`}
+                  >
+                    {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-2 sm:p-3">
+                <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Average Price</p>
+                <p className="text-base sm:text-lg lg:text-xl font-bold text-gray-900 dark:text-gray-100">
+                  {formatPrice(avgPrice)}
+                </p>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-2 sm:p-3">
+                <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Avg $/sq.ft.</p>
+                <p className="text-base sm:text-lg lg:text-xl font-bold text-gray-900 dark:text-gray-100">
+                  ${avgPricePerSqft}
+                </p>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-2 sm:p-3">
+                <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Price Range</p>
+                <p className="text-base sm:text-lg lg:text-xl font-bold text-gray-900 dark:text-gray-100">
+                  {formatPriceShort(minPrice)} - {formatPriceShort(maxPrice)}
+                </p>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-2 sm:p-3">
+                <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5"># of Comps</p>
+                <p className="text-base sm:text-lg lg:text-xl font-bold text-gray-900 dark:text-gray-100">
+                  {filteredComps.length}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## Repliers imageInsights Integration
+
+### Getting Best Photos
+
+```typescript
+// In server/repliers.ts or where photos are processed
+function getBestPhotos(images: RepliersImage[]): ProcessedPhoto[] {
+  return images
+    .map(img => ({
+      url: img.url,
+      imageInsights: img.imageInsights,
+      score: img.imageInsights?.quality?.score || 0,
+      category: img.imageInsights?.classification?.imageOf || 'unknown'
+    }))
+    .filter(img => img.score > 70)  // Only high-quality photos
+    .sort((a, b) => b.score - a.score)  // Best first
+    .slice(0, 3);  // Top 3
+}
+
+// Prioritize exterior shots for the main display
+function getPrimaryPhoto(images: ProcessedPhoto[]): ProcessedPhoto | null {
+  const exterior = images.find(img => 
+    img.category?.includes('exterior') || 
+    img.category?.includes('front')
+  );
+  return exterior || images[0] || null;
+}
+```
+
+---
+
+## Verification Checklist
+
+### 100% Viewport Fit
+- [ ] Slide fits on 1920x1080 desktop at 100% zoom
+- [ ] Slide fits on 1440x900 laptop at 100% zoom
+- [ ] Slide fits on iPad Pro (1024x1366) at 100%
+- [ ] No horizontal or vertical scrolling needed
+- [ ] All content visible without zooming out
+
+### 3-Column Layout
+- [ ] Photo on left with AI badge and thumbnails
+- [ ] Address + Price in center with tooltip
+- [ ] Mapbox on right with coordinates
+- [ ] Responsive: stacks on mobile
+
+### Tooltip
+- [ ] Info icon (ℹ️) next to Edit button
+- [ ] Click opens popover explaining calculation
+- [ ] Shows: Comparable analysis, property details, market data
+- [ ] Shows actual calculation formula
+- [ ] Click outside or X closes tooltip
+
+### Features
+- [ ] Photo shows AI quality score (if available)
+- [ ] Photo thumbnails are clickable
+- [ ] Price is editable with Save/Cancel
+- [ ] Mapbox shows with Spyglass orange marker
+- [ ] Filter buttons recalculate stats
+- [ ] All touch targets 44px minimum
+
+### Mobile
+- [ ] Works on iPhone Safari
+- [ ] Works on Android Chrome
+- [ ] Stacked layout on narrow screens
+- [ ] Touch-friendly buttons
