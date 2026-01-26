@@ -115,17 +115,33 @@ export function PropertyDetailModal({ isOpen, onClose, property }: PropertyDetai
               <>
                 <button
                   onClick={prevPhoto}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 rounded-full p-2 transition-colors touch-target-44"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 
+                             min-w-[48px] min-h-[48px] 
+                             bg-black/50 hover:bg-black/70 
+                             text-white rounded-full 
+                             flex items-center justify-center
+                             transition-all duration-200
+                             shadow-lg z-10
+                             focus:outline-none focus:ring-2 focus:ring-white/50"
                   data-testid="button-prev-photo"
+                  aria-label="Previous photo"
                 >
-                  <ChevronLeft className="h-5 w-5 text-white" />
+                  <ChevronLeft className="w-6 h-6" />
                 </button>
                 <button
                   onClick={nextPhoto}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 rounded-full p-2 transition-colors touch-target-44"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 
+                             min-w-[48px] min-h-[48px] 
+                             bg-black/50 hover:bg-black/70 
+                             text-white rounded-full 
+                             flex items-center justify-center
+                             transition-all duration-200
+                             shadow-lg z-10
+                             focus:outline-none focus:ring-2 focus:ring-white/50"
                   data-testid="button-next-photo"
+                  aria-label="Next photo"
                 >
-                  <ChevronRight className="h-5 w-5 text-white" />
+                  <ChevronRight className="w-6 h-6" />
                 </button>
                 
                 <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 px-3 py-1 rounded-full text-white text-sm">

@@ -1,0 +1,216 @@
+# Fix Property Modal Photo Navigation Arrows — Make Visible
+
+## Issue
+
+The photo navigation arrows (previous/next) in the property detail modal are barely visible - they blend into the background and are hard to see/click.
+
+**Affects:**
+1. CMA Comparable Property Modal (`client/src/components/`)
+2. CMA Presentation Comparable Property Modal (`client/src/components/cma-presentation/`)
+
+---
+
+## Current vs Target
+
+| Current | Target |
+|---------|--------|
+| Arrows nearly invisible | Clear, visible navigation buttons |
+| No background/contrast | Semi-transparent dark or white background |
+| Hard to find | Obviously positioned on left/right edges |
+
+---
+
+## Fix Implementation
+
+### Make Navigation Arrows Clearly Visible:
+
+```tsx
+{/* Previous Arrow - Left Side */}
+<button
+  onClick={handlePrevPhoto}
+  className="absolute left-4 top-1/2 -translate-y-1/2 
+             min-w-[48px] min-h-[48px] 
+             bg-black/50 hover:bg-black/70 
+             text-white rounded-full 
+             flex items-center justify-center
+             transition-all duration-200
+             shadow-lg
+             focus:outline-none focus:ring-2 focus:ring-white/50"
+  aria-label="Previous photo"
+>
+  <ChevronLeft className="w-6 h-6" />
+</button>
+
+{/* Next Arrow - Right Side */}
+<button
+  onClick={handleNextPhoto}
+  className="absolute right-4 top-1/2 -translate-y-1/2 
+             min-w-[48px] min-h-[48px] 
+             bg-black/50 hover:bg-black/70 
+             text-white rounded-full 
+             flex items-center justify-center
+             transition-all duration-200
+             shadow-lg
+             focus:outline-none focus:ring-2 focus:ring-white/50"
+  aria-label="Next photo"
+>
+  <ChevronRight className="w-6 h-6" />
+</button>
+```
+
+### Alternative Style (White with shadow):
+
+```tsx
+{/* If background is dark, use white buttons */}
+<button
+  onClick={handlePrevPhoto}
+  className="absolute left-4 top-1/2 -translate-y-1/2 
+             min-w-[48px] min-h-[48px] 
+             bg-white/90 hover:bg-white 
+             text-gray-800 rounded-full 
+             flex items-center justify-center
+             transition-all duration-200
+             shadow-xl
+             focus:outline-none focus:ring-2 focus:ring-[#EF4923]"
+  aria-label="Previous photo"
+>
+  <ChevronLeft className="w-6 h-6" />
+</button>
+```
+
+---
+
+## Key Styling Requirements
+
+### Size & Touch Target:
+```css
+min-w-[48px] min-h-[48px]  /* Large enough to tap on mobile */
+```
+
+### Background (choose one):
+```css
+/* Option A: Dark semi-transparent */
+bg-black/50 hover:bg-black/70 text-white
+
+/* Option B: White semi-transparent */
+bg-white/90 hover:bg-white text-gray-800
+
+/* Option C: Solid with shadow */
+bg-white shadow-xl text-gray-800
+```
+
+### Position:
+```css
+absolute left-4 top-1/2 -translate-y-1/2   /* Left arrow */
+absolute right-4 top-1/2 -translate-y-1/2  /* Right arrow */
+```
+
+### Shape:
+```css
+rounded-full  /* Circular button */
+```
+
+### Visibility:
+```css
+shadow-lg     /* Add depth/contrast */
+z-10          /* Ensure above image */
+```
+
+---
+
+## Files to Update
+
+### 1. CMA Comparable Modal:
+```bash
+grep -rn "ChevronLeft\|ChevronRight\|prev.*photo\|next.*photo" --include="*.tsx" client/src/components/
+```
+Likely in: `PropertyDetailModal.tsx` or similar
+
+### 2. CMA Presentation Comparable Modal:
+```
+client/src/components/cma-presentation/widgets/PropertyDetailModal.tsx
+```
+
+---
+
+## Copy/Paste for Replit
+
+```
+Fix photo navigation arrows in property modals - they are barely visible.
+
+## ISSUE:
+The previous/next photo navigation arrows are nearly invisible - they blend into the background.
+
+## UPDATE BOTH FILES:
+1. CMA Comparable Property Modal (find in client/src/components/)
+2. CMA Presentation Property Modal (client/src/components/cma-presentation/widgets/)
+
+## CHANGE ARROW BUTTONS TO:
+
+<button
+  onClick={handlePrevPhoto}
+  className="absolute left-4 top-1/2 -translate-y-1/2 
+             min-w-[48px] min-h-[48px] 
+             bg-black/50 hover:bg-black/70 
+             text-white rounded-full 
+             flex items-center justify-center
+             transition-all shadow-lg z-10"
+  aria-label="Previous photo"
+>
+  <ChevronLeft className="w-6 h-6" />
+</button>
+
+<button
+  onClick={handleNextPhoto}
+  className="absolute right-4 top-1/2 -translate-y-1/2 
+             min-w-[48px] min-h-[48px] 
+             bg-black/50 hover:bg-black/70 
+             text-white rounded-full 
+             flex items-center justify-center
+             transition-all shadow-lg z-10"
+  aria-label="Next photo"
+>
+  <ChevronRight className="w-6 h-6" />
+</button>
+
+## KEY REQUIREMENTS:
+- Background: bg-black/50 (semi-transparent dark)
+- Hover: bg-black/70 (darker on hover)
+- Size: min-w-[48px] min-h-[48px] (large touch target)
+- Shape: rounded-full (circular)
+- Shadow: shadow-lg (for contrast/depth)
+- Color: text-white
+- Position: left-4 / right-4, vertically centered
+- Z-index: z-10 (above image)
+
+## ALTERNATIVE (if dark background):
+Use white buttons instead:
+bg-white/90 hover:bg-white text-gray-800 shadow-xl
+
+I've attached screenshots showing the current barely-visible arrows (marked with red arrows).
+```
+
+---
+
+## Expected Result
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│                                                             │
+│   ┌───┐                                           ┌───┐    │
+│   │ < │              [Property Photo]             │ > │    │
+│   └───┘                                           └───┘    │
+│     ↑                                               ↑      │
+│  Clearly                                         Clearly   │
+│  visible                    3 / 40               visible   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Navigation arrows should be:
+- Clearly visible with dark semi-transparent background
+- Large enough to tap (48x48px)
+- Circular shape
+- Shadow for depth
+- Hover state for feedback

@@ -132,26 +132,36 @@ export function PropertyDetailModal({ property, onClose }: PropertyDetailModalPr
             
             {photos.length > 1 && (
               <>
-                <Button
-                  variant="secondary"
-                  size="icon"
+                <button
                   onClick={handlePrevPhoto}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white shadow-lg"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 
+                             min-w-[48px] min-h-[48px] 
+                             bg-black/50 hover:bg-black/70 
+                             text-white rounded-full 
+                             flex items-center justify-center
+                             transition-all duration-200
+                             shadow-lg z-10
+                             focus:outline-none focus:ring-2 focus:ring-white/50"
                   aria-label="Previous photo"
                   data-testid="button-prev-photo"
                 >
-                  <ChevronLeft className="w-5 h-5" />
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="icon"
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <button
                   onClick={handleNextPhoto}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white shadow-lg"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 
+                             min-w-[48px] min-h-[48px] 
+                             bg-black/50 hover:bg-black/70 
+                             text-white rounded-full 
+                             flex items-center justify-center
+                             transition-all duration-200
+                             shadow-lg z-10
+                             focus:outline-none focus:ring-2 focus:ring-white/50"
                   aria-label="Next photo"
                   data-testid="button-next-photo"
                 >
-                  <ChevronRight className="w-5 h-5" />
-                </Button>
+                  <ChevronRight className="w-6 h-6" />
+                </button>
               </>
             )}
           </div>
