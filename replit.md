@@ -75,6 +75,11 @@ Preferred communication style: Simple, everyday language.
   - File Upload: PDF/Word docs up to 50MB, stored at `.private/resources/{userId}/{timestamp}-{filename}` via @replit/object-storage
   - Settings Page: Drag-to-reorder list, visibility toggles, edit/delete, file upload with dashed border drop zones
   - SpyglassResourcesWidget: CloudCMA-style underlined text links, supports authenticated and public contexts via optional `cmaToken` prop
+- **User Notification Preferences System**: Per-user Slack notification settings:
+  - Database: `userNotificationPreferences` table with userId, notifyDocumentUploads, notifyClosingReminders, notifyMarketingAssets
+  - API Endpoints: GET/PUT `/api/user/notification-preferences` with Zod validation
+  - Component: `NotificationPreferences.tsx` with 3 toggles, auto-save, optimistic updates
+  - Settings Page Integration: Replaced inline notification settings with reusable component
 
 ## External Dependencies
 - **Slack**: Team coordination.

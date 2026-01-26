@@ -4770,7 +4770,18 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
         return res.status(401).json({ message: "Unauthorized" });
       }
       
-      const prefs = await storage.upsertUserNotificationPreferences(userId, req.body);
+      // Validate request body with Zod schema
+      const { updateUserNotificationPreferencesSchema } = await import("@shared/schema");
+      const validationResult = updateUserNotificationPreferencesSchema.safeParse(req.body);
+      
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid request body",
+          errors: validationResult.error.errors 
+        });
+      }
+      
+      const prefs = await storage.upsertUserNotificationPreferences(userId, validationResult.data);
       res.json(prefs);
     } catch (error) {
       console.error("Error updating notification preferences:", error);

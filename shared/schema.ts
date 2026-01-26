@@ -291,6 +291,13 @@ export const userNotificationPreferences = pgTable("user_notification_preference
 export type UserNotificationPreferences = typeof userNotificationPreferences.$inferSelect;
 export type InsertUserNotificationPreferences = typeof userNotificationPreferences.$inferInsert;
 
+// Zod schema for validating user notification preferences updates
+export const updateUserNotificationPreferencesSchema = z.object({
+  notifyDocumentUploads: z.boolean().optional(),
+  notifyClosingReminders: z.boolean().optional(),
+  notifyMarketingAssets: z.boolean().optional(),
+});
+
 // Agent profiles for CMA reports and marketing
 export const agentProfiles = pgTable("agent_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

@@ -96,19 +96,6 @@ export default function Settings() {
   const [coverLetterTone, setCoverLetterTone] = useState<'professional' | 'friendly' | 'confident'>('professional');
   const [isGeneratingCoverLetter, setIsGeneratingCoverLetter] = useState(false);
 
-  // Notification settings state - ALL DEFAULTS ARE FALSE (opt-in)
-  const [notificationSettings, setNotificationSettings] = useState({
-    documentUploads: false,
-    closingReminders: false,
-    marketingAssets: false,
-    reminder30Days: false,
-    reminder14Days: false,
-    reminder7Days: false,
-    reminder3Days: false,
-    reminder1Day: false,
-    reminderDayOf: false,
-  });
-
   useEffect(() => {
     if (user?.slackUserId) {
       setMySlackUserId(user.slackUserId);
@@ -155,42 +142,6 @@ export default function Settings() {
       });
     }
   }, [agentProfileData]);
-
-  // Notification settings query - scoped by userId for per-user sync
-  // Refetch on window focus for cross-device sync
-  const { data: savedNotificationSettings } = useQuery<{
-    documentUploads: boolean;
-    closingReminders: boolean;
-    marketingAssets: boolean;
-    reminder30Days: boolean;
-    reminder14Days: boolean;
-    reminder7Days: boolean;
-    reminder3Days: boolean;
-    reminder1Day: boolean;
-    reminderDayOf: boolean;
-  }>({
-    queryKey: ["/api/notification-settings", user?.id], // Include userId for per-user cache separation
-    staleTime: 30000, // Consider stale after 30 seconds for cross-device sync
-    refetchOnWindowFocus: true, // Refetch when user returns to the app/tab
-    enabled: !!user, // Only fetch when user is logged in
-  });
-
-  // Load notification settings when fetched - ALL DEFAULTS ARE FALSE
-  useEffect(() => {
-    if (savedNotificationSettings) {
-      setNotificationSettings({
-        documentUploads: savedNotificationSettings.documentUploads ?? false,
-        closingReminders: savedNotificationSettings.closingReminders ?? false,
-        marketingAssets: savedNotificationSettings.marketingAssets ?? false,
-        reminder30Days: savedNotificationSettings.reminder30Days ?? false,
-        reminder14Days: savedNotificationSettings.reminder14Days ?? false,
-        reminder7Days: savedNotificationSettings.reminder7Days ?? false,
-        reminder3Days: savedNotificationSettings.reminder3Days ?? false,
-        reminder1Day: savedNotificationSettings.reminder1Day ?? false,
-        reminderDayOf: savedNotificationSettings.reminderDayOf ?? false,
-      });
-    }
-  }, [savedNotificationSettings]);
 
   // CMA Resources state
   const [showAddLinkDialog, setShowAddLinkDialog] = useState(false);
@@ -343,53 +294,6 @@ export default function Settings() {
       });
     },
   });
-
-  const updateNotificationSettingsMutation = useMutation({
-    mutationFn: async (data: typeof notificationSettings) => {
-      const res = await apiRequest("PUT", "/api/notification-settings", data);
-      return res.json();
-    },
-    onSuccess: (data) => {
-      toast({ title: "Settings saved", description: "Your notification preferences have been updated." });
-      queryClient.invalidateQueries({ queryKey: ["/api/notification-settings", user?.id] }); // Include userId to invalidate correct user's cache
-      // Update local state with server response to ensure consistency - ALL DEFAULTS ARE FALSE
-      if (data) {
-        setNotificationSettings({
-          documentUploads: data.documentUploads ?? false,
-          closingReminders: data.closingReminders ?? false,
-          marketingAssets: data.marketingAssets ?? false,
-          reminder30Days: data.reminder30Days ?? false,
-          reminder14Days: data.reminder14Days ?? false,
-          reminder7Days: data.reminder7Days ?? false,
-          reminder3Days: data.reminder3Days ?? false,
-          reminder1Day: data.reminder1Day ?? false,
-          reminderDayOf: data.reminderDayOf ?? false,
-        });
-      }
-    },
-    onError: (error: Error, _variables, context: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update notification settings",
-        variant: "destructive",
-      });
-      // Revert to previous settings on error
-      if (context?.previousSettings) {
-        setNotificationSettings(context.previousSettings);
-      }
-    },
-    onMutate: async (newSettings) => {
-      // Save current settings for rollback on error
-      const previousSettings = { ...notificationSettings };
-      setNotificationSettings(newSettings);
-      return { previousSettings };
-    },
-  });
-
-  const handleNotificationToggle = (key: keyof typeof notificationSettings, value: boolean) => {
-    const newSettings = { ...notificationSettings, [key]: value };
-    updateNotificationSettingsMutation.mutate(newSettings);
-  };
 
   const addMutation = useMutation({
     mutationFn: async (data: typeof newCoordinator) => {

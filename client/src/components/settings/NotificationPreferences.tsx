@@ -81,10 +81,10 @@ export function NotificationPreferences() {
       <Card>
         <CardContent className="p-6">
           <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-muted rounded w-1/3"></div>
-            <div className="h-12 bg-muted rounded"></div>
-            <div className="h-12 bg-muted rounded"></div>
-            <div className="h-12 bg-muted rounded"></div>
+            <div className="h-4 bg-muted rounded-md w-1/3"></div>
+            <div className="h-12 bg-muted rounded-md"></div>
+            <div className="h-12 bg-muted rounded-md"></div>
+            <div className="h-12 bg-muted rounded-md"></div>
           </div>
         </CardContent>
       </Card>
@@ -118,8 +118,8 @@ export function NotificationPreferences() {
     <Card data-testid="notification-preferences-card">
       <CardHeader>
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-[#EF4923]/10 rounded-lg">
-            <Bell className="h-5 w-5 text-[#EF4923]" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-amber-500/10">
+            <Bell className="h-5 w-5 text-amber-500" />
           </div>
           <div>
             <CardTitle>Slack Notifications</CardTitle>
@@ -129,9 +129,9 @@ export function NotificationPreferences() {
           </div>
         </div>
         
-        <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-start gap-2">
-          <User className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
-          <span className="text-sm text-blue-400">
+        <div className="mt-4 p-3 bg-muted/50 border border-border rounded-md flex items-start gap-2">
+          <User className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+          <span className="text-sm text-muted-foreground">
             These are your personal notification preferences. Other team members have their own settings.
           </span>
         </div>
@@ -145,7 +145,7 @@ export function NotificationPreferences() {
         {notificationOptions.map((option) => (
           <div
             key={option.key}
-            className="flex items-center justify-between p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
+            className="flex items-center justify-between p-4 bg-muted/30 rounded-md"
             data-testid={`notification-option-${option.key}`}
           >
             <div className="flex items-center gap-3">
@@ -161,7 +161,6 @@ export function NotificationPreferences() {
               checked={prefs[option.key]}
               onCheckedChange={(checked) => updatePreference(option.key, checked)}
               disabled={saving}
-              className="data-[state=checked]:bg-[#EF4923]"
               data-testid={`switch-${option.key}`}
             />
           </div>
@@ -175,7 +174,7 @@ export function NotificationPreferences() {
         </div>
 
         {activeCount > 0 && (
-          <div className="p-4 bg-muted/20 rounded-lg">
+          <div className="p-4 bg-muted/20 rounded-md">
             <p className="text-sm text-muted-foreground mb-2">
               <span className="font-medium">Your Active Notifications:</span>
             </p>

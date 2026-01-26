@@ -1,0 +1,179 @@
+# CMA Presentation PDF Output - 33 Sections
+
+## Overview
+Professional PDF document generated from the CMA Presentation Builder for Spyglass Realty agents.
+
+---
+
+## 📄 All 33 Sections by Category
+
+### 1️⃣ Introduction (7 sections)
+| # | Section ID | Page Title | Description |
+|---|------------|------------|-------------|
+| 1 | `cover_page` | Cover Page | Title, date, agent photo, property address |
+| 2 | `listing_brochure` | Listing Brochure | Property flyer/marketing material |
+| 3 | `cover_letter` | Cover Letter | Personalized letter to client |
+| 4 | `agent_resume` | Agent Resume | Agent bio, credentials, photo |
+| 5 | `our_company` | Our Company | Spyglass Realty company profile |
+| 6 | `what_is_cma` | What is a CMA? | Educational content explaining CMAs |
+| 7 | `contact_me` | Contact Me | Agent contact information |
+
+---
+
+### 2️⃣ Marketing & Branding (6 sections)
+| # | Section ID | Page Title | Description |
+|---|------------|------------|-------------|
+| 8 | `listing_with_spyglass` | Listing with Spyglass Realty | Why list with us |
+| 9 | `home_selling_system` | Home Selling System | Step-by-step process overview |
+| 10 | `our_proven_approach` | Our Proven Approach | Marketing methodology |
+| 11 | `marketing_overview` | Marketing Overview | Full marketing plan |
+| 12 | `client_testimonials` | Client Testimonials | Reviews and quotes |
+| 13 | `what_clients_say` | What Our Clients Say | Extended testimonials |
+
+---
+
+### 3️⃣ Digital Marketing (5 sections)
+| # | Section ID | Page Title | Description |
+|---|------------|------------|-------------|
+| 14 | `seo_digital_marketing` | SEO & Digital Marketing | Online strategy overview |
+| 15 | `google_meta_ads` | Google + Meta Ads | Paid advertising approach |
+| 16 | `professional_videography` | Professional Videography | Video marketing services |
+| 17 | `aerial_photography` | Aerial Photography | Drone photography services |
+| 18 | `zillow_showcase` | Zillow Showcase Listings | Premium listing features |
+
+---
+
+### 4️⃣ Comparable Listings (6 sections)
+| # | Section ID | Page Title | Description |
+|---|------------|------------|-------------|
+| 19 | `map_all_listings` | Map of All Listings | Interactive Mapbox map with pins |
+| 20 | `listings_header` | Comparable Properties | Section divider/header |
+| 21 | `summary_comparables` | Summary of Comparables | Avg price, $/sqft, DOM stats |
+| 22-27 | `property_details` | Property Details | Individual comp cards (6 pages) |
+| 28-30 | `property_photos` | Property Photos | Photo grids for each comp |
+| 31 | `adjustments` | Adjustments Table | Color-coded adjustment analysis |
+
+---
+
+### 5️⃣ Market Analysis (6 sections)
+| # | Section ID | Page Title | Description |
+|---|------------|------------|-------------|
+| 32 | `analysis_header` | Market Analysis | Section divider/header |
+| 33 | `online_valuation` | Online Valuation Analysis | AVM comparison (Zillow, Redfin) |
+| 34 | `price_per_sqft` | Average Price Per Sq. Ft. | Bar chart visualization |
+| 35 | `comparable_stats` | Comparable Statistics | Statistical breakdown |
+| 36 | `time_to_sell` | Time to Sell Analysis | Days on market analysis |
+| 37 | `suggested_list_price` | Suggested List Price | Price recommendation |
+
+---
+
+### 6️⃣ Pricing & Closing (6 sections)
+| # | Section ID | Page Title | Description |
+|---|------------|------------|-------------|
+| 38 | `pricing_strategy` | Pricing Strategy | Strategic pricing approach |
+| 39 | `listing_price` | Recommended Listing Price | Final price recommendation |
+| 40 | `marketing_timeline` | Marketing Timeline | Week-by-week marketing plan |
+| 41 | `listing_action_plan` | Listing Action Plan | Checklist of next steps |
+| 42 | `spyglass_resources` | Spyglass Resources | Links and tools |
+| 43 | `thank_you` | Thank You | Closing slide with contact |
+
+---
+
+## 🎨 PDF Design Specifications
+
+### Page Size
+- **US Letter**: 8.5" x 11" (612 x 792 points)
+- **Resolution**: 300 DPI for print quality
+- **Margins**: 0.5" on all sides
+
+### Branding
+- **Primary Color**: Spyglass Orange `#EF4923`
+- **Dark Background**: `#18181b` (zinc-900)
+- **Text Colors**: White `#ffffff`, Zinc-400 `#a1a1aa`
+- **Font**: Inter or system sans-serif
+
+### Page Types
+| Type | Background | Usage |
+|------|------------|-------|
+| Cover | Dark gradient | Cover page, Thank you |
+| Content | White | Letters, details, analysis |
+| Data | White | Tables, charts, comparisons |
+| Visual | Dark | Maps, photo galleries |
+
+---
+
+## 📊 Key Visual Elements
+
+### Cover Page
+- Spyglass logo (centered)
+- "Comparative Market Analysis" title
+- Property address in framed box
+- Date
+- Agent photo + name + credentials
+
+### Map of All Listings
+- Mapbox GL interactive map
+- Color-coded pins:
+  - 🟠 Orange = Subject property
+  - 🟢 Green = Sold comps
+  - 🔵 Blue = Active listings
+  - 🟡 Yellow = Pending
+- Polygon boundary (optional)
+
+### Summary Statistics
+- Large number displays
+- Key metrics: Avg Price, $/Sq.Ft., Days on Market
+- Sold vs Active count badges
+
+### Adjustments Table
+- Column headers: Feature, Comp 1, Comp 2, Comp 3
+- Color coding:
+  - 🟢 Green = Negative adjustments (favorable)
+  - 🔴 Red = Positive adjustments (unfavorable)
+- Bold row for Adjusted Price
+
+### Price Per Sq.Ft. Chart
+- Vertical bar chart
+- Orange highlight for subject property
+- Dollar labels above each bar
+
+### Suggested List Price
+- Large centered price display
+- Low/High range indicators
+- Price per sq.ft. badge
+
+---
+
+## 🔧 Technical Implementation
+
+### PDF Generation Library
+```javascript
+// Using @react-pdf/renderer
+import { Document, Page, View, Text, Image } from '@react-pdf/renderer';
+```
+
+### File Output
+- **Format**: PDF/A-1b (archival quality)
+- **Filename**: `CMA_[Address]_[Date].pdf`
+- **Size**: ~5-15 MB depending on photos
+
+### Export Options
+1. **Download** - Direct browser download
+2. **Email** - Send to client via email
+3. **Share Link** - Generate public URL
+4. **Print** - Direct to printer
+
+---
+
+## ✅ Quality Checklist
+
+- [ ] All 33 sections render correctly
+- [ ] Spyglass branding consistent throughout
+- [ ] Photos are high resolution (300 DPI)
+- [ ] Agent info populated from profile
+- [ ] Property data pulled from MLS
+- [ ] Adjustments calculated correctly
+- [ ] Map renders with all pins
+- [ ] Charts display accurate data
+- [ ] No blank pages or sections
+- [ ] File size optimized for email (<15 MB)
