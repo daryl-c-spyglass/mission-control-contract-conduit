@@ -1,26 +1,38 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FileText, Settings } from 'lucide-react';
 import { Link } from 'wouter';
 import type { AgentResource } from '@shared/schema';
+import { DocumentPreviewModal } from '@/components/DocumentPreviewModal';
 
 interface SpyglassResourcesWidgetProps {
-  cmaToken?: string; // Optional token for public CMA access
+  cmaToken?: string;
 }
 
 export function SpyglassResourcesWidget({ cmaToken }: SpyglassResourcesWidgetProps) {
-  // Use different endpoint based on whether we have a public token or are authenticated
-  const queryKey = cmaToken 
+  const [previewDocument, setPreviewDocument] = useState<AgentResource | null>(null);
+
+  const queryKey = cmaToken
     ? [`/api/shared/cma/${cmaToken}/resources`]
     : ["/api/agent/resources"];
 
   const { data: resources = [], isLoading, isError } = useQuery<AgentResource[]>({
     queryKey,
     staleTime: 60000,
-    retry: false, // Don't retry on auth failures
+    retry: false,
   });
 
-  // Filter to only active resources (treat undefined/null as active)
   const activeResources = resources.filter(r => r.isActive !== false);
+
+  const handleResourceClick = (resource: AgentResource, e: React.MouseEvent) => {
+    if (resource.type === 'link') {
+      window.open(resource.url || '#', '_blank');
+      return;
+    }
+
+    e.preventDefault();
+    setPreviewDocument(resource);
+  };
 
   return (
     <div className="h-full w-full flex flex-col" data-testid="spyglass-resources-widget">
@@ -31,7 +43,6 @@ export function SpyglassResourcesWidget({ cmaToken }: SpyglassResourcesWidgetPro
             <div className="w-6 h-6 border-2 border-[#EF4923] border-t-transparent rounded-full animate-spin mx-auto" />
           </div>
         ) : isError ? (
-          /* Error state - show empty placeholder for public viewers */
           <div className="text-center max-w-md">
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
               <FileText className="w-8 h-8 text-muted-foreground" />
@@ -46,24 +57,22 @@ export function SpyglassResourcesWidget({ cmaToken }: SpyglassResourcesWidgetPro
         ) : activeResources.length > 0 ? (
           <div className="text-center space-y-6 max-w-lg">
             {activeResources.map((resource) => (
-              <a
+              <button
                 key={resource.id}
-                href={resource.type === 'file' ? resource.fileUrl || '#' : resource.url || '#'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block text-lg text-foreground hover:text-[#EF4923] transition-colors 
-                           underline underline-offset-4 decoration-muted-foreground/30 hover:decoration-[#EF4923]"
+                onClick={(e) => handleResourceClick(resource, e)}
+                className="block w-full text-lg text-foreground hover:text-[#EF4923] transition-colors 
+                           underline underline-offset-4 decoration-muted-foreground/30 hover:decoration-[#EF4923]
+                           text-center"
                 data-testid={`resource-link-${resource.id}`}
               >
                 {resource.name}
                 {resource.type === 'file' && (
-                  <span className="inline-block ml-2 text-muted-foreground text-sm">(Download)</span>
+                  <span className="inline-block ml-2 text-muted-foreground text-sm no-underline">(Preview)</span>
                 )}
-              </a>
+              </button>
             ))}
           </div>
         ) : (
-          /* Empty State Placeholder */
           <div className="text-center max-w-md">
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
               <FileText className="w-8 h-8 text-muted-foreground" />
@@ -72,7 +81,7 @@ export function SpyglassResourcesWidget({ cmaToken }: SpyglassResourcesWidgetPro
               No Resources Added
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
-              {cmaToken 
+              {cmaToken
                 ? "No resources are available for this presentation."
                 : "Add helpful documents and links for your clients in Settings."}
             </p>
@@ -88,6 +97,17 @@ export function SpyglassResourcesWidget({ cmaToken }: SpyglassResourcesWidgetPro
           </div>
         )}
       </div>
+
+      {/* Document Preview Modal */}
+      <DocumentPreviewModal
+        isOpen={!!previewDocument}
+        onClose={() => setPreviewDocument(null)}
+        document={previewDocument ? {
+          name: previewDocument.name,
+          url: previewDocument.fileUrl || previewDocument.url || '',
+          type: previewDocument.type,
+        } : null}
+      />
     </div>
   );
 }

@@ -1,0 +1,623 @@
+# Replit Agent Task: Add Document Preview Modal to Spyglass Resources Slide
+
+## Overview
+
+When a user clicks on a document link (PDF, Word, CSV, etc.) on the "SPYGLASS RESOURCES AND LINKS" slide, show a **preview modal** instead of immediately downloading the file.
+
+---
+
+## Current State
+- Clicking a file triggers immediate download
+- No preview capability
+
+## Target State
+- Clicking opens a modal with document preview
+- Option to download from within the modal
+- Support for PDF, images, and basic text files
+- Fallback for unsupported formats
+
+---
+
+## Implementation
+
+### Document Preview Modal Component
+
+```tsx
+// client/src/components/DocumentPreviewModal.tsx
+
+import { useState, useEffect } from 'react';
+import { X, Download, ExternalLink, FileText, Image, File, AlertCircle } from 'lucide-react';
+
+interface DocumentPreviewModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  document: {
+    name: string;
+    url: string;
+    type?: string;  // MIME type or file extension
+    fileType?: string;
+  };
+}
+
+export function DocumentPreviewModal({ isOpen, onClose, document }: DocumentPreviewModalProps) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  if (!isOpen) return null;
+  
+  // Determine file type from URL or provided type
+  const getFileType = (): 'pdf' | 'image' | 'text' | 'office' | 'unknown' => {
+    const url = document.url.toLowerCase();
+    const type = (document.type || document.fileType || '').toLowerCase();
+    
+    if (url.endsWith('.pdf') || type.includes('pdf')) return 'pdf';
+    if (url.match(/\.(jpg|jpeg|png|gif|webp|svg)$/) || type.includes('image')) return 'image';
+    if (url.match(/\.(txt|md|json|csv)$/) || type.includes('text')) return 'text';
+    if (url.match(/\.(doc|docx|xls|xlsx|ppt|pptx)$/)) return 'office';
+    return 'unknown';
+  };
+  
+  const fileType = getFileType();
+  
+  // Handle download
+  const handleDownload = () => {
+    const link = window.document.createElement('a');
+    link.href = document.url;
+    link.download = document.name;
+    link.click();
+  };
+  
+  // Handle open in new tab
+  const handleOpenInNewTab = () => {
+    window.open(document.url, '_blank');
+  };
+  
+  return (
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] 
+                   flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 
+                        dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+          <div className="flex items-center gap-3 min-w-0">
+            <FileTypeIcon type={fileType} />
+            <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
+              {document.name}
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {/* Open in New Tab */}
+            <button
+              onClick={handleOpenInNewTab}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 
+                         hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Open in new tab"
+            >
+              <ExternalLink className="w-4 h-4" />
+              <span className="hidden sm:inline">Open</span>
+            </button>
+            
+            {/* Download */}
+            <button
+              onClick={handleDownload}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#EF4923] text-white 
+                         hover:bg-[#d43d1c] rounded-lg transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">Download</span>
+            </button>
+            
+            {/* Close */}
+            <button
+              onClick={onClose}
+              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 
+                         rounded-lg transition-colors ml-2"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+        
+        {/* Preview Content */}
+        <div className="flex-1 overflow-hidden bg-gray-100 dark:bg-gray-800">
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+              <div className="text-center">
+                <div className="w-8 h-8 border-2 border-[#EF4923] border-t-transparent 
+                                rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-sm text-gray-500">Loading preview...</p>
+              </div>
+            </div>
+          )}
+          
+          {error && (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center max-w-md px-4">
+                <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+                <p className="text-gray-700 mb-2">Unable to preview this file</p>
+                <p className="text-sm text-gray-500 mb-4">{error}</p>
+                <button
+                  onClick={handleDownload}
+                  className="px-4 py-2 bg-[#EF4923] text-white rounded-lg hover:bg-[#d43d1c]"
+                >
+                  Download Instead
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {/* PDF Preview */}
+          {fileType === 'pdf' && !error && (
+            <iframe
+              src={`${document.url}#toolbar=1&navpanes=0`}
+              className="w-full h-full border-0"
+              onLoad={() => setIsLoading(false)}
+              onError={() => {
+                setIsLoading(false);
+                setError('PDF preview not available');
+              }}
+              title={document.name}
+            />
+          )}
+          
+          {/* Image Preview */}
+          {fileType === 'image' && !error && (
+            <div className="h-full flex items-center justify-center p-4 overflow-auto">
+              <img
+                src={document.url}
+                alt={document.name}
+                className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                onLoad={() => setIsLoading(false)}
+                onError={() => {
+                  setIsLoading(false);
+                  setError('Image failed to load');
+                }}
+              />
+            </div>
+          )}
+          
+          {/* Text/CSV Preview */}
+          {fileType === 'text' && !error && (
+            <TextPreview 
+              url={document.url} 
+              onLoad={() => setIsLoading(false)}
+              onError={(err) => {
+                setIsLoading(false);
+                setError(err);
+              }}
+            />
+          )}
+          
+          {/* Office Documents - Use Google Docs Viewer or Microsoft Viewer */}
+          {fileType === 'office' && !error && (
+            <iframe
+              src={`https://docs.google.com/viewer?url=${encodeURIComponent(document.url)}&embedded=true`}
+              className="w-full h-full border-0"
+              onLoad={() => setIsLoading(false)}
+              onError={() => {
+                setIsLoading(false);
+                setError('Document preview not available. Please download to view.');
+              }}
+              title={document.name}
+            />
+          )}
+          
+          {/* Unknown/Unsupported Format */}
+          {fileType === 'unknown' && !error && (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center max-w-md px-4">
+                <File className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-700 mb-2">
+                  Preview Not Available
+                </h3>
+                <p className="text-sm text-gray-500 mb-6">
+                  This file type cannot be previewed in the browser. 
+                  Please download to view.
+                </p>
+                <button
+                  onClick={handleDownload}
+                  className="px-4 py-2 bg-[#EF4923] text-white rounded-lg hover:bg-[#d43d1c]"
+                >
+                  <Download className="w-4 h-4 inline mr-2" />
+                  Download File
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Footer (optional - for multi-page navigation) */}
+        {fileType === 'pdf' && (
+          <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700 
+                          bg-gray-50 dark:bg-gray-800 text-center">
+            <p className="text-xs text-gray-500">
+              Use scroll or PDF controls to navigate pages
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// File Type Icon Component
+function FileTypeIcon({ type }: { type: string }) {
+  switch (type) {
+    case 'pdf':
+      return <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center">
+        <FileText className="w-4 h-4 text-red-600" />
+      </div>;
+    case 'image':
+      return <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
+        <Image className="w-4 h-4 text-blue-600" />
+      </div>;
+    case 'office':
+      return <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
+        <FileText className="w-4 h-4 text-blue-600" />
+      </div>;
+    default:
+      return <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
+        <File className="w-4 h-4 text-gray-600" />
+      </div>;
+  }
+}
+
+// Text File Preview Component
+function TextPreview({ 
+  url, 
+  onLoad, 
+  onError 
+}: { 
+  url: string; 
+  onLoad: () => void; 
+  onError: (err: string) => void;
+}) {
+  const [content, setContent] = useState<string>('');
+  
+  useEffect(() => {
+    fetch(url)
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to load');
+        return res.text();
+      })
+      .then(text => {
+        setContent(text);
+        onLoad();
+      })
+      .catch(() => onError('Failed to load text file'));
+  }, [url, onLoad, onError]);
+  
+  // Check if CSV for table rendering
+  const isCSV = url.toLowerCase().endsWith('.csv');
+  
+  if (isCSV && content) {
+    return <CSVTable content={content} />;
+  }
+  
+  return (
+    <pre className="h-full overflow-auto p-4 text-sm font-mono text-gray-800 
+                    dark:text-gray-200 whitespace-pre-wrap">
+      {content}
+    </pre>
+  );
+}
+
+// CSV Table Renderer
+function CSVTable({ content }: { content: string }) {
+  const rows = content.split('\n').map(row => row.split(','));
+  const headers = rows[0] || [];
+  const data = rows.slice(1);
+  
+  return (
+    <div className="h-full overflow-auto p-4">
+      <table className="min-w-full border-collapse bg-white rounded-lg overflow-hidden">
+        <thead>
+          <tr className="bg-gray-100">
+            {headers.map((header, i) => (
+              <th key={i} className="px-4 py-2 text-left text-sm font-medium text-gray-700 border">
+                {header.trim()}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((row, i) => (
+            <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+              {row.map((cell, j) => (
+                <td key={j} className="px-4 py-2 text-sm text-gray-600 border">
+                  {cell.trim()}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+```
+
+---
+
+## Update Spyglass Resources Slide
+
+### Modify the link click handler
+
+```tsx
+// In SpyglassResourcesSlide.tsx
+
+import { useState } from 'react';
+import { DocumentPreviewModal } from '@/components/DocumentPreviewModal';
+
+interface Resource {
+  id: string;
+  name: string;
+  type: 'file' | 'link';
+  url: string;
+  fileUrl?: string;
+  fileType?: string;
+}
+
+export function SpyglassResourcesSlide({ resources }: { resources: Resource[] }) {
+  const [previewDocument, setPreviewDocument] = useState<Resource | null>(null);
+  
+  const activeResources = resources.filter(r => r.isActive);
+  
+  const handleResourceClick = (resource: Resource, e: React.MouseEvent) => {
+    // For external links, open in new tab
+    if (resource.type === 'link') {
+      window.open(resource.url, '_blank');
+      return;
+    }
+    
+    // For files, open preview modal
+    e.preventDefault();
+    setPreviewDocument(resource);
+  };
+  
+  return (
+    <div className="h-full w-full flex flex-col">
+      {/* Header */}
+      <div className="bg-gray-900 text-white py-4 text-center">
+        <h1 className="text-xl font-bold tracking-wide uppercase">
+          Spyglass Resources and Links
+        </h1>
+      </div>
+      
+      {/* Content */}
+      <div className="flex-1 flex items-center justify-center bg-gray-50 p-8">
+        {activeResources.length > 0 ? (
+          <div className="text-center space-y-4">
+            {activeResources.map((resource) => (
+              <button
+                key={resource.id}
+                onClick={(e) => handleResourceClick(resource, e)}
+                className="block w-full text-lg text-gray-700 hover:text-[#EF4923] 
+                           transition-colors underline underline-offset-4 
+                           decoration-gray-300 hover:decoration-[#EF4923]"
+              >
+                {resource.name}
+                {resource.type === 'file' && (
+                  <span className="text-sm text-gray-400 ml-2 no-underline">
+                    (Preview)
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <EmptyState />
+        )}
+      </div>
+      
+      {/* Document Preview Modal */}
+      <DocumentPreviewModal
+        isOpen={!!previewDocument}
+        onClose={() => setPreviewDocument(null)}
+        document={previewDocument ? {
+          name: previewDocument.name,
+          url: previewDocument.fileUrl || previewDocument.url,
+          type: previewDocument.fileType,
+        } : { name: '', url: '' }}
+      />
+    </div>
+  );
+}
+```
+
+---
+
+## Supported File Types
+
+| Type | Preview Method | Fallback |
+|------|---------------|----------|
+| **PDF** | Native iframe embed | Download button |
+| **Images** (jpg, png, gif, webp) | Native img tag | Download button |
+| **Text** (txt, md, json) | Fetch + render as pre | Download button |
+| **CSV** | Fetch + render as table | Download button |
+| **Word/Excel/PPT** | Google Docs Viewer | Download button |
+| **Other** | Show "Preview not available" | Download button |
+
+---
+
+## Mobile Responsive Modal
+
+```tsx
+// Modal container - full screen on mobile
+<div 
+  className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl 
+             w-full max-w-5xl h-[85vh]
+             /* Mobile: full screen */
+             fixed inset-0 sm:relative sm:inset-auto
+             sm:rounded-xl rounded-none"
+>
+  {/* Header - sticky on mobile */}
+  <div className="sticky top-0 z-10 ...">
+    {/* ... */}
+  </div>
+  
+  {/* Content - scrollable */}
+  <div className="flex-1 overflow-auto pb-safe">
+    {/* ... */}
+  </div>
+</div>
+```
+
+### Touch-Friendly Controls
+
+```tsx
+{/* Download button - larger touch target on mobile */}
+<button
+  onClick={handleDownload}
+  className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3 sm:py-1.5
+             min-h-[44px] min-w-[44px]  /* Touch target */
+             text-sm bg-[#EF4923] text-white hover:bg-[#d43d1c] 
+             rounded-lg transition-colors"
+>
+  <Download className="w-4 h-4" />
+  <span className="hidden sm:inline">Download</span>
+</button>
+```
+
+---
+
+## Alternative: PDF.js for Better PDF Preview
+
+For more control over PDF rendering (especially on mobile):
+
+```tsx
+// Using react-pdf library
+import { Document, Page, pdfjs } from 'react-pdf';
+
+// Set worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+
+function PDFPreview({ url }: { url: string }) {
+  const [numPages, setNumPages] = useState<number>(0);
+  const [pageNumber, setPageNumber] = useState(1);
+  
+  return (
+    <div className="h-full flex flex-col">
+      {/* PDF Viewer */}
+      <div className="flex-1 overflow-auto flex items-center justify-center p-4">
+        <Document
+          file={url}
+          onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+          loading={<div>Loading PDF...</div>}
+          error={<div>Failed to load PDF</div>}
+        >
+          <Page 
+            pageNumber={pageNumber} 
+            renderTextLayer={false}
+            renderAnnotationLayer={false}
+            className="shadow-lg"
+          />
+        </Document>
+      </div>
+      
+      {/* Page Navigation */}
+      {numPages > 1 && (
+        <div className="flex items-center justify-center gap-4 py-3 border-t">
+          <button
+            onClick={() => setPageNumber(p => Math.max(1, p - 1))}
+            disabled={pageNumber <= 1}
+            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span className="text-sm text-gray-600">
+            Page {pageNumber} of {numPages}
+          </span>
+          <button
+            onClick={() => setPageNumber(p => Math.min(numPages, p + 1))}
+            disabled={pageNumber >= numPages}
+            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## Visual Preview
+
+### Modal Open State
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 📄 CMA-ACT2451173.pdf                    [Open] [Download] [X] │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│    ┌───────────────────────────────────────────────────────┐    │
+│    │                                                       │    │
+│    │                  PDF DOCUMENT                         │    │
+│    │                                                       │    │
+│    │              [Preview renders here]                   │    │
+│    │                                                       │    │
+│    │                                                       │    │
+│    │                                                       │    │
+│    └───────────────────────────────────────────────────────┘    │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│           Use scroll or PDF controls to navigate pages          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Unsupported Format State
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 📄 document.xlsx                         [Open] [Download] [X] │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│                           📄                                    │
+│                                                                 │
+│                 Preview Not Available                           │
+│                                                                 │
+│     This file type cannot be previewed in the browser.         │
+│              Please download to view.                           │
+│                                                                 │
+│                    [⬇️ Download File]                           │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Verification Checklist
+
+### Modal Functionality
+- [ ] Modal opens when clicking file resource
+- [ ] Modal closes on X button click
+- [ ] Modal closes on backdrop click
+- [ ] Download button works
+- [ ] Open in new tab button works
+- [ ] External links still open in new tab (no modal)
+
+### File Type Previews
+- [ ] PDF files render in iframe
+- [ ] Images display correctly
+- [ ] Text files show content
+- [ ] CSV files render as table
+- [ ] Unsupported types show fallback message
+
+### Mobile
+- [ ] Modal is full screen on mobile
+- [ ] Buttons have 44px touch targets
+- [ ] PDF is scrollable on touch devices
+- [ ] Close gesture works (if implemented)
+
+### Error Handling
+- [ ] Shows error if file fails to load
+- [ ] Download option always available
+- [ ] Loading state while file loads
