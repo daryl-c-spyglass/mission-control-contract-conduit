@@ -76,11 +76,13 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
+// Contract Conduit Standard: Closed=RED, Active=GREEN, Under Contract=ORANGE, Pending=GRAY
 const getStatusColor = (status: string) => {
-  const s = status.toLowerCase();
-  if (s.includes('closed')) return 'bg-green-500';
-  if (s.includes('active') && !s.includes('under')) return 'bg-red-500';
-  if (s.includes('pending') || s.includes('under')) return 'bg-yellow-500';
+  const s = status?.toLowerCase() || '';
+  if (s.includes('closed') || s.includes('sold')) return 'bg-red-500';  // RED for Closed/Sold
+  if (s.includes('active under') || s.includes('under contract')) return 'bg-orange-500';  // ORANGE for Under Contract
+  if (s.includes('active')) return 'bg-green-500';  // GREEN for Active
+  if (s.includes('pending')) return 'bg-gray-500';  // GRAY for Pending
   return 'bg-gray-500';
 };
 
