@@ -10,7 +10,6 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  ReferenceLine,
   Cell
 } from 'recharts';
 import type { CmaProperty } from '../types';
@@ -302,7 +301,7 @@ export function AveragePriceAcreWidget({
     }];
   }, [subjectWithAcreage, showSubject, avgPricePerAcre]);
 
-  const { minAcres, maxAcres, minPrice, maxPrice, trendlineSlope } = useMemo(() => {
+  const { minAcres, maxAcres, minPrice, maxPrice, trendlineData } = useMemo(() => {
     const allAcres = chartData.map(d => d.x);
     const allPrices = chartData.map(d => d.y);
     if (subjectChartData.length > 0) {
@@ -310,17 +309,34 @@ export function AveragePriceAcreWidget({
       allPrices.push(subjectChartData[0].y);
     }
     
+    if (allAcres.length === 0) {
+      return { minAcres: 0, maxAcres: 1, minPrice: 0, maxPrice: 1, trendlineData: [] };
+    }
+    
     const minA = Math.min(...allAcres) * 0.9;
     const maxA = Math.max(...allAcres) * 1.1;
-    const minP = Math.min(...allPrices) * 0.9;
-    const maxP = Math.max(...allPrices) * 1.1;
+    
+    // Calculate trendline endpoints: y = avgPricePerAcre * x
+    const trendMinY = avgPricePerAcre * minA;
+    const trendMaxY = avgPricePerAcre * maxA;
+    
+    // Include trendline endpoints in price range calculation
+    const pricesWithTrend = [...allPrices, trendMinY, trendMaxY].filter(p => p > 0);
+    const minP = pricesWithTrend.length > 0 ? Math.min(...pricesWithTrend) * 0.9 : 0;
+    const maxP = pricesWithTrend.length > 0 ? Math.max(...pricesWithTrend) * 1.1 : 1;
+    
+    // Create trendline data points (two points define the line)
+    const trendline = avgPricePerAcre > 0 ? [
+      { x: minA, y: trendMinY },
+      { x: maxA, y: trendMaxY },
+    ] : [];
     
     return {
       minAcres: minA,
       maxAcres: maxA,
       minPrice: minP,
       maxPrice: maxP,
-      trendlineSlope: avgPricePerAcre,
+      trendlineData: trendline,
     };
   }, [chartData, subjectChartData, avgPricePerAcre]);
 
@@ -413,15 +429,17 @@ export function AveragePriceAcreWidget({
                   />
                   <Tooltip content={<CustomTooltip />} />
                   
-                  {showTrendline && (
-                    <ReferenceLine
-                      segment={[
-                        { x: minAcres, y: minAcres * trendlineSlope },
-                        { x: maxAcres, y: maxAcres * trendlineSlope },
-                      ]}
-                      stroke="hsl(var(--muted-foreground))"
-                      strokeDasharray="5 5"
-                      strokeWidth={1.5}
+                  {showTrendline && trendlineData.length === 2 && (
+                    <Scatter
+                      data={trendlineData}
+                      line={{
+                        stroke: '#9CA3AF',
+                        strokeWidth: 2,
+                        strokeDasharray: '8 4',
+                      }}
+                      shape={() => null}
+                      isAnimationActive={false}
+                      legendType="none"
                     />
                   )}
 

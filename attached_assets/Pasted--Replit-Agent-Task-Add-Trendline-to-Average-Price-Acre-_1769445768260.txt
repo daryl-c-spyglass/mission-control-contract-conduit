@@ -1,0 +1,499 @@
+# Replit Agent Task: Add Trendline to Average Price/Acre Scatter Chart
+
+## Problem
+
+The Average Price/Acre scatter chart is showing data points correctly, but the **trendline is missing**. The legend shows "Trendline (avg price/acre of SOLD)" but no dashed line appears on the chart.
+
+**Test Property:** 612 Twelve Oaks LN, Austin, TX (MLS# ACT4728035)
+
+---
+
+## What the Trendline Should Show
+
+The trendline represents the **average price per acre** calculated from SOLD listings only. It's a line where:
+- **Slope** = average $/acre
+- **Formula**: `y = avgPricePerAcre × x` (where x = acres, y = price)
+
+This helps visualize whether properties are priced above or below the market average.
+
+---
+
+## Implementation
+
+### Step 1: Calculate the Trendline Data
+
+```typescript
+// In the slide component where chart data is prepared
+
+// Get sold properties with valid acreage
+const soldWithAcreage = comparables.filter(p => 
+  p.status === 'Closed' && 
+  p.lotSizeAcres && p.lotSizeAcres > 0 &&
+  p.soldPrice && p.soldPrice > 0
+);
+
+// Calculate average price per acre from sold listings
+const avgPricePerAcre = soldWithAcreage.length > 0
+  ? soldWithAcreage.reduce((sum, p) => sum + (p.soldPrice! / p.lotSizeAcres!), 0) / soldWithAcreage.length
+  : 0;
+
+// Get min/max acres for trendline endpoints
+const allAcres = propertiesWithAcreage.map(p => p.lotSizeAcres!);
+if (subjectProperty.lotSizeAcres) {
+  allAcres.push(subjectProperty.lotSizeAcres);
+}
+
+const minAcres = Math.min(...allAcres) * 0.9;  // 10% padding
+const maxAcres = Math.max(...allAcres) * 1.1;  // 10% padding
+
+// Create trendline data points
+const trendlineData = avgPricePerAcre > 0 ? [
+  { x: minAcres, y: avgPricePerAcre * minAcres },
+  { x: maxAcres, y: avgPricePerAcre * maxAcres },
+] : [];
+```
+
+### Step 2: Add Trendline to Recharts Scatter Chart
+
+```tsx
+import { 
+  ScatterChart, 
+  Scatter, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  Cell,
+  Line,
+  ReferenceLine
+} from 'recharts';
+
+// Inside the ScatterChart component:
+
+<ResponsiveContainer width="100%" height="100%">
+  <ScatterChart margin={{ top: 20, right: 30, bottom: 30, left: 20 }}>
+    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+    
+    <XAxis 
+      type="number" 
+      dataKey="x" 
+      name="Acres"
+      domain={[minAcres, maxAcres]}
+      tickFormatter={(v) => v.toFixed(2)}
+      label={{ value: 'Acres', position: 'bottom', offset: 10 }}
+    />
+    
+    <YAxis 
+      type="number" 
+      dataKey="y" 
+      name="Price"
+      tickFormatter={formatYAxis}
+      width={70}
+    />
+    
+    <Tooltip content={<CustomTooltip />} />
+    
+    {/* === TRENDLINE === */}
+    {trendlineData.length === 2 && showTrendline && (
+      <Scatter 
+        data={trendlineData}
+        line={{ 
+          stroke: '#9CA3AF',      // Gray color
+          strokeWidth: 2,
+          strokeDasharray: '8 4'  // Dashed line
+        }}
+        shape={() => null}        // Hide the endpoints
+        isAnimationActive={false}
+        legendType="none"
+      />
+    )}
+    
+    {/* Property scatter points */}
+    <Scatter
+      data={chartData}
+      onClick={(data) => onPropertyClick(data)}
+      cursor="pointer"
+    >
+      {chartData.map((entry, index) => (
+        <Cell 
+          key={`cell-${index}`} 
+          fill={getStatusColor(entry.status)}
+          stroke="#fff"
+          strokeWidth={2}
+          r={10}
+        />
+      ))}
+    </Scatter>
+    
+    {/* Subject Property */}
+    {subjectData.length > 0 && (
+      <Scatter
+        data={subjectData}
+        shape="diamond"
+      >
+        <Cell fill="#3B82F6" stroke="#fff" strokeWidth={2} r={12} />
+      </Scatter>
+    )}
+  </ScatterChart>
+</ResponsiveContainer>
+```
+
+### Step 3: Alternative - Using ReferenceLine for Simple Implementation
+
+If the Scatter line approach doesn't work well, use a simple reference line:
+
+```tsx
+// Calculate the Y value at a specific X point on the trendline
+const getTrendlineY = (x: number) => avgPricePerAcre * x;
+
+// In the chart - use multiple reference lines to create the trendline effect
+// Or use a custom SVG line
+
+<ScatterChart>
+  {/* ... other elements ... */}
+  
+  {/* Custom Trendline using SVG */}
+  {avgPricePerAcre > 0 && (
+    <line
+      x1={xScale(minAcres)}
+      y1={yScale(avgPricePerAcre * minAcres)}
+      x2={xScale(maxAcres)}
+      y2={yScale(avgPricePerAcre * maxAcres)}
+      stroke="#9CA3AF"
+      strokeWidth={2}
+      strokeDasharray="8 4"
+    />
+  )}
+</ScatterChart>
+```
+
+### Step 4: Better Approach - ComposedChart with Line
+
+```tsx
+import { ComposedChart, Scatter, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+
+// Prepare combined data
+const chartData = propertiesWithAcreage.map(p => ({
+  ...p,
+  x: p.lotSizeAcres,
+  y: p.soldPrice || p.listPrice,
+}));
+
+// Trendline as separate data series
+const trendlineData = [
+  { x: minAcres, trendY: avgPricePerAcre * minAcres },
+  { x: maxAcres, trendY: avgPricePerAcre * maxAcres },
+];
+
+<ResponsiveContainer width="100%" height="100%">
+  <ComposedChart margin={{ top: 20, right: 30, bottom: 30, left: 20 }}>
+    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+    
+    <XAxis 
+      type="number" 
+      dataKey="x" 
+      domain={[minAcres, maxAcres]}
+      tickFormatter={(v) => v.toFixed(2)}
+    />
+    
+    <YAxis 
+      type="number" 
+      tickFormatter={formatYAxis}
+      width={70}
+    />
+    
+    <Tooltip content={<CustomTooltip />} />
+    
+    {/* Trendline */}
+    {showTrendline && avgPricePerAcre > 0 && (
+      <Line
+        data={trendlineData}
+        type="linear"
+        dataKey="trendY"
+        stroke="#9CA3AF"
+        strokeWidth={2}
+        strokeDasharray="8 4"
+        dot={false}
+        isAnimationActive={false}
+        legendType="none"
+      />
+    )}
+    
+    {/* Property scatter points */}
+    <Scatter
+      data={chartData}
+      dataKey="y"
+      onClick={(data) => onPropertyClick(data)}
+    >
+      {chartData.map((entry, index) => (
+        <Cell 
+          key={`cell-${index}`} 
+          fill={getStatusColor(entry.status)}
+          stroke="#fff"
+          strokeWidth={2}
+          r={10}
+        />
+      ))}
+    </Scatter>
+    
+    {/* Subject Property */}
+    <Scatter
+      data={subjectData}
+      dataKey="y"
+      shape="diamond"
+    >
+      <Cell fill="#3B82F6" stroke="#fff" strokeWidth={2} r={12} />
+    </Scatter>
+  </ComposedChart>
+</ResponsiveContainer>
+```
+
+---
+
+## Step 5: Add Checkbox Toggle for Trendline
+
+```tsx
+// State for trendline visibility
+const [showTrendline, setShowTrendline] = useState(true);
+
+// In the legend area:
+<label className="flex items-center gap-2 cursor-pointer">
+  <input 
+    type="checkbox" 
+    checked={showTrendline}
+    onChange={(e) => setShowTrendline(e.target.checked)}
+    className="rounded border-gray-300" 
+  />
+  <span className="w-6 border-t-2 border-dashed border-gray-400"></span>
+  <span className="text-gray-600 dark:text-gray-400">
+    Trendline (avg price/acre of SOLD)
+  </span>
+</label>
+```
+
+---
+
+## Complete Working Example
+
+```tsx
+import { useState, useMemo } from 'react';
+import { 
+  ScatterChart, 
+  Scatter, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  Cell
+} from 'recharts';
+
+export function PriceAcreScatterChart({
+  properties,
+  subjectProperty,
+  onPropertyClick,
+}: Props) {
+  const [showTrendline, setShowTrendline] = useState(true);
+  const [showSubject, setShowSubject] = useState(true);
+  
+  // Calculate average $/acre from SOLD only
+  const soldProperties = properties.filter(p => 
+    p.status === 'Closed' && p.soldPrice > 0 && p.lotSizeAcres > 0
+  );
+  
+  const avgPricePerAcre = soldProperties.length > 0
+    ? soldProperties.reduce((sum, p) => sum + (p.soldPrice / p.lotSizeAcres), 0) / soldProperties.length
+    : 0;
+  
+  // Get domain
+  const allAcres = properties.map(p => p.lotSizeAcres).filter(Boolean);
+  if (subjectProperty?.lotSizeAcres) allAcres.push(subjectProperty.lotSizeAcres);
+  
+  const minAcres = Math.min(...allAcres) * 0.9;
+  const maxAcres = Math.max(...allAcres) * 1.1;
+  
+  // Chart data
+  const scatterData = properties.map(p => ({
+    ...p,
+    x: p.lotSizeAcres,
+    y: p.soldPrice || p.listPrice,
+  }));
+  
+  // Trendline data (two points to draw a line)
+  const trendlineData = avgPricePerAcre > 0 ? [
+    { x: minAcres, y: avgPricePerAcre * minAcres },
+    { x: maxAcres, y: avgPricePerAcre * maxAcres },
+  ] : [];
+  
+  // Subject property
+  const subjectData = subjectProperty?.lotSizeAcres ? [{
+    x: subjectProperty.lotSizeAcres,
+    y: subjectProperty.listPrice,
+    isSubject: true,
+  }] : [];
+  
+  const getStatusColor = (status) => {
+    if (status === 'Closed') return '#EF4444';
+    if (status === 'Active') return '#22C55E';
+    if (status === 'Under Contract') return '#F59E0B';
+    return '#3B82F6';
+  };
+  
+  const formatYAxis = (value) => {
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+    return `$${(value / 1000).toFixed(0)}K`;
+  };
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Chart */}
+      <div className="flex-1">
+        <ResponsiveContainer width="100%" height="100%">
+          <ScatterChart margin={{ top: 20, right: 30, bottom: 30, left: 60 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+            
+            <XAxis 
+              type="number" 
+              dataKey="x"
+              domain={[minAcres, maxAcres]}
+              tickFormatter={(v) => v.toFixed(2)}
+              label={{ value: 'Acres', position: 'bottom', offset: 10, fontSize: 12 }}
+              tick={{ fontSize: 11 }}
+            />
+            
+            <YAxis 
+              type="number" 
+              dataKey="y"
+              tickFormatter={formatYAxis}
+              tick={{ fontSize: 11 }}
+              width={70}
+            />
+            
+            <Tooltip />
+            
+            {/* === TRENDLINE (dashed line) === */}
+            {showTrendline && trendlineData.length === 2 && (
+              <Scatter
+                data={trendlineData}
+                line={{
+                  stroke: '#9CA3AF',
+                  strokeWidth: 2,
+                  strokeDasharray: '8 4',
+                }}
+                shape={() => null}
+                isAnimationActive={false}
+              />
+            )}
+            
+            {/* Property points */}
+            <Scatter
+              data={scatterData}
+              onClick={(data) => onPropertyClick(data)}
+              cursor="pointer"
+            >
+              {scatterData.map((entry, index) => (
+                <Cell 
+                  key={`cell-${index}`} 
+                  fill={getStatusColor(entry.status)}
+                  stroke="#fff"
+                  strokeWidth={2}
+                  r={10}
+                />
+              ))}
+            </Scatter>
+            
+            {/* Subject Property (blue diamond) */}
+            {showSubject && subjectData.length > 0 && (
+              <Scatter
+                data={subjectData}
+                shape="diamond"
+              >
+                <Cell fill="#3B82F6" stroke="#fff" strokeWidth={2} r={12} />
+              </Scatter>
+            )}
+          </ScatterChart>
+        </ResponsiveContainer>
+      </div>
+      
+      {/* Legend with toggles */}
+      <div className="flex items-center gap-6 mt-3 text-xs">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input 
+            type="checkbox" 
+            checked={showSubject}
+            onChange={(e) => setShowSubject(e.target.checked)}
+            className="rounded" 
+          />
+          <span className="w-3 h-3 bg-blue-500 rounded-sm rotate-45"></span>
+          <span className="text-gray-600">Subject Property</span>
+        </label>
+        
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input 
+            type="checkbox" 
+            checked={showTrendline}
+            onChange={(e) => setShowTrendline(e.target.checked)}
+            className="rounded" 
+          />
+          <span className="w-6 border-t-2 border-dashed border-gray-400"></span>
+          <span className="text-gray-600">Trendline (avg price/acre of SOLD)</span>
+        </label>
+        
+        <div className="flex items-center gap-4 ml-auto">
+          <span className="flex items-center gap-1">
+            <span className="w-3 h-3 bg-red-500 rounded-full"></span>
+            <span>Closed</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-3 h-3 bg-yellow-500 rounded-full"></span>
+            <span>Under Contract</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+            <span>Active</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## Verification
+
+After implementing, verify:
+
+- [ ] Dashed gray line appears on chart
+- [ ] Line passes through the "center" of sold properties
+- [ ] Trendline toggles on/off with checkbox
+- [ ] Line extends slightly beyond data points (10% padding)
+- [ ] Formula: `price = avgPricePerAcre × acres`
+
+---
+
+## Debug: Check avgPricePerAcre Calculation
+
+```typescript
+console.log('[Trendline Debug]', {
+  soldCount: soldProperties.length,
+  avgPricePerAcre: avgPricePerAcre.toLocaleString(),
+  trendlineData,
+  domain: { minAcres, maxAcres },
+});
+```
+
+Expected output:
+```
+[Trendline Debug] {
+  soldCount: 5,
+  avgPricePerAcre: "4,500,000",
+  trendlineData: [
+    { x: 0.05, y: 225000 },
+    { x: 0.30, y: 1350000 }
+  ],
+  domain: { minAcres: 0.05, maxAcres: 0.30 }
+}
+```
