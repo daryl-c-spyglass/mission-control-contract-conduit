@@ -128,7 +128,7 @@ export function PropertyDetailModal({ property, onClose }: PropertyDetailModalPr
                 
                 <button
                   onClick={() => setFullscreenPhoto(true)}
-                  className="absolute top-2 right-2 z-10 min-w-[40px] min-h-[40px] bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors"
+                  className="absolute top-2 right-2 z-10 min-w-[44px] min-h-[44px] bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors"
                   aria-label="View fullscreen"
                   data-testid="button-expand-photo"
                 >
