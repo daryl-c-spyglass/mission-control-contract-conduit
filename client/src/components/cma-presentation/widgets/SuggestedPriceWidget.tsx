@@ -1,7 +1,7 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useState, useRef, useEffect } from 'react';
-import { Edit2, Check, X, Info, Star, Camera, MapPin, BarChart3, Home, TrendingUp, Lightbulb } from 'lucide-react';
+import { Edit2, Check, X, Info, Star, Camera, MapPin, BarChart3, Home, TrendingUp, Lightbulb, Undo2 } from 'lucide-react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { CmaProperty } from '../types';
@@ -45,7 +45,7 @@ function PriceTooltip({
   return (
     <>
       <div className="fixed inset-0 z-[90]" onClick={onClose} />
-      <div className="absolute z-[100] bottom-full left-1/2 -translate-x-1/2 mb-2 
+      <div className="absolute z-[100] top-full left-1/2 -translate-x-1/2 mt-2 
                       w-80 sm:w-96 bg-card rounded-xl shadow-2xl 
                       border border-border overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 bg-muted border-b border-border">
@@ -136,6 +136,8 @@ export function SuggestedPriceWidget({
   const [isEditing, setIsEditing] = useState(false);
   const [displayPrice, setDisplayPrice] = useState<number>(0);
   const [editedPrice, setEditedPrice] = useState<number>(0);
+  const [originalPrice, setOriginalPrice] = useState<number>(0);
+  const [hasBeenEdited, setHasBeenEdited] = useState(false);
   const [mapToken, setMapToken] = useState<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [showTooltip, setShowTooltip] = useState(false);
@@ -144,6 +146,7 @@ export function SuggestedPriceWidget({
   
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const originalPriceInitialized = useRef(false);
 
   const closedComps = comparables.filter(c => c.status.toLowerCase().includes('closed'));
   const activeComps = comparables.filter(c => c.status.toLowerCase() === 'active');
@@ -157,8 +160,16 @@ export function SuggestedPriceWidget({
 
   useEffect(() => {
     const price = calculateSuggestedPrice();
-    setDisplayPrice(price);
-    setEditedPrice(price);
+    
+    if (!originalPriceInitialized.current) {
+      setOriginalPrice(price);
+      originalPriceInitialized.current = true;
+    }
+    
+    if (!hasBeenEdited) {
+      setDisplayPrice(price);
+      setEditedPrice(price);
+    }
   }, [suggestedPrice, closedComps.length, subjectProperty?.sqft]);
 
   useEffect(() => {
@@ -264,12 +275,20 @@ export function SuggestedPriceWidget({
   const handleSavePrice = () => {
     setDisplayPrice(editedPrice);
     setIsEditing(false);
+    setHasBeenEdited(true);
     onPriceUpdate?.(editedPrice);
   };
 
   const handleCancelEdit = () => {
     setEditedPrice(displayPrice);
     setIsEditing(false);
+  };
+
+  const handleUndo = () => {
+    setDisplayPrice(originalPrice);
+    setEditedPrice(originalPrice);
+    setHasBeenEdited(false);
+    onPriceUpdate?.(originalPrice);
   };
 
   const hasCoordinates = subjectProperty?.latitude && subjectProperty?.longitude;
@@ -449,7 +468,27 @@ export function SuggestedPriceWidget({
                       <Edit2 className="w-3 h-3 mr-1" />
                       Edit
                     </Button>
+                    
+                    {hasBeenEdited && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleUndo}
+                        className="text-muted-foreground min-h-[36px] text-xs"
+                        title={`Restore original: ${formatPrice(originalPrice)}`}
+                        data-testid="button-undo-price"
+                      >
+                        <Undo2 className="w-3 h-3 mr-1" />
+                        Undo
+                      </Button>
+                    )}
                   </div>
+                  
+                  {hasBeenEdited && (
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Original: {formatPrice(originalPrice)}
+                    </p>
+                  )}
                 </div>
               )}
             </div>

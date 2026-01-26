@@ -1,0 +1,402 @@
+# Replit Agent Task: Fix Tooltip Position + Add Undo Button on Suggested List Price
+
+## Issue 1: Tooltip Overlaps Above Viewport
+
+The "How is this price calculated?" tooltip is appearing **above** the price card and getting cut off at the top of the viewport.
+
+### Current Problem
+```
+┌──────────────────────────────────────────┐ ← Top of viewport (content cut off)
+│ ... price calculated?              ✕     │
+│ ─────────────────────────────────────────│
+│ 📊 Comparable Sales Analysis             │
+│ ...                                      │
+└──────────────────────────────────────────┘
+         ▲
+    ┌─────────────────┐
+    │   $1,296,232    │
+    │   ℹ️  ✏️ Edit   │
+    └─────────────────┘
+```
+
+### Fix: Position Tooltip Below Instead of Above
+
+Change the tooltip positioning from `bottom-full` (above) to `top-full` (below):
+
+**Find this code:**
+```tsx
+{/* Tooltip Popover - Current (WRONG) */}
+<div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 ...">
+```
+
+**Change to:**
+```tsx
+{/* Tooltip Popover - Fixed (CORRECT) */}
+<div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-2 
+                w-72 sm:w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl 
+                border border-gray-200 dark:border-gray-700 text-left overflow-hidden">
+```
+
+**Key changes:**
+- `bottom-full` → `top-full` (position below trigger instead of above)
+- `mb-2` → `mt-2` (margin-top instead of margin-bottom)
+
+### Alternative: Smart Positioning (Best Practice)
+
+For better UX, detect available space and position accordingly:
+
+```tsx
+const [tooltipPosition, setTooltipPosition] = useState<'top' | 'bottom'>('bottom');
+const tooltipTriggerRef = useRef<HTMLButtonElement>(null);
+
+const handleTooltipOpen = () => {
+  if (tooltipTriggerRef.current) {
+    const rect = tooltipTriggerRef.current.getBoundingClientRect();
+    const spaceAbove = rect.top;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    
+    // If more space below (or not enough above), show below
+    setTooltipPosition(spaceAbove < 300 ? 'bottom' : 'top');
+  }
+  setShowTooltip(true);
+};
+
+// In JSX:
+<button
+  ref={tooltipTriggerRef}
+  onClick={handleTooltipOpen}
+  // ...
+>
+  <Info className="w-4 h-4" />
+</button>
+
+{showTooltip && (
+  <div className={`absolute z-50 left-1/2 -translate-x-1/2 
+    ${tooltipPosition === 'bottom' ? 'top-full mt-2' : 'bottom-full mb-2'}
+    w-72 sm:w-80 bg-white rounded-xl shadow-2xl ...`}>
+    {/* Tooltip content */}
+  </div>
+)}
+```
+
+---
+
+## Issue 2: Add Undo Button
+
+Add an "Undo" button that appears after the user has edited and saved the price, allowing them to revert to the original suggested price.
+
+### Implementation
+
+**Add state to track original price:**
+```tsx
+const [originalPrice] = useState(initialPrice);  // Never changes
+const [displayPrice, setDisplayPrice] = useState(initialPrice);
+const [hasBeenEdited, setHasBeenEdited] = useState(false);
+```
+
+**Update save handler:**
+```tsx
+const handleSavePrice = () => {
+  setDisplayPrice(editedPrice);
+  setIsEditing(false);
+  setHasBeenEdited(true);  // Track that user edited
+  onPriceUpdate?.(editedPrice);
+};
+```
+
+**Add undo handler:**
+```tsx
+const handleUndo = () => {
+  setDisplayPrice(originalPrice);
+  setEditedPrice(originalPrice);
+  setHasBeenEdited(false);
+  onPriceUpdate?.(originalPrice);
+};
+```
+
+**Update the button row (when not editing):**
+```tsx
+{!isEditing && (
+  <>
+    <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[#EF4923] mb-1">
+      {formatPrice(displayPrice)}
+    </div>
+    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
+      Suggested List Price
+    </p>
+    
+    {/* Action Buttons Row */}
+    <div className="flex items-center justify-center gap-1 flex-wrap">
+      {/* Tooltip Trigger */}
+      <button
+        onClick={() => setShowTooltip(!showTooltip)}
+        className="min-w-[40px] min-h-[40px] p-2 text-gray-500 hover:text-[#EF4923] 
+                   hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded-full transition-colors"
+        aria-label="How is this calculated?"
+      >
+        <Info className="w-4 h-4" />
+      </button>
+      
+      {/* Edit Button */}
+      <button
+        onClick={() => setIsEditing(true)}
+        className="min-h-[40px] px-3 text-sm text-[#EF4923] hover:bg-orange-100 
+                   dark:hover:bg-orange-900/30 rounded-lg flex items-center gap-1 transition-colors"
+      >
+        <Edit2 className="w-4 h-4" /> Edit
+      </button>
+      
+      {/* Undo Button - Only show if price has been edited */}
+      {hasBeenEdited && (
+        <button
+          onClick={handleUndo}
+          className="min-h-[40px] px-3 text-sm text-gray-500 hover:text-gray-700 
+                     hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg 
+                     flex items-center gap-1 transition-colors"
+          title={`Restore original: ${formatPrice(originalPrice)}`}
+        >
+          <Undo2 className="w-4 h-4" /> Undo
+        </button>
+      )}
+    </div>
+    
+    {/* Show original price hint if edited */}
+    {hasBeenEdited && (
+      <p className="text-[10px] text-gray-400 mt-2">
+        Original: {formatPrice(originalPrice)}
+      </p>
+    )}
+  </>
+)}
+```
+
+**Add Undo2 icon import:**
+```tsx
+import { Edit2, Check, X, Info, Star, Camera, MapPin, Undo2 } from 'lucide-react';
+```
+
+---
+
+## Complete Updated Price Card Component
+
+```tsx
+{/* Price Card */}
+<div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 
+                rounded-2xl p-4 sm:p-5 w-full max-w-xs relative">
+  {isEditing ? (
+    {/* Edit Mode */}
+    <div className="space-y-3">
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg text-gray-400">$</span>
+        <input
+          type="number"
+          value={editedPrice}
+          onChange={(e) => setEditedPrice(Number(e.target.value))}
+          className="w-full text-xl sm:text-2xl font-bold text-center text-[#EF4923] 
+                     bg-white dark:bg-gray-800 border-2 border-[#EF4923] rounded-xl 
+                     py-2 pl-8 focus:outline-none focus:ring-2 focus:ring-[#EF4923]"
+          autoFocus
+        />
+      </div>
+      <div className="flex gap-2 justify-center">
+        <button
+          onClick={handleSavePrice}
+          className="min-h-[40px] px-3 bg-green-500 hover:bg-green-600 text-white 
+                     rounded-lg flex items-center gap-1 text-sm transition-colors"
+        >
+          <Check className="w-4 h-4" /> Save
+        </button>
+        <button
+          onClick={() => { setEditedPrice(displayPrice); setIsEditing(false); }}
+          className="min-h-[40px] px-3 bg-gray-400 hover:bg-gray-500 text-white 
+                     rounded-lg flex items-center gap-1 text-sm transition-colors"
+        >
+          <X className="w-4 h-4" /> Cancel
+        </button>
+      </div>
+    </div>
+  ) : (
+    {/* Display Mode */}
+    <>
+      <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[#EF4923] mb-1">
+        {formatPrice(displayPrice)}
+      </div>
+      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
+        Suggested List Price
+      </p>
+      
+      {/* Action Buttons */}
+      <div className="flex items-center justify-center gap-1 flex-wrap">
+        {/* Info Tooltip Trigger */}
+        <div className="relative">
+          <button
+            onClick={() => setShowTooltip(!showTooltip)}
+            className="min-w-[40px] min-h-[40px] p-2 text-gray-500 hover:text-[#EF4923] 
+                       hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded-full transition-colors"
+            aria-label="How is this calculated?"
+          >
+            <Info className="w-4 h-4" />
+          </button>
+          
+          {/* Tooltip - Positioned BELOW */}
+          {showTooltip && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowTooltip(false)} />
+              <div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-2 
+                              w-72 sm:w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl 
+                              border border-gray-200 dark:border-gray-700 text-left overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900 
+                                border-b border-gray-200 dark:border-gray-700 rounded-t-xl">
+                  <h4 className="font-semibold text-gray-900 dark:text-gray-100 text-sm flex items-center gap-2">
+                    <Info className="w-4 h-4 text-[#EF4923]" />
+                    How is this price calculated?
+                  </h4>
+                  <button onClick={() => setShowTooltip(false)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
+                    <X className="w-3 h-3 text-gray-500" />
+                  </button>
+                </div>
+                
+                {/* Body */}
+                <div className="p-3 space-y-2 text-xs max-h-[50vh] overflow-y-auto">
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1">
+                      📊 Comparable Sales Analysis
+                    </p>
+                    <ul className="text-gray-500 ml-5 mt-0.5 space-y-0.5">
+                      <li>• Average sold price of similar properties</li>
+                      <li>• Adjusted for size, age, and features</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1">
+                      📍 Location Factors
+                    </p>
+                    <ul className="text-gray-500 ml-5 mt-0.5 space-y-0.5">
+                      <li>• Neighborhood market trends</li>
+                      <li>• Recent sales within search radius</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1">
+                      🏠 Property Characteristics
+                    </p>
+                    <ul className="text-gray-500 ml-5 mt-0.5 space-y-0.5">
+                      <li>• Square footage: {subjectProperty.sqft?.toLocaleString()} sq ft</li>
+                      <li>• Beds/Baths: {subjectProperty.beds} bed / {subjectProperty.baths} bath</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1">
+                      📈 Market Conditions
+                    </p>
+                    <ul className="text-gray-500 ml-5 mt-0.5 space-y-0.5">
+                      <li>• Average days on market: {avgDom} days</li>
+                      <li>• List-to-sale price ratio: {(listToSaleRatio * 100).toFixed(0)}%</li>
+                    </ul>
+                  </div>
+                  
+                  {/* Calculation */}
+                  <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">Calculation</p>
+                    <div className="bg-gray-50 dark:bg-gray-900 rounded p-2 font-mono text-[10px] text-center">
+                      <span className="text-gray-500">Avg Comp Price × Adjustment</span><br/>
+                      <span className="text-gray-900 dark:text-gray-100 font-semibold">
+                        {formatPrice(avgPrice)} × {(displayPrice / avgPrice).toFixed(3)} = {formatPrice(displayPrice)}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Tip */}
+                  <p className="text-gray-400 text-[10px] pt-1 flex items-start gap-1">
+                    <span>💡</span>
+                    <span>This is a suggested starting point. Click "Edit Price" to adjust.</span>
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        
+        {/* Edit Button */}
+        <button
+          onClick={() => setIsEditing(true)}
+          className="min-h-[40px] px-3 text-sm text-[#EF4923] hover:bg-orange-100 
+                     dark:hover:bg-orange-900/30 rounded-lg flex items-center gap-1 transition-colors"
+        >
+          <Edit2 className="w-4 h-4" /> Edit
+        </button>
+        
+        {/* Undo Button - Only visible after editing */}
+        {hasBeenEdited && (
+          <button
+            onClick={handleUndo}
+            className="min-h-[40px] px-3 text-sm text-gray-500 hover:text-gray-700 
+                       hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg 
+                       flex items-center gap-1 transition-colors"
+            title={`Restore original: ${formatPrice(originalPrice)}`}
+          >
+            <Undo2 className="w-4 h-4" /> Undo
+          </button>
+        )}
+      </div>
+      
+      {/* Original price hint when edited */}
+      {hasBeenEdited && (
+        <p className="text-[10px] text-gray-400 mt-2 text-center">
+          Original: {formatPrice(originalPrice)}
+        </p>
+      )}
+    </>
+  )}
+</div>
+```
+
+---
+
+## Summary of Changes
+
+| Issue | Fix |
+|-------|-----|
+| Tooltip overlaps above | Changed `bottom-full mb-2` to `top-full mt-2` |
+| Need Undo button | Added Undo button with `hasBeenEdited` state |
+| Track original price | Added `originalPrice` state (never changes) |
+| Show original price | Displays "Original: $X" when price has been edited |
+
+---
+
+## Visual After Fix
+
+```
+    ┌─────────────────────┐
+    │     $1,296,232      │
+    │  Suggested Price    │
+    │  ℹ️  ✏️ Edit  ↩️ Undo │
+    │  Original: $1.3M    │  ← Shows after editing
+    └─────────────────────┘
+              │
+              ▼
+    ┌─────────────────────────────┐
+    │ How is this price calculated?│
+    │ ────────────────────────────│
+    │ 📊 Comparable Sales...      │
+    │ 📍 Location Factors...      │
+    │ 🏠 Property Characteristics │
+    │ 📈 Market Conditions        │
+    │ ────────────────────────────│
+    │ Calculation:                │
+    │ $1,298,200 × 0.998 = ...   │
+    └─────────────────────────────┘
+```
+
+---
+
+## Verification
+
+- [ ] Tooltip appears BELOW the price card (not above)
+- [ ] Tooltip is fully visible within viewport
+- [ ] Edit button works as before
+- [ ] Undo button appears ONLY after price has been saved
+- [ ] Undo button restores original suggested price
+- [ ] "Original: $X" hint shows when price was edited
+- [ ] All buttons have 44px minimum touch targets
