@@ -34,6 +34,22 @@ const STATUS_FILTERS = [
   { id: 'active', label: 'Active' },
 ] as const;
 
+// Safe helper to calculate price per sqft avoiding NaN
+// Returns formatted string without trailing "/sqft" - caller adds it
+function getSafePricePerSqft(property: CmaProperty): string {
+  // First check if pricePerSqft is valid
+  if (property.pricePerSqft && !isNaN(property.pricePerSqft) && property.pricePerSqft > 0) {
+    return `$${Math.round(property.pricePerSqft)}`;
+  }
+  // Try to calculate from price and sqft
+  const price = property.soldPrice ?? property.price ?? property.listPrice;
+  const sqft = property.sqft || (property as any).livingArea;
+  if (price && sqft && sqft > 0 && !isNaN(price) && !isNaN(sqft)) {
+    return `$${Math.round(price / sqft)}`;
+  }
+  return '--';
+}
+
 function calculateStatistics(comparables: CmaProperty[]): PropertyStatistics | null {
   if (!comparables || comparables.length === 0) return null;
   
@@ -55,14 +71,28 @@ function calculateStatistics(comparables: CmaProperty[]): PropertyStatistics | n
     };
   };
   
+  // Filter for valid price/sqft values before calculation
   const pricePerSqFts = comparables
-    .filter(c => c.sqft > 0)
-    .map(c => (c.soldPrice || c.price) / c.sqft);
+    .filter(c => c.sqft && c.sqft > 0 && !isNaN(c.sqft))
+    .map(c => {
+      const price = c.soldPrice ?? c.price ?? c.listPrice;
+      if (price && !isNaN(price) && price > 0) return price / c.sqft;
+      return NaN; // will be filtered by calculateMetric
+    })
+    .filter(v => !isNaN(v));
+  
+  // Filter for valid prices and DOM values
+  const validPrices = comparables
+    .map(c => c.soldPrice ?? c.price ?? c.listPrice)
+    .filter((p): p is number => p !== undefined && p !== null && !isNaN(p) && p > 0);
+  const validDom = comparables
+    .map(c => c.daysOnMarket)
+    .filter((d): d is number => d !== undefined && d !== null && !isNaN(d) && d >= 0);
   
   return {
-    price: calculateMetric(comparables.map(c => c.soldPrice || c.price)),
+    price: calculateMetric(validPrices),
     pricePerSqFt: calculateMetric(pricePerSqFts),
-    daysOnMarket: calculateMetric(comparables.map(c => c.daysOnMarket)),
+    daysOnMarket: calculateMetric(validDom),
   };
 }
 
@@ -193,7 +223,7 @@ function PropertyCard({ property, isSubject = false, onClick }: { property: CmaP
             {formatCurrency(property.soldPrice || property.price)}
           </p>
           <p className="text-sm text-muted-foreground" data-testid={`property-ppsf-${property.id}`}>
-            ${property.pricePerSqft || Math.round((property.soldPrice || property.price) / property.sqft)}/sqft
+            {getSafePricePerSqft(property)}/sqft
           </p>
         </div>
         <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
@@ -253,7 +283,7 @@ function PropertyListItem({ property, isSubject = false, onClick }: { property: 
         <p className="text-lg font-bold mt-1" data-testid={`property-list-price-${property.id}`}>
           {formatCurrency(property.soldPrice || property.price)}
           <span className="text-sm font-normal text-muted-foreground ml-2">
-            ${property.pricePerSqft || Math.round((property.soldPrice || property.price) / property.sqft)}/sqft
+            {getSafePricePerSqft(property)}/sqft
           </span>
         </p>
         <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground flex-wrap">
@@ -307,7 +337,7 @@ function PropertyTable({ comparables, subjectProperty, onPropertyClick }: { comp
                 </Badge>
               </td>
               <td className="text-right p-3 font-medium" data-testid={`table-price-${index}`}>{formatCurrency(property.soldPrice || property.price)}</td>
-              <td className="text-right p-3" data-testid={`table-ppsf-${index}`}>${property.pricePerSqft || Math.round((property.soldPrice || property.price) / property.sqft)}</td>
+              <td className="text-right p-3" data-testid={`table-ppsf-${index}`}>{getSafePricePerSqft(property)}/sqft</td>
               <td className="text-center p-3" data-testid={`table-beds-${index}`}>{property.beds}</td>
               <td className="text-center p-3" data-testid={`table-baths-${index}`}>{property.baths}</td>
               <td className="text-right p-3" data-testid={`table-sqft-${index}`}>{property.sqft.toLocaleString()}</td>

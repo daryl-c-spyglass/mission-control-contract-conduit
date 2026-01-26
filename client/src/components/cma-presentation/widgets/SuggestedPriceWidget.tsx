@@ -137,7 +137,21 @@ export function SuggestedPriceWidget({
   const calculateSuggestedPrice = () => {
     if (suggestedPrice) return suggestedPrice;
     if (closedComps.length === 0 || !subjectProperty) return 0;
-    const avgPricePerSqft = closedComps.reduce((sum, c) => sum + c.pricePerSqft, 0) / closedComps.length;
+    
+    // Filter to only closed comps with valid pricePerSqft
+    const validPricePerSqfts = closedComps
+      .map(c => {
+        if (c.pricePerSqft && !isNaN(c.pricePerSqft) && c.pricePerSqft > 0) return c.pricePerSqft;
+        // Calculate from price and sqft if pricePerSqft is invalid
+        const price = c.soldPrice ?? c.price ?? c.listPrice;
+        const sqft = c.sqft || (c as any).livingArea;
+        if (price && sqft && sqft > 0 && !isNaN(price) && !isNaN(sqft)) return price / sqft;
+        return null;
+      })
+      .filter((p): p is number => p !== null && p > 0);
+    
+    if (validPricePerSqfts.length === 0) return 0;
+    const avgPricePerSqft = validPricePerSqfts.reduce((sum, p) => sum + p, 0) / validPricePerSqfts.length;
     return Math.round(avgPricePerSqft * (subjectProperty.sqft || 0));
   };
 
@@ -235,24 +249,57 @@ export function SuggestedPriceWidget({
   };
 
   const filteredComps = getFilteredComps();
-  const avgPrice = filteredComps.length > 0 
-    ? filteredComps.reduce((sum, c) => sum + (c.soldPrice || c.price), 0) / filteredComps.length 
-    : 0;
-  const avgPricePerSqft = filteredComps.length > 0
-    ? filteredComps.reduce((sum, c) => sum + c.pricePerSqft, 0) / filteredComps.length
+  
+  // Safe helper to get a valid price from a comparable
+  const getValidPrice = (c: CmaProperty): number | null => {
+    const price = c.soldPrice ?? c.price ?? c.listPrice ?? null;
+    if (price === null || price === undefined || isNaN(price) || price <= 0) return null;
+    return price;
+  };
+  
+  // Safe helper to get valid price per sqft
+  const getValidPricePerSqft = (c: CmaProperty): number | null => {
+    if (c.pricePerSqft && !isNaN(c.pricePerSqft) && c.pricePerSqft > 0) return c.pricePerSqft;
+    const price = getValidPrice(c);
+    const sqft = c.sqft || (c as any).livingArea;
+    if (price && sqft && sqft > 0) return price / sqft;
+    return null;
+  };
+  
+  // Calculate avgPrice from valid prices only
+  const validPrices = filteredComps.map(getValidPrice).filter((p): p is number => p !== null);
+  const avgPrice = validPrices.length > 0 
+    ? validPrices.reduce((sum, p) => sum + p, 0) / validPrices.length 
     : 0;
   
-  const prices = filteredComps.map(c => c.soldPrice || c.price);
-  const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
-  const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+  // Calculate avgPricePerSqft from valid values only
+  const validPricePerSqft = filteredComps.map(getValidPricePerSqft).filter((p): p is number => p !== null);
+  const avgPricePerSqft = validPricePerSqft.length > 0
+    ? validPricePerSqft.reduce((sum, p) => sum + p, 0) / validPricePerSqft.length
+    : 0;
   
-  const soldComps = closedComps.filter(c => c.soldPrice);
-  const listToSaleRatio = soldComps.length > 0
-    ? soldComps.reduce((sum, c) => sum + ((c.soldPrice || 0) / (c.listPrice || c.price)), 0) / soldComps.length
+  const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
+  const maxPrice = validPrices.length > 0 ? Math.max(...validPrices) : 0;
+  
+  const soldComps = closedComps.filter(c => c.soldPrice && c.soldPrice > 0);
+  // Calculate listToSaleRatio only from comps with valid both soldPrice AND listPrice
+  const validListToSaleRatios = soldComps
+    .map(c => {
+      const listPrice = c.listPrice || c.price;
+      if (listPrice && listPrice > 0 && !isNaN(listPrice) && c.soldPrice && !isNaN(c.soldPrice)) {
+        return c.soldPrice / listPrice;
+      }
+      return null;
+    })
+    .filter((r): r is number => r !== null);
+  const listToSaleRatio = validListToSaleRatios.length > 0
+    ? validListToSaleRatios.reduce((sum, r) => sum + r, 0) / validListToSaleRatios.length
     : 0.97;
   
-  const avgDom = filteredComps.length > 0
-    ? Math.round(filteredComps.reduce((sum, c) => sum + c.daysOnMarket, 0) / filteredComps.length)
+  // Calculate avgDom from valid values
+  const validDom = filteredComps.map(c => c.daysOnMarket).filter(d => d !== undefined && d !== null && !isNaN(d) && d >= 0);
+  const avgDom = validDom.length > 0
+    ? Math.round(validDom.reduce((sum, d) => sum + d, 0) / validDom.length)
     : 0;
 
   const handleSavePrice = () => {
