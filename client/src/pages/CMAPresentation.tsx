@@ -254,6 +254,7 @@ export default function CMAPresentation() {
           comparables={presentationComparables as any}
           subjectProperty={subjectProperty as any}
           averageDaysOnMarket={averageDaysOnMarket}
+          suggestedListPrice={suggestedListPrice}
         />
         <BottomNavigation
           mode="slide"

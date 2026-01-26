@@ -119,6 +119,7 @@ export function CmaPresentationPlayer({
           comparables={comparables}
           subjectProperty={subjectProperty}
           averageDaysOnMarket={averageDaysOnMarket}
+          suggestedListPrice={suggestedListPrice}
         />
         <BottomNavigation
           mode="slide"
