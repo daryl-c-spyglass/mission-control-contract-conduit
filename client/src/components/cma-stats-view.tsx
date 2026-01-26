@@ -886,19 +886,37 @@ function AveragePricePerSqftSection({ comparables, subjectProperty }: { comparab
                   <>
                     <button
                       onClick={prevPhoto}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1 shadow"
+                      className="absolute left-4 top-1/2 -translate-y-1/2 
+                                 min-w-[48px] min-h-[48px] 
+                                 bg-black/50 hover:bg-black/70 
+                                 text-white rounded-full 
+                                 flex items-center justify-center
+                                 transition-all duration-200
+                                 shadow-lg z-10
+                                 focus:outline-none focus:ring-2 focus:ring-white/50"
+                      aria-label="Previous photo"
+                      data-testid="button-prev-photo"
                     >
-                      <ChevronLeft className="h-4 w-4 text-zinc-700" />
+                      <ChevronLeft className="w-6 h-6" />
                     </button>
                     <button
                       onClick={nextPhoto}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1 shadow"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 
+                                 min-w-[48px] min-h-[48px] 
+                                 bg-black/50 hover:bg-black/70 
+                                 text-white rounded-full 
+                                 flex items-center justify-center
+                                 transition-all duration-200
+                                 shadow-lg z-10
+                                 focus:outline-none focus:ring-2 focus:ring-white/50"
+                      aria-label="Next photo"
+                      data-testid="button-next-photo"
                     >
-                      <ChevronRight className="h-4 w-4 text-zinc-700" />
+                      <ChevronRight className="w-6 h-6" />
                     </button>
 
                     {/* Photo Counter */}
-                    <div className="absolute bottom-2 right-2 bg-black/60 px-2 py-0.5 rounded text-white text-xs">
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 px-3 py-1 rounded-full text-white text-sm">
                       {safePhotoIndex + 1} / {selectedProperty.photos.length}
                     </div>
                   </>
