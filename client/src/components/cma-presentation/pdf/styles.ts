@@ -1,23 +1,7 @@
 import { StyleSheet, Font } from '@react-pdf/renderer';
 
-// Disable hyphenation to prevent italic font lookups (Inter doesn't have italic)
+// Disable hyphenation to prevent font lookup issues
 Font.registerHyphenationCallback((word: string) => [word]);
-
-// Register Inter font with all weights used in the PDF
-Font.register({
-  family: 'Inter',
-  fonts: [
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa1ZL7.woff2', fontWeight: 400, fontStyle: 'normal' },
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa0JL7.woff2', fontWeight: 500, fontStyle: 'normal' },
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa2pL7.woff2', fontWeight: 600, fontStyle: 'normal' },
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa25L7.woff2', fontWeight: 700, fontStyle: 'normal' },
-    // Fallback: use regular weight for italic requests (Inter doesn't have true italic)
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa1ZL7.woff2', fontWeight: 400, fontStyle: 'italic' },
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa0JL7.woff2', fontWeight: 500, fontStyle: 'italic' },
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa2pL7.woff2', fontWeight: 600, fontStyle: 'italic' },
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa25L7.woff2', fontWeight: 700, fontStyle: 'italic' },
-  ],
-});
 
 export const COLORS = {
   spyglassOrange: '#EF4923',
@@ -35,13 +19,13 @@ export const COLORS = {
 export const styles = StyleSheet.create({
   page: {
     backgroundColor: COLORS.white,
-    fontFamily: 'Inter',
+    fontFamily: 'Helvetica',
     fontSize: 10,
     padding: 0,
   },
   darkPage: {
     backgroundColor: COLORS.darkBackground,
-    fontFamily: 'Inter',
+    fontFamily: 'Helvetica',
     fontSize: 10,
     padding: 0,
   },
