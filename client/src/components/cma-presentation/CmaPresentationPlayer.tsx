@@ -99,6 +99,7 @@ export function CmaPresentationPlayer({
           onPrev={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
           onNext={() => setCurrentSlide(Math.min(WIDGETS.length - 1, currentSlide + 1))}
           onHome={() => setCurrentSlide(null)}
+          onMenuClick={() => setSidebarOpen(true)}
           agent={agent}
           comparables={comparables}
           subjectProperty={subjectProperty}

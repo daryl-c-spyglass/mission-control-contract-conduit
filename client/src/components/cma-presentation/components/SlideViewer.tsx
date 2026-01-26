@@ -21,6 +21,7 @@ interface SlideViewerProps {
   onPrev: () => void;
   onNext: () => void;
   onHome: () => void;
+  onMenuClick: () => void;
   agent: AgentProfile;
   comparables: CmaProperty[];
   subjectProperty?: CmaProperty;
@@ -33,6 +34,7 @@ export function SlideViewer({
   onPrev,
   onNext,
   onHome,
+  onMenuClick,
   agent,
   comparables,
   subjectProperty,
@@ -102,7 +104,7 @@ export function SlideViewer({
             <Button
               variant="ghost"
               size="icon"
-              onClick={onHome}
+              onClick={onMenuClick}
               className="text-white hover:bg-white/10"
               data-testid="button-menu-slide"
             >
