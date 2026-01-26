@@ -23,6 +23,7 @@ import CMAs from "@/pages/CMAs";
 import CMANew from "@/pages/CMANew";
 import CMADetailPage from "@/pages/CMADetailPage";
 import CMAPresentationBuilder from "@/pages/CMAPresentationBuilder";
+import CMAPresentation from "@/pages/CMAPresentation";
 import NotFound from "@/pages/not-found";
 import type { Transaction } from "@shared/schema";
 
@@ -218,6 +219,7 @@ function AuthenticatedApp() {
                     setCreateDialogOpen={setCreateDialogOpen}
                   />
                 </Route>
+                <Route path="/transactions/:transactionId/cma-presentation" component={CMAPresentation} />
                 <Route path="/archive" component={Archive} />
                 <Route path="/settings" component={Settings} />
                 <Route path="/admin" component={Admin} />

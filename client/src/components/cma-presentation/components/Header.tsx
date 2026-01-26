@@ -6,7 +6,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Menu, Search, Star, Phone, Mail, X } from 'lucide-react';
+import { Menu, Search, Phone, Mail, X } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { PdfDownloadButton } from './PdfDownloadButton';
 import type { AgentProfile, CmaProperty } from '../types';
@@ -84,7 +84,7 @@ export function Header({
             )}
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
@@ -92,14 +92,6 @@ export function Header({
               data-testid="button-search"
             >
               <Search className="w-5 h-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/20"
-              data-testid="button-favorite"
-            >
-              <Star className="w-5 h-5" />
             </Button>
             <PdfDownloadButton
               propertyAddress={propertyAddress}
