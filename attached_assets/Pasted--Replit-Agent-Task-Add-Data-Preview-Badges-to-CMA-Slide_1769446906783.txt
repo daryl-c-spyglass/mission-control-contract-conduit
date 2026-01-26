@@ -1,0 +1,400 @@
+# Replit Agent Task: Add Data Preview Badges to CMA Slide Cards
+
+## Overview
+
+Add data preview badges to the "Suggested List Price" and "Average Price/Acre" slide cards, similar to how "COMPS" shows "10" and "TIME TO SELL" shows "27 days".
+
+---
+
+## Current State
+
+| Slide | Badge Shown |
+|-------|-------------|
+| COMPS | ✅ "10" (count) |
+| TIME TO SELL | ✅ "27 days" |
+| SUGGESTED LIST PRICE | ❌ No badge |
+| AVERAGE PRICE/ACRE | ❌ No badge |
+
+---
+
+## Target State
+
+| Slide | Badge to Add | Example |
+|-------|--------------|---------|
+| COMPS | Count | `10` |
+| TIME TO SELL | Days | `27 days` |
+| **SUGGESTED LIST PRICE** | Price | `$434,990` |
+| **AVERAGE PRICE/ACRE** | Price/acre | `$4.9M/acre` |
+
+---
+
+## Part 1: Update Slide Card Grid (Main Overview)
+
+### Find the slide card component
+
+Look for the CMA overview/home page component that renders the grid of cards. It's likely in:
+- `CMAPresentationBuilder.tsx`
+- `CMAOverview.tsx`
+- `CMAHome.tsx`
+- `SlideGrid.tsx`
+
+### Add badges to the cards
+
+```tsx
+// Find the card rendering logic and add badges
+
+// For SUGGESTED LIST PRICE card
+{slideType === 'suggested-list-price' && suggestedListPrice && (
+  <div className="mt-2">
+    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium 
+                     bg-[#EF4923]/10 text-[#EF4923] border border-[#EF4923]/20">
+      {formatCompactPrice(suggestedListPrice)}
+    </span>
+  </div>
+)}
+
+// For AVERAGE PRICE/ACRE card
+{slideType === 'average-price-acre' && avgPricePerAcre && avgPricePerAcre > 0 && (
+  <div className="mt-2">
+    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium 
+                     bg-[#EF4923]/10 text-[#EF4923] border border-[#EF4923]/20">
+      {formatCompactPrice(avgPricePerAcre)}/acre
+    </span>
+  </div>
+)}
+```
+
+### Format helper for compact prices
+
+```typescript
+// Format price compactly for badges
+const formatCompactPrice = (price: number): string => {
+  if (price >= 1000000) {
+    const millions = price / 1000000;
+    // Show 1 decimal if needed, otherwise whole number
+    return `$${millions % 1 === 0 ? millions.toFixed(0) : millions.toFixed(1)}M`;
+  }
+  if (price >= 1000) {
+    const thousands = price / 1000;
+    return `$${thousands % 1 === 0 ? thousands.toFixed(0) : thousands.toFixed(0)}K`;
+  }
+  return `$${price.toLocaleString()}`;
+};
+
+// Examples:
+// 434990 → "$435K"
+// 4957228 → "$5.0M"
+// 111316319 → "$111.3M"
+// 1500000 → "$1.5M"
+```
+
+---
+
+## Part 2: Update Sections Sidebar/Drawer
+
+### Find the sections sidebar component
+
+Look for the drawer/sidebar that shows numbered sections. It's likely in:
+- `SectionsDrawer.tsx`
+- `SlideNavigation.tsx`
+- `CMASidebar.tsx`
+- `TableOfContents.tsx`
+
+### Add badges to section items
+
+```tsx
+// Section item with optional badge
+interface SectionItem {
+  id: string;
+  title: string;
+  number: number;
+  badge?: string | number;  // Add this
+}
+
+// Render section with badge
+const SectionItem = ({ section }: { section: SectionItem }) => (
+  <button 
+    onClick={() => navigateToSlide(section.id)}
+    className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 
+               transition-colors text-left"
+  >
+    <div className="flex items-center gap-3">
+      <span className="text-sm text-gray-400 w-6">{section.number}</span>
+      <span className="text-sm font-medium text-gray-700 uppercase tracking-wide">
+        {section.title}
+      </span>
+    </div>
+    
+    {/* Badge */}
+    {section.badge && (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium 
+                       bg-gray-100 text-gray-600 border border-gray-200">
+        {section.badge}
+      </span>
+    )}
+  </button>
+);
+```
+
+### Pass badge data to sections
+
+```tsx
+// When building sections array
+const sections = useMemo(() => {
+  const items = [
+    { id: 'home', title: 'Home', number: 0 },
+    { id: 'agent-resume', title: 'Agent Resume', number: 1 },
+    { id: 'listing-with-spyglass', title: 'Listing with Spyglass Realty', number: 2 },
+    { id: 'client-testimonials', title: 'Client Testimonials', number: 3 },
+    { id: 'marketing', title: 'Marketing', number: 4 },
+    { 
+      id: 'comps', 
+      title: 'Comps', 
+      number: 5,
+      badge: comparables?.length || 0  // ✅ Already exists
+    },
+    { 
+      id: 'time-to-sell', 
+      title: 'Time to Sell', 
+      number: 6,
+      badge: avgDaysOnMarket ? `${avgDaysOnMarket} days` : null  // ✅ Already exists
+    },
+    { 
+      id: 'suggested-list-price', 
+      title: 'Suggested List Price', 
+      number: 7,
+      badge: suggestedListPrice ? formatCompactPrice(suggestedListPrice) : null  // ← ADD
+    },
+    { id: 'listing-action-plan', title: 'Listing Action Plan', number: 8 },
+    { id: 'spyglass-resources', title: 'Spyglass Resources and Links', number: 9 },
+    { 
+      id: 'average-price-acre', 
+      title: 'Average Price/Acre', 
+      number: 10,
+      badge: avgPricePerAcre && avgPricePerAcre > 0 
+        ? `${formatCompactPrice(avgPricePerAcre)}/ac` 
+        : null  // ← ADD
+    },
+    // ... rest of sections
+  ];
+  
+  return items;
+}, [comparables, avgDaysOnMarket, suggestedListPrice, avgPricePerAcre]);
+```
+
+---
+
+## Part 3: Badge Styling Consistency
+
+### Use consistent badge styles across the app
+
+```tsx
+// Badge component for reuse
+interface BadgeProps {
+  children: React.ReactNode;
+  variant?: 'default' | 'orange' | 'success' | 'warning';
+}
+
+const SlideBadge = ({ children, variant = 'default' }: BadgeProps) => {
+  const variantStyles = {
+    default: 'bg-gray-100 text-gray-600 border-gray-200',
+    orange: 'bg-[#EF4923]/10 text-[#EF4923] border-[#EF4923]/20',
+    success: 'bg-green-100 text-green-700 border-green-200',
+    warning: 'bg-amber-100 text-amber-700 border-amber-200',
+  };
+  
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium 
+                      border ${variantStyles[variant]}`}>
+      {children}
+    </span>
+  );
+};
+
+// Usage in grid cards (larger badges)
+<SlideBadge variant="orange">{formatCompactPrice(suggestedListPrice)}</SlideBadge>
+
+// Usage in sidebar (smaller, more subtle)
+<SlideBadge variant="default">{formatCompactPrice(avgPricePerAcre)}/ac</SlideBadge>
+```
+
+---
+
+## Part 4: Ensure Data is Available
+
+### Check that the data flows to the overview component
+
+The overview/home component needs access to:
+
+```typescript
+// Required data for badges
+interface CMAOverviewData {
+  // Existing
+  comparablesCount: number;
+  avgDaysOnMarket: number;
+  
+  // NEW - Add these
+  suggestedListPrice: number | null;
+  avgPricePerAcre: number | null;
+}
+```
+
+### Calculate avg price per acre for the badge
+
+```typescript
+// In the overview component or data preparation
+const avgPricePerAcre = useMemo(() => {
+  const soldWithAcres = comparables.filter(p => 
+    p.status === 'Closed' && 
+    p.lotSizeAcres && p.lotSizeAcres > 0 &&
+    p.soldPrice && p.soldPrice > 0
+  );
+  
+  if (soldWithAcres.length === 0) return null;
+  
+  const total = soldWithAcres.reduce((sum, p) => 
+    sum + (p.soldPrice! / p.lotSizeAcres!), 0
+  );
+  
+  return Math.round(total / soldWithAcres.length);
+}, [comparables]);
+```
+
+### Get suggested list price
+
+```typescript
+// Suggested list price from CMA calculation
+const suggestedListPrice = useMemo(() => {
+  // This should come from the CMA data or calculation
+  return cmaData?.suggestedListPrice || 
+         subjectProperty?.suggestedPrice || 
+         null;
+}, [cmaData, subjectProperty]);
+```
+
+---
+
+## Part 5: Handle Edge Cases
+
+### When data is not available
+
+```tsx
+// Only show badge if data exists and is valid
+{slideType === 'suggested-list-price' && (
+  suggestedListPrice && suggestedListPrice > 0 ? (
+    <SlideBadge variant="orange">
+      {formatCompactPrice(suggestedListPrice)}
+    </SlideBadge>
+  ) : null  // Don't show badge if no data
+)}
+
+{slideType === 'average-price-acre' && (
+  avgPricePerAcre && avgPricePerAcre > 0 && avgPricePerAcre < 100000000 ? (  // Sanity check
+    <SlideBadge variant="orange">
+      {formatCompactPrice(avgPricePerAcre)}/ac
+    </SlideBadge>
+  ) : null
+)}
+```
+
+### Truncate long values in sidebar
+
+For the sections sidebar where space is limited:
+
+```typescript
+// Use abbreviated format for sidebar
+const formatSidebarBadge = (price: number): string => {
+  if (price >= 1000000000) return `$${(price / 1000000000).toFixed(1)}B`;
+  if (price >= 1000000) return `$${(price / 1000000).toFixed(1)}M`;
+  if (price >= 1000) return `$${Math.round(price / 1000)}K`;
+  return `$${price}`;
+};
+
+// Sidebar: "$4.9M/ac" (short)
+// Grid card: "$4,957,228/acre" or "$4.9M/acre" (can be longer)
+```
+
+---
+
+## Visual Reference
+
+### Grid Card Layout
+
+```
+┌─────────────────────────────────┐
+│           [Chart Icon]          │
+│                                 │
+│    SUGGESTED LIST PRICE         │
+│                                 │
+│         ┌─────────┐             │
+│         │ $435K   │  ← Badge    │
+│         └─────────┘             │
+└─────────────────────────────────┘
+
+┌─────────────────────────────────┐
+│           [Chart Icon]          │
+│                                 │
+│     AVERAGE PRICE/ACRE          │
+│                                 │
+│       ┌────────────┐            │
+│       │ $4.9M/acre │  ← Badge   │
+│       └────────────┘            │
+└─────────────────────────────────┘
+```
+
+### Sections Sidebar Layout
+
+```
+┌─────────────────────────────────┐
+│ Sections                    ✕   │
+├─────────────────────────────────┤
+│ 🏠 Home                         │
+│ 1  AGENT RESUME                 │
+│ 2  LISTING WITH SPYGLASS        │
+│ ...                             │
+│ 5  COMPS                   [10] │
+│ 6  TIME TO SELL        [27 days]│
+│ 7  SUGGESTED LIST PRICE  [$435K]│ ← ADD
+│ 8  LISTING ACTION PLAN          │
+│ 9  SPYGLASS RESOURCES           │
+│10  AVERAGE PRICE/ACRE [$4.9M/ac]│ ← ADD
+│ ...                             │
+└─────────────────────────────────┘
+```
+
+---
+
+## Verification Checklist
+
+### Grid Cards (Overview Page)
+- [ ] COMPS shows count badge (e.g., "10")
+- [ ] TIME TO SELL shows days badge (e.g., "27 days")
+- [ ] SUGGESTED LIST PRICE shows price badge (e.g., "$435K")
+- [ ] AVERAGE PRICE/ACRE shows price/acre badge (e.g., "$4.9M/acre")
+- [ ] Badges don't show when data is unavailable
+- [ ] Badge styling is consistent (orange theme)
+
+### Sections Sidebar
+- [ ] COMPS shows count (e.g., "10")
+- [ ] TIME TO SELL shows days (e.g., "27 days")
+- [ ] SUGGESTED LIST PRICE shows price (e.g., "$435K")
+- [ ] AVERAGE PRICE/ACRE shows abbreviated price (e.g., "$4.9M/ac")
+- [ ] Section titles remain readable
+- [ ] Badges right-aligned, don't overflow
+
+### Data
+- [ ] Suggested list price pulls from CMA calculation
+- [ ] Average price/acre calculated from sold comps with lot data
+- [ ] Extreme values handled gracefully (e.g., $111M/acre)
+
+---
+
+## Test With
+
+**Property:** 7312 Stitzel Weller Dr, Austin, TX 78744 (MLS# 4579418)
+
+Expected badges:
+- COMPS: "10"
+- TIME TO SELL: "27 days" (or calculated value)
+- SUGGESTED LIST PRICE: Calculated price
+- AVERAGE PRICE/ACRE: Calculated from sold comps

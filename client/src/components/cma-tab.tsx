@@ -380,6 +380,31 @@ export function CMATab({ transaction }: CMATabProps) {
     return Math.round(total / validComps.length);
   }, [presentationComparables]);
 
+  // Calculate suggested list price from sold comparables
+  const suggestedListPrice = useMemo(() => {
+    const soldComps = presentationComparables.filter(c => 
+      c.status === 'Closed' && c.price > 0
+    );
+    if (!soldComps.length) return null;
+    const total = soldComps.reduce((sum, c) => sum + c.price, 0);
+    return Math.round(total / soldComps.length);
+  }, [presentationComparables]);
+
+  // Calculate average price per acre from sold comparables with lot data
+  const avgPricePerAcre = useMemo(() => {
+    const MIN_LOT_SIZE_ACRES = 0.05; // Exclude small lots (condos, etc.)
+    const soldWithAcres = presentationComparables.filter(c => 
+      c.status === 'Closed' && 
+      c.lotSizeAcres && c.lotSizeAcres >= MIN_LOT_SIZE_ACRES &&
+      c.price && c.price > 0
+    );
+    if (!soldWithAcres.length) return null;
+    const total = soldWithAcres.reduce((sum, c) => 
+      sum + (c.price / (c.lotSizeAcres || 1)), 0
+    );
+    return Math.round(total / soldWithAcres.length);
+  }, [presentationComparables]);
+
   const generateCmaMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest('POST', `/api/transactions/${transaction.id}/generate-cma-fallback`, { radius: 5 });
@@ -813,6 +838,8 @@ export function CMATab({ transaction }: CMATabProps) {
         subjectProperty={subjectProperty}
         comparables={presentationComparables}
         averageDaysOnMarket={averageDaysOnMarket}
+        suggestedListPrice={suggestedListPrice}
+        avgPricePerAcre={avgPricePerAcre}
         latitude={subjectProperty?.latitude}
         longitude={subjectProperty?.longitude}
       />

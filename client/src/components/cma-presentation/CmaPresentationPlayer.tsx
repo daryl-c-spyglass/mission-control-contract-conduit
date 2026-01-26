@@ -18,6 +18,8 @@ interface CmaPresentationPlayerProps {
   subjectProperty?: CmaProperty;
   comparables: CmaProperty[];
   averageDaysOnMarket: number;
+  suggestedListPrice?: number | null;
+  avgPricePerAcre?: number | null;
   latitude?: number;
   longitude?: number;
 }
@@ -32,6 +34,8 @@ export function CmaPresentationPlayer({
   subjectProperty,
   comparables,
   averageDaysOnMarket,
+  suggestedListPrice,
+  avgPricePerAcre,
   latitude,
   longitude,
 }: CmaPresentationPlayerProps) {
@@ -154,6 +158,9 @@ export function CmaPresentationPlayer({
         }}
         currentWidget={currentSlide ?? undefined}
         compsCount={comparables.length}
+        daysOnMarket={averageDaysOnMarket}
+        suggestedListPrice={suggestedListPrice}
+        avgPricePerAcre={avgPricePerAcre}
       />
 
       <Header
@@ -175,6 +182,8 @@ export function CmaPresentationPlayer({
           onSelectWidget={setCurrentSlide}
           compsCount={comparables.length}
           daysOnMarket={averageDaysOnMarket}
+          suggestedListPrice={suggestedListPrice}
+          avgPricePerAcre={avgPricePerAcre}
           agent={agent}
         />
       </div>

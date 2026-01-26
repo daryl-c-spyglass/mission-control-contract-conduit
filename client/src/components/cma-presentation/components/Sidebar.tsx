@@ -11,7 +11,18 @@ interface SidebarProps {
   onSelectWidget: (index: number) => void;
   currentWidget?: number;
   compsCount?: number;
+  daysOnMarket?: number;
+  suggestedListPrice?: number | null;
+  avgPricePerAcre?: number | null;
 }
+
+// Format price compactly for sidebar badges
+const formatSidebarBadge = (price: number): string => {
+  if (price >= 1000000000) return `$${(price / 1000000000).toFixed(1)}B`;
+  if (price >= 1000000) return `$${(price / 1000000).toFixed(1)}M`;
+  if (price >= 1000) return `$${Math.round(price / 1000)}K`;
+  return `$${price}`;
+};
 
 export function Sidebar({
   isOpen,
@@ -20,7 +31,21 @@ export function Sidebar({
   onSelectWidget,
   currentWidget,
   compsCount = 0,
+  daysOnMarket = 0,
+  suggestedListPrice,
+  avgPricePerAcre,
 }: SidebarProps) {
+  const getWidgetBadge = (widget: WidgetDefinition): string | number | null => {
+    if (widget.id === 'comps' && compsCount > 0) return compsCount;
+    if (widget.id === 'time_to_sell' && daysOnMarket > 0) return `${daysOnMarket} days`;
+    if (widget.id === 'suggested_list_price' && suggestedListPrice && suggestedListPrice > 0) {
+      return formatSidebarBadge(suggestedListPrice);
+    }
+    if (widget.id === 'average_price_acre' && avgPricePerAcre && avgPricePerAcre > 0 && avgPricePerAcre < 1000000000) {
+      return `${formatSidebarBadge(avgPricePerAcre)}/ac`;
+    }
+    return null;
+  };
   if (!isOpen) return null;
 
   return (
@@ -108,9 +133,9 @@ export function Sidebar({
                   >
                     {widget.title}
                   </span>
-                  {widget.id === 'comps' && compsCount > 0 && (
+                  {getWidgetBadge(widget) && (
                     <Badge variant="secondary" className="ml-auto flex-shrink-0">
-                      {compsCount}
+                      {getWidgetBadge(widget)}
                     </Badge>
                   )}
                 </button>
