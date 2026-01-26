@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -101,6 +102,11 @@ app.use((req, res, next) => {
     res.status(status).json({ message });
     throw err;
   });
+
+  // Serve static files from public directory (for CMA widget images, logos, etc.)
+  // This must come BEFORE the Vite catch-all to properly serve static assets
+  const publicPath = path.resolve(import.meta.dirname, "..", "public");
+  app.use(express.static(publicPath));
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
