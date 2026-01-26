@@ -1,0 +1,189 @@
+# Replit Agent Task: Add Photo Navigation Arrows to COMPS Modal
+
+## Problem
+The COMPS slide property modal is missing the left/right navigation arrows on the photo gallery. The photo counter shows "1 / 34" indicating there are multiple photos, but users cannot navigate through them.
+
+**Current State:**
+- Photo displays ✓
+- Photo counter shows "1 / 34" ✓
+- Navigation arrows MISSING ❌
+
+## Fix Required
+
+Add left and right chevron buttons to navigate through photos.
+
+### Locate the COMPS Modal
+
+The modal is likely in one of these files:
+- `client/src/components/cma-presentation/widgets/PropertyDetailModal.tsx`
+- `client/src/components/cma/PropertyDetailModal.tsx`
+- Or inline in a COMPS-related component
+
+Search for the photo section:
+```bash
+grep -n "1 / 34\|photoCount\|currentPhotoIndex\|photo.*counter" --include="*.tsx" -r client/src/
+```
+
+### Add Navigation Arrows
+
+Find the photo container in the modal and add navigation buttons:
+
+```tsx
+{/* Photo Gallery Section */}
+<div className="relative">
+  {/* Photo */}
+  <img 
+    src={photos[currentPhotoIndex]} 
+    alt={`Property photo ${currentPhotoIndex + 1}`}
+    className="w-full h-auto object-cover"
+  />
+  
+  {/* LEFT Arrow - ADD THIS */}
+  {photos.length > 1 && (
+    <button
+      onClick={() => setCurrentPhotoIndex(i => i === 0 ? photos.length - 1 : i - 1)}
+      className="absolute left-2 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] 
+                 bg-black/50 hover:bg-black/70 text-white rounded-full 
+                 flex items-center justify-center transition-colors z-10"
+      aria-label="Previous photo"
+    >
+      <ChevronLeft className="w-6 h-6" />
+    </button>
+  )}
+  
+  {/* RIGHT Arrow - ADD THIS */}
+  {photos.length > 1 && (
+    <button
+      onClick={() => setCurrentPhotoIndex(i => i === photos.length - 1 ? 0 : i + 1)}
+      className="absolute right-2 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] 
+                 bg-black/50 hover:bg-black/70 text-white rounded-full 
+                 flex items-center justify-center transition-colors z-10"
+      aria-label="Next photo"
+    >
+      <ChevronRight className="w-6 h-6" />
+    </button>
+  )}
+  
+  {/* Photo Counter (already exists) */}
+  <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 text-white text-sm rounded">
+    {currentPhotoIndex + 1} / {photos.length}
+  </div>
+</div>
+```
+
+### Ensure State Exists
+
+Make sure the component has the state for tracking current photo:
+
+```tsx
+const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+
+// Reset photo index when property changes
+useEffect(() => {
+  setCurrentPhotoIndex(0);
+}, [property.mlsNumber]);
+```
+
+### Add Icon Import
+
+Make sure ChevronLeft and ChevronRight are imported:
+
+```tsx
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+```
+
+### Add Keyboard Navigation (Optional but Recommended)
+
+```tsx
+useEffect(() => {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'ArrowLeft' && photos.length > 1) {
+      setCurrentPhotoIndex(i => i === 0 ? photos.length - 1 : i - 1);
+    }
+    if (e.key === 'ArrowRight' && photos.length > 1) {
+      setCurrentPhotoIndex(i => i === photos.length - 1 ? 0 : i + 1);
+    }
+  };
+  
+  window.addEventListener('keydown', handleKeyDown);
+  return () => window.removeEventListener('keydown', handleKeyDown);
+}, [photos.length]);
+```
+
+---
+
+## Quick Implementation
+
+If the photo section already exists but just needs arrows, here's the minimal change:
+
+**Find code like this:**
+```tsx
+<div className="relative">
+  <img src={photos[currentPhotoIndex]} ... />
+  {/* Photo counter */}
+  <div className="absolute bottom-2 right-2 ...">
+    {currentPhotoIndex + 1} / {photos.length}
+  </div>
+</div>
+```
+
+**Add arrows inside the relative container:**
+```tsx
+<div className="relative">
+  <img src={photos[currentPhotoIndex]} ... />
+  
+  {/* ADD: Left Arrow */}
+  {photos.length > 1 && (
+    <button
+      onClick={() => setCurrentPhotoIndex(i => i === 0 ? photos.length - 1 : i - 1)}
+      className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center"
+    >
+      <ChevronLeft className="w-6 h-6" />
+    </button>
+  )}
+  
+  {/* ADD: Right Arrow */}
+  {photos.length > 1 && (
+    <button
+      onClick={() => setCurrentPhotoIndex(i => i === photos.length - 1 ? 0 : i + 1)}
+      className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center"
+    >
+      <ChevronRight className="w-6 h-6" />
+    </button>
+  )}
+  
+  {/* Existing: Photo counter */}
+  <div className="absolute bottom-2 right-2 ...">
+    {currentPhotoIndex + 1} / {photos.length}
+  </div>
+</div>
+```
+
+---
+
+## Verification
+
+After adding the arrows:
+
+- [ ] Left arrow appears on photo (semi-transparent black circle with chevron)
+- [ ] Right arrow appears on photo
+- [ ] Clicking left arrow goes to previous photo (or last if on first)
+- [ ] Clicking right arrow goes to next photo (or first if on last)
+- [ ] Photo counter updates correctly (e.g., "2 / 34")
+- [ ] Arrows only show when there are multiple photos
+- [ ] Touch targets are at least 44x44px for mobile
+
+---
+
+## File to Modify
+
+Based on the COMPS slide structure, the modal is likely:
+```
+client/src/components/cma-presentation/widgets/PropertyDetailModal.tsx
+```
+or
+```
+client/src/components/cma/PropertyDetailModal.tsx
+```
+
+Find the photo section and add the navigation arrows.

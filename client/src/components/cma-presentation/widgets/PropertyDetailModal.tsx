@@ -120,28 +120,24 @@ export function PropertyDetailModal({ property, onClose }: PropertyDetailModalPr
                 
                 {photos.length > 1 && (
                   <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
+                    <button
                       onClick={handlePrevPhoto}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white rounded-full min-w-[44px] min-h-[44px]"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors"
                       aria-label="Previous photo"
                       data-testid="button-prev-photo"
                     >
-                      <ChevronLeft className="w-5 h-5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
+                      <ChevronLeft className="w-6 h-6" />
+                    </button>
+                    <button
                       onClick={handleNextPhoto}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white rounded-full min-w-[44px] min-h-[44px]"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors"
                       aria-label="Next photo"
                       data-testid="button-next-photo"
                     >
-                      <ChevronRight className="w-5 h-5" />
-                    </Button>
+                      <ChevronRight className="w-6 h-6" />
+                    </button>
                     <div 
-                      className="absolute bottom-2 right-2 z-10 bg-black/50 text-white text-sm px-2 py-1 rounded"
+                      className="absolute bottom-2 right-2 z-10 bg-black/60 text-white text-sm px-2 py-1 rounded"
                       data-testid="photo-counter"
                     >
                       {currentPhotoIndex + 1} / {photos.length}
