@@ -93,6 +93,17 @@ export function CmaPresentationPlayer({
 
     return (
       <>
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          widgets={WIDGETS}
+          onSelectWidget={(index) => {
+            setCurrentSlide(index);
+            setSidebarOpen(false);
+          }}
+          currentWidget={currentSlide}
+          compsCount={comparables.length}
+        />
         <SlideViewer
           currentIndex={currentSlide}
           onClose={() => setCurrentSlide(null)}

@@ -1,0 +1,348 @@
+# CMA Presentation — Debug Hamburger Menu Not Working
+
+## Issue
+
+The hamburger menu icon (3 lines) in the CMA Presentation slide header does not open the Sections sidebar when clicked.
+
+**Location:** Top-left corner of slide view (see attached screenshot)
+**Expected:** Clicking hamburger should open the Sections sidebar
+**Actual:** Nothing happens when clicked
+
+---
+
+## Step 1: DIAGNOSTIC — Find the Issue
+
+### 1.1 Locate the hamburger button code:
+
+```bash
+# Find hamburger/menu button in CMA presentation components
+grep -rn "Menu\|hamburger\|onMenuToggle\|toggleMenu\|setSidebarOpen" --include="*.tsx" client/src/components/cma-presentation/
+
+# Find the Header component
+grep -rn "header.*menu\|Menu.*className" --include="*.tsx" client/src/components/cma-presentation/
+```
+
+### 1.2 Check if onClick handler exists:
+
+Look for the hamburger button and verify it has an onClick handler:
+
+```tsx
+// Does it look like this? (CORRECT)
+<button onClick={onMenuToggle}>
+  <Menu className="w-6 h-6" />
+</button>
+
+// Or like this? (BROKEN - missing onClick)
+<button>
+  <Menu className="w-6 h-6" />
+</button>
+```
+
+### 1.3 Add console.log for debugging:
+
+```tsx
+// In the Header component, add:
+<button 
+  onClick={() => {
+    console.log('Hamburger clicked!'); // Add this
+    onMenuToggle?.();
+  }}
+>
+  <Menu className="w-6 h-6" />
+</button>
+```
+
+### 1.4 Check if onMenuToggle prop is passed:
+
+```tsx
+// In parent component (SlideViewer or CmaPresentationPlayer), verify:
+<Header 
+  onMenuToggle={() => setIsSidebarOpen(true)}  // Is this being passed?
+  // ... other props
+/>
+```
+
+### 1.5 Check sidebar state:
+
+```tsx
+// Is the sidebar state being managed?
+const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+// Is it being passed to both Header and Sidebar?
+<Header onMenuToggle={() => setIsSidebarOpen(true)} />
+<Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+```
+
+---
+
+## Step 2: COMMON ISSUES TO CHECK
+
+### Issue A: onClick handler not connected
+
+```tsx
+// BROKEN
+<button className="...">
+  <Menu />
+</button>
+
+// FIXED
+<button onClick={handleMenuToggle} className="...">
+  <Menu />
+</button>
+```
+
+### Issue B: onMenuToggle prop not passed from parent
+
+```tsx
+// BROKEN - Parent doesn't pass the handler
+<Header slideTitle={title} />
+
+// FIXED - Parent passes the handler
+<Header 
+  slideTitle={title}
+  onMenuToggle={() => setIsSidebarOpen(true)}
+/>
+```
+
+### Issue C: State not initialized or wrong initial value
+
+```tsx
+// Check state exists in parent
+const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+```
+
+### Issue D: Sidebar not conditionally rendered based on state
+
+```tsx
+// BROKEN - Sidebar always hidden or doesn't use isOpen
+<Sidebar />
+
+// FIXED - Sidebar uses isOpen prop
+<Sidebar 
+  isOpen={isSidebarOpen}
+  onClose={() => setIsSidebarOpen(false)}
+/>
+```
+
+### Issue E: z-index issue (button underneath another element)
+
+```tsx
+// Add z-index to make sure button is clickable
+<button className="z-50 relative ...">
+  <Menu />
+</button>
+```
+
+### Issue F: pointer-events issue
+
+```tsx
+// Check if parent has pointer-events-none that blocks clicks
+// BROKEN
+<div className="pointer-events-none">
+  <button>...</button>  // Can't click!
+</div>
+
+// FIXED
+<div className="pointer-events-none">
+  <button className="pointer-events-auto">...</button>  // Can click
+</div>
+```
+
+---
+
+## Step 3: FIX IMPLEMENTATION
+
+Once you identify the issue, here's the correct implementation:
+
+### Parent Component (SlideViewer.tsx or CmaPresentationPlayer.tsx):
+
+```tsx
+export function CmaPresentationPlayer() {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  const handleMenuToggle = () => {
+    console.log('Menu toggle called, current state:', isSidebarOpen);
+    setIsSidebarOpen(prev => !prev);
+  };
+  
+  const handleSidebarClose = () => {
+    console.log('Sidebar close called');
+    setIsSidebarOpen(false);
+  };
+  
+  return (
+    <div className="relative">
+      {/* Header with hamburger */}
+      <Header 
+        onMenuToggle={handleMenuToggle}
+        // ... other props
+      />
+      
+      {/* Sidebar */}
+      <Sidebar 
+        isOpen={isSidebarOpen}
+        onClose={handleSidebarClose}
+        sections={sections}
+        currentSection={currentSlide}
+        onSelectSection={(id) => {
+          setCurrentSlide(id);
+          setIsSidebarOpen(false); // Close after selection
+        }}
+      />
+      
+      {/* Slide content */}
+      <main>...</main>
+    </div>
+  );
+}
+```
+
+### Header Component:
+
+```tsx
+interface HeaderProps {
+  onMenuToggle: () => void;
+  // ... other props
+}
+
+export function Header({ onMenuToggle, ...props }: HeaderProps) {
+  return (
+    <header className="...">
+      {/* Hamburger Button */}
+      <button
+        type="button"
+        onClick={() => {
+          console.log('Hamburger button clicked');
+          onMenuToggle();
+        }}
+        className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-white/10 
+                   transition-colors z-50 relative"
+        aria-label="Open sections menu"
+      >
+        <Menu className="w-6 h-6 text-white" />
+      </button>
+      
+      {/* ... rest of header */}
+    </header>
+  );
+}
+```
+
+### Sidebar Component:
+
+```tsx
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+  // ... other props
+}
+
+export function Sidebar({ isOpen, onClose, ...props }: SidebarProps) {
+  // Log state for debugging
+  console.log('Sidebar render, isOpen:', isOpen);
+  
+  return (
+    <>
+      {/* Backdrop */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40"
+          onClick={onClose}
+        />
+      )}
+      
+      {/* Sidebar Panel */}
+      <aside
+        className={`
+          fixed top-0 left-0 h-full w-[320px] bg-white z-50
+          transform transition-transform duration-300
+          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}
+      >
+        {/* ... sidebar content */}
+      </aside>
+    </>
+  );
+}
+```
+
+---
+
+## Step 4: TESTING CHECKLIST
+
+Before confirming the fix works, test ALL of these:
+
+### Desktop Testing:
+- [ ] Click hamburger icon → Sidebar opens
+- [ ] Click backdrop (dark overlay) → Sidebar closes
+- [ ] Click X button in sidebar → Sidebar closes
+- [ ] Click a section in sidebar → Navigates to slide AND sidebar closes
+- [ ] Press ESC key → Sidebar closes
+
+### Mobile Testing (Chrome DevTools mobile view):
+- [ ] Hamburger icon has 44x44px touch target
+- [ ] Sidebar slides in smoothly from left
+- [ ] Can scroll through all 33 sections
+- [ ] Tapping section works and closes sidebar
+
+### Console Logging:
+- [ ] "Hamburger button clicked" appears in console when clicked
+- [ ] "Menu toggle called" appears in console
+- [ ] "Sidebar render, isOpen: true" appears when opening
+- [ ] "Sidebar close called" appears when closing
+
+---
+
+## Copy/Paste for Replit
+
+```
+DEBUG: Hamburger menu not working in CMA Presentation slides.
+
+## ISSUE:
+Clicking the hamburger icon (3 lines) in top-left of slide header does nothing.
+The Sections sidebar should open but it doesn't.
+
+## DIAGNOSTIC STEPS:
+
+1. Find the hamburger button:
+   grep -rn "Menu\|hamburger\|onMenuToggle" --include="*.tsx" client/src/components/cma-presentation/
+
+2. Add console.log to the button:
+   <button onClick={() => { console.log('Hamburger clicked!'); onMenuToggle?.(); }}>
+
+3. Check if onMenuToggle prop is passed from parent component
+
+4. Check if sidebar state exists:
+   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+5. Check if Sidebar component uses isOpen prop correctly
+
+## COMMON FIXES:
+
+A. onClick handler missing on button
+B. onMenuToggle prop not passed from parent
+C. State not connected between Header and Sidebar
+D. z-index issue blocking clicks
+E. pointer-events-none blocking clicks
+
+## REQUIRED TESTING:
+
+After fixing, verify ALL of these work:
+- [ ] Click hamburger → Sidebar opens
+- [ ] Click backdrop → Sidebar closes  
+- [ ] Click X in sidebar → Sidebar closes
+- [ ] Click section → Navigate AND close sidebar
+- [ ] Mobile: 44x44px touch target works
+
+Add console.log statements and share the output to confirm the fix.
+Do NOT say "it's working" until you've tested all checkboxes above.
+```
+
+---
+
+## Expected Result After Fix
+
+1. Click hamburger → Sidebar slides in from left
+2. Shows all 33 sections with numbers
+3. Click section → Navigate to that slide
+4. Click outside or X → Sidebar closes
