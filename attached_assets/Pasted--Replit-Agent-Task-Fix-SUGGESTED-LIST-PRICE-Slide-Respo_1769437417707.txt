@@ -1,0 +1,492 @@
+# Replit Agent Task: Fix SUGGESTED LIST PRICE Slide - Responsive Layout + Mapbox + Editable
+
+## Current Problems
+
+1. **Page doesn't fit at 100% zoom** - User has to zoom to 80% to see all content
+2. **Map is a placeholder** - Shows "Mapbox integration coming soon"
+3. **Price is not editable** - Agents need to adjust suggested price
+4. **Layout not optimized** - Poor use of screen space
+5. **Not responsive** - Doesn't adapt to different devices
+
+---
+
+## Target Devices
+
+| Device | Screen Size | Priority |
+|--------|-------------|----------|
+| Desktop (Windows/Mac) | 1920x1080, 1440x900 | High |
+| iPad Pro | 1024x1366 | High |
+| iPad Air/Mini | 768x1024 | High |
+| iPhone 14/15 Pro | 393x852 | Medium |
+| Android Tablet | 800x1280 | Medium |
+| Android Phone | 360x800 | Medium |
+
+---
+
+## New Layout Design
+
+### Desktop/Tablet (≥768px) - Single Page View
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         SUGGESTED LIST PRICE                    7 / 33   │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│   ┌────────────────────────────────┐  ┌────────────────────────────────┐ │
+│   │                                │  │                                │ │
+│   │      154 Pettigrew             │  │                                │ │
+│   │      Buda, TX 78610            │  │        MAPBOX MAP              │ │
+│   │                                │  │           📍                   │ │
+│   │   ┌────────────────────────┐   │  │                                │ │
+│   │   │      $1,296,232        │   │  │                                │ │
+│   │   │   Suggested List Price │   │  │                                │ │
+│   │   │        ✏️ Edit         │   │  │                                │ │
+│   │   └────────────────────────┘   │  │                                │ │
+│   │                                │  └────────────────────────────────┘ │
+│   └────────────────────────────────┘                                     │
+│                                                                          │
+│   ┌──────────────────────────────────────────────────────────────────┐   │
+│   │  Compare pricing with the comps          [All] [Sold] [Active]   │   │
+│   │                                                                  │   │
+│   │   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │   │
+│   │   │ Average Price│  │ Avg $/sq.ft. │  │  Price Range │           │   │
+│   │   │  $1,298,200  │  │    $378      │  │ $1.1M-$1.5M  │           │   │
+│   │   └──────────────┘  └──────────────┘  └──────────────┘           │   │
+│   └──────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### Mobile (<768px) - Stacked Layout
+
+```
+┌─────────────────────────────┐
+│  SUGGESTED LIST PRICE  7/33 │
+├─────────────────────────────┤
+│                             │
+│   154 Pettigrew             │
+│   Buda, TX 78610            │
+│                             │
+│  ┌───────────────────────┐  │
+│  │     $1,296,232        │  │
+│  │  Suggested List Price │  │
+│  │       ✏️ Edit         │  │
+│  └───────────────────────┘  │
+│                             │
+│  ┌───────────────────────┐  │
+│  │                       │  │
+│  │     MAPBOX MAP        │  │
+│  │        📍             │  │
+│  │                       │  │
+│  └───────────────────────┘  │
+│                             │
+│  Compare pricing with comps │
+│   [All] [Sold] [Active]     │
+│                             │
+│  ┌─────────┐ ┌─────────┐    │
+│  │Avg Price│ │Avg $/sf │    │
+│  │$1,298,200│ │  $378   │    │
+│  └─────────┘ └─────────┘    │
+│                             │
+└─────────────────────────────┘
+```
+
+---
+
+## Implementation
+
+### File to Modify
+Find the Suggested List Price slide component:
+
+```bash
+grep -rn "SUGGESTED LIST PRICE\|SuggestedListPrice\|suggestedPrice" --include="*.tsx" client/src/
+```
+
+Likely location:
+- `client/src/components/cma-presentation/slides/SuggestedListPriceSlide.tsx`
+- Or similar path
+
+---
+
+## Component Code
+
+```tsx
+import { useState, useEffect, useRef } from 'react';
+import { Edit2, Check, X } from 'lucide-react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+interface SuggestedListPriceSlideProps {
+  subjectProperty: {
+    address: string;
+    city: string;
+    state: string;
+    zip: string;
+    coordinates?: { lat: number; lng: number };
+  };
+  suggestedPrice: number;
+  comparables: Array<{
+    listPrice: number;
+    soldPrice?: number;
+    sqft: number;
+    status: string;
+  }>;
+  onPriceUpdate?: (newPrice: number) => void;
+}
+
+export function SuggestedListPriceSlide({ 
+  subjectProperty, 
+  suggestedPrice: initialPrice, 
+  comparables,
+  onPriceUpdate 
+}: SuggestedListPriceSlideProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedPrice, setEditedPrice] = useState(initialPrice);
+  const [displayPrice, setDisplayPrice] = useState(initialPrice);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'sold' | 'active'>('all');
+  
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  
+  // Initialize Mapbox
+  useEffect(() => {
+    if (!mapContainer.current || map.current) return;
+    if (!subjectProperty.coordinates) return;
+    
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+    
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [subjectProperty.coordinates.lng, subjectProperty.coordinates.lat],
+      zoom: 14,
+    });
+    
+    // Spyglass orange marker
+    new mapboxgl.Marker({ color: '#EF4923' })
+      .setLngLat([subjectProperty.coordinates.lng, subjectProperty.coordinates.lat])
+      .addTo(map.current);
+    
+    map.current.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+    
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, [subjectProperty.coordinates]);
+  
+  // Calculate stats based on filter
+  const filteredComps = comparables.filter(comp => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'sold') return comp.status === 'Closed';
+    if (activeFilter === 'active') return comp.status === 'Active';
+    return true;
+  });
+  
+  const avgPrice = filteredComps.length > 0
+    ? Math.round(filteredComps.reduce((sum, c) => sum + (c.soldPrice || c.listPrice), 0) / filteredComps.length)
+    : 0;
+    
+  const avgPricePerSqft = filteredComps.length > 0
+    ? Math.round(filteredComps.reduce((sum, c) => sum + ((c.soldPrice || c.listPrice) / c.sqft), 0) / filteredComps.length)
+    : 0;
+  
+  const prices = filteredComps.map(c => c.soldPrice || c.listPrice);
+  const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+  const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+  
+  // Handle price edit
+  const handleSavePrice = () => {
+    setDisplayPrice(editedPrice);
+    setIsEditing(false);
+    onPriceUpdate?.(editedPrice);
+  };
+  
+  const handleCancelEdit = () => {
+    setEditedPrice(displayPrice);
+    setIsEditing(false);
+  };
+  
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(price);
+  };
+  
+  const formatPriceShort = (price: number) => {
+    if (price >= 1000000) {
+      return `$${(price / 1000000).toFixed(1)}M`;
+    }
+    return `$${(price / 1000).toFixed(0)}K`;
+  };
+
+  return (
+    <div className="h-full w-full flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
+      {/* Content Container - Fits viewport */}
+      <div className="flex-1 flex flex-col p-4 md:p-6 lg:p-8 max-h-full overflow-auto">
+        
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 flex-1 min-h-0">
+          
+          {/* Left Column: Address + Price */}
+          <div className="flex flex-col justify-center items-center text-center order-1">
+            {/* Address */}
+            <div className="mb-4 md:mb-6">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-gray-100">
+                {subjectProperty.address}
+              </h2>
+              <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">
+                {subjectProperty.city}, {subjectProperty.state} {subjectProperty.zip}
+              </p>
+            </div>
+            
+            {/* Suggested Price Card */}
+            <div className="bg-orange-50 dark:bg-orange-900/20 rounded-2xl p-6 md:p-8 w-full max-w-sm">
+              {isEditing ? (
+                <div className="space-y-4">
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-gray-500">$</span>
+                    <input
+                      type="number"
+                      value={editedPrice}
+                      onChange={(e) => setEditedPrice(Number(e.target.value))}
+                      className="w-full text-3xl md:text-4xl font-bold text-center text-[#EF4923] 
+                                 bg-white dark:bg-gray-800 border-2 border-[#EF4923] rounded-xl 
+                                 py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-[#EF4923]"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-center">
+                    <button
+                      onClick={handleSavePrice}
+                      className="min-w-[44px] min-h-[44px] px-4 bg-green-500 hover:bg-green-600 
+                                 text-white rounded-lg flex items-center gap-2 transition-colors"
+                    >
+                      <Check className="w-5 h-5" />
+                      <span className="hidden sm:inline">Save</span>
+                    </button>
+                    <button
+                      onClick={handleCancelEdit}
+                      className="min-w-[44px] min-h-[44px] px-4 bg-gray-500 hover:bg-gray-600 
+                                 text-white rounded-lg flex items-center gap-2 transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                      <span className="hidden sm:inline">Cancel</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#EF4923] mb-2">
+                    {formatPrice(displayPrice)}
+                  </div>
+                  <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mb-3">
+                    Suggested List Price
+                  </p>
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="min-h-[44px] px-4 py-2 text-sm text-[#EF4923] hover:bg-orange-100 
+                               dark:hover:bg-orange-900/30 rounded-lg flex items-center gap-2 
+                               mx-auto transition-colors"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Edit Price
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+          
+          {/* Right Column: Map */}
+          <div className="order-2 min-h-[200px] md:min-h-[250px] lg:min-h-0">
+            <div className="h-full w-full rounded-xl overflow-hidden shadow-lg bg-gray-200 dark:bg-gray-800">
+              {subjectProperty.coordinates ? (
+                <div ref={mapContainer} className="w-full h-full min-h-[200px] md:min-h-[250px] lg:min-h-[300px]" />
+              ) : (
+                <div className="w-full h-full min-h-[200px] flex items-center justify-center text-gray-500">
+                  <div className="text-center">
+                    <p className="font-medium">Map Unavailable</p>
+                    <p className="text-sm">No coordinates available for this property</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* Bottom Section: Comp Stats */}
+        <div className="mt-4 md:mt-6">
+          {/* Section Title + Filters */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <h3 className="text-base md:text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Compare pricing with the comps
+            </h3>
+            
+            {/* Filter Buttons */}
+            <div className="flex gap-2">
+              {(['all', 'sold', 'active'] as const).map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setActiveFilter(filter)}
+                  className={`min-h-[36px] px-4 py-1.5 text-sm font-medium rounded-full transition-colors
+                    ${activeFilter === filter
+                      ? 'bg-[#EF4923] text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    }`}
+                >
+                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+            {/* Average Price */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mb-1">
+                Average Price
+              </p>
+              <p className="text-xl md:text-2xl font-bold text-gray-900 dark:text-gray-100">
+                {formatPrice(avgPrice)}
+              </p>
+            </div>
+            
+            {/* Avg $/sq.ft. */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mb-1">
+                Avg $/sq. ft.
+              </p>
+              <p className="text-xl md:text-2xl font-bold text-gray-900 dark:text-gray-100">
+                ${avgPricePerSqft}
+              </p>
+            </div>
+            
+            {/* Price Range */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 col-span-2 md:col-span-1">
+              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mb-1">
+                Price Range
+              </p>
+              <p className="text-xl md:text-2xl font-bold text-gray-900 dark:text-gray-100">
+                {formatPriceShort(minPrice)} - {formatPriceShort(maxPrice)}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## Key Features
+
+### 1. Editable Price
+- Click "Edit Price" button to enter edit mode
+- Input field with $ prefix
+- Save/Cancel buttons
+- Calls `onPriceUpdate` callback when saved
+
+### 2. Mapbox Integration
+- Uses `VITE_MAPBOX_ACCESS_TOKEN` from environment
+- Spyglass orange marker (#EF4923)
+- Navigation controls
+- Fallback message if no coordinates
+
+### 3. Responsive Layout
+- **Desktop/Tablet**: Side-by-side (address+price | map)
+- **Mobile**: Stacked vertically
+- Uses CSS Grid with responsive breakpoints
+- All content fits without scrolling at 100% zoom
+
+### 4. Filter Functionality
+- All / Sold / Active filter buttons
+- Stats recalculate based on filter
+- Visual feedback on active filter
+
+---
+
+## CSS Breakpoints
+
+```
+Mobile: < 768px (md)
+Tablet: 768px - 1024px
+Desktop: > 1024px (lg)
+```
+
+---
+
+## Mobile Optimization Checklist
+
+- [x] Touch targets minimum 44x44px
+- [x] Responsive grid (stacks on mobile)
+- [x] Readable font sizes (min 16px body)
+- [x] No horizontal overflow
+- [x] Works in portrait and landscape
+- [x] Edit price with mobile-friendly input
+- [x] Map has minimum height on mobile
+
+---
+
+## Data Requirements
+
+Ensure the component receives:
+
+```typescript
+interface Props {
+  subjectProperty: {
+    address: string;           // "154 Pettigrew"
+    city: string;              // "Buda"
+    state: string;             // "TX"
+    zip: string;               // "78610"
+    coordinates?: {
+      lat: number;             // From Repliers map.latitude
+      lng: number;             // From Repliers map.longitude
+    };
+  };
+  suggestedPrice: number;      // Calculated or default
+  comparables: CmaProperty[];  // For stats calculation
+  onPriceUpdate?: (price: number) => void;  // Callback for saving
+}
+```
+
+---
+
+## Integration Steps
+
+### Step 1: Find the existing slide component
+
+```bash
+grep -rn "SUGGESTED LIST PRICE\|SuggestedListPrice\|suggestedPrice" --include="*.tsx" client/src/
+```
+
+### Step 2: Replace with the new responsive component
+
+### Step 3: Ensure coordinates are passed
+
+Check where the slide gets its data and ensure `subjectProperty.coordinates` includes lat/lng from Repliers.
+
+### Step 4: Add onPriceUpdate handler
+
+If the price should be persisted, implement the callback in the parent component.
+
+---
+
+## Verification Checklist
+
+- [ ] Page fits at 100% zoom on 1920x1080 desktop
+- [ ] Page fits on iPad without scrolling
+- [ ] Map shows with Mapbox (not placeholder)
+- [ ] Spyglass orange marker on map
+- [ ] "Edit Price" button works
+- [ ] Price can be edited and saved
+- [ ] Filter buttons switch between All/Sold/Active
+- [ ] Stats update when filter changes
+- [ ] Mobile layout stacks correctly
+- [ ] All touch targets are 44px+
+- [ ] Dark mode works correctly
