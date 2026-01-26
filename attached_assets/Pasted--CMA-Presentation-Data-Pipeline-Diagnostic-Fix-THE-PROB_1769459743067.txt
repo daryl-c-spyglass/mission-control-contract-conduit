@@ -1,0 +1,376 @@
+# CMA Presentation Data Pipeline Diagnostic & Fix
+
+## THE PROBLEM
+
+The CMA Presentation viewer at slide "SUGGESTED LIST PRICE" (7/33) shows data errors:
+- **Avg Price:** `$NaNK` (NaN = Not a Number)
+- **Avg $/sqft:** `$NaN`
+- **Price Range:** `$---`
+- **# Comps:** `10` (this works, so some data exists)
+
+This indicates the comparables data is being COUNTED but the numeric calculations (prices, sqft) are failing.
+
+---
+
+## PHASE 1: DIAGNOSE DATA FLOW
+
+### Step 1: Find where slide data is calculated
+
+Search for components that calculate these statistics:
+```
+Search for: "Avg Price", "avgPrice", "NaN", "pricePerSqFt", "Price Range"
+```
+
+### Step 2: Add diagnostic logging
+
+Find the component rendering the "SUGGESTED LIST PRICE" slide and add:
+
+```typescript
+console.log('[SUGGESTED LIST PRICE] Raw data:', {
+  comparables: comparables,
+  comparablesCount: comparables?.length,
+  firstComp: comparables?.[0],
+  prices: comparables?.map(c => ({
+    address: c.address,
+    price: c.price,
+    listPrice: c.listPrice,
+    soldPrice: c.soldPrice,
+    closePrice: c.closePrice,
+    sqft: c.sqft,
+    pricePerSqFt: c.pricePerSqFt
+  }))
+});
+```
+
+### Step 3: Check the calculation logic
+
+The NaN error happens when:
+- Dividing by zero
+- Using undefined/null in math operations
+- Parsing non-numeric strings
+
+Find calculations like:
+```typescript
+// This WILL cause NaN if prices contains undefined/null
+const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
+```
+
+---
+
+## PHASE 2: IDENTIFY ALL AFFECTED SLIDES
+
+These slides likely have data dependencies that may be broken:
+
+### SLIDES WITH CALCULATED STATS
+| Slide | Data Needed | Status |
+|-------|-------------|--------|
+| Suggested List Price | Avg Price, Avg $/sqft, Price Range, # Comps | ❌ BROKEN |
+| Summary of Comparables | Avg Price, Avg $/sqft, Avg DOM | 🔍 CHECK |
+| Price Per Sq Ft Chart | Price and sqft for each comp | 🔍 CHECK |
+| Comparable Statistics | Price stats, DOM stats | 🔍 CHECK |
+| Time to Sell Analysis | Days on market data | 🔍 CHECK |
+| Adjustments Table | Property values for comparison | 🔍 CHECK |
+| Online Valuation Analysis | Price estimates | 🔍 CHECK |
+
+### SLIDES WITH MAP DATA
+| Slide | Data Needed | Status |
+|-------|-------------|--------|
+| Map of All Listings | lat/lng coordinates for all properties | 🔍 CHECK |
+
+### SLIDES WITH PROPERTY DATA
+| Slide | Data Needed | Status |
+|-------|-------------|--------|
+| Property Details | Individual comp details | 🔍 CHECK |
+| Property Photos | Photo URLs for each comp | 🔍 CHECK |
+
+---
+
+## PHASE 3: FIX THE CALCULATIONS
+
+### Fix 1: Safe number extraction
+
+Create a utility function that safely extracts prices:
+
+```typescript
+// client/src/lib/cma-utils.ts
+
+/**
+ * Safely get a numeric price from a comparable property
+ * Handles various field names and null/undefined values
+ */
+export function getCompPrice(comp: any): number | null {
+  // Try different price fields in order of preference
+  const priceFields = ['closePrice', 'soldPrice', 'price', 'listPrice'];
+  
+  for (const field of priceFields) {
+    const value = comp?.[field];
+    if (value !== null && value !== undefined) {
+      const num = typeof value === 'string' ? parseFloat(value.replace(/[,$]/g, '')) : value;
+      if (!isNaN(num) && num > 0) {
+        return num;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Safely get sqft from a property
+ */
+export function getCompSqft(comp: any): number | null {
+  const value = comp?.sqft || comp?.livingArea || comp?.squareFeet;
+  if (value !== null && value !== undefined) {
+    const num = typeof value === 'string' ? parseFloat(value.replace(/,/g, '')) : value;
+    if (!isNaN(num) && num > 0) {
+      return num;
+    }
+  }
+  return null;
+}
+
+/**
+ * Calculate stats from comparables with safe null handling
+ */
+export function calculateCompStats(comparables: any[]) {
+  if (!comparables || comparables.length === 0) {
+    return {
+      avgPrice: null,
+      minPrice: null,
+      maxPrice: null,
+      avgPricePerSqft: null,
+      priceRange: null,
+      count: 0,
+    };
+  }
+
+  // Extract valid prices
+  const prices = comparables
+    .map(c => getCompPrice(c))
+    .filter((p): p is number => p !== null);
+
+  // Extract valid price per sqft
+  const pricesPerSqft = comparables
+    .map(c => {
+      const price = getCompPrice(c);
+      const sqft = getCompSqft(c);
+      if (price && sqft) {
+        return Math.round(price / sqft);
+      }
+      return null;
+    })
+    .filter((p): p is number => p !== null);
+
+  const avgPrice = prices.length > 0
+    ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
+    : null;
+
+  const minPrice = prices.length > 0 ? Math.min(...prices) : null;
+  const maxPrice = prices.length > 0 ? Math.max(...prices) : null;
+
+  const avgPricePerSqft = pricesPerSqft.length > 0
+    ? Math.round(pricesPerSqft.reduce((a, b) => a + b, 0) / pricesPerSqft.length)
+    : null;
+
+  return {
+    avgPrice,
+    minPrice,
+    maxPrice,
+    avgPricePerSqft,
+    priceRange: minPrice && maxPrice ? `$${minPrice.toLocaleString()} - $${maxPrice.toLocaleString()}` : null,
+    count: comparables.length,
+  };
+}
+```
+
+### Fix 2: Update the Suggested List Price slide
+
+Find the component and update it to use safe calculations:
+
+```typescript
+import { calculateCompStats, getCompPrice } from '@/lib/cma-utils';
+
+function SuggestedListPriceSlide({ subjectProperty, comparables, suggestedPrice }) {
+  const stats = calculateCompStats(comparables);
+  
+  // Debug logging
+  console.log('[SuggestedListPrice] Stats:', stats);
+  
+  return (
+    <div className="compare-pricing">
+      <div className="stat-box">
+        <span className="label">Avg Price</span>
+        <span className="value">
+          {stats.avgPrice !== null 
+            ? `$${(stats.avgPrice / 1000).toFixed(0)}K`
+            : 'N/A'}
+        </span>
+      </div>
+      
+      <div className="stat-box">
+        <span className="label">Avg $/sqft</span>
+        <span className="value">
+          {stats.avgPricePerSqft !== null
+            ? `$${stats.avgPricePerSqft}`
+            : 'N/A'}
+        </span>
+      </div>
+      
+      <div className="stat-box">
+        <span className="label">Price Range</span>
+        <span className="value">
+          {stats.priceRange || 'N/A'}
+        </span>
+      </div>
+      
+      <div className="stat-box">
+        <span className="label"># Comps</span>
+        <span className="value">{stats.count}</span>
+      </div>
+    </div>
+  );
+}
+```
+
+### Fix 3: Check where comparables data comes from
+
+The slide is getting `# Comps: 10` correctly, so the array exists. But prices are failing.
+
+Find where comparables are fetched and check the data structure:
+
+```typescript
+// In the API route or data fetcher
+app.get('/api/cma/:id/presentation', async (req, res) => {
+  // Fetch comparables
+  const comparables = await fetchComparables(cmaId);
+  
+  // Log to verify data structure
+  console.log('[API] Comparables sample:', comparables[0]);
+  console.log('[API] Price fields available:', {
+    hasPrice: 'price' in comparables[0],
+    hasListPrice: 'listPrice' in comparables[0],
+    hasSoldPrice: 'soldPrice' in comparables[0],
+    hasClosePrice: 'closePrice' in comparables[0],
+  });
+  
+  res.json({ comparables });
+});
+```
+
+---
+
+## PHASE 4: CHECK DATA SOURCE MAPPING
+
+The issue might be that Repliers API returns different field names than expected.
+
+### Repliers API Response Fields
+```typescript
+// Repliers API might return:
+{
+  listPrice: 450000,      // For active listings
+  soldPrice: 435000,      // For sold properties
+  closePrice: 435000,     // Alternative field name
+  // But component might expect just "price"
+}
+```
+
+### Fix the mapping in the API layer
+
+```typescript
+// server/repliers.ts or wherever comparables are fetched
+
+function normalizeComparable(raw: any) {
+  return {
+    ...raw,
+    // Ensure a unified "price" field exists
+    price: raw.closePrice || raw.soldPrice || raw.listPrice,
+    // Ensure sqft is available
+    sqft: raw.sqft || raw.livingArea || raw.squareFeet,
+    // Ensure price per sqft is calculated
+    pricePerSqFt: raw.pricePerSqFt || (
+      (raw.closePrice || raw.soldPrice || raw.listPrice) && 
+      (raw.sqft || raw.livingArea) 
+        ? Math.round((raw.closePrice || raw.soldPrice || raw.listPrice) / (raw.sqft || raw.livingArea))
+        : null
+    ),
+  };
+}
+
+// Apply to all comparables
+const normalizedComparables = rawComparables.map(normalizeComparable);
+```
+
+---
+
+## PHASE 5: UPDATE ALL AFFECTED SLIDES
+
+After creating the `cma-utils.ts`, update these components to use safe calculations:
+
+### List of components to update:
+
+1. **SuggestedListPriceSlide** - Uses avgPrice, avgPricePerSqft, priceRange
+2. **SummaryOfComparablesSlide** - Uses avgPrice, avgPricePerSqft, avgDOM
+3. **PricePerSqFtChartSlide** - Uses price/sqft for each comp
+4. **ComparableStatisticsSlide** - Uses various price stats
+5. **TimeToSellSlide** - Uses days on market
+6. **AdjustmentsTableSlide** - Uses property values
+7. **OnlineValuationSlide** - Uses price estimates
+
+For each component:
+1. Import `calculateCompStats` from `@/lib/cma-utils`
+2. Replace direct property access with safe utility functions
+3. Handle null values with "N/A" or fallback displays
+
+---
+
+## VERIFICATION CHECKLIST
+
+After applying fixes:
+
+- [ ] Suggested List Price shows numeric values (not NaN)
+- [ ] Avg Price shows correctly formatted price
+- [ ] Avg $/sqft shows correctly formatted number
+- [ ] Price Range shows min-max range
+- [ ] Summary of Comparables slide works
+- [ ] Price Per Sq Ft chart renders
+- [ ] Map loads with markers
+- [ ] All 33 slides render without NaN errors
+
+---
+
+## DEBUGGING COMMANDS
+
+Add these to browser console to debug:
+
+```javascript
+// Check if comparables data exists
+console.log('CMA Data:', window.__CMA_DATA__);
+
+// Check a specific comparable's price fields
+const comp = window.__CMA_DATA__?.comparables?.[0];
+console.log('First comparable:', comp);
+console.log('Price fields:', {
+  price: comp?.price,
+  listPrice: comp?.listPrice,
+  soldPrice: comp?.soldPrice,
+  closePrice: comp?.closePrice,
+});
+```
+
+---
+
+## ROOT CAUSE SUMMARY
+
+The `$NaN` errors occur because:
+
+1. **Field name mismatch**: Repliers API returns `closePrice`/`soldPrice`, but code expects `price`
+2. **Missing null checks**: Direct array operations without filtering null values
+3. **Type coercion issues**: String prices not being parsed to numbers
+
+The fix is to:
+1. Create safe utility functions that try multiple field names
+2. Filter out null/undefined before calculations
+3. Display "N/A" when data is unavailable instead of NaN
+
+---
+
+Copy this prompt to Replit to diagnose and fix all the CMA Presentation data issues.

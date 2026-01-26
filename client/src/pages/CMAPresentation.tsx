@@ -66,7 +66,15 @@ export default function CMAPresentation() {
   });
 
   const { data: agentProfileData, isLoading: profileLoading } = useQuery<{
-    profile: AgentProfile | null;
+    profile: {
+      id?: string;
+      userId?: string;
+      title?: string;
+      headshotUrl?: string;
+      bio?: string;
+      defaultCoverLetter?: string;
+      marketingCompany?: string;
+    } | null;
     user: { 
       firstName?: string; 
       lastName?: string;
@@ -82,7 +90,7 @@ export default function CMAPresentation() {
   });
 
   const agentProfile = useMemo(() => {
-    if (!agentProfileData) return { name: '', company: 'Spyglass Realty', phone: '', email: '', photo: '' };
+    if (!agentProfileData) return { name: '', company: 'Spyglass Realty', phone: '', email: '', photo: '', bio: '' };
     
     const { profile, user } = agentProfileData;
     const displayName = user?.marketingDisplayName || 
@@ -91,11 +99,12 @@ export default function CMAPresentation() {
     
     return {
       name: displayName,
-      company: (profile as any)?.marketingCompany || 'Spyglass Realty',
+      company: profile?.marketingCompany || 'Spyglass Realty',
       phone: user?.marketingPhone || '',
       email: user?.marketingEmail || '',
-      photo: user?.marketingHeadshotUrl || (profile as any)?.headshotUrl || user?.profileImageUrl || '',
-      title: (profile as any)?.title || user?.marketingTitle || '',
+      photo: user?.marketingHeadshotUrl || profile?.headshotUrl || user?.profileImageUrl || '',
+      title: profile?.title || user?.marketingTitle || '',
+      bio: profile?.bio || '',
     };
   }, [agentProfileData]);
 
