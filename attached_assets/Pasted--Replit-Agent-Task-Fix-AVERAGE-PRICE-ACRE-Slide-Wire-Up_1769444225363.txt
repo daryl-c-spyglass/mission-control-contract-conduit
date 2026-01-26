@@ -1,0 +1,500 @@
+# Replit Agent Task: Fix AVERAGE PRICE/ACRE Slide - Wire Up Repliers Lot Data
+
+## Overview
+
+The "Average Price/Acre" slide is showing "$0 / ACRE" and "No properties with acreage data" because lot size data isn't being pulled from Repliers API correctly.
+
+**Reference:** CloudCMA's implementation (see attached screenshots)
+
+---
+
+## Non-Negotiables (Project Rules)
+
+- **Repliers API ONLY** (no other data sources)
+- **MLS: ACTRIS**
+- **Exclude Lease listings globally** (`type === "Sale"` only)
+- **No silent fallbacks** - If API fails, show error state, not "0 comps"
+- **Single source of truth** - Use same comps dataset as other slides
+
+---
+
+## Part 1: Repliers API Fields for Lot Size
+
+### Lot Size Fields (from Repliers `lot` object)
+
+From Repliers documentation, lot data is inside the `lot` object:
+
+```typescript
+// Repliers returns lot data in the `lot` object
+interface RepliersLotData {
+  lot?: {
+    acres?: number;        // Direct acres value (PREFERRED)
+    squareFeet?: number;   // Square feet (convert: ÷ 43560)
+    size?: string;         // String representation
+  };
+}
+```
+
+**Important:** Repliers documents that `1 acre = 43,560 sqft` for lot size filtering.
+
+### Other Required Fields
+
+```typescript
+// Pricing
+listPrice: number;         // Current asking price
+soldPrice?: number;        // Final sale price (for closed)
+originalPrice?: number;    // Original asking price
+soldDate?: string;         // Close date
+
+// Status
+status: string;            // "A", "U", "S", etc.
+lastStatus?: string;       // More granular lifecycle codes
+type: string;              // "Sale" or "Lease" - USE SALE ONLY
+
+// Identification
+mlsNumber: string;
+address: string;
+images?: string[];         // For thumbnails
+```
+
+---
+
+## Part 2: Create Normalized Acres Utility
+
+### Create shared utility function
+
+**File:** `server/utils/lotSize.ts` (or add to existing utils)
+
+```typescript
+/**
+ * Normalizes lot size to acres from Repliers listing data
+ * @param listing - Repliers listing object
+ * @returns number (acres) or null if no lot data available
+ * 
+ * Conversion: 1 acre = 43,560 square feet
+ * Source: Repliers Help Center - Lot Size Filtering
+ */
+export function normalizedAcres(listing: any): number | null {
+  // Priority 1: Direct acres value from lot object
+  if (listing.lot?.acres && listing.lot.acres > 0) {
+    return listing.lot.acres;
+  }
+  
+  // Priority 2: Convert lot.squareFeet to acres
+  if (listing.lot?.squareFeet && listing.lot.squareFeet > 0) {
+    return listing.lot.squareFeet / 43560;
+  }
+  
+  // Priority 3: Try lotSize at root level (backup)
+  if (listing.lotSize && listing.lotSize > 0) {
+    // If > 100, assume sqft; otherwise assume acres
+    return listing.lotSize > 100 ? listing.lotSize / 43560 : listing.lotSize;
+  }
+  
+  // Priority 4: Try lotSizeArea (backup)
+  if (listing.lotSizeArea && listing.lotSizeArea > 0) {
+    return listing.lotSizeArea > 100 ? listing.lotSizeArea / 43560 : listing.lotSizeArea;
+  }
+  
+  // No lot data available
+  return null;
+}
+
+/**
+ * Calculate price per acre
+ */
+export function calculatePricePerAcre(price: number, acres: number | null): number | null {
+  if (!acres || acres <= 0 || !price || price <= 0) return null;
+  return Math.round(price / acres);
+}
+```
+
+---
+
+## Part 3: Update Repliers Data Mapping
+
+### In `server/repliers.ts`
+
+Find where listings are mapped and ADD lot size fields:
+
+```typescript
+import { normalizedAcres, calculatePricePerAcre } from './utils/lotSize';
+
+// In the listing mapping function
+const mapRepliersListing = (listing: any) => {
+  // Calculate acres using the utility
+  const acres = normalizedAcres(listing);
+  const price = listing.soldPrice || listing.listPrice;
+  const pricePerAcre = calculatePricePerAcre(price, acres);
+  
+  return {
+    // ... existing fields ...
+    mlsNumber: listing.mlsNumber,
+    address: listing.address,
+    listPrice: listing.listPrice,
+    soldPrice: listing.soldPrice,
+    originalPrice: listing.originalPrice,
+    soldDate: listing.soldDate,
+    status: listing.status,
+    lastStatus: listing.lastStatus,
+    type: listing.type,  // "Sale" or "Lease"
+    
+    // === ADD THESE LOT SIZE FIELDS ===
+    lot: {
+      acres: listing.lot?.acres || null,
+      squareFeet: listing.lot?.squareFeet || null,
+      size: listing.lot?.size || null,
+    },
+    lotSizeAcres: acres,           // Normalized acres (calculated)
+    lotSizeSquareFeet: listing.lot?.squareFeet || null,
+    pricePerAcre: pricePerAcre,    // Calculated price/acre
+    
+    // ... rest of existing fields ...
+  };
+};
+```
+
+### Filter out Lease listings (CRITICAL)
+
+```typescript
+// When fetching comps, ALWAYS exclude leases
+const fetchComparables = async (params) => {
+  const response = await repliersApi.get('/listings', {
+    params: {
+      ...params,
+      type: 'Sale',  // CRITICAL: Exclude leases
+    }
+  });
+  
+  // Double-check filter (belt and suspenders)
+  return response.data.listings
+    .filter(listing => listing.type === 'Sale')
+    .map(mapRepliersListing);
+};
+```
+
+---
+
+## Part 4: Update CmaProperty Interface
+
+### In `shared/types.ts` or `types/index.ts`
+
+```typescript
+export interface CmaProperty {
+  // ... existing fields ...
+  
+  // === ADD LOT SIZE FIELDS ===
+  lot?: {
+    acres?: number | null;
+    squareFeet?: number | null;
+    size?: string | null;
+  };
+  lotSizeAcres?: number | null;      // Normalized acres
+  lotSizeSquareFeet?: number | null; // Raw square feet
+  pricePerAcre?: number | null;      // Calculated $/acre
+}
+```
+
+---
+
+## Part 5: Update cma-tab.tsx Mapping (if applicable)
+
+### Ensure lot data flows through to the slide
+
+```typescript
+// In the comparable mapping (around line 281-312)
+return {
+  // ... existing fields ...
+  
+  // === ADD LOT SIZE MAPPING ===
+  lot: c.lot || null,
+  lotSizeAcres: c.lotSizeAcres || normalizedAcres(c) || null,
+  lotSizeSquareFeet: c.lot?.squareFeet || c.lotSizeSquareFeet || null,
+  pricePerAcre: c.pricePerAcre || calculatePricePerAcre(
+    c.soldPrice || c.listPrice, 
+    c.lotSizeAcres || normalizedAcres(c)
+  ),
+};
+
+// In the subject property mapping (around line 314-342)
+const subjectProperty = {
+  // ... existing fields ...
+  
+  // === ADD LOT SIZE FOR SUBJECT ===
+  lot: mlsData.lot || null,
+  lotSizeAcres: mlsData.lotSizeAcres || normalizedAcres(mlsData) || null,
+  lotSizeSquareFeet: mlsData.lot?.squareFeet || null,
+  pricePerAcre: mlsData.pricePerAcre || null,
+};
+```
+
+---
+
+## Part 6: Status Color Mapping
+
+### Consistent colors across chart, sidebar, and legend
+
+```typescript
+// Status → Color mapping (matches CloudCMA)
+const getStatusColor = (status: string): string => {
+  const s = (status || '').toUpperCase();
+  
+  // SOLD/CLOSED = RED
+  if (['CLOSED', 'SOLD', 'S'].some(x => s.includes(x))) {
+    return '#EF4444';
+  }
+  
+  // PENDING/UNDER CONTRACT = YELLOW
+  if (['PENDING', 'CONTRACT', 'U', 'P'].some(x => s.includes(x))) {
+    return '#F59E0B';
+  }
+  
+  // ACTIVE = GREEN
+  if (['ACTIVE', 'A'].some(x => s === x || s.includes(x))) {
+    return '#22C55E';
+  }
+  
+  // EXPIRED/CANCELED/WITHDRAWN = BLUE
+  if (['EXPIRED', 'CANCEL', 'WITHDRAWN', 'TERMINAT', 'X', 'W', 'T'].some(x => s.includes(x))) {
+    return '#3B82F6';
+  }
+  
+  return '#6B7280'; // Gray fallback
+};
+
+// Status bucket for grouping
+const getStatusBucket = (status: string): 'Closed' | 'Under Contract' | 'Active' | 'Expired' | 'Other' => {
+  const s = (status || '').toUpperCase();
+  
+  if (['CLOSED', 'SOLD', 'S'].some(x => s.includes(x))) return 'Closed';
+  if (['PENDING', 'CONTRACT', 'U', 'P'].some(x => s.includes(x))) return 'Under Contract';
+  if (['ACTIVE', 'A'].some(x => s === x)) return 'Active';
+  if (['EXPIRED', 'CANCEL', 'WITHDRAWN', 'X', 'W', 'T'].some(x => s.includes(x))) return 'Expired';
+  
+  return 'Other';
+};
+```
+
+---
+
+## Part 7: Chart Computations
+
+### Filter and process data
+
+```typescript
+// 1. Filter to Sale-only with valid acreage
+const propertiesWithAcreage = comparables.filter(p => {
+  if (p.type === 'Lease') return false;  // Exclude leases
+  const acres = p.lotSizeAcres;
+  return acres !== null && acres !== undefined && acres > 0;
+});
+
+// 2. Group by status
+const groupedByStatus = {
+  closed: propertiesWithAcreage.filter(p => getStatusBucket(p.status) === 'Closed'),
+  underContract: propertiesWithAcreage.filter(p => getStatusBucket(p.status) === 'Under Contract'),
+  active: propertiesWithAcreage.filter(p => getStatusBucket(p.status) === 'Active'),
+  expired: propertiesWithAcreage.filter(p => getStatusBucket(p.status) === 'Expired'),
+};
+
+// 3. Calculate average $/acre from SOLD comps ONLY
+const soldWithAcreage = groupedByStatus.closed.filter(p => 
+  p.soldPrice && p.soldPrice > 0 && p.lotSizeAcres && p.lotSizeAcres > 0
+);
+
+const avgPricePerAcre = soldWithAcreage.length > 0
+  ? Math.round(
+      soldWithAcreage.reduce((sum, p) => sum + (p.soldPrice! / p.lotSizeAcres!), 0) 
+      / soldWithAcreage.length
+    )
+  : null;
+
+// 4. Prepare scatter data
+// X-axis: Acres
+// Y-axis: Price (soldPrice for closed, listPrice for others)
+const scatterData = propertiesWithAcreage.map(p => ({
+  ...p,
+  x: p.lotSizeAcres,
+  y: getStatusBucket(p.status) === 'Closed' ? p.soldPrice : p.listPrice,
+  color: getStatusColor(p.status),
+}));
+```
+
+### Trendline (based on SOLD only)
+
+```typescript
+// Trendline shows average price per acre slope through sold listings
+const calculateTrendline = (soldData: CmaProperty[]) => {
+  const validSold = soldData.filter(p => 
+    p.lotSizeAcres && p.lotSizeAcres > 0 && p.soldPrice && p.soldPrice > 0
+  );
+  
+  if (validSold.length < 2) return null;
+  
+  // Simple linear regression or just use average price per acre
+  const avgPricePerAcre = validSold.reduce((sum, p) => 
+    sum + (p.soldPrice! / p.lotSizeAcres!), 0
+  ) / validSold.length;
+  
+  const allAcres = propertiesWithAcreage.map(p => p.lotSizeAcres!);
+  const minAcres = Math.min(...allAcres) * 0.9;
+  const maxAcres = Math.max(...allAcres) * 1.1;
+  
+  return {
+    // Line: y = avgPricePerAcre * x
+    start: { x: minAcres, y: avgPricePerAcre * minAcres },
+    end: { x: maxAcres, y: avgPricePerAcre * maxAcres },
+  };
+};
+```
+
+---
+
+## Part 8: Debug Logging (REQUIRED)
+
+### Add server-side logging
+
+```typescript
+// In the data processing function
+const processCompsForPriceAcre = (comps: any[]) => {
+  const totalReceived = comps.length;
+  const salesOnly = comps.filter(c => c.type === 'Sale');
+  const leasesFiltered = totalReceived - salesOnly.length;
+  
+  const withAcreage = salesOnly.filter(c => {
+    const acres = c.lotSizeAcres || normalizedAcres(c);
+    return acres !== null && acres > 0;
+  });
+  const missingAcreage = salesOnly.length - withAcreage.length;
+  
+  const soldWithAcreage = withAcreage.filter(c => 
+    getStatusBucket(c.status) === 'Closed' && c.soldPrice > 0
+  );
+  
+  console.log('=== [AVERAGE PRICE/ACRE] Data Pipeline ===');
+  console.log({
+    totalCompsReceived: totalReceived,
+    leasesFilteredOut: leasesFiltered,
+    salesCompsRemaining: salesOnly.length,
+    compsWithAcreage: withAcreage.length,
+    compsMissingAcreage: missingAcreage,
+    soldCompsForAvgCalculation: soldWithAcreage.length,
+  });
+  
+  // Log sample of 3 properties
+  if (withAcreage.length > 0) {
+    console.log('Sample points:', withAcreage.slice(0, 3).map(c => ({
+      mlsNumber: c.mlsNumber,
+      acres: c.lotSizeAcres?.toFixed(2),
+      price: c.soldPrice || c.listPrice,
+      status: c.status,
+      pricePerAcre: c.pricePerAcre,
+      lotData: c.lot,
+    })));
+  } else {
+    console.log('⚠️ NO PROPERTIES WITH ACREAGE DATA');
+    console.log('Sample of lot fields from first 3 comps:', salesOnly.slice(0, 3).map(c => ({
+      mlsNumber: c.mlsNumber,
+      lot: c.lot,
+      lotSize: c.lotSize,
+      lotSizeArea: c.lotSizeArea,
+    })));
+  }
+  
+  return withAcreage;
+};
+```
+
+---
+
+## Part 9: Acceptance Criteria
+
+### Must Pass:
+
+| Criteria | Check |
+|----------|-------|
+| Scatter plot renders when comps have `lot.acres` or `lot.squareFeet` | ☐ |
+| Rentals/leases (`type="Lease"`) never appear | ☐ |
+| Headline avg $/acre from SOLD comps using `soldPrice / acres` | ☐ |
+| Status colors: Red=Sold, Yellow=Pending, Green=Active, Blue=Expired | ☐ |
+| Trendline drawn through sold listings | ☐ |
+| Subject property shown as blue diamond | ☐ |
+| Clicking dot/sidebar opens property modal | ☐ |
+| API errors show error UI, not "0 comps" | ☐ |
+| "No acreage data" only when comps exist but none have lot size | ☐ |
+| Console logs show data pipeline counts | ☐ |
+
+### Unit Tests:
+
+```typescript
+// Test: 43,560 sqft = 1 acre
+expect(normalizedAcres({ lot: { squareFeet: 43560 } })).toBe(1);
+expect(normalizedAcres({ lot: { squareFeet: 21780 } })).toBe(0.5);
+
+// Test: Direct acres preferred over sqft
+expect(normalizedAcres({ lot: { acres: 0.25, squareFeet: 10890 } })).toBe(0.25);
+
+// Test: Null when no lot data
+expect(normalizedAcres({ lot: {} })).toBeNull();
+expect(normalizedAcres({})).toBeNull();
+
+// Test: Lease exclusion
+const comps = [{ type: 'Sale', lot: { acres: 0.5 }}, { type: 'Lease', lot: { acres: 0.5 }}];
+expect(comps.filter(c => c.type === 'Sale').length).toBe(1);
+```
+
+---
+
+## Part 10: Verification Steps After Implementation
+
+### Check Console Logs:
+
+```
+=== [AVERAGE PRICE/ACRE] Data Pipeline ===
+{
+  totalCompsReceived: 15,
+  leasesFilteredOut: 0,
+  salesCompsRemaining: 15,
+  compsWithAcreage: 12,
+  compsMissingAcreage: 3,
+  soldCompsForAvgCalculation: 8
+}
+Sample points: [
+  { mlsNumber: 'ACT123', acres: '0.25', price: 450000, pricePerAcre: 1800000 },
+  ...
+]
+```
+
+### Visual Verification:
+
+1. ☐ Header shows calculated avg (e.g., "$4,957,228 / ACRE")
+2. ☐ Scatter plot has colored dots
+3. ☐ Left sidebar lists properties with $/acre
+4. ☐ Trendline visible on chart
+5. ☐ Subject property diamond visible
+6. ☐ Clicking dot opens modal with property details
+
+---
+
+## Summary: Files to Modify
+
+| File | Change |
+|------|--------|
+| `server/utils/lotSize.ts` | **NEW** - Create `normalizedAcres()` utility |
+| `server/repliers.ts` | Add `lot`, `lotSizeAcres`, `pricePerAcre` mapping |
+| `shared/types.ts` | Add lot fields to `CmaProperty` interface |
+| `client/.../cma-tab.tsx` | Ensure lot data passes through |
+| `client/.../AveragePricePerAcreSlide.tsx` | Use real data + debug logging |
+
+---
+
+## Key Repliers Fields Summary
+
+```
+lot.acres        → Direct acres (use first if available)
+lot.squareFeet   → Convert: ÷ 43,560 = acres
+type             → "Sale" only (exclude "Lease")
+soldPrice        → Use for CLOSED comps
+listPrice        → Use for ACTIVE/PENDING comps
+status           → Determine color (A/U/S/X/etc.)
+```

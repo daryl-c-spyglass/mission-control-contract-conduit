@@ -1,5 +1,6 @@
 // Real Repliers MLS API integration using REPLIERS_API_KEY
 import { isRentalOrLease, excludeRentals } from "../shared/lib/listings";
+import { normalizedAcres, normalizedLotSquareFeet, calculatePricePerAcre, buildLotSizeData } from "./utils/lotSize";
 
 const REPLIERS_API_BASE = "https://api.repliers.io";
 const REPLIERS_CDN_BASE = "https://cdn.repliers.io/";
@@ -54,6 +55,14 @@ export interface MLSListingData {
   halfBaths: number;
   sqft: number;
   lotSize: string;
+  lot: {
+    acres: number | null;
+    squareFeet: number | null;
+    size: string | null;
+  };
+  lotSizeAcres: number | null;
+  lotSizeSquareFeet: number | null;
+  pricePerAcre: number | null;
   yearBuilt: number;
   propertyType: string;
   propertyStyle: string;
@@ -166,6 +175,17 @@ export interface CMAComparable {
     latitude: number;
     longitude: number;
   };
+  lot?: {
+    acres: number | null;
+    squareFeet: number | null;
+    size: string | null;
+  };
+  lotSizeAcres?: number | null;
+  lotSizeSquareFeet?: number | null;
+  pricePerAcre?: number | null;
+  soldPrice?: number | null;
+  listPrice?: number;
+  type?: string;
 }
 
 function normalizeImageUrls(images: any): string[] {
@@ -373,6 +393,13 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
       halfBaths: listing.bathroomsHalf || listing.details?.halfBaths || 0,
       sqft: listing.livingArea || listing.buildingAreaTotal || listing.details?.sqft || listing.sqft || 0,
       lotSize: buildLotSize(listing),
+      lot: buildLotSizeData(listing),
+      lotSizeAcres: normalizedAcres(listing),
+      lotSizeSquareFeet: normalizedLotSquareFeet(listing),
+      pricePerAcre: calculatePricePerAcre(
+        listing.soldPrice ? parseFloat(listing.soldPrice) : parseFloat(listing.listPrice) || 0,
+        normalizedAcres(listing)
+      ),
       yearBuilt: listing.yearBuilt || listing.details?.yearBuilt || 0,
       propertyType: listing.propertyType || listing.details?.propertyType || listing.class || "Residential",
       propertyStyle: listing.architecturalStyle || listing.details?.style || "",

@@ -35,6 +35,14 @@ export interface CmaProperty {
   beds: number;
   baths: number;
   lotSize?: number;
+  lot?: {
+    acres: number | null;
+    squareFeet: number | null;
+    size: string | null;
+  };
+  lotSizeAcres?: number | null;
+  lotSizeSquareFeet?: number | null;
+  pricePerAcre?: number | null;
   yearBuilt?: number;
   garageSpaces?: number;
   status: 'Active' | 'Pending' | 'Closed' | 'Active Under Contract' | 'Expired' | 'Canceled' | 'Withdrawn';
@@ -49,6 +57,7 @@ export interface CmaProperty {
   longitude?: number;
   acres?: number;
   description?: string;
+  type?: string;
 }
 
 export interface CmaPresentationData {

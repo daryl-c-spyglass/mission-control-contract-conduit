@@ -284,6 +284,10 @@ export function CMATab({ transaction }: CMATabProps) {
       const c = comp as any;
       const sqft = typeof c.sqft === 'number' ? c.sqft : parseFloat(c.sqft as string) || 0;
       const price = c.soldPrice || c.closePrice || c.price || 0;
+      const lotAcres = c.lotSizeAcres ?? c.lot?.acres ?? (c.lotSizeSquareFeet ? c.lotSizeSquareFeet / 43560 : null);
+      const lotSqft = c.lotSizeSquareFeet ?? c.lot?.squareFeet ?? (c.lotSizeAcres ? c.lotSizeAcres * 43560 : null);
+      const calculatedPricePerAcre = lotAcres && lotAcres > 0 && price > 0 ? Math.round(price / lotAcres) : null;
+      
       return {
         id: c.mlsNumber || `comp-${index}`,
         address: c.address || '',
@@ -291,12 +295,17 @@ export function CMATab({ transaction }: CMATabProps) {
         state: c.state || 'TX',
         zipCode: c.zipCode || '',
         price: c.price,
+        listPrice: c.listPrice || c.price,
         soldPrice: c.soldPrice || c.closePrice,
         originalPrice: c.originalPrice || c.listPrice,
         sqft: sqft,
         beds: c.bedrooms || 0,
         baths: c.bathrooms || 0,
         lotSize: typeof c.lotSize === 'number' ? c.lotSize : undefined,
+        lot: c.lot || { acres: lotAcres, squareFeet: lotSqft, size: null },
+        lotSizeAcres: lotAcres,
+        lotSizeSquareFeet: lotSqft,
+        pricePerAcre: c.pricePerAcre ?? calculatedPricePerAcre,
         yearBuilt: typeof c.yearBuilt === 'number' ? c.yearBuilt : undefined,
         garageSpaces: c.garageSpaces,
         status: normalizeStatusLabel(c.status || ''),
@@ -306,8 +315,9 @@ export function CMATab({ transaction }: CMATabProps) {
         photos: c.photos || [],
         latitude: c.map?.latitude || c.latitude,
         longitude: c.map?.longitude || c.longitude,
-        acres: c.acres,
+        acres: c.acres || lotAcres,
         description: c.description || c.remarks || c.publicRemarks || '',
+        type: c.type || 'Sale',
       };
     });
   }, [cmaData]);
@@ -320,6 +330,11 @@ export function CMATab({ transaction }: CMATabProps) {
     const price = transaction.listPrice || mlsData.listPrice || mlsData.price || 0;
     const lat = mlsData.coordinates?.latitude || mlsData.map?.latitude || mlsData.latitude;
     const lng = mlsData.coordinates?.longitude || mlsData.map?.longitude || mlsData.longitude;
+    
+    const lotAcres = mlsData.lotSizeAcres ?? mlsData.lot?.acres ?? (mlsData.lotSizeSquareFeet ? mlsData.lotSizeSquareFeet / 43560 : null);
+    const lotSqft = mlsData.lotSizeSquareFeet ?? mlsData.lot?.squareFeet ?? (mlsData.lotSizeAcres ? mlsData.lotSizeAcres * 43560 : null);
+    const calculatedPricePerAcre = lotAcres && lotAcres > 0 && price > 0 ? Math.round(price / lotAcres) : null;
+    
     return {
       id: transaction.mlsNumber || transaction.id,
       mlsNumber: transaction.mlsNumber || mlsData.mlsNumber || '',
@@ -328,10 +343,15 @@ export function CMATab({ transaction }: CMATabProps) {
       state: mlsData.state || 'TX',
       zipCode: mlsData.zipCode || '',
       price: price,
+      listPrice: mlsData.listPrice || price,
       sqft: sqft,
       beds: mlsData.bedrooms || transaction.bedrooms || 0,
       baths: mlsData.bathrooms || transaction.bathrooms || 0,
       lotSize: mlsData.lotSize ? parseFloat(mlsData.lotSize) : undefined,
+      lot: mlsData.lot || { acres: lotAcres, squareFeet: lotSqft, size: null },
+      lotSizeAcres: lotAcres,
+      lotSizeSquareFeet: lotSqft,
+      pricePerAcre: mlsData.pricePerAcre ?? calculatedPricePerAcre,
       yearBuilt: mlsData.yearBuilt ? parseInt(mlsData.yearBuilt, 10) : undefined,
       status: normalizeStatusLabel(mlsStatus),
       daysOnMarket: mlsData.daysOnMarket || mlsData.simpleDaysOnMarket || 0,
@@ -340,7 +360,9 @@ export function CMATab({ transaction }: CMATabProps) {
       isSubject: true,
       latitude: lat,
       longitude: lng,
+      acres: lotAcres ?? undefined,
       description: mlsData.description || mlsData.publicRemarks || mlsData.remarks || '',
+      type: 'Sale',
     };
   }, [mlsData, transaction, mlsStatus]);
 
