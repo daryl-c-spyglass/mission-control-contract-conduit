@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3, Map as MapIcon, TrendingUp, List, LayoutGrid, Table2, Bed, Bath, Square, Clock, MapPin } from 'lucide-react';
 import { CMAMap } from '@/components/cma-map';
+import { PropertyDetailModal } from './PropertyDetailModal';
 import type { CmaProperty } from '../types';
 import type { Property } from '@shared/schema';
 
@@ -142,11 +143,20 @@ function StatItem({
   );
 }
 
-function PropertyCard({ property, isSubject = false }: { property: CmaProperty; isSubject?: boolean }) {
+function PropertyCard({ property, isSubject = false, onClick }: { property: CmaProperty; isSubject?: boolean; onClick?: () => void }) {
   return (
     <Card 
-      className={`overflow-hidden ${isSubject ? 'border-[#EF4923] border-2' : ''}`}
+      className={`overflow-hidden cursor-pointer hover:shadow-lg transition-shadow ${isSubject ? 'border-[#EF4923] border-2' : ''}`}
       data-testid={`property-card-${property.id}`}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
     >
       <div className="relative aspect-[4/3]">
         {property.photos?.[0] ? (
@@ -203,11 +213,20 @@ function PropertyCard({ property, isSubject = false }: { property: CmaProperty; 
   );
 }
 
-function PropertyListItem({ property, isSubject = false }: { property: CmaProperty; isSubject?: boolean }) {
+function PropertyListItem({ property, isSubject = false, onClick }: { property: CmaProperty; isSubject?: boolean; onClick?: () => void }) {
   return (
     <Card 
-      className={`p-4 flex gap-4 flex-wrap ${isSubject ? 'border-[#EF4923] border-2' : ''}`}
+      className={`p-4 flex gap-4 flex-wrap cursor-pointer hover:shadow-lg transition-shadow ${isSubject ? 'border-[#EF4923] border-2' : ''}`}
       data-testid={`property-list-${property.id}`}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
     >
       <div className="w-32 h-24 flex-shrink-0 rounded overflow-hidden">
         {property.photos?.[0] ? (
@@ -246,7 +265,7 @@ function PropertyListItem({ property, isSubject = false }: { property: CmaProper
   );
 }
 
-function PropertyTable({ comparables, subjectProperty }: { comparables: CmaProperty[]; subjectProperty?: CmaProperty }) {
+function PropertyTable({ comparables, subjectProperty, onPropertyClick }: { comparables: CmaProperty[]; subjectProperty?: CmaProperty; onPropertyClick?: (property: CmaProperty) => void }) {
   const allProperties = subjectProperty ? [subjectProperty, ...comparables] : comparables;
   
   return (
@@ -268,8 +287,16 @@ function PropertyTable({ comparables, subjectProperty }: { comparables: CmaPrope
           {allProperties.map((property, index) => (
             <tr 
               key={property.id} 
-              className={`border-b hover:bg-muted/50 ${property.isSubject ? 'bg-[#EF4923]/10' : ''}`}
+              className={`border-b hover:bg-muted/50 cursor-pointer ${property.isSubject ? 'bg-[#EF4923]/10' : ''}`}
               data-testid={`property-row-${property.id}`}
+              onClick={() => onPropertyClick?.(property)}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onPropertyClick?.(property);
+                }
+              }}
             >
               <td className="p-3 max-w-[200px] truncate" data-testid={`table-address-${index}`}>{property.address}</td>
               <td className="p-3" data-testid={`table-status-${index}`}>
@@ -325,6 +352,7 @@ export function CompsWidget({ comparables, subjectProperty }: CompsWidgetProps) 
   const [mainView, setMainView] = useState<'compare' | 'map' | 'stats' | 'list'>('compare');
   const [subView, setSubView] = useState<'grid' | 'list' | 'table'>('grid');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedProperty, setSelectedProperty] = useState<CmaProperty | null>(null);
 
   const filteredComparables = useMemo(() => {
     if (statusFilter === 'all') return comparables;
@@ -451,27 +479,44 @@ export function CompsWidget({ comparables, subjectProperty }: CompsWidgetProps) 
             {subView === 'grid' && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="grid-view">
                 {subjectProperty && (
-                  <PropertyCard property={{...subjectProperty, isSubject: true}} isSubject />
+                  <PropertyCard 
+                    property={{...subjectProperty, isSubject: true}} 
+                    isSubject 
+                    onClick={() => setSelectedProperty({...subjectProperty, isSubject: true})}
+                  />
                 )}
                 {filteredComparables.map(comp => (
-                  <PropertyCard key={comp.id} property={comp} />
+                  <PropertyCard 
+                    key={comp.id} 
+                    property={comp} 
+                    onClick={() => setSelectedProperty(comp)}
+                  />
                 ))}
               </div>
             )}
             {subView === 'list' && (
               <div className="space-y-3" data-testid="list-view">
                 {subjectProperty && (
-                  <PropertyListItem property={{...subjectProperty, isSubject: true}} isSubject />
+                  <PropertyListItem 
+                    property={{...subjectProperty, isSubject: true}} 
+                    isSubject 
+                    onClick={() => setSelectedProperty({...subjectProperty, isSubject: true})}
+                  />
                 )}
                 {filteredComparables.map(comp => (
-                  <PropertyListItem key={comp.id} property={comp} />
+                  <PropertyListItem 
+                    key={comp.id} 
+                    property={comp} 
+                    onClick={() => setSelectedProperty(comp)}
+                  />
                 ))}
               </div>
             )}
             {subView === 'table' && (
               <PropertyTable 
                 comparables={filteredComparables} 
-                subjectProperty={subjectProperty ? {...subjectProperty, isSubject: true} : undefined} 
+                subjectProperty={subjectProperty ? {...subjectProperty, isSubject: true} : undefined}
+                onPropertyClick={setSelectedProperty}
               />
             )}
           </>
@@ -551,10 +596,18 @@ export function CompsWidget({ comparables, subjectProperty }: CompsWidgetProps) 
         {mainView === 'list' && (
           <PropertyTable 
             comparables={filteredComparables} 
-            subjectProperty={subjectProperty ? {...subjectProperty, isSubject: true} : undefined} 
+            subjectProperty={subjectProperty ? {...subjectProperty, isSubject: true} : undefined}
+            onPropertyClick={setSelectedProperty}
           />
         )}
       </div>
+
+      {selectedProperty && (
+        <PropertyDetailModal
+          property={selectedProperty}
+          onClose={() => setSelectedProperty(null)}
+        />
+      )}
     </div>
   );
 }

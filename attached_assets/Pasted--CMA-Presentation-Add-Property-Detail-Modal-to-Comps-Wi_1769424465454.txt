@@ -1,0 +1,361 @@
+# CMA Presentation — Add Property Detail Modal to Comps Widget
+
+## Objective
+
+Make property cards in the CMA Presentation Comps widget **clickable** to open a modal showing full property details, matching the existing CMA tab's property modal.
+
+---
+
+## Modal Design (from screenshot)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 321 Delayne DR                              9.4 mi away  X │
+│ MLS# ACT3841116                                            │
+├─────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │                                                         │ │
+│ │                    [Main Photo]                         │ │
+│ │                                                         │ │
+│ │                                            1 / 40       │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│                                                             │
+│ [thumb1] [thumb2] [thumb3] [thumb4] [thumb5] [thumb6]...   │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│ Price              Price/SqFt                              │
+│ $2,099,900         $587                                    │
+│                                                             │
+│ Bedrooms           Bathrooms                               │
+│ 4                  4                                       │
+│                                                             │
+│ Square Feet        Days on Market                          │
+│ 3578               0                                       │
+│                                                             │
+│ Status             List Date                               │
+│ [Closed]           Jul 29, 2025                            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Implementation
+
+### Step 1: Add State for Modal
+
+```tsx
+// In CompsWidget.tsx
+const [selectedProperty, setSelectedProperty] = useState<CmaProperty | null>(null);
+```
+
+### Step 2: Make Property Cards Clickable
+
+```tsx
+// Update PropertyCard to be clickable
+<button
+  onClick={() => setSelectedProperty(property)}
+  className="w-full text-left rounded-lg border overflow-hidden hover:shadow-lg 
+             transition-shadow cursor-pointer focus:outline-none focus:ring-2 
+             focus:ring-[#EF4923] focus:ring-offset-2"
+>
+  {/* Card content */}
+</button>
+```
+
+### Step 3: Create PropertyDetailModal Component
+
+```tsx
+// components/cma-presentation/widgets/PropertyDetailModal.tsx
+
+import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import { CmaProperty } from '../types';
+
+interface PropertyDetailModalProps {
+  property: CmaProperty;
+  onClose: () => void;
+}
+
+export function PropertyDetailModal({ property, onClose }: PropertyDetailModalProps) {
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const photos = property.photos || [];
+  
+  const handlePrevPhoto = () => {
+    setCurrentPhotoIndex(prev => (prev > 0 ? prev - 1 : photos.length - 1));
+  };
+  
+  const handleNextPhoto = () => {
+    setCurrentPhotoIndex(prev => (prev < photos.length - 1 ? prev + 1 : 0));
+  };
+  
+  // Close on ESC key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft') handlePrevPhoto();
+      if (e.key === 'ArrowRight') handleNextPhoto();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+  
+  const getStatusColor = (status: string) => {
+    const s = status.toLowerCase();
+    if (s.includes('closed')) return 'bg-red-500';
+    if (s.includes('active') && !s.includes('under')) return 'bg-green-500';
+    if (s.includes('pending') || s.includes('under')) return 'bg-yellow-500';
+    return 'bg-gray-500';
+  };
+  
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+    }).format(value);
+  };
+  
+  return (
+    <>
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black/60 z-50"
+        onClick={onClose}
+      />
+      
+      {/* Modal */}
+      <div className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 
+                      md:w-full md:max-w-2xl md:max-h-[90vh] 
+                      bg-white rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col">
+        
+        {/* Header */}
+        <div className="flex items-start justify-between p-4 border-b">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">{property.address}</h2>
+            <p className="text-sm text-gray-500">MLS# {property.mlsNumber || property.id}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {property.distance && (
+              <span className="text-sm text-gray-500">{property.distance} mi away</span>
+            )}
+            <button
+              onClick={onClose}
+              className="min-w-[44px] min-h-[44px] p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              aria-label="Close modal"
+            >
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+        </div>
+        
+        {/* Photo Gallery */}
+        <div className="relative">
+          {/* Main Photo */}
+          <div className="relative aspect-[16/10] bg-gray-100">
+            {photos.length > 0 ? (
+              <img
+                src={photos[currentPhotoIndex]}
+                alt={`${property.address} - Photo ${currentPhotoIndex + 1}`}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                No photos available
+              </div>
+            )}
+            
+            {/* Photo Counter */}
+            {photos.length > 1 && (
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 
+                              px-3 py-1 bg-black/60 text-white text-sm rounded-full">
+                {currentPhotoIndex + 1} / {photos.length}
+              </div>
+            )}
+            
+            {/* Navigation Arrows */}
+            {photos.length > 1 && (
+              <>
+                <button
+                  onClick={handlePrevPhoto}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 
+                             min-w-[44px] min-h-[44px] p-2 bg-white/80 rounded-full 
+                             hover:bg-white transition-colors shadow-lg"
+                  aria-label="Previous photo"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={handleNextPhoto}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 
+                             min-w-[44px] min-h-[44px] p-2 bg-white/80 rounded-full 
+                             hover:bg-white transition-colors shadow-lg"
+                  aria-label="Next photo"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </>
+            )}
+          </div>
+          
+          {/* Thumbnail Strip */}
+          {photos.length > 1 && (
+            <div className="flex gap-2 p-3 overflow-x-auto">
+              {photos.map((photo, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentPhotoIndex(index)}
+                  className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden 
+                              border-2 transition-colors ${
+                                index === currentPhotoIndex 
+                                  ? 'border-[#EF4923]' 
+                                  : 'border-transparent hover:border-gray-300'
+                              }`}
+                >
+                  <img
+                    src={photo}
+                    alt={`Thumbnail ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        {/* Property Details */}
+        <div className="p-4 overflow-y-auto">
+          <div className="grid grid-cols-2 gap-4">
+            <DetailItem label="Price" value={formatCurrency(property.price)} />
+            <DetailItem label="Price/SqFt" value={`$${Math.round(property.pricePerSqft || property.price / property.sqft)}`} />
+            <DetailItem label="Bedrooms" value={property.beds.toString()} />
+            <DetailItem label="Bathrooms" value={property.baths.toString()} />
+            <DetailItem label="Square Feet" value={property.sqft.toLocaleString()} />
+            <DetailItem label="Days on Market" value={property.daysOnMarket.toString()} />
+            <div>
+              <p className="text-sm text-gray-500">Status</p>
+              <span className={`inline-block px-2 py-1 text-xs font-medium text-white rounded ${getStatusColor(property.status)}`}>
+                {property.status}
+              </span>
+            </div>
+            {property.listDate && (
+              <DetailItem label="List Date" value={new Date(property.listDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} />
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-sm text-gray-500">{label}</p>
+      <p className="text-lg font-semibold text-gray-900">{value}</p>
+    </div>
+  );
+}
+```
+
+### Step 4: Add Modal to CompsWidget
+
+```tsx
+// In CompsWidget.tsx, add at the end of the return statement
+
+{selectedProperty && (
+  <PropertyDetailModal
+    property={selectedProperty}
+    onClose={() => setSelectedProperty(null)}
+  />
+)}
+```
+
+---
+
+## Copy/Paste for Replit
+
+```
+Add clickable property modal to CMA Presentation Comps widget.
+
+## FEATURE:
+When user clicks a property card in the Comps widget, open a modal showing full property details.
+
+## MODAL CONTENT:
+1. Header:
+   - Address (bold)
+   - MLS# below address
+   - Distance "X mi away" on right
+   - X close button
+
+2. Photo Gallery:
+   - Main photo with navigation arrows
+   - Photo counter "1 / 40"
+   - Thumbnail strip below (scrollable)
+   - Click thumbnail to change main photo
+   - Arrow keys navigate photos
+
+3. Property Details (2-column grid):
+   - Price: $2,099,900
+   - Price/SqFt: $587
+   - Bedrooms: 4
+   - Bathrooms: 4
+   - Square Feet: 3578
+   - Days on Market: 0
+   - Status: [Closed] (badge with color)
+   - List Date: Jul 29, 2025
+
+## IMPLEMENTATION:
+
+1. Add state in CompsWidget:
+   const [selectedProperty, setSelectedProperty] = useState<CmaProperty | null>(null);
+
+2. Make PropertyCard a button:
+   <button onClick={() => setSelectedProperty(property)} className="w-full text-left cursor-pointer hover:shadow-lg">
+
+3. Create PropertyDetailModal component with:
+   - Backdrop (bg-black/60, click to close)
+   - Modal container (max-w-2xl, centered)
+   - Photo gallery with prev/next navigation
+   - Thumbnail strip
+   - Details grid
+
+4. Close modal on:
+   - Click X button
+   - Click backdrop
+   - Press ESC key
+
+## KEYBOARD NAVIGATION:
+- ESC: Close modal
+- ArrowLeft: Previous photo
+- ArrowRight: Next photo
+
+## MOBILE:
+- Modal: full screen with inset-4
+- Touch targets: min 44x44px
+- Thumbnail strip: horizontal scroll
+
+## STATUS BADGE COLORS:
+- Closed: bg-red-500
+- Active: bg-green-500
+- Pending/Under Contract: bg-yellow-500
+
+I've attached a screenshot of the existing CMA property modal to match.
+```
+
+---
+
+## Expected Result
+
+1. **Click property card** → Modal opens
+2. **Modal shows:**
+   - Photo gallery with thumbnails
+   - Full property details
+   - Status badge
+3. **Close via:**
+   - X button
+   - Click outside
+   - ESC key
+4. **Navigate photos:**
+   - Click arrows
+   - Click thumbnails
+   - Arrow keys
