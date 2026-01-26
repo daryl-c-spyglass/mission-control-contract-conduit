@@ -1,0 +1,229 @@
+# Replit Agent Task: FIX - Missing Database Columns on Production (Render)
+
+## Error
+
+```
+Error 400: {"message":"column \"half_baths\" of relation \"transactions\" does not exist"}
+```
+
+## Root Cause
+
+The schema was updated to include new columns for the **Off Market Property** feature, but the **database migration wasn't run** on the production Render database.
+
+---
+
+## Missing Columns
+
+These columns were added to `shared/schema.ts` but don't exist in the production database:
+
+```typescript
+// Off Market Property Details
+isOffMarket: boolean('is_off_market').default(false),
+offMarketListingDate: timestamp('off_market_listing_date'),
+listingDescription: text('listing_description'),
+listingPrice: integer('listing_price'),
+propertyType: varchar('property_type', { length: 50 }),
+sqft: integer('sqft'),
+lotSizeAcres: decimal('lot_size_acres', { precision: 10, scale: 2 }),
+bedrooms: integer('bedrooms'),
+fullBaths: integer('full_baths'),
+halfBaths: integer('half_baths'),  // ← THIS IS MISSING
+isUnderContract: boolean('is_under_contract').default(true),
+isCompanyLead: boolean('is_company_lead').default(false),
+```
+
+---
+
+## Fix Option 1: Run Database Migration (Recommended)
+
+### Step 1: Check which columns are missing
+
+Run this SQL query on the production database to see current columns:
+
+```sql
+SELECT column_name, data_type, is_nullable, column_default
+FROM information_schema.columns 
+WHERE table_name = 'transactions'
+ORDER BY ordinal_position;
+```
+
+### Step 2: Add missing columns
+
+Run this migration SQL on the **production database** (Render's PostgreSQL):
+
+```sql
+-- Add missing Off Market columns to transactions table
+
+-- Off Market flag
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS is_off_market BOOLEAN DEFAULT false;
+
+-- Off Market listing details
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS off_market_listing_date TIMESTAMP;
+
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS listing_description TEXT;
+
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS listing_price INTEGER;
+
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS property_type VARCHAR(50);
+
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS sqft INTEGER;
+
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS lot_size_acres DECIMAL(10, 2);
+
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS bedrooms INTEGER;
+
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS full_baths INTEGER;
+
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS half_baths INTEGER;
+
+-- Contract status
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS is_under_contract BOOLEAN DEFAULT true;
+
+-- Company lead flag
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS is_company_lead BOOLEAN DEFAULT false;
+```
+
+### Step 3: Verify columns were added
+
+```sql
+SELECT column_name 
+FROM information_schema.columns 
+WHERE table_name = 'transactions' 
+AND column_name IN ('half_baths', 'full_baths', 'bedrooms', 'sqft', 'is_off_market');
+```
+
+---
+
+## Fix Option 2: Use Drizzle Push (If Available)
+
+If using Drizzle Kit with database connection:
+
+```bash
+# Generate migration
+npx drizzle-kit generate:pg
+
+# Push schema changes to database
+npx drizzle-kit push:pg
+```
+
+Or if using a migration command:
+
+```bash
+npm run db:migrate
+# or
+npm run db:push
+```
+
+---
+
+## Fix Option 3: Temporary Code Fix (Not Recommended)
+
+If you can't run migrations immediately, temporarily remove the `half_baths` field from the insert:
+
+```typescript
+// In the transaction creation endpoint
+// TEMPORARY: Remove fields that don't exist in DB yet
+const { half_baths, full_baths, bedrooms, sqft, is_off_market, ...safeData } = transactionData;
+
+await db.insert(transactions).values(safeData);
+```
+
+**⚠️ This is a temporary workaround - the proper fix is to run the migration.**
+
+---
+
+## How to Run Migration on Render
+
+### Option A: Render Dashboard
+
+1. Go to Render Dashboard → Your PostgreSQL Database
+2. Click "Shell" or "PSQL" connection
+3. Run the SQL migration commands above
+
+### Option B: Connect via psql
+
+```bash
+# Get connection string from Render Dashboard
+psql "postgresql://user:password@host:port/database"
+
+# Then run the ALTER TABLE commands
+```
+
+### Option C: Add Migration to Deploy
+
+Add a migration script that runs on deploy:
+
+```json
+// package.json
+{
+  "scripts": {
+    "db:migrate": "npx drizzle-kit push:pg",
+    "start": "npm run db:migrate && node server/index.js"
+  }
+}
+```
+
+---
+
+## Verification
+
+After running migration, test by creating a new transaction:
+
+1. Go to mission-control-contract-conduit.onrender.com
+2. Click "New Transaction"
+3. Fill in property details
+4. Click "Create Transaction"
+5. Should succeed without error
+
+---
+
+## Prevent Future Issues
+
+### Set up automatic migrations on deploy:
+
+```bash
+# In Render Build Command or start script
+npm run db:push
+```
+
+### Or use a migration check:
+
+```typescript
+// server/index.ts or startup script
+import { sql } from 'drizzle-orm';
+
+async function checkDatabaseSchema() {
+  try {
+    // Check if a required column exists
+    await db.execute(sql`SELECT half_baths FROM transactions LIMIT 0`);
+    console.log('Database schema is up to date');
+  } catch (error) {
+    console.error('Database schema mismatch! Run migrations.');
+    console.error('Missing columns detected. Please run: npm run db:migrate');
+    // Optionally: process.exit(1) to prevent app from starting with mismatched schema
+  }
+}
+```
+
+---
+
+## Summary
+
+| Action | Command/Location |
+|--------|-----------------|
+| Check current columns | `SELECT column_name FROM information_schema.columns WHERE table_name = 'transactions'` |
+| Add missing columns | Run `ALTER TABLE` SQL above |
+| Verify fix | Create new transaction in app |
+| Prevent future issues | Add `db:migrate` to deploy/start script |
