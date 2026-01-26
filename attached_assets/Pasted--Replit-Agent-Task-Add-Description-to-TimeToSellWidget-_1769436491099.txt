@@ -1,0 +1,137 @@
+# Replit Agent Task: Add Description to TimeToSellWidget INLINE Modal
+
+## Problem
+The Property Description fix was applied to `PropertyDetailModal.tsx`, but the **Time to Sell slide uses an INLINE modal** inside `TimeToSellWidget.tsx` (lines 426-708). That's why the description isn't showing.
+
+## Direct Fix
+
+**File:** `client/src/components/cma-presentation/widgets/TimeToSellWidget.tsx`
+
+### Step 1: Find the Inline Modal's Property Details Section
+
+Search for "Property Details" in the file:
+
+```bash
+grep -n "Property Details" client/src/components/cma-presentation/widgets/TimeToSellWidget.tsx
+```
+
+This should be around lines 550-650 in the inline PropertyDetailModal function.
+
+### Step 2: Add Description Section After Property Details
+
+Find the section that renders Property Details (Bedrooms, Bathrooms, Square Feet, Days on Market, Status) and add the description section AFTER it:
+
+```tsx
+{/* Existing Property Details grid ends here */}
+</div>
+
+{/* ADD THIS: Property Description Section */}
+{property.description && (
+  <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+      Property Description
+    </h3>
+    <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-wrap">
+      {property.description}
+    </p>
+  </div>
+)}
+
+{/* Rest of modal content continues... */}
+```
+
+### Step 3: Verify Property Has Description Field
+
+Check that the property object used in the inline modal includes `description`. Look for where `selectedProperty` is set (probably in state):
+
+```tsx
+// Find code like this:
+setSelectedProperty(property);
+
+// Or the property type definition - ensure it includes description:
+interface TimeToSellProperty {
+  // ... other fields
+  description?: string;
+}
+```
+
+If the property object doesn't have description, it needs to be added when the data is fetched/mapped.
+
+### Step 4: Check Data Source
+
+The Time to Sell widget gets its data from somewhere. Find where properties are loaded and ensure `description` is included:
+
+```bash
+grep -n "description\|remarks\|publicRemarks" client/src/components/cma-presentation/widgets/TimeToSellWidget.tsx
+```
+
+If description isn't being passed to the component, trace back to where the data comes from (likely `cma-tab.tsx` or a context/store).
+
+---
+
+## Full Context: Inline Modal Location
+
+From earlier diagnostics, the inline modal is at:
+- **File:** `client/src/components/cma-presentation/widgets/TimeToSellWidget.tsx`
+- **Function:** `PropertyDetailModal` (defined inline, NOT imported)
+- **Lines:** Approximately 426-708
+
+The modal structure is roughly:
+```tsx
+function PropertyDetailModal({ property, subjectProperty, onClose }) {
+  // ... state for photos, fullscreen, etc.
+  
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-content">
+        {/* Header: Address, MLS# */}
+        {/* Photo Gallery */}
+        {/* Price & Beds/Baths summary */}
+        {/* Property Details grid */}
+        {/* ← ADD DESCRIPTION HERE */}
+        {/* Price History (if exists) */}
+        {/* MLS# footer */}
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## Verification
+
+After adding the description section:
+
+1. Open Time to Sell slide
+2. Click on a property
+3. Scroll down in the modal
+4. Property Description section should appear below Property Details
+
+If still not showing:
+- Check browser console for errors
+- Verify `property.description` has a value (add `console.log(property)`)
+- The specific property might not have a description in Repliers data
+
+---
+
+## Alternative: Test with Hardcoded Text
+
+To verify the UI is working, temporarily hardcode a description:
+
+```tsx
+{/* TEMPORARY TEST */}
+<div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+    Property Description
+  </h3>
+  <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+    {property.description || 'TEST: No description available for this property. The description field is: ' + JSON.stringify(property.description)}
+  </p>
+</div>
+```
+
+This will show whether:
+- The UI section is rendering (if you see it)
+- The description field exists but is empty (if you see "TEST: No description...")
+- There's a rendering issue (if nothing appears)
