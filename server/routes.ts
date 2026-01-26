@@ -4679,9 +4679,9 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
           return res.status(400).json({ error: "Only PDF and Word documents are allowed" });
         }
 
-        // Validate file size (max 10MB)
-        if (req.file.size > 10 * 1024 * 1024) {
-          return res.status(400).json({ error: "File size must be less than 10MB" });
+        // Validate file size (max 50MB)
+        if (req.file.size > 50 * 1024 * 1024) {
+          return res.status(400).json({ error: "File size must be less than 50MB" });
         }
 
         try {
