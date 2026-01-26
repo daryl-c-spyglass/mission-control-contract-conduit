@@ -1,0 +1,166 @@
+# CMA Comparable Properties — Code Inquiry
+
+## Objective
+
+I need to understand how the CMA section's Comparable Properties feature is built so I can replicate it in the CMA Presentation Builder's Comps slide.
+
+---
+
+## Please Provide Details On:
+
+### 1. File Locations
+
+List all files related to the CMA Comparable Properties feature:
+
+```bash
+# Run these searches and share results:
+grep -rn "Comparable Properties\|ComparableProperties" --include="*.tsx" client/src/
+grep -rn "LOW PRICE\|HIGH PRICE\|AVG PRICE" --include="*.tsx" client/src/
+grep -rn "Grid.*List.*Table\|view.*Grid\|ViewToggle" --include="*.tsx" client/src/
+```
+
+Share the file paths for:
+- Main Comparable Properties component
+- Property card component (shows photo, price, beds, baths, sqft, DOM)
+- Stats summary row (Low/High/Avg Price, Median, Avg $/sqft, Avg DOM)
+- Filter tabs component (All, Closed, Active Under Contract, Pending, Active)
+- View toggle component (Grid, List, Table)
+- Compare/Map/Stats/List tabs
+
+---
+
+### 2. Data Structure
+
+What does the comparable property data object look like?
+
+```typescript
+// Share the TypeScript interface/type for a comparable property
+interface ComparableProperty {
+  // What fields are available?
+}
+```
+
+---
+
+### 3. Component Structure
+
+Share the JSX structure of:
+
+**A. Stats Summary Row:**
+```
+LOW PRICE | HIGH PRICE | AVG PRICE | MEDIAN | AVG $/SQFT | AVG DOM
+$749,000  | $2,199,000 | $1,353,780| $1,299,000 | $394 | 0 days
+                        ↓ 59.4% vs market
+```
+
+**B. Property Card (Grid View):**
+```
+┌─────────────────────────┐
+│  [Property Image]       │
+│  ┌──────┐ ┌──────┐     │
+│  │Closed│ │9.4 mi│     │
+│  └──────┘ └──────┘     │
+├─────────────────────────┤
+│ 321 Delayne DR          │
+│ $2,099,900    $587/sqft │
+│ 4 beds  4 baths  3,578  │
+│ ⏱ 0 days on market      │
+└─────────────────────────┘
+```
+
+**C. Filter Tabs:**
+```
+[All] [Closed] [Active Under Contract] [Pending] [Active]
+```
+
+**D. View Toggle:**
+```
+View: [Grid] [List] [Table]
+```
+
+**E. Top Tabs:**
+```
+[Compare] [Map] [Stats] [List]
+```
+
+---
+
+### 4. State Management
+
+How is the view state managed?
+
+```typescript
+// What state variables are used?
+const [activeFilter, setActiveFilter] = useState<string>('All');
+const [viewMode, setViewMode] = useState<'grid' | 'list' | 'table'>('grid');
+const [activeTab, setActiveTab] = useState<'compare' | 'map' | 'stats' | 'list'>('compare');
+```
+
+---
+
+### 5. API / Data Fetching
+
+How is the comparable data fetched?
+
+```typescript
+// Share the API call or data source
+const { data: comparables } = useQuery({
+  queryKey: ['comparables', transactionId],
+  queryFn: () => fetch(`/api/...`).then(r => r.json())
+});
+```
+
+---
+
+### 6. Calculations
+
+How are the stats calculated (Low, High, Avg, Median, etc.)?
+
+```typescript
+// Share the calculation logic
+const stats = useMemo(() => {
+  const prices = comparables.map(c => c.price);
+  return {
+    low: Math.min(...prices),
+    high: Math.max(...prices),
+    avg: prices.reduce((a, b) => a + b, 0) / prices.length,
+    // ...
+  };
+}, [comparables]);
+```
+
+---
+
+### 7. Map Component
+
+What map library is used and how are comparables displayed on it?
+
+- Mapbox / Google Maps / Leaflet?
+- How are markers rendered?
+- Does it show subject property differently?
+
+---
+
+### 8. Styling
+
+What styling approach is used?
+
+- Tailwind classes?
+- CSS modules?
+- Specific color values for status badges (Closed = green, Active = ?, etc.)
+
+---
+
+## Output Requested
+
+Please share:
+
+1. **File paths** for all related components
+2. **Full code** of the main Comparable Properties component
+3. **Full code** of the Property Card component
+4. **Full code** of the Stats Summary component
+5. **Data interface/type** definitions
+6. **Any utility functions** for calculations
+7. **Map implementation** details
+
+This will help me create a comprehensive prompt to replicate this in the CMA Presentation Builder.
