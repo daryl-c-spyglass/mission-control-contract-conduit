@@ -1,0 +1,161 @@
+# Replit Agent Task: DIAGNOSTIC - Time to Sell Modal Issues
+
+## Issues to Investigate
+
+1. **Property Description NOT showing** - Repliers API should provide this but it's missing from the modal
+2. **Photo Expand feature needed** - User should be able to click to view photos in fullscreen
+
+---
+
+## Part 1: Investigate Missing Property Description
+
+### Step 1: Check Repliers API Response
+
+Find where the Repliers API is called for listing data and log the response:
+
+```bash
+# Find Repliers API calls
+grep -rn "repliers\|/listings/\|remarks\|publicRemarks\|description" --include="*.ts" --include="*.tsx" client/src/
+```
+
+### Step 2: Check the Data Flow
+
+Trace the property description field through the code:
+
+**A) API Layer** - Where is Repliers data fetched?
+```bash
+grep -rn "fetch.*repliers\|repliers.*api\|listings.*api" --include="*.ts" --include="*.tsx" client/src/
+```
+
+**B) Data Transformation** - Is `remarks` or `publicRemarks` being mapped?
+```bash
+grep -rn "remarks\|publicRemarks\|description" --include="*.ts" --include="*.tsx" client/src/
+```
+
+**C) Component Props** - Is description passed to the modal?
+Look in `TimeToSellWidget.tsx` for how properties are structured.
+
+### Step 3: Report Findings
+
+Please tell me:
+
+1. **Repliers API endpoint being used:** `_______________`
+
+2. **Is `remarks` or `publicRemarks` in the API response?**
+   - Yes / No / Unknown
+   - If Yes, what's the field path? (e.g., `listing.remarks`)
+
+3. **Is description being mapped in data transformation?**
+   - Yes / No
+   - If Yes, show the mapping code
+   - If No, this is the problem
+
+4. **Is description in the property object passed to modal?**
+   - Yes / No
+   - Show the property interface/type
+
+5. **Is description being rendered in the modal UI?**
+   - Yes / No
+   - If Yes but empty, the data isn't coming through
+   - If No, need to add the UI element
+
+### Step 4: Show Me the Relevant Code
+
+Please provide snippets of:
+
+**A) The Repliers API call (server or client side):**
+```typescript
+// Show the fetch/axios call to Repliers
+```
+
+**B) The data mapping/transformation:**
+```typescript
+// Show how listing data is transformed
+```
+
+**C) The property interface used in TimeToSellWidget:**
+```typescript
+// Show the TypeScript interface for the property object
+```
+
+**D) The modal's current rendering of description (if any):**
+```tsx
+// Show the JSX that should render description
+```
+
+---
+
+## Part 2: Photo Expand Feature
+
+### Current State
+
+Looking at the screenshot:
+- Photo displays with arrows ✓
+- Photo counter shows "1 / 40" ✓
+- No expand/fullscreen button ❌
+
+### What We Need
+
+Add a fullscreen/expand button that allows users to view photos in a larger lightbox view.
+
+### Questions to Answer
+
+1. **Where is the photo gallery code in TimeToSellWidget.tsx?**
+   - Line numbers: `_______________`
+
+2. **Is there an existing lightbox/fullscreen component in the project?**
+   ```bash
+   grep -rn "lightbox\|fullscreen\|expand\|zoom" --include="*.tsx" client/src/
+   ```
+
+3. **What photo library is being used (if any)?**
+   ```bash
+   grep -rn "react-image\|lightbox\|gallery" package.json
+   ```
+
+---
+
+## Expected Response Format
+
+```
+## Diagnostic Results
+
+### Property Description Investigation
+
+**1. Repliers API Endpoint:**
+[endpoint URL or file location]
+
+**2. API Response includes remarks?**
+[Yes/No + field path]
+
+**3. Data Mapping:**
+[Show code or state "NOT MAPPED - needs to be added"]
+
+**4. Property Interface:**
+```typescript
+[Show the interface]
+```
+
+**5. Modal UI for Description:**
+[Show code or state "NOT IMPLEMENTED - needs to be added"]
+
+### Root Cause:
+[Explain why description is not showing]
+
+### Photo Expand Investigation
+
+**1. Photo Gallery Location:**
+[File and line numbers]
+
+**2. Existing Lightbox Component:**
+[Yes/No + location if exists]
+
+**3. Photo Library:**
+[Name or "None - using custom implementation"]
+```
+
+---
+
+## DO NOT Fix Yet
+
+This is a **diagnostic task only**. Report findings so we can create a comprehensive fix prompt.
