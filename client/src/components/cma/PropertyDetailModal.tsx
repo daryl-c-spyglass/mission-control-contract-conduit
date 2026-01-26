@@ -56,11 +56,11 @@ export function PropertyDetailModal({ isOpen, onClose, property }: PropertyDetai
   };
 
   const getStatusColor = (status: string) => {
-    const normalized = status?.toLowerCase();
-    if (normalized === 'closed' || normalized === 'sold') return 'bg-green-500';
-    if (normalized === 'active' && !normalized.includes('under')) return 'bg-emerald-500';
-    if (normalized === 'pending') return 'bg-yellow-400 !text-gray-900';
-    if (normalized.includes('under contract') || normalized.includes('under')) return 'bg-orange-500';
+    const s = status?.toLowerCase();
+    if (s?.includes('closed') || s?.includes('sold')) return 'bg-red-500';
+    if (s?.includes('active') && !s?.includes('under') && !s?.includes('contract')) return 'bg-green-500';
+    if (s?.includes('under contract') || s?.includes('active under')) return 'bg-orange-500';
+    if (s?.includes('pending')) return 'bg-gray-500';
     return 'bg-gray-500';
   };
 

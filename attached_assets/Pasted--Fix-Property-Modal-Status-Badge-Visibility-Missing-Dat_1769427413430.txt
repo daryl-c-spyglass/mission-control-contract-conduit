@@ -1,0 +1,193 @@
+# Fix Property Modal — Status Badge Visibility + Missing Data (UPDATED)
+
+## Issues
+
+1. **Status badge not visible** - Dark on dark background
+2. **Missing property data** - Property Type, Year Built, Days on Market showing "—"
+
+---
+
+## Issue 1: Status Badge Not Visible
+
+### CORRECT Status Colors (Standard for Contract Conduit):
+
+```tsx
+const getStatusBadgeColor = (status: string, isSubject?: boolean): string => {
+  if (isSubject) return 'bg-blue-500 text-white';  // BLUE for Subject
+  
+  const s = status?.toLowerCase();
+  
+  if (s?.includes('closed') || s?.includes('sold')) {
+    return 'bg-red-500 text-white';      // RED for Closed/Sold
+  }
+  if (s?.includes('active') && !s?.includes('under') && !s?.includes('contract')) {
+    return 'bg-green-500 text-white';    // GREEN for Active
+  }
+  if (s?.includes('under contract') || s?.includes('active under')) {
+    return 'bg-orange-500 text-white';   // ORANGE for Active Under Contract
+  }
+  if (s?.includes('pending')) {
+    return 'bg-gray-500 text-white';     // GRAY for Pending
+  }
+  
+  return 'bg-gray-500 text-white';       // Default GRAY
+};
+```
+
+### Status Color Reference:
+
+| Status | Color | Tailwind Class |
+|--------|-------|----------------|
+| Closed / Sold | 🔴 Red | `bg-red-500 text-white` |
+| Active | 🟢 Green | `bg-green-500 text-white` |
+| Active Under Contract | 🟠 Orange | `bg-orange-500 text-white` |
+| Pending | ⚫ Gray | `bg-gray-500 text-white` |
+| Subject | 🔵 Blue | `bg-blue-500 text-white` |
+
+### Position Badge Over Photo:
+
+```tsx
+<div className="relative">
+  <img src={photo} className="w-full" />
+  <div className="absolute top-3 left-3 z-10">
+    <span className={`px-3 py-1.5 text-sm font-bold rounded shadow-lg ${getStatusBadgeColor(property.status, property.isSubject)}`}>
+      {property.isSubject ? 'Subject' : property.status}
+    </span>
+  </div>
+</div>
+```
+
+---
+
+## Issue 2: Missing Property Data from Repliers API
+
+Property Type, Year Built, Days on Market showing "—" instead of actual values.
+
+### Check Repliers API Field Mapping:
+
+```typescript
+// In server/repliers.ts or data transformation file
+
+function transformRepliersToProperty(repliersData: any): CmaProperty {
+  return {
+    // ... other fields ...
+    
+    // ENSURE THESE ARE MAPPED:
+    propertyType: repliersData.propertyType || 
+                  repliersData.propertySubType || 
+                  repliersData.type || 
+                  repliersData.details?.propertyType || 
+                  '—',
+    
+    yearBuilt: repliersData.yearBuilt || 
+               repliersData.yearConstructed || 
+               repliersData.details?.yearBuilt || 
+               null,
+    
+    daysOnMarket: repliersData.daysOnMarket || 
+                  repliersData.dom || 
+                  repliersData.cumulativeDaysOnMarket || 
+                  repliersData.details?.daysOnMarket || 
+                  0,
+    
+    mlsNumber: repliersData.mlsNumber || 
+               repliersData.listingId || 
+               repliersData.id,
+  };
+}
+```
+
+### Debug - Log Raw Repliers Response:
+
+```typescript
+console.log('Raw Repliers data:', JSON.stringify(repliersData, null, 2));
+```
+
+---
+
+## Copy/Paste for Replit
+
+```
+Fix the CMA Presentation Comps property modal - two issues:
+
+## ISSUE 1: Status Badge Not Visible
+The status badge is dark on dark background - can't see it.
+
+FIX - Use CORRECT status colors (standard for Contract Conduit):
+
+const getStatusBadgeColor = (status: string, isSubject?: boolean): string => {
+  if (isSubject) return 'bg-blue-500 text-white';  // BLUE for Subject
+  
+  const s = status?.toLowerCase();
+  
+  if (s?.includes('closed') || s?.includes('sold')) {
+    return 'bg-red-500 text-white';      // RED for Closed/Sold
+  }
+  if (s?.includes('active') && !s?.includes('under') && !s?.includes('contract')) {
+    return 'bg-green-500 text-white';    // GREEN for Active
+  }
+  if (s?.includes('under contract') || s?.includes('active under')) {
+    return 'bg-orange-500 text-white';   // ORANGE for Active Under Contract
+  }
+  if (s?.includes('pending')) {
+    return 'bg-gray-500 text-white';     // GRAY for Pending
+  }
+  
+  return 'bg-gray-500 text-white';
+};
+
+## STATUS COLOR REFERENCE:
+- Closed/Sold = RED (bg-red-500)
+- Active = GREEN (bg-green-500)
+- Active Under Contract = ORANGE (bg-orange-500)
+- Pending = GRAY (bg-gray-500)
+- Subject = BLUE (bg-blue-500)
+
+Position badge OVER the photo:
+<div className="absolute top-3 left-3 z-10">
+  <span className={`px-3 py-1.5 text-sm font-bold rounded shadow-lg ${getStatusBadgeColor(status, isSubject)}`}>
+    {isSubject ? 'Subject' : status}
+  </span>
+</div>
+
+## ISSUE 2: Missing Property Data (from Repliers API)
+Property Type, Year Built, Days on Market showing "—" instead of values.
+
+FIX:
+1. Find Repliers data transformation (server/repliers.ts)
+
+2. Map these fields - check multiple possible field names:
+   propertyType: repliersData.propertyType || repliersData.propertySubType || repliersData.type || repliersData.details?.propertyType
+   yearBuilt: repliersData.yearBuilt || repliersData.yearConstructed || repliersData.details?.yearBuilt
+   daysOnMarket: repliersData.daysOnMarket || repliersData.dom || repliersData.cumulativeDaysOnMarket
+
+3. Debug - log raw Repliers response:
+   console.log('Repliers data:', JSON.stringify(repliersData, null, 2))
+
+4. Fields may be nested under "details" object - check both root and nested paths
+
+I've attached screenshots showing both issues.
+```
+
+---
+
+## Expected Result
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  ┌─────────────────────────────────────────────────┐   │
+│  │ [Closed]  ← RED badge (bg-red-500), visible    │   │
+│  │                                                 │   │
+│  │           [Property Photo]              < >    │   │
+│  │                                    5 / 33       │   │
+│  └─────────────────────────────────────────────────┘   │
+│                                                         │
+│  $1,200,000                                            │
+│  📍 1494 Bunker Ranch BLVD                             │
+│                                                         │
+│  Property Type          Single Family Residence  ← Has data │
+│  Year Built             2019                     ← Has data │
+│  Days on Market         45                       ← Has data │
+│  MLS #                  ACT2180001                         │
+└─────────────────────────────────────────────────────────┘
+```
