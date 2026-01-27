@@ -357,6 +357,8 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
                       <SelectItem value="0.5">50%</SelectItem>
                       <SelectItem value="0.75">75%</SelectItem>
                       <SelectItem value="1">100%</SelectItem>
+                      <SelectItem value="1.25">125%</SelectItem>
+                      <SelectItem value="1.5">150%</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
