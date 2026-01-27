@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3, Map as MapIcon, TrendingUp, List, LayoutGrid, Table2, Bed, Bath, Square, Clock, MapPin } from 'lucide-react';
 import { CMAMap } from '@/components/cma-map';
 import { PropertyDetailModal } from './PropertyDetailModal';
+import { extractPrice, extractSqft, extractDOM, calculatePricePerSqft } from '@/lib/cma-data-utils';
 import type { CmaProperty } from '../types';
 import type { Property } from '@shared/schema';
 
@@ -34,6 +35,13 @@ const STATUS_FILTERS = [
   { id: 'active', label: 'Active' },
 ] as const;
 
+// Safe helper to get display price using utility functions
+function getDisplayPrice(property: CmaProperty): number {
+  // Use the robust extractPrice utility that checks multiple field names
+  const price = extractPrice(property);
+  return price ?? 0;
+}
+
 // Safe helper to calculate price per sqft avoiding NaN
 // Returns formatted string without trailing "/sqft" - caller adds it
 function getSafePricePerSqft(property: CmaProperty): string {
@@ -41,11 +49,10 @@ function getSafePricePerSqft(property: CmaProperty): string {
   if (property.pricePerSqft && !isNaN(property.pricePerSqft) && property.pricePerSqft > 0) {
     return `$${Math.round(property.pricePerSqft)}`;
   }
-  // Try to calculate from price and sqft
-  const price = property.soldPrice ?? property.price ?? property.listPrice;
-  const sqft = property.sqft || (property as any).livingArea;
-  if (price && sqft && sqft > 0 && !isNaN(price) && !isNaN(sqft)) {
-    return `$${Math.round(price / sqft)}`;
+  // Use the robust utility that checks multiple field names
+  const pricePerSqft = calculatePricePerSqft(property);
+  if (pricePerSqft && pricePerSqft > 0) {
+    return `$${Math.round(pricePerSqft)}`;
   }
   return '--';
 }
@@ -71,22 +78,22 @@ function calculateStatistics(comparables: CmaProperty[]): PropertyStatistics | n
     };
   };
   
-  // Filter for valid price/sqft values before calculation
+  // Filter for valid price/sqft values before calculation - use extractPrice for robust field matching
   const pricePerSqFts = comparables
-    .filter(c => c.sqft && c.sqft > 0 && !isNaN(c.sqft))
     .map(c => {
-      const price = c.soldPrice ?? c.price ?? c.listPrice;
-      if (price && !isNaN(price) && price > 0) return price / c.sqft;
-      return NaN; // will be filtered by calculateMetric
+      const sqft = extractSqft(c);
+      const price = extractPrice(c);
+      if (price && sqft && sqft > 0) return price / sqft;
+      return NaN;
     })
     .filter(v => !isNaN(v));
   
-  // Filter for valid prices and DOM values
+  // Filter for valid prices and DOM values - use extractPrice for robust field matching
   const validPrices = comparables
-    .map(c => c.soldPrice ?? c.price ?? c.listPrice)
-    .filter((p): p is number => p !== undefined && p !== null && !isNaN(p) && p > 0);
+    .map(c => extractPrice(c))
+    .filter((p): p is number => p !== null && p > 0);
   const validDom = comparables
-    .map(c => c.daysOnMarket)
+    .map(c => extractDOM(c) ?? c.daysOnMarket)
     .filter((d): d is number => d !== undefined && d !== null && !isNaN(d) && d >= 0);
   
   return {
@@ -220,7 +227,7 @@ function PropertyCard({ property, isSubject = false, onClick }: { property: CmaP
         </p>
         <div className="flex items-baseline justify-between gap-2 mt-2 flex-wrap">
           <p className="text-lg font-bold" data-testid={`property-price-${property.id}`}>
-            {formatCurrency(property.soldPrice || property.price)}
+            {formatCurrency(getDisplayPrice(property))}
           </p>
           <p className="text-sm text-muted-foreground" data-testid={`property-ppsf-${property.id}`}>
             {getSafePricePerSqft(property)}/sqft
@@ -281,7 +288,7 @@ function PropertyListItem({ property, isSubject = false, onClick }: { property: 
         </div>
         <p className="font-medium text-sm truncate" data-testid={`property-list-address-${property.id}`}>{property.address}</p>
         <p className="text-lg font-bold mt-1" data-testid={`property-list-price-${property.id}`}>
-          {formatCurrency(property.soldPrice || property.price)}
+          {formatCurrency(getDisplayPrice(property))}
           <span className="text-sm font-normal text-muted-foreground ml-2">
             {getSafePricePerSqft(property)}/sqft
           </span>
@@ -336,7 +343,7 @@ function PropertyTable({ comparables, subjectProperty, onPropertyClick }: { comp
                   {property.isSubject ? 'Subject' : property.status}
                 </Badge>
               </td>
-              <td className="text-right p-3 font-medium" data-testid={`table-price-${index}`}>{formatCurrency(property.soldPrice || property.price)}</td>
+              <td className="text-right p-3 font-medium" data-testid={`table-price-${index}`}>{formatCurrency(getDisplayPrice(property))}</td>
               <td className="text-right p-3" data-testid={`table-ppsf-${index}`}>{getSafePricePerSqft(property)}/sqft</td>
               <td className="text-center p-3" data-testid={`table-beds-${index}`}>{property.beds}</td>
               <td className="text-center p-3" data-testid={`table-baths-${index}`}>{property.baths}</td>

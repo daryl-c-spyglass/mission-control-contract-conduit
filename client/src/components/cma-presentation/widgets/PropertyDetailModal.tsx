@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, ChevronLeft, ChevronRight, Bed, Bath, Square, Clock, Calendar, Maximize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { extractPrice, extractSqft, calculatePricePerSqft } from '@/lib/cma-data-utils';
 import type { CmaProperty } from '../types';
 
 interface PropertyDetailModalProps {
@@ -79,8 +80,10 @@ export function PropertyDetailModal({ property, onClose }: PropertyDetailModalPr
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [photos.length, fullscreenPhoto, onClose]);
   
-  const pricePerSqft = property.pricePerSqft || 
-    (property.sqft > 0 ? Math.round((property.soldPrice || property.price) / property.sqft) : 0);
+  // Use robust price extraction that checks multiple field names
+  const displayPrice = extractPrice(property) ?? 0;
+  const displaySqft = extractSqft(property) ?? property.sqft ?? 0;
+  const pricePerSqft = property.pricePerSqft || calculatePricePerSqft(property) || 0;
   
   return (
     <>
@@ -179,7 +182,7 @@ export function PropertyDetailModal({ property, onClose }: PropertyDetailModalPr
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <div>
                 <p className="text-3xl font-bold" data-testid="modal-price">
-                  {formatCurrency(property.soldPrice || property.price)}
+                  {formatCurrency(displayPrice)}
                 </p>
                 <p className="text-sm text-muted-foreground" data-testid="modal-price-per-sqft">
                   ${pricePerSqft}/sqft
@@ -190,7 +193,7 @@ export function PropertyDetailModal({ property, onClose }: PropertyDetailModalPr
                   {property.beds} beds • {property.baths} baths
                 </p>
                 <p className="text-muted-foreground" data-testid="modal-sqft">
-                  {property.sqft.toLocaleString()} sqft
+                  {displaySqft.toLocaleString()} sqft
                 </p>
               </div>
             </div>

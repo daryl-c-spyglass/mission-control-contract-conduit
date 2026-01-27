@@ -1,0 +1,479 @@
+# CMA Presentation — Fix $0 Price & $NaN/sqft Issues
+
+## 🚨 Critical Bug
+
+**Location:** CMA Presentation → COMPS slide (Slide 5/33)
+**Property:** 268 Chisholm TRL, Bastrop, TX (MLS# ACT7703651)
+
+### Symptoms:
+
+| View | Price Column | $/SqFt Column | Stats Bar |
+|------|--------------|---------------|-----------|
+| Grid | $0 | $NaN/sqft | ✅ Correct ($350K-$2.2M) |
+| List | $0 | Shows values ($187-$821) | ✅ Correct |
+| Table | $0 | Shows values | ✅ Correct |
+| Modal | $0, $NaN/sqft | — | Price History shows $2,200,000 |
+
+### Key Observation:
+- **Stats bar shows CORRECT prices** (Low: $350,000, High: $2,200,000, Avg: $840,690)
+- **Individual property cards show $0**
+- **$/SqFt sometimes works** (meaning price data exists somewhere)
+
+**Root Cause:** Field name mismatch between stats calculation and property display
+
+---
+
+## 🔍 STEP 1: Diagnostic — Find the Correct Price Field
+
+Add this diagnostic code to identify which field contains the price:
+
+```typescript
+// Add to the COMPS component or data loading function
+
+function diagnosePropertyPrices(comparables: any[]) {
+  console.group('🔍 Price Field Diagnostic');
+  
+  comparables.forEach((comp, index) => {
+    console.log(`\n--- Property ${index + 1}: ${comp.address || comp.streetAddress} ---`);
+    console.log('Status:', comp.status);
+    console.log('Price-related fields:', {
+      // Common price field names
+      price: comp.price,
+      listPrice: comp.listPrice,
+      closePrice: comp.closePrice,
+      soldPrice: comp.soldPrice,
+      salePrice: comp.salePrice,
+      originalListPrice: comp.originalListPrice,
+      currentPrice: comp.currentPrice,
+      
+      // Snake case variants (from database)
+      list_price: comp.list_price,
+      close_price: comp.close_price,
+      sold_price: comp.sold_price,
+      sale_price: comp.sale_price,
+      
+      // Nested objects
+      'listing.price': comp.listing?.price,
+      'listing.listPrice': comp.listing?.listPrice,
+      'details.price': comp.details?.price,
+    });
+    
+    // Check sqft fields too
+    console.log('SqFt-related fields:', {
+      sqft: comp.sqft,
+      squareFeet: comp.squareFeet,
+      livingArea: comp.livingArea,
+      sqft_total: comp.sqft_total,
+      livingAreaSqFt: comp.livingAreaSqFt,
+    });
+  });
+  
+  console.groupEnd();
+}
+
+// Call this when comparables data loads
+useEffect(() => {
+  if (comparables?.length) {
+    diagnosePropertyPrices(comparables);
+  }
+}, [comparables]);
+```
+
+---
+
+## 🔧 STEP 2: Fix Price Parsing
+
+Create a robust price getter that checks all possible fields:
+
+```typescript
+// File: lib/price-utils.ts or add to existing utils
+
+/**
+ * Get the display price for a property based on its status
+ * - For CLOSED properties: use closePrice or soldPrice
+ * - For ACTIVE properties: use listPrice
+ * - For PENDING properties: use listPrice
+ */
+export function getPropertyPrice(property: any): number {
+  const status = (property.status || '').toLowerCase();
+  
+  // For closed/sold properties, prefer close/sold price
+  if (status === 'closed' || status === 'sold') {
+    const closedPrice = 
+      property.closePrice ||
+      property.close_price ||
+      property.soldPrice ||
+      property.sold_price ||
+      property.salePrice ||
+      property.sale_price;
+    
+    if (closedPrice && !isNaN(Number(closedPrice))) {
+      return Number(closedPrice);
+    }
+  }
+  
+  // For active/pending or fallback, use list price
+  const listPrice =
+    property.listPrice ||
+    property.list_price ||
+    property.price ||
+    property.currentPrice ||
+    property.originalListPrice ||
+    property.original_list_price;
+  
+  if (listPrice && !isNaN(Number(listPrice))) {
+    return Number(listPrice);
+  }
+  
+  // Check nested objects
+  if (property.listing?.price) {
+    return Number(property.listing.price);
+  }
+  
+  if (property.details?.listPrice) {
+    return Number(property.details.listPrice);
+  }
+  
+  console.warn(`Could not find price for property: ${property.address || property.streetAddress}`);
+  return 0;
+}
+
+/**
+ * Get the square footage for a property
+ */
+export function getPropertySqft(property: any): number {
+  const sqft =
+    property.sqft ||
+    property.squareFeet ||
+    property.livingArea ||
+    property.sqft_total ||
+    property.livingAreaSqFt ||
+    property.living_area ||
+    property.totalSqFt ||
+    property.details?.squareFeet;
+  
+  if (sqft && !isNaN(Number(sqft))) {
+    return Number(sqft);
+  }
+  
+  console.warn(`Could not find sqft for property: ${property.address || property.streetAddress}`);
+  return 0;
+}
+
+/**
+ * Calculate price per square foot
+ */
+export function getPricePerSqft(property: any): number | null {
+  const price = getPropertyPrice(property);
+  const sqft = getPropertySqft(property);
+  
+  if (price > 0 && sqft > 0) {
+    return Math.round(price / sqft);
+  }
+  
+  return null;
+}
+
+/**
+ * Format price for display
+ */
+export function formatPrice(price: number | null | undefined): string {
+  if (price === null || price === undefined || isNaN(price) || price === 0) {
+    return '—'; // Or 'N/A' or leave empty
+  }
+  
+  return `$${price.toLocaleString()}`;
+}
+
+/**
+ * Format price per sqft for display
+ */
+export function formatPricePerSqft(pricePerSqft: number | null): string {
+  if (pricePerSqft === null || isNaN(pricePerSqft)) {
+    return '—';
+  }
+  
+  return `$${pricePerSqft}/sqft`;
+}
+```
+
+---
+
+## 🔧 STEP 3: Update Property Card Component
+
+```tsx
+// File: Find the property card component used in Grid/List views
+
+import { getPropertyPrice, getPropertySqft, getPricePerSqft, formatPrice, formatPricePerSqft } from '@/lib/price-utils';
+
+interface PropertyCardProps {
+  property: any;
+  onClick?: () => void;
+}
+
+function PropertyCard({ property, onClick }: PropertyCardProps) {
+  // Use the safe price getters
+  const price = getPropertyPrice(property);
+  const sqft = getPropertySqft(property);
+  const pricePerSqft = getPricePerSqft(property);
+  
+  return (
+    <div onClick={onClick} className="...">
+      {/* Property Image */}
+      <img src={property.photos?.[0]} alt={property.address} />
+      
+      {/* Status Badge */}
+      <span className="...">{property.status}</span>
+      
+      {/* Address */}
+      <h3>{property.streetAddress || property.address}</h3>
+      
+      {/* Price - USE THE SAFE GETTER */}
+      <p className="text-xl font-bold">
+        {formatPrice(price)}
+      </p>
+      
+      {/* Price per SqFt - USE THE SAFE GETTER */}
+      <p className="text-sm text-gray-500">
+        {formatPricePerSqft(pricePerSqft)}
+      </p>
+      
+      {/* Details */}
+      <p className="text-sm">
+        {property.beds || property.bedrooms} beds • 
+        {property.baths || property.bathrooms} baths • 
+        {sqft.toLocaleString()} sqft
+      </p>
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 STEP 4: Update Property Modal Component
+
+```tsx
+// File: Find the property detail modal component
+
+function PropertyDetailModal({ property, isOpen, onClose }) {
+  const price = getPropertyPrice(property);
+  const sqft = getPropertySqft(property);
+  const pricePerSqft = getPricePerSqft(property);
+  
+  return (
+    <Modal isOpen={isOpen} onClose={onClose}>
+      {/* Header */}
+      <h2>{property.streetAddress}</h2>
+      <p>MLS# {property.mlsNumber}</p>
+      
+      {/* Photo Gallery */}
+      <PhotoCarousel photos={property.photos} />
+      
+      {/* Price Display - FIXED */}
+      <div className="flex justify-between items-start">
+        <div>
+          <p className="text-3xl font-bold">{formatPrice(price)}</p>
+          <p className="text-gray-500">{formatPricePerSqft(pricePerSqft)}</p>
+        </div>
+        <div className="text-right">
+          <p className="font-semibold">
+            {property.beds} beds • {property.baths} baths
+          </p>
+          <p>{sqft.toLocaleString()} sqft</p>
+        </div>
+      </div>
+      
+      {/* Price History - if available */}
+      {property.listPrice && (
+        <div className="border-t pt-4 mt-4">
+          <h4 className="font-medium mb-2">Price History</h4>
+          <p>List: {formatPrice(property.listPrice)}</p>
+          {property.closePrice && property.status?.toLowerCase() === 'closed' && (
+            <p>Sold: {formatPrice(property.closePrice)}</p>
+          )}
+        </div>
+      )}
+      
+      {/* Property Details */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <span className="text-gray-500">Bedrooms</span>
+          <p className="font-semibold">{property.beds || property.bedrooms}</p>
+        </div>
+        <div>
+          <span className="text-gray-500">Bathrooms</span>
+          <p className="font-semibold">{property.baths || property.bathrooms}</p>
+        </div>
+        <div>
+          <span className="text-gray-500">Square Feet</span>
+          <p className="font-semibold">{sqft.toLocaleString()}</p>
+        </div>
+        <div>
+          <span className="text-gray-500">Days on Market</span>
+          <p className="font-semibold">{property.daysOnMarket ?? 0}</p>
+        </div>
+        <div>
+          <span className="text-gray-500">Status</span>
+          <span className={cn(
+            "px-2 py-1 rounded text-sm font-medium",
+            property.status?.toLowerCase() === 'closed' && "bg-red-100 text-red-700",
+            property.status?.toLowerCase() === 'active' && "bg-green-100 text-green-700"
+          )}>
+            {property.status}
+          </span>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+```
+
+---
+
+## 🔧 STEP 5: Update Table View
+
+```tsx
+// File: Find the table view component
+
+function CompsTableView({ comparables, subjectProperty }) {
+  return (
+    <table className="w-full">
+      <thead>
+        <tr>
+          <th>Address</th>
+          <th>Status</th>
+          <th>Price</th>
+          <th>$/SqFt</th>
+          <th>Beds</th>
+          <th>Baths</th>
+          <th>SqFt</th>
+          <th>DOM</th>
+        </tr>
+      </thead>
+      <tbody>
+        {/* Subject Property Row */}
+        {subjectProperty && (
+          <tr className="bg-orange-50 border-2 border-orange-200">
+            <td>{subjectProperty.address}</td>
+            <td><span className="bg-orange-500 text-white px-2 py-1 rounded">Subject</span></td>
+            <td>{formatPrice(getPropertyPrice(subjectProperty))}</td>
+            <td>{formatPricePerSqft(getPricePerSqft(subjectProperty))}</td>
+            <td>{subjectProperty.beds}</td>
+            <td>{subjectProperty.baths}</td>
+            <td>{getPropertySqft(subjectProperty).toLocaleString()}</td>
+            <td>{subjectProperty.daysOnMarket ?? '—'}</td>
+          </tr>
+        )}
+        
+        {/* Comparable Properties */}
+        {comparables.map((comp, index) => (
+          <tr key={index}>
+            <td>{comp.streetAddress || comp.address}</td>
+            <td>
+              <span className={cn(
+                "px-2 py-1 rounded text-sm",
+                comp.status?.toLowerCase() === 'closed' && "bg-red-100 text-red-700"
+              )}>
+                {comp.status}
+              </span>
+            </td>
+            <td>{formatPrice(getPropertyPrice(comp))}</td>
+            <td>{formatPricePerSqft(getPricePerSqft(comp))}</td>
+            <td>{comp.beds || comp.bedrooms}</td>
+            <td>{comp.baths || comp.bathrooms}</td>
+            <td>{getPropertySqft(comp).toLocaleString()}</td>
+            <td>{comp.daysOnMarket ?? 0}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+```
+
+---
+
+## 🔧 STEP 6: Check Data Source — CMA Tab vs Presentation
+
+The stats bar shows correct values, so the data IS correct somewhere. Check:
+
+1. **Where stats are calculated** — that code has the right field names
+2. **Where property cards read prices** — that code has wrong field names
+
+```bash
+# Search for where stats are calculated (this works)
+grep -rn "avgPrice\|averagePrice\|LOW_PRICE\|HIGH_PRICE" --include="*.tsx" --include="*.ts" client/src/
+
+# Search for where property price is displayed (this is broken)
+grep -rn "property.price\|comp.price\|\.price" --include="*.tsx" client/src/components/cma-presentation/
+```
+
+---
+
+## 🔍 STEP 7: Check Repliers API Response
+
+The CMA data comes from Repliers API. Check what field names they use:
+
+```typescript
+// Add logging when fetching CMA data
+async function fetchCMAComparables(mlsNumber: string) {
+  const response = await fetch(`/api/repliers/comparables/${mlsNumber}`);
+  const data = await response.json();
+  
+  console.log('📦 Raw Repliers API Response:');
+  console.log('First comparable:', JSON.stringify(data.comparables?.[0], null, 2));
+  
+  // List all keys that contain "price"
+  if (data.comparables?.[0]) {
+    const priceKeys = Object.keys(data.comparables[0]).filter(key => 
+      key.toLowerCase().includes('price')
+    );
+    console.log('Price-related keys:', priceKeys);
+  }
+  
+  return data;
+}
+```
+
+---
+
+## 📋 Quick Fix Summary
+
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| $0 price | Using wrong field name | Use `getPropertyPrice()` helper |
+| $NaN/sqft | Price is 0, sqft might be wrong | Use `getPricePerSqft()` with validation |
+| Modal shows $0 | Same field name issue | Update modal to use helpers |
+
+**Most Likely Cause:**
+- Code is looking for `property.price`
+- But Repliers API returns `listPrice` for active, `closePrice` for closed
+
+---
+
+## ✅ Verification Checklist
+
+After applying fixes:
+
+- [ ] Grid view shows correct prices (not $0)
+- [ ] List view shows correct prices
+- [ ] Table view shows correct prices
+- [ ] Modal shows correct price
+- [ ] $/SqFt calculates correctly (no NaN)
+- [ ] Stats bar still shows correct values
+- [ ] Closed properties show sold/close price
+- [ ] Active properties show list price
+
+---
+
+## 📱 Mobile Optimization
+
+- [ ] Price text readable on small screens
+- [ ] Table scrolls horizontally if needed
+- [ ] Modal works on mobile devices
+
+---
+
+*Copy this entire prompt to Replit for Contract Conduit project.*
+*Run the diagnostic first to identify the exact field names being used.*
