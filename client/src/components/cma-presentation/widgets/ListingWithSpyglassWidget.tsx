@@ -26,19 +26,16 @@ export function ListingWithSpyglassWidget({
               Video Presentation
             </p>
             
-            {/* YouTube Link */}
-            <a 
-              href={videoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#EF4923] hover:text-[#d63d18] underline text-lg font-medium block"
-            >
-              {videoUrl}
-            </a>
-            
-            <p className="text-lg text-[#EF4923] font-medium">
-              Watch our video presentation
-            </p>
+            {/* Embedded YouTube Video */}
+            <div className="relative w-full aspect-video max-w-2xl mx-auto rounded-lg overflow-hidden shadow-lg">
+              <iframe
+                src={videoUrl.replace('watch?v=', 'embed/')}
+                title="Spyglass Realty Video Presentation"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="absolute inset-0 w-full h-full"
+              />
+            </div>
           </div>
           
           <div className="text-center space-y-4">
