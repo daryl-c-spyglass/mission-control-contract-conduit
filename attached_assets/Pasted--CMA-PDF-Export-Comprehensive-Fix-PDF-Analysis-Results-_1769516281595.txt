@@ -1,0 +1,619 @@
+# CMA PDF Export - Comprehensive Fix
+
+## PDF Analysis Results
+
+The exported PDF has multiple categories of issues that need to be fixed:
+
+---
+
+## CATEGORY 1: NaN/Zero Calculation Errors
+
+### Affected Slides:
+- **Slide 5 (Summary of Comparables)**: All prices show `$NaN`, Avg Price/Sq Ft shows `$0/sqft`
+- **Slide 6 (Time to Sell)**: All DOM values show `0 days`
+- **Slide 7 (Suggested List Price)**: Avg $/Sq Ft shows `$0`, Recommended shows `—`
+- **Slide 10 (Average Price/Acre)**: Shows `$0 per acre`
+- **Slides 34-36 (Property Details)**: Price `$NaN`, $/Sq Ft `$NaN`
+
+### Root Cause:
+The comparables data exists (10 properties counted) but price fields are not being extracted correctly.
+
+### Fix - Create Safe Data Extraction Utility:
+
+```typescript
+// client/src/lib/cma-data-utils.ts
+
+/**
+ * Safely extract price from a comparable property
+ * Repliers API may return: closePrice, soldPrice, listPrice, or price
+ */
+export function extractPrice(comp: any): number | null {
+  const fields = ['closePrice', 'soldPrice', 'price', 'listPrice'];
+  
+  for (const field of fields) {
+    const value = comp?.[field];
+    if (value != null) {
+      const num = typeof value === 'string' 
+        ? parseFloat(value.replace(/[,$]/g, '')) 
+        : Number(value);
+      if (!isNaN(num) && num > 0) {
+        return num;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Safely extract square footage
+ */
+export function extractSqft(comp: any): number | null {
+  const fields = ['sqft', 'livingArea', 'squareFeet', 'sqFt', 'size'];
+  
+  for (const field of fields) {
+    const value = comp?.[field];
+    if (value != null) {
+      const num = typeof value === 'string' 
+        ? parseFloat(value.replace(/,/g, '')) 
+        : Number(value);
+      if (!isNaN(num) && num > 0) {
+        return num;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Safely extract days on market
+ */
+export function extractDOM(comp: any): number | null {
+  const fields = ['dom', 'daysOnMarket', 'cumulativeDom', 'DOM'];
+  
+  for (const field of fields) {
+    const value = comp?.[field];
+    if (value != null) {
+      const num = typeof value === 'string' ? parseInt(value) : Number(value);
+      if (!isNaN(num) && num >= 0) {
+        return num;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Safely extract lot size in acres
+ */
+export function extractLotAcres(comp: any): number | null {
+  // Try acres first
+  const acresFields = ['lotSizeAcres', 'acres', 'lotAcres'];
+  for (const field of acresFields) {
+    const value = comp?.[field];
+    if (value != null) {
+      const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+      if (!isNaN(num) && num > 0) {
+        return num;
+      }
+    }
+  }
+  
+  // Try sqft and convert
+  const sqftFields = ['lotSize', 'lotSizeSqFt', 'lotSquareFeet'];
+  for (const field of sqftFields) {
+    const value = comp?.[field];
+    if (value != null) {
+      const num = typeof value === 'string' ? parseFloat(value.replace(/,/g, '')) : Number(value);
+      if (!isNaN(num) && num > 0) {
+        return num / 43560; // Convert sqft to acres
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Build full address string
+ */
+export function extractFullAddress(comp: any): string {
+  // Try full address field first
+  if (comp?.fullAddress && comp.fullAddress.trim()) {
+    return comp.fullAddress;
+  }
+  
+  // Try address field
+  if (comp?.address && comp.address.trim()) {
+    const city = comp?.city || '';
+    const state = comp?.state || comp?.stateOrProvince || 'TX';
+    const zip = comp?.zip || comp?.postalCode || '';
+    
+    if (city) {
+      return `${comp.address}, ${city}, ${state} ${zip}`.trim();
+    }
+    return comp.address;
+  }
+  
+  // Build from components
+  const parts = [
+    comp?.streetNumber,
+    comp?.streetName,
+    comp?.streetSuffix,
+  ].filter(Boolean).join(' ');
+  
+  if (parts) {
+    const city = comp?.city || '';
+    const state = comp?.state || 'TX';
+    return city ? `${parts}, ${city}, ${state}` : parts;
+  }
+  
+  return 'Address unavailable';
+}
+
+/**
+ * Calculate all stats from comparables array
+ */
+export function calculateCMAStats(comparables: any[]) {
+  if (!comparables || comparables.length === 0) {
+    return {
+      count: 0,
+      avgPrice: null,
+      minPrice: null,
+      maxPrice: null,
+      avgPricePerSqft: null,
+      avgDOM: null,
+      avgPricePerAcre: null,
+      priceRange: 'N/A',
+    };
+  }
+
+  const prices = comparables.map(c => extractPrice(c)).filter((p): p is number => p !== null);
+  const pricesPerSqft = comparables.map(c => {
+    const price = extractPrice(c);
+    const sqft = extractSqft(c);
+    return price && sqft ? Math.round(price / sqft) : null;
+  }).filter((p): p is number => p !== null);
+  const domValues = comparables.map(c => extractDOM(c)).filter((d): d is number => d !== null);
+  const acreValues = comparables.map(c => extractLotAcres(c)).filter((a): a is number => a !== null);
+  const pricesPerAcre = comparables.map(c => {
+    const price = extractPrice(c);
+    const acres = extractLotAcres(c);
+    return price && acres ? Math.round(price / acres) : null;
+  }).filter((p): p is number => p !== null);
+
+  const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+
+  return {
+    count: comparables.length,
+    avgPrice: prices.length > 0 ? Math.round(avg(prices)!) : null,
+    minPrice: prices.length > 0 ? Math.min(...prices) : null,
+    maxPrice: prices.length > 0 ? Math.max(...prices) : null,
+    avgPricePerSqft: pricesPerSqft.length > 0 ? Math.round(avg(pricesPerSqft)!) : null,
+    avgDOM: domValues.length > 0 ? Math.round(avg(domValues)!) : null,
+    avgPricePerAcre: pricesPerAcre.length > 0 ? Math.round(avg(pricesPerAcre)!) : null,
+    priceRange: prices.length > 0 
+      ? `$${Math.min(...prices).toLocaleString()} - $${Math.max(...prices).toLocaleString()}`
+      : 'N/A',
+  };
+}
+
+/**
+ * Format price for display
+ */
+export function formatPrice(value: number | null | undefined): string {
+  if (value == null || isNaN(value)) return 'N/A';
+  return `$${value.toLocaleString()}`;
+}
+
+/**
+ * Format price in thousands (e.g., $450K)
+ */
+export function formatPriceK(value: number | null | undefined): string {
+  if (value == null || isNaN(value)) return 'N/A';
+  if (value >= 1000000) {
+    return `$${(value / 1000000).toFixed(2)}M`;
+  }
+  return `$${Math.round(value / 1000)}K`;
+}
+```
+
+---
+
+## CATEGORY 2: Static Marketing Slides Showing Placeholder Text
+
+### Affected Slides (Pages 11-32):
+- HOME SELLING SYSTEM
+- OUR PROVEN APPROACH
+- SEO & DIGITAL MARKETING
+- GOOGLE + META ADS
+- PROFESSIONAL VIDEOGRAPHY
+- WHY 4K VIDEO
+- EXAMPLE VIDEOS
+- AERIAL PHOTOGRAPHY
+- IN-HOUSE DESIGN TEAM
+- PRINT & FLYERS
+- CUSTOM PROPERTY PAGE
+- GLOBAL MARKETING REACH
+- LEADINGRE NETWORK STRENGTH
+- FEATURED PROPERTY PROGRAM
+- ZILLOW MARKETING TOOLS
+- ZILLOW SHOWCASE LISTINGS
+- OPEN HOUSE PROCESS
+- PRICING STRATEGY
+- LISTING PRICE
+- MARKETING TIMELINE
+- SELECT MOVE PROGRAM
+- WHAT OUR CLIENTS SAY
+
+### Current Output:
+```
+[SLIDE TITLE]
+View full content in presentation mode
+```
+
+### Expected:
+These slides should display the actual static marketing images from Spyglass branding assets.
+
+### Fix:
+
+These slides need to embed actual images. Find where these slides are rendered and update:
+
+```typescript
+// For static marketing slides, embed the image directly
+import { Image, View, Text, StyleSheet } from '@react-pdf/renderer';
+
+const staticSlides = {
+  HOME_SELLING_SYSTEM: '/assets/slides/home-selling-system.png',
+  OUR_PROVEN_APPROACH: '/assets/slides/our-proven-approach.png',
+  SEO_DIGITAL_MARKETING: '/assets/slides/seo-digital-marketing.png',
+  GOOGLE_META_ADS: '/assets/slides/google-meta-ads.png',
+  PROFESSIONAL_VIDEOGRAPHY: '/assets/slides/professional-videography.png',
+  WHY_4K_VIDEO: '/assets/slides/why-4k-video.png',
+  EXAMPLE_VIDEOS: '/assets/slides/example-videos.png',
+  AERIAL_PHOTOGRAPHY: '/assets/slides/aerial-photography.png',
+  IN_HOUSE_DESIGN_TEAM: '/assets/slides/in-house-design-team.png',
+  PRINT_FLYERS: '/assets/slides/print-flyers.png',
+  CUSTOM_PROPERTY_PAGE: '/assets/slides/custom-property-page.png',
+  GLOBAL_MARKETING_REACH: '/assets/slides/global-marketing-reach.png',
+  LEADINGRE_NETWORK: '/assets/slides/leadingre-network.png',
+  FEATURED_PROPERTY: '/assets/slides/featured-property.png',
+  ZILLOW_MARKETING: '/assets/slides/zillow-marketing.png',
+  ZILLOW_SHOWCASE: '/assets/slides/zillow-showcase.png',
+  OPEN_HOUSE_PROCESS: '/assets/slides/open-house-process.png',
+  PRICING_STRATEGY: '/assets/slides/pricing-strategy.png',
+  LISTING_PRICE: '/assets/slides/listing-price.png',
+  MARKETING_TIMELINE: '/assets/slides/marketing-timeline.png',
+  SELECT_MOVE_PROGRAM: '/assets/slides/select-move-program.png',
+  WHAT_CLIENTS_SAY: '/assets/slides/what-clients-say.png',
+};
+
+// Static Image Slide Component
+function StaticImageSlide({ 
+  title, 
+  imageSrc, 
+  slideNumber, 
+  totalSlides,
+  address 
+}: {
+  title: string;
+  imageSrc: string;
+  slideNumber: number;
+  totalSlides: number;
+  address: string;
+}) {
+  return (
+    <Page size="LETTER" style={styles.page}>
+      <View style={styles.header}>
+        <Text style={styles.slideTitle}>{title}</Text>
+        <Text style={styles.slideNumber}>Slide {slideNumber} of {totalSlides}</Text>
+      </View>
+      
+      <View style={styles.imageContainer}>
+        <Image src={imageSrc} style={styles.fullWidthImage} />
+      </View>
+      
+      <View style={styles.footer}>
+        <Text>{address}</Text>
+        <Text>Spyglass Realty</Text>
+      </View>
+    </Page>
+  );
+}
+```
+
+### Alternative - If Images Are Not Available:
+
+If the static slide images don't exist yet, create a placeholder that explains this is a preview:
+
+```typescript
+function StaticSlidePlaceholder({ title, slideNumber, totalSlides, address }) {
+  return (
+    <Page size="LETTER" style={styles.page}>
+      <View style={styles.header}>
+        <Text style={styles.slideTitle}>{title}</Text>
+        <Text style={styles.slideNumber}>Slide {slideNumber} of {totalSlides}</Text>
+      </View>
+      
+      <View style={styles.placeholderContainer}>
+        <Image src="/assets/spyglass-logo.png" style={styles.logo} />
+        <Text style={styles.placeholderText}>
+          Marketing content will be displayed during live presentation
+        </Text>
+      </View>
+      
+      <View style={styles.footer}>
+        <Text>{address}</Text>
+        <Text>Spyglass Realty</Text>
+      </View>
+    </Page>
+  );
+}
+```
+
+---
+
+## CATEGORY 3: Missing Property Photos
+
+### Affected Slides:
+- Property Details slides (Pages 34-36) show no photos
+
+### Fix:
+
+```typescript
+// Property Details slide should include photo
+function PropertyDetailsSlide({ 
+  property, 
+  slideNumber, 
+  totalSlides,
+  subjectAddress 
+}) {
+  const price = extractPrice(property);
+  const sqft = extractSqft(property);
+  const pricePerSqft = price && sqft ? Math.round(price / sqft) : null;
+  const dom = extractDOM(property);
+  const address = extractFullAddress(property);
+  
+  // Get primary photo URL
+  const photoUrl = property?.photos?.[0] 
+    || property?.primaryPhoto 
+    || property?.images?.[0]?.url
+    || property?.media?.[0]?.mediaUrl
+    || null;
+
+  return (
+    <Page size="LETTER" style={styles.page}>
+      <View style={styles.header}>
+        <Text style={styles.slideTitle}>PROPERTY DETAILS</Text>
+        <Text style={styles.slideNumber}>Slide {slideNumber} of {totalSlides}</Text>
+      </View>
+      
+      <View style={styles.propertyContent}>
+        {/* Property Photo */}
+        {photoUrl ? (
+          <Image src={photoUrl} style={styles.propertyPhoto} />
+        ) : (
+          <View style={styles.noPhotoPlaceholder}>
+            <Text>No Photo Available</Text>
+          </View>
+        )}
+        
+        {/* Property Info */}
+        <View style={styles.propertyInfo}>
+          <Text style={styles.propertyAddress}>{address}</Text>
+          <Text style={styles.propertyPrice}>{formatPrice(price)}</Text>
+          <Text style={styles.propertyStatus}>{property?.status || 'Closed'}</Text>
+          
+          <View style={styles.propertyStats}>
+            <Text>Bedrooms: {property?.beds || property?.bedrooms || 'N/A'}</Text>
+            <Text>Bathrooms: {property?.baths || property?.bathrooms || 'N/A'}</Text>
+            <Text>Square Feet: {sqft?.toLocaleString() || 'N/A'}</Text>
+            <Text>Price/Sq Ft: {pricePerSqft ? `$${pricePerSqft}` : 'N/A'}</Text>
+            <Text>Days on Market: {dom ?? 'N/A'}</Text>
+          </View>
+        </View>
+      </View>
+      
+      <View style={styles.footer}>
+        <Text>{subjectAddress}</Text>
+        <Text>Spyglass Realty</Text>
+      </View>
+    </Page>
+  );
+}
+```
+
+---
+
+## CATEGORY 4: Missing Agent Information
+
+### Affected:
+- Cover page shows "Agent" instead of actual name
+- Agent Resume slide shows "Agent" placeholder
+
+### Fix:
+
+Ensure agent data is passed to the PDF generator:
+
+```typescript
+interface AgentInfo {
+  name: string;
+  email: string;
+  phone: string;
+  photoUrl?: string;
+  title?: string;
+  bio?: string;
+}
+
+// When generating PDF, fetch agent data
+const agentInfo = await fetchAgentProfile(userId);
+
+// Pass to PDF document
+<CmaPdfDocument
+  transaction={transaction}
+  comparables={comparables}
+  agent={agentInfo}  // <-- Make sure this is passed
+/>
+```
+
+In the PDF component:
+
+```typescript
+function CoverPage({ address, mlsNumber, agent, date }) {
+  return (
+    <Page size="LETTER" style={styles.coverPage}>
+      <Image src="/assets/spyglass-logo.png" style={styles.logo} />
+      
+      <Text style={styles.title}>Comparative Market Analysis</Text>
+      <Text style={styles.address}>{address}</Text>
+      <Text style={styles.date}>{date}</Text>
+      
+      <View style={styles.agentSection}>
+        <Text style={styles.preparedBy}>Prepared by</Text>
+        {agent?.photoUrl && (
+          <Image src={agent.photoUrl} style={styles.agentPhoto} />
+        )}
+        <Text style={styles.agentName}>{agent?.name || 'Spyglass Realty Agent'}</Text>
+        <Text style={styles.agentCompany}>Spyglass Realty</Text>
+      </View>
+    </Page>
+  );
+}
+```
+
+---
+
+## CATEGORY 5: Missing Map Slide
+
+### Expected:
+A slide showing map with all comparable properties marked
+
+### Fix:
+
+For PDF export, you cannot use interactive Mapbox. Instead, use Mapbox Static Images API:
+
+```typescript
+function generateMapImageUrl(subject: any, comparables: any[]): string {
+  const MAPBOX_TOKEN = process.env.MAPBOX_ACCESS_TOKEN;
+  
+  // Build markers string
+  const markers: string[] = [];
+  
+  // Subject property marker (orange)
+  if (subject?.latitude && subject?.longitude) {
+    markers.push(`pin-l-home+EF4923(${subject.longitude},${subject.latitude})`);
+  }
+  
+  // Comparable markers (blue for active, green for sold)
+  comparables.forEach((comp, i) => {
+    if (comp?.latitude && comp?.longitude) {
+      const color = comp.status?.toLowerCase() === 'closed' ? '22C55E' : '3B82F6';
+      markers.push(`pin-s-${i + 1}+${color}(${comp.longitude},${comp.latitude})`);
+    }
+  });
+  
+  // Calculate center and zoom
+  const allLats = [subject?.latitude, ...comparables.map(c => c?.latitude)].filter(Boolean);
+  const allLngs = [subject?.longitude, ...comparables.map(c => c?.longitude)].filter(Boolean);
+  
+  const centerLat = allLats.reduce((a, b) => a + b, 0) / allLats.length;
+  const centerLng = allLngs.reduce((a, b) => a + b, 0) / allLngs.length;
+  
+  return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${markers.join(',')}/${centerLng},${centerLat},11,0/800x600@2x?access_token=${MAPBOX_TOKEN}`;
+}
+
+function MapSlide({ subject, comparables, slideNumber, totalSlides, address }) {
+  const mapUrl = generateMapImageUrl(subject, comparables);
+  
+  return (
+    <Page size="LETTER" style={styles.page}>
+      <View style={styles.header}>
+        <Text style={styles.slideTitle}>MAP OF ALL LISTINGS</Text>
+        <Text style={styles.slideNumber}>Slide {slideNumber} of {totalSlides}</Text>
+      </View>
+      
+      <View style={styles.mapContainer}>
+        <Image src={mapUrl} style={styles.mapImage} />
+      </View>
+      
+      <View style={styles.mapLegend}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: '#EF4923' }]} />
+          <Text>Subject Property</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: '#22C55E' }]} />
+          <Text>Sold</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
+          <Text>Active</Text>
+        </View>
+      </View>
+      
+      <View style={styles.footer}>
+        <Text>{address}</Text>
+        <Text>Spyglass Realty</Text>
+      </View>
+    </Page>
+  );
+}
+```
+
+---
+
+## DEBUGGING: Add Logging to Find Data Issues
+
+Add this at the start of PDF generation to see what data is available:
+
+```typescript
+console.log('[PDF] Starting CMA PDF generation');
+console.log('[PDF] Transaction:', {
+  id: transaction?.id,
+  address: transaction?.address,
+  mlsNumber: transaction?.mlsNumber,
+});
+console.log('[PDF] Comparables count:', comparables?.length);
+console.log('[PDF] First comparable sample:', comparables?.[0] ? {
+  address: comparables[0].address,
+  price: comparables[0].price,
+  closePrice: comparables[0].closePrice,
+  soldPrice: comparables[0].soldPrice,
+  listPrice: comparables[0].listPrice,
+  sqft: comparables[0].sqft,
+  livingArea: comparables[0].livingArea,
+  dom: comparables[0].dom,
+  daysOnMarket: comparables[0].daysOnMarket,
+  photos: comparables[0].photos?.length || 0,
+  latitude: comparables[0].latitude,
+  longitude: comparables[0].longitude,
+} : 'No comparables');
+console.log('[PDF] Agent:', agent);
+```
+
+---
+
+## VERIFICATION CHECKLIST
+
+After applying fixes:
+
+### Calculations
+- [ ] Summary of Comparables shows actual prices (not $NaN)
+- [ ] Avg Price/Sq Ft shows calculated value (not $0)
+- [ ] Days on Market shows actual values (not all 0)
+- [ ] Suggested List Price shows calculated range
+- [ ] Average Price/Acre shows calculated value
+- [ ] Property Details slides show actual prices
+
+### Images
+- [ ] Static marketing slides show images (not placeholder text)
+- [ ] Property Details slides include property photos
+- [ ] Map slide renders with markers
+- [ ] Agent photo appears on cover/resume pages
+
+### Data
+- [ ] Agent name displays correctly
+- [ ] Full addresses display with city/state
+- [ ] All 10 comparables are represented
+
+---
+
+Copy this prompt to Replit to fix all CMA PDF export issues.
