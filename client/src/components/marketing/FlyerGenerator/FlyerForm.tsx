@@ -250,8 +250,8 @@ export function FlyerForm({
 
       <Section icon={<ImageIcon className="w-5 h-5 text-primary" />} title="Property Images">
         <div className="flex items-center gap-2 text-green-500 text-sm mb-4">
-          <Check className="w-4 h-4" />
-          Auto-selected using image quality
+          <Sparkles className="w-4 h-4" />
+          Auto-selected using Repliers AI
         </div>
 
         <div className="space-y-4">
@@ -262,17 +262,17 @@ export function FlyerForm({
             data-testid="input-flyer-address"
           />
 
-          <ImageUploadField
-            label="Main Property Photo"
-            id="mainImage"
-            preview={images.mainImage}
-            onChange={onImageUpload('mainImage')}
-            aiSelectionInfo={photoSelectionInfo?.mainImage}
-            availablePhotos={allMlsPhotos}
-            onSelectPhoto={(url) => onSelectPhoto?.('mainImage', url)}
-          />
+          <div className="space-y-4">
+            <ImageUploadField
+              label="Main Property Photo"
+              id="mainImage"
+              preview={images.mainImage}
+              onChange={onImageUpload('mainImage')}
+              aiSelectionInfo={photoSelectionInfo?.mainImage}
+              availablePhotos={allMlsPhotos}
+              onSelectPhoto={(url) => onSelectPhoto?.('mainImage', url)}
+            />
 
-          <div className="grid grid-cols-2 gap-3">
             <ImageUploadField
               label="Kitchen Photo"
               id="kitchenImage"
@@ -282,6 +282,7 @@ export function FlyerForm({
               availablePhotos={allMlsPhotos}
               onSelectPhoto={(url) => onSelectPhoto?.('kitchenImage', url)}
             />
+
             <ImageUploadField
               label="Room Photo"
               id="roomImage"
