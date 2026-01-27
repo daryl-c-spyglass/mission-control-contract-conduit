@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -17,6 +17,22 @@ import type { FlyerData, FlyerImages, ImageTransforms, ImageTransform } from '@/
 import { DEFAULT_TRANSFORMS } from '@/lib/flyer-types';
 import { apiRequest } from '@/lib/queryClient';
 
+interface AgentProfileResponse {
+  profile: any;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    profileImageUrl: string;
+    marketingPhone: string;
+    marketingEmail: string;
+    marketingDisplayName: string;
+    marketingTitle: string;
+    marketingHeadshotUrl: string;
+  } | null;
+}
+
 interface FlyerGeneratorProps {
   transactionId: string;
   transaction: any;
@@ -32,6 +48,13 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   const [imageTransforms, setImageTransforms] = useState<ImageTransforms>({ ...DEFAULT_TRANSFORMS });
 
   const { data: marketingProfile } = useMarketingProfile();
+  
+  // Fetch agent profile for name, phone, etc.
+  const { data: agentProfile } = useQuery<AgentProfileResponse>({
+    queryKey: ['/api/agent/profile'],
+    staleTime: 60000,
+    refetchOnWindowFocus: false,
+  });
 
   const [images, setImages] = useState<FlyerImages>({
     mainImage: null,
@@ -63,6 +86,13 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   useEffect(() => {
     if (transaction) {
       const mlsData = transaction.mlsData || {};
+      const user = agentProfile?.user;
+
+      // Build agent name from settings or fallback to transaction
+      const agentName = user?.marketingDisplayName 
+        || `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
+        || transaction.agentName 
+        || '';
 
       form.reset({
         price: formatPrice(transaction.listPrice || mlsData.listPrice),
@@ -72,9 +102,9 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
         sqft: formatNumber(mlsData.sqft || mlsData.livingArea || mlsData.buildingAreaTotal),
         introHeading: generateDefaultHeadline(transaction, mlsData),
         introDescription: mlsData.publicRemarks || mlsData.remarks || '',
-        agentName: marketingProfile?.agentTitle ? '' : (transaction.agentName || ''),
-        agentTitle: marketingProfile?.agentTitle || 'REALTOR®',
-        phone: transaction.agentPhone || '',
+        agentName,
+        agentTitle: user?.marketingTitle || marketingProfile?.agentTitle || 'REALTOR®',
+        phone: user?.marketingPhone || transaction.agentPhone || '',
       });
 
       const photos = mlsData.photos || mlsData.images || [];
@@ -88,23 +118,25 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
         }));
       }
     }
-  }, [transaction, form, marketingProfile]);
+  }, [transaction, form, marketingProfile, agentProfile]);
 
   useEffect(() => {
-    if (marketingProfile) {
+    if (marketingProfile || agentProfile) {
+      const user = agentProfile?.user;
       setImages(prev => ({
         ...prev,
-        agentPhoto: marketingProfile.agentPhoto || null,
-        qrCode: marketingProfile.qrCode || null,
-        companyLogo: marketingProfile.companyLogoUseDefault
+        // Use marketing profile photo, fall back to user's marketing headshot or profile image
+        agentPhoto: marketingProfile?.agentPhoto || user?.marketingHeadshotUrl || user?.profileImageUrl || null,
+        qrCode: marketingProfile?.qrCode || null,
+        companyLogo: marketingProfile?.companyLogoUseDefault !== false
           ? '/logos/SpyglassRealty_Logo_Black.png'
-          : marketingProfile.companyLogo || '/logos/SpyglassRealty_Logo_Black.png',
-        secondaryLogo: marketingProfile.secondaryLogoUseDefault
+          : marketingProfile?.companyLogo || '/logos/SpyglassRealty_Logo_Black.png',
+        secondaryLogo: marketingProfile?.secondaryLogoUseDefault !== false
           ? '/logos/lre-sgr-black.png'
-          : marketingProfile.secondaryLogo || '/logos/lre-sgr-black.png',
+          : marketingProfile?.secondaryLogo || '/logos/lre-sgr-black.png',
       }));
     }
-  }, [marketingProfile]);
+  }, [marketingProfile, agentProfile]);
 
   const handleImageUpload = (field: keyof FlyerImages) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
