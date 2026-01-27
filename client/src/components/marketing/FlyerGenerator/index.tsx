@@ -103,16 +103,10 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
 
   const watchedValues = form.watch();
 
+  // Effect for MLS/property data - runs when transaction changes
   useEffect(() => {
     if (transaction) {
       const mlsData = transaction.mlsData || {};
-      const user = agentProfile?.user;
-
-      // Build agent name from settings or fallback to transaction
-      const agentName = user?.marketingDisplayName 
-        || `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
-        || transaction.agentName 
-        || '';
 
       // Extract data using robust utility functions that handle Repliers API field variations
       const listPrice = transaction.listPrice || mlsData.listPrice || mlsData.price || mlsData.ListPrice;
@@ -142,23 +136,18 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
                         mlsData.squareFeet ?? mlsData.SquareFeet ?? null;
       const sqft = sqftValue !== null && sqftValue !== undefined ? sqftValue : '';
 
-
       // Store original description for AI summarize feature
       const fullDescription = mlsData.publicRemarks || mlsData.remarks || mlsData.description || '';
       setOriginalDescription(fullDescription);
 
-      form.reset({
-        price: formatPrice(listPrice),
-        address: formatAddress(transaction, mlsData),
-        bedrooms: beds !== null && beds !== undefined && beds !== '' ? String(beds) : '',
-        bathrooms: baths !== null && baths !== undefined && baths !== '' ? String(baths) : '',
-        sqft: sqft !== null && sqft !== undefined && sqft !== '' ? formatNumber(sqft) : '',
-        introHeading: generateDefaultHeadline(transaction, mlsData),
-        introDescription: fullDescription,
-        agentName,
-        agentTitle: user?.marketingTitle || marketingProfile?.agentTitle || 'REALTOR®',
-        phone: user?.marketingPhone || transaction.agentPhone || '',
-      });
+      // Set property-related form values
+      form.setValue('price', formatPrice(listPrice));
+      form.setValue('address', formatAddress(transaction, mlsData));
+      form.setValue('bedrooms', beds !== null && beds !== undefined && beds !== '' ? String(beds) : '');
+      form.setValue('bathrooms', baths !== null && baths !== undefined && baths !== '' ? String(baths) : '');
+      form.setValue('sqft', sqft !== null && sqft !== undefined && sqft !== '' ? formatNumber(sqft) : '');
+      form.setValue('introHeading', generateDefaultHeadline(transaction, mlsData));
+      form.setValue('introDescription', fullDescription);
 
       // Get photos from mlsData - handle various Repliers API formats
       const photos = mlsData.photos || mlsData.images || mlsData.Media || [];
@@ -175,7 +164,26 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
         setAllMlsPhotos(selected.allPhotos);
       }
     }
-  }, [transaction, form, marketingProfile, agentProfile]);
+  }, [transaction, form]);
+
+  // Effect for agent data - runs when agent profile or marketing profile loads
+  useEffect(() => {
+    const user = agentProfile?.user;
+    
+    // Build agent name from settings or fallback to transaction
+    const agentName = user?.marketingDisplayName 
+      || `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
+      || transaction?.agentName 
+      || '';
+
+    const agentTitle = user?.marketingTitle || marketingProfile?.agentTitle || 'REALTOR®';
+    const phone = user?.marketingPhone || transaction?.agentPhone || '';
+
+    // Only update if we have values (don't overwrite with empty)
+    if (agentName) form.setValue('agentName', agentName);
+    if (agentTitle) form.setValue('agentTitle', agentTitle);
+    if (phone) form.setValue('phone', phone);
+  }, [agentProfile, marketingProfile, transaction, form]);
 
   useEffect(() => {
     if (marketingProfile || agentProfile) {
