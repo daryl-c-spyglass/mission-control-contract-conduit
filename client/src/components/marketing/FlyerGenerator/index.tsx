@@ -273,40 +273,20 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
 
   const saveAssetMutation = useMutation({
     mutationFn: async () => {
-      // First, generate the PNG to get image data
-      const response = await apiRequest('POST', `/api/transactions/${transactionId}/export-flyer?format=png`, {
+      // The export-flyer endpoint already saves to marketing assets internally
+      const response = await apiRequest('POST', `/api/transactions/${transactionId}/export-flyer?format=png&saveOnly=true`, {
         ...watchedValues,
         ...images,
         imageTransforms,
       });
-      if (!response.ok) throw new Error('Failed to generate flyer');
       
-      const blob = await response.blob();
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Save failed:', errorText);
+        throw new Error('Failed to save flyer');
+      }
       
-      // Convert blob to base64
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onloadend = () => {
-          const result = reader.result as string;
-          resolve(result);
-        };
-        reader.onerror = reject;
-      });
-      reader.readAsDataURL(blob);
-      const imageData = await base64Promise;
-
-      // Save to marketing assets
-      const safeAddress = watchedValues.address?.replace(/[^a-zA-Z0-9]/g, '-') || 'property';
-      const fileName = `flyer-${safeAddress}-${Date.now()}.png`;
-      
-      const saveResponse = await apiRequest('POST', `/api/transactions/${transactionId}/marketing-assets`, {
-        type: 'flyer',
-        imageData,
-        fileName,
-      });
-      
-      if (!saveResponse.ok) throw new Error('Failed to save asset');
-      return saveResponse.json();
+      return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/transactions/${transactionId}/marketing-assets`] });

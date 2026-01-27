@@ -4179,6 +4179,7 @@ Generate only the headline, nothing else.`;
     try {
       const { id } = req.params;
       const format = req.query.format as string || 'png';
+      const saveOnly = req.query.saveOnly === 'true';
       const data = req.body;
 
       // Validate transaction exists
@@ -4207,22 +4208,35 @@ Generate only the headline, nothing else.`;
         qrCodeUrl: data.qrCode || undefined,
       };
 
-      console.log(`[FlyerGenerator] Exporting ${format} flyer for transaction ${id}`);
+      console.log(`[FlyerGenerator] ${saveOnly ? 'Saving' : 'Exporting'} ${format} flyer for transaction ${id}`);
 
       const outputType: OutputType = format === 'cmyk' ? 'pdf' : 'pngPreview';
       const buffer = await generatePrintFlyer(flyerData, outputType);
 
       const addressSlug = (data.address || 'property').split(',')[0].replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
 
-      // Save to marketing assets
-      try {
+      // Save to marketing assets (only on export or when saveOnly is true)
+      if (saveOnly) {
         const userId = req.user?.claims?.sub;
-        const assetName = `Flyer - ${data.address || 'Property'} - ${new Date().toISOString().split('T')[0]}`;
         await storage.createMarketingAsset({
           transactionId: id,
           type: 'flyer',
-          imageData: buffer.toString('base64'),
-          fileName: `${addressSlug}_flyer.${outputType}`,
+          imageData: `data:image/png;base64,${buffer.toString('base64')}`,
+          fileName: `${addressSlug}_flyer_${Date.now()}.png`,
+          metadata: { format, createdBy: userId, flyerData: data },
+        });
+        console.log(`[FlyerGenerator] Saved flyer to marketing assets`);
+        return res.json({ success: true, message: 'Flyer saved to My Assets' });
+      }
+
+      // For regular export, also save to assets
+      try {
+        const userId = req.user?.claims?.sub;
+        await storage.createMarketingAsset({
+          transactionId: id,
+          type: 'flyer',
+          imageData: `data:image/png;base64,${buffer.toString('base64')}`,
+          fileName: `${addressSlug}_flyer.${format === 'cmyk' ? 'pdf' : 'png'}`,
           metadata: { format, createdBy: userId, flyerData: data },
         });
         console.log(`[FlyerGenerator] Saved flyer to marketing assets`);
