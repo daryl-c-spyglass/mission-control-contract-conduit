@@ -74,8 +74,21 @@ Preferred communication style: Simple, everyday language.
   - Features: Landscape Letter format, all 33 widgets covered, specialized pages for dynamic content
   - Page Types: CoverPage, AgentResumePage, ComparablesSummaryPage, TimeToSellPage, SuggestedPricePage, AveragePricePerAcrePage, ListingActionPlanPage, ClientTestimonialsPage, ListingWithSpyglassPage, SpyglassResourcesPage, MarketingPage, ThankYouPage, StaticImagePage (fallback), PropertyDetailPage (top 3 comparables)
   - Data Flow: CmaPresentationPlayer → Header → PdfDownloadButton → CmaPdfDocument (props: agent, comparables, subjectProperty, averageDaysOnMarket, suggestedListPrice, avgPricePerAcre, preparedFor)
-  - Styling: Spyglass brand colors (#EF4923, #222222), Inter font registered, 40+ style definitions
+  - Styling: Spyglass brand colors (#EF4923, #222222), built-in Helvetica font (Inter disabled due to browser font loading issues), 40+ style definitions
   - Output: `CMA-{address}-{date}.pdf` with toast notifications for status updates
+  - **Font Handling**: Uses built-in Helvetica font family; hyphenation disabled via Font.registerHyphenationCallback to prevent font lookup issues
+  - **Image Handling**: All images removed from PDF - uses text fallbacks for logo, property photos, agent photos, and widget content to avoid cross-origin loading failures
+- **CMA Data Extraction Utilities** (`client/src/lib/cma-data-utils.ts`): Safe data extraction functions for handling MLS/Repliers API field variations:
+  - `extractPrice(comp)`: Handles soldPrice, closePrice, price, listPrice fields
+  - `extractSqft(comp)`: Handles sqft, livingArea, squareFeet (including string parsing)
+  - `extractDOM(comp)`: Handles daysOnMarket, dom, cumulativeDom, simpleDaysOnMarket
+  - `extractLotAcres(comp)`: Handles lot.acres, lotSizeAcres, lotAcres
+  - `extractBeds(comp)`, `extractBaths(comp)`: Handles bedroomsTotal, beds, bathroomsTotal, baths
+  - `extractFullAddress(comp)`: Handles address, unparsedAddress, streetAddress, nested streetNumber/streetName
+  - `calculatePricePerSqft(comp)`, `calculatePricePerAcre(comp)`: Safe calculation with null checks
+  - `calculateCMAStats(comparables)`: Calculates avgPrice, avgSqft, avgDOM, avgPricePerSqft, avgPricePerAcre, priceRange
+  - `formatPrice(value)`, `formatNumber(value)`: Safe formatting with N/A fallback
+  - `normalizeStatus(status)`, `getStatusColor(status)`: Status display utilities
 - **CMA Resources System**: Agent-managed resources (documents, links) for CMA presentations:
   - Database: `agentResources` table with id, userId, name, type (file/link), url, fileUrl, displayOrder, isActive, timestamps
   - API Endpoints: GET/POST `/api/agent/resources`, PATCH/DELETE `/api/agent/resources/:id`, POST `/api/agent/resources/reorder`, POST `/api/agent/resources/upload`
