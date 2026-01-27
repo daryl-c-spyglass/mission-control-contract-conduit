@@ -1,12 +1,33 @@
 interface PhotoWithInsights {
   url?: string;
+  href?: string;
   highResUrl?: string;
   largeUrl?: string;
+  Uri?: string;
   imageInsights?: {
     room?: string;
     description?: string;
     tags?: string[];
     isExterior?: boolean;
+    classification?: {
+      imageOf?: string;
+      confidence?: number;
+    };
+    quality?: {
+      score?: number;
+      brightness?: number;
+      contrast?: number;
+      sharpness?: number;
+    };
+  };
+  ImageInsights?: {
+    Classification?: {
+      ImageOf?: string;
+      Confidence?: number;
+    };
+    Quality?: {
+      Score?: number;
+    };
   };
 }
 
@@ -16,80 +37,146 @@ interface SelectedPhotos {
   roomPhoto: string | null;
 }
 
+export interface PhotoSelectionInfo {
+  classification: string;
+  quality: number;
+  reason: string;
+}
+
+export interface PhotoSelectionResult {
+  mainPhoto: string | null;
+  kitchenPhoto: string | null;
+  roomPhoto: string | null;
+  selectionInfo: {
+    mainImage: PhotoSelectionInfo | null;
+    kitchenImage: PhotoSelectionInfo | null;
+    roomImage: PhotoSelectionInfo | null;
+  };
+  allPhotos: Array<{ url: string; classification: string; quality: number }>;
+}
+
 export function autoSelectPhotos(photos: PhotoWithInsights[]): SelectedPhotos {
+  const result = autoSelectPhotosWithInfo(photos);
+  return {
+    mainPhoto: result.mainPhoto,
+    kitchenPhoto: result.kitchenPhoto,
+    roomPhoto: result.roomPhoto,
+  };
+}
+
+export function autoSelectPhotosWithInfo(photos: PhotoWithInsights[]): PhotoSelectionResult {
   if (!photos || photos.length === 0) {
     return {
       mainPhoto: null,
       kitchenPhoto: null,
       roomPhoto: null,
+      selectionInfo: { mainImage: null, kitchenImage: null, roomImage: null },
+      allPhotos: [],
     };
   }
 
   const getPhotoUrl = (photo: PhotoWithInsights): string => {
-    return photo.highResUrl || photo.largeUrl || photo.url || '';
+    return photo.href || photo.highResUrl || photo.largeUrl || photo.url || photo.Uri || '';
   };
 
-  let mainPhoto: string | null = null;
-  let kitchenPhoto: string | null = null;
-  let roomPhoto: string | null = null;
+  const getClassification = (photo: PhotoWithInsights): string => {
+    return (
+      photo.imageInsights?.classification?.imageOf ||
+      photo.ImageInsights?.Classification?.ImageOf ||
+      photo.imageInsights?.room ||
+      'unknown'
+    ).toLowerCase();
+  };
 
-  const usedIndices = new Set<number>();
+  const getQualityScore = (photo: PhotoWithInsights): number => {
+    return (
+      photo.imageInsights?.quality?.score ||
+      photo.ImageInsights?.Quality?.Score ||
+      50
+    );
+  };
 
-  for (let i = 0; i < photos.length; i++) {
-    const photo = photos[i];
-    const insights = photo.imageInsights;
-    const room = insights?.room?.toLowerCase() || '';
-    const description = insights?.description?.toLowerCase() || '';
-    const tags = insights?.tags?.map(t => t.toLowerCase()) || [];
-    const isExterior = insights?.isExterior;
+  // Normalize photos with classification and quality
+  const normalizedPhotos = photos.map((photo, index) => ({
+    url: getPhotoUrl(photo),
+    classification: getClassification(photo),
+    quality: getQualityScore(photo),
+    index,
+  })).filter(p => p.url);
 
-    if (!mainPhoto && (isExterior || room.includes('exterior') || room.includes('front') || tags.includes('exterior'))) {
-      mainPhoto = getPhotoUrl(photo);
-      usedIndices.add(i);
-    }
+  // Sort by quality (highest first)
+  const sortedByQuality = [...normalizedPhotos].sort((a, b) => b.quality - a.quality);
 
-    if (!kitchenPhoto && (room.includes('kitchen') || description.includes('kitchen') || tags.includes('kitchen'))) {
-      kitchenPhoto = getPhotoUrl(photo);
-      usedIndices.add(i);
-    }
-
-    if (!roomPhoto && !usedIndices.has(i) && (
-      room.includes('living') || room.includes('bedroom') || room.includes('master') ||
-      description.includes('living') || description.includes('bedroom') ||
-      tags.includes('living room') || tags.includes('bedroom')
-    )) {
-      roomPhoto = getPhotoUrl(photo);
-      usedIndices.add(i);
-    }
+  // Main photo priorities: exterior_front > aerial > exterior_* > highest quality
+  const mainOptions = ['exterior_front', 'exterior', 'front', 'aerial', 'drone'];
+  let mainPhotoData = sortedByQuality.find(p =>
+    mainOptions.some(opt => p.classification.includes(opt))
+  );
+  if (!mainPhotoData) {
+    mainPhotoData = sortedByQuality[0];
   }
 
-  if (!mainPhoto && photos.length > 0) {
-    mainPhoto = getPhotoUrl(photos[0]);
-    usedIndices.add(0);
+  // Kitchen photo: kitchen > breakfast_area
+  const kitchenOptions = ['kitchen', 'breakfast'];
+  let kitchenPhotoData = sortedByQuality.find(p =>
+    kitchenOptions.some(opt => p.classification.includes(opt)) &&
+    p.url !== mainPhotoData?.url
+  );
+  if (!kitchenPhotoData && sortedByQuality.length > 1) {
+    kitchenPhotoData = sortedByQuality.find(p => p.url !== mainPhotoData?.url);
   }
 
-  if (!kitchenPhoto) {
-    for (let i = 0; i < photos.length && !kitchenPhoto; i++) {
-      if (!usedIndices.has(i)) {
-        kitchenPhoto = getPhotoUrl(photos[i]);
-        usedIndices.add(i);
-      }
-    }
+  // Room photo: living_room > family_room > master_bedroom > bedroom
+  const roomOptions = ['living', 'family', 'bedroom', 'master', 'dining', 'great_room'];
+  const usedUrls = [mainPhotoData?.url, kitchenPhotoData?.url].filter(Boolean);
+  let roomPhotoData = sortedByQuality.find(p =>
+    roomOptions.some(opt => p.classification.includes(opt)) &&
+    !usedUrls.includes(p.url)
+  );
+  if (!roomPhotoData) {
+    roomPhotoData = sortedByQuality.find(p => !usedUrls.includes(p.url));
   }
 
-  if (!roomPhoto) {
-    for (let i = 0; i < photos.length && !roomPhoto; i++) {
-      if (!usedIndices.has(i)) {
-        roomPhoto = getPhotoUrl(photos[i]);
-        usedIndices.add(i);
-      }
+  // Build selection info for tooltips
+  const buildReason = (photo: typeof normalizedPhotos[0] | undefined, type: 'main' | 'kitchen' | 'room'): string => {
+    if (!photo) return '';
+    if (type === 'main') {
+      return mainOptions.some(opt => photo.classification.includes(opt))
+        ? `Best exterior shot (${photo.classification})`
+        : `Highest quality image (${photo.quality}%)`;
     }
-  }
+    if (type === 'kitchen') {
+      return kitchenOptions.some(opt => photo.classification.includes(opt))
+        ? `Kitchen area detected (${photo.quality}%)`
+        : `Second best quality (${photo.quality}%)`;
+    }
+    return roomOptions.some(opt => photo.classification.includes(opt))
+      ? `Living area detected (${photo.classification})`
+      : `High quality interior (${photo.quality}%)`;
+  };
 
   return {
-    mainPhoto,
-    kitchenPhoto,
-    roomPhoto,
+    mainPhoto: mainPhotoData?.url || null,
+    kitchenPhoto: kitchenPhotoData?.url || null,
+    roomPhoto: roomPhotoData?.url || null,
+    selectionInfo: {
+      mainImage: mainPhotoData ? {
+        classification: mainPhotoData.classification,
+        quality: mainPhotoData.quality,
+        reason: buildReason(mainPhotoData, 'main'),
+      } : null,
+      kitchenImage: kitchenPhotoData ? {
+        classification: kitchenPhotoData.classification,
+        quality: kitchenPhotoData.quality,
+        reason: buildReason(kitchenPhotoData, 'kitchen'),
+      } : null,
+      roomImage: roomPhotoData ? {
+        classification: roomPhotoData.classification,
+        quality: roomPhotoData.quality,
+        reason: buildReason(roomPhotoData, 'room'),
+      } : null,
+    },
+    allPhotos: normalizedPhotos,
   };
 }
 

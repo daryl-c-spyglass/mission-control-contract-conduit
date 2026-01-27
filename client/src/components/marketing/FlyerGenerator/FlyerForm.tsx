@@ -5,11 +5,12 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import {
   FileText, DollarSign, BedDouble, Bath, Ruler, User, Phone, MapPin,
-  Image as ImageIcon, Check
+  Image as ImageIcon, Check, Sparkles
 } from 'lucide-react';
 import { ImageUploadField } from './ImageUploadField';
 import { AIHeadlineButton } from './AIHeadlineButton';
 import type { FlyerData, FlyerImages, ImageTransforms, ImageTransform } from '@/lib/flyer-types';
+import type { PhotoSelectionInfo } from '@/lib/flyer-utils';
 
 interface FlyerFormProps {
   form: UseFormReturn<FlyerData>;
@@ -19,6 +20,13 @@ interface FlyerFormProps {
   onTransformChange: (field: keyof ImageTransforms) => (transform: ImageTransform) => void;
   transactionId: string;
   mlsData: any;
+  photoSelectionInfo?: {
+    mainImage: PhotoSelectionInfo | null;
+    kitchenImage: PhotoSelectionInfo | null;
+    roomImage: PhotoSelectionInfo | null;
+  };
+  allMlsPhotos?: Array<{ url: string; classification: string; quality: number }>;
+  onSelectPhoto?: (field: keyof FlyerImages, url: string) => void;
 }
 
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
@@ -61,6 +69,9 @@ export function FlyerForm({
   onTransformChange,
   transactionId,
   mlsData,
+  photoSelectionInfo,
+  allMlsPhotos,
+  onSelectPhoto,
 }: FlyerFormProps) {
   const { register, setValue } = form;
 
@@ -229,6 +240,9 @@ export function FlyerForm({
             transform={imageTransforms.mainImage}
             onTransformChange={onTransformChange('mainImage')}
             showCropControls
+            aiSelectionInfo={photoSelectionInfo?.mainImage}
+            availablePhotos={allMlsPhotos}
+            onSelectPhoto={(url) => onSelectPhoto?.('mainImage', url)}
           />
 
           <div className="grid grid-cols-2 gap-3">
@@ -240,6 +254,9 @@ export function FlyerForm({
               transform={imageTransforms.kitchenImage}
               onTransformChange={onTransformChange('kitchenImage')}
               showCropControls
+              aiSelectionInfo={photoSelectionInfo?.kitchenImage}
+              availablePhotos={allMlsPhotos}
+              onSelectPhoto={(url) => onSelectPhoto?.('kitchenImage', url)}
             />
             <ImageUploadField
               label="Room Photo"
@@ -249,6 +266,9 @@ export function FlyerForm({
               transform={imageTransforms.roomImage}
               onTransformChange={onTransformChange('roomImage')}
               showCropControls
+              aiSelectionInfo={photoSelectionInfo?.roomImage}
+              availablePhotos={allMlsPhotos}
+              onSelectPhoto={(url) => onSelectPhoto?.('roomImage', url)}
             />
           </div>
         </div>

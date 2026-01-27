@@ -12,7 +12,7 @@ import { FlyerForm } from './FlyerForm';
 import { FlyerPreview } from './FlyerPreview';
 import { GridOverlay } from './GridOverlay';
 import { useMarketingProfile } from '@/hooks/useMarketingProfile';
-import { autoSelectPhotos, formatPrice, formatAddress, formatNumber, generateDefaultHeadline } from '@/lib/flyer-utils';
+import { autoSelectPhotosWithInfo, formatPrice, formatAddress, formatNumber, generateDefaultHeadline, type PhotoSelectionInfo } from '@/lib/flyer-utils';
 import type { FlyerData, FlyerImages, ImageTransforms, ImageTransform } from '@/lib/flyer-types';
 import { DEFAULT_TRANSFORMS } from '@/lib/flyer-types';
 import { apiRequest } from '@/lib/queryClient';
@@ -66,6 +66,20 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
     qrCode: null,
   });
 
+  // Photo selection info for AI tooltips
+  const [photoSelectionInfo, setPhotoSelectionInfo] = useState<{
+    mainImage: PhotoSelectionInfo | null;
+    kitchenImage: PhotoSelectionInfo | null;
+    roomImage: PhotoSelectionInfo | null;
+  }>({
+    mainImage: null,
+    kitchenImage: null,
+    roomImage: null,
+  });
+
+  // All available MLS photos for gallery selection
+  const [allMlsPhotos, setAllMlsPhotos] = useState<Array<{ url: string; classification: string; quality: number }>>([]);
+
   const form = useForm<FlyerData>({
     defaultValues: {
       price: '',
@@ -109,13 +123,15 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
 
       const photos = mlsData.photos || mlsData.images || [];
       if (photos.length > 0) {
-        const selected = autoSelectPhotos(photos);
+        const selected = autoSelectPhotosWithInfo(photos);
         setImages(prev => ({
           ...prev,
           mainImage: selected.mainPhoto,
           kitchenImage: selected.kitchenPhoto,
           roomImage: selected.roomPhoto,
         }));
+        setPhotoSelectionInfo(selected.selectionInfo);
+        setAllMlsPhotos(selected.allPhotos);
       }
     }
   }, [transaction, form, marketingProfile, agentProfile]);
@@ -191,8 +207,8 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   };
 
   return (
-    <div className="h-full flex flex-col bg-background">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+    <div className="h-full flex flex-col bg-background overflow-hidden">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
@@ -228,9 +244,9 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="w-[420px] min-w-[420px] border-r border-border bg-card">
-          <ScrollArea className="h-full">
+      <div className="flex flex-1 overflow-hidden min-h-0">
+        <div className="w-[420px] min-w-[420px] border-r border-border bg-card flex flex-col h-full overflow-hidden">
+          <ScrollArea className="flex-1 h-full" style={{ WebkitOverflowScrolling: 'touch' }}>
             <FlyerForm
               form={form}
               images={images}
@@ -239,6 +255,9 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
               onTransformChange={handleTransformChange}
               transactionId={transactionId}
               mlsData={transaction?.mlsData}
+              photoSelectionInfo={photoSelectionInfo}
+              allMlsPhotos={allMlsPhotos}
+              onSelectPhoto={(field, url) => setImages(prev => ({ ...prev, [field]: url }))}
             />
           </ScrollArea>
         </div>

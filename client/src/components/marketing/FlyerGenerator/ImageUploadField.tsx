@@ -1,8 +1,12 @@
+import { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Upload, ZoomIn, MoveHorizontal, MoveVertical, RotateCcw } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Upload, ZoomIn, MoveHorizontal, MoveVertical, RotateCcw, Sparkles, Images, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ImageTransform } from '@/lib/flyer-types';
+import type { PhotoSelectionInfo } from '@/lib/flyer-utils';
 
 interface ImageUploadFieldProps {
   label: string;
@@ -14,6 +18,9 @@ interface ImageUploadFieldProps {
   showCropControls?: boolean;
   compact?: boolean;
   circular?: boolean;
+  aiSelectionInfo?: PhotoSelectionInfo | null;
+  availablePhotos?: Array<{ url: string; classification: string; quality: number }>;
+  onSelectPhoto?: (url: string) => void;
 }
 
 export function ImageUploadField({
@@ -26,16 +33,50 @@ export function ImageUploadField({
   showCropControls = false,
   compact = false,
   circular = false,
+  aiSelectionInfo,
+  availablePhotos,
+  onSelectPhoto,
 }: ImageUploadFieldProps) {
+  const [galleryOpen, setGalleryOpen] = useState(false);
+
   const handleReset = () => {
     onTransformChange?.({ scale: 1, positionX: 0, positionY: 0 });
   };
 
+  const handleSelectFromGallery = (url: string) => {
+    onSelectPhoto?.(url);
+    setGalleryOpen(false);
+  };
+
   return (
     <div className="space-y-2">
-      <Label className="text-xs font-medium uppercase tracking-wide">
-        {label}
-      </Label>
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-xs font-medium uppercase tracking-wide">
+          {label}
+        </Label>
+        {aiSelectionInfo && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 cursor-help"
+                data-testid={`ai-selection-trigger-${id}`}
+              >
+                <Sparkles className="w-3 h-3" />
+                <span>AI Selected</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs" data-testid={`ai-selection-tooltip-${id}`}>
+              <div className="space-y-1 text-xs">
+                <p className="font-medium">{aiSelectionInfo.reason}</p>
+                <p className="text-muted-foreground">
+                  Type: {aiSelectionInfo.classification} | Quality: {aiSelectionInfo.quality}%
+                </p>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
 
       <label
         htmlFor={id}
@@ -159,6 +200,59 @@ export function ImageUploadField({
             Reset
           </Button>
         </div>
+      )}
+
+      {availablePhotos && availablePhotos.length > 0 && onSelectPhoto && (
+        <Dialog open={galleryOpen} onOpenChange={setGalleryOpen}>
+          <DialogTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full h-7 text-xs gap-1"
+              data-testid={`button-gallery-${id}`}
+            >
+              <Images className="w-3 h-3" />
+              Choose from MLS Photos ({availablePhotos.length})
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle>Select Photo for {label}</DialogTitle>
+            </DialogHeader>
+            <div className="grid grid-cols-3 gap-2 overflow-y-auto max-h-[60vh] p-1">
+              {availablePhotos.map((photo, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => handleSelectFromGallery(photo.url)}
+                  className={cn(
+                    "relative aspect-video rounded-md overflow-hidden border-2 transition-all hover-elevate",
+                    preview === photo.url
+                      ? "border-primary ring-2 ring-primary/30"
+                      : "border-transparent"
+                  )}
+                  data-testid={`gallery-photo-${index}`}
+                >
+                  <img
+                    src={photo.url}
+                    alt={`Photo ${index + 1}`}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  {preview === photo.url && (
+                    <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                      <Check className="w-3 h-3 text-primary-foreground" />
+                    </div>
+                  )}
+                  <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[10px] px-1.5 py-0.5 truncate">
+                    {photo.classification} · {photo.quality}%
+                  </div>
+                </button>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
