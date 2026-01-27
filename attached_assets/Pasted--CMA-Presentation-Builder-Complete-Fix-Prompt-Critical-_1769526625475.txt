@@ -1,0 +1,573 @@
+# CMA Presentation Builder — Complete Fix Prompt
+
+## 🎯 Critical Issues to Fix
+
+| # | Issue | Current State | Expected State |
+|---|-------|---------------|----------------|
+| 1 | **Preview Dark Background** | Dark background even in light mode | Respect system theme |
+| 2 | **False Warning** | "Days on market data not available" but COMPS shows "0 days" | Remove false positive |
+| 3 | **Agent Photo Missing** | Generic person icon | Photo from Settings → Agent Marketing Profile |
+| 4 | **Cover Page Logo** | Orange house icon | Spyglass Realty logo |
+| 5 | **YouTube Thumbnail** | Play button icon | Actual YouTube video thumbnail |
+| 6 | **Marketing Slides #11-33** | "Marketing slide #11" placeholder text | Actual static images |
+| 7 | **Preview/PDF Mismatch** | Different rendering | Must be identical |
+
+---
+
+## 📁 Assets Already in Replit (Use These!)
+
+### Logos — Already Uploaded
+```
+public/logos/
+├── SpyglassRealty_Logo_White.png    → Dark backgrounds (preview header, PDF dark slides)
+├── SpyglassRealty_Logo_Black.png    → Light backgrounds (PDF cover page, light mode)
+├── Square.png                       → Widget card icons
+└── spyglass-logo-square.png         → Alternative square logo
+```
+
+### Widget Static Images — Already Uploaded  
+```
+public/cma-widgets/
+├── 11-home-selling-system.png
+├── 12-our-proven-approach.png
+├── 13-seo-digital-marketing.png
+├── 14-google-meta-ads.png
+├── 15-professional-videography.png
+├── 16-why-4k-video.png
+├── 17-example-videos.png
+├── 18-aerial-photography.png
+├── 19-in-house-design-team.png
+├── 20-print-flyers.png
+├── 21-custom-property-page.png
+├── 22-global-marketing-reach.png
+├── 23-leadingre-network-strength.png
+├── 24-featured-property-program.png
+├── 25-zillow-marketing-tools.png
+├── 26-zillow-showcase-listings.png
+├── 27-open-house-process.png
+├── 28-pricing-strategy.png
+├── 29-listing-price.png
+├── 30-marketing-timeline.png
+├── 31-select-move-program.png
+├── 32-what-our-clients-say.png
+└── 33-thank-you.png
+```
+
+---
+
+## 🔧 FIX 1: Preview Background Theme
+
+**Problem:** Preview modal has dark background even when user is in light mode
+
+**File:** Find the Preview modal/dialog component
+
+**Current (Wrong):**
+```tsx
+<div className="bg-gray-900 ...">  {/* Always dark */}
+```
+
+**Fix — Make theme-aware:**
+```tsx
+// Add theme detection
+const isDarkMode = document.documentElement.classList.contains('dark') ||
+  (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+// Or use your theme context
+import { useTheme } from '@/hooks/useTheme';
+const { theme } = useTheme();
+const isDarkMode = theme === 'dark' || 
+  (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+// Apply conditional background
+<div className={cn(
+  "fixed inset-0 z-50",
+  isDarkMode ? "bg-gray-900" : "bg-gray-100"
+)}>
+```
+
+**For the preview slides container:**
+```tsx
+<div className={cn(
+  "p-4 rounded-lg",
+  isDarkMode ? "bg-gray-800" : "bg-white border border-gray-200"
+)}>
+```
+
+---
+
+## 🔧 FIX 2: Remove False "Days on Market" Warning
+
+**Problem:** Shows "Days on market data not available" even when COMPS card shows "0 days Avg DOM"
+
+**File:** Find where the warning is generated (likely `CMAPresentationPreview.tsx` or similar)
+
+**Current (Wrong):**
+```tsx
+// Likely checking if daysOnMarket is truthy (0 is falsy!)
+if (!statistics.avgDaysOnMarket) {
+  issues.push('Days on market data not available');
+}
+```
+
+**Fix — Check for undefined/null, not falsy:**
+```tsx
+// Correct check - 0 is a valid value!
+if (statistics.avgDaysOnMarket === undefined || statistics.avgDaysOnMarket === null) {
+  issues.push('Days on market data not available');
+}
+
+// Or even better - only warn if NO comparables have DOM data
+const hasAnyDomData = comparables.some(comp => 
+  comp.daysOnMarket !== undefined && 
+  comp.daysOnMarket !== null
+);
+
+if (!hasAnyDomData) {
+  issues.push('Days on market data not available');
+}
+```
+
+---
+
+## 🔧 FIX 3: Agent Photo Not Syncing
+
+**Problem:** Agent Resume shows generic person icon instead of actual photo
+
+**Root Cause:** Photo URL not being passed or wrong field being accessed
+
+**Database Schema Reference:**
+```typescript
+// agent_profiles table has:
+headshotUrl: text("headshot_url")
+
+// users table has:
+marketingHeadshotUrl: text("marketing_headshot_url")
+profileImageUrl: text("profile_image_url")
+```
+
+**Fix — Update photo fallback chain:**
+
+```typescript
+// When fetching agent data for presentation
+const agentPhoto = 
+  agentProfileData?.user?.marketingHeadshotUrl ||  // Priority 1: Marketing headshot
+  agentProfileData?.profile?.headshotUrl ||         // Priority 2: Profile headshot  
+  agentProfileData?.user?.profileImageUrl ||        // Priority 3: Google profile pic
+  null;
+
+// Log for debugging
+console.log('Agent photo sources:', {
+  marketingHeadshotUrl: agentProfileData?.user?.marketingHeadshotUrl,
+  headshotUrl: agentProfileData?.profile?.headshotUrl,
+  profileImageUrl: agentProfileData?.user?.profileImageUrl,
+  selected: agentPhoto
+});
+```
+
+**In Agent Resume component:**
+```tsx
+{agentPhoto ? (
+  <img 
+    src={agentPhoto} 
+    alt={agentName}
+    className="w-20 h-20 rounded-full object-cover"
+    onError={(e) => {
+      console.error('Agent photo failed to load:', agentPhoto);
+      e.currentTarget.style.display = 'none';
+      e.currentTarget.nextElementSibling?.classList.remove('hidden');
+    }}
+  />
+) : null}
+
+{/* Fallback icon - hidden by default if photo exists */}
+<div className={cn(
+  "w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center",
+  agentPhoto ? "hidden" : ""
+)}>
+  <User className="w-10 h-10 text-gray-400" />
+</div>
+```
+
+---
+
+## 🔧 FIX 4: Cover Page — Use Spyglass Logo Instead of House Icon
+
+**Problem:** Cover page shows orange house emoji icon instead of Spyglass logo
+
+**File:** `CoverPageSlide.tsx` or wherever cover page is rendered
+
+**Current (Wrong):**
+```tsx
+<div className="bg-orange-500 rounded-full p-4">
+  <Home className="w-8 h-8 text-white" />  {/* House icon */}
+</div>
+```
+
+**Fix — Use Spyglass logo:**
+```tsx
+// For Preview (web component)
+<img 
+  src="/logos/SpyglassRealty_Logo_Black.png"  // Black logo on white background
+  alt="Spyglass Realty"
+  className="h-16 w-auto mx-auto mb-4"
+/>
+
+// OR if you want the orange background circle style:
+<div className="bg-orange-500 rounded-full p-4 flex items-center justify-center">
+  <img 
+    src="/logos/Square.png"  // White square logo
+    alt="Spyglass Realty"
+    className="h-8 w-8 object-contain"
+  />
+</div>
+```
+
+**For PDF Export (@react-pdf/renderer):**
+```tsx
+import { Image } from '@react-pdf/renderer';
+
+// Need to use absolute URL or base64 for PDF
+const logoUrl = `${window.location.origin}/logos/SpyglassRealty_Logo_Black.png`;
+
+<Image 
+  src={logoUrl}
+  style={{ width: 150, height: 'auto', alignSelf: 'center', marginBottom: 20 }}
+/>
+```
+
+---
+
+## 🔧 FIX 5: LISTING WITH SPYGLASS REALTY — YouTube Thumbnail
+
+**Problem:** Shows play button icon instead of actual YouTube video thumbnail
+
+**YouTube Video URL:** `https://www.youtube.com/embed/iB_u-ksW3ts`
+
+**YouTube Video ID:** `iB_u-ksW3ts`
+
+**YouTube Thumbnail URL:** `https://img.youtube.com/vi/iB_u-ksW3ts/maxresdefault.jpg`
+
+**Fix — Show thumbnail with play overlay:**
+```tsx
+// For the slide preview
+<div className="relative aspect-video w-full">
+  {/* YouTube Thumbnail */}
+  <img 
+    src="https://img.youtube.com/vi/iB_u-ksW3ts/maxresdefault.jpg"
+    alt="Listing with Spyglass Realty Video"
+    className="w-full h-full object-cover rounded-lg"
+    onError={(e) => {
+      // Fallback to medium quality if maxres not available
+      e.currentTarget.src = "https://img.youtube.com/vi/iB_u-ksW3ts/hqdefault.jpg";
+    }}
+  />
+  
+  {/* Play Button Overlay */}
+  <div className="absolute inset-0 flex items-center justify-center">
+    <div className="bg-orange-500 rounded-full p-4 shadow-lg hover:scale-110 transition-transform cursor-pointer">
+      <Play className="w-8 h-8 text-white fill-white" />
+    </div>
+  </div>
+  
+  {/* "Video Presentation" label */}
+  <div className="absolute bottom-4 left-0 right-0 text-center">
+    <span className="text-sm text-gray-500 uppercase tracking-wider">
+      LISTING WITH SPYGLASS REALTY
+    </span>
+    <p className="text-gray-700 mt-1">Video presentation</p>
+  </div>
+</div>
+```
+
+**For the card thumbnail (grid view):**
+```tsx
+<div className="relative aspect-video w-full overflow-hidden rounded-lg">
+  <img 
+    src="https://img.youtube.com/vi/iB_u-ksW3ts/mqdefault.jpg"
+    alt="Video"
+    className="w-full h-full object-cover"
+  />
+  <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+    <Play className="w-8 h-8 text-white fill-white" />
+  </div>
+</div>
+```
+
+---
+
+## 🔧 FIX 6: Marketing Slides #11-33 — Use Actual Images
+
+**Problem:** Shows "Marketing slide #11" placeholder text instead of actual static images
+
+**File:** Find where these slides are rendered (likely a switch/case or mapping function)
+
+**Current (Wrong):**
+```tsx
+// Generic placeholder for all marketing slides
+case 'home_selling_system':
+case 'our_proven_approach':
+// ... etc
+  return (
+    <div className="flex flex-col items-center justify-center h-full">
+      <SomeIcon className="w-12 h-12 text-gray-400" />
+      <span className="text-gray-500">{title}</span>
+      <span className="text-gray-400">Marketing slide #{slideNumber}</span>
+    </div>
+  );
+```
+
+**Fix — Use actual images from public/cma-widgets/:**
+
+```tsx
+// Create a mapping of slide IDs to image paths
+const STATIC_SLIDE_IMAGES: Record<string, string> = {
+  'home_selling_system': '/cma-widgets/11-home-selling-system.png',
+  'our_proven_approach': '/cma-widgets/12-our-proven-approach.png',
+  'seo_digital_marketing': '/cma-widgets/13-seo-digital-marketing.png',
+  'google_meta_ads': '/cma-widgets/14-google-meta-ads.png',
+  'professional_videography': '/cma-widgets/15-professional-videography.png',
+  'why_4k_video': '/cma-widgets/16-why-4k-video.png',
+  'example_videos': '/cma-widgets/17-example-videos.png',
+  'aerial_photography': '/cma-widgets/18-aerial-photography.png',
+  'in_house_design_team': '/cma-widgets/19-in-house-design-team.png',
+  'print_flyers': '/cma-widgets/20-print-flyers.png',
+  'custom_property_page': '/cma-widgets/21-custom-property-page.png',
+  'global_marketing_reach': '/cma-widgets/22-global-marketing-reach.png',
+  'leadingre_network_strength': '/cma-widgets/23-leadingre-network-strength.png',
+  'featured_property_program': '/cma-widgets/24-featured-property-program.png',
+  'zillow_marketing_tools': '/cma-widgets/25-zillow-marketing-tools.png',
+  'zillow_showcase_listings': '/cma-widgets/26-zillow-showcase-listings.png',
+  'open_house_process': '/cma-widgets/27-open-house-process.png',
+  'pricing_strategy': '/cma-widgets/28-pricing-strategy.png',
+  'listing_price': '/cma-widgets/29-listing-price.png',
+  'marketing_timeline': '/cma-widgets/30-marketing-timeline.png',
+  'select_move_program': '/cma-widgets/31-select-move-program.png',
+  'what_clients_say': '/cma-widgets/32-what-our-clients-say.png',
+  'thank_you': '/cma-widgets/33-thank-you.png',
+};
+
+// Component to render static image slides
+function StaticImageSlide({ slideId, title }: { slideId: string; title: string }) {
+  const imagePath = STATIC_SLIDE_IMAGES[slideId];
+  
+  if (!imagePath) {
+    console.warn(`No image mapping for slide: ${slideId}`);
+    return null;
+  }
+  
+  return (
+    <div className="relative w-full h-full">
+      <img 
+        src={imagePath}
+        alt={title}
+        className="w-full h-full object-contain"
+        onError={(e) => {
+          console.error(`Failed to load image: ${imagePath}`);
+          // Show fallback on error
+          e.currentTarget.style.display = 'none';
+          e.currentTarget.parentElement?.querySelector('.fallback')?.classList.remove('hidden');
+        }}
+      />
+      {/* Fallback - hidden unless image fails */}
+      <div className="fallback hidden absolute inset-0 flex flex-col items-center justify-center bg-gray-100">
+        <span className="text-gray-500">{title}</span>
+        <span className="text-red-500 text-sm">Image not found: {imagePath}</span>
+      </div>
+    </div>
+  );
+}
+```
+
+**Verify images exist:**
+```bash
+# Run in Replit terminal to verify all images are present
+ls -la public/cma-widgets/
+```
+
+---
+
+## 🔧 FIX 7: Preview and PDF Must Mirror Each Other
+
+**Principle:** Any component rendered in Preview MUST use the same data transformation and rendering logic as PDF export.
+
+**Architecture Pattern:**
+
+```typescript
+// 1. Create a SHARED data transformer
+// File: lib/cma-slide-data.ts
+
+export interface SlideData {
+  id: string;
+  type: 'cover' | 'agent' | 'video' | 'comps' | 'static_image' | 'dynamic';
+  title: string;
+  content: any;
+  imagePath?: string;
+}
+
+export function transformToSlideData(
+  cma: CMAData,
+  agent: AgentInfo,
+  comparables: Comparable[],
+  statistics: Statistics,
+  includedSections: string[]
+): SlideData[] {
+  // Single source of truth for both Preview and PDF
+  const slides: SlideData[] = [];
+  
+  // Cover page
+  if (includedSections.includes('cover_page')) {
+    slides.push({
+      id: 'cover_page',
+      type: 'cover',
+      title: 'Comparative Market Analysis',
+      content: {
+        address: cma.subjectProperty.address,
+        agentName: `${agent.firstName} ${agent.lastName}`,
+        agentCompany: agent.company,
+        logo: '/logos/SpyglassRealty_Logo_Black.png',
+      }
+    });
+  }
+  
+  // Agent Resume
+  if (includedSections.includes('agent_resume')) {
+    slides.push({
+      id: 'agent_resume',
+      type: 'agent',
+      title: 'Agent Resume',
+      content: {
+        name: `${agent.firstName} ${agent.lastName}`,
+        company: agent.company,
+        phone: agent.phone,
+        email: agent.email,
+        photo: agent.photo,  // Use the fallback chain result
+        bio: agent.bio,
+      }
+    });
+  }
+  
+  // Static image slides (11-33)
+  Object.entries(STATIC_SLIDE_IMAGES).forEach(([slideId, imagePath]) => {
+    if (includedSections.includes(slideId)) {
+      slides.push({
+        id: slideId,
+        type: 'static_image',
+        title: slideId.replace(/_/g, ' ').toUpperCase(),
+        content: null,
+        imagePath,
+      });
+    }
+  });
+  
+  return slides;
+}
+```
+
+```tsx
+// 2. Use the SAME transformer for Preview
+// File: components/cma-preview/CMAPresentationPreview.tsx
+
+import { transformToSlideData } from '@/lib/cma-slide-data';
+
+function CMAPresentationPreview({ cma, agent, comparables, statistics, includedSections }) {
+  const slides = transformToSlideData(cma, agent, comparables, statistics, includedSections);
+  
+  return (
+    <div className="grid grid-cols-3 gap-4">
+      {slides.map((slide) => (
+        <SlidePreviewCard key={slide.id} slide={slide} />
+      ))}
+    </div>
+  );
+}
+```
+
+```tsx
+// 3. Use the SAME transformer for PDF
+// File: components/pdf/CMAPdfDocument.tsx
+
+import { transformToSlideData } from '@/lib/cma-slide-data';
+
+function CMAPdfDocument({ cma, agent, comparables, statistics, includedSections }) {
+  const slides = transformToSlideData(cma, agent, comparables, statistics, includedSections);
+  
+  return (
+    <Document>
+      {slides.map((slide) => (
+        <SlidePdfPage key={slide.id} slide={slide} />
+      ))}
+    </Document>
+  );
+}
+```
+
+---
+
+## 📱 Mobile Optimization Requirements
+
+All fixes must work on:
+
+| Device | Browser | Screen Size |
+|--------|---------|-------------|
+| iPad Pro | Safari | 1024 x 1366 |
+| iPad Air/Mini | Safari | 768 x 1024 |
+| iPhone 14/15 Pro | Safari | 393 x 852 |
+| iPhone SE | Safari | 375 x 667 |
+| Android Tablet | Chrome | 800 x 1280 |
+| Android Phone | Chrome | 360 x 800 |
+
+**Mobile Checklist:**
+- [ ] Touch targets minimum 44x44px
+- [ ] Images load on mobile networks
+- [ ] Preview scrolls smoothly on touch devices
+- [ ] PDF export works on iOS Safari
+- [ ] Grid layout responsive (3 cols desktop, 2 cols tablet, 1 col phone)
+
+---
+
+## ✅ Verification Checklist
+
+### Preview Component
+- [ ] Background respects system light/dark theme
+- [ ] No false "Days on market" warning when data is 0
+- [ ] Agent photo displays from Settings → Agent Marketing Profile
+- [ ] Cover page shows Spyglass logo (not house icon)
+- [ ] "Listing with Spyglass" shows YouTube thumbnail
+- [ ] Slides 11-33 show actual images from public/cma-widgets/
+- [ ] All slides display correctly in grid view
+
+### PDF Export  
+- [ ] PDF matches Preview exactly (same content, same order)
+- [ ] Agent photo included in PDF
+- [ ] Spyglass logo renders in PDF
+- [ ] Static images (11-33) render in PDF
+- [ ] PDF generates without errors
+
+### Data Consistency
+- [ ] Preview and PDF use same data transformer
+- [ ] Agent data comes from correct fields with fallback chain
+- [ ] Statistics calculations consistent between views
+
+---
+
+## 🔍 Debugging Commands
+
+Run these in Replit terminal to verify assets:
+
+```bash
+# Check if logo files exist
+ls -la public/logos/
+
+# Check if widget images exist  
+ls -la public/cma-widgets/
+
+# Find all spyglass-related files
+find . -name "*spyglass*" -not -path "./node_modules/*"
+
+# Check if images are being served correctly
+curl -I http://localhost:5000/logos/SpyglassRealty_Logo_Black.png
+```
+
+---
+
+*Copy this entire prompt to Replit for Contract Conduit project.*

@@ -98,7 +98,8 @@ export function generatePreviewSlides({
         break;
 
       case 'time_to_sell':
-        hasIssue = stats.avgDOM === null || stats.avgDOM === 0;
+        // Note: 0 days is valid (fast-selling market), only null/undefined indicates missing data
+        hasIssue = stats.avgDOM === null || stats.avgDOM === undefined;
         issueMessage = hasIssue ? 'Days on market data not available' : undefined;
         slideContent = <TimeToSellContent stats={stats} averageDaysOnMarket={averageDaysOnMarket} />;
         break;
@@ -124,8 +125,8 @@ export function generatePreviewSlides({
         break;
 
       default:
-        if (widget.type === 'static') {
-          slideContent = <StaticSlideContent title={widget.title} widgetNumber={widget.number} />;
+        if (widget.type === 'static' && widget.imagePath) {
+          slideContent = <StaticSlideContent title={widget.title} imagePath={widget.imagePath} />;
         } else {
           slideContent = <GenericSlideContent title={widget.title} />;
         }
@@ -178,7 +179,9 @@ export function checkDataIssues({ comparables, agent, subjectProperty }: {
   const issues: string[] = [];
 
   if (!agent?.name) issues.push('Agent name not configured');
-  if (!agent?.photo) issues.push('Agent photo not uploaded');
+  // Use same fallback chain as AgentResumeContent for photo check
+  const agentPhoto = agent?.photo || (agent as any)?.headshotUrl || (agent as any)?.photoUrl;
+  if (!agentPhoto) issues.push('Agent photo not uploaded');
   if (!agent?.bio) issues.push('Agent bio not filled in');
 
   if (subjectProperty) {
@@ -223,9 +226,10 @@ export function checkDataIssues({ comparables, agent, subjectProperty }: {
       issues.push('Location coordinates missing - map will not display');
     }
 
+    // Check if any comparables have DOM data - 0 is a valid value (fast-selling market)
     const withDOM = comparables.filter(c => {
       const dom = extractDOM(c);
-      return dom !== null && dom > 0;
+      return dom !== null && dom !== undefined;
     });
     if (withDOM.length === 0) {
       issues.push('Days on market data not available');
@@ -247,9 +251,14 @@ function CoverSlideContent({ address, agent }: { address: string; agent: AgentPr
   return (
     <div className="flex flex-col items-center justify-center h-full text-center">
       <div className="mb-4">
-        <div className="w-16 h-16 bg-[#EF4923] rounded-full flex items-center justify-center mx-auto mb-2">
-          <Home className="w-8 h-8 text-white" />
-        </div>
+        <img 
+          src="/logos/spyglass-logo-black.png"
+          alt="Spyglass Realty"
+          className="h-12 w-auto mx-auto mb-4"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
+        />
         <h1 className="text-2xl font-bold text-[#222222]">COMPARATIVE MARKET ANALYSIS</h1>
       </div>
       <p className="text-lg text-zinc-700 mb-4">{address}</p>
@@ -263,10 +272,25 @@ function CoverSlideContent({ address, agent }: { address: string; agent: AgentPr
 }
 
 function AgentResumeContent({ agent }: { agent: AgentProfile }) {
+  // Get agent photo - the AgentProfile type uses 'photo' field
+  const agentPhoto = agent?.photo || (agent as any)?.headshotUrl || (agent as any)?.photoUrl;
+  
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-start gap-4 mb-4">
-        <div className="w-16 h-16 bg-zinc-200 rounded-full flex items-center justify-center">
+        {agentPhoto ? (
+          <img 
+            src={agentPhoto}
+            alt={agent?.name || 'Agent'}
+            className="w-16 h-16 rounded-full object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              const fallback = e.currentTarget.nextElementSibling;
+              if (fallback) (fallback as HTMLElement).classList.remove('hidden');
+            }}
+          />
+        ) : null}
+        <div className={`w-16 h-16 bg-zinc-200 rounded-full flex items-center justify-center ${agentPhoto ? 'hidden' : ''}`}>
           <User className="w-8 h-8 text-zinc-400" />
         </div>
         <div>
@@ -287,11 +311,29 @@ function AgentResumeContent({ agent }: { agent: AgentProfile }) {
 }
 
 function VideoSlideContent({ title }: { title: string }) {
+  // YouTube video ID for Listing with Spyglass Realty
+  const youtubeVideoId = 'iB_u-ksW3ts';
+  
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center bg-zinc-100 rounded">
-      <Play className="w-12 h-12 text-[#EF4923] mb-4" />
-      <p className="font-medium text-zinc-700">{title}</p>
-      <p className="text-sm text-zinc-500 mt-2">Video presentation</p>
+    <div className="flex flex-col items-center justify-center h-full text-center">
+      <div className="relative w-full max-w-md aspect-video">
+        <img 
+          src={`https://img.youtube.com/vi/${youtubeVideoId}/maxresdefault.jpg`}
+          alt={title}
+          className="w-full h-full object-cover rounded-lg"
+          onError={(e) => {
+            // Fallback to medium quality if maxres not available
+            e.currentTarget.src = `https://img.youtube.com/vi/${youtubeVideoId}/hqdefault.jpg`;
+          }}
+        />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="bg-[#EF4923] rounded-full p-3 shadow-lg">
+            <Play className="w-6 h-6 text-white fill-white" />
+          </div>
+        </div>
+      </div>
+      <p className="font-medium text-zinc-700 mt-4">{title}</p>
+      <p className="text-sm text-zinc-500 mt-1">Video presentation</p>
     </div>
   );
 }
@@ -451,12 +493,25 @@ function AveragePriceAcreContent({ avgPricePerAcre, stats }: {
   );
 }
 
-function StaticSlideContent({ title, widgetNumber }: { title: string; widgetNumber: number }) {
+function StaticSlideContent({ title, imagePath }: { title: string; imagePath: string }) {
+  // Use the imagePath directly from widget constants for consistency with PDF
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center bg-zinc-50 rounded">
-      <FileText className="w-12 h-12 text-zinc-400 mb-4" />
-      <p className="font-medium text-zinc-700">{title}</p>
-      <p className="text-xs text-zinc-400 mt-4">Marketing slide #{widgetNumber}</p>
+    <div className="relative w-full h-full flex items-center justify-center bg-white rounded overflow-hidden">
+      <img 
+        src={imagePath}
+        alt={title}
+        className="w-full h-full object-contain"
+        onError={(e) => {
+          // Show fallback on error
+          e.currentTarget.style.display = 'none';
+          const fallback = e.currentTarget.parentElement?.querySelector('.fallback');
+          if (fallback) (fallback as HTMLElement).classList.remove('hidden');
+        }}
+      />
+      <div className="fallback hidden absolute inset-0 flex flex-col items-center justify-center bg-zinc-50">
+        <FileText className="w-12 h-12 text-zinc-400 mb-4" />
+        <p className="font-medium text-zinc-700">{title}</p>
+      </div>
     </div>
   );
 }

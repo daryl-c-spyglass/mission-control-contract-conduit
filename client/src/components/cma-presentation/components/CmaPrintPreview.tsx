@@ -15,6 +15,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/hooks/use-theme';
 import { generatePreviewSlides, checkDataIssues, type PreviewSlide } from './preview-slides';
 import type { AgentProfile, CmaProperty } from '../types';
 
@@ -48,6 +49,7 @@ export function CmaPrintPreview({
   const [zoom, setZoom] = useState(100);
   const [isDownloading, setIsDownloading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { isDark } = useTheme();
 
   const slides = generatePreviewSlides({
     propertyAddress,
@@ -96,19 +98,34 @@ export function CmaPrintPreview({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] p-0 bg-zinc-900 border-zinc-700 flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+      <DialogContent className={cn(
+        "max-w-[95vw] w-[1400px] h-[90vh] p-0 flex flex-col",
+        isDark ? "bg-zinc-900 border-zinc-700" : "bg-gray-100 border-gray-200"
+      )}>
+        <div className={cn(
+          "flex items-center justify-between px-6 py-4 border-b",
+          isDark ? "border-zinc-800" : "border-gray-200"
+        )}>
           <div>
-            <DialogTitle className="text-xl font-semibold text-white">
+            <DialogTitle className={cn(
+              "text-xl font-semibold",
+              isDark ? "text-white" : "text-gray-900"
+            )}>
               Preview
             </DialogTitle>
-            <p className="text-sm text-zinc-400 mt-1">
+            <p className={cn(
+              "text-sm mt-1",
+              isDark ? "text-zinc-400" : "text-gray-600"
+            )}>
               {propertyAddress} - {slides.length} slides
             </p>
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-1">
+            <div className={cn(
+              "flex items-center gap-1 rounded-lg p-1",
+              isDark ? "bg-zinc-800" : "bg-gray-200"
+            )}>
               <Button
                 variant={viewMode === 'single' ? 'secondary' : 'ghost'}
                 size="sm"
@@ -140,7 +157,7 @@ export function CmaPrintPreview({
                 >
                   <ZoomOut className="w-4 h-4" />
                 </Button>
-                <span className="text-sm text-zinc-400 w-12 text-center">{zoom}%</span>
+                <span className={cn("text-sm w-12 text-center", isDark ? "text-zinc-400" : "text-gray-600")}>{zoom}%</span>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -205,7 +222,7 @@ export function CmaPrintPreview({
         )}
 
         <div className="flex-1 flex overflow-hidden">
-          <div className="w-48 border-r border-zinc-800 flex-shrink-0">
+          <div className={cn("w-48 border-r flex-shrink-0", isDark ? "border-zinc-800" : "border-gray-200")}>
             <ScrollArea className="h-full">
               <div className="p-3 space-y-2">
                 {slides.map((slide: PreviewSlide, index: number) => (
@@ -219,7 +236,7 @@ export function CmaPrintPreview({
                       "w-full aspect-[11/8.5] rounded-lg border-2 overflow-visible",
                       currentSlide === index && viewMode === 'single'
                         ? "border-[#EF4923]"
-                        : "border-zinc-700 hover-elevate"
+                        : isDark ? "border-zinc-700 hover-elevate" : "border-gray-300 hover-elevate"
                     )}
                     data-testid={`thumbnail-slide-${index}`}
                   >
@@ -241,7 +258,7 @@ export function CmaPrintPreview({
             </ScrollArea>
           </div>
 
-          <div className="flex-1 bg-zinc-950 overflow-hidden">
+          <div className={cn("flex-1 overflow-hidden", isDark ? "bg-zinc-950" : "bg-gray-200")}>
             {viewMode === 'single' ? (
               <div className="h-full flex flex-col">
                 <div 
@@ -260,7 +277,7 @@ export function CmaPrintPreview({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-center gap-4 py-4 border-t border-zinc-800">
+                <div className={cn("flex items-center justify-center gap-4 py-4 border-t", isDark ? "border-zinc-800" : "border-gray-300")}>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -270,7 +287,7 @@ export function CmaPrintPreview({
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </Button>
-                  <span className="text-sm text-zinc-400">
+                  <span className={cn("text-sm", isDark ? "text-zinc-400" : "text-gray-600")}>
                     Slide {currentSlide + 1} of {slides.length}
                   </span>
                   <Button
