@@ -1,4 +1,4 @@
-import { Document, Page, View, Text } from '@react-pdf/renderer';
+import { Document, Page, View, Text, Image } from '@react-pdf/renderer';
 import { styles, COLORS } from './styles';
 import type { AgentProfile, CmaProperty } from '../types';
 import { WIDGETS, MARKETING_TEXT } from '../constants/widgets';
@@ -34,6 +34,7 @@ interface CmaPdfDocumentProps {
   suggestedListPrice?: number | null;
   avgPricePerAcre?: number | null;
   preparedFor?: string;
+  baseUrl?: string;
 }
 
 const PageHeader = ({ title, slideNumber, totalSlides }: { title: string; slideNumber: number; totalSlides: number }) => (
@@ -50,21 +51,27 @@ const PageFooter = ({ propertyAddress }: { propertyAddress: string }) => (
   </View>
 );
 
-const CoverPage = ({ propertyAddress, agent, preparedFor }: { propertyAddress: string; agent: AgentProfile; preparedFor?: string }) => {
+const CoverPage = ({ propertyAddress, agent, preparedFor, baseUrl }: { propertyAddress: string; agent: AgentProfile; preparedFor?: string; baseUrl: string }) => {
   const agentName = getAgentName(agent);
   const agentInitials = getAgentInitials(agent);
+  const agentPhoto = getAgentPhoto(agent) || '';
   const addressParts = propertyAddress.split(',');
   const streetAddress = addressParts[0]?.trim() || propertyAddress;
   const cityState = addressParts.slice(1).join(',').trim();
+  const logoUrl = baseUrl ? `${baseUrl}/logos/spyglass-logo-white.png` : '';
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.darkPage}>
       <View style={styles.coverPagePro}>
         <View style={styles.coverContentPro}>
-          <View style={styles.coverLogoPro}>
-            <Text style={styles.coverLogoOrange}>SPYGLASS</Text>
-            <Text style={styles.coverLogoWhite}>REALTY</Text>
-          </View>
+          {baseUrl ? (
+            <Image src={logoUrl} style={{ width: 180, height: 40, marginBottom: 20 }} />
+          ) : (
+            <View style={styles.coverLogoPro}>
+              <Text style={styles.coverLogoOrange}>SPYGLASS</Text>
+              <Text style={styles.coverLogoWhite}>REALTY</Text>
+            </View>
+          )}
           <Text style={styles.coverTitle}>Comparative Market Analysis</Text>
           {preparedFor && (
             <Text style={styles.coverSubtitle}>Prepared for {preparedFor}</Text>
@@ -80,9 +87,13 @@ const CoverPage = ({ propertyAddress, agent, preparedFor }: { propertyAddress: s
           })}</Text>
         </View>
         <View style={styles.coverAgentSection}>
-          <View style={styles.coverAgentPhotoPlaceholder}>
-            <Text style={styles.coverAgentInitials}>{agentInitials}</Text>
-          </View>
+          {agentPhoto ? (
+            <Image src={agentPhoto} style={{ width: 70, height: 70, borderRadius: 35, marginRight: 16 }} />
+          ) : (
+            <View style={styles.coverAgentPhotoPlaceholder}>
+              <Text style={styles.coverAgentInitials}>{agentInitials}</Text>
+            </View>
+          )}
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase' }}>Prepared by</Text>
             <Text style={{ fontSize: 20, fontWeight: 700, color: COLORS.white, marginTop: 2 }}>{agentName}</Text>
@@ -100,6 +111,7 @@ const CoverPage = ({ propertyAddress, agent, preparedFor }: { propertyAddress: s
 const AgentResumePage = ({ agent, slideNumber, totalSlides }: { agent: AgentProfile; slideNumber: number; totalSlides: number }) => {
   const agentName = getAgentName(agent);
   const agentInitials = getAgentInitials(agent);
+  const agentPhoto = getAgentPhoto(agent) || '';
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>
@@ -107,9 +119,13 @@ const AgentResumePage = ({ agent, slideNumber, totalSlides }: { agent: AgentProf
       <View style={styles.content}>
         <View style={{ flexDirection: 'row', gap: 30 }}>
           <View style={{ width: '35%' }}>
-            <View style={{ width: '100%', height: 200, backgroundColor: COLORS.lightGray, borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 48, color: COLORS.mediumGray }}>{agentInitials}</Text>
-            </View>
+            {agentPhoto ? (
+              <Image src={agentPhoto} style={{ width: '100%', height: 200, borderRadius: 4, objectFit: 'cover' }} />
+            ) : (
+              <View style={{ width: '100%', height: 200, backgroundColor: COLORS.lightGray, borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 48, color: COLORS.mediumGray }}>{agentInitials}</Text>
+              </View>
+            )}
             <View style={{ backgroundColor: COLORS.darkBackground, padding: 12, borderRadius: 4, marginTop: 12 }}>
               <Text style={{ fontSize: 14, fontWeight: 700, color: COLORS.white }}>{agentName}</Text>
               <Text style={{ fontSize: 9, color: COLORS.mediumGray, marginTop: 2 }}>REALTOR | {agent.company || 'Spyglass Realty'}</Text>
@@ -253,6 +269,7 @@ const PropertyDetailPage = ({
   const isClosed = status.toLowerCase() === 'closed';
   const address = extractFullAddress(property);
   const streetOnly = address.split(',')[0] || address;
+  const primaryPhoto = getPrimaryPhoto(property);
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>
@@ -260,17 +277,21 @@ const PropertyDetailPage = ({
       <View style={styles.content}>
         <View style={{ flexDirection: 'row', gap: 24 }}>
           <View style={{ width: '45%' }}>
-            <View style={{ 
-              width: '100%', 
-              height: 200, 
-              backgroundColor: COLORS.lightGray, 
-              borderRadius: 4, 
-              alignItems: 'center', 
-              justifyContent: 'center' 
-            }}>
-              <Text style={{ fontSize: 11, color: COLORS.mediumGray }}>Property Photo</Text>
-              <Text style={{ fontSize: 9, color: COLORS.mediumGray, marginTop: 4 }}>(View in interactive presentation)</Text>
-            </View>
+            {primaryPhoto ? (
+              <Image src={primaryPhoto} style={{ width: '100%', height: 200, borderRadius: 4, objectFit: 'cover' }} />
+            ) : (
+              <View style={{ 
+                width: '100%', 
+                height: 200, 
+                backgroundColor: COLORS.lightGray, 
+                borderRadius: 4, 
+                alignItems: 'center', 
+                justifyContent: 'center' 
+              }}>
+                <Text style={{ fontSize: 11, color: COLORS.mediumGray }}>Property Photo</Text>
+                <Text style={{ fontSize: 9, color: COLORS.mediumGray, marginTop: 4 }}>(View in interactive presentation)</Text>
+              </View>
+            )}
             <View style={{ marginTop: 12 }}>
               <Text style={{ fontSize: 16, fontWeight: 700, color: COLORS.textPrimary }}>{streetOnly}</Text>
               <Text style={{ fontSize: 10, color: COLORS.textSecondary, marginTop: 2 }}>
@@ -871,58 +892,44 @@ const StaticImagePage = ({
   widget, 
   propertyAddress,
   slideNumber, 
-  totalSlides 
+  totalSlides,
+  baseUrl
 }: { 
   widget: { id?: string; title: string; imagePath?: string };
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
+  baseUrl: string;
 }) => {
-  const content = widget.id ? STATIC_SLIDE_CONTENT[widget.id] : null;
+  const hasImage = widget.imagePath && widget.imagePath.length > 0 && baseUrl;
+  const normalizedPath = widget.imagePath?.startsWith('/') ? widget.imagePath : `/${widget.imagePath}`;
+  const imageUrl = hasImage ? (widget.imagePath?.startsWith('http') ? widget.imagePath : `${baseUrl}${normalizedPath}`) : null;
   
   return (
-    <Page size="LETTER" orientation="landscape" style={styles.page}>
-      <PageHeader title={widget.title} slideNumber={slideNumber} totalSlides={totalSlides} />
-      <View style={styles.content}>
-        <Text style={styles.sectionTitle}>{widget.title}</Text>
-        
-        {content ? (
-          <>
-            <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginBottom: 20, lineHeight: 1.6 }}>
-              {content.description}
-            </Text>
-            
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
-              {content.bullets.map((bullet, i) => (
-                <View key={i} style={{ width: '45%', flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 }}>
-                  <View style={{ 
-                    width: 6, 
-                    height: 6, 
-                    borderRadius: 3, 
-                    backgroundColor: COLORS.spyglassOrange, 
-                    marginRight: 8,
-                    marginTop: 4
-                  }} />
-                  <Text style={{ fontSize: 11, color: COLORS.textPrimary, flex: 1 }}>{bullet}</Text>
-                </View>
-              ))}
-            </View>
-            
-            <View style={{ marginTop: 30, padding: 15, backgroundColor: COLORS.lightGray, borderRadius: 8 }}>
-              <Text style={{ fontSize: 10, color: COLORS.textSecondary, textAlign: 'center' }}>
-                View the full interactive presentation for detailed visuals and media content
+    <Page size="LETTER" orientation="landscape" style={{ padding: 0 }}>
+      {imageUrl ? (
+        <Image
+          src={imageUrl}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+          }}
+        />
+      ) : (
+        <>
+          <PageHeader title={widget.title} slideNumber={slideNumber} totalSlides={totalSlides} />
+          <View style={styles.content}>
+            <Text style={styles.sectionTitle}>{widget.title}</Text>
+            <View style={styles.centeredContent}>
+              <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 10 }}>
+                View full content in the interactive presentation
               </Text>
             </View>
-          </>
-        ) : (
-          <View style={styles.centeredContent}>
-            <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 10 }}>
-              View full content in the interactive presentation
-            </Text>
           </View>
-        )}
-      </View>
-      <PageFooter propertyAddress={propertyAddress} />
+          <PageFooter propertyAddress={propertyAddress} />
+        </>
+      )}
     </Page>
   );
 };
@@ -930,6 +937,7 @@ const StaticImagePage = ({
 const ThankYouPage = ({ agent, slideNumber, totalSlides }: { agent: AgentProfile; slideNumber: number; totalSlides: number }) => {
   const agentName = getAgentName(agent);
   const agentInitials = getAgentInitials(agent);
+  const agentPhoto = getAgentPhoto(agent) || '';
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.darkPage}>
@@ -941,18 +949,28 @@ const ThankYouPage = ({ agent, slideNumber, totalSlides }: { agent: AgentProfile
           </View>
           <Text style={{ fontSize: 36, color: COLORS.white, marginTop: 24, marginBottom: 8 }}>Thank You</Text>
           <Text style={{ fontSize: 12, color: COLORS.mediumGray, marginBottom: 32 }}>for considering Spyglass Realty</Text>
-          <View style={{ 
-            width: 80, 
-            height: 80, 
-            borderRadius: 40, 
-            backgroundColor: '#4b5563', 
-            borderWidth: 4, 
-            borderColor: COLORS.spyglassOrange, 
-            alignItems: 'center', 
-            justifyContent: 'center' 
-          }}>
-            <Text style={{ fontSize: 28, color: COLORS.white, fontWeight: 700 }}>{agentInitials}</Text>
-          </View>
+          {agentPhoto ? (
+            <Image src={agentPhoto} style={{ 
+              width: 80, 
+              height: 80, 
+              borderRadius: 40, 
+              borderWidth: 4, 
+              borderColor: COLORS.spyglassOrange 
+            }} />
+          ) : (
+            <View style={{ 
+              width: 80, 
+              height: 80, 
+              borderRadius: 40, 
+              backgroundColor: '#4b5563', 
+              borderWidth: 4, 
+              borderColor: COLORS.spyglassOrange, 
+              alignItems: 'center', 
+              justifyContent: 'center' 
+            }}>
+              <Text style={{ fontSize: 28, color: COLORS.white, fontWeight: 700 }}>{agentInitials}</Text>
+            </View>
+          )}
           <Text style={{ fontSize: 20, fontWeight: 700, color: COLORS.white, marginTop: 16 }}>{agentName}</Text>
           <Text style={{ fontSize: 11, color: COLORS.mediumGray, marginTop: 4 }}>REALTOR | {agent.company || 'Spyglass Realty'}</Text>
           {agent.phone && <Text style={{ fontSize: 11, color: COLORS.spyglassOrange, marginTop: 16 }}>{agent.phone}</Text>}
@@ -972,6 +990,7 @@ export function CmaPdfDocument({
   suggestedListPrice,
   avgPricePerAcre,
   preparedFor,
+  baseUrl = '',
 }: CmaPdfDocumentProps) {
   const totalSlides = WIDGETS.length;
   const stats = calculateCMAStats(comparables);
@@ -981,7 +1000,7 @@ export function CmaPdfDocument({
   
   return (
     <Document>
-      <CoverPage propertyAddress={propertyAddress} agent={agent} preparedFor={preparedFor} />
+      <CoverPage propertyAddress={propertyAddress} agent={agent} preparedFor={preparedFor} baseUrl={baseUrl} />
       
       {WIDGETS.map((widget, index) => {
         slideNum = index + 1;
@@ -1021,7 +1040,7 @@ export function CmaPdfDocument({
             return <ThankYouPage key={widget.id} agent={agent} slideNumber={slideNum} totalSlides={totalSlides} />;
           
           default:
-            return <StaticImagePage key={widget.id} widget={widget} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} />;
+            return <StaticImagePage key={widget.id} widget={widget} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} baseUrl={baseUrl} />;
         }
       })}
       

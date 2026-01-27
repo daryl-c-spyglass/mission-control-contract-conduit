@@ -43,6 +43,8 @@ export function PdfDownloadButton({
         description: 'This may take a moment...',
       });
 
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+
       const doc = (
         <CmaPdfDocument
           propertyAddress={propertyAddress}
@@ -53,6 +55,7 @@ export function PdfDownloadButton({
           suggestedListPrice={suggestedListPrice}
           avgPricePerAcre={avgPricePerAcre}
           preparedFor={preparedFor}
+          baseUrl={baseUrl}
         />
       );
 

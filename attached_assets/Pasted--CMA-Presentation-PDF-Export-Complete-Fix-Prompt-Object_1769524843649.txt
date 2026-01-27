@@ -1,0 +1,719 @@
+# CMA Presentation PDF Export — Complete Fix Prompt
+
+## 🎯 Objective
+
+Fix all PDF export issues in the CMA Presentation Builder so the exported PDF matches the Live Preview exactly, including agent profile data, widget images, and Spyglass logos.
+
+---
+
+## ❌ Current Issues (From Exported PDF Analysis)
+
+### Issue 1: Cover Page (Page 1) — Missing Agent Profile
+**Current State:**
+```
+A
+Agent
+REALTOR | Spyglass Realty
+```
+
+**Expected State:**
+- Agent profile photo (from Settings → Agent Marketing Profile → headshot)
+- Agent name (from Settings → Agent Marketing Profile)
+- Agent title/position
+- Should be automatically synced from Settings
+
+### Issue 2: Placeholder Text on Multiple Slides
+**Current State:** Many slides show:
+```
+"View the full interactive presentation for detailed visuals and media content"
+```
+
+This appears on slides 11-33 (Home Selling System through Thank You):
+- Slide 11: HOME SELLING SYSTEM
+- Slide 12: OUR PROVEN APPROACH
+- Slide 13: SEO & DIGITAL MARKETING
+- Slide 14: GOOGLE + META ADS
+- Slide 15: PROFESSIONAL VIDEOGRAPHY
+- Slide 16: WHY 4K VIDEO
+- Slide 17: EXAMPLE VIDEOS
+- Slide 18: AERIAL PHOTOGRAPHY
+- Slide 19: IN-HOUSE DESIGN TEAM
+- Slide 20: PRINT & FLYERS
+- Slide 21: CUSTOM PROPERTY PAGE
+- Slide 22: GLOBAL MARKETING REACH
+- Slide 23: LEADINGRE NETWORK STRENGTH
+- Slide 24: FEATURED PROPERTY PROGRAM
+- Slide 25: ZILLOW MARKETING TOOLS
+- Slide 26: ZILLOW SHOWCASE LISTINGS
+- Slide 27: OPEN HOUSE PROCESS
+- Slide 28: PRICING STRATEGY
+- Slide 29: LISTING PRICE
+- Slide 30: MARKETING TIMELINE
+- Slide 31: SELECT MOVE PROGRAM
+- Slide 32: WHAT OUR CLIENTS SAY
+- Slide 33: THANK YOU
+
+**Expected State:** Each slide should display the actual static image from `public/cma-widgets/` folder
+
+### Issue 3: Comparable Property Photos Missing
+**Current State:**
+```
+Property Photo
+(View in interactive presentation)
+```
+
+**Expected State:** Actual property photos from Repliers API
+
+### Issue 4: Spyglass Logo Missing on Cover Page
+**Current State:** No logo or text-only "SPYGLASS REALTY"
+
+**Expected State:** Use the actual Spyglass logo image from `public/logos/`
+
+---
+
+## 📁 Assets Already in Project — Use These!
+
+### Logos (Already Uploaded)
+```
+public/logos/
+├── SpyglassRealty_Logo_White.png    → Cover page header, dark backgrounds
+├── SpyglassRealty_Logo.png          → General use, light backgrounds  
+├── Square.png                       → Widget card icons
+└── spyglass-logo-square.png         → Alternative square logo
+```
+
+### Widget Static Images (Already Uploaded)
+```
+public/cma-widgets/
+├── 11-home-selling-system.png
+├── 12-our-proven-approach.png
+├── 13-seo-digital-marketing.png
+├── 14-google-meta-ads.png
+├── 15-professional-videography.png
+├── 16-why-4k-video.png
+├── 17-example-videos.png
+├── 18-aerial-photography.png
+├── 19-in-house-design-team.png
+├── 20-print-flyers.png
+├── 21-custom-property-page.png
+├── 22-global-marketing-reach.png
+├── 23-leadingre-network-strength.png
+├── 24-featured-property-program.png
+├── 25-zillow-marketing-tools.png
+├── 26-zillow-showcase-listings.png
+├── 27-open-house-process.png
+├── 28-pricing-strategy.png
+├── 29-listing-price.png
+├── 30-marketing-timeline.png
+├── 31-select-move-program.png
+├── 32-what-our-clients-say.png
+└── 33-thank-you.png
+```
+
+---
+
+## 🔧 Fix 1: Agent Profile Data Mapping
+
+### Root Cause
+The code looks for `profile.name` which **doesn't exist** in the database schema. Agent name must come from the `users` table, not `agent_profiles` table.
+
+### Database Schema Reference
+```typescript
+// agent_profiles table has NO 'name' field:
+agentProfiles = {
+  id, userId, title, headshotUrl, bio, defaultCoverLetter,
+  facebookUrl, instagramUrl, linkedinUrl, twitterUrl, websiteUrl,
+  marketingCompany, createdAt, updatedAt
+}
+
+// users table HAS name fields:
+users = {
+  id, email, firstName, lastName, profileImageUrl,
+  marketingPhone, marketingEmail, marketingDisplayName,
+  marketingTitle, marketingHeadshotUrl, ...
+}
+```
+
+### Fix: Update `agentInfo` Construction
+
+**File:** `client/src/pages/CMAPresentationBuilder.tsx` (around lines 371-391)
+
+**Find:**
+```tsx
+const agentInfo = {
+  firstName: agentProfileData?.profile?.name?.split(' ')[0] || 
+             agentProfileData?.user?.marketingDisplayName?.split(' ')[0] || 'Agent',
+  lastName: agentProfileData?.profile?.name?.split(' ').slice(1).join(' ') || 
+            agentProfileData?.user?.marketingDisplayName?.split(' ').slice(1).join(' ') || '',
+  // ...
+  photo: agentProfileData?.user?.marketingHeadshotUrl || '',
+};
+```
+
+**Replace with:**
+```tsx
+// Correctly construct agent name from available sources
+const getAgentFullName = () => {
+  // Priority 1: Marketing display name (user-configured for marketing materials)
+  if (agentProfileData?.user?.marketingDisplayName) {
+    return agentProfileData.user.marketingDisplayName;
+  }
+  // Priority 2: First + Last name from user table
+  const firstName = agentProfileData?.user?.firstName || '';
+  const lastName = agentProfileData?.user?.lastName || '';
+  if (firstName || lastName) {
+    return `${firstName} ${lastName}`.trim();
+  }
+  // Priority 3: Fallback
+  return 'Agent';
+};
+
+const agentFullName = getAgentFullName();
+const nameParts = agentFullName.split(' ');
+
+const agentInfo = {
+  // Name fields
+  firstName: nameParts[0] || 'Agent',
+  lastName: nameParts.slice(1).join(' ') || '',
+  fullName: agentFullName,
+  
+  // Title - check user marketing settings first, then profile
+  title: agentProfileData?.user?.marketingTitle || 
+         agentProfileData?.profile?.title || 
+         'REALTOR® | Spyglass Realty',
+  
+  // Contact info
+  email: agentProfileData?.user?.marketingEmail || 
+         agentProfileData?.user?.email || '',
+  phone: agentProfileData?.user?.marketingPhone || '',
+  
+  // Company
+  company: agentProfileData?.profile?.marketingCompany || 'Spyglass Realty',
+  
+  // Bio and Cover Letter
+  bio: agentProfileData?.profile?.bio || '',
+  coverLetter: agentProfileData?.profile?.defaultCoverLetter || '',
+  
+  // Photo - CRITICAL: Check multiple sources with fallback chain
+  photo: agentProfileData?.user?.marketingHeadshotUrl || 
+         agentProfileData?.profile?.headshotUrl || 
+         agentProfileData?.user?.profileImageUrl || 
+         '',
+};
+```
+
+---
+
+## 🔧 Fix 2: Cover Page PDF Component
+
+**File:** `client/src/components/pdf/slides/CoverPageSlide.tsx` (or similar)
+
+Update the cover page component to properly display agent info:
+
+```tsx
+import { Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
+
+interface CoverPageProps {
+  data: {
+    title: string;
+    subtitle: string;
+    address: string;
+    date: string;
+    agent: {
+      fullName: string;
+      title: string;
+      photo: string;
+    };
+  };
+}
+
+const styles = StyleSheet.create({
+  page: {
+    padding: 40,
+    backgroundColor: '#1a1a2e',
+  },
+  logo: {
+    width: 180,
+    height: 'auto',
+    marginBottom: 40,
+    alignSelf: 'center',
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  address: {
+    fontSize: 18,
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  date: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textAlign: 'center',
+    marginBottom: 40,
+  },
+  agentSection: {
+    alignItems: 'center',
+    marginTop: 'auto',
+    paddingTop: 40,
+  },
+  agentPhoto: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 12,
+  },
+  agentPhotoPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#374151',
+    marginBottom: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  agentPhotoInitial: {
+    fontSize: 32,
+    color: '#9ca3af',
+  },
+  agentName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  agentTitle: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+});
+
+export function CoverPageSlide({ data }: CoverPageProps) {
+  const { title, subtitle, address, date, agent } = data;
+  
+  // Get agent initials for placeholder
+  const initials = agent.fullName
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+  
+  return (
+    <Page size="LETTER" style={styles.page}>
+      {/* Spyglass Logo - Use actual image from public/logos/ */}
+      <Image 
+        src="/logos/SpyglassRealty_Logo_White.png" 
+        style={styles.logo}
+      />
+      
+      <Text style={styles.title}>{title || 'Comparative Market Analysis'}</Text>
+      <Text style={styles.address}>{address}</Text>
+      <Text style={styles.date}>{date}</Text>
+      
+      {/* Agent Section */}
+      <View style={styles.agentSection}>
+        {agent.photo ? (
+          <Image src={agent.photo} style={styles.agentPhoto} />
+        ) : (
+          <View style={styles.agentPhotoPlaceholder}>
+            <Text style={styles.agentPhotoInitial}>{initials || 'A'}</Text>
+          </View>
+        )}
+        <Text style={styles.agentName}>{agent.fullName}</Text>
+        <Text style={styles.agentTitle}>{agent.title}</Text>
+      </View>
+    </Page>
+  );
+}
+```
+
+---
+
+## 🔧 Fix 3: Static Widget Images in PDF
+
+For slides 11-33, replace placeholder text with actual images.
+
+**File:** `client/src/components/pdf/slides/StaticWidgetSlide.tsx`
+
+```tsx
+import { Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
+
+interface StaticWidgetSlideProps {
+  slideNumber: number;
+  title: string;
+  address: string;
+}
+
+// Map slide numbers to image paths
+const WIDGET_IMAGE_MAP: Record<number, string> = {
+  11: '/cma-widgets/11-home-selling-system.png',
+  12: '/cma-widgets/12-our-proven-approach.png',
+  13: '/cma-widgets/13-seo-digital-marketing.png',
+  14: '/cma-widgets/14-google-meta-ads.png',
+  15: '/cma-widgets/15-professional-videography.png',
+  16: '/cma-widgets/16-why-4k-video.png',
+  17: '/cma-widgets/17-example-videos.png',
+  18: '/cma-widgets/18-aerial-photography.png',
+  19: '/cma-widgets/19-in-house-design-team.png',
+  20: '/cma-widgets/20-print-flyers.png',
+  21: '/cma-widgets/21-custom-property-page.png',
+  22: '/cma-widgets/22-global-marketing-reach.png',
+  23: '/cma-widgets/23-leadingre-network-strength.png',
+  24: '/cma-widgets/24-featured-property-program.png',
+  25: '/cma-widgets/25-zillow-marketing-tools.png',
+  26: '/cma-widgets/26-zillow-showcase-listings.png',
+  27: '/cma-widgets/27-open-house-process.png',
+  28: '/cma-widgets/28-pricing-strategy.png',
+  29: '/cma-widgets/29-listing-price.png',
+  30: '/cma-widgets/30-marketing-timeline.png',
+  31: '/cma-widgets/31-select-move-program.png',
+  32: '/cma-widgets/32-what-our-clients-say.png',
+  33: '/cma-widgets/33-thank-you.png',
+};
+
+const styles = StyleSheet.create({
+  page: {
+    padding: 0, // Full bleed for image
+  },
+  slideImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain',
+  },
+  header: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#374151',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  slideNumber: {
+    fontSize: 10,
+    color: '#6b7280',
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  footerAddress: {
+    fontSize: 9,
+    color: '#6b7280',
+  },
+  footerBrand: {
+    fontSize: 9,
+    color: '#6b7280',
+  },
+});
+
+export function StaticWidgetSlide({ slideNumber, title, address }: StaticWidgetSlideProps) {
+  const imagePath = WIDGET_IMAGE_MAP[slideNumber];
+  
+  // IMPORTANT: Do NOT show placeholder text - show the actual image
+  if (!imagePath) {
+    console.warn(`No image found for slide ${slideNumber}`);
+    return null; // Skip slides without images
+  }
+  
+  return (
+    <Page size="LETTER" style={styles.page}>
+      {/* Header with title and slide number */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>{title}</Text>
+        <Text style={styles.slideNumber}>Slide {slideNumber} of 33</Text>
+      </View>
+      
+      {/* Full slide image - NO PLACEHOLDER TEXT */}
+      <Image src={imagePath} style={styles.slideImage} />
+      
+      {/* Footer */}
+      <View style={styles.footer}>
+        <Text style={styles.footerAddress}>{address}</Text>
+        <Text style={styles.footerBrand}>Spyglass Realty</Text>
+      </View>
+    </Page>
+  );
+}
+```
+
+---
+
+## 🔧 Fix 4: Update PDF Document Builder
+
+**File:** `client/src/components/pdf/CMAPdfDocument.tsx`
+
+Update the main PDF document to pass correct agent data and use static images:
+
+```tsx
+import { Document, Font } from '@react-pdf/renderer';
+import { CoverPageSlide } from './slides/CoverPageSlide';
+import { StaticWidgetSlide } from './slides/StaticWidgetSlide';
+// ... other imports
+
+// Register fonts (use system fonts as fallback)
+Font.register({
+  family: 'Inter',
+  fonts: [
+    { src: '/fonts/Inter-Regular.ttf', fontWeight: 'normal' },
+    { src: '/fonts/Inter-Bold.ttf', fontWeight: 'bold' },
+  ],
+});
+
+// Fallback to system fonts if Inter not available
+Font.registerHyphenationCallback(word => [word]);
+
+interface CMAPdfDocumentProps {
+  data: {
+    propertyAddress: string;
+    date: string;
+    agent: {
+      fullName: string;
+      title: string;
+      photo: string;
+      email: string;
+      phone: string;
+      company: string;
+      bio: string;
+    };
+    comparables: any[];
+    statistics: any;
+  };
+  includedSections: string[];
+  sectionOrder: string[];
+}
+
+export function CMAPdfDocument({ data, includedSections, sectionOrder }: CMAPdfDocumentProps) {
+  const { propertyAddress, date, agent, comparables, statistics } = data;
+  
+  // Static widget sections (11-33)
+  const staticWidgetSections = [
+    { id: 'home_selling_system', number: 11, title: 'HOME SELLING SYSTEM' },
+    { id: 'our_proven_approach', number: 12, title: 'OUR PROVEN APPROACH' },
+    { id: 'seo_digital_marketing', number: 13, title: 'SEO & DIGITAL MARKETING' },
+    { id: 'google_meta_ads', number: 14, title: 'GOOGLE + META ADS' },
+    { id: 'professional_videography', number: 15, title: 'PROFESSIONAL VIDEOGRAPHY' },
+    { id: 'why_4k_video', number: 16, title: 'WHY 4K VIDEO' },
+    { id: 'example_videos', number: 17, title: 'EXAMPLE VIDEOS' },
+    { id: 'aerial_photography', number: 18, title: 'AERIAL PHOTOGRAPHY' },
+    { id: 'in_house_design', number: 19, title: 'IN-HOUSE DESIGN TEAM' },
+    { id: 'print_flyers', number: 20, title: 'PRINT & FLYERS' },
+    { id: 'custom_property_page', number: 21, title: 'CUSTOM PROPERTY PAGE' },
+    { id: 'global_marketing', number: 22, title: 'GLOBAL MARKETING REACH' },
+    { id: 'leadingre_network', number: 23, title: 'LEADINGRE NETWORK STRENGTH' },
+    { id: 'featured_property', number: 24, title: 'FEATURED PROPERTY PROGRAM' },
+    { id: 'zillow_marketing', number: 25, title: 'ZILLOW MARKETING TOOLS' },
+    { id: 'zillow_showcase', number: 26, title: 'ZILLOW SHOWCASE LISTINGS' },
+    { id: 'open_house', number: 27, title: 'OPEN HOUSE PROCESS' },
+    { id: 'pricing_strategy', number: 28, title: 'PRICING STRATEGY' },
+    { id: 'listing_price', number: 29, title: 'LISTING PRICE' },
+    { id: 'marketing_timeline', number: 30, title: 'MARKETING TIMELINE' },
+    { id: 'select_move', number: 31, title: 'SELECT MOVE PROGRAM' },
+    { id: 'client_testimonials', number: 32, title: 'WHAT OUR CLIENTS SAY' },
+    { id: 'thank_you', number: 33, title: 'THANK YOU' },
+  ];
+  
+  return (
+    <Document>
+      {/* Cover Page */}
+      {includedSections.includes('cover_page') && (
+        <CoverPageSlide
+          data={{
+            title: 'Comparative Market Analysis',
+            subtitle: 'Prepared exclusively for you',
+            address: propertyAddress,
+            date: date,
+            agent: {
+              fullName: agent.fullName,
+              title: agent.title,
+              photo: agent.photo,
+            },
+          }}
+        />
+      )}
+      
+      {/* ... other dynamic slides (Agent Resume, Comparables, etc.) ... */}
+      
+      {/* Static Widget Slides (11-33) */}
+      {staticWidgetSections.map((section) => {
+        if (!includedSections.includes(section.id)) return null;
+        
+        return (
+          <StaticWidgetSlide
+            key={section.id}
+            slideNumber={section.number}
+            title={section.title}
+            address={propertyAddress}
+          />
+        );
+      })}
+    </Document>
+  );
+}
+```
+
+---
+
+## 🔧 Fix 5: Image Path Resolution for PDF
+
+**Important:** @react-pdf/renderer needs absolute URLs or base64 data for images.
+
+### Option A: Convert to Absolute URLs
+
+```tsx
+// Helper function to get absolute URL for images
+function getAbsoluteImageUrl(relativePath: string): string {
+  // In production, use the full domain
+  const baseUrl = window.location.origin;
+  return `${baseUrl}${relativePath}`;
+}
+
+// Usage in PDF components
+<Image src={getAbsoluteImageUrl('/logos/SpyglassRealty_Logo_White.png')} />
+```
+
+### Option B: Pre-fetch and Convert to Base64
+
+```tsx
+// In the export function, before generating PDF
+async function prepareImagesForPdf(imagePaths: string[]): Promise<Record<string, string>> {
+  const imageData: Record<string, string> = {};
+  
+  for (const path of imagePaths) {
+    try {
+      const response = await fetch(path);
+      const blob = await response.blob();
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+      imageData[path] = base64;
+    } catch (error) {
+      console.error(`Failed to load image: ${path}`, error);
+    }
+  }
+  
+  return imageData;
+}
+```
+
+---
+
+## 📱 Mobile Optimization Requirements
+
+All changes must work on:
+
+| Device | Browser | Screen Size |
+|--------|---------|-------------|
+| iPad Pro | Safari | 1024 x 1366 |
+| iPad Air/Mini | Safari | 768 x 1024 |
+| iPhone 14/15 Pro | Safari | 393 x 852 |
+| iPhone SE | Safari | 375 x 667 |
+| Android Tablet | Chrome | 800 x 1280 |
+| Android Phone | Chrome | 360 x 800 |
+
+### Mobile UX Checklist:
+- [ ] Touch targets minimum 44x44px
+- [ ] PDF export works on all devices
+- [ ] Loading states shown during PDF generation
+- [ ] Error handling for image loading failures
+- [ ] Progress indicator for multi-page PDF generation
+
+---
+
+## ✅ Verification Checklist
+
+### Cover Page (Page 1)
+- [ ] Spyglass logo displays (not text)
+- [ ] Agent photo displays (from Settings → Agent Marketing Profile)
+- [ ] Agent name displays correctly
+- [ ] Agent title displays correctly
+- [ ] Falls back gracefully if photo missing
+
+### Static Widget Slides (11-33)
+- [ ] Each slide shows actual image from `public/cma-widgets/`
+- [ ] No "View the full interactive presentation..." placeholder text
+- [ ] Images are properly sized and positioned
+- [ ] Slide header/footer shows correctly
+
+### Comparable Properties
+- [ ] Property photos load from Repliers API
+- [ ] Fallback placeholder if photo unavailable
+- [ ] Beds, baths, year built display correctly
+
+### General
+- [ ] PDF generates without errors
+- [ ] All images load in exported PDF
+- [ ] Fonts render correctly (fallback to system fonts if needed)
+- [ ] PDF file size is reasonable
+- [ ] Export works on iOS Safari
+
+---
+
+## 🔍 Debugging Steps
+
+If images don't appear in PDF:
+
+1. **Check Console for Errors:**
+```javascript
+// Add this to PDF export function
+console.log('Agent photo URL:', agent.photo);
+console.log('Widget image paths:', staticWidgetSections.map(s => `/cma-widgets/${s.number}-*.png`));
+```
+
+2. **Verify Image Files Exist:**
+```bash
+ls -la public/logos/
+ls -la public/cma-widgets/
+```
+
+3. **Test Image Loading:**
+```javascript
+// Test if image can be fetched
+fetch('/logos/SpyglassRealty_Logo_White.png')
+  .then(r => console.log('Logo status:', r.status))
+  .catch(e => console.error('Logo error:', e));
+```
+
+4. **Check CORS:**
+Ensure images are served with correct headers if using external URLs.
+
+---
+
+## 📋 Files to Modify
+
+1. `client/src/pages/CMAPresentationBuilder.tsx` — Fix agentInfo construction
+2. `client/src/components/pdf/CMAPdfDocument.tsx` — Main PDF document
+3. `client/src/components/pdf/slides/CoverPageSlide.tsx` — Cover page with agent
+4. `client/src/components/pdf/slides/StaticWidgetSlide.tsx` — Static image slides
+5. `client/src/lib/cma-transformer.ts` — Data transformation for PDF
+
+---
+
+*Copy this entire prompt to Replit for Contract Conduit project.*

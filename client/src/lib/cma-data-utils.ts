@@ -323,6 +323,15 @@ export function getPrimaryPhoto(comp: any): string | null {
   if (comp.photos && Array.isArray(comp.photos) && comp.photos.length > 0) {
     return comp.photos[0];
   }
+  if (comp.images && Array.isArray(comp.images) && comp.images.length > 0) {
+    const img = comp.images[0];
+    if (typeof img === 'string' && img.startsWith('http')) {
+      return img;
+    }
+    if (typeof img === 'string') {
+      return `https://cdn.repliers.io/${img}`;
+    }
+  }
   if (comp.imageUrl) return comp.imageUrl;
   if (comp.primaryPhoto) return comp.primaryPhoto;
   if (comp.image) return comp.image;
