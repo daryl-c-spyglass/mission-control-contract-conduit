@@ -1,0 +1,55 @@
+# Replit Agent Task: Fix Repliers API 404 Error Handling
+
+## Problem
+The application is logging excessive errors when the Repliers API returns a 404 for listings that don't have comparable properties. This is flooding the logs and treating expected "no data" responses as errors.
+
+## Current Behavior
+When fetching similar listings, a 404 response throws an error:
+```
+Error fetching similar listings: Error: Repliers API error: 404 Not Found -
+```
+
+This happens repeatedly (8+ times in 2 minutes during testing) and clutters the logs.
+
+## Desired Behavior
+1. A 404 response should be handled gracefully as "no comparables found" - not an error
+2. Log it as a WARNING (not error) with the specific MLS number for debugging
+3. Return an empty array instead of throwing
+4. Other HTTP errors (500, 401, etc.) should still throw as errors
+
+## Task
+1. Find the file that contains the Repliers API integration (search for "Error fetching similar listings" or "Repliers API error")
+
+2. Update the error handling to treat 404 as a valid "no data" response:
+
+```typescript
+// Handle 404 as "no comparables found" - not an error
+if (!response.ok) {
+  if (response.status === 404) {
+    console.warn(`[Repliers] No comparables found for MLS# ${mlsNumber}`);
+    return { photos: [], comparables: [] }; // or appropriate empty structure
+  }
+  // Only throw for actual errors (500, 401, etc.)
+  throw new Error(`Repliers API error: ${response.status} ${response.statusText}`);
+}
+```
+
+3. Make sure the MLS number being queried is included in the warning message so we can track which properties have no comparables
+
+4. Test by running the app and triggering a CMA request - verify:
+   - 404s now show as warnings, not errors
+   - The MLS number appears in the log
+   - The app continues working (returns 0 comparables instead of failing)
+
+## Additional Context
+- This affects both Replit dev environment and Render production
+- The specific MLS# that consistently returns 404 is: `8932820` (323 Blackbear Dr, Hutto, TX)
+- Other MLS numbers with ACT prefix (like `ACT9921752`) work fine
+- The fix should be backwards compatible - don't change the successful response handling
+
+## Success Criteria
+- [ ] 404 responses logged as warnings, not errors
+- [ ] MLS number included in warning message
+- [ ] Empty comparables returned (not thrown error)
+- [ ] Other HTTP errors still throw properly
+- [ ] App continues to function normally
