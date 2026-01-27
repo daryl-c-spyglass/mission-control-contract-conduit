@@ -1,0 +1,592 @@
+# Replit Prompt: Enhance Agent Marketing Profile — Add Branding Fields
+
+## 🎯 Objective
+
+**Add branding fields to the EXISTING "Agent Marketing Profile" card** in Settings. This is NOT a new card — just add these fields to the existing card:
+- QR Code upload
+- Company Logo (with Spyglass default toggle)
+- Secondary Logo (with Leading RE default toggle)
+
+**Keep everything that already exists.** The existing Title field will be used as Agent Title on flyers.
+
+---
+
+## 📍 Current vs. Updated Layout
+
+### BEFORE (Current)
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ 👤 Agent Marketing Profile                                          │
+│    Your personal information displayed on CMA reports               │
+├─────────────────────────────────────────────────────────────────────┤
+│  Profile Photo                                                      │
+│  [Photo] data:image/jpeg;base64...  [Change]                       │
+│                                                                     │
+│  First Name              Last Name                                  │
+│  [Daryl]                 [Camingao]                                │
+│                                                                     │
+│  Email                   Phone                                      │
+│  [daryl@spyglass...]     [546-546-5123]                            │
+│                                                                     │
+│  Title                   Company                                    │
+│  [AI Web Developer]      [Spyglass Realty]                         │
+│                                                                     │
+│                                        [Save Marketing Profile]     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### AFTER (Add Branding Section Below)
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ 👤 Agent Marketing Profile                                          │
+│    Your personal information displayed on CMA reports               │
+├─────────────────────────────────────────────────────────────────────┤
+│  Profile Photo                                                      │
+│  [Photo] data:image/jpeg;base64...  [Change]                       │
+│                                                                     │
+│  First Name              Last Name                                  │
+│  [Daryl]                 [Camingao]                                │
+│                                                                     │
+│  Email                   Phone                                      │
+│  [daryl@spyglass...]     [546-546-5123]                            │
+│                                                                     │
+│  Title                   Company                                    │
+│  [REALTOR®]              [Spyglass Realty]                         │
+│                                                                     │
+│  ─────────────────────────────────────────────────────────────────  │
+│  MARKETING BRANDING                                                 │
+│  ─────────────────────────────────────────────────────────────────  │
+│                                                                     │
+│  QR CODE                                                            │
+│  ┌──────────────┐                                                   │
+│  │   [QR Icon]  │  Upload your personal QR code                    │
+│  │    Upload    │  Links to your website, vCard, or contact page   │
+│  └──────────────┘                                                   │
+│                                                                     │
+│  COMPANY LOGO                     SECONDARY LOGO                    │
+│  [●] Use Spyglass Default         [●] Use Leading RE Default       │
+│  ┌─────────────────────┐          ┌─────────────────────┐          │
+│  │    SPYGLASS         │          │  SPYGLASS | Leading │          │
+│  │      REALTY         │          │                     │          │
+│  └─────────────────────┘          └─────────────────────┘          │
+│                                                                     │
+│                                        [Save Marketing Profile]     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🗄️ Database Schema Update
+
+Add these columns to the existing users/settings table:
+
+```sql
+-- Add new columns for branding (run migration)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS qr_code TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS company_logo TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS company_logo_use_default BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS secondary_logo TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS secondary_logo_use_default BOOLEAN DEFAULT true;
+```
+
+### Drizzle Schema Update
+
+```typescript
+// In schema.ts - Add to existing users table definition
+// Find the users table and add these columns:
+
+qrCode: text('qr_code'),
+companyLogo: text('company_logo'),
+companyLogoUseDefault: boolean('company_logo_use_default').default(true),
+secondaryLogo: text('secondary_logo'),
+secondaryLogoUseDefault: boolean('secondary_logo_use_default').default(true),
+```
+
+---
+
+## 🖥️ UI Implementation
+
+### Add to Existing Agent Marketing Profile Component
+
+Find the existing Agent Marketing Profile component and add the Marketing Branding section **below** the Title/Company fields, but **above** the Save button.
+
+```tsx
+// Add this section to the existing Agent Marketing Profile card
+// Place it AFTER Title/Company fields and BEFORE the Save button
+
+import { useState, useEffect } from 'react';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { Upload, QrCode } from 'lucide-react';
+
+// Add these to your existing form state
+const [qrCode, setQrCode] = useState<string | null>(null);
+const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+const [companyLogoUseDefault, setCompanyLogoUseDefault] = useState(true);
+const [secondaryLogo, setSecondaryLogo] = useState<string | null>(null);
+const [secondaryLogoUseDefault, setSecondaryLogoUseDefault] = useState(true);
+
+// Add to useEffect that loads existing data
+useEffect(() => {
+  if (existingData) {
+    // ... existing field loading
+    setQrCode(existingData.qrCode || null);
+    setCompanyLogo(existingData.companyLogo || null);
+    setCompanyLogoUseDefault(existingData.companyLogoUseDefault ?? true);
+    setSecondaryLogo(existingData.secondaryLogo || null);
+    setSecondaryLogoUseDefault(existingData.secondaryLogoUseDefault ?? true);
+  }
+}, [existingData]);
+
+// Image upload handler
+const handleBrandingImageUpload = (
+  setter: (value: string | null) => void
+) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (file) {
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: 'File Too Large',
+        description: 'Please upload an image under 5MB.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setter(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  }
+};
+
+// Add to your save handler - include these new fields
+const handleSave = async () => {
+  await fetch('/api/settings', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      // ... existing fields
+      qrCode,
+      companyLogo,
+      companyLogoUseDefault,
+      secondaryLogo,
+      secondaryLogoUseDefault,
+    }),
+  });
+};
+```
+
+### JSX to Add (Insert After Title/Company, Before Save Button)
+
+```tsx
+{/* Marketing Branding Section - ADD THIS */}
+<div className="pt-6">
+  <Separator className="mb-6" />
+  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+    Marketing Branding
+  </h3>
+
+  {/* QR Code */}
+  <div className="mb-6">
+    <Label className="text-xs font-medium uppercase tracking-wide mb-2 block">
+      QR Code
+    </Label>
+    <div className="flex items-center gap-4">
+      <label
+        htmlFor="qr-code-upload"
+        className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/50 hover:border-primary/50 transition-colors overflow-hidden"
+      >
+        {qrCode ? (
+          <img
+            src={qrCode}
+            alt="QR Code"
+            className="h-full w-full object-contain p-2"
+          />
+        ) : (
+          <QrCode className="h-8 w-8 text-muted-foreground" />
+        )}
+        <input
+          type="file"
+          id="qr-code-upload"
+          accept="image/*"
+          onChange={handleBrandingImageUpload(setQrCode)}
+          className="hidden"
+        />
+      </label>
+      <div className="flex-1">
+        <p className="text-sm text-muted-foreground">
+          Upload your personal QR code
+        </p>
+        <p className="text-xs text-muted-foreground/60">
+          Links to your website, vCard, or contact page
+        </p>
+        {qrCode && (
+          <button
+            type="button"
+            onClick={() => setQrCode(null)}
+            className="mt-1 text-xs text-destructive hover:underline"
+          >
+            Remove
+          </button>
+        )}
+      </div>
+    </div>
+  </div>
+
+  {/* Logos Grid */}
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    {/* Company Logo */}
+    <div className="space-y-3">
+      <Label className="text-xs font-medium uppercase tracking-wide">
+        Company Logo
+      </Label>
+      
+      <div className="flex items-center justify-between">
+        <div className="space-y-0.5">
+          <Label htmlFor="use-spyglass-default" className="text-sm cursor-pointer">
+            Use Spyglass Default
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            Use the standard Spyglass Realty logo
+          </p>
+        </div>
+        <Switch
+          id="use-spyglass-default"
+          checked={companyLogoUseDefault}
+          onCheckedChange={setCompanyLogoUseDefault}
+        />
+      </div>
+
+      <div className="h-20 rounded-lg border border-border bg-muted/30 flex items-center justify-center overflow-hidden">
+        {companyLogoUseDefault ? (
+          <img
+            src="/logos/SpyglassRealty_Logo_Black.png"
+            alt="Spyglass Realty"
+            className="h-12 object-contain"
+          />
+        ) : companyLogo ? (
+          <div className="relative w-full h-full flex items-center justify-center group">
+            <img
+              src={companyLogo}
+              alt="Company Logo"
+              className="h-full object-contain p-2"
+            />
+            <button
+              type="button"
+              onClick={() => setCompanyLogo(null)}
+              className="absolute top-1 right-1 h-6 w-6 rounded-full bg-destructive/80 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              ×
+            </button>
+          </div>
+        ) : (
+          <label
+            htmlFor="company-logo-upload"
+            className="flex flex-col items-center gap-1 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Upload className="h-5 w-5" />
+            <span className="text-xs">Upload Custom Logo</span>
+            <input
+              type="file"
+              id="company-logo-upload"
+              accept="image/*"
+              onChange={handleBrandingImageUpload(setCompanyLogo)}
+              className="hidden"
+            />
+          </label>
+        )}
+      </div>
+    </div>
+
+    {/* Secondary Logo */}
+    <div className="space-y-3">
+      <Label className="text-xs font-medium uppercase tracking-wide">
+        Secondary Logo
+      </Label>
+      
+      <div className="flex items-center justify-between">
+        <div className="space-y-0.5">
+          <Label htmlFor="use-leadingre-default" className="text-sm cursor-pointer">
+            Use Leading RE Default
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            Use the standard Leading Real Estate logo
+          </p>
+        </div>
+        <Switch
+          id="use-leadingre-default"
+          checked={secondaryLogoUseDefault}
+          onCheckedChange={setSecondaryLogoUseDefault}
+        />
+      </div>
+
+      <div className="h-20 rounded-lg border border-border bg-muted/30 flex items-center justify-center overflow-hidden">
+        {secondaryLogoUseDefault ? (
+          <img
+            src="/logos/LeadingRE_Logo.png"
+            alt="Leading Real Estate"
+            className="h-12 object-contain"
+          />
+        ) : secondaryLogo ? (
+          <div className="relative w-full h-full flex items-center justify-center group">
+            <img
+              src={secondaryLogo}
+              alt="Secondary Logo"
+              className="h-full object-contain p-2"
+            />
+            <button
+              type="button"
+              onClick={() => setSecondaryLogo(null)}
+              className="absolute top-1 right-1 h-6 w-6 rounded-full bg-destructive/80 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              ×
+            </button>
+          </div>
+        ) : (
+          <label
+            htmlFor="secondary-logo-upload"
+            className="flex flex-col items-center gap-1 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Upload className="h-5 w-5" />
+            <span className="text-xs">Upload Custom Logo</span>
+            <input
+              type="file"
+              id="secondary-logo-upload"
+              accept="image/*"
+              onChange={handleBrandingImageUpload(setSecondaryLogo)}
+              className="hidden"
+            />
+          </label>
+        )}
+      </div>
+    </div>
+  </div>
+</div>
+{/* END Marketing Branding Section */}
+
+{/* Save Button - Keep existing, just ensure it saves new fields */}
+```
+
+---
+
+## 🔌 API Update
+
+Update your existing settings PATCH endpoint to handle the new fields:
+
+```typescript
+// In your existing settings route
+app.patch('/api/settings', async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const {
+      // Existing fields
+      firstName,
+      lastName,
+      email,
+      phone,
+      title,
+      company,
+      profilePhoto,
+      
+      // NEW branding fields
+      qrCode,
+      companyLogo,
+      companyLogoUseDefault,
+      secondaryLogo,
+      secondaryLogoUseDefault,
+    } = req.body;
+
+    const [updated] = await db
+      .update(users)
+      .set({
+        // Existing fields
+        firstName,
+        lastName,
+        email,
+        phone,
+        title,
+        company,
+        profilePhoto,
+        
+        // NEW branding fields
+        qrCode,
+        companyLogo,
+        companyLogoUseDefault,
+        secondaryLogo,
+        secondaryLogoUseDefault,
+        
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Settings update error:', error);
+    res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+```
+
+Also update the GET endpoint to return the new fields:
+
+```typescript
+app.get('/api/settings', async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+
+    // Return all fields including new branding fields
+    res.json({
+      firstName: user?.firstName || '',
+      lastName: user?.lastName || '',
+      email: user?.email || '',
+      phone: user?.phone || '',
+      title: user?.title || 'REALTOR®',
+      company: user?.company || '',
+      profilePhoto: user?.profilePhoto || null,
+      
+      // NEW branding fields with defaults
+      qrCode: user?.qrCode || null,
+      companyLogo: user?.companyLogo || null,
+      companyLogoUseDefault: user?.companyLogoUseDefault ?? true,
+      secondaryLogo: user?.secondaryLogo || null,
+      secondaryLogoUseDefault: user?.secondaryLogoUseDefault ?? true,
+    });
+  } catch (error) {
+    console.error('Settings fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch settings' });
+  }
+});
+```
+
+---
+
+## 🖼️ Default Logo Files
+
+Ensure these files exist in `/public/logos/`:
+- `SpyglassRealty_Logo_Black.png`
+- `LeadingRE_Logo.png`
+
+---
+
+## 🔗 How Flyer Generator Will Use These Fields
+
+```typescript
+// In Flyer Generator - pulling from settings
+const { data: settings } = useQuery({ queryKey: ['/api/settings'] });
+
+// Agent info (existing fields)
+const agentName = `${settings?.firstName || ''} ${settings?.lastName || ''}`.trim();
+const agentTitle = settings?.title || 'REALTOR®';  // Uses existing Title field
+const agentPhone = settings?.phone || '';
+const agentPhoto = settings?.profilePhoto || null;  // Uses existing Profile Photo
+
+// Branding (new fields)
+const qrCode = settings?.qrCode || null;
+const companyLogo = settings?.companyLogoUseDefault 
+  ? '/logos/SpyglassRealty_Logo_Black.png' 
+  : settings?.companyLogo;
+const secondaryLogo = settings?.secondaryLogoUseDefault 
+  ? '/logos/LeadingRE_Logo.png' 
+  : settings?.secondaryLogo;
+```
+
+---
+
+## 📱 Mobile Optimization
+
+```css
+/* Logo grid stacks on mobile */
+@media (max-width: 768px) {
+  .grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Touch-friendly upload areas */
+label[for*="upload"] {
+  min-height: 80px;
+  min-width: 80px;
+}
+```
+
+---
+
+## ✅ Verification Checklist
+
+### Database
+- [ ] New columns added: `qr_code`, `company_logo`, `company_logo_use_default`, `secondary_logo`, `secondary_logo_use_default`
+- [ ] Migration runs successfully
+- [ ] Default values set correctly (use_default = true)
+
+### UI (Single Card)
+- [ ] Marketing Branding section appears within Agent Marketing Profile card
+- [ ] QR Code upload works
+- [ ] Company Logo toggle works (Spyglass default ↔ custom)
+- [ ] Secondary Logo toggle works (Leading RE default ↔ custom)
+- [ ] Default logos display when toggles are ON
+- [ ] Custom upload appears when toggles are OFF
+- [ ] Remove buttons work for uploaded images
+- [ ] Single "Save Marketing Profile" button saves ALL fields
+
+### API
+- [ ] GET /api/settings returns new branding fields
+- [ ] PATCH /api/settings saves new branding fields
+- [ ] Data persists after page refresh
+
+### Remove
+- [ ] Delete the separate "Flyer & Marketing Branding" card (if it exists)
+- [ ] Remove duplicate Agent Photo field
+- [ ] Remove duplicate Agent Title field
+
+---
+
+## 📋 Summary
+
+| Action | Details |
+|--------|---------|
+| **Database** | Add 5 new columns to existing users table |
+| **UI** | Add "Marketing Branding" section to existing Agent Marketing Profile card |
+| **Keep** | Profile Photo, First/Last Name, Email, Phone, Title, Company |
+| **Add** | QR Code, Company Logo (with toggle), Secondary Logo (with toggle) |
+| **Remove** | Separate "Flyer & Marketing Branding" card (merge into one) |
+| **Title** | Use existing "Title" field as Agent Title (no duplication) |
+| **Photo** | Use existing "Profile Photo" as Agent Photo (no duplication) |
+
+---
+
+## 🎯 Final Result: ONE Card
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ 👤 Agent Marketing Profile                                          │
+│    Your personal information displayed on CMA reports               │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  Profile Photo    ← Used as Agent Photo on flyers                  │
+│  First Name / Last Name                                             │
+│  Email / Phone                                                      │
+│  Title / Company  ← Title used as Agent Title on flyers            │
+│                                                                     │
+│  ───────────────────────────────────────────────────────────────── │
+│  MARKETING BRANDING                                                 │
+│  ───────────────────────────────────────────────────────────────── │
+│                                                                     │
+│  QR Code          ← NEW                                            │
+│  Company Logo     ← NEW (with Spyglass default toggle)             │
+│  Secondary Logo   ← NEW (with Leading RE default toggle)           │
+│                                                                     │
+│                                        [Save Marketing Profile]     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+*This prompt merges everything into ONE card. No more separate "Flyer & Marketing Branding" card.*

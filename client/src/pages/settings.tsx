@@ -151,23 +151,20 @@ export default function Settings() {
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const resourceFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Flyer/Marketing Branding state
-  const [flyerBranding, setFlyerBranding] = useState({
-    agentPhoto: null as string | null,
-    agentTitle: 'REALTOR®',
+  // Marketing Branding state (QR Code, Company Logo, Secondary Logo only - Agent Photo uses marketingProfile.headshotUrl)
+  const [marketingBranding, setMarketingBranding] = useState({
     qrCode: null as string | null,
     companyLogo: null as string | null,
     companyLogoUseDefault: true,
     secondaryLogo: null as string | null,
     secondaryLogoUseDefault: true,
   });
-  const flyerPhotoInputRef = useRef<HTMLInputElement>(null);
   const qrCodeInputRef = useRef<HTMLInputElement>(null);
   const companyLogoInputRef = useRef<HTMLInputElement>(null);
   const secondaryLogoInputRef = useRef<HTMLInputElement>(null);
 
-  // Flyer Branding query
-  const { data: flyerBrandingData, isLoading: flyerBrandingLoading } = useQuery<{
+  // Marketing Branding query
+  const { data: marketingBrandingData, isLoading: marketingBrandingLoading } = useQuery<{
     agentPhoto: string | null;
     agentTitle: string;
     qrCode: string | null;
@@ -181,38 +178,21 @@ export default function Settings() {
     refetchOnWindowFocus: true,
   });
 
-  // Load flyer branding when data arrives
+  // Load marketing branding when data arrives
   useEffect(() => {
-    if (flyerBrandingData) {
-      setFlyerBranding({
-        agentPhoto: flyerBrandingData.agentPhoto || null,
-        agentTitle: flyerBrandingData.agentTitle || 'REALTOR®',
-        qrCode: flyerBrandingData.qrCode || null,
-        companyLogo: flyerBrandingData.companyLogo || null,
-        companyLogoUseDefault: flyerBrandingData.companyLogoUseDefault ?? true,
-        secondaryLogo: flyerBrandingData.secondaryLogo || null,
-        secondaryLogoUseDefault: flyerBrandingData.secondaryLogoUseDefault ?? true,
+    if (marketingBrandingData) {
+      setMarketingBranding({
+        qrCode: marketingBrandingData.qrCode || null,
+        companyLogo: marketingBrandingData.companyLogo || null,
+        companyLogoUseDefault: marketingBrandingData.companyLogoUseDefault ?? true,
+        secondaryLogo: marketingBrandingData.secondaryLogo || null,
+        secondaryLogoUseDefault: marketingBrandingData.secondaryLogoUseDefault ?? true,
       });
     }
-  }, [flyerBrandingData]);
+  }, [marketingBrandingData]);
 
-  // Flyer branding save mutation
-  const saveFlyerBrandingMutation = useMutation({
-    mutationFn: async (data: typeof flyerBranding) => {
-      const res = await apiRequest("POST", "/api/settings/marketing-profile", data);
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Branding Saved", description: "Your flyer branding has been updated." });
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/marketing-profile"] });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message || "Failed to save branding", variant: "destructive" });
-    },
-  });
-
-  // Flyer branding image upload handler
-  const handleFlyerImageUpload = (field: keyof typeof flyerBranding) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Marketing branding image upload handler
+  const handleBrandingImageUpload = (field: keyof typeof marketingBranding) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
@@ -221,15 +201,15 @@ export default function Settings() {
       }
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFlyerBranding(prev => ({ ...prev, [field]: reader.result as string }));
+        setMarketingBranding(prev => ({ ...prev, [field]: reader.result as string }));
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // Clear flyer branding image handler
-  const handleClearFlyerImage = (field: keyof typeof flyerBranding) => {
-    setFlyerBranding(prev => ({ ...prev, [field]: null }));
+  // Clear marketing branding image handler
+  const handleClearBrandingImage = (field: keyof typeof marketingBranding) => {
+    setMarketingBranding(prev => ({ ...prev, [field]: null }));
   };
 
   // CMA Resources query
@@ -534,8 +514,8 @@ export default function Settings() {
     reader.readAsDataURL(file);
   };
 
-  const handleSaveMarketingProfile = () => {
-    // Store phone formatted for display on marketing materials
+  const handleSaveMarketingProfile = async () => {
+    // Save marketing profile fields
     updateMarketingProfileMutation.mutate({
       firstName: marketingProfile.firstName || undefined,
       lastName: marketingProfile.lastName || undefined,
@@ -544,6 +524,27 @@ export default function Settings() {
       marketingCompany: marketingProfile.company || undefined,
       marketingHeadshotUrl: marketingProfile.headshotUrl || undefined,
     });
+
+    // Also save branding fields (QR code, company logo, secondary logo)
+    try {
+      await apiRequest("POST", "/api/settings/marketing-profile", {
+        agentPhoto: marketingProfile.headshotUrl || null, // Use the profile photo as agent photo
+        agentTitle: marketingProfile.title || 'REALTOR®', // Use the title field
+        qrCode: marketingBranding.qrCode,
+        companyLogo: marketingBranding.companyLogo,
+        companyLogoUseDefault: marketingBranding.companyLogoUseDefault,
+        secondaryLogo: marketingBranding.secondaryLogo,
+        secondaryLogoUseDefault: marketingBranding.secondaryLogoUseDefault,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/marketing-profile"] });
+    } catch (error: any) {
+      console.error('Failed to save branding:', error);
+      toast({
+        title: "Branding Error",
+        description: error.message || "Failed to save branding settings",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleAddCoordinator = () => {
@@ -737,8 +738,212 @@ export default function Settings() {
                 />
               </div>
             </div>
+
+            {/* Marketing Branding Section */}
+            <div className="pt-6 border-t border-border">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                Marketing Branding
+              </h3>
+
+              {marketingBrandingLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* QR Code */}
+                  <div>
+                    <Label className="text-xs font-medium uppercase tracking-wide mb-2 block">
+                      QR Code
+                    </Label>
+                    <div className="flex items-center gap-4">
+                      <label
+                        htmlFor="qr-code-upload"
+                        className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/50 hover:border-primary/50 transition-colors overflow-hidden"
+                      >
+                        {marketingBranding.qrCode ? (
+                          <img
+                            src={marketingBranding.qrCode}
+                            alt="QR Code"
+                            className="h-full w-full object-contain p-2"
+                          />
+                        ) : (
+                          <QrCode className="h-8 w-8 text-muted-foreground" />
+                        )}
+                        <input
+                          type="file"
+                          id="qr-code-upload"
+                          accept="image/*"
+                          ref={qrCodeInputRef}
+                          onChange={handleBrandingImageUpload('qrCode')}
+                          className="hidden"
+                          data-testid="input-qr-code-upload"
+                        />
+                      </label>
+                      <div className="flex-1">
+                        <p className="text-sm text-muted-foreground">
+                          Upload your personal QR code
+                        </p>
+                        <p className="text-xs text-muted-foreground/60">
+                          Links to your website, vCard, or contact page
+                        </p>
+                        {marketingBranding.qrCode && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            type="button"
+                            onClick={() => handleClearBrandingImage('qrCode')}
+                            className="mt-1 text-destructive hover:text-destructive p-0 h-auto"
+                            data-testid="button-remove-qr-code"
+                          >
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Logos Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Company Logo */}
+                    <div className="space-y-3">
+                      <Label className="text-xs font-medium uppercase tracking-wide">
+                        Company Logo
+                      </Label>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="use-spyglass-default" className="text-sm cursor-pointer">
+                            Use Spyglass Default
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            Use the standard Spyglass Realty logo
+                          </p>
+                        </div>
+                        <Switch
+                          id="use-spyglass-default"
+                          checked={marketingBranding.companyLogoUseDefault}
+                          onCheckedChange={(checked) => setMarketingBranding(prev => ({ ...prev, companyLogoUseDefault: checked }))}
+                          data-testid="switch-company-logo-default"
+                        />
+                      </div>
+
+                      <div className="h-20 rounded-lg border border-border bg-muted/30 flex items-center justify-center overflow-hidden">
+                        {marketingBranding.companyLogoUseDefault ? (
+                          <img
+                            src="/logos/SpyglassRealty_Logo_Black.png"
+                            alt="Spyglass Realty"
+                            className="h-12 object-contain"
+                          />
+                        ) : marketingBranding.companyLogo ? (
+                          <div className="relative w-full h-full flex items-center justify-center group">
+                            <img
+                              src={marketingBranding.companyLogo}
+                              alt="Company Logo"
+                              className="h-full object-contain p-2"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleClearBrandingImage('companyLogo')}
+                              className="absolute top-1 right-1 h-6 w-6 rounded-full bg-destructive/80 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                              data-testid="button-remove-company-logo"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ) : (
+                          <label
+                            htmlFor="company-logo-upload"
+                            className="flex flex-col items-center gap-1 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <Upload className="h-5 w-5" />
+                            <span className="text-xs">Upload Custom Logo</span>
+                            <input
+                              type="file"
+                              id="company-logo-upload"
+                              accept="image/*"
+                              ref={companyLogoInputRef}
+                              onChange={handleBrandingImageUpload('companyLogo')}
+                              className="hidden"
+                              data-testid="input-company-logo-upload"
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Secondary Logo */}
+                    <div className="space-y-3">
+                      <Label className="text-xs font-medium uppercase tracking-wide">
+                        Secondary Logo
+                      </Label>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="use-leadingre-default" className="text-sm cursor-pointer">
+                            Use Leading RE Default
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            Use the standard Leading Real Estate logo
+                          </p>
+                        </div>
+                        <Switch
+                          id="use-leadingre-default"
+                          checked={marketingBranding.secondaryLogoUseDefault}
+                          onCheckedChange={(checked) => setMarketingBranding(prev => ({ ...prev, secondaryLogoUseDefault: checked }))}
+                          data-testid="switch-secondary-logo-default"
+                        />
+                      </div>
+
+                      <div className="h-20 rounded-lg border border-border bg-muted/30 flex items-center justify-center overflow-hidden">
+                        {marketingBranding.secondaryLogoUseDefault ? (
+                          <img
+                            src="/logos/lre-sgr-black.png"
+                            alt="Leading Real Estate"
+                            className="h-12 object-contain"
+                          />
+                        ) : marketingBranding.secondaryLogo ? (
+                          <div className="relative w-full h-full flex items-center justify-center group">
+                            <img
+                              src={marketingBranding.secondaryLogo}
+                              alt="Secondary Logo"
+                              className="h-full object-contain p-2"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleClearBrandingImage('secondaryLogo')}
+                              className="absolute top-1 right-1 h-6 w-6 rounded-full bg-destructive/80 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                              data-testid="button-remove-secondary-logo"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ) : (
+                          <label
+                            htmlFor="secondary-logo-upload"
+                            className="flex flex-col items-center gap-1 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <Upload className="h-5 w-5" />
+                            <span className="text-xs">Upload Custom Logo</span>
+                            <input
+                              type="file"
+                              id="secondary-logo-upload"
+                              accept="image/*"
+                              ref={secondaryLogoInputRef}
+                              onChange={handleBrandingImageUpload('secondaryLogo')}
+                              className="hidden"
+                              data-testid="input-secondary-logo-upload"
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
             
-            <div className="flex justify-end">
+            <div className="flex justify-end pt-4">
               <Button
                 onClick={handleSaveMarketingProfile}
                 disabled={updateMarketingProfileMutation.isPending}
@@ -846,262 +1051,6 @@ export default function Settings() {
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#EF4923]/10">
-              <ImageIcon className="h-5 w-5 text-[#EF4923]" />
-            </div>
-            <div>
-              <CardTitle>Flyer & Marketing Branding</CardTitle>
-              <CardDescription>
-                Logos, photos, and QR code used across all marketing materials
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {flyerBrandingLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium uppercase tracking-wide">Agent Photo</Label>
-                  <div className="flex items-center gap-4">
-                    <label
-                      htmlFor="flyer-agent-photo"
-                      className="flex h-24 w-24 cursor-pointer items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/25 bg-muted/50 hover:border-primary/50 transition-colors overflow-hidden"
-                    >
-                      {flyerBranding.agentPhoto ? (
-                        <img src={flyerBranding.agentPhoto} alt="Agent" className="h-full w-full object-cover" />
-                      ) : (
-                        <User className="h-8 w-8 text-muted-foreground" />
-                      )}
-                      <input
-                        type="file"
-                        id="flyer-agent-photo"
-                        accept="image/*"
-                        ref={flyerPhotoInputRef}
-                        onChange={handleFlyerImageUpload('agentPhoto')}
-                        className="hidden"
-                        data-testid="input-flyer-agent-photo"
-                      />
-                    </label>
-                    <div className="flex-1">
-                      <p className="text-sm text-muted-foreground">Upload your professional headshot</p>
-                      <p className="text-xs text-muted-foreground/60">PNG or JPG, max 5MB</p>
-                      {flyerBranding.agentPhoto && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleClearFlyerImage('agentPhoto')}
-                          className="mt-2 text-destructive hover:text-destructive"
-                          data-testid="button-remove-flyer-photo"
-                        >
-                          Remove Photo
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium uppercase tracking-wide">QR Code</Label>
-                  <div className="flex items-center gap-4">
-                    <label
-                      htmlFor="flyer-qr-code"
-                      className="flex h-24 w-24 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/50 hover:border-primary/50 transition-colors overflow-hidden"
-                    >
-                      {flyerBranding.qrCode ? (
-                        <img src={flyerBranding.qrCode} alt="QR Code" className="h-full w-full object-contain p-2" />
-                      ) : (
-                        <QrCode className="h-8 w-8 text-muted-foreground" />
-                      )}
-                      <input
-                        type="file"
-                        id="flyer-qr-code"
-                        accept="image/*"
-                        ref={qrCodeInputRef}
-                        onChange={handleFlyerImageUpload('qrCode')}
-                        className="hidden"
-                        data-testid="input-flyer-qr-code"
-                      />
-                    </label>
-                    <div className="flex-1">
-                      <p className="text-sm text-muted-foreground">Upload your personal QR code</p>
-                      <p className="text-xs text-muted-foreground/60">Links to your website, vCard, or contact page</p>
-                      {flyerBranding.qrCode && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleClearFlyerImage('qrCode')}
-                          className="mt-2 text-destructive hover:text-destructive"
-                          data-testid="button-remove-qr-code"
-                        >
-                          Remove QR Code
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="flyer-agent-title" className="text-sm font-medium uppercase tracking-wide">Agent Title</Label>
-                <Input
-                  id="flyer-agent-title"
-                  value={flyerBranding.agentTitle}
-                  onChange={(e) => setFlyerBranding(prev => ({ ...prev, agentTitle: e.target.value }))}
-                  placeholder="REALTOR®"
-                  className="max-w-xs"
-                  data-testid="input-flyer-agent-title"
-                />
-                <p className="text-xs text-muted-foreground">Your professional title (e.g., REALTOR®, Broker, Agent)</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <Label className="text-sm font-medium uppercase tracking-wide">Company Logo</Label>
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="use-default-company" className="text-sm">Use Spyglass Default</Label>
-                      <p className="text-xs text-muted-foreground">Use the standard Spyglass Realty logo</p>
-                    </div>
-                    <Switch
-                      id="use-default-company"
-                      checked={flyerBranding.companyLogoUseDefault}
-                      onCheckedChange={(checked) => setFlyerBranding(prev => ({ ...prev, companyLogoUseDefault: checked }))}
-                      data-testid="switch-default-company-logo"
-                    />
-                  </div>
-                  {flyerBranding.companyLogoUseDefault ? (
-                    <div className="h-20 bg-muted/50 rounded-lg flex items-center justify-center border border-border">
-                      <img src="/logos/SpyglassRealty_Logo_Black.png" alt="Spyglass Realty" className="h-12 object-contain" />
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="custom-company-logo"
-                        className="flex h-20 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/50 hover:border-primary/50 transition-colors overflow-hidden"
-                      >
-                        {flyerBranding.companyLogo ? (
-                          <img src={flyerBranding.companyLogo} alt="Company Logo" className="h-full object-contain p-2" />
-                        ) : (
-                          <div className="flex flex-col items-center gap-1 text-muted-foreground">
-                            <Upload className="h-5 w-5" />
-                            <span className="text-xs">Upload Custom Logo</span>
-                          </div>
-                        )}
-                        <input
-                          type="file"
-                          id="custom-company-logo"
-                          accept="image/*"
-                          ref={companyLogoInputRef}
-                          onChange={handleFlyerImageUpload('companyLogo')}
-                          className="hidden"
-                          data-testid="input-custom-company-logo"
-                        />
-                      </label>
-                      {flyerBranding.companyLogo && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleClearFlyerImage('companyLogo')}
-                          className="text-destructive hover:text-destructive"
-                          data-testid="button-remove-company-logo"
-                        >
-                          Remove
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-4">
-                  <Label className="text-sm font-medium uppercase tracking-wide">Secondary Logo</Label>
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="use-default-secondary" className="text-sm">Use Leading RE Default</Label>
-                      <p className="text-xs text-muted-foreground">Use the standard Leading Real Estate logo</p>
-                    </div>
-                    <Switch
-                      id="use-default-secondary"
-                      checked={flyerBranding.secondaryLogoUseDefault}
-                      onCheckedChange={(checked) => setFlyerBranding(prev => ({ ...prev, secondaryLogoUseDefault: checked }))}
-                      data-testid="switch-default-secondary-logo"
-                    />
-                  </div>
-                  {flyerBranding.secondaryLogoUseDefault ? (
-                    <div className="h-20 bg-muted/50 rounded-lg flex items-center justify-center border border-border">
-                      <img src="/logos/lre-sgr-black.png" alt="Leading Real Estate" className="h-12 object-contain" />
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="custom-secondary-logo"
-                        className="flex h-20 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/50 hover:border-primary/50 transition-colors overflow-hidden"
-                      >
-                        {flyerBranding.secondaryLogo ? (
-                          <img src={flyerBranding.secondaryLogo} alt="Secondary Logo" className="h-full object-contain p-2" />
-                        ) : (
-                          <div className="flex flex-col items-center gap-1 text-muted-foreground">
-                            <Upload className="h-5 w-5" />
-                            <span className="text-xs">Upload Custom Logo</span>
-                          </div>
-                        )}
-                        <input
-                          type="file"
-                          id="custom-secondary-logo"
-                          accept="image/*"
-                          ref={secondaryLogoInputRef}
-                          onChange={handleFlyerImageUpload('secondaryLogo')}
-                          className="hidden"
-                          data-testid="input-custom-secondary-logo"
-                        />
-                      </label>
-                      {flyerBranding.secondaryLogo && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleClearFlyerImage('secondaryLogo')}
-                          className="text-destructive hover:text-destructive"
-                          data-testid="button-remove-secondary-logo"
-                        >
-                          Remove
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button
-                  onClick={() => saveFlyerBrandingMutation.mutate(flyerBranding)}
-                  disabled={saveFlyerBrandingMutation.isPending}
-                  data-testid="button-save-flyer-branding"
-                >
-                  {saveFlyerBrandingMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="mr-2 h-4 w-4" />
-                      Save Flyer Branding
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
