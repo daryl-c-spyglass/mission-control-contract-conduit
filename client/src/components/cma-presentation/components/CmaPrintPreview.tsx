@@ -98,10 +98,12 @@ export function CmaPrintPreview({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className={cn(
-        "max-w-[95vw] w-[1400px] h-[90vh] p-0 flex flex-col",
-        isDark ? "bg-zinc-900 border-zinc-700" : "bg-gray-100 border-gray-200"
-      )}>
+      <DialogContent 
+        hideCloseButton
+        className={cn(
+          "max-w-[95vw] w-[1400px] h-[90vh] p-0 flex flex-col",
+          isDark ? "bg-zinc-900 border-zinc-700" : "bg-gray-100 border-gray-200"
+        )}>
         <div className={cn(
           "flex items-center justify-between px-6 py-4 border-b",
           isDark ? "border-zinc-800" : "border-gray-200"
@@ -363,16 +365,11 @@ function SlidePreview({ slide, compact = false }: { slide: PreviewSlide; compact
         compact ? "text-[6px] pt-1 mt-2" : "text-xs"
       )}>
         {slideNumber > 1 ? (
-          <div className={cn(
-            "bg-black rounded px-2 py-1",
-            compact ? "px-1 py-0.5" : ""
-          )}>
-            <img 
-              src="/logos/SpyglassRealty_Logo_White.png"
-              alt="Spyglass Realty"
-              className={cn(compact ? "h-2" : "h-4")}
-            />
-          </div>
+          <img 
+            src="/logos/spyglass-logo-black.png"
+            alt="Spyglass Realty"
+            className={cn(compact ? "h-3" : "h-5")}
+          />
         ) : (
           <span>Spyglass Realty</span>
         )}

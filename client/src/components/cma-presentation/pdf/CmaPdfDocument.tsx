@@ -45,15 +45,13 @@ const PageHeader = ({ title, slideNumber, totalSlides }: { title: string; slideN
 );
 
 const PageFooter = ({ propertyAddress, slideNumber = 2, baseUrl }: { propertyAddress: string; slideNumber?: number; baseUrl?: string }) => {
-  const logoUrl = baseUrl ? `${baseUrl}/logos/SpyglassRealty_Logo_White.png` : '/logos/SpyglassRealty_Logo_White.png';
+  const logoUrl = baseUrl ? `${baseUrl}/logos/spyglass-logo-black.png` : '/logos/spyglass-logo-black.png';
   const showLogo = slideNumber > 1;
   
   return (
     <View style={styles.footer}>
       {showLogo ? (
-        <View style={{ backgroundColor: '#000000', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4 }}>
-          <Image src={logoUrl} style={{ height: 16, width: 120 }} />
-        </View>
+        <Image src={logoUrl} style={{ height: 18, width: 100 }} />
       ) : (
         <Text style={styles.footerText}>Spyglass Realty</Text>
       )}

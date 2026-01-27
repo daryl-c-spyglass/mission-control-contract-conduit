@@ -1,0 +1,307 @@
+# CMA Presentation Builder — Footer Logo & UI Fix
+
+## 🎯 Issues to Fix
+
+| Issue | Problem | Fix |
+|-------|---------|-----|
+| 1 | Footer logo unreadable (white on white) | Use `SpyglassRealty_Logo_Black.png` instead |
+| 2 | Duplicate X/close buttons in Preview | Remove one, keep only 1 working close button |
+| 3 | Preview ≠ PDF | Ensure they match exactly |
+
+---
+
+## 📁 Logo Files
+
+| Location | Logo File | Why |
+|----------|-----------|-----|
+| **Slide 1 (Cover)** | `LRE_SGR_White.png` | Combined logo (has black bg) |
+| **Footer (Slides 2-44)** | `SpyglassRealty_Logo_Black.png` | Black/gray text visible on white slides |
+
+**Upload:** `SpyglassRealty_Logo_Black.png` to `public/logos/`
+
+---
+
+## 🔧 FIX 1: Footer Logo — Use Black Version
+
+**Problem:** White logo on white slide background = invisible
+
+**Solution:** Use `SpyglassRealty_Logo_Black.png` which has black/gray text with orange accent on transparent background
+
+### Update Footer Component:
+
+```tsx
+// File: components/cma-presentation/SlideFooter.tsx
+
+interface SlideFooterProps {
+  slideNumber: number;
+  totalSlides: number;
+}
+
+// Use BLACK logo for light/white slide backgrounds
+const SPYGLASS_LOGO_BLACK = '/logos/SpyglassRealty_Logo_Black.png';
+
+export function SlideFooter({ slideNumber, totalSlides }: SlideFooterProps) {
+  // Slide 1 uses text, Slides 2+ use logo
+  const showLogo = slideNumber > 1;
+  
+  return (
+    <div className="flex justify-between items-center px-6 py-3 border-t border-gray-200">
+      {/* Left: Logo (slides 2-44) or Text (slide 1) */}
+      <div className="flex items-center h-8">
+        {showLogo ? (
+          <img 
+            src={SPYGLASS_LOGO_BLACK}
+            alt="Spyglass Realty"
+            className="h-6 w-auto"
+          />
+        ) : (
+          <span className="text-sm text-gray-500">Spyglass Realty</span>
+        )}
+      </div>
+      
+      {/* Right: Slide number */}
+      <span className="text-sm text-gray-400">
+        Slide {slideNumber} of {totalSlides}
+      </span>
+    </div>
+  );
+}
+```
+
+### For PDF Footer:
+
+```tsx
+// File: components/pdf/PdfSlideFooter.tsx
+import { View, Text, Image, StyleSheet } from '@react-pdf/renderer';
+
+export function PdfSlideFooter({ slideNumber, totalSlides }: { slideNumber: number; totalSlides: number }) {
+  const showLogo = slideNumber > 1;
+  
+  return (
+    <View style={styles.footer}>
+      {/* Left: Logo or Text */}
+      {showLogo ? (
+        <Image 
+          src="/logos/SpyglassRealty_Logo_Black.png"
+          style={styles.footerLogo}
+        />
+      ) : (
+        <Text style={styles.footerText}>Spyglass Realty</Text>
+      )}
+      
+      {/* Right: Slide number */}
+      <Text style={styles.slideNumber}>Slide {slideNumber} of {totalSlides}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  footer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 40,
+    right: 40,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingTop: 10,
+  },
+  footerLogo: {
+    height: 20,
+    width: 'auto',
+  },
+  footerText: {
+    fontSize: 10,
+    color: '#6b7280',
+  },
+  slideNumber: {
+    fontSize: 10,
+    color: '#9ca3af',
+  },
+});
+```
+
+---
+
+## 🔧 FIX 2: Remove Duplicate X/Close Buttons
+
+**Problem:** Preview modal has 2 close buttons (X)
+
+**Solution:** Keep only ONE close button that works
+
+### Find the Preview Modal Component:
+
+```tsx
+// File: Look for CMAPresentationPreview.tsx, PreviewModal.tsx, or similar
+
+// CURRENT (Wrong) - Two X buttons
+<div className="...">
+  <button onClick={onClose}>✕</button>  {/* First X */}
+</div>
+<div className="...">
+  <button onClick={onClose}>✕</button>  {/* Second X - REMOVE THIS */}
+</div>
+
+// FIX - Keep only ONE close button in the header
+function PreviewModal({ isOpen, onClose, children }) {
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
+      <div className="bg-white rounded-lg w-full max-w-6xl h-[90vh] flex flex-col relative">
+        {/* Header with SINGLE close button */}
+        <div className="flex items-center justify-between p-4 border-b">
+          <div>
+            <h2 className="text-lg font-semibold">Preview</h2>
+            <p className="text-sm text-gray-500">268 Chisholm TRL, Bastrop, TX - 44 slides</p>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            {/* View toggles */}
+            <div className="flex border rounded-lg overflow-hidden">
+              <button className="px-3 py-1.5 text-sm">Single</button>
+              <button className="px-3 py-1.5 text-sm bg-gray-100">Grid</button>
+            </div>
+            
+            {/* Zoom controls */}
+            <div className="flex items-center gap-2">
+              <button className="p-1">−</button>
+              <span className="text-sm">100%</span>
+              <button className="p-1">+</button>
+            </div>
+            
+            {/* Download PDF button */}
+            <button className="bg-[#EF4923] text-white px-4 py-2 rounded-lg flex items-center gap-2">
+              <Download className="w-4 h-4" />
+              Download PDF
+            </button>
+            
+            {/* SINGLE Close Button */}
+            <button 
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+              aria-label="Close preview"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+        </div>
+        
+        {/* Content */}
+        <div className="flex-1 overflow-auto">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### Search for duplicate close buttons:
+
+```bash
+# Find all X/close button instances in preview components
+grep -rn "onClose\|✕\|close\|X.*button" --include="*.tsx" client/src/components/cma-presentation/
+grep -rn "<X\s" --include="*.tsx" client/src/components/
+```
+
+---
+
+## 🔧 FIX 3: Ensure Preview = PDF Export
+
+**Principle:** Both Preview and PDF must render identically
+
+### Checklist:
+
+| Element | Preview | PDF | Must Match |
+|---------|---------|-----|------------|
+| Slide 1 logo | `LRE_SGR_White.png` | `LRE_SGR_White.png` | ✓ |
+| Footer logo (2-44) | `SpyglassRealty_Logo_Black.png` | `SpyglassRealty_Logo_Black.png` | ✓ |
+| Footer text (slide 1) | "Spyglass Realty" | "Spyglass Realty" | ✓ |
+| Slide numbers | "Slide X of 44" | "Slide X of 44" | ✓ |
+| Colors | Same | Same | ✓ |
+| Fonts | Same | Same | ✓ |
+| Layout | Same | Same | ✓ |
+
+### Shared Constants:
+
+```typescript
+// File: lib/cma-constants.ts
+
+export const CMA_LOGOS = {
+  coverPage: '/logos/LRE_SGR_White.png',        // Slide 1 - combined logo
+  footer: '/logos/SpyglassRealty_Logo_Black.png', // Slides 2-44 - black logo
+};
+
+export const CMA_COLORS = {
+  spyglassOrange: '#EF4923',
+  spyglassBlack: '#222222',
+  textPrimary: '#1f2937',
+  textSecondary: '#6b7280',
+  textMuted: '#9ca3af',
+  border: '#e5e7eb',
+};
+
+// Use these constants in BOTH Preview and PDF components
+```
+
+---
+
+## 📋 Quick Summary
+
+| Change | Before | After |
+|--------|--------|-------|
+| Footer logo | `SpyglassRealty_Logo_White.png` (invisible) | `SpyglassRealty_Logo_Black.png` (visible) |
+| Close buttons | 2 X buttons | 1 X button only |
+| Preview vs PDF | May differ | Must be identical |
+
+---
+
+## 📁 Files to Upload
+
+```bash
+# Copy black logo to public folder
+cp SpyglassRealty_Logo_Black.png public/logos/SpyglassRealty_Logo_Black.png
+
+# Verify all logos exist
+ls -la public/logos/
+# Should show:
+# - LRE_SGR_White.png
+# - SpyglassRealty_Logo_Black.png
+```
+
+---
+
+## ✅ Verification Checklist
+
+### Footer Logo
+- [ ] `SpyglassRealty_Logo_Black.png` displays clearly on white slides
+- [ ] Logo visible in both Preview and PDF
+- [ ] Appears on slides 2-44 only
+- [ ] Slide 1 still shows "Spyglass Realty" text
+
+### Close Button
+- [ ] Only ONE X button in Preview header
+- [ ] X button closes the Preview modal
+- [ ] No orphan/duplicate close buttons
+
+### Preview = PDF
+- [ ] Download PDF and compare side-by-side with Preview
+- [ ] All slides look identical
+- [ ] Logos render correctly in PDF
+- [ ] Colors match exactly
+
+---
+
+## 📱 Mobile Optimization
+
+- [ ] Close button has 44x44px minimum touch target
+- [ ] Footer logo scales appropriately on small screens
+- [ ] Preview modal works on tablet/mobile
+
+---
+
+*Copy this entire prompt to Replit for Contract Conduit project.*
+*Upload: `SpyglassRealty_Logo_Black.png` to `public/logos/`*
