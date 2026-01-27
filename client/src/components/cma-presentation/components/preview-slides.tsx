@@ -142,8 +142,7 @@ export function generatePreviewSlides({
     });
   });
 
-  const top3Comparables = comparables.slice(0, 3);
-  top3Comparables.forEach((comp, index) => {
+  comparables.forEach((comp, index) => {
     const price = extractPrice(comp);
     const hasPhoto = (comp.photos && comp.photos.length > 0) || (comp as any).primaryPhoto;
     

@@ -100,7 +100,7 @@ export function CmaPrintPreview({
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
           <div>
             <DialogTitle className="text-xl font-semibold text-white">
-              Print Preview
+              Preview
             </DialogTitle>
             <p className="text-sm text-zinc-400 mt-1">
               {propertyAddress} - {slides.length} slides

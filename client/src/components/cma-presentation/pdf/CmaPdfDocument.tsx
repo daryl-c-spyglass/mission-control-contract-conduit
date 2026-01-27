@@ -206,7 +206,7 @@ const ComparablesSummaryPage = ({
             <Text style={[styles.tableHeaderCell, { width: '14%', textAlign: 'center' }]}>Status</Text>
             <Text style={[styles.tableHeaderCell, { width: '10%', textAlign: 'right' }]}>DOM</Text>
           </View>
-          {comparables.slice(0, 8).map((comp, i) => {
+          {comparables.map((comp, i) => {
             const price = extractPrice(comp);
             const sqft = extractSqft(comp);
             const pricePerSqft = calculatePricePerSqft(comp);
@@ -384,7 +384,7 @@ const TimeToSellPage = ({
         </View>
         
         <Text style={{ fontSize: 12, fontWeight: 600, marginBottom: 15 }}>Days on Market by Property</Text>
-        {comparables.slice(0, 5).map((comp, i) => {
+        {comparables.map((comp, i) => {
           const dom = extractDOM(comp);
           const barWidth = dom != null && maxDom > 0 ? Math.min(100, (dom / maxDom) * 100) : 0;
           const address = extractFullAddress(comp);
@@ -544,7 +544,7 @@ const AveragePricePerAcrePage = ({
               <Text style={styles.tableHeaderCell}>Lot Size (acres)</Text>
               <Text style={styles.tableHeaderCell}>Price/Acre</Text>
             </View>
-            {propsWithAcreData.slice(0, 5).map((comp, i) => (
+            {propsWithAcreData.map((comp, i) => (
               <View key={comp.id || i} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}>
                 <Text style={[styles.tableCell, { flex: 2 }]}>{extractFullAddress(comp)}</Text>
                 <Text style={styles.tableCell}>{comp.acres?.toFixed(2) || 'N/A'}</Text>
@@ -1044,13 +1044,13 @@ export function CmaPdfDocument({
         }
       })}
       
-      {comparables.slice(0, 3).map((comp, i) => (
+      {comparables.map((comp, i) => (
         <PropertyDetailPage 
           key={`detail-${comp.id}`} 
           property={comp} 
           propertyAddress={propertyAddress}
           slideNumber={totalSlides + i + 1} 
-          totalSlides={totalSlides + 3} 
+          totalSlides={totalSlides + comparables.length} 
         />
       ))}
     </Document>

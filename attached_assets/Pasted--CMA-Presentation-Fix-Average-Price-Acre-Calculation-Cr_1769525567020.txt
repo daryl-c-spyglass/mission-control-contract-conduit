@@ -1,0 +1,663 @@
+# CMA Presentation — Fix Average Price/Acre Calculation
+
+## 🚨 Critical Issue
+
+The "AVERAGE PRICE/ACRE" widget is showing impossible values:
+- **Card displays:** "$64M/acre" (impossible for Austin residential)
+- **Slide displays:** "$NaN / ACRE" (calculation failing)
+- **Sidebar shows:** "$NaN / acre" for ALL properties
+
+## 🔍 Root Cause Analysis
+
+### Likely Causes
+
+| Possible Issue | Explanation |
+|----------------|-------------|
+| **Lot size is 0 or null** | Division by zero/null returns NaN |
+| **Lot size in wrong units** | Repliers may return sq ft, code expects acres |
+| **Field name mismatch** | Looking for wrong field in API response |
+| **Type coercion issue** | String "0.19" not converted to number |
+| **Missing data** | Lot size not populated for comparables |
+
+### Why $64M/acre?
+
+If a $950,000 property has lot size stored as **0.015 acres** (or incorrectly parsed):
+```
+$950,000 ÷ 0.015 = $63,333,333/acre ≈ $64M/acre
+```
+
+This suggests either:
+1. Lot size values are extremely small (data error)
+2. Lot size is in square feet but treated as acres (1 acre = 43,560 sq ft)
+3. Decimal parsing issue (0.19 becoming 0.019)
+
+---
+
+## 🔧 STEP 1: Add Diagnostic Logging
+
+**Find the component that calculates price per acre** (likely in `AveragePriceAcreWidget.tsx` or similar)
+
+Add this diagnostic code:
+
+```typescript
+// Add at the top of the component or calculation function
+const diagnosticLog = (comparables: any[]) => {
+  console.group('🔍 Price/Acre Diagnostic');
+  
+  comparables.forEach((comp, index) => {
+    console.log(`\n--- Comparable ${index + 1}: ${comp.address || comp.streetAddress} ---`);
+    console.log('Raw lot size fields:', {
+      lotSizeArea: comp.lotSizeArea,
+      lotSize: comp.lotSize,
+      lotSizeAcres: comp.lotSizeAcres,
+      lot_size_acres: comp.lot_size_acres,
+      lotSizeSquareFeet: comp.lotSizeSquareFeet,
+      lotSizeSqFt: comp.lotSizeSqFt,
+      acres: comp.acres,
+    });
+    console.log('Raw price fields:', {
+      listPrice: comp.listPrice,
+      price: comp.price,
+      soldPrice: comp.soldPrice,
+      closePrice: comp.closePrice,
+    });
+    
+    const lotAcres = parseLotSizeToAcres(comp);
+    const price = parsePrice(comp);
+    const pricePerAcre = lotAcres > 0 ? price / lotAcres : null;
+    
+    console.log('Parsed values:', {
+      lotAcres,
+      price,
+      pricePerAcre,
+      pricePerAcreFormatted: pricePerAcre ? `$${(pricePerAcre / 1000000).toFixed(2)}M` : 'N/A'
+    });
+  });
+  
+  console.groupEnd();
+};
+
+// Call this when component mounts or data changes
+useEffect(() => {
+  if (comparables?.length) {
+    diagnosticLog(comparables);
+  }
+}, [comparables]);
+```
+
+---
+
+## 🔧 STEP 2: Fix Lot Size Parsing
+
+**Create a robust lot size parser that handles all Repliers API formats:**
+
+```typescript
+/**
+ * Safely parse lot size to acres from various Repliers API field formats
+ * 
+ * Repliers API may return lot size in different fields and units:
+ * - lotSizeArea: Could be sq ft or acres (check value magnitude)
+ * - lotSizeAcres: Already in acres
+ * - lotSizeSquareFeet: In square feet
+ * - lotSize: String with unit suffix like "0.19 Acres" or "8276 SqFt"
+ */
+function parseLotSizeToAcres(property: any): number {
+  const SQFT_PER_ACRE = 43560;
+  
+  // Priority 1: lotSizeAcres (already in correct units)
+  if (property.lotSizeAcres != null) {
+    const acres = parseFloat(String(property.lotSizeAcres));
+    if (!isNaN(acres) && acres > 0) {
+      console.log(`Using lotSizeAcres: ${acres}`);
+      return acres;
+    }
+  }
+  
+  // Priority 2: lot_size_acres (snake_case variant from our DB)
+  if (property.lot_size_acres != null) {
+    const acres = parseFloat(String(property.lot_size_acres));
+    if (!isNaN(acres) && acres > 0) {
+      console.log(`Using lot_size_acres: ${acres}`);
+      return acres;
+    }
+  }
+  
+  // Priority 3: lotSizeSquareFeet or lotSizeSqFt (convert to acres)
+  const sqFtField = property.lotSizeSquareFeet ?? property.lotSizeSqFt ?? property.lotSizeSF;
+  if (sqFtField != null) {
+    const sqFt = parseFloat(String(sqFtField));
+    if (!isNaN(sqFt) && sqFt > 0) {
+      const acres = sqFt / SQFT_PER_ACRE;
+      console.log(`Converting ${sqFt} sqft to ${acres} acres`);
+      return acres;
+    }
+  }
+  
+  // Priority 4: lotSizeArea (determine unit by magnitude)
+  if (property.lotSizeArea != null) {
+    const value = parseFloat(String(property.lotSizeArea));
+    if (!isNaN(value) && value > 0) {
+      // If value > 100, it's likely square feet
+      // Typical residential lots are 0.1-2 acres or 4,000-87,000 sq ft
+      if (value > 100) {
+        const acres = value / SQFT_PER_ACRE;
+        console.log(`lotSizeArea ${value} appears to be sqft, converting to ${acres} acres`);
+        return acres;
+      } else {
+        console.log(`lotSizeArea ${value} appears to be acres`);
+        return value;
+      }
+    }
+  }
+  
+  // Priority 5: lotSize string with unit
+  if (property.lotSize && typeof property.lotSize === 'string') {
+    const lotSizeStr = property.lotSize.toLowerCase();
+    const numericMatch = lotSizeStr.match(/[\d.]+/);
+    if (numericMatch) {
+      const value = parseFloat(numericMatch[0]);
+      if (lotSizeStr.includes('acre')) {
+        console.log(`Parsed "${property.lotSize}" as ${value} acres`);
+        return value;
+      } else if (lotSizeStr.includes('sq') || lotSizeStr.includes('ft')) {
+        const acres = value / SQFT_PER_ACRE;
+        console.log(`Parsed "${property.lotSize}" as ${value} sqft = ${acres} acres`);
+        return acres;
+      }
+    }
+  }
+  
+  // Priority 6: acres field directly
+  if (property.acres != null) {
+    const acres = parseFloat(String(property.acres));
+    if (!isNaN(acres) && acres > 0) {
+      console.log(`Using acres field: ${acres}`);
+      return acres;
+    }
+  }
+  
+  console.warn(`Could not parse lot size for property:`, property.address || property.streetAddress);
+  return 0; // Return 0 to indicate missing data
+}
+```
+
+---
+
+## 🔧 STEP 3: Fix Price Parsing
+
+```typescript
+/**
+ * Safely parse price from various Repliers API field formats
+ */
+function parsePrice(property: any): number {
+  // For closed/sold properties, prefer close/sold price
+  const priceFields = [
+    property.closePrice,
+    property.soldPrice,
+    property.listPrice,
+    property.price,
+    property.originalListPrice,
+  ];
+  
+  for (const priceField of priceFields) {
+    if (priceField != null) {
+      // Handle string with currency symbols and commas
+      const priceStr = String(priceField).replace(/[$,]/g, '');
+      const price = parseFloat(priceStr);
+      if (!isNaN(price) && price > 0) {
+        return price;
+      }
+    }
+  }
+  
+  console.warn(`Could not parse price for property:`, property.address || property.streetAddress);
+  return 0;
+}
+```
+
+---
+
+## 🔧 STEP 4: Fix Average Calculation with Validation
+
+```typescript
+/**
+ * Calculate average price per acre with proper validation
+ */
+function calculateAveragePricePerAcre(comparables: any[]): {
+  average: number | null;
+  validCount: number;
+  excludedCount: number;
+  details: Array<{
+    address: string;
+    price: number;
+    acres: number;
+    pricePerAcre: number | null;
+    excluded: boolean;
+    reason?: string;
+  }>;
+} {
+  const MIN_LOT_SIZE_ACRES = 0.01; // Exclude lots smaller than 0.01 acres (435 sq ft)
+  const MAX_PRICE_PER_ACRE = 50_000_000; // $50M/acre sanity check for Austin
+  const MIN_PRICE_PER_ACRE = 10_000; // $10K/acre minimum sanity check
+  
+  const details: Array<any> = [];
+  let totalPricePerAcre = 0;
+  let validCount = 0;
+  let excludedCount = 0;
+  
+  for (const comp of comparables) {
+    const address = comp.address || comp.streetAddress || 'Unknown';
+    const price = parsePrice(comp);
+    const acres = parseLotSizeToAcres(comp);
+    
+    let pricePerAcre: number | null = null;
+    let excluded = false;
+    let reason = '';
+    
+    if (price <= 0) {
+      excluded = true;
+      reason = 'Invalid price';
+    } else if (acres <= 0) {
+      excluded = true;
+      reason = 'Missing lot size';
+    } else if (acres < MIN_LOT_SIZE_ACRES) {
+      excluded = true;
+      reason = `Lot too small (${acres.toFixed(3)} acres < ${MIN_LOT_SIZE_ACRES})`;
+    } else {
+      pricePerAcre = price / acres;
+      
+      // Sanity check the result
+      if (pricePerAcre > MAX_PRICE_PER_ACRE) {
+        excluded = true;
+        reason = `Price/acre exceeds maximum ($${(pricePerAcre / 1_000_000).toFixed(1)}M > $${MAX_PRICE_PER_ACRE / 1_000_000}M)`;
+      } else if (pricePerAcre < MIN_PRICE_PER_ACRE) {
+        excluded = true;
+        reason = `Price/acre below minimum ($${pricePerAcre.toFixed(0)} < $${MIN_PRICE_PER_ACRE})`;
+      } else {
+        totalPricePerAcre += pricePerAcre;
+        validCount++;
+      }
+    }
+    
+    if (excluded) {
+      excludedCount++;
+    }
+    
+    details.push({
+      address,
+      price,
+      acres,
+      pricePerAcre,
+      excluded,
+      reason,
+    });
+  }
+  
+  const average = validCount > 0 ? totalPricePerAcre / validCount : null;
+  
+  // Log summary
+  console.log('Price/Acre Calculation Summary:', {
+    totalProperties: comparables.length,
+    validCount,
+    excludedCount,
+    average: average ? `$${(average / 1_000_000).toFixed(2)}M/acre` : 'N/A',
+  });
+  
+  if (excludedCount > 0) {
+    console.log('Excluded properties:');
+    details.filter(d => d.excluded).forEach(d => {
+      console.log(`  - ${d.address}: ${d.reason}`);
+    });
+  }
+  
+  return { average, validCount, excludedCount, details };
+}
+```
+
+---
+
+## 🔧 STEP 5: Update the Widget Component
+
+**File:** `client/src/components/cma-presentation/widgets/AveragePriceAcreWidget.tsx`
+
+```tsx
+import React, { useMemo } from 'react';
+import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
+
+interface AveragePriceAcreWidgetProps {
+  comparables: any[];
+  subjectProperty?: any;
+}
+
+export function AveragePriceAcreWidget({ comparables, subjectProperty }: AveragePriceAcreWidgetProps) {
+  const { average, validCount, excludedCount, details, chartData } = useMemo(() => {
+    const result = calculateAveragePricePerAcre(comparables);
+    
+    // Prepare chart data
+    const chartData = result.details
+      .filter(d => !d.excluded && d.pricePerAcre !== null)
+      .map(d => ({
+        name: d.address,
+        acres: d.acres,
+        pricePerAcre: d.pricePerAcre! / 1_000_000, // Convert to millions for chart
+        price: d.price,
+        status: comparables.find(c => 
+          (c.address || c.streetAddress) === d.address
+        )?.status || 'unknown',
+      }));
+    
+    return { ...result, chartData };
+  }, [comparables]);
+  
+  // Format display value
+  const displayValue = useMemo(() => {
+    if (average === null) {
+      return { value: 'N/A', subtitle: 'Insufficient data' };
+    }
+    
+    if (average >= 1_000_000) {
+      return {
+        value: `$${(average / 1_000_000).toFixed(1)}M`,
+        subtitle: `${validCount} properties analyzed`,
+      };
+    }
+    
+    return {
+      value: `$${(average / 1_000).toFixed(0)}K`,
+      subtitle: `${validCount} properties analyzed`,
+    };
+  }, [average, validCount]);
+  
+  // Subject property data point
+  const subjectData = useMemo(() => {
+    if (!subjectProperty) return null;
+    
+    const price = parsePrice(subjectProperty);
+    const acres = parseLotSizeToAcres(subjectProperty);
+    
+    if (price > 0 && acres > 0) {
+      return {
+        name: 'Subject Property',
+        acres,
+        pricePerAcre: (price / acres) / 1_000_000,
+        price,
+        isSubject: true,
+      };
+    }
+    return null;
+  }, [subjectProperty]);
+  
+  return (
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="mb-4">
+        <h2 className="text-3xl font-bold">
+          <span className="text-orange-500">{displayValue.value}</span>
+          <span className="text-gray-500 text-lg font-normal"> / ACRE</span>
+        </h2>
+        <p className="text-gray-500 text-sm">
+          Comparable land sold for an average of{' '}
+          <span className="text-orange-500">{displayValue.value}</span> / acre.
+        </p>
+        {excludedCount > 0 && (
+          <p className="text-gray-400 text-xs mt-1">
+            {excludedCount} properties excluded (lots under 0.05 acres)
+          </p>
+        )}
+      </div>
+      
+      {/* Chart */}
+      <div className="flex-1 min-h-[300px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 60 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis 
+              dataKey="acres" 
+              name="Acres" 
+              unit=" acres"
+              type="number"
+              domain={['auto', 'auto']}
+              tick={{ fontSize: 12 }}
+              label={{ value: 'Acres', position: 'bottom', offset: 20 }}
+            />
+            <YAxis 
+              dataKey="pricePerAcre" 
+              name="Price/Acre" 
+              unit="M"
+              type="number"
+              domain={['auto', 'auto']}
+              tick={{ fontSize: 12 }}
+              tickFormatter={(value) => `$${value.toFixed(1)}M`}
+            />
+            <Tooltip
+              formatter={(value: number, name: string) => {
+                if (name === 'pricePerAcre') return [`$${value.toFixed(2)}M/acre`, 'Price/Acre'];
+                if (name === 'acres') return [`${value.toFixed(3)} acres`, 'Lot Size'];
+                return [value, name];
+              }}
+              labelFormatter={(label) => `Property: ${label}`}
+            />
+            <Legend />
+            
+            {/* Average reference line */}
+            {average && (
+              <ReferenceLine 
+                y={average / 1_000_000} 
+                stroke="#f97316" 
+                strokeDasharray="5 5"
+                label={{ value: 'Avg', position: 'right' }}
+              />
+            )}
+            
+            {/* Comparable properties */}
+            <Scatter 
+              name="Closed" 
+              data={chartData.filter(d => d.status?.toLowerCase() === 'closed')} 
+              fill="#ef4444"
+            />
+            <Scatter 
+              name="Active" 
+              data={chartData.filter(d => d.status?.toLowerCase() === 'active')} 
+              fill="#22c55e"
+            />
+            <Scatter 
+              name="Under Contract" 
+              data={chartData.filter(d => 
+                d.status?.toLowerCase().includes('pending') || 
+                d.status?.toLowerCase().includes('contract')
+              )} 
+              fill="#f59e0b"
+            />
+            
+            {/* Subject property */}
+            {subjectData && (
+              <Scatter 
+                name="Subject Property" 
+                data={[subjectData]} 
+                fill="#3b82f6"
+                shape="diamond"
+              />
+            )}
+          </ScatterChart>
+        </ResponsiveContainer>
+      </div>
+      
+      {/* Legend */}
+      <div className="flex items-center justify-between mt-4 text-xs text-gray-500">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-blue-500 transform rotate-45" />
+            <span>Subject Property</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 border-t-2 border-dashed border-orange-500" />
+            <span>Trendline (avg price/acre of SOLD)</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-red-500" />
+            <span>Closed</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-amber-500" />
+            <span>Under Contract</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-green-500" />
+            <span>Active</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 STEP 6: Fix the Card Display Value
+
+**File:** Find where the card "$64M/acre" value is calculated (likely in `widgets.ts` or the grid component)
+
+```typescript
+// Update the card value calculation to use the same safe calculation
+function getCardDisplayValue(widgetId: string, data: any): string {
+  if (widgetId === 'average_price_acre') {
+    const result = calculateAveragePricePerAcre(data.comparables);
+    
+    if (result.average === null) {
+      return 'N/A';
+    }
+    
+    // Format as $X.XM/acre or $XXXK/acre
+    if (result.average >= 1_000_000) {
+      return `$${(result.average / 1_000_000).toFixed(1)}M/acre`;
+    }
+    return `$${Math.round(result.average / 1_000)}K/acre`;
+  }
+  
+  // ... other widget value calculations
+}
+```
+
+---
+
+## 🔧 STEP 7: Check Data Source in Repliers API Response
+
+**Add this to your Repliers API fetching code to log the raw response:**
+
+```typescript
+// In server/repliers.ts or wherever you fetch comparable data
+
+async function fetchComparables(mlsNumber: string): Promise<any[]> {
+  const response = await fetch(`${REPLIERS_API_URL}/listings/${mlsNumber}/comparables`, {
+    headers: { 'Authorization': `Bearer ${REPLIERS_API_KEY}` }
+  });
+  
+  const data = await response.json();
+  
+  // DEBUG: Log raw API response to see actual field names
+  console.log('📦 Repliers API Raw Response (first comparable):');
+  if (data.comparables?.[0]) {
+    const firstComp = data.comparables[0];
+    console.log('Lot size related fields:', {
+      lotSizeArea: firstComp.lotSizeArea,
+      lotSizeAreaUnits: firstComp.lotSizeAreaUnits,
+      lotSize: firstComp.lotSize,
+      lotSizeAcres: firstComp.lotSizeAcres,
+      lotSizeDimensions: firstComp.lotSizeDimensions,
+      lotSizeSource: firstComp.lotSizeSource,
+      acres: firstComp.acres,
+      // Log all fields with "lot" or "acre" in the name
+      ...Object.fromEntries(
+        Object.entries(firstComp).filter(([key]) => 
+          key.toLowerCase().includes('lot') || 
+          key.toLowerCase().includes('acre')
+        )
+      )
+    });
+  }
+  
+  return data.comparables || [];
+}
+```
+
+---
+
+## 📱 Mobile Optimization
+
+Ensure the fix works on all devices:
+
+| Device | Consideration |
+|--------|---------------|
+| iPad | Chart should be readable, touch targets for property dots |
+| iPhone | May need simplified view, vertical layout |
+| Android | Test chart rendering in Chrome |
+
+---
+
+## ✅ Verification Checklist
+
+After implementing fixes:
+
+- [ ] Run diagnostic logging and check console output
+- [ ] Verify lot size values are parsed correctly (should be 0.1 - 2 acres for typical residential)
+- [ ] Verify price per acre is reasonable ($500K - $5M for Austin residential)
+- [ ] Card shows realistic value (e.g., "$2.1M/acre")
+- [ ] Slide shows same value, not NaN
+- [ ] Sidebar property list shows individual price/acre values
+- [ ] Chart displays data points at reasonable positions
+- [ ] Test with multiple transactions to ensure fix works broadly
+
+---
+
+## 🔍 Investigation: Check Other Transactions
+
+Run this SQL query to check lot size data across all transactions:
+
+```sql
+-- Check lot_size_acres values across all transactions
+SELECT 
+  id,
+  address,
+  list_price,
+  lot_size_acres,
+  CASE 
+    WHEN lot_size_acres > 0 THEN list_price / lot_size_acres 
+    ELSE NULL 
+  END as price_per_acre
+FROM transactions
+WHERE lot_size_acres IS NOT NULL
+ORDER BY lot_size_acres ASC
+LIMIT 20;
+
+-- Find transactions with suspicious lot sizes
+SELECT 
+  id,
+  address,
+  lot_size_acres,
+  list_price
+FROM transactions
+WHERE lot_size_acres < 0.01 
+   OR lot_size_acres > 100
+   OR lot_size_acres IS NULL;
+```
+
+---
+
+## 📋 Summary
+
+The $64M/acre and $NaN issues are caused by:
+1. **Missing or incorrect lot size data** from Repliers API
+2. **No validation** before performing division
+3. **Field name mismatches** between API response and code
+
+The fix involves:
+1. Robust lot size parsing with multiple fallback fields
+2. Unit detection (sq ft vs acres) based on value magnitude
+3. Sanity checks to exclude outliers
+4. Proper NaN/null handling
+5. Diagnostic logging to identify data issues
+
+*Copy this entire prompt to Replit for Contract Conduit project.*
