@@ -52,18 +52,22 @@ function Section({ icon, title, children }: { icon: React.ReactNode; title: stri
 function FormField({
   icon,
   label,
+  value,
+  onChange,
   ...inputProps
 }: {
   icon?: React.ReactNode;
   label: string;
-} & React.InputHTMLAttributes<HTMLInputElement>) {
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
   return (
     <div className="space-y-1.5">
       <Label className="text-xs font-medium uppercase tracking-wide flex items-center gap-1.5">
         {icon && <span className="text-muted-foreground">{icon}</span>}
         {label}
       </Label>
-      <Input {...inputProps} className="h-9" />
+      <Input value={value || ''} onChange={onChange} {...inputProps} className="h-9" />
     </div>
   );
 }
@@ -84,7 +88,17 @@ export function FlyerForm({
   onRevertDescription,
 }: FlyerFormProps) {
   const { register, setValue, watch } = form;
+  
+  // Watch all form values for controlled inputs
+  const priceValue = watch('price') || '';
+  const bedroomsValue = watch('bedrooms') || '';
+  const bathroomsValue = watch('bathrooms') || '';
+  const sqftValue = watch('sqft') || '';
+  const headlineValue = watch('introHeading') || '';
   const descriptionValue = watch('introDescription') || '';
+  const agentNameValue = watch('agentName') || '';
+  const agentTitleValue = watch('agentTitle') || '';
+  const phoneValue = watch('phone') || '';
   const addressValue = watch('address') || '';
 
   return (
@@ -99,7 +113,8 @@ export function FlyerForm({
           <FormField
             icon={<DollarSign className="w-3 h-3" />}
             label="Listed Price"
-            {...register('price')}
+            value={priceValue}
+            onChange={(e) => setValue('price', e.target.value)}
             data-testid="input-flyer-price"
           />
 
@@ -107,19 +122,22 @@ export function FlyerForm({
             <FormField
               icon={<BedDouble className="w-3 h-3" />}
               label="Beds"
-              {...register('bedrooms')}
+              value={bedroomsValue}
+              onChange={(e) => setValue('bedrooms', e.target.value)}
               data-testid="input-flyer-beds"
             />
             <FormField
               icon={<Bath className="w-3 h-3" />}
               label="Baths"
-              {...register('bathrooms')}
+              value={bathroomsValue}
+              onChange={(e) => setValue('bathrooms', e.target.value)}
               data-testid="input-flyer-baths"
             />
             <FormField
               icon={<Ruler className="w-3 h-3" />}
               label="Sq Ft"
-              {...register('sqft')}
+              value={sqftValue}
+              onChange={(e) => setValue('sqft', e.target.value)}
               data-testid="input-flyer-sqft"
             />
           </div>
@@ -140,7 +158,8 @@ export function FlyerForm({
               />
             </div>
             <Input
-              {...register('introHeading')}
+              value={headlineValue}
+              onChange={(e) => setValue('introHeading', e.target.value)}
               placeholder="Prime Opportunity in Travis County"
               data-testid="input-flyer-headline"
             />
@@ -165,7 +184,8 @@ export function FlyerForm({
               )}
             </div>
             <Textarea
-              {...register('introDescription')}
+              value={descriptionValue}
+              onChange={(e) => setValue('introDescription', e.target.value)}
               placeholder="Describe the property..."
               className="min-h-[100px] resize-none"
               data-testid="input-flyer-description"
@@ -190,18 +210,21 @@ export function FlyerForm({
         <div className="space-y-4">
           <FormField
             label="Agent Name"
-            {...register('agentName')}
+            value={agentNameValue}
+            onChange={(e) => setValue('agentName', e.target.value)}
             data-testid="input-flyer-agent-name"
           />
           <FormField
             label="Title"
-            {...register('agentTitle')}
+            value={agentTitleValue}
+            onChange={(e) => setValue('agentTitle', e.target.value)}
             data-testid="input-flyer-agent-title"
           />
           <FormField
             icon={<Phone className="w-3 h-3" />}
             label="Phone Number"
-            {...register('phone')}
+            value={phoneValue}
+            onChange={(e) => setValue('phone', e.target.value)}
             data-testid="input-flyer-phone"
           />
         </div>
@@ -258,7 +281,8 @@ export function FlyerForm({
           <FormField
             icon={<MapPin className="w-3 h-3" />}
             label="Property Address"
-            {...register('address')}
+            value={addressValue}
+            onChange={(e) => setValue('address', e.target.value)}
             data-testid="input-flyer-address"
           />
 
