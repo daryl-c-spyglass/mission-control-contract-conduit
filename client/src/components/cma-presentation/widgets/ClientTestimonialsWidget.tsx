@@ -1,47 +1,5 @@
 import { Star, ExternalLink, MoreVertical } from 'lucide-react';
-import { GOOGLE_REVIEWS_URL } from '../constants/widgets';
-
-interface Review {
-  id: string;
-  authorInitial: string;
-  avatarColor: string;
-  reviewCount: string;
-  rating: number;
-  timeAgo: string;
-  text: string;
-  positiveHighlights?: string[];
-}
-
-const SAMPLE_REVIEWS: Review[] = [
-  {
-    id: '1',
-    authorInitial: 'P',
-    avatarColor: '#EC407A',
-    reviewCount: '1 review',
-    rating: 5,
-    timeAgo: '2 years ago',
-    text: 'My family and I recently relocated internationally to Austin. I was introduced to Ryan through a trusted colleague to help quickly locate a home for my family. Ryan and Sunny did a brilliant job of helping us, and I can\'t thank them enough for their patience and persistence. I look forward to continuing to work with Spyglass in future.',
-  },
-  {
-    id: '2',
-    authorInitial: 'E',
-    avatarColor: '#66BB6A',
-    reviewCount: '1 review',
-    rating: 5,
-    timeAgo: 'a year ago',
-    positiveHighlights: ['Professionalism', 'Quality', 'Responsiveness', 'Value'],
-    text: 'Michele did a wonderful job. The overall transaction went well. We had a little hiccup with our first buyers finding a loophole and backing out, but Michele was great about immediately setting up another open house and getting us more offers. Michele did especially well in hitting the market hard and fast which I believe maximized our offers.',
-  },
-  {
-    id: '3',
-    authorInitial: 'E',
-    avatarColor: '#66BB6A',
-    reviewCount: '4 reviews',
-    rating: 5,
-    timeAgo: 'a year ago',
-    text: 'I worked with Emily Shea to help sell my home and I cannot say good enough things about her. The entire process was a seamless experience. Emily is very experienced and extremely knowledgeable about real estate. She did a lot of research on the appropriate sales price, and all I can say is she nailed it. We were able to solidify a primary and backup offer within four hours of listing.',
-  },
-];
+import { GOOGLE_REVIEWS_URL, SAMPLE_REVIEWS, type Review } from '../constants/widgets';
 
 export function ClientTestimonialsWidget() {
   return (

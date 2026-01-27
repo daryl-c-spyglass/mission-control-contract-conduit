@@ -1,7 +1,7 @@
 import { Document, Page, View, Text, Image } from '@react-pdf/renderer';
 import { styles, COLORS } from './styles';
 import type { AgentProfile, CmaProperty } from '../types';
-import { WIDGETS, MARKETING_TEXT } from '../constants/widgets';
+import { WIDGETS, MARKETING_TEXT, SAMPLE_REVIEWS, type Review } from '../constants/widgets';
 import {
   extractPrice,
   extractSqft,
@@ -672,6 +672,70 @@ const MarketingPage = ({
   </Page>
 );
 
+const StarRating = ({ rating }: { rating: number }) => (
+  <View style={{ flexDirection: 'row', gap: 1 }}>
+    {[...Array(5)].map((_, i) => (
+      <View 
+        key={i} 
+        style={{ 
+          width: 10, 
+          height: 10, 
+          backgroundColor: i < rating ? '#FACC15' : '#D1D5DB',
+          borderRadius: 1,
+        }} 
+      />
+    ))}
+  </View>
+);
+
+const ReviewCardPdf = ({ review }: { review: Review }) => (
+  <View style={{ 
+    borderBottomWidth: 1, 
+    borderBottomColor: COLORS.lightGray, 
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  }}>
+    <View style={{ flexDirection: 'row', gap: 8 }}>
+      <View style={{ 
+        width: 32, 
+        height: 32, 
+        borderRadius: 16, 
+        backgroundColor: review.avatarColor,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <Text style={{ color: COLORS.white, fontSize: 14, fontWeight: 600 }}>{review.authorInitial}</Text>
+      </View>
+      
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 8, color: COLORS.mediumGray }}>{review.reviewCount}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+          <StarRating rating={review.rating} />
+          <Text style={{ fontSize: 8, color: COLORS.mediumGray }}>{review.timeAgo}</Text>
+        </View>
+      </View>
+    </View>
+    
+    {review.positiveHighlights && review.positiveHighlights.length > 0 && (
+      <View style={{ marginTop: 6 }}>
+        <Text style={{ fontSize: 8, color: COLORS.textSecondary }}>
+          <Text style={{ fontWeight: 600, color: COLORS.textPrimary }}>Positive: </Text>
+          {review.positiveHighlights.join(', ')}
+        </Text>
+      </View>
+    )}
+    
+    <Text style={{ 
+      fontSize: 9, 
+      color: COLORS.textPrimary, 
+      lineHeight: 1.4, 
+      marginTop: 6,
+    }}>
+      {review.text}
+    </Text>
+  </View>
+);
+
 const ClientTestimonialsPage = ({ 
   propertyAddress,
   slideNumber, 
@@ -684,45 +748,21 @@ const ClientTestimonialsPage = ({
   <Page size="LETTER" orientation="landscape" style={styles.page}>
     <PageHeader title="CLIENT TESTIMONIALS" slideNumber={slideNumber} totalSlides={totalSlides} />
     <View style={styles.content}>
-      <Text style={styles.sectionTitle}>What Our Clients Say</Text>
-      <Text style={styles.sectionSubtitle}>Real feedback from satisfied homeowners</Text>
-      
-      <View style={{ flexDirection: 'row', gap: 16, marginTop: 20 }}>
-        <View style={{ flex: 1, backgroundColor: COLORS.lightGray, padding: 16, borderRadius: 8 }}>
-          <Text style={{ fontSize: 20, color: COLORS.spyglassOrange, fontWeight: 700, marginBottom: 8 }}>"</Text>
-          <Text style={{ fontSize: 10, color: COLORS.textSecondary, lineHeight: 1.5, fontStyle: 'italic' }}>
-            Exceptional service from start to finish. They made the entire process seamless and stress-free.
-          </Text>
-          <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={{ fontSize: 9, fontWeight: 600, color: COLORS.textPrimary }}>— Happy Homeowner</Text>
-            <Text style={{ fontSize: 8, color: COLORS.mediumGray }}>Google Review</Text>
-          </View>
-        </View>
-        <View style={{ flex: 1, backgroundColor: COLORS.lightGray, padding: 16, borderRadius: 8 }}>
-          <Text style={{ fontSize: 20, color: COLORS.spyglassOrange, fontWeight: 700, marginBottom: 8 }}>"</Text>
-          <Text style={{ fontSize: 10, color: COLORS.textSecondary, lineHeight: 1.5, fontStyle: 'italic' }}>
-            Professional, knowledgeable, and always available. I couldn't have asked for a better team.
-          </Text>
-          <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={{ fontSize: 9, fontWeight: 600, color: COLORS.textPrimary }}>— Satisfied Seller</Text>
-            <Text style={{ fontSize: 8, color: COLORS.mediumGray }}>Zillow Review</Text>
-          </View>
-        </View>
-        <View style={{ flex: 1, backgroundColor: COLORS.lightGray, padding: 16, borderRadius: 8 }}>
-          <Text style={{ fontSize: 20, color: COLORS.spyglassOrange, fontWeight: 700, marginBottom: 8 }}>"</Text>
-          <Text style={{ fontSize: 10, color: COLORS.textSecondary, lineHeight: 1.5, fontStyle: 'italic' }}>
-            They sold our home in just 5 days for above asking price. Highly recommend!
-          </Text>
-          <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={{ fontSize: 9, fontWeight: 600, color: COLORS.textPrimary }}>— Austin Family</Text>
-            <Text style={{ fontSize: 8, color: COLORS.mediumGray }}>Google Review</Text>
-          </View>
-        </View>
+      <View style={{ flex: 1 }}>
+        {SAMPLE_REVIEWS.map((review) => (
+          <ReviewCardPdf key={review.id} review={review} />
+        ))}
       </View>
       
-      <View style={{ marginTop: 30, alignItems: 'center' }}>
-        <Text style={{ fontSize: 12, color: COLORS.textSecondary }}>View more testimonials at</Text>
-        <Text style={{ fontSize: 12, color: COLORS.spyglassOrange, fontWeight: 600 }}>spyglassrealty.com/reviews</Text>
+      <View style={{ 
+        borderTopWidth: 1, 
+        borderTopColor: COLORS.lightGray, 
+        paddingTop: 12,
+        alignItems: 'center',
+      }}>
+        <Text style={{ fontSize: 10, color: COLORS.spyglassOrange, fontWeight: 600 }}>
+          Click to read all of our reviews on Google!
+        </Text>
       </View>
     </View>
     <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />

@@ -14,7 +14,7 @@ import {
 } from '@/lib/cma-data-utils';
 import { Home, MapPin, Calendar, Ruler, DollarSign, Clock, User, Building, FileText, Play, MessageSquare, TrendingUp, Link } from 'lucide-react';
 import type { AgentProfile, CmaProperty } from '../types';
-import { WIDGETS, LISTING_ACTION_PLAN_TEXT, MARKETING_TEXT } from '../constants/widgets';
+import { WIDGETS, LISTING_ACTION_PLAN_TEXT, MARKETING_TEXT, GOOGLE_REVIEWS_URL, SAMPLE_REVIEWS } from '../constants/widgets';
 
 export interface PreviewSlide {
   type: string;
@@ -346,51 +346,66 @@ function VideoSlideContent({ title }: { title: string }) {
 }
 
 function TestimonialsContent() {
-  const testimonials = [
-    {
-      quote: "Exceptional service from start to finish. They made the entire process seamless and stress-free.",
-      author: "Happy Homeowner",
-      source: "Google Review"
-    },
-    {
-      quote: "Professional, knowledgeable, and always available. I couldn't have asked for a better team.",
-      author: "Satisfied Seller",
-      source: "Zillow Review"
-    },
-    {
-      quote: "They sold our home in just 5 days for above asking price. Highly recommend!",
-      author: "Austin Family",
-      source: "Google Review"
-    }
-  ];
-
   return (
-    <div className="flex flex-col h-full p-2">
-      <div className="flex items-center gap-2 mb-3">
-        <MessageSquare className="w-5 h-5 text-[#EF4923]" />
-        <h2 className="font-bold text-sm text-[#222222]">CLIENT TESTIMONIALS</h2>
-      </div>
-      <p className="text-xs text-zinc-500 mb-3">What clients say about working with Spyglass Realty</p>
-      
-      <div className="flex-1 space-y-2 overflow-auto">
-        {testimonials.map((testimonial, index) => (
-          <div key={index} className="bg-zinc-50 rounded-lg p-3 relative">
-            <div className="absolute -top-1 left-2 text-xl text-[#EF4923] font-serif">"</div>
-            <p className="text-xs text-zinc-700 italic pl-4 pr-2 leading-relaxed">
-              {testimonial.quote}
-            </p>
-            <div className="mt-2 flex items-center justify-between">
-              <span className="text-xs font-medium text-zinc-800">— {testimonial.author}</span>
-              <span className="text-[10px] text-zinc-500">{testimonial.source}</span>
+    <div className="flex flex-col h-full bg-white">
+      <div className="flex-1 overflow-auto">
+        <div className="divide-y divide-gray-100">
+          {SAMPLE_REVIEWS.map((review) => (
+            <div key={review.id} className="p-3">
+              <div className="flex items-start gap-2">
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0"
+                  style={{ backgroundColor: review.avatarColor }}
+                >
+                  {review.authorInitial}
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <p className="text-gray-500 text-[10px]">{review.reviewCount}</p>
+                  
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <div className="flex items-center">
+                      {[...Array(5)].map((_, i) => (
+                        <svg
+                          key={i}
+                          className={`w-3 h-3 ${i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      ))}
+                    </div>
+                    <span className="text-gray-500 text-[10px]">{review.timeAgo}</span>
+                  </div>
+                </div>
+              </div>
+              
+              {review.positiveHighlights && review.positiveHighlights.length > 0 && (
+                <p className="mt-1 text-[10px] text-gray-600">
+                  <span className="font-medium text-gray-700">Positive: </span>
+                  {review.positiveHighlights.join(', ')}
+                </p>
+              )}
+              
+              <p className="mt-1 text-gray-800 leading-relaxed text-[10px]">
+                {review.text}
+              </p>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
       
-      <div className="text-center mt-2">
-        <p className="text-[10px] text-zinc-400">
-          View more at <span className="text-[#EF4923]">spyglassrealty.com/reviews</span>
-        </p>
+      <div className="border-t border-gray-200 p-2 bg-white">
+        <a
+          href={GOOGLE_REVIEWS_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-1 text-[#EF4923] font-medium text-[10px]"
+        >
+          <span>Click to read all of our reviews on Google!</span>
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
       </div>
     </div>
   );
