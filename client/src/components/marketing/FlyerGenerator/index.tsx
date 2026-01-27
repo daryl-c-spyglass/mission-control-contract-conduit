@@ -168,21 +168,24 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
 
   // Effect for agent data - runs when agent profile or marketing profile loads
   useEffect(() => {
-    const user = agentProfile?.user;
+    // Only proceed if we have agent profile data
+    if (!agentProfile?.user) return;
+    
+    const user = agentProfile.user;
     
     // Build agent name from settings or fallback to transaction
-    const agentName = user?.marketingDisplayName 
-      || `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
+    const agentName = user.marketingDisplayName 
+      || `${user.firstName || ''} ${user.lastName || ''}`.trim()
       || transaction?.agentName 
       || '';
 
-    const agentTitle = user?.marketingTitle || marketingProfile?.agentTitle || 'REALTOR®';
-    const phone = user?.marketingPhone || transaction?.agentPhone || '';
+    const agentTitle = user.marketingTitle || marketingProfile?.agentTitle || 'REALTOR®';
+    const phone = user.marketingPhone || transaction?.agentPhone || '';
 
-    // Only update if we have values (don't overwrite with empty)
-    if (agentName) form.setValue('agentName', agentName);
-    if (agentTitle) form.setValue('agentTitle', agentTitle);
-    if (phone) form.setValue('phone', phone);
+    // Set values (always update when we have profile data)
+    form.setValue('agentName', agentName);
+    form.setValue('agentTitle', agentTitle);
+    form.setValue('phone', phone);
   }, [agentProfile, marketingProfile, transaction, form]);
 
   useEffect(() => {
