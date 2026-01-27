@@ -50,7 +50,10 @@ Preferred communication style: Simple, everyday language.
     - Bathrooms: `bathroomsTotal`, `bathroomsTotalInteger`, `baths`
     - Square footage: `livingArea`, `sqft` (parsed from string)
     - Coordinates: `latitude/longitude`, `lat/lng`, `map.latitude/longitude`, `coordinates.latitude/longitude`
-  - **Status Normalization**: MLS status codes normalized to human-readable values (U/Sc → Pending, A → Active, C/S → Closed)
+  - **Status Normalization**: MLS status codes normalized to human-readable values:
+    - Repliers-specific codes: Sld (Sold→Closed), Lsd (Leased), Sc (Sold Conditionally→Pending), Pc (Price Changed→Pending), Bom (Back on Market→Active), Exp (Expired), Wdn (Withdrawn)
+    - Standard codes: U/Sc → Pending, A → Active, C/S → Closed
+    - Fallback chain: `status || standardStatus || lastStatus` (handles empty status fields in stored CMA data)
   - **CMAMapPreview**: Wrapper component for CMA Presentation Builder Live Preview that uses the working `CMAMap` component with coordinate normalization from various formats
 - **Status Badges & Utilities**: Consistent styling and display logic for transaction statuses and days remaining.
 - **Shared Listing Utilities**: Predicates and helpers for rental exclusion, accurate Days on Market display, and filtering.
@@ -102,7 +105,9 @@ Preferred communication style: Simple, everyday language.
   - `calculateCMAStats(comparables)`: Calculates avgPrice, avgSqft, avgDOM, avgPricePerSqft, avgPricePerAcre, priceRange, count
   - `formatPrice(value)`, `formatNumber(value)`: Safe formatting with N/A fallback
   - `formatPriceShort(value)`: Compact price format ($500K, $1.2M)
-  - `normalizeStatus(status)`, `getStatusColor(status)`: Status display utilities
+  - `extractStatus(comp)`: Safely extracts status from multiple fields (status, standardStatus, lastStatus, mlsStatus, listingStatus)
+  - `normalizeStatus(status)`: Normalizes status codes to human-readable values, handles Repliers-specific codes (Sld, Lsd, Sc, etc.)
+  - `getStatusColor(status)`: Status display color utilities
   - `getAgentName(agent)`, `getAgentInitials(agent)`: Agent display helpers for PDF
   - `getPrimaryPhoto(comp)`, `getPhotos(comp)`: Photo extraction from various field structures
   - `getCoordinates(comp)`: Coordinate extraction from multiple field formats

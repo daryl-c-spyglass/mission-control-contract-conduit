@@ -1,0 +1,354 @@
+# CMA Presentation COMPS — Fix Status Mismatch with CMA Tab
+
+## 🚨 Critical Issue
+
+**Property:** 268 Chisholm TRL, Bastrop, TX (MLS# ACT7703651)
+
+The CMA Presentation COMPS slide shows WRONG status for comparable properties. The CMA Tab is the source of truth, but the statuses don't match.
+
+### Status Comparison:
+
+| Property | CMA Tab Status | CMA Presentation Status | Correct? |
+|----------|----------------|------------------------|----------|
+| 2205 3rd ST | **Closed** | Active | ❌ |
+| 2903 Village DR | **Closed** | Active | ❌ |
+| 280 Adoquin TRL | **Closed** | Active | ❌ |
+| 614 Spanish Mustang DR | **Closed** | Active | ❌ |
+| 11620 Running Brush LN | **Closed** | Active | ❌ |
+| 1116 Willowbrook DR | **Closed** | Active | ❌ |
+
+**The CMA Tab shows "Closed" but CMA Presentation shows "Active"**
+
+---
+
+## 🔍 Root Cause Analysis
+
+Possible causes:
+
+1. **Different data source** - CMA Presentation pulling from different location than CMA Tab
+2. **Field name mismatch** - Using wrong field for status
+3. **Stale data** - CMA Presentation not using latest CMA data
+4. **Default value** - Falling back to "Active" when status field is empty/null
+5. **Data transformation issue** - Status being transformed/overwritten incorrectly
+
+---
+
+## 🔧 STEP 1: Diagnostic — Check Data Flow
+
+Add logging to trace where the status comes from:
+
+```typescript
+// In CMA Tab component - log the data being used
+console.group('📊 CMA Tab Data');
+comparables.forEach((comp, index) => {
+  console.log(`${index + 1}. ${comp.address}:`, {
+    status: comp.status,
+    mlsStatus: comp.mlsStatus,
+    listingStatus: comp.listingStatus,
+    standardStatus: comp.standardStatus,
+  });
+});
+console.groupEnd();
+
+// In CMA Presentation COMPS component - log the data being used
+console.group('📊 CMA Presentation COMPS Data');
+comparables.forEach((comp, index) => {
+  console.log(`${index + 1}. ${comp.address}:`, {
+    status: comp.status,
+    mlsStatus: comp.mlsStatus,
+    listingStatus: comp.listingStatus,
+    standardStatus: comp.standardStatus,
+  });
+});
+console.groupEnd();
+```
+
+### Check if they're using the same data source:
+
+```typescript
+// CMA Tab likely uses:
+const { comparables } = useCMAData(transactionId);
+
+// CMA Presentation should use THE SAME source:
+const { comparables } = useCMAData(transactionId);  // Same hook?
+// OR
+const comparables = transaction.cmaData?.comparables;  // From transaction?
+```
+
+---
+
+## 🔧 STEP 2: Ensure Single Source of Truth
+
+The CMA Presentation MUST use the same data as the CMA Tab.
+
+### Option A: Use the same hook/context
+
+```typescript
+// File: CMA Presentation COMPS component
+
+// CORRECT: Use the same data source as CMA Tab
+import { useCMAData } from '@/hooks/useCMAData';
+
+function CMAPresentationComps({ transactionId }) {
+  // This should return the exact same data as CMA Tab
+  const { comparables, subjectProperty, isLoading } = useCMAData(transactionId);
+  
+  // Use the data directly - no transformation that could change status
+  return (
+    <div>
+      {comparables.map(comp => (
+        <PropertyCard 
+          key={comp.id}
+          property={comp}
+          // Pass status directly from source data
+          status={comp.status}  // Should be "Closed" from CMA Tab
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+### Option B: Pass data from parent
+
+```typescript
+// File: CMA Presentation parent component
+
+function CMAPresentationBuilder({ transaction }) {
+  // Get CMA data once at parent level
+  const cmaData = transaction.cmaData;
+  const comparables = cmaData?.comparables || [];
+  
+  return (
+    <div>
+      {/* Pass the SAME comparables to COMPS slide */}
+      <CompsSlide 
+        comparables={comparables}
+        subjectProperty={cmaData?.subjectProperty}
+      />
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 STEP 3: Fix Status Field Mapping
+
+Make sure the status field is correctly mapped:
+
+```typescript
+// File: lib/property-utils.ts
+
+/**
+ * Get the correct status from a property object
+ * Checks multiple possible field names
+ */
+export function getPropertyStatus(property: any): string {
+  // Check various status field names
+  const status = 
+    property.status ||
+    property.mlsStatus ||
+    property.standardStatus ||
+    property.listingStatus ||
+    property.propertyStatus;
+  
+  if (!status) {
+    console.warn(`No status found for property: ${property.address}`);
+    return 'Unknown';  // Don't default to "Active"!
+  }
+  
+  // Normalize the status string
+  const normalizedStatus = String(status).toLowerCase().trim();
+  
+  // Map to display values
+  const statusMap: Record<string, string> = {
+    'closed': 'Closed',
+    'sold': 'Closed',
+    'active': 'Active',
+    'active under contract': 'Active Under Contract',
+    'pending': 'Pending',
+    'withdrawn': 'Withdrawn',
+    'expired': 'Expired',
+    'canceled': 'Canceled',
+    'cancelled': 'Canceled',
+  };
+  
+  return statusMap[normalizedStatus] || status;
+}
+```
+
+### Update Property Card to use the helper:
+
+```tsx
+// File: Property Card component
+
+import { getPropertyStatus } from '@/lib/property-utils';
+
+function PropertyCard({ property, isSubject }) {
+  // Use the safe status getter
+  const status = isSubject ? 'Subject' : getPropertyStatus(property);
+  
+  return (
+    <div>
+      {/* Status Badge */}
+      <span className={cn(
+        "px-2 py-1 rounded text-xs font-semibold text-white",
+        status === 'Subject' && "bg-orange-500",
+        status === 'Closed' && "bg-red-500",
+        status === 'Active' && "bg-green-500",
+        status === 'Active Under Contract' && "bg-yellow-500",
+        status === 'Pending' && "bg-yellow-500",
+      )}>
+        {status}
+      </span>
+      
+      {/* Rest of card */}
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 STEP 4: Check for Data Transformation Issues
+
+Look for any code that might be overwriting the status:
+
+```typescript
+// WRONG: Don't transform status when passing to CMA Presentation
+const transformedComparables = comparables.map(comp => ({
+  ...comp,
+  status: 'Active',  // ❌ This overwrites the real status!
+}));
+
+// CORRECT: Pass data as-is
+const transformedComparables = comparables.map(comp => ({
+  ...comp,
+  // Don't touch the status field!
+}));
+```
+
+### Search for problematic code:
+
+```bash
+# Find any code that might be setting status to "Active"
+grep -rn "status.*=.*'Active'\|status.*=.*\"Active\"\|status:.*'Active'\|status:.*\"Active\"" --include="*.tsx" --include="*.ts" client/src/
+
+# Find where status is being assigned
+grep -rn "\.status\s*=" --include="*.tsx" --include="*.ts" client/src/components/cma-presentation/
+```
+
+---
+
+## 🔧 STEP 5: Ensure CMA Tab and Presentation Use Same Data Path
+
+```typescript
+// File: CMA Tab component (working correctly)
+function CMATab({ transaction }) {
+  const comparables = transaction.cmaData?.comparables || [];
+  // Shows: Closed, Closed, Closed...
+  
+  return <CompsTable comparables={comparables} />;
+}
+
+// File: CMA Presentation component (should use SAME path)
+function CMAPresentationComps({ transaction }) {
+  // MUST use the same data path as CMA Tab
+  const comparables = transaction.cmaData?.comparables || [];
+  // Should also show: Closed, Closed, Closed...
+  
+  return <CompsSlide comparables={comparables} />;
+}
+```
+
+---
+
+## 📋 Quick Fix Checklist
+
+```
+1. VERIFY: CMA Presentation uses same data source as CMA Tab
+   - Both should read from: transaction.cmaData.comparables
+   - OR both should use: useCMAData(transactionId) hook
+
+2. CHECK: Status field is not being overwritten
+   - Search for: status = 'Active' or status: 'Active'
+   - Remove any hardcoded status values
+
+3. VERIFY: Status field name is correct
+   - CMA Tab uses: comp.status
+   - CMA Presentation should use: comp.status (same field!)
+
+4. TEST: Compare console logs
+   - Add logging to both components
+   - Verify data is identical
+
+5. FIX: If data differs, trace back to the source
+```
+
+---
+
+## 🔍 Database Check
+
+If the issue persists, check the database:
+
+```sql
+-- Check CMA data for this transaction
+SELECT 
+  id,
+  address,
+  cma_data
+FROM transactions
+WHERE mls_number = 'ACT7703651';
+
+-- Look at the stored comparables status
+-- The cma_data JSON should contain:
+-- { "comparables": [{ "address": "2205 3rd ST", "status": "Closed", ... }] }
+```
+
+---
+
+## ✅ Expected Behavior After Fix
+
+### CMA Tab (Table View):
+| Address | Status |
+|---------|--------|
+| 2205 3rd ST | **Closed** |
+| 2903 Village DR | **Closed** |
+| 280 Adoquin TRL | **Closed** |
+
+### CMA Presentation COMPS (Compare - Table View):
+| Address | Status |
+|---------|--------|
+| 268 Chisholm TRL | **Subject** |
+| 2205 3rd ST | **Closed** | ← Must match CMA Tab
+| 2903 Village DR | **Closed** | ← Must match CMA Tab
+| 280 Adoquin TRL | **Closed** | ← Must match CMA Tab
+
+**Both should show IDENTICAL status values!**
+
+---
+
+## ✅ Verification Checklist
+
+After implementing fix:
+
+- [ ] CMA Tab shows "Closed" for closed properties
+- [ ] CMA Presentation COMPS shows "Closed" for same properties
+- [ ] Grid view shows correct status badges
+- [ ] List view shows correct status badges
+- [ ] Table view shows correct status values
+- [ ] Status colors match (red for Closed, green for Active)
+- [ ] No properties incorrectly showing "Active"
+
+---
+
+## 📱 Mobile Optimization
+
+- [ ] Status badges readable on all screen sizes
+- [ ] Status colors maintain proper contrast
+
+---
+
+*Copy this entire prompt to Replit for Contract Conduit project.*
+*Property: 268 Chisholm TRL, Bastrop, TX (MLS# ACT7703651)*

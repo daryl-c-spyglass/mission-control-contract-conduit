@@ -373,13 +373,73 @@ export function getStatusColor(status: string): string {
 }
 
 /**
+ * Safely extract status from a comparable property
+ * Checks multiple fields including lastStatus for sold/closed listings
+ */
+export function extractStatus(comp: any): string {
+  if (!comp) return '';
+  
+  // Check multiple status fields in priority order
+  const fields = ['status', 'standardStatus', 'lastStatus', 'mlsStatus', 'listingStatus'];
+  
+  for (const field of fields) {
+    const value = comp?.[field];
+    if (value && typeof value === 'string' && value.trim() !== '') {
+      return value.trim();
+    }
+  }
+  return '';
+}
+
+/**
  * Normalize status display text
+ * Handles Repliers-specific status codes: Sld (Sold), Lsd (Leased), Sc (Sold Conditionally/Under Contract), etc.
  */
 export function normalizeStatus(status: string): string {
-  const statusLower = (status || '').toLowerCase();
-  if (statusLower === 's' || statusLower === 'c' || statusLower === 'sold') return 'Closed';
-  if (statusLower === 'a' || statusLower === 'active') return 'Active';
-  if (statusLower === 'u' || statusLower === 'sc' || statusLower === 'pending') return 'Pending';
+  const statusLower = (status || '').toLowerCase().trim();
+  
+  // Handle empty/unknown
+  if (!statusLower) return 'Unknown';
+  
+  // Repliers-specific codes and common variations
+  // Closed/Sold statuses
+  if (statusLower === 'sld' || statusLower === 'sold' || statusLower === 's' || 
+      statusLower === 'c' || statusLower === 'closed' || statusLower.includes('closed')) {
+    return 'Closed';
+  }
+  
+  // Pending/Under Contract statuses
+  if (statusLower === 'sc' || statusLower === 'u' || statusLower === 'pending' || 
+      statusLower.includes('pending') || statusLower.includes('under contract') ||
+      statusLower === 'pc') {
+    return 'Pending';
+  }
+  
+  // Active statuses
+  if (statusLower === 'a' || statusLower === 'active' || statusLower.includes('active')) {
+    return 'Active';
+  }
+  
+  // Leased (for rentals)
+  if (statusLower === 'lsd' || statusLower === 'leased') {
+    return 'Leased';
+  }
+  
+  // Back on market
+  if (statusLower === 'bom' || statusLower.includes('back on market')) {
+    return 'Active';
+  }
+  
+  // Withdrawn
+  if (statusLower === 'wdn' || statusLower === 'withdrawn') {
+    return 'Withdrawn';
+  }
+  
+  // Expired
+  if (statusLower === 'exp' || statusLower === 'expired') {
+    return 'Expired';
+  }
+  
   return status || 'Unknown';
 }
 

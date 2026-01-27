@@ -274,16 +274,6 @@ export default function CMAPresentationBuilder() {
       rawComparables = transactionCmaData;
     }
     
-    // Debug: Log the data source and status fields
-    if (rawComparables.length > 0) {
-      console.log('[CMA Debug] Data source:', propertiesData.length > 0 ? 'propertiesData' : 'transactionCmaData');
-      console.log('[CMA Debug] First comparable status fields:', {
-        status: rawComparables[0]?.status,
-        standardStatus: rawComparables[0]?.standardStatus,
-        lastStatus: rawComparables[0]?.lastStatus,
-      });
-    }
-    
     return rawComparables.map((comp: any, index: number) => {
     const resolvedAddress = comp.unparsedAddress || comp.streetAddress || comp.address || 
       comp.fullAddress || comp.addressLine1 || comp.location?.address || '';
