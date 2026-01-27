@@ -9,6 +9,7 @@ import {
   extractLotAcres,
   extractBeds,
   extractBaths,
+  extractFullAddress,
   calculatePricePerSqft,
   calculatePricePerAcre,
   calculateCMAStats,
