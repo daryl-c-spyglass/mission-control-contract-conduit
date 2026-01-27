@@ -1,7 +1,22 @@
-import { Document, Page, View, Text, Image, Link } from '@react-pdf/renderer';
+import { Document, Page, View, Text } from '@react-pdf/renderer';
 import { styles, COLORS } from './styles';
 import type { AgentProfile, CmaProperty } from '../types';
-import { WIDGETS, LISTING_ACTION_PLAN_TEXT, MARKETING_TEXT } from '../constants/widgets';
+import { WIDGETS, MARKETING_TEXT } from '../constants/widgets';
+import {
+  extractPrice,
+  extractSqft,
+  extractDOM,
+  extractLotAcres,
+  extractBeds,
+  extractBaths,
+  calculatePricePerSqft,
+  calculatePricePerAcre,
+  calculateCMAStats,
+  formatPrice,
+  formatNumber,
+  getStatusColor,
+  normalizeStatus,
+} from '@/lib/cma-data-utils';
 
 interface CmaPdfDocumentProps {
   propertyAddress: string;
@@ -13,50 +28,6 @@ interface CmaPdfDocumentProps {
   avgPricePerAcre?: number | null;
   preparedFor?: string;
 }
-
-const formatPrice = (price: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(price);
-};
-
-const formatNumber = (num: number): string => {
-  return new Intl.NumberFormat('en-US').format(num);
-};
-
-const calculateStats = (comparables: CmaProperty[]) => {
-  if (!comparables.length) return null;
-  
-  // Filter to valid numeric values only to prevent NaN
-  const prices = comparables
-    .map(c => c.soldPrice ?? c.price ?? c.listPrice)
-    .filter((p): p is number => p !== undefined && p !== null && !isNaN(p) && p > 0);
-  const pricesPerSqft = comparables
-    .map(c => c.pricePerSqft)
-    .filter((p): p is number => p !== undefined && p !== null && !isNaN(p) && p > 0);
-  const daysOnMarket = comparables
-    .map(c => c.daysOnMarket)
-    .filter((d): d is number => d !== undefined && d !== null && !isNaN(d) && d >= 0);
-  
-  const avgPrice = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
-  const avgPricePerSqft = pricesPerSqft.length ? pricesPerSqft.reduce((a, b) => a + b, 0) / pricesPerSqft.length : 0;
-  const avgDom = daysOnMarket.length ? daysOnMarket.reduce((a, b) => a + b, 0) / daysOnMarket.length : 0;
-  
-  const minPrice = prices.length ? Math.min(...prices) : 0;
-  const maxPrice = prices.length ? Math.max(...prices) : 0;
-  
-  return { avgPrice, avgPricePerSqft, avgDom, minPrice, maxPrice, count: comparables.length };
-};
-
-const getStatusColor = (status: string): string => {
-  const statusLower = status?.toLowerCase() || '';
-  if (statusLower.includes('closed') || statusLower === 'sold') return '#6b7280';
-  if (statusLower.includes('pending') || statusLower.includes('under contract')) return '#f59e0b';
-  if (statusLower.includes('active')) return '#22c55e';
-  return '#6b7280';
-};
 
 const PageHeader = ({ title, slideNumber, totalSlides }: { title: string; slideNumber: number; totalSlides: number }) => (
   <View style={styles.header}>
@@ -129,7 +100,7 @@ const ComparablesSummaryPage = ({
   slideNumber: number; 
   totalSlides: number;
 }) => {
-  const stats = calculateStats(comparables);
+  const stats = calculateCMAStats(comparables);
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>
@@ -138,22 +109,20 @@ const ComparablesSummaryPage = ({
         <Text style={styles.sectionTitle}>Summary of Comparables</Text>
         <Text style={styles.sectionSubtitle}>{comparables.length} properties analyzed in the surrounding area</Text>
         
-        {stats && (
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{formatPrice(stats.avgPrice)}</Text>
-              <Text style={styles.statLabel}>Average Price</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>${Math.round(stats.avgPricePerSqft)}/sqft</Text>
-              <Text style={styles.statLabel}>Avg Price/Sq Ft</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{Math.round(stats.avgDom)} days</Text>
-              <Text style={styles.statLabel}>Avg Days on Market</Text>
-            </View>
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{formatPrice(stats.avgPrice)}</Text>
+            <Text style={styles.statLabel}>Average Price</Text>
           </View>
-        )}
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{stats.avgPricePerSqft ? `$${stats.avgPricePerSqft}/sqft` : 'N/A'}</Text>
+            <Text style={styles.statLabel}>Avg Price/Sq Ft</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{stats.avgDOM != null ? `${stats.avgDOM} days` : 'N/A'}</Text>
+            <Text style={styles.statLabel}>Avg Days on Market</Text>
+          </View>
+        </View>
         
         <View style={styles.table}>
           <View style={styles.tableHeader}>
@@ -165,17 +134,28 @@ const ComparablesSummaryPage = ({
             <Text style={styles.tableHeaderCell}>Status</Text>
             <Text style={styles.tableHeaderCell}>DOM</Text>
           </View>
-          {comparables.slice(0, 6).map((comp, i) => (
-            <View key={comp.id} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}>
-              <Text style={[styles.tableCell, { flex: 2 }]}>{comp.address}</Text>
-              <Text style={styles.tableCell}>{formatPrice(comp.soldPrice || comp.price)}</Text>
-              <Text style={styles.tableCell}>{comp.beds}/{comp.baths}</Text>
-              <Text style={styles.tableCell}>{formatNumber(comp.sqft)}</Text>
-              <Text style={styles.tableCell}>${Math.round(comp.pricePerSqft)}</Text>
-              <Text style={[styles.tableCell, { color: getStatusColor(comp.status) }]}>{comp.status}</Text>
-              <Text style={styles.tableCell}>{comp.daysOnMarket}</Text>
-            </View>
-          ))}
+          {comparables.slice(0, 6).map((comp, i) => {
+            const price = extractPrice(comp);
+            const sqft = extractSqft(comp);
+            const pricePerSqft = calculatePricePerSqft(comp);
+            const dom = extractDOM(comp);
+            const beds = extractBeds(comp);
+            const baths = extractBaths(comp);
+            const status = normalizeStatus(comp.status);
+            const address = extractFullAddress(comp);
+            
+            return (
+              <View key={comp.id || i} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}>
+                <Text style={[styles.tableCell, { flex: 2 }]}>{address}</Text>
+                <Text style={styles.tableCell}>{formatPrice(price)}</Text>
+                <Text style={styles.tableCell}>{beds}/{baths}</Text>
+                <Text style={styles.tableCell}>{formatNumber(sqft)}</Text>
+                <Text style={styles.tableCell}>{pricePerSqft ? `$${pricePerSqft}` : 'N/A'}</Text>
+                <Text style={[styles.tableCell, { color: getStatusColor(status) }]}>{status}</Text>
+                <Text style={styles.tableCell}>{dom != null ? dom : 'N/A'}</Text>
+              </View>
+            );
+          })}
         </View>
       </View>
       <PageFooter propertyAddress={propertyAddress} />
@@ -193,57 +173,67 @@ const PropertyDetailPage = ({
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
-}) => (
-  <Page size="LETTER" orientation="landscape" style={styles.page}>
-    <PageHeader title="PROPERTY DETAILS" slideNumber={slideNumber} totalSlides={totalSlides} />
-    <View style={styles.content}>
-      <View style={{ flexDirection: 'row', gap: 30 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.propertyAddress}>{property.address}</Text>
-          <Text style={{ fontSize: 10, color: COLORS.textSecondary, marginBottom: 10 }}>
-            {property.city}, {property.state} {property.zipCode}
-          </Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.propertyPrice}>{formatPrice(property.soldPrice || property.price)}</Text>
-          <View style={[styles.badge, { backgroundColor: getStatusColor(property.status), marginBottom: 15, alignSelf: 'flex-start' }]}>
-            <Text style={styles.badgeText}>{property.status}</Text>
+}) => {
+  const price = extractPrice(property);
+  const sqft = extractSqft(property);
+  const pricePerSqft = calculatePricePerSqft(property);
+  const dom = extractDOM(property);
+  const beds = extractBeds(property);
+  const baths = extractBaths(property);
+  const status = normalizeStatus(property.status);
+  
+  return (
+    <Page size="LETTER" orientation="landscape" style={styles.page}>
+      <PageHeader title="PROPERTY DETAILS" slideNumber={slideNumber} totalSlides={totalSlides} />
+      <View style={styles.content}>
+        <View style={{ flexDirection: 'row', gap: 30 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.propertyAddress}>{extractFullAddress(property)}</Text>
+            <Text style={{ fontSize: 10, color: COLORS.textSecondary, marginBottom: 10 }}>
+              {[property.city, property.state, property.zipCode].filter(Boolean).join(', ') || 'Location information unavailable'}
+            </Text>
           </View>
-          
-          <View style={{ marginTop: 10 }}>
-            <View style={{ flexDirection: 'row', marginBottom: 8 }}>
-              <Text style={{ fontSize: 11, color: COLORS.textSecondary, width: 100 }}>Bedrooms:</Text>
-              <Text style={{ fontSize: 11, color: COLORS.textPrimary, fontWeight: 600 }}>{property.beds}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.propertyPrice}>{formatPrice(price)}</Text>
+            <View style={[styles.badge, { backgroundColor: getStatusColor(status), marginBottom: 15, alignSelf: 'flex-start' }]}>
+              <Text style={styles.badgeText}>{status}</Text>
             </View>
-            <View style={{ flexDirection: 'row', marginBottom: 8 }}>
-              <Text style={{ fontSize: 11, color: COLORS.textSecondary, width: 100 }}>Bathrooms:</Text>
-              <Text style={{ fontSize: 11, color: COLORS.textPrimary, fontWeight: 600 }}>{property.baths}</Text>
-            </View>
-            <View style={{ flexDirection: 'row', marginBottom: 8 }}>
-              <Text style={{ fontSize: 11, color: COLORS.textSecondary, width: 100 }}>Square Feet:</Text>
-              <Text style={{ fontSize: 11, color: COLORS.textPrimary, fontWeight: 600 }}>{formatNumber(property.sqft)}</Text>
-            </View>
-            <View style={{ flexDirection: 'row', marginBottom: 8 }}>
-              <Text style={{ fontSize: 11, color: COLORS.textSecondary, width: 100 }}>Price/Sq Ft:</Text>
-              <Text style={{ fontSize: 11, color: COLORS.textPrimary, fontWeight: 600 }}>${Math.round(property.pricePerSqft)}</Text>
-            </View>
-            <View style={{ flexDirection: 'row', marginBottom: 8 }}>
-              <Text style={{ fontSize: 11, color: COLORS.textSecondary, width: 100 }}>Days on Market:</Text>
-              <Text style={{ fontSize: 11, color: COLORS.textPrimary, fontWeight: 600 }}>{property.daysOnMarket}</Text>
-            </View>
-            {property.yearBuilt && (
+            
+            <View style={{ marginTop: 10 }}>
               <View style={{ flexDirection: 'row', marginBottom: 8 }}>
-                <Text style={{ fontSize: 11, color: COLORS.textSecondary, width: 100 }}>Year Built:</Text>
-                <Text style={{ fontSize: 11, color: COLORS.textPrimary, fontWeight: 600 }}>{property.yearBuilt}</Text>
+                <Text style={{ fontSize: 11, color: COLORS.textSecondary, width: 100 }}>Bedrooms:</Text>
+                <Text style={{ fontSize: 11, color: COLORS.textPrimary, fontWeight: 600 }}>{beds}</Text>
               </View>
-            )}
+              <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+                <Text style={{ fontSize: 11, color: COLORS.textSecondary, width: 100 }}>Bathrooms:</Text>
+                <Text style={{ fontSize: 11, color: COLORS.textPrimary, fontWeight: 600 }}>{baths}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+                <Text style={{ fontSize: 11, color: COLORS.textSecondary, width: 100 }}>Square Feet:</Text>
+                <Text style={{ fontSize: 11, color: COLORS.textPrimary, fontWeight: 600 }}>{formatNumber(sqft)}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+                <Text style={{ fontSize: 11, color: COLORS.textSecondary, width: 100 }}>Price/Sq Ft:</Text>
+                <Text style={{ fontSize: 11, color: COLORS.textPrimary, fontWeight: 600 }}>{pricePerSqft ? `$${pricePerSqft}` : 'N/A'}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+                <Text style={{ fontSize: 11, color: COLORS.textSecondary, width: 100 }}>Days on Market:</Text>
+                <Text style={{ fontSize: 11, color: COLORS.textPrimary, fontWeight: 600 }}>{dom != null ? dom : 'N/A'}</Text>
+              </View>
+              {property.yearBuilt && (
+                <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+                  <Text style={{ fontSize: 11, color: COLORS.textSecondary, width: 100 }}>Year Built:</Text>
+                  <Text style={{ fontSize: 11, color: COLORS.textPrimary, fontWeight: 600 }}>{property.yearBuilt}</Text>
+                </View>
+              )}
+            </View>
           </View>
         </View>
       </View>
-    </View>
-    <PageFooter propertyAddress={propertyAddress} />
-  </Page>
-);
+      <PageFooter propertyAddress={propertyAddress} />
+    </Page>
+  );
+};
 
 const TimeToSellPage = ({ 
   averageDaysOnMarket, 
@@ -258,7 +248,11 @@ const TimeToSellPage = ({
   slideNumber: number; 
   totalSlides: number;
 }) => {
-  const maxDom = Math.max(...comparables.map(c => c.daysOnMarket), 1);
+  const stats = calculateCMAStats(comparables);
+  const avgDom = averageDaysOnMarket || stats.avgDOM || 0;
+  
+  const domValues = comparables.map(c => extractDOM(c)).filter((d): d is number => d !== null && d > 0);
+  const maxDom = domValues.length > 0 ? Math.max(...domValues) : 1;
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>
@@ -267,28 +261,34 @@ const TimeToSellPage = ({
         <Text style={styles.sectionTitle}>Average Days on Market</Text>
         <View style={{ alignItems: 'center', marginVertical: 30 }}>
           <Text style={{ fontSize: 64, fontWeight: 700, color: COLORS.spyglassOrange }}>
-            {Math.round(averageDaysOnMarket)}
+            {avgDom > 0 ? Math.round(avgDom) : 'N/A'}
           </Text>
           <Text style={{ fontSize: 16, color: COLORS.textSecondary }}>days average</Text>
         </View>
         
         <Text style={{ fontSize: 12, fontWeight: 600, marginBottom: 15 }}>Days on Market by Property</Text>
-        {comparables.slice(0, 5).map((comp, i) => (
-          <View key={i} style={{ marginBottom: 12 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-              <Text style={{ fontSize: 9, color: COLORS.textSecondary }}>{comp.address}</Text>
-              <Text style={{ fontSize: 9, fontWeight: 600 }}>{comp.daysOnMarket} days</Text>
+        {comparables.slice(0, 5).map((comp, i) => {
+          const dom = extractDOM(comp);
+          const barWidth = dom != null && maxDom > 0 ? Math.min(100, (dom / maxDom) * 100) : 0;
+          const address = extractFullAddress(comp);
+          
+          return (
+            <View key={i} style={{ marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                <Text style={{ fontSize: 9, color: COLORS.textSecondary }}>{address}</Text>
+                <Text style={{ fontSize: 9, fontWeight: 600 }}>{dom != null ? `${dom} days` : 'N/A'}</Text>
+              </View>
+              <View style={{ height: 12, backgroundColor: COLORS.lightGray, borderRadius: 6 }}>
+                <View style={{ 
+                  height: 12, 
+                  width: `${barWidth}%`, 
+                  backgroundColor: COLORS.spyglassOrange, 
+                  borderRadius: 6 
+                }} />
+              </View>
             </View>
-            <View style={{ height: 12, backgroundColor: COLORS.lightGray, borderRadius: 6 }}>
-              <View style={{ 
-                height: 12, 
-                width: `${(comp.daysOnMarket / maxDom) * 100}%`, 
-                backgroundColor: COLORS.spyglassOrange, 
-                borderRadius: 6 
-              }} />
-            </View>
-          </View>
-        ))}
+          );
+        })}
       </View>
       <PageFooter propertyAddress={propertyAddress} />
     </Page>
@@ -308,10 +308,11 @@ const SuggestedPricePage = ({
   slideNumber: number; 
   totalSlides: number;
 }) => {
-  const stats = calculateStats(comparables);
-  const price = suggestedListPrice || stats?.avgPrice || 0;
-  const lowPrice = Math.round(price * 0.95);
-  const highPrice = Math.round(price * 1.05);
+  const stats = calculateCMAStats(comparables);
+  const price = suggestedListPrice || stats.avgPrice || 0;
+  const hasValidPrice = price > 0;
+  const lowPrice = hasValidPrice ? Math.round(price * 0.95) : null;
+  const highPrice = hasValidPrice ? Math.round(price * 1.05) : null;
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>
@@ -329,7 +330,7 @@ const SuggestedPricePage = ({
             </View>
             <Text style={{ fontSize: 24, color: COLORS.mediumGray }}>—</Text>
             <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 48, fontWeight: 700, color: COLORS.spyglassOrange }}>{formatPrice(price)}</Text>
+              <Text style={{ fontSize: 48, fontWeight: 700, color: COLORS.spyglassOrange }}>{hasValidPrice ? formatPrice(price) : 'N/A'}</Text>
               <Text style={{ fontSize: 12, color: COLORS.textSecondary }}>Recommended</Text>
             </View>
             <Text style={{ fontSize: 24, color: COLORS.mediumGray }}>—</Text>
@@ -340,21 +341,19 @@ const SuggestedPricePage = ({
           </View>
         </View>
         
-        {stats && (
-          <View style={{ backgroundColor: COLORS.lightGray, padding: 20, borderRadius: 8, marginTop: 20 }}>
-            <Text style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>Price Analysis</Text>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
-              <View style={{ alignItems: 'center' }}>
-                <Text style={{ fontSize: 10, color: COLORS.textSecondary }}>Avg $/Sq Ft</Text>
-                <Text style={{ fontSize: 14, fontWeight: 600 }}>${Math.round(stats.avgPricePerSqft)}</Text>
-              </View>
-              <View style={{ alignItems: 'center' }}>
-                <Text style={{ fontSize: 10, color: COLORS.textSecondary }}>Price Range</Text>
-                <Text style={{ fontSize: 14, fontWeight: 600 }}>{formatPrice(stats.minPrice)} - {formatPrice(stats.maxPrice)}</Text>
-              </View>
+        <View style={{ backgroundColor: COLORS.lightGray, padding: 20, borderRadius: 8, marginTop: 20 }}>
+          <Text style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>Price Analysis</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 10, color: COLORS.textSecondary }}>Avg $/Sq Ft</Text>
+              <Text style={{ fontSize: 14, fontWeight: 600 }}>{stats.avgPricePerSqft ? `$${stats.avgPricePerSqft}` : 'N/A'}</Text>
+            </View>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 10, color: COLORS.textSecondary }}>Price Range</Text>
+              <Text style={{ fontSize: 14, fontWeight: 600 }}>{stats.priceRange}</Text>
             </View>
           </View>
-        )}
+        </View>
       </View>
       <PageFooter propertyAddress={propertyAddress} />
     </Page>
@@ -374,10 +373,17 @@ const AveragePricePerAcrePage = ({
   slideNumber: number; 
   totalSlides: number;
 }) => {
-  const propsWithAcres = comparables.filter(c => c.lotSizeAcres || c.lot?.acres);
-  const avgPrice = avgPricePerAcre || (propsWithAcres.length > 0 
-    ? propsWithAcres.reduce((sum, c) => sum + (c.pricePerAcre || 0), 0) / propsWithAcres.length 
-    : 0);
+  const propsWithAcreData = comparables
+    .map(c => ({
+      ...c,
+      acres: extractLotAcres(c),
+      pricePerAcreCalc: calculatePricePerAcre(c),
+    }))
+    .filter(c => c.acres !== null && c.acres > 0);
+  
+  const stats = calculateCMAStats(comparables);
+  const avgPrice = avgPricePerAcre || stats.avgPricePerAcre || 0;
+  const hasValidData = avgPrice > 0;
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>
@@ -387,25 +393,33 @@ const AveragePricePerAcrePage = ({
         
         <View style={{ alignItems: 'center', marginVertical: 40 }}>
           <Text style={{ fontSize: 48, fontWeight: 700, color: COLORS.spyglassOrange }}>
-            {formatPrice(avgPrice)}
+            {hasValidData ? formatPrice(avgPrice) : 'N/A'}
           </Text>
           <Text style={{ fontSize: 16, color: COLORS.textSecondary }}>per acre (average)</Text>
         </View>
         
-        {propsWithAcres.length > 0 && (
+        {propsWithAcreData.length > 0 && (
           <View style={styles.table}>
             <View style={styles.tableHeader}>
               <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Property</Text>
               <Text style={styles.tableHeaderCell}>Lot Size (acres)</Text>
               <Text style={styles.tableHeaderCell}>Price/Acre</Text>
             </View>
-            {propsWithAcres.slice(0, 5).map((comp, i) => (
-              <View key={comp.id} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}>
-                <Text style={[styles.tableCell, { flex: 2 }]}>{comp.address}</Text>
-                <Text style={styles.tableCell}>{(comp.lotSizeAcres || comp.lot?.acres || 0).toFixed(2)}</Text>
-                <Text style={styles.tableCell}>{formatPrice(comp.pricePerAcre || 0)}</Text>
+            {propsWithAcreData.slice(0, 5).map((comp, i) => (
+              <View key={comp.id || i} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}>
+                <Text style={[styles.tableCell, { flex: 2 }]}>{extractFullAddress(comp)}</Text>
+                <Text style={styles.tableCell}>{comp.acres?.toFixed(2) || 'N/A'}</Text>
+                <Text style={styles.tableCell}>{comp.pricePerAcreCalc ? formatPrice(comp.pricePerAcreCalc) : 'N/A'}</Text>
               </View>
             ))}
+          </View>
+        )}
+        
+        {propsWithAcreData.length === 0 && (
+          <View style={{ alignItems: 'center', padding: 20 }}>
+            <Text style={{ fontSize: 12, color: COLORS.textSecondary }}>
+              Lot size data not available for comparable properties
+            </Text>
           </View>
         )}
       </View>
@@ -640,30 +654,160 @@ const SpyglassResourcesPage = ({
   </Page>
 );
 
+const STATIC_SLIDE_CONTENT: Record<string, { description: string; bullets: string[] }> = {
+  home_selling_system: {
+    description: 'Our proven step-by-step system to get your home sold quickly and for top dollar.',
+    bullets: ['Strategic pricing analysis', 'Professional staging consultation', 'Premium photography and video', 'Targeted digital marketing', 'Expert negotiation'],
+  },
+  our_proven_approach: {
+    description: 'A comprehensive marketing strategy that maximizes exposure and attracts qualified buyers.',
+    bullets: ['Market analysis and positioning', 'Custom marketing plan', 'Open house strategy', 'Buyer feedback tracking', 'Weekly status updates'],
+  },
+  seo_digital_marketing: {
+    description: 'Advanced digital marketing to ensure your property reaches the right buyers.',
+    bullets: ['Search engine optimization', 'Social media campaigns', 'Email marketing', 'Retargeting ads', 'Analytics and reporting'],
+  },
+  google_meta_ads: {
+    description: 'Targeted advertising on Google and Meta platforms for maximum reach.',
+    bullets: ['Google search ads', 'Display network advertising', 'Facebook and Instagram ads', 'Custom audience targeting', 'Performance optimization'],
+  },
+  professional_videography: {
+    description: 'High-quality video production that showcases your property beautifully.',
+    bullets: ['4K video tours', 'Drone aerial footage', 'Professional editing', 'Music and narration', 'Social media optimized versions'],
+  },
+  why_4k_video: {
+    description: 'The importance of professional 4K video in today\'s real estate market.',
+    bullets: ['93% of buyers use video in their search', 'Properties with video get 403% more inquiries', 'Virtual tours save time for serious buyers', 'Stand out from competition'],
+  },
+  example_videos: {
+    description: 'Sample property videos showcasing our production quality.',
+    bullets: ['Full property walkthrough', 'Neighborhood highlights', 'Lifestyle content', 'Agent introduction'],
+  },
+  aerial_photography: {
+    description: 'Stunning aerial photography that captures your property\'s full potential.',
+    bullets: ['Licensed drone operators', 'High-resolution imagery', 'Property boundary views', 'Neighborhood context', 'Unique perspectives'],
+  },
+  in_house_design_team: {
+    description: 'Professional design team creating custom marketing materials.',
+    bullets: ['Custom property brochures', 'Digital presentations', 'Social media graphics', 'Print marketing', 'Brand consistency'],
+  },
+  print_flyers: {
+    description: 'High-quality print materials for open houses and distribution.',
+    bullets: ['Property feature sheets', 'Neighborhood guides', 'Open house signage', 'Direct mail campaigns'],
+  },
+  custom_property_page: {
+    description: 'Dedicated property website showcasing your listing.',
+    bullets: ['Custom domain', 'Photo gallery', 'Video integration', 'Lead capture', 'Social sharing'],
+  },
+  global_marketing_reach: {
+    description: 'International exposure through our global network.',
+    bullets: ['1M+ monthly website visitors', '100+ countries reached', 'Multi-language support', 'International buyer connections'],
+  },
+  leadingre_network: {
+    description: 'Part of the Leading Real Estate Companies of the World network.',
+    bullets: ['550+ member firms', '4,600 offices worldwide', '150,000 agents', 'Referral network access'],
+  },
+  featured_property_program: {
+    description: 'Premium placement for maximum visibility.',
+    bullets: ['Featured on homepage', 'Priority search placement', 'Email blast inclusion', 'Social media spotlight'],
+  },
+  zillow_marketing: {
+    description: 'Leveraging Zillow\'s massive platform for your property.',
+    bullets: ['Zillow Premier Agent', 'Enhanced listings', 'Lead generation', 'Performance tracking'],
+  },
+  zillow_showcase: {
+    description: 'Zillow Showcase listing benefits.',
+    bullets: ['Professional photography', 'Interactive floor plans', '3D home tours', 'Priority placement'],
+  },
+  open_house_process: {
+    description: 'Our strategic open house approach.',
+    bullets: ['Pre-event marketing', 'Professional presentation', 'Buyer feedback collection', 'Follow-up system'],
+  },
+  pricing_strategy: {
+    description: 'Data-driven pricing to attract buyers and maximize value.',
+    bullets: ['Comparative market analysis', 'Market condition assessment', 'Pricing psychology', 'Adjustment strategy'],
+  },
+  listing_price: {
+    description: 'Understanding the importance of correct listing price.',
+    bullets: ['First impression impact', 'Days on market correlation', 'Buyer perception', 'Negotiation positioning'],
+  },
+  marketing_timeline: {
+    description: 'Week-by-week marketing plan for your property.',
+    bullets: ['Pre-listing preparation', 'Launch week activities', 'Ongoing marketing', 'Price adjustment strategy'],
+  },
+  select_move_program: {
+    description: 'Spyglass Select Move Program benefits.',
+    bullets: ['Bridge financing', 'Buy before you sell', 'Cash offer assistance', 'Relocation support'],
+  },
+  what_clients_say: {
+    description: 'Testimonials from satisfied clients.',
+    bullets: ['5-star reviews', 'Client success stories', 'Referral network', 'Community impact'],
+  },
+  thank_you: {
+    description: 'Thank you for considering Spyglass Realty.',
+    bullets: ['Ready to get started', 'Questions answered', 'Next steps outlined'],
+  },
+};
+
 const StaticImagePage = ({ 
   widget, 
   propertyAddress,
   slideNumber, 
   totalSlides 
 }: { 
-  widget: { title: string; imagePath?: string };
+  widget: { id?: string; title: string; imagePath?: string };
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
-}) => (
-  <Page size="LETTER" orientation="landscape" style={styles.page}>
-    <PageHeader title={widget.title} slideNumber={slideNumber} totalSlides={totalSlides} />
-    <View style={{ flex: 1, padding: 20 }}>
-      <View style={styles.centeredContent}>
-        <Text style={{ fontSize: 24, fontWeight: 700, color: COLORS.textPrimary }}>{widget.title}</Text>
-        <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 10 }}>
-          View full content in presentation mode
-        </Text>
+}) => {
+  const content = widget.id ? STATIC_SLIDE_CONTENT[widget.id] : null;
+  
+  return (
+    <Page size="LETTER" orientation="landscape" style={styles.page}>
+      <PageHeader title={widget.title} slideNumber={slideNumber} totalSlides={totalSlides} />
+      <View style={styles.content}>
+        <Text style={styles.sectionTitle}>{widget.title}</Text>
+        
+        {content ? (
+          <>
+            <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginBottom: 20, lineHeight: 1.6 }}>
+              {content.description}
+            </Text>
+            
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
+              {content.bullets.map((bullet, i) => (
+                <View key={i} style={{ width: '45%', flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 }}>
+                  <View style={{ 
+                    width: 6, 
+                    height: 6, 
+                    borderRadius: 3, 
+                    backgroundColor: COLORS.spyglassOrange, 
+                    marginRight: 8,
+                    marginTop: 4
+                  }} />
+                  <Text style={{ fontSize: 11, color: COLORS.textPrimary, flex: 1 }}>{bullet}</Text>
+                </View>
+              ))}
+            </View>
+            
+            <View style={{ marginTop: 30, padding: 15, backgroundColor: COLORS.lightGray, borderRadius: 8 }}>
+              <Text style={{ fontSize: 10, color: COLORS.textSecondary, textAlign: 'center' }}>
+                View the full interactive presentation for detailed visuals and media content
+              </Text>
+            </View>
+          </>
+        ) : (
+          <View style={styles.centeredContent}>
+            <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 10 }}>
+              View full content in the interactive presentation
+            </Text>
+          </View>
+        )}
       </View>
-    </View>
-    <PageFooter propertyAddress={propertyAddress} />
-  </Page>
-);
+      <PageFooter propertyAddress={propertyAddress} />
+    </Page>
+  );
+};
 
 const ThankYouPage = ({ agent, slideNumber, totalSlides }: { agent: AgentProfile; slideNumber: number; totalSlides: number }) => (
   <Page size="LETTER" orientation="landscape" style={styles.darkPage}>
@@ -691,8 +835,8 @@ export function CmaPdfDocument({
   preparedFor,
 }: CmaPdfDocumentProps) {
   const totalSlides = WIDGETS.length;
-  const stats = calculateStats(comparables);
-  const avgDom = averageDaysOnMarket || stats?.avgDom || 0;
+  const stats = calculateCMAStats(comparables);
+  const avgDom = averageDaysOnMarket || stats.avgDOM || 0;
   
   let slideNum = 0;
   
