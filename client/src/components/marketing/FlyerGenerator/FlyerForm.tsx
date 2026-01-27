@@ -11,7 +11,7 @@ import { ImageUploadField } from './ImageUploadField';
 import { AIHeadlineButton } from './AIHeadlineButton';
 import { AISummarizeButton } from './AISummarizeButton';
 import { CharacterCounter } from './CharacterCounter';
-import type { FlyerData, FlyerImages, ImageTransforms, ImageTransform } from '@/lib/flyer-types';
+import type { FlyerData, FlyerImages } from '@/lib/flyer-types';
 import type { PhotoSelectionInfo } from '@/lib/flyer-utils';
 
 const MAX_DESCRIPTION_LENGTH = 150;
@@ -19,9 +19,7 @@ const MAX_DESCRIPTION_LENGTH = 150;
 interface FlyerFormProps {
   form: UseFormReturn<FlyerData>;
   images: FlyerImages;
-  imageTransforms: ImageTransforms;
   onImageUpload: (field: keyof FlyerImages) => (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onTransformChange: (field: keyof ImageTransforms) => (transform: ImageTransform) => void;
   transactionId: string;
   mlsData: any;
   photoSelectionInfo?: {
@@ -73,9 +71,7 @@ function FormField({
 export function FlyerForm({
   form,
   images,
-  imageTransforms,
   onImageUpload,
-  onTransformChange,
   transactionId,
   mlsData,
   photoSelectionInfo,
@@ -271,9 +267,6 @@ export function FlyerForm({
             id="mainImage"
             preview={images.mainImage}
             onChange={onImageUpload('mainImage')}
-            transform={imageTransforms.mainImage}
-            onTransformChange={onTransformChange('mainImage')}
-            showCropControls
             aiSelectionInfo={photoSelectionInfo?.mainImage}
             availablePhotos={allMlsPhotos}
             onSelectPhoto={(url) => onSelectPhoto?.('mainImage', url)}
@@ -285,9 +278,6 @@ export function FlyerForm({
               id="kitchenImage"
               preview={images.kitchenImage}
               onChange={onImageUpload('kitchenImage')}
-              transform={imageTransforms.kitchenImage}
-              onTransformChange={onTransformChange('kitchenImage')}
-              showCropControls
               aiSelectionInfo={photoSelectionInfo?.kitchenImage}
               availablePhotos={allMlsPhotos}
               onSelectPhoto={(url) => onSelectPhoto?.('kitchenImage', url)}
@@ -297,9 +287,6 @@ export function FlyerForm({
               id="roomImage"
               preview={images.roomImage}
               onChange={onImageUpload('roomImage')}
-              transform={imageTransforms.roomImage}
-              onTransformChange={onTransformChange('roomImage')}
-              showCropControls
               aiSelectionInfo={photoSelectionInfo?.roomImage}
               availablePhotos={allMlsPhotos}
               onSelectPhoto={(url) => onSelectPhoto?.('roomImage', url)}

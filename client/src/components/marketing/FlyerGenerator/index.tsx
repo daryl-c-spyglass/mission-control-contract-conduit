@@ -14,7 +14,7 @@ import { GridOverlay } from './GridOverlay';
 import { useMarketingProfile } from '@/hooks/useMarketingProfile';
 import { autoSelectPhotosWithInfo, formatPrice, formatAddress, formatNumber, generateDefaultHeadline, type PhotoSelectionInfo } from '@/lib/flyer-utils';
 import { extractSqft, extractBeds, extractBaths } from '@/lib/cma-data-utils';
-import type { FlyerData, FlyerImages, ImageTransforms, ImageTransform } from '@/lib/flyer-types';
+import type { FlyerData, FlyerImages, ImageTransforms } from '@/lib/flyer-types';
 import { DEFAULT_TRANSFORMS } from '@/lib/flyer-types';
 import { apiRequest } from '@/lib/queryClient';
 
@@ -218,10 +218,6 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
     }
   };
 
-  const handleTransformChange = (field: keyof ImageTransforms) => (transform: ImageTransform) => {
-    setImageTransforms(prev => ({ ...prev, [field]: transform }));
-  };
-
   // Handle AI summarization
   const handleSummarized = (summary: string) => {
     const currentDescription = form.getValues('introDescription') || '';
@@ -317,9 +313,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
             <FlyerForm
               form={form}
               images={images}
-              imageTransforms={imageTransforms}
               onImageUpload={handleImageUpload}
-              onTransformChange={handleTransformChange}
               transactionId={transactionId}
               mlsData={transaction?.mlsData}
               photoSelectionInfo={photoSelectionInfo}
