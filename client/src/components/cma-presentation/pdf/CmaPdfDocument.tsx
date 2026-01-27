@@ -45,7 +45,7 @@ const PageHeader = ({ title, slideNumber, totalSlides }: { title: string; slideN
   </View>
 );
 
-const PageFooter = ({ propertyAddress, slideNumber = 2, baseUrl }: { propertyAddress: string; slideNumber?: number; baseUrl?: string }) => {
+const PageFooter = ({ slideNumber = 2, totalSlides = 44, baseUrl }: { slideNumber?: number; totalSlides?: number; baseUrl?: string }) => {
   const logoUrl = baseUrl ? `${baseUrl}/logos/SpyglassRealty_Logo_Black.png` : '/logos/SpyglassRealty_Logo_Black.png';
   const showLogo = slideNumber > 1;
   
@@ -56,70 +56,40 @@ const PageFooter = ({ propertyAddress, slideNumber = 2, baseUrl }: { propertyAdd
       ) : (
         <Text style={styles.footerText}>Spyglass Realty</Text>
       )}
-      <Text style={styles.footerText}>{propertyAddress}</Text>
+      <Text style={styles.footerText}>Slide {slideNumber} of {totalSlides}</Text>
     </View>
   );
 };
 
-const CoverPage = ({ propertyAddress, agent, preparedFor, baseUrl }: { propertyAddress: string; agent: AgentProfile; preparedFor?: string; baseUrl: string }) => {
+const CoverPage = ({ propertyAddress, agent, preparedFor, baseUrl, slideNumber, totalSlides }: { propertyAddress: string; agent: AgentProfile; preparedFor?: string; baseUrl: string; slideNumber: number; totalSlides: number }) => {
   const agentName = getAgentName(agent);
-  const agentInitials = getAgentInitials(agent);
-  const agentPhoto = getAgentPhoto(agent) || '';
-  const addressParts = propertyAddress.split(',');
-  const streetAddress = addressParts[0]?.trim() || propertyAddress;
-  const cityState = addressParts.slice(1).join(',').trim();
-  const logoUrl = baseUrl ? `${baseUrl}/logos/LRE_SGR_White.png` : '/logos/LRE_SGR_White.png';
+  const logoUrl = baseUrl ? `${baseUrl}/logos/SpyglassRealty_Logo_Black.png` : '/logos/SpyglassRealty_Logo_Black.png';
   
   return (
-    <Page size="LETTER" orientation="landscape" style={styles.darkPage}>
-      <View style={{ flex: 1, backgroundColor: COLORS.darkBackground, display: 'flex', flexDirection: 'column' }}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}>
-          <Image src={logoUrl} style={{ width: 280, height: 56, marginBottom: 24, borderRadius: 4 }} />
-          <Text style={{ fontSize: 24, fontWeight: 700, color: COLORS.white, textAlign: 'center', marginBottom: 16 }}>
-            Comparative Market Analysis
+    <Page size="LETTER" orientation="landscape" style={styles.page}>
+      <PageHeader title="COMPARATIVE MARKET ANALYSIS" slideNumber={slideNumber} totalSlides={totalSlides} />
+      <View style={styles.content}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Image src={logoUrl} style={{ width: 120, height: 40, marginBottom: 30 }} />
+          <Text style={{ fontSize: 28, fontWeight: 700, color: COLORS.textPrimary, textAlign: 'center', marginBottom: 30 }}>
+            COMPARATIVE MARKET ANALYSIS
+          </Text>
+          <Text style={{ fontSize: 18, color: COLORS.darkGray, textAlign: 'center', marginBottom: 40 }}>
+            {propertyAddress}
           </Text>
           {preparedFor && (
-            <Text style={{ fontSize: 12, color: COLORS.mediumGray, textAlign: 'center', marginBottom: 16 }}>
+            <Text style={{ fontSize: 12, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 20 }}>
               Prepared for {preparedFor}
             </Text>
           )}
-          <View style={{ marginTop: 16, alignItems: 'center' }}>
-            <Text style={{ fontSize: 16, fontWeight: 600, color: COLORS.white, textAlign: 'center' }}>{streetAddress}</Text>
-            {cityState && <Text style={{ fontSize: 12, color: COLORS.mediumGray, textAlign: 'center', marginTop: 4 }}>{cityState}</Text>}
-          </View>
-          <Text style={{ fontSize: 10, color: COLORS.darkGray, marginTop: 20 }}>
-            {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-          </Text>
-        </View>
-        <View style={{ 
-          backgroundColor: COLORS.spyglassOrange, 
-          padding: 20, 
-          flexDirection: 'row', 
-          alignItems: 'center',
-          flexShrink: 0,
-        }}>
-          {agentPhoto ? (
-            <Image src={agentPhoto} style={{ width: 56, height: 56, borderRadius: 28, marginRight: 16 }} />
-          ) : (
-            <View style={{ 
-              width: 56, 
-              height: 56, 
-              borderRadius: 28, 
-              backgroundColor: 'rgba(255,255,255,0.2)', 
-              marginRight: 16, 
-              alignItems: 'center', 
-              justifyContent: 'center' 
-            }}>
-              <Text style={{ fontSize: 18, fontWeight: 700, color: COLORS.white }}>{agentInitials}</Text>
-            </View>
-          )}
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Prepared by</Text>
-            <Text style={{ fontSize: 16, fontWeight: 700, color: COLORS.white, marginTop: 2 }}>{agentName}</Text>
-            <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.9)', marginTop: 2 }}>REALTOR | {agent.company || 'Spyglass Realty'}</Text>
+          <View style={{ marginTop: 20, alignItems: 'center' }}>
+            <Text style={{ fontSize: 12, color: COLORS.textSecondary, textAlign: 'center' }}>Prepared by</Text>
+            <Text style={{ fontSize: 16, fontWeight: 600, color: COLORS.textPrimary, textAlign: 'center', marginTop: 4 }}>{agentName}</Text>
+            <Text style={{ fontSize: 12, color: COLORS.darkGray, textAlign: 'center', marginTop: 2 }}>{agent.company || 'Spyglass Realty'}</Text>
           </View>
         </View>
       </View>
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} baseUrl={baseUrl} />
     </Page>
   );
 };
@@ -171,7 +141,7 @@ const AgentResumePage = ({ agent, slideNumber, totalSlides }: { agent: AgentProf
           </View>
         </View>
       </View>
-      <PageFooter propertyAddress="" />
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
     </Page>
   );
 };
@@ -258,7 +228,7 @@ const ComparablesSummaryPage = ({
           Data sourced from Austin Board of REALTORS MLS. Information deemed reliable but not guaranteed.
         </Text>
       </View>
-      <PageFooter propertyAddress={propertyAddress} />
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
     </Page>
   );
 };
@@ -363,7 +333,7 @@ const PropertyDetailPage = ({
           </View>
         </View>
       </View>
-      <PageFooter propertyAddress={propertyAddress} />
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
     </Page>
   );
 };
@@ -423,7 +393,7 @@ const TimeToSellPage = ({
           );
         })}
       </View>
-      <PageFooter propertyAddress={propertyAddress} />
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
     </Page>
   );
 };
@@ -510,7 +480,7 @@ const SuggestedPricePage = ({
           </View>
         </View>
       </View>
-      <PageFooter propertyAddress={propertyAddress} />
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
     </Page>
   );
 };
@@ -599,7 +569,7 @@ const AveragePricePerAcrePage = ({
           </View>
         )}
       </View>
-      <PageFooter propertyAddress={propertyAddress} />
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
     </Page>
   );
 };
@@ -655,7 +625,7 @@ const ListingActionPlanPage = ({
           ))}
         </View>
       </View>
-      <PageFooter propertyAddress={propertyAddress} />
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
     </Page>
   );
 };
@@ -698,7 +668,7 @@ const MarketingPage = ({
         </View>
       </View>
     </View>
-    <PageFooter propertyAddress={propertyAddress} />
+    <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
   </Page>
 );
 
@@ -755,7 +725,7 @@ const ClientTestimonialsPage = ({
         <Text style={{ fontSize: 12, color: COLORS.spyglassOrange, fontWeight: 600 }}>spyglassrealty.com/reviews</Text>
       </View>
     </View>
-    <PageFooter propertyAddress={propertyAddress} />
+    <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
   </Page>
 );
 
@@ -824,7 +794,7 @@ const ListingWithSpyglassPage = ({
           </Text>
         </View>
       </View>
-      <PageFooter propertyAddress={propertyAddress} slideNumber={slideNumber} baseUrl={baseUrl} />
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} baseUrl={baseUrl} />
     </Page>
   );
 };
@@ -860,7 +830,7 @@ const SpyglassResourcesPage = ({
         </Text>
       </View>
     </View>
-    <PageFooter propertyAddress={propertyAddress} />
+    <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
   </Page>
 );
 
@@ -998,7 +968,7 @@ const StaticImagePage = ({
               </Text>
             </View>
           </View>
-          <PageFooter propertyAddress={propertyAddress} />
+          <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
         </>
       )}
     </Page>
@@ -1071,7 +1041,7 @@ export function CmaPdfDocument({
   
   return (
     <Document>
-      <CoverPage propertyAddress={propertyAddress} agent={agent} preparedFor={preparedFor} baseUrl={baseUrl} />
+      <CoverPage propertyAddress={propertyAddress} agent={agent} preparedFor={preparedFor} baseUrl={baseUrl} slideNumber={1} totalSlides={totalSlides} />
       
       {WIDGETS.map((widget, index) => {
         slideNum = index + 1;

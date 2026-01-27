@@ -330,15 +330,7 @@ export function CmaPrintPreview({
 }
 
 function SlidePreview({ slide, compact = false }: { slide: PreviewSlide; compact?: boolean }) {
-  const { title, content, hasIssue, issueMessage, slideNumber, totalSlides, type } = slide;
-
-  if (type === 'cover') {
-    return (
-      <div className="w-full h-full">
-        {content}
-      </div>
-    );
-  }
+  const { title, content, hasIssue, issueMessage, slideNumber, totalSlides } = slide;
 
   return (
     <div className={cn(
