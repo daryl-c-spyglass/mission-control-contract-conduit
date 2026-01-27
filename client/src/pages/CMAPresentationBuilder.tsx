@@ -302,6 +302,8 @@ export default function CMAPresentationBuilder() {
       streetAddress: resolvedAddress,
       address: resolvedAddress,
       city: comp.city || comp.location?.city || '',
+      state: comp.state || comp.stateOrProvince || comp.location?.state || '',
+      zipCode: comp.postalCode || comp.zipCode || comp.zip || '',
       postalCode: comp.postalCode || '',
       // Price fields
       listPrice: parsedPrice,
@@ -364,6 +366,10 @@ export default function CMAPresentationBuilder() {
     unparsedAddress: rawSubject.address || rawSubject.unparsedAddress || rawSubject.streetAddress || '',
     streetAddress: rawSubject.address || rawSubject.streetAddress || rawSubject.unparsedAddress || '',
     address: rawSubject.address || rawSubject.unparsedAddress || rawSubject.streetAddress || '',
+    // City/State aliases
+    city: rawSubject.city || rawSubject.location?.city || '',
+    state: rawSubject.state || rawSubject.stateOrProvince || rawSubject.location?.state || '',
+    zipCode: rawSubject.postalCode || rawSubject.zipCode || rawSubject.zip || '',
     // Bedroom/bathroom aliases (mlsData uses bedrooms/bathrooms, not bedroomsTotal/bathroomsTotal)
     bedroomsTotal: rawSubject.bedroomsTotal || rawSubject.bedrooms || 0,
     beds: rawSubject.bedroomsTotal || rawSubject.bedrooms || 0,
