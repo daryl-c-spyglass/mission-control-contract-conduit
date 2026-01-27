@@ -256,41 +256,41 @@ function CoverSlideContent({ address, agent }: { address: string; agent: AgentPr
   const cityState = addressParts.slice(1).join(',').trim();
   
   return (
-    <div className="flex flex-col h-full bg-[#18181b] -m-6">
-      <div className="flex-1 flex flex-col items-center justify-center p-8">
+    <div className="flex flex-col h-full bg-[#18181b]">
+      <div className="flex-1 flex flex-col items-center justify-center p-6">
         <img 
           src="/logos/LRE_SGR_White.png"
           alt="Spyglass Realty - Leading Real Estate Companies of the World"
-          className="w-full max-w-xs h-auto mx-auto mb-6 rounded-lg"
+          className="w-full max-w-[200px] h-auto mx-auto mb-4 rounded-lg"
           onError={(e) => {
             e.currentTarget.style.display = 'none';
           }}
         />
-        <h1 className="text-xl font-bold text-white text-center mb-2">Comparative Market Analysis</h1>
-        <div className="mt-4 text-center">
-          <p className="text-base font-semibold text-white">{streetAddress}</p>
-          {cityState && <p className="text-sm text-zinc-400">{cityState}</p>}
+        <h1 className="text-lg font-bold text-white text-center mb-2">Comparative Market Analysis</h1>
+        <div className="mt-3 text-center">
+          <p className="text-sm font-semibold text-white">{streetAddress}</p>
+          {cityState && <p className="text-xs text-zinc-400">{cityState}</p>}
         </div>
-        <p className="text-xs text-zinc-500 mt-4">
+        <p className="text-[10px] text-zinc-500 mt-3">
           {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
       </div>
-      <div className="bg-[#EF4923] p-4 flex items-center gap-3">
+      <div className="bg-[#EF4923] p-3 flex items-center gap-3 flex-shrink-0">
         {agentPhoto ? (
           <img 
             src={agentPhoto}
             alt={agent?.name || 'Agent'}
-            className="w-12 h-12 rounded-full object-cover border-2 border-white/30"
+            className="w-10 h-10 rounded-full object-cover border-2 border-white/30"
           />
         ) : (
-          <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-            <span className="text-white font-bold text-lg">{agentInitials}</span>
+          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+            <span className="text-white font-bold text-sm">{agentInitials}</span>
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] text-white/80 uppercase">Prepared by</p>
-          <p className="text-sm font-bold text-white truncate">{agent?.name || 'Agent'}</p>
-          <p className="text-[10px] text-white/90">REALTOR | {agent?.company || 'Spyglass Realty'}</p>
+          <p className="text-[8px] text-white/80 uppercase">Prepared by</p>
+          <p className="text-xs font-bold text-white truncate">{agent?.name || 'Agent'}</p>
+          <p className="text-[8px] text-white/90">REALTOR | {agent?.company || 'Spyglass Realty'}</p>
         </div>
       </div>
     </div>
