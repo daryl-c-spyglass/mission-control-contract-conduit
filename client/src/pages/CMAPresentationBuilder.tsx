@@ -344,6 +344,74 @@ export default function CMAPresentationBuilder() {
   }) as unknown as Property[];
   }, [cma?.propertiesData, linkedTransaction?.cmaData, normalizeStatus]);
 
+  // State to store geocoded locations for properties without city/state
+  const [geocodedLocations, setGeocodedLocations] = useState<Record<string, { city: string; state: string }>>({});
+  
+  // Geocode properties that don't have city/state data
+  useEffect(() => {
+    const geocodeProperties = async () => {
+      const propertiesToGeocode = properties.filter((p: any) => {
+        const hasLocation = p.city && p.city.trim() !== '';
+        const alreadyGeocoded = geocodedLocations[p.mlsNumber || p.id];
+        return !hasLocation && !alreadyGeocoded && p.address;
+      });
+      
+      if (propertiesToGeocode.length === 0) return;
+      
+      // Geocode up to 5 properties at a time to avoid rate limiting
+      const batch = propertiesToGeocode.slice(0, 5);
+      const newLocations: Record<string, { city: string; state: string }> = {};
+      
+      for (const property of batch) {
+        try {
+          const prop = property as any;
+          const address = prop.address || prop.unparsedAddress || '';
+          const zipCode = prop.zipCode || prop.postalCode || '';
+          
+          if (!address && !zipCode) continue;
+          
+          const params = new URLSearchParams();
+          if (address) params.set('address', address);
+          if (zipCode) params.set('zipcode', zipCode);
+          
+          const response = await fetch(`/api/mapbox-geocode?${params.toString()}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.found && (data.city || data.state)) {
+              newLocations[prop.mlsNumber || prop.id] = {
+                city: data.city || '',
+                state: data.state || ''
+              };
+            }
+          }
+        } catch (error) {
+          console.error('Geocoding error for property:', (property as any).address, error);
+        }
+      }
+      
+      if (Object.keys(newLocations).length > 0) {
+        setGeocodedLocations(prev => ({ ...prev, ...newLocations }));
+      }
+    };
+    
+    geocodeProperties();
+  }, [properties, geocodedLocations]);
+
+  // Merge geocoded locations with properties
+  const propertiesWithLocations = useMemo(() => {
+    return properties.map((p: any) => {
+      const geocoded = geocodedLocations[p.mlsNumber || p.id];
+      if (geocoded && (!p.city || p.city.trim() === '')) {
+        return {
+          ...p,
+          city: geocoded.city,
+          state: geocoded.state
+        };
+      }
+      return p;
+    });
+  }, [properties, geocodedLocations]);
+
   // Get subject property from linked transaction's mlsData and normalize fields (memoized)
   const subjectFromTransaction = useMemo((): Property | null => {
     const rawSubject = linkedTransaction?.mlsData as any;
@@ -632,9 +700,10 @@ export default function CMAPresentationBuilder() {
 
   // Comparables are all properties in propertiesData (subject is not included there)
   // If subject is somehow in properties, filter it out
+  // Use propertiesWithLocations to include geocoded city/state data
   const comparables = subjectFromTransaction 
-    ? properties // All properties are comparables since subject comes from transaction
-    : properties.filter(p => p.mlsNumber !== cma?.subjectPropertyId);
+    ? propertiesWithLocations // All properties are comparables since subject comes from transaction
+    : propertiesWithLocations.filter(p => p.mlsNumber !== cma?.subjectPropertyId);
 
   const sections: SectionItem[] = (config.sectionOrder || CMA_REPORT_SECTIONS.map(s => s.id)).map(sectionId => {
     const sectionDef = CMA_REPORT_SECTIONS.find(s => s.id === sectionId);

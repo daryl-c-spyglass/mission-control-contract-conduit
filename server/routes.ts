@@ -3186,6 +3186,74 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
     res.json({ token });
   });
 
+  // ============ Mapbox Geocoding ============
+  // Geocodes an address to get city/state information
+  app.get("/api/mapbox-geocode", isAuthenticated, async (req, res) => {
+    try {
+      const token = process.env.MAPBOX_TOKEN;
+      if (!token) {
+        return res.status(500).json({ error: 'Mapbox token not configured' });
+      }
+      
+      const { address, zipcode } = req.query;
+      
+      if (!address && !zipcode) {
+        return res.status(400).json({ error: 'Address or zipcode is required' });
+      }
+      
+      // Use address if available, otherwise use zipcode
+      const searchQuery = encodeURIComponent(String(address || zipcode));
+      const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${searchQuery}.json?access_token=${token}&country=us&limit=1`;
+      
+      const response = await fetch(geocodeUrl);
+      if (!response.ok) {
+        console.error('Mapbox geocoding failed:', response.status, response.statusText);
+        return res.status(response.status).json({ error: 'Geocoding failed' });
+      }
+      
+      const data = await response.json();
+      
+      if (!data.features || data.features.length === 0) {
+        return res.json({ city: null, state: null, found: false });
+      }
+      
+      const feature = data.features[0];
+      let city = null;
+      let state = null;
+      let zipCode = null;
+      
+      // Extract city, state, and zip from context
+      if (feature.context) {
+        for (const ctx of feature.context) {
+          if (ctx.id.startsWith('place.')) {
+            city = ctx.text;
+          } else if (ctx.id.startsWith('region.')) {
+            // Get state abbreviation from short_code (e.g., "US-TX" -> "TX")
+            state = ctx.short_code?.replace('US-', '') || ctx.text;
+          } else if (ctx.id.startsWith('postcode.')) {
+            zipCode = ctx.text;
+          }
+        }
+      }
+      
+      // If the feature itself is a place, use it as the city
+      if (!city && feature.place_type?.includes('place')) {
+        city = feature.text;
+      }
+      
+      res.json({ 
+        city, 
+        state, 
+        zipCode,
+        found: !!(city || state),
+        fullAddress: feature.place_name 
+      });
+    } catch (error) {
+      console.error('Mapbox geocoding error:', error);
+      res.status(500).json({ error: 'Failed to geocode address' });
+    }
+  });
+
   // ============ Google Maps Embed ============
   // Returns a secure Maps Embed API URL for displaying property locations
   // The API key is kept server-side and only the embed URL is exposed
