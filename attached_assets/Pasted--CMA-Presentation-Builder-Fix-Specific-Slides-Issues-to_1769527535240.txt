@@ -1,0 +1,648 @@
+# CMA Presentation Builder — Fix Specific Slides
+
+## 🎯 Issues to Fix
+
+| Slide | Issue | Fix |
+|-------|-------|-----|
+| 3 | YouTube thumbnail shows gray placeholder | Use actual YouTube thumbnail URL |
+| 4 | Client Testimonials empty/placeholder | Show actual testimonials or remove if no data |
+| 6 | COMPS shows "+5 more properties" | List ALL properties (no truncation for PDF) |
+| 35-44 | Comparable property slides missing photos/maps | Add property photos from Repliers API |
+
+---
+
+## 🔧 FIX 1: YouTube Thumbnail (Slide 3 - LISTING WITH SPYGLASS REALTY)
+
+**Problem:** Shows gray YouTube placeholder icon instead of actual video thumbnail
+
+**YouTube Video ID:** `iB_u-ksW3ts`
+
+**Thumbnail URLs (use in order of preference):**
+```
+https://img.youtube.com/vi/iB_u-ksW3ts/maxresdefault.jpg  (1280x720 - best)
+https://img.youtube.com/vi/iB_u-ksW3ts/sddefault.jpg     (640x480)
+https://img.youtube.com/vi/iB_u-ksW3ts/hqdefault.jpg     (480x360 - fallback)
+https://img.youtube.com/vi/iB_u-ksW3ts/mqdefault.jpg     (320x180 - small)
+```
+
+**Current (Wrong):**
+```tsx
+// Generic YouTube icon placeholder
+<div className="bg-gray-200 rounded-lg flex items-center justify-center">
+  <Youtube className="w-16 h-16 text-gray-400" />
+  <Play className="absolute ..." />
+</div>
+```
+
+**Fix — Use actual thumbnail:**
+```tsx
+const YOUTUBE_VIDEO_ID = 'iB_u-ksW3ts';
+const YOUTUBE_THUMBNAIL = `https://img.youtube.com/vi/${YOUTUBE_VIDEO_ID}/maxresdefault.jpg`;
+const YOUTUBE_THUMBNAIL_FALLBACK = `https://img.youtube.com/vi/${YOUTUBE_VIDEO_ID}/hqdefault.jpg`;
+
+// In the component
+<div className="relative aspect-video w-full max-w-2xl mx-auto rounded-lg overflow-hidden shadow-lg">
+  {/* Actual YouTube Thumbnail */}
+  <img 
+    src={YOUTUBE_THUMBNAIL}
+    alt="Listing with Spyglass Realty - Video Presentation"
+    className="w-full h-full object-cover"
+    onError={(e) => {
+      // Try fallback thumbnail
+      if (e.currentTarget.src !== YOUTUBE_THUMBNAIL_FALLBACK) {
+        e.currentTarget.src = YOUTUBE_THUMBNAIL_FALLBACK;
+      }
+    }}
+  />
+  
+  {/* Play Button Overlay */}
+  <div className="absolute inset-0 flex items-center justify-center">
+    <div className="bg-red-600 rounded-full p-4 shadow-xl hover:bg-red-700 transition-colors cursor-pointer">
+      <Play className="w-8 h-8 text-white fill-white" />
+    </div>
+  </div>
+</div>
+
+{/* Labels below */}
+<div className="text-center mt-4">
+  <p className="text-gray-500 text-sm uppercase tracking-wider">
+    LISTING WITH SPYGLASS REALTY
+  </p>
+  <p className="text-gray-600 mt-1">Video presentation</p>
+</div>
+```
+
+**For PDF Export:**
+```tsx
+// @react-pdf/renderer needs full URL
+<Image 
+  src="https://img.youtube.com/vi/iB_u-ksW3ts/hqdefault.jpg"
+  style={{ 
+    width: '100%', 
+    height: 'auto',
+    borderRadius: 8 
+  }}
+/>
+```
+
+---
+
+## 🔧 FIX 2: Client Testimonials (Slide 4)
+
+**Problem:** Shows empty placeholder with just a chat icon
+
+**Options:**
+
+### Option A: Show Actual Testimonials (if available in data)
+```tsx
+interface Testimonial {
+  quote: string;
+  author: string;
+  source?: string;
+}
+
+// Sample testimonials (can be pulled from database or hardcoded for Spyglass)
+const TESTIMONIALS: Testimonial[] = [
+  {
+    quote: "Exceptional service from start to finish. They made the entire process seamless and stress-free.",
+    author: "Happy Homeowner",
+    source: "Google Review"
+  },
+  {
+    quote: "Professional, knowledgeable, and always available. I couldn't have asked for a better team.",
+    author: "Satisfied Seller",
+    source: "Zillow Review"
+  },
+  {
+    quote: "They sold our home in just 5 days for above asking price. Highly recommend!",
+    author: "Austin Family",
+    source: "Google Review"
+  }
+];
+
+function ClientTestimonialsSlide({ testimonials = TESTIMONIALS }) {
+  return (
+    <div className="p-8">
+      <h2 className="text-2xl font-bold text-center mb-8">CLIENT TESTIMONIALS</h2>
+      <p className="text-gray-500 text-center mb-8">
+        What clients say about working with Spyglass Realty
+      </p>
+      
+      <div className="space-y-6 max-w-2xl mx-auto">
+        {testimonials.map((testimonial, index) => (
+          <div key={index} className="bg-gray-50 rounded-lg p-6 relative">
+            {/* Quote mark */}
+            <div className="absolute -top-3 left-4 text-4xl text-orange-500 font-serif">"</div>
+            
+            <p className="text-gray-700 italic pl-6 pr-4">
+              {testimonial.quote}
+            </p>
+            
+            <div className="mt-4 flex items-center justify-between">
+              <span className="font-medium text-gray-800">— {testimonial.author}</span>
+              {testimonial.source && (
+                <span className="text-sm text-gray-500">{testimonial.source}</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {/* Google Reviews Link */}
+      <div className="text-center mt-8">
+        <p className="text-sm text-gray-500">
+          View more testimonials at{' '}
+          <span className="text-orange-500">spyglassrealty.com/reviews</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+```
+
+### Option B: Link to Google Reviews with QR Code
+```tsx
+function ClientTestimonialsSlide() {
+  const GOOGLE_REVIEWS_URL = 'https://www.google.com/search?q=spyglass+realty+reviews';
+  
+  return (
+    <div className="p-8 text-center">
+      <h2 className="text-2xl font-bold mb-4">CLIENT TESTIMONIALS</h2>
+      
+      <div className="flex flex-col items-center justify-center py-8">
+        <MessageSquare className="w-16 h-16 text-orange-500 mb-4" />
+        
+        <p className="text-gray-600 mb-6 max-w-md">
+          See what our clients have to say about their experience with Spyglass Realty
+        </p>
+        
+        {/* QR Code to Google Reviews */}
+        <div className="bg-white p-4 rounded-lg shadow-md">
+          <img 
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(GOOGLE_REVIEWS_URL)}`}
+            alt="Scan for reviews"
+            className="w-32 h-32"
+          />
+        </div>
+        
+        <p className="text-sm text-gray-500 mt-4">
+          Scan to read our Google Reviews
+        </p>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 FIX 3: COMPS Slide — Show ALL Properties (Slide 6)
+
+**Problem:** Shows only 5 properties with "+5 more properties" link. PDF needs ALL properties.
+
+**Current (Wrong):**
+```tsx
+// Truncating to 5 items with "show more" link
+const displayedComps = comparables.slice(0, 5);
+const remainingCount = comparables.length - 5;
+
+{displayedComps.map(comp => <CompRow ... />)}
+{remainingCount > 0 && (
+  <button>+ {remainingCount} more properties</button>
+)}
+```
+
+**Fix — Show ALL properties (no truncation):**
+```tsx
+function CompsSlide({ comparables, statistics }: CompsSlideProps) {
+  // NO TRUNCATION - show all properties for PDF compatibility
+  const allComps = comparables;
+  
+  return (
+    <div className="p-6">
+      <h2 className="text-2xl font-bold mb-6">COMPS</h2>
+      
+      {/* Summary Stats */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="text-center p-4 bg-gray-50 rounded-lg">
+          <div className="text-3xl font-bold text-orange-500">
+            {allComps.length}
+          </div>
+          <div className="text-sm text-gray-500">Properties</div>
+        </div>
+        <div className="text-center p-4 bg-gray-50 rounded-lg">
+          <div className="text-3xl font-bold">
+            ${(statistics.avgPrice / 1000).toFixed(0)}K
+          </div>
+          <div className="text-sm text-gray-500">Avg Price</div>
+        </div>
+        <div className="text-center p-4 bg-gray-50 rounded-lg">
+          <div className="text-3xl font-bold">
+            {statistics.avgDaysOnMarket ?? 0} days
+          </div>
+          <div className="text-sm text-gray-500">Avg DOM</div>
+        </div>
+      </div>
+      
+      {/* Property Table - ALL PROPERTIES, no truncation */}
+      <div className="overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="text-left py-2 font-medium text-gray-600">Address</th>
+              <th className="text-right py-2 font-medium text-gray-600">Price</th>
+              <th className="text-right py-2 font-medium text-gray-600">Sq Ft</th>
+              <th className="text-right py-2 font-medium text-gray-600">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* Map ALL comparables - no slice, no limit */}
+            {allComps.map((comp, index) => (
+              <tr key={index} className="border-b border-gray-100">
+                <td className="py-2 text-gray-800">
+                  {comp.streetAddress || comp.address || 'Unknown'}
+                </td>
+                <td className="py-2 text-right text-gray-800">
+                  ${(comp.listPrice || comp.price || 0).toLocaleString()}
+                </td>
+                <td className="py-2 text-right text-gray-600">
+                  {(comp.sqft || comp.squareFeet || 0).toLocaleString()}
+                </td>
+                <td className="py-2 text-right">
+                  <span className={cn(
+                    "px-2 py-0.5 rounded text-xs font-medium",
+                    comp.status?.toLowerCase() === 'closed' 
+                      ? "bg-red-100 text-red-700"
+                      : comp.status?.toLowerCase() === 'active'
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-100 text-gray-700"
+                  )}>
+                    {comp.status || 'Unknown'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      
+      {/* Remove the "+X more properties" link completely */}
+      {/* NO truncation message - all properties are shown */}
+    </div>
+  );
+}
+```
+
+**For PDF - Same logic:**
+```tsx
+// In PDF component, also show ALL properties
+function CompsPdfSlide({ comparables, statistics }) {
+  return (
+    <Page size="LETTER" style={styles.page}>
+      {/* ... header ... */}
+      
+      {/* ALL comparables - no truncation */}
+      {comparables.map((comp, index) => (
+        <View key={index} style={styles.tableRow}>
+          <Text style={styles.addressCell}>{comp.address}</Text>
+          <Text style={styles.priceCell}>${comp.listPrice?.toLocaleString()}</Text>
+          <Text style={styles.sqftCell}>{comp.sqft?.toLocaleString()}</Text>
+          <Text style={styles.statusCell}>{comp.status}</Text>
+        </View>
+      ))}
+    </Page>
+  );
+}
+```
+
+---
+
+## 🔧 FIX 4: Comparable Property Slides (Slides 35-44) — Add Property Photos
+
+**Problem:** Individual comparable property slides are missing photos and map screenshots
+
+**Data Source:** Property photos come from Repliers API in the `photos` or `images` array
+
+### Get Property Photos from Repliers API
+
+```typescript
+// Property photos are in the comparable data from Repliers API
+interface ComparableProperty {
+  mlsNumber: string;
+  address: string;
+  photos?: string[];      // Array of photo URLs
+  images?: {
+    url: string;
+    caption?: string;
+  }[];
+  // ... other fields
+}
+
+// Helper to get primary photo
+function getPrimaryPhoto(comp: ComparableProperty): string | null {
+  // Check photos array first
+  if (comp.photos && comp.photos.length > 0) {
+    return comp.photos[0];
+  }
+  
+  // Check images array
+  if (comp.images && comp.images.length > 0) {
+    return comp.images[0].url;
+  }
+  
+  return null;
+}
+```
+
+### Component for Comparable Property Slide
+
+```tsx
+interface ComparablePropertySlideProps {
+  property: ComparableProperty;
+  slideNumber: number;
+  totalSlides: number;
+  subjectAddress: string;
+}
+
+function ComparablePropertySlide({ 
+  property, 
+  slideNumber, 
+  totalSlides,
+  subjectAddress 
+}: ComparablePropertySlideProps) {
+  const primaryPhoto = getPrimaryPhoto(property);
+  
+  // Calculate distance from subject (if available)
+  const distance = property.distance 
+    ? `${property.distance.toFixed(1)} mi` 
+    : null;
+  
+  return (
+    <div className="p-6 h-full flex flex-col">
+      {/* Header */}
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <span className="text-xs text-gray-500 uppercase tracking-wider">
+            COMPARABLE PROPERTY
+          </span>
+          <h2 className="text-xl font-bold text-gray-800 mt-1">
+            {property.streetAddress || property.address}
+          </h2>
+          <p className="text-gray-500">{property.city}, {property.state}</p>
+        </div>
+        <div className="text-right">
+          <span className={cn(
+            "px-3 py-1 rounded-full text-sm font-medium",
+            property.status?.toLowerCase() === 'closed' 
+              ? "bg-red-100 text-red-700"
+              : "bg-green-100 text-green-700"
+          )}>
+            {property.status}
+          </span>
+          {distance && (
+            <p className="text-sm text-gray-500 mt-1">{distance} from subject</p>
+          )}
+        </div>
+      </div>
+      
+      {/* Property Photo - PRIMARY CONTENT */}
+      <div className="flex-1 grid grid-cols-2 gap-4 mb-4">
+        {/* Main Photo */}
+        <div className="relative rounded-lg overflow-hidden bg-gray-100">
+          {primaryPhoto ? (
+            <img 
+              src={primaryPhoto}
+              alt={property.address}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                console.error('Photo failed to load:', primaryPhoto);
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+              }}
+            />
+          ) : null}
+          
+          {/* Fallback if no photo */}
+          <div className={cn(
+            "absolute inset-0 flex flex-col items-center justify-center",
+            primaryPhoto ? "hidden" : ""
+          )}>
+            <Home className="w-16 h-16 text-gray-300" />
+            <span className="text-gray-400 mt-2">No photo available</span>
+          </div>
+        </div>
+        
+        {/* Map/Location - Using Static Map Image */}
+        <div className="relative rounded-lg overflow-hidden bg-gray-100">
+          <StaticMapImage 
+            address={`${property.streetAddress}, ${property.city}, ${property.state}`}
+            latitude={property.latitude}
+            longitude={property.longitude}
+          />
+        </div>
+      </div>
+      
+      {/* Property Details */}
+      <div className="grid grid-cols-4 gap-4 bg-gray-50 rounded-lg p-4">
+        <div className="text-center">
+          <div className="text-2xl font-bold text-orange-500">
+            ${(property.listPrice || property.closePrice || 0).toLocaleString()}
+          </div>
+          <div className="text-xs text-gray-500 uppercase">Price</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold">
+            {property.beds || '-'}
+          </div>
+          <div className="text-xs text-gray-500 uppercase">Beds</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold">
+            {property.baths || '-'}
+          </div>
+          <div className="text-xs text-gray-500 uppercase">Baths</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold">
+            {(property.sqft || property.squareFeet || 0).toLocaleString()}
+          </div>
+          <div className="text-xs text-gray-500 uppercase">Sq Ft</div>
+        </div>
+      </div>
+      
+      {/* Additional Stats Row */}
+      <div className="grid grid-cols-3 gap-4 mt-4 text-sm">
+        <div className="flex justify-between">
+          <span className="text-gray-500">Price per Sq Ft</span>
+          <span className="font-medium">
+            ${property.pricePerSqft || Math.round((property.listPrice || 0) / (property.sqft || 1))}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">Days on Market</span>
+          <span className="font-medium">{property.daysOnMarket ?? '-'}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">Lot Size</span>
+          <span className="font-medium">
+            {property.lotSizeAcres ? `${property.lotSizeAcres} acres` : '-'}
+          </span>
+        </div>
+      </div>
+      
+      {/* Footer */}
+      <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-200 text-sm text-gray-500">
+        <span>Spyglass Realty</span>
+        <span>Slide {slideNumber} of {totalSlides}</span>
+      </div>
+    </div>
+  );
+}
+```
+
+### Static Map Image Component
+
+Since you can't take live screenshots, use a static map API:
+
+```tsx
+interface StaticMapImageProps {
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  width?: number;
+  height?: number;
+}
+
+function StaticMapImage({ 
+  address, 
+  latitude, 
+  longitude,
+  width = 400,
+  height = 300 
+}: StaticMapImageProps) {
+  // Option 1: Using Mapbox Static Images API
+  const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+  
+  let mapUrl = '';
+  
+  if (latitude && longitude) {
+    // Use coordinates if available
+    mapUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/pin-s+f37216(${longitude},${latitude})/${longitude},${latitude},15,0/${width}x${height}?access_token=${MAPBOX_TOKEN}`;
+  } else if (address) {
+    // Fallback: Use Google Static Maps with address
+    const encodedAddress = encodeURIComponent(address);
+    mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${encodedAddress}&zoom=15&size=${width}x${height}&markers=color:orange%7C${encodedAddress}&key=${import.meta.env.VITE_GOOGLE_MAPS_KEY}`;
+  }
+  
+  if (!mapUrl) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-100">
+        <MapPin className="w-12 h-12 text-gray-300" />
+        <span className="text-gray-400 ml-2">Map unavailable</span>
+      </div>
+    );
+  }
+  
+  return (
+    <img 
+      src={mapUrl}
+      alt={`Map of ${address}`}
+      className="w-full h-full object-cover"
+      onError={(e) => {
+        console.error('Map image failed to load');
+        e.currentTarget.style.display = 'none';
+        // Show fallback
+      }}
+    />
+  );
+}
+```
+
+### Alternative: OpenStreetMap Static Tiles (No API Key Required)
+
+```tsx
+function StaticMapImage({ latitude, longitude }: { latitude: number; longitude: number }) {
+  // Using OpenStreetMap tiles - no API key needed
+  const zoom = 15;
+  const tileUrl = `https://tile.openstreetmap.org/${zoom}/${Math.floor((longitude + 180) / 360 * Math.pow(2, zoom))}/${Math.floor((1 - Math.log(Math.tan(latitude * Math.PI / 180) + 1 / Math.cos(latitude * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom))}.png`;
+  
+  // Or use a static map service
+  const staticMapUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${latitude},${longitude}&zoom=15&size=400x300&markers=${latitude},${longitude},lightblue`;
+  
+  return (
+    <img 
+      src={staticMapUrl}
+      alt="Property location"
+      className="w-full h-full object-cover"
+    />
+  );
+}
+```
+
+---
+
+## 📱 Mobile Optimization
+
+All fixes must work on:
+
+| Device | Screen Size |
+|--------|-------------|
+| iPad Pro | 1024 x 1366 |
+| iPad Air | 768 x 1024 |
+| iPhone | 393 x 852 |
+| Android | 360 x 800 |
+
+**Requirements:**
+- [ ] Touch targets 44x44px minimum
+- [ ] Images lazy-load on mobile
+- [ ] Table scrolls horizontally if needed on small screens
+- [ ] Font sizes readable on all devices
+
+---
+
+## ✅ Verification Checklist
+
+### Slide 3 - YouTube Thumbnail
+- [ ] Shows actual video thumbnail (not gray placeholder)
+- [ ] Play button overlay visible
+- [ ] Thumbnail loads in both Preview and PDF
+
+### Slide 4 - Client Testimonials  
+- [ ] Shows actual testimonial quotes OR QR code to reviews
+- [ ] Not just an empty placeholder icon
+
+### Slide 6 - COMPS
+- [ ] Shows ALL properties (not truncated)
+- [ ] No "+X more properties" link
+- [ ] Table displays correctly in PDF
+
+### Slides 35-44 - Comparable Properties
+- [ ] Primary photo displays for each property
+- [ ] Map/location image displays
+- [ ] Property details (beds, baths, sqft, price) show correctly
+- [ ] Status badge shows correct color
+- [ ] Fallback shown if photo missing
+
+---
+
+## 🔍 Debug: Check Repliers API Response for Photos
+
+Add this logging to verify photo data is available:
+
+```typescript
+// When fetching comparables
+const comparables = await fetchComparables(mlsNumber);
+
+console.log('📸 Comparable Photos Check:');
+comparables.forEach((comp, i) => {
+  console.log(`Comp ${i + 1}: ${comp.address}`);
+  console.log('  - photos:', comp.photos?.length || 0);
+  console.log('  - images:', comp.images?.length || 0);
+  console.log('  - First photo URL:', comp.photos?.[0] || comp.images?.[0]?.url || 'NONE');
+  console.log('  - Coordinates:', comp.latitude, comp.longitude);
+});
+```
+
+---
+
+*Copy this entire prompt to Replit for Contract Conduit project.*

@@ -701,20 +701,36 @@ const ClientTestimonialsPage = ({
       <Text style={styles.sectionTitle}>What Our Clients Say</Text>
       <Text style={styles.sectionSubtitle}>Real feedback from satisfied homeowners</Text>
       
-      <View style={{ flexDirection: 'row', gap: 20, marginTop: 20 }}>
-        <View style={{ flex: 1, backgroundColor: COLORS.lightGray, padding: 20, borderRadius: 8 }}>
-          <Text style={{ fontSize: 24, color: COLORS.spyglassOrange, fontWeight: 700, marginBottom: 10 }}>"</Text>
-          <Text style={{ fontSize: 11, color: COLORS.textSecondary, lineHeight: 1.6, fontStyle: 'italic' }}>
+      <View style={{ flexDirection: 'row', gap: 16, marginTop: 20 }}>
+        <View style={{ flex: 1, backgroundColor: COLORS.lightGray, padding: 16, borderRadius: 8 }}>
+          <Text style={{ fontSize: 20, color: COLORS.spyglassOrange, fontWeight: 700, marginBottom: 8 }}>"</Text>
+          <Text style={{ fontSize: 10, color: COLORS.textSecondary, lineHeight: 1.5, fontStyle: 'italic' }}>
             Exceptional service from start to finish. They made the entire process seamless and stress-free.
           </Text>
-          <Text style={{ fontSize: 10, fontWeight: 600, marginTop: 15, color: COLORS.textPrimary }}>— Happy Homeowner</Text>
+          <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 9, fontWeight: 600, color: COLORS.textPrimary }}>— Happy Homeowner</Text>
+            <Text style={{ fontSize: 8, color: COLORS.mediumGray }}>Google Review</Text>
+          </View>
         </View>
-        <View style={{ flex: 1, backgroundColor: COLORS.lightGray, padding: 20, borderRadius: 8 }}>
-          <Text style={{ fontSize: 24, color: COLORS.spyglassOrange, fontWeight: 700, marginBottom: 10 }}>"</Text>
-          <Text style={{ fontSize: 11, color: COLORS.textSecondary, lineHeight: 1.6, fontStyle: 'italic' }}>
+        <View style={{ flex: 1, backgroundColor: COLORS.lightGray, padding: 16, borderRadius: 8 }}>
+          <Text style={{ fontSize: 20, color: COLORS.spyglassOrange, fontWeight: 700, marginBottom: 8 }}>"</Text>
+          <Text style={{ fontSize: 10, color: COLORS.textSecondary, lineHeight: 1.5, fontStyle: 'italic' }}>
             Professional, knowledgeable, and always available. I couldn't have asked for a better team.
           </Text>
-          <Text style={{ fontSize: 10, fontWeight: 600, marginTop: 15, color: COLORS.textPrimary }}>— Satisfied Seller</Text>
+          <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 9, fontWeight: 600, color: COLORS.textPrimary }}>— Satisfied Seller</Text>
+            <Text style={{ fontSize: 8, color: COLORS.mediumGray }}>Zillow Review</Text>
+          </View>
+        </View>
+        <View style={{ flex: 1, backgroundColor: COLORS.lightGray, padding: 16, borderRadius: 8 }}>
+          <Text style={{ fontSize: 20, color: COLORS.spyglassOrange, fontWeight: 700, marginBottom: 8 }}>"</Text>
+          <Text style={{ fontSize: 10, color: COLORS.textSecondary, lineHeight: 1.5, fontStyle: 'italic' }}>
+            They sold our home in just 5 days for above asking price. Highly recommend!
+          </Text>
+          <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 9, fontWeight: 600, color: COLORS.textPrimary }}>— Austin Family</Text>
+            <Text style={{ fontSize: 8, color: COLORS.mediumGray }}>Google Review</Text>
+          </View>
         </View>
       </View>
       
@@ -768,10 +784,32 @@ const ListingWithSpyglassPage = ({
             </View>
           </View>
         </View>
-        <View style={{ flex: 1, backgroundColor: COLORS.darkBackground, padding: 25, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 14, color: COLORS.white, textAlign: 'center', marginBottom: 15 }}>Watch our introduction video</Text>
-          <Text style={{ fontSize: 11, color: COLORS.mediumGray, textAlign: 'center' }}>Scan the QR code or visit our website</Text>
-          <Text style={{ fontSize: 12, color: COLORS.spyglassOrange, marginTop: 10, fontWeight: 600 }}>spyglassrealty.com</Text>
+        <View style={{ flex: 1 }}>
+          {/* YouTube Video Thumbnail */}
+          <View style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+            <Image 
+              src="https://img.youtube.com/vi/iB_u-ksW3ts/hqdefault.jpg"
+              style={{ width: '100%', height: 150, borderRadius: 8, objectFit: 'cover' }}
+            />
+            <View style={{ 
+              position: 'absolute', 
+              top: '50%', 
+              left: '50%', 
+              marginTop: -20,
+              marginLeft: -20,
+              width: 40, 
+              height: 40, 
+              backgroundColor: COLORS.spyglassOrange, 
+              borderRadius: 20,
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Text style={{ fontSize: 18, color: COLORS.white }}>▶</Text>
+            </View>
+          </View>
+          <Text style={{ fontSize: 10, color: COLORS.textSecondary, textAlign: 'center' }}>
+            Watch our introduction video at <Text style={{ color: COLORS.spyglassOrange, fontWeight: 600 }}>spyglassrealty.com</Text>
+          </Text>
         </View>
       </View>
     </View>

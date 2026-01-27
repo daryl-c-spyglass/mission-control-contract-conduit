@@ -10,6 +10,7 @@ import {
   formatNumber,
   normalizeStatus,
   getStatusColor,
+  getPrimaryPhoto,
 } from '@/lib/cma-data-utils';
 import { Home, MapPin, Calendar, Ruler, DollarSign, Clock, User, Building, FileText, Play, MessageSquare, TrendingUp, Link } from 'lucide-react';
 import type { AgentProfile, CmaProperty } from '../types';
@@ -339,11 +340,52 @@ function VideoSlideContent({ title }: { title: string }) {
 }
 
 function TestimonialsContent() {
+  const testimonials = [
+    {
+      quote: "Exceptional service from start to finish. They made the entire process seamless and stress-free.",
+      author: "Happy Homeowner",
+      source: "Google Review"
+    },
+    {
+      quote: "Professional, knowledgeable, and always available. I couldn't have asked for a better team.",
+      author: "Satisfied Seller",
+      source: "Zillow Review"
+    },
+    {
+      quote: "They sold our home in just 5 days for above asking price. Highly recommend!",
+      author: "Austin Family",
+      source: "Google Review"
+    }
+  ];
+
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center">
-      <MessageSquare className="w-12 h-12 text-[#EF4923] mb-4" />
-      <p className="font-medium text-zinc-700">CLIENT TESTIMONIALS</p>
-      <p className="text-sm text-zinc-500 mt-2">What clients say about working with Spyglass Realty</p>
+    <div className="flex flex-col h-full p-2">
+      <div className="flex items-center gap-2 mb-3">
+        <MessageSquare className="w-5 h-5 text-[#EF4923]" />
+        <h2 className="font-bold text-sm text-[#222222]">CLIENT TESTIMONIALS</h2>
+      </div>
+      <p className="text-xs text-zinc-500 mb-3">What clients say about working with Spyglass Realty</p>
+      
+      <div className="flex-1 space-y-2 overflow-auto">
+        {testimonials.map((testimonial, index) => (
+          <div key={index} className="bg-zinc-50 rounded-lg p-3 relative">
+            <div className="absolute -top-1 left-2 text-xl text-[#EF4923] font-serif">"</div>
+            <p className="text-xs text-zinc-700 italic pl-4 pr-2 leading-relaxed">
+              {testimonial.quote}
+            </p>
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-xs font-medium text-zinc-800">— {testimonial.author}</span>
+              <span className="text-[10px] text-zinc-500">{testimonial.source}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      <div className="text-center mt-2">
+        <p className="text-[10px] text-zinc-400">
+          View more at <span className="text-[#EF4923]">spyglassrealty.com/reviews</span>
+        </p>
+      </div>
     </div>
   );
 }
@@ -391,7 +433,8 @@ function CompsContent({ comparables, stats }: {
             </tr>
           </thead>
           <tbody>
-            {comparables.slice(0, 5).map((comp, i) => (
+            {/* Show ALL comparables - no truncation for PDF compatibility */}
+            {comparables.map((comp, i) => (
               <tr key={i} className="border-b border-zinc-100">
                 <td className="py-1 truncate max-w-[120px]">{extractFullAddress(comp) || 'Unknown'}</td>
                 <td className="text-right py-1">{formatPrice(extractPrice(comp))}</td>
@@ -411,11 +454,6 @@ function CompsContent({ comparables, stats }: {
             ))}
           </tbody>
         </table>
-        {comparables.length > 5 && (
-          <p className="text-xs text-zinc-400 mt-2 text-center">
-            + {comparables.length - 5} more properties
-          </p>
-        )}
       </div>
     </div>
   );
@@ -526,10 +564,29 @@ function GenericSlideContent({ title }: { title: string }) {
 }
 
 function PropertyDetailsContent({ property }: { property: CmaProperty }) {
+  // Get property photo from Repliers API data
+  const primaryPhoto = getPrimaryPhoto(property);
+  
   return (
     <div className="flex flex-col h-full">
-      <div className="bg-zinc-100 h-24 rounded mb-3 flex items-center justify-center">
-        <Building className="w-8 h-8 text-zinc-400" />
+      {/* Property Photo from Repliers API */}
+      <div className="h-24 rounded mb-3 overflow-hidden">
+        {primaryPhoto ? (
+          <img 
+            src={primaryPhoto}
+            alt={extractFullAddress(property) || 'Property'}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              // Fallback to placeholder on error
+              e.currentTarget.style.display = 'none';
+              const fallback = e.currentTarget.parentElement?.querySelector('.fallback');
+              if (fallback) (fallback as HTMLElement).classList.remove('hidden');
+            }}
+          />
+        ) : null}
+        <div className={`fallback ${primaryPhoto ? 'hidden' : ''} w-full h-full bg-zinc-100 flex items-center justify-center`}>
+          <Building className="w-8 h-8 text-zinc-400" />
+        </div>
       </div>
       <h3 className="font-medium text-sm mb-2">{extractFullAddress(property) || 'Property Address'}</h3>
       <div className="grid grid-cols-2 gap-2 text-xs">
