@@ -222,9 +222,11 @@ function PropertyCard({ property, isSubject = false, onClick }: { property: CmaP
       
       <div className="p-4">
         <p className="font-medium text-sm truncate" data-testid={`property-address-${property.id}`}>{property.address}</p>
-        <p className="text-xs text-muted-foreground truncate">
-          {getCityState(property) || 'Location unavailable'}
-        </p>
+        {getCityState(property) && (
+          <p className="text-xs text-muted-foreground truncate">
+            {getCityState(property)}
+          </p>
+        )}
         <div className="flex items-baseline justify-between gap-2 mt-2 flex-wrap">
           <p className="text-lg font-bold" data-testid={`property-price-${property.id}`}>
             {formatCurrency(getDisplayPrice(property))}
