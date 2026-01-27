@@ -71,38 +71,51 @@ const CoverPage = ({ propertyAddress, agent, preparedFor, baseUrl }: { propertyA
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.darkPage}>
-      <View style={styles.coverPagePro}>
-        <View style={styles.coverContentPro}>
-          <Image src={logoUrl} style={{ width: 300, height: 60, marginBottom: 20, borderRadius: 8 }} />
-          <Text style={styles.coverTitle}>Comparative Market Analysis</Text>
+      <View style={{ flex: 1, backgroundColor: COLORS.darkBackground, display: 'flex', flexDirection: 'column' }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}>
+          <Image src={logoUrl} style={{ width: 280, height: 56, marginBottom: 24, borderRadius: 4 }} />
+          <Text style={{ fontSize: 24, fontWeight: 700, color: COLORS.white, textAlign: 'center', marginBottom: 16 }}>
+            Comparative Market Analysis
+          </Text>
           {preparedFor && (
-            <Text style={styles.coverSubtitle}>Prepared for {preparedFor}</Text>
+            <Text style={{ fontSize: 12, color: COLORS.mediumGray, textAlign: 'center', marginBottom: 16 }}>
+              Prepared for {preparedFor}
+            </Text>
           )}
-          <View style={styles.coverAddressBox}>
-            <Text style={styles.coverAddressPro}>{streetAddress}</Text>
-            {cityState && <Text style={styles.coverCityPro}>{cityState}</Text>}
+          <View style={{ marginTop: 16, alignItems: 'center' }}>
+            <Text style={{ fontSize: 16, fontWeight: 600, color: COLORS.white, textAlign: 'center' }}>{streetAddress}</Text>
+            {cityState && <Text style={{ fontSize: 12, color: COLORS.mediumGray, textAlign: 'center', marginTop: 4 }}>{cityState}</Text>}
           </View>
-          <Text style={styles.coverDate}>{new Date().toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}</Text>
+          <Text style={{ fontSize: 10, color: COLORS.darkGray, marginTop: 20 }}>
+            {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+          </Text>
         </View>
-        <View style={styles.coverAgentSection}>
+        <View style={{ 
+          backgroundColor: COLORS.spyglassOrange, 
+          padding: 20, 
+          flexDirection: 'row', 
+          alignItems: 'center',
+          flexShrink: 0,
+        }}>
           {agentPhoto ? (
-            <Image src={agentPhoto} style={{ width: 70, height: 70, borderRadius: 35, marginRight: 16 }} />
+            <Image src={agentPhoto} style={{ width: 56, height: 56, borderRadius: 28, marginRight: 16 }} />
           ) : (
-            <View style={styles.coverAgentPhotoPlaceholder}>
-              <Text style={styles.coverAgentInitials}>{agentInitials}</Text>
+            <View style={{ 
+              width: 56, 
+              height: 56, 
+              borderRadius: 28, 
+              backgroundColor: 'rgba(255,255,255,0.2)', 
+              marginRight: 16, 
+              alignItems: 'center', 
+              justifyContent: 'center' 
+            }}>
+              <Text style={{ fontSize: 18, fontWeight: 700, color: COLORS.white }}>{agentInitials}</Text>
             </View>
           )}
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase' }}>Prepared by</Text>
-            <Text style={{ fontSize: 20, fontWeight: 700, color: COLORS.white, marginTop: 2 }}>{agentName}</Text>
-            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.9)', marginTop: 2 }}>REALTOR | {agent.company || 'Spyglass Realty'}</Text>
-            {agent.phone && (
-              <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>{agent.phone} | {agent.email}</Text>
-            )}
+            <Text style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Prepared by</Text>
+            <Text style={{ fontSize: 16, fontWeight: 700, color: COLORS.white, marginTop: 2 }}>{agentName}</Text>
+            <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.9)', marginTop: 2 }}>REALTOR | {agent.company || 'Spyglass Realty'}</Text>
           </View>
         </View>
       </View>

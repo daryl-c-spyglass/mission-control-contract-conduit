@@ -249,24 +249,49 @@ export function checkDataIssues({ comparables, agent, subjectProperty }: {
 }
 
 function CoverSlideContent({ address, agent }: { address: string; agent: AgentProfile }) {
+  const agentPhoto = agent?.photo || (agent as any)?.headshotUrl || (agent as any)?.photoUrl;
+  const agentInitials = agent?.name ? agent.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'A';
+  const addressParts = address.split(',');
+  const streetAddress = addressParts[0]?.trim() || address;
+  const cityState = addressParts.slice(1).join(',').trim();
+  
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center bg-[#222222] -m-6 p-6">
-      <div className="mb-4">
+    <div className="flex flex-col h-full bg-[#18181b] -m-6">
+      <div className="flex-1 flex flex-col items-center justify-center p-8">
         <img 
           src="/logos/LRE_SGR_White.png"
           alt="Spyglass Realty - Leading Real Estate Companies of the World"
-          className="w-full max-w-md h-auto mx-auto mb-6 rounded-lg"
+          className="w-full max-w-xs h-auto mx-auto mb-6 rounded-lg"
           onError={(e) => {
             e.currentTarget.style.display = 'none';
           }}
         />
-        <h1 className="text-2xl font-bold text-white">COMPARATIVE MARKET ANALYSIS</h1>
+        <h1 className="text-xl font-bold text-white text-center mb-2">Comparative Market Analysis</h1>
+        <div className="mt-4 text-center">
+          <p className="text-base font-semibold text-white">{streetAddress}</p>
+          {cityState && <p className="text-sm text-zinc-400">{cityState}</p>}
+        </div>
+        <p className="text-xs text-zinc-500 mt-4">
+          {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+        </p>
       </div>
-      <p className="text-lg text-zinc-300 mb-4">{address}</p>
-      <div className="mt-4 pt-4 border-t border-zinc-600">
-        <p className="text-sm text-zinc-400">Prepared by</p>
-        <p className="font-medium text-white">{agent?.name || 'Agent Name'}</p>
-        <p className="text-sm text-zinc-400">{agent?.company || 'Spyglass Realty'}</p>
+      <div className="bg-[#EF4923] p-4 flex items-center gap-3">
+        {agentPhoto ? (
+          <img 
+            src={agentPhoto}
+            alt={agent?.name || 'Agent'}
+            className="w-12 h-12 rounded-full object-cover border-2 border-white/30"
+          />
+        ) : (
+          <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+            <span className="text-white font-bold text-lg">{agentInitials}</span>
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] text-white/80 uppercase">Prepared by</p>
+          <p className="text-sm font-bold text-white truncate">{agent?.name || 'Agent'}</p>
+          <p className="text-[10px] text-white/90">REALTOR | {agent?.company || 'Spyglass Realty'}</p>
+        </div>
       </div>
     </div>
   );

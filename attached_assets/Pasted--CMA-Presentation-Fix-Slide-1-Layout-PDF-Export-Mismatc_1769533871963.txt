@@ -1,0 +1,419 @@
+# CMA Presentation — Fix Slide 1 Layout & PDF Export Mismatch
+
+## 🎯 Issues to Fix
+
+| Issue | Description |
+|-------|-------------|
+| 1 | **Slide 1 "Prepared by"** - Text is overlapping/cut off at bottom, needs to move higher inside the black container |
+| 2 | **PDF Export ≠ Preview** - The exported PDF looks different from the Preview modal |
+
+---
+
+## 🔧 FIX 1: Slide 1 (Cover Page) Layout
+
+### Current Problem:
+The "Prepared by" section is positioned too low and gets cut off or overlaps the footer area.
+
+### Visual of Current vs Fixed:
+
+**CURRENT (broken):**
+```
+┌─────────────────────────────────────────┐
+│  COMPARATIVE MARKET ANALYSIS            │
+│                                         │
+│  ┌─────────────────────────────────┐    │
+│  │  COMPARATIVE MARKET ANALYSIS    │    │
+│  │                                 │    │
+│  │  268 Chisholm TRL, Bastrop, TX  │    │
+│  │  ─────────────────              │    │
+│  │  Prepared by                    │    │  ← Cut off / too low
+│  └─────────────────────────────────┘    │
+│    [OVERLAPPING FOOTER]                 │  ← Problem!
+├─────────────────────────────────────────┤
+│ Spyglass Realty            Slide 1 of 44│
+└─────────────────────────────────────────┘
+```
+
+**FIXED:**
+```
+┌─────────────────────────────────────────┐
+│  COMPARATIVE MARKET ANALYSIS            │
+│                                         │
+│  ┌─────────────────────────────────┐    │
+│  │  [LRE + Spyglass Logo]          │    │
+│  │                                 │    │
+│  │  COMPARATIVE MARKET ANALYSIS    │    │
+│  │                                 │    │
+│  │  268 Chisholm TRL, Bastrop, TX  │    │
+│  │  ─────────────────              │    │
+│  │  Prepared by                    │    │  ← Inside container
+│  │  Agent Name                     │    │  ← Inside container
+│  │  Spyglass Realty                │    │  ← Inside container
+│  └─────────────────────────────────┘    │
+│                                         │  ← Proper spacing
+├─────────────────────────────────────────┤
+│ Spyglass Realty            Slide 1 of 44│
+└─────────────────────────────────────────┘
+```
+
+### Code Fix:
+
+```tsx
+// File: Find the Cover Page / Slide 1 component
+
+function CoverPageSlide({ 
+  address, 
+  agentName, 
+  agentCompany,
+  slideNumber = 1,
+  totalSlides = 44 
+}) {
+  return (
+    <div className="h-full flex flex-col bg-white">
+      {/* Header Label */}
+      <div className="px-6 pt-6">
+        <p className="text-sm font-semibold text-gray-800 tracking-wide">
+          COMPARATIVE MARKET ANALYSIS
+        </p>
+      </div>
+      
+      {/* Main Content - Use flex-1 and center content */}
+      <div className="flex-1 flex items-center justify-center px-6 py-4">
+        {/* Black Container - Contains ALL content including Prepared by */}
+        <div className="bg-[#222222] rounded-lg p-8 w-full max-w-lg text-center text-white">
+          {/* Logo */}
+          <img 
+            src="/logos/LRE_SGR_White.png"
+            alt="Spyglass Realty"
+            className="h-16 w-auto mx-auto mb-6"
+          />
+          
+          {/* Title */}
+          <h1 className="text-2xl font-bold mb-4">
+            COMPARATIVE MARKET ANALYSIS
+          </h1>
+          
+          {/* Address */}
+          <p className="text-lg text-gray-300 mb-6">
+            {address}
+          </p>
+          
+          {/* Divider */}
+          <div className="w-16 h-px bg-gray-500 mx-auto mb-6" />
+          
+          {/* Prepared By - INSIDE the container */}
+          <p className="text-sm text-gray-400 mb-2">Prepared by</p>
+          <p className="text-lg font-semibold">{agentName || 'Agent'}</p>
+          <p className="text-gray-400">{agentCompany || 'Spyglass Realty'}</p>
+        </div>
+      </div>
+      
+      {/* Footer - Fixed at bottom */}
+      <div className="px-6 pb-4">
+        <div className="flex justify-between items-center text-sm text-gray-400 pt-3 border-t border-gray-200">
+          <span>Spyglass Realty</span>
+          <span>Slide {slideNumber} of {totalSlides}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### Alternative Layout (White Background Version):
+
+If you prefer the current white background style with black text:
+
+```tsx
+function CoverPageSlideWhite({ address, agentName, agentCompany }) {
+  return (
+    <div className="h-full flex flex-col bg-white">
+      {/* Header */}
+      <div className="px-6 pt-6">
+        <p className="text-sm font-semibold text-gray-800 tracking-wide">
+          COMPARATIVE MARKET ANALYSIS
+        </p>
+      </div>
+      
+      {/* Main Content - Vertically centered with proper spacing */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6">
+        {/* Logo on black background */}
+        <div className="bg-[#222222] rounded-lg px-8 py-4 mb-8">
+          <img 
+            src="/logos/LRE_SGR_White.png"
+            alt="Spyglass Realty"
+            className="h-12 w-auto"
+          />
+        </div>
+        
+        {/* Title */}
+        <h1 className="text-3xl font-bold text-gray-900 mb-4 text-center">
+          COMPARATIVE MARKET ANALYSIS
+        </h1>
+        
+        {/* Address */}
+        <p className="text-xl text-gray-600 mb-8 text-center">
+          {address}
+        </p>
+        
+        {/* Divider */}
+        <div className="w-20 h-px bg-gray-300 mb-8" />
+        
+        {/* Prepared By - Ensure enough margin-bottom */}
+        <div className="text-center mb-8"> {/* Added mb-8 for spacing */}
+          <p className="text-sm text-gray-500 mb-2">Prepared by</p>
+          <p className="text-lg font-semibold text-gray-900">
+            {agentName || 'Agent'}
+          </p>
+          <p className="text-gray-600">{agentCompany || 'Spyglass Realty'}</p>
+        </div>
+      </div>
+      
+      {/* Footer */}
+      <div className="px-6 pb-4 mt-auto"> {/* mt-auto pushes to bottom */}
+        <div className="flex justify-between items-center text-sm text-gray-400 pt-3 border-t border-gray-200">
+          <span>Spyglass Realty</span>
+          <span>Slide 1 of 44</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### Key CSS Fixes:
+
+```css
+/* Ensure the main content doesn't overflow into footer */
+.slide-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden; /* Prevent overflow */
+  padding-bottom: 20px; /* Buffer before footer */
+}
+
+/* Footer always at bottom */
+.slide-footer {
+  margin-top: auto;
+  flex-shrink: 0; /* Don't compress the footer */
+}
+```
+
+---
+
+## 🔧 FIX 2: PDF Export Must Match Preview
+
+### Testing Instructions for Replit:
+
+**CRITICAL: Please perform this test to compare Preview vs PDF output:**
+
+1. **Generate a test PDF:**
+   ```bash
+   # Navigate to the CMA Presentation for property:
+   # 268 Chisholm TRL, Bastrop, TX (MLS# ACT7703651)
+   # Click "Download PDF" button
+   ```
+
+2. **Compare visually:**
+   - Open the Preview modal (Grid view)
+   - Open the downloaded PDF
+   - Compare slide-by-slide:
+     - Slide 1: Cover page layout
+     - Slide 2: Agent Resume
+     - Slide 3: Listing with Spyglass (YouTube link)
+     - Slides 4-10: Various content slides
+     - Slides 11-33: Static widget images
+     - Slides 34+: Comparable properties
+
+3. **Check for these common PDF issues:**
+   - [ ] Fonts rendering differently
+   - [ ] Images missing or wrong size
+   - [ ] Layout shifts (elements in wrong position)
+   - [ ] Colors appearing different
+   - [ ] Text cut off or overflowing
+   - [ ] Footer logo not rendering
+   - [ ] Logos missing or broken
+
+### PDF Export Component Check:
+
+```tsx
+// File: Find the PDF export component (likely using @react-pdf/renderer)
+
+// Ensure PDF uses SAME layout as Preview
+import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
+
+function CMAPresentationPdf({ slides, property, agent }) {
+  return (
+    <Document>
+      {/* Slide 1 - Cover Page */}
+      <Page size="LETTER" style={styles.page}>
+        <View style={styles.header}>
+          <Text style={styles.headerText}>COMPARATIVE MARKET ANALYSIS</Text>
+        </View>
+        
+        <View style={styles.content}>
+          {/* Logo */}
+          <Image 
+            src="/logos/LRE_SGR_White.png"
+            style={styles.logo}
+          />
+          
+          <Text style={styles.title}>COMPARATIVE MARKET ANALYSIS</Text>
+          <Text style={styles.address}>{property.address}</Text>
+          
+          <View style={styles.divider} />
+          
+          {/* Prepared By - Must match Preview position */}
+          <Text style={styles.preparedByLabel}>Prepared by</Text>
+          <Text style={styles.agentName}>{agent.name || 'Agent'}</Text>
+          <Text style={styles.agentCompany}>{agent.company || 'Spyglass Realty'}</Text>
+        </View>
+        
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Spyglass Realty</Text>
+          <Text style={styles.footerText}>Slide 1 of 44</Text>
+        </View>
+      </Page>
+      
+      {/* ... other slides ... */}
+    </Document>
+  );
+}
+
+const styles = StyleSheet.create({
+  page: {
+    padding: 40,
+    backgroundColor: 'white',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  header: {
+    marginBottom: 20,
+  },
+  headerText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    letterSpacing: 1,
+  },
+  content: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logo: {
+    width: 200,
+    height: 'auto',
+    marginBottom: 30,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  address: {
+    fontSize: 16,
+    color: '#4b5563',
+    textAlign: 'center',
+    marginBottom: 30,
+  },
+  divider: {
+    width: 60,
+    height: 1,
+    backgroundColor: '#d1d5db',
+    marginBottom: 30,
+  },
+  preparedByLabel: {
+    fontSize: 10,
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  agentName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  agentCompany: {
+    fontSize: 12,
+    color: '#4b5563',
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingTop: 12,
+    marginTop: 'auto',
+  },
+  footerText: {
+    fontSize: 10,
+    color: '#9ca3af',
+  },
+});
+```
+
+---
+
+## 📋 Quick Summary
+
+| Fix | What to Change |
+|-----|----------------|
+| **Slide 1 Layout** | Move "Prepared by" section higher, add proper spacing/margin before footer |
+| **PDF Export** | Ensure PDF rendering uses same layout calculations as Preview component |
+
+---
+
+## 🧪 Testing Checklist
+
+After implementing fixes:
+
+### Preview Modal:
+- [ ] Slide 1 "Prepared by" is fully visible
+- [ ] "Prepared by" doesn't overlap footer
+- [ ] Proper spacing between content and footer
+- [ ] Logo displays correctly
+
+### PDF Export:
+- [ ] Generate PDF and open it
+- [ ] Slide 1 matches Preview exactly
+- [ ] All 44 slides render correctly
+- [ ] No missing images or broken layouts
+- [ ] Footer appears on all slides
+- [ ] Text is not cut off anywhere
+
+### Side-by-Side Comparison:
+- [ ] Preview slide 1 = PDF page 1
+- [ ] Preview slide 2 = PDF page 2
+- [ ] (repeat for all slides)
+
+---
+
+## 📎 Attachments
+
+**User will attach:** The actual PDF export output for comparison
+
+**Please check the attached PDF against the Preview and report:**
+1. Which slides look different
+2. What specifically is different (layout, images, text, colors)
+3. Any missing elements
+
+---
+
+## 📱 Mobile Optimization
+
+- [ ] Cover page layout works on all screen sizes
+- [ ] "Prepared by" section doesn't get cut off on mobile
+- [ ] Footer stays at bottom on all devices
+
+---
+
+*Copy this entire prompt to Replit for Contract Conduit project.*
+*Attach the PDF export file for comparison testing.*
