@@ -64,7 +64,7 @@ export function autoSelectPhotos(photos: PhotoWithInsights[]): SelectedPhotos {
   };
 }
 
-export function autoSelectPhotosWithInfo(photos: PhotoWithInsights[]): PhotoSelectionResult {
+export function autoSelectPhotosWithInfo(photos: (PhotoWithInsights | string)[]): PhotoSelectionResult {
   if (!photos || photos.length === 0) {
     return {
       mainPhoto: null,
@@ -75,11 +75,19 @@ export function autoSelectPhotosWithInfo(photos: PhotoWithInsights[]): PhotoSele
     };
   }
 
-  const getPhotoUrl = (photo: PhotoWithInsights): string => {
+  const getPhotoUrl = (photo: PhotoWithInsights | string): string => {
+    // Handle string URLs directly (common format from Repliers API)
+    if (typeof photo === 'string') {
+      return photo;
+    }
     return photo.href || photo.highResUrl || photo.largeUrl || photo.url || photo.Uri || '';
   };
 
-  const getClassification = (photo: PhotoWithInsights): string => {
+  const getClassification = (photo: PhotoWithInsights | string): string => {
+    // String photos don't have classification metadata
+    if (typeof photo === 'string') {
+      return 'unknown';
+    }
     return (
       photo.imageInsights?.classification?.imageOf ||
       photo.ImageInsights?.Classification?.ImageOf ||
@@ -88,7 +96,11 @@ export function autoSelectPhotosWithInfo(photos: PhotoWithInsights[]): PhotoSele
     ).toLowerCase();
   };
 
-  const getQualityScore = (photo: PhotoWithInsights): number => {
+  const getQualityScore = (photo: PhotoWithInsights | string): number => {
+    // String photos don't have quality metadata - use default
+    if (typeof photo === 'string') {
+      return 50;
+    }
     return (
       photo.imageInsights?.quality?.score ||
       photo.ImageInsights?.Quality?.Score ||
@@ -182,54 +194,65 @@ export function autoSelectPhotosWithInfo(photos: PhotoWithInsights[]): PhotoSele
 
 export function formatPrice(price: number | string | null | undefined): string {
   if (price === null || price === undefined || price === '') return '';
-  const num = typeof price === 'string' ? parseFloat(price.replace(/[^0-9.]/g, '')) : price;
+  // Handle JSON-encoded strings (with extra quotes) and regular strings
+  let cleaned = typeof price === 'string' ? price.replace(/^["']|["']$/g, '').replace(/[^0-9.]/g, '') : String(price);
+  const num = parseFloat(cleaned);
   if (isNaN(num)) return '';
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(num);
+}
+
+// Helper to clean JSON-encoded string values
+function cleanJsonString(val: any): string {
+  if (val === null || val === undefined) return '';
+  const str = String(val);
+  return str.replace(/^["']|["']$/g, '').trim();
 }
 
 export function formatAddress(transaction: any, mlsData: any): string {
   // First check for pre-formatted full address fields (most reliable)
   const preformattedAddress = 
-    mlsData?.fullAddress ||
-    mlsData?.unparsedAddress ||
-    mlsData?.address?.fullAddress ||
-    mlsData?.address?.full ||
-    (typeof mlsData?.address === 'string' ? mlsData.address : null);
+    cleanJsonString(mlsData?.fullAddress) ||
+    cleanJsonString(mlsData?.unparsedAddress) ||
+    cleanJsonString(mlsData?.address?.fullAddress) ||
+    cleanJsonString(mlsData?.address?.full) ||
+    (typeof mlsData?.address === 'string' ? cleanJsonString(mlsData.address) : '');
   
-  if (preformattedAddress && typeof preformattedAddress === 'string' && preformattedAddress.trim()) {
+  if (preformattedAddress && preformattedAddress.trim()) {
     return preformattedAddress.toUpperCase().trim();
   }
   
   // Build address from component parts (Repliers API format)
   const addr = (typeof mlsData?.address === 'object' && mlsData?.address) ? mlsData.address : mlsData || {};
   
-  const streetNumber = mlsData?.streetNumber || addr?.streetNumber || transaction?.streetNumber || '';
-  const streetDirection = mlsData?.streetDirection || addr?.streetDirection || mlsData?.streetDir || addr?.streetDir || '';
-  const streetName = mlsData?.streetName || addr?.streetName || transaction?.streetName || '';
-  const streetSuffix = mlsData?.streetSuffix || addr?.streetSuffix || mlsData?.streetType || addr?.streetType || '';
-  const unitNumber = mlsData?.unitNumber || addr?.unitNumber || mlsData?.unit || addr?.unit || '';
+  const streetNumber = cleanJsonString(mlsData?.streetNumber || addr?.streetNumber || transaction?.streetNumber);
+  const streetDirection = cleanJsonString(mlsData?.streetDirection || addr?.streetDirection || mlsData?.streetDir || addr?.streetDir);
+  const streetName = cleanJsonString(mlsData?.streetName || addr?.streetName || transaction?.streetName);
+  const streetSuffix = cleanJsonString(mlsData?.streetSuffix || addr?.streetSuffix || mlsData?.streetType || addr?.streetType);
+  const unitNumber = cleanJsonString(mlsData?.unitNumber || addr?.unitNumber || mlsData?.unit || addr?.unit);
   
   // Build street address with direction (normalize direction abbreviations)
   const dirNormalized = streetDirection ? streetDirection.replace(/\./g, '').toUpperCase() : '';
   const streetParts = [streetNumber, dirNormalized, streetName, streetSuffix].filter(Boolean).join(' ');
   const fullStreet = unitNumber ? `${streetParts}, Unit ${unitNumber}` : streetParts;
 
-  const city = mlsData?.city || addr?.city || transaction?.city || '';
-  const state = mlsData?.state || addr?.state || mlsData?.stateOrProvince || addr?.stateOrProvince || mlsData?.province || transaction?.state || 'TX';
-  const zip = mlsData?.postalCode || addr?.postalCode || mlsData?.postalCodeNumber || addr?.postalCodeNumber || mlsData?.zip || transaction?.postalCode || '';
+  const city = cleanJsonString(mlsData?.city || addr?.city || transaction?.city);
+  const state = cleanJsonString(mlsData?.state || addr?.state || mlsData?.stateOrProvince || addr?.stateOrProvince || mlsData?.province || transaction?.state) || 'TX';
+  const zip = cleanJsonString(mlsData?.postalCode || addr?.postalCode || mlsData?.postalCodeNumber || addr?.postalCodeNumber || mlsData?.zip || transaction?.postalCode);
 
   if (fullStreet && city) {
     return `${fullStreet}, ${city}, ${state} ${zip}`.toUpperCase().trim();
   }
   
   // Final fallback to transaction address
-  const fallbackAddress = transaction?.propertyAddress || transaction?.address || '';
-  return typeof fallbackAddress === 'string' ? fallbackAddress.toUpperCase() : '';
+  const fallbackAddress = cleanJsonString(transaction?.propertyAddress || transaction?.address);
+  return fallbackAddress.toUpperCase();
 }
 
 export function formatNumber(num: number | string | null | undefined): string {
   if (num === null || num === undefined || num === '') return '';
-  const n = typeof num === 'string' ? parseFloat(num.replace(/[^0-9.]/g, '')) : num;
+  // Handle JSON-encoded strings (with extra quotes) and regular strings
+  let cleaned = typeof num === 'string' ? num.replace(/^["']|["']$/g, '').replace(/[^0-9.]/g, '') : String(num);
+  const n = parseFloat(cleaned);
   if (isNaN(n)) return '';
   return new Intl.NumberFormat('en-US').format(Math.round(n));
 }

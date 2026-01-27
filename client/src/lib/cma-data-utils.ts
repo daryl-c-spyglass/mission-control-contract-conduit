@@ -38,9 +38,11 @@ export function extractSqft(comp: any): number | null {
   for (const field of fields) {
     const value = comp?.[field];
     if (value != null) {
-      const num = typeof value === 'string' 
-        ? parseFloat(value.replace(/,/g, '')) 
-        : Number(value);
+      // Clean JSON-encoded strings (strip leading/trailing quotes) and commas
+      const cleaned = typeof value === 'string' 
+        ? value.replace(/^["']|["']$/g, '').replace(/,/g, '') 
+        : value;
+      const num = typeof cleaned === 'string' ? parseFloat(cleaned) : Number(cleaned);
       if (!isNaN(num) && num > 0) {
         return num;
       }
@@ -196,7 +198,9 @@ export function extractBeds(comp: any): number | string {
   for (const field of fields) {
     const value = comp?.[field];
     if (value != null) {
-      const num = typeof value === 'string' ? parseInt(value) : Number(value);
+      // Clean JSON-encoded strings (strip leading/trailing quotes)
+      const cleaned = typeof value === 'string' ? value.replace(/^["']|["']$/g, '') : value;
+      const num = typeof cleaned === 'string' ? parseInt(cleaned) : Number(cleaned);
       if (!isNaN(num) && num >= 0) {
         return num;
       }
@@ -214,7 +218,9 @@ export function extractBaths(comp: any): number | string {
   for (const field of fields) {
     const value = comp?.[field];
     if (value != null) {
-      const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+      // Clean JSON-encoded strings (strip leading/trailing quotes)
+      const cleaned = typeof value === 'string' ? value.replace(/^["']|["']$/g, '') : value;
+      const num = typeof cleaned === 'string' ? parseFloat(cleaned) : Number(cleaned);
       if (!isNaN(num) && num >= 0) {
         return num;
       }
