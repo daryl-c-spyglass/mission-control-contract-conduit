@@ -10,6 +10,7 @@ import {
   extractBeds,
   extractBaths,
   extractFullAddress,
+  getCityState,
   calculatePricePerSqft,
   calculatePricePerAcre,
   calculateCMAStats,
@@ -310,7 +311,7 @@ const PropertyDetailPage = ({
             <View style={{ marginTop: 12 }}>
               <Text style={{ fontSize: 16, fontWeight: 700, color: COLORS.textPrimary }}>{streetOnly}</Text>
               <Text style={{ fontSize: 10, color: COLORS.textSecondary, marginTop: 2 }}>
-                {[property.city, property.state, property.zipCode].filter(Boolean).join(', ') || 'Austin, TX'}
+                {getCityState(property) || 'Austin, TX'}
               </Text>
             </View>
           </View>

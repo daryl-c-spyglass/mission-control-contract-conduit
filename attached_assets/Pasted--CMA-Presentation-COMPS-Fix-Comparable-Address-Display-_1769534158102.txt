@@ -1,0 +1,513 @@
+# CMA Presentation COMPS — Fix Comparable Address Display
+
+## 🚨 Issue
+
+**Subject Property:** Shows full address correctly
+```
+268 Chisholm TRL
+Bastrop, TX
+$499,999
+```
+
+**Comparable Properties:** Missing city/state, shows just comma
+```
+2205 3rd ST
+,                    ← Missing city/state!
+$1,950,000
+```
+
+---
+
+## 🔍 Root Cause
+
+The comparable properties are likely using different field names or the city/state fields are:
+1. Empty/null in the data
+2. Named differently than expected
+3. Nested in a different object structure
+
+---
+
+## 🔧 STEP 1: Diagnostic — Check Address Fields
+
+Add logging to see what address fields exist on comparables:
+
+```typescript
+// Add to the COMPS component where comparables are used
+
+useEffect(() => {
+  if (comparables?.length > 0) {
+    console.group('🏠 Address Field Diagnostic');
+    
+    comparables.forEach((comp, index) => {
+      console.log(`\n--- Comparable ${index + 1} ---`);
+      console.log('Address-related fields:', {
+        // Street address variations
+        address: comp.address,
+        streetAddress: comp.streetAddress,
+        street_address: comp.street_address,
+        streetNumber: comp.streetNumber,
+        streetName: comp.streetName,
+        streetSuffix: comp.streetSuffix,
+        
+        // City variations
+        city: comp.city,
+        cityName: comp.cityName,
+        city_name: comp.city_name,
+        
+        // State variations
+        state: comp.state,
+        stateCode: comp.stateCode,
+        state_code: comp.state_code,
+        stateOrProvince: comp.stateOrProvince,
+        
+        // Combined address
+        fullAddress: comp.fullAddress,
+        full_address: comp.full_address,
+        formattedAddress: comp.formattedAddress,
+        
+        // Nested address object
+        'address.city': comp.address?.city,
+        'address.state': comp.address?.state,
+        'location.city': comp.location?.city,
+        'location.state': comp.location?.state,
+      });
+      
+      // Show all keys to find the right ones
+      console.log('All available keys:', Object.keys(comp));
+    });
+    
+    console.groupEnd();
+  }
+}, [comparables]);
+```
+
+---
+
+## 🔧 STEP 2: Create Safe Address Parser
+
+```typescript
+// File: lib/address-utils.ts
+
+/**
+ * Safely extract street address from property
+ */
+export function getStreetAddress(property: any): string {
+  // Try various field names for street address
+  const street = 
+    property.streetAddress ||
+    property.street_address ||
+    property.address?.street ||
+    property.address?.streetAddress ||
+    // Build from components
+    buildStreetAddress(property) ||
+    property.address ||
+    'Address unavailable';
+  
+  return String(street).trim();
+}
+
+/**
+ * Build street address from components (streetNumber, streetName, streetSuffix)
+ */
+function buildStreetAddress(property: any): string | null {
+  const number = property.streetNumber || property.street_number || '';
+  const name = property.streetName || property.street_name || '';
+  const suffix = property.streetSuffix || property.street_suffix || '';
+  
+  if (name) {
+    return [number, name, suffix].filter(Boolean).join(' ').trim();
+  }
+  return null;
+}
+
+/**
+ * Safely extract city from property
+ */
+export function getCity(property: any): string {
+  return (
+    property.city ||
+    property.cityName ||
+    property.city_name ||
+    property.address?.city ||
+    property.location?.city ||
+    property.municipality ||
+    ''
+  ).trim();
+}
+
+/**
+ * Safely extract state from property
+ */
+export function getState(property: any): string {
+  return (
+    property.state ||
+    property.stateCode ||
+    property.state_code ||
+    property.stateOrProvince ||
+    property.address?.state ||
+    property.location?.state ||
+    property.province ||
+    ''
+  ).trim();
+}
+
+/**
+ * Get formatted city, state string
+ */
+export function getCityState(property: any): string {
+  const city = getCity(property);
+  const state = getState(property);
+  
+  if (city && state) {
+    return `${city}, ${state}`;
+  }
+  if (city) {
+    return city;
+  }
+  if (state) {
+    return state;
+  }
+  
+  // Fallback: try to extract from full address
+  const fullAddress = property.fullAddress || property.full_address || property.formattedAddress;
+  if (fullAddress) {
+    // Try to extract city, state from "123 Main St, Austin, TX 78701"
+    const parts = fullAddress.split(',');
+    if (parts.length >= 2) {
+      return parts.slice(1).join(',').trim();
+    }
+  }
+  
+  return ''; // Return empty instead of showing just comma
+}
+
+/**
+ * Get full formatted address
+ */
+export function getFullAddress(property: any): string {
+  const street = getStreetAddress(property);
+  const cityState = getCityState(property);
+  
+  if (street && cityState) {
+    return `${street}, ${cityState}`;
+  }
+  return street || cityState || 'Address unavailable';
+}
+```
+
+---
+
+## 🔧 STEP 3: Update Property Card Component
+
+```tsx
+// File: Find the property card component used in COMPS Grid view
+
+import { getStreetAddress, getCityState, getPropertyPrice, getPricePerSqft, formatPrice, formatPricePerSqft } from '@/lib/utils';
+
+interface PropertyCardProps {
+  property: any;
+  isSubject?: boolean;
+  onClick?: () => void;
+}
+
+function PropertyCard({ property, isSubject = false, onClick }: PropertyCardProps) {
+  // Use safe getters for all fields
+  const streetAddress = getStreetAddress(property);
+  const cityState = getCityState(property);
+  const price = getPropertyPrice(property);
+  const pricePerSqft = getPricePerSqft(property);
+  
+  return (
+    <div 
+      onClick={onClick}
+      className={cn(
+        "rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow cursor-pointer",
+        isSubject && "ring-2 ring-orange-500"
+      )}
+    >
+      {/* Property Image */}
+      <div className="relative aspect-[4/3]">
+        <img 
+          src={property.photos?.[0] || property.images?.[0]?.url || '/placeholder-property.jpg'}
+          alt={streetAddress}
+          className="w-full h-full object-cover"
+        />
+        
+        {/* Status Badge */}
+        <div className="absolute top-3 left-3">
+          <span className={cn(
+            "px-2 py-1 rounded text-xs font-semibold text-white",
+            isSubject && "bg-orange-500",
+            property.status?.toLowerCase() === 'closed' && "bg-red-500",
+            property.status?.toLowerCase() === 'active' && "bg-green-500",
+            property.status?.toLowerCase() === 'pending' && "bg-yellow-500",
+          )}>
+            {isSubject ? 'Subject' : property.status}
+          </span>
+        </div>
+      </div>
+      
+      {/* Property Info */}
+      <div className="p-4 bg-white">
+        {/* Street Address */}
+        <h3 className="font-semibold text-gray-900 truncate">
+          {streetAddress}
+        </h3>
+        
+        {/* City, State - USE SAFE GETTER */}
+        <p className="text-sm text-gray-500">
+          {cityState || 'Location unavailable'}
+        </p>
+        
+        {/* Price Row */}
+        <div className="flex items-baseline justify-between mt-2">
+          <span className="text-xl font-bold text-gray-900">
+            {formatPrice(price)}
+          </span>
+          <span className="text-sm text-gray-500">
+            {formatPricePerSqft(pricePerSqft)}
+          </span>
+        </div>
+        
+        {/* Details Row */}
+        <div className="flex items-center gap-3 mt-2 text-sm text-gray-600">
+          <span className="flex items-center gap-1">
+            <span>🛏️</span>
+            {property.beds || property.bedrooms || '-'}
+          </span>
+          <span className="flex items-center gap-1">
+            <span>🚿</span>
+            {property.baths || property.bathrooms || '-'}
+          </span>
+          <span className="flex items-center gap-1">
+            <span>📐</span>
+            {property.sqft || property.livingArea ? 
+              `${(property.sqft || property.livingArea).toLocaleString()}` : '-'}
+          </span>
+        </div>
+        
+        {/* Days on Market */}
+        <p className="text-xs text-gray-400 mt-2">
+          {property.daysOnMarket ?? 0} days on market
+        </p>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 STEP 4: Update List View Row
+
+```tsx
+// File: Find the list view row component
+
+function PropertyListRow({ property, isSubject, onClick }: PropertyCardProps) {
+  const streetAddress = getStreetAddress(property);
+  const cityState = getCityState(property);
+  const price = getPropertyPrice(property);
+  const pricePerSqft = getPricePerSqft(property);
+  
+  return (
+    <div 
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-4 p-4 rounded-lg hover:bg-gray-50 cursor-pointer",
+        isSubject && "bg-orange-50 border-2 border-orange-200"
+      )}
+    >
+      {/* Thumbnail */}
+      <img 
+        src={property.photos?.[0] || '/placeholder.jpg'}
+        alt={streetAddress}
+        className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
+      />
+      
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        {/* Status Badge */}
+        <span className={cn(
+          "inline-block px-2 py-0.5 rounded text-xs font-semibold text-white mb-1",
+          isSubject && "bg-orange-500",
+          property.status?.toLowerCase() === 'closed' && "bg-red-500",
+        )}>
+          {isSubject ? 'Subject' : property.status}
+        </span>
+        
+        {/* Address */}
+        <h3 className="font-semibold text-gray-900 truncate">
+          {streetAddress}
+        </h3>
+        
+        {/* City, State - FIXED */}
+        <p className="text-sm text-gray-500">
+          {cityState || 'Location unavailable'}
+        </p>
+        
+        {/* Price & Details */}
+        <div className="flex items-center gap-4 mt-1">
+          <span className="font-bold">{formatPrice(price)}</span>
+          <span className="text-sm text-gray-500">{formatPricePerSqft(pricePerSqft)}</span>
+          <span className="text-sm text-gray-500">
+            {property.beds || '-'} beds • {property.baths || '-'} baths • 
+            {property.sqft?.toLocaleString() || '-'} sqft
+          </span>
+          <span className="text-sm text-gray-500">
+            {property.daysOnMarket ?? 0} DOM
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 STEP 5: Update Table View
+
+```tsx
+// File: Find the table view component
+
+function CompsTableView({ comparables, subjectProperty }) {
+  return (
+    <table className="w-full">
+      <thead>
+        <tr className="border-b text-left">
+          <th className="py-3 px-2">Address</th>
+          <th className="py-3 px-2">Status</th>
+          <th className="py-3 px-2 text-right">Price</th>
+          <th className="py-3 px-2 text-right">$/SqFt</th>
+          <th className="py-3 px-2 text-center">Beds</th>
+          <th className="py-3 px-2 text-center">Baths</th>
+          <th className="py-3 px-2 text-right">SqFt</th>
+          <th className="py-3 px-2 text-right">DOM</th>
+        </tr>
+      </thead>
+      <tbody>
+        {/* Subject Property Row */}
+        {subjectProperty && (
+          <tr className="bg-orange-50 border-2 border-orange-200">
+            <td className="py-3 px-2">
+              <div>
+                <p className="font-semibold">{getStreetAddress(subjectProperty)}</p>
+                <p className="text-sm text-gray-500">{getCityState(subjectProperty)}</p>
+              </div>
+            </td>
+            <td className="py-3 px-2">
+              <span className="bg-orange-500 text-white px-2 py-0.5 rounded text-xs">
+                Subject
+              </span>
+            </td>
+            <td className="py-3 px-2 text-right">{formatPrice(getPropertyPrice(subjectProperty))}</td>
+            <td className="py-3 px-2 text-right">{formatPricePerSqft(getPricePerSqft(subjectProperty))}</td>
+            <td className="py-3 px-2 text-center">{subjectProperty.beds || '-'}</td>
+            <td className="py-3 px-2 text-center">{subjectProperty.baths || '-'}</td>
+            <td className="py-3 px-2 text-right">{subjectProperty.sqft?.toLocaleString() || '-'}</td>
+            <td className="py-3 px-2 text-right">{subjectProperty.daysOnMarket ?? '-'}</td>
+          </tr>
+        )}
+        
+        {/* Comparable Properties */}
+        {comparables.map((comp, index) => (
+          <tr key={index} className="border-b hover:bg-gray-50">
+            <td className="py-3 px-2">
+              <div>
+                <p className="font-medium">{getStreetAddress(comp)}</p>
+                <p className="text-sm text-gray-500">{getCityState(comp)}</p>
+              </div>
+            </td>
+            <td className="py-3 px-2">
+              <span className={cn(
+                "px-2 py-0.5 rounded text-xs font-medium text-white",
+                comp.status?.toLowerCase() === 'closed' && "bg-red-500",
+                comp.status?.toLowerCase() === 'active' && "bg-green-500",
+              )}>
+                {comp.status}
+              </span>
+            </td>
+            <td className="py-3 px-2 text-right">{formatPrice(getPropertyPrice(comp))}</td>
+            <td className="py-3 px-2 text-right">{formatPricePerSqft(getPricePerSqft(comp))}</td>
+            <td className="py-3 px-2 text-center">{comp.beds || comp.bedrooms || '-'}</td>
+            <td className="py-3 px-2 text-center">{comp.baths || comp.bathrooms || '-'}</td>
+            <td className="py-3 px-2 text-right">{(comp.sqft || comp.livingArea)?.toLocaleString() || '-'}</td>
+            <td className="py-3 px-2 text-right">{comp.daysOnMarket ?? 0}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+```
+
+---
+
+## 📋 Quick Summary
+
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| City/State shows just `,` | Using `city, state` but fields are empty/null | Use safe `getCityState()` helper that checks multiple field names |
+| Subject works, comps don't | Subject might have different data structure | Use same helper for both |
+
+---
+
+## 🔍 Possible Field Names from Repliers API
+
+```typescript
+// Repliers API typically returns address fields like:
+{
+  streetNumber: "2205",
+  streetName: "3rd",
+  streetSuffix: "ST",
+  streetAddress: "2205 3rd ST",  // Sometimes combined
+  city: "Bastrop",
+  state: "TX",
+  stateOrProvince: "TX",
+  postalCode: "78602",
+  // Or nested:
+  address: {
+    street: "2205 3rd ST",
+    city: "Bastrop",
+    state: "TX"
+  }
+}
+```
+
+Run the diagnostic first to see which fields actually contain the city/state data!
+
+---
+
+## ✅ Verification Checklist
+
+After implementing fixes:
+
+### Grid View
+- [ ] Subject property shows full address with city, state
+- [ ] ALL comparable properties show full address with city, state
+- [ ] No properties show just a comma
+
+### List View  
+- [ ] All addresses display correctly
+- [ ] City, state visible for all properties
+
+### Table View
+- [ ] Address column shows street + city/state
+- [ ] No missing location data
+
+### Edge Cases
+- [ ] Properties with missing city still show state
+- [ ] Properties with missing state still show city
+- [ ] Properties with both missing show "Location unavailable"
+
+---
+
+## 📱 Mobile Optimization
+
+- [ ] Address text doesn't overflow on small screens
+- [ ] City/state text readable at mobile sizes
+- [ ] Text truncates gracefully if too long
+
+---
+
+*Copy this entire prompt to Replit for Contract Conduit project.*

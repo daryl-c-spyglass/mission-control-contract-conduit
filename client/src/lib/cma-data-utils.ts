@@ -248,6 +248,78 @@ export function calculatePricePerAcre(comp: any): number | null {
 }
 
 /**
+ * Safely extract city from a property
+ * Handles various field name formats from MLS/Repliers API
+ */
+export function extractCity(comp: any): string {
+  if (!comp) return '';
+  
+  // Try direct field names
+  const city = comp?.city || 
+    comp?.cityName || 
+    comp?.city_name ||
+    comp?.address?.city ||
+    comp?.location?.city ||
+    comp?.municipality ||
+    '';
+    
+  return String(city).trim();
+}
+
+/**
+ * Safely extract state from a property
+ * Handles various field name formats from MLS/Repliers API
+ */
+export function extractState(comp: any): string {
+  if (!comp) return '';
+  
+  const state = comp?.state || 
+    comp?.stateCode || 
+    comp?.state_code ||
+    comp?.stateOrProvince ||
+    comp?.address?.state ||
+    comp?.location?.state ||
+    comp?.province ||
+    '';
+    
+  return String(state).trim();
+}
+
+/**
+ * Get formatted city, state string
+ * Returns empty string if both are missing to avoid showing just a comma
+ */
+export function getCityState(comp: any): string {
+  if (!comp) return '';
+  
+  const city = extractCity(comp);
+  const state = extractState(comp);
+  
+  if (city && state) {
+    return `${city}, ${state}`;
+  }
+  if (city) {
+    return city;
+  }
+  if (state) {
+    return state;
+  }
+  
+  // Fallback: try to extract from full/formatted address
+  const fullAddress = comp?.fullAddress || comp?.full_address || comp?.formattedAddress || comp?.unparsedAddress;
+  if (fullAddress && typeof fullAddress === 'string') {
+    // Try to extract city, state from "123 Main St, Austin, TX 78701"
+    const parts = fullAddress.split(',');
+    if (parts.length >= 2) {
+      // Get everything after the street address
+      return parts.slice(1).join(',').trim();
+    }
+  }
+  
+  return '';
+}
+
+/**
  * Build full address string
  */
 export function extractFullAddress(comp: any): string {

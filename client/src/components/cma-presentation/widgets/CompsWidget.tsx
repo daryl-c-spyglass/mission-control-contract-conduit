@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3, Map as MapIcon, TrendingUp, List, LayoutGrid, Table2, Bed, Bath, Square, Clock, MapPin } from 'lucide-react';
 import { CMAMap } from '@/components/cma-map';
 import { PropertyDetailModal } from './PropertyDetailModal';
-import { extractPrice, extractSqft, extractDOM, calculatePricePerSqft } from '@/lib/cma-data-utils';
+import { extractPrice, extractSqft, extractDOM, calculatePricePerSqft, getCityState } from '@/lib/cma-data-utils';
 import type { CmaProperty } from '../types';
 import type { Property } from '@shared/schema';
 
@@ -223,7 +223,7 @@ function PropertyCard({ property, isSubject = false, onClick }: { property: CmaP
       <div className="p-4">
         <p className="font-medium text-sm truncate" data-testid={`property-address-${property.id}`}>{property.address}</p>
         <p className="text-xs text-muted-foreground truncate">
-          {property.city}, {property.state}
+          {getCityState(property) || 'Location unavailable'}
         </p>
         <div className="flex items-baseline justify-between gap-2 mt-2 flex-wrap">
           <p className="text-lg font-bold" data-testid={`property-price-${property.id}`}>
