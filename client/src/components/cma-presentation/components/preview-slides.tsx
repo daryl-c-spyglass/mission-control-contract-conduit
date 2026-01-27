@@ -1,0 +1,509 @@
+import { 
+  extractPrice, 
+  extractSqft, 
+  extractDOM, 
+  extractFullAddress,
+  extractBeds,
+  extractBaths,
+  calculateCMAStats,
+  formatPrice,
+  formatNumber,
+  normalizeStatus,
+  getStatusColor,
+} from '@/lib/cma-data-utils';
+import { Home, MapPin, Calendar, Ruler, DollarSign, Clock, User, Building, FileText, Play, MessageSquare, TrendingUp, Link } from 'lucide-react';
+import type { AgentProfile, CmaProperty } from '../types';
+import { WIDGETS, LISTING_ACTION_PLAN_TEXT, MARKETING_TEXT } from '../constants/widgets';
+
+export interface PreviewSlide {
+  type: string;
+  title: string;
+  content: React.ReactNode;
+  slideNumber: number;
+  totalSlides: number;
+  hasIssue: boolean;
+  issueMessage?: string;
+}
+
+interface GeneratePreviewSlidesParams {
+  propertyAddress: string;
+  comparables: CmaProperty[];
+  agent: AgentProfile;
+  subjectProperty?: CmaProperty;
+  averageDaysOnMarket?: number;
+  suggestedListPrice?: number | null;
+  avgPricePerAcre?: number | null;
+}
+
+export function generatePreviewSlides({
+  propertyAddress,
+  comparables,
+  agent,
+  subjectProperty,
+  averageDaysOnMarket,
+  suggestedListPrice,
+  avgPricePerAcre,
+}: GeneratePreviewSlidesParams): PreviewSlide[] {
+  const slides: PreviewSlide[] = [];
+  const stats = calculateCMAStats(comparables);
+  const address = propertyAddress || 'Property Address';
+
+  slides.push({
+    type: 'cover',
+    title: 'COMPARATIVE MARKET ANALYSIS',
+    content: (
+      <CoverSlideContent 
+        address={address}
+        agent={agent}
+      />
+    ),
+    slideNumber: 1,
+    totalSlides: 0,
+    hasIssue: !agent?.name,
+    issueMessage: !agent?.name ? 'Agent name not configured' : undefined,
+  });
+
+  WIDGETS.forEach((widget) => {
+    let slideContent: React.ReactNode;
+    let hasIssue = false;
+    let issueMessage: string | undefined;
+
+    switch (widget.id) {
+      case 'agent_resume':
+        hasIssue = !agent?.name || !agent?.bio;
+        issueMessage = hasIssue ? 'Agent profile incomplete' : undefined;
+        slideContent = <AgentResumeContent agent={agent} />;
+        break;
+
+      case 'listing_with_spyglass':
+        slideContent = <VideoSlideContent title={widget.title} />;
+        break;
+
+      case 'client_testimonials':
+        slideContent = <TestimonialsContent />;
+        break;
+
+      case 'marketing':
+        slideContent = <MarketingContent />;
+        break;
+
+      case 'comps':
+        hasIssue = comparables.length === 0 || stats.avgPrice === null;
+        issueMessage = comparables.length === 0 
+          ? 'No comparable properties loaded' 
+          : stats.avgPrice === null 
+            ? 'Price data not available' 
+            : undefined;
+        slideContent = <CompsContent comparables={comparables} stats={stats} />;
+        break;
+
+      case 'time_to_sell':
+        hasIssue = stats.avgDOM === null || stats.avgDOM === 0;
+        issueMessage = hasIssue ? 'Days on market data not available' : undefined;
+        slideContent = <TimeToSellContent stats={stats} averageDaysOnMarket={averageDaysOnMarket} />;
+        break;
+
+      case 'suggested_list_price':
+        hasIssue = stats.avgPrice === null && !suggestedListPrice;
+        issueMessage = hasIssue ? 'Cannot calculate suggested price without comparable prices' : undefined;
+        slideContent = <SuggestedPriceContent stats={stats} suggestedListPrice={suggestedListPrice} />;
+        break;
+
+      case 'listing_action_plan':
+        slideContent = <ListingActionPlanContent />;
+        break;
+
+      case 'spyglass_resources':
+        slideContent = <SpyglassResourcesContent />;
+        break;
+
+      case 'average_price_acre':
+        hasIssue = avgPricePerAcre === null || avgPricePerAcre === undefined;
+        issueMessage = hasIssue ? 'Acreage data not available' : undefined;
+        slideContent = <AveragePriceAcreContent avgPricePerAcre={avgPricePerAcre} stats={stats} />;
+        break;
+
+      default:
+        if (widget.type === 'static') {
+          slideContent = <StaticSlideContent title={widget.title} widgetNumber={widget.number} />;
+        } else {
+          slideContent = <GenericSlideContent title={widget.title} />;
+        }
+    }
+
+    slides.push({
+      type: widget.type,
+      title: widget.title,
+      content: slideContent,
+      slideNumber: slides.length + 1,
+      totalSlides: 0,
+      hasIssue,
+      issueMessage,
+    });
+  });
+
+  const top3Comparables = comparables.slice(0, 3);
+  top3Comparables.forEach((comp, index) => {
+    const price = extractPrice(comp);
+    const hasPhoto = (comp.photos && comp.photos.length > 0) || (comp as any).primaryPhoto;
+    
+    slides.push({
+      type: 'propertyDetails',
+      title: `PROPERTY DETAILS - ${extractFullAddress(comp) || `Comparable ${index + 1}`}`,
+      content: <PropertyDetailsContent property={comp} />,
+      slideNumber: slides.length + 1,
+      totalSlides: 0,
+      hasIssue: price === null || !hasPhoto,
+      issueMessage: price === null 
+        ? 'Price not available' 
+        : !hasPhoto 
+          ? 'Photo not available' 
+          : undefined,
+    });
+  });
+
+  const totalSlides = slides.length;
+  slides.forEach((slide, index) => {
+    slide.slideNumber = index + 1;
+    slide.totalSlides = totalSlides;
+  });
+
+  return slides;
+}
+
+export function checkDataIssues({ comparables, agent, subjectProperty }: {
+  comparables: CmaProperty[];
+  agent: AgentProfile;
+  subjectProperty?: CmaProperty;
+}): string[] {
+  const issues: string[] = [];
+
+  if (!agent?.name) issues.push('Agent name not configured');
+  if (!agent?.photo) issues.push('Agent photo not uploaded');
+  if (!agent?.bio) issues.push('Agent bio not filled in');
+
+  if (subjectProperty) {
+    const subjectAddress = extractFullAddress(subjectProperty);
+    if (!subjectAddress || subjectAddress === 'Address unavailable') {
+      issues.push('Subject property address not available');
+    }
+    const subjectPrice = extractPrice(subjectProperty);
+    if (subjectPrice === null) {
+      issues.push('Subject property price not available');
+    }
+    const subjectSqft = extractSqft(subjectProperty);
+    if (subjectSqft === null || subjectSqft === 0) {
+      issues.push('Subject property square footage not available');
+    }
+    const hasSubjectPhotos = (subjectProperty.photos && subjectProperty.photos.length > 0) || (subjectProperty as any).primaryPhoto;
+    if (!hasSubjectPhotos) {
+      issues.push('Subject property photos not available');
+    }
+  }
+
+  if (!comparables || comparables.length === 0) {
+    issues.push('No comparable properties loaded');
+  } else {
+    const withPrice = comparables.filter(c => extractPrice(c) !== null);
+    if (withPrice.length === 0) {
+      issues.push('Price data missing for all comparables');
+    } else if (withPrice.length < comparables.length) {
+      issues.push(`Price data missing for ${comparables.length - withPrice.length} comparables`);
+    }
+
+    const withPhotos = comparables.filter(c => (c.photos && c.photos.length > 0) || (c as any).primaryPhoto);
+    if (withPhotos.length < comparables.length) {
+      issues.push(`Photos missing for ${comparables.length - withPhotos.length} comparables`);
+    }
+
+    const withCoords = comparables.filter(c => 
+      (c.latitude && c.longitude) || 
+      ((c as any).map?.latitude && (c as any).map?.longitude)
+    );
+    if (withCoords.length === 0) {
+      issues.push('Location coordinates missing - map will not display');
+    }
+
+    const withDOM = comparables.filter(c => {
+      const dom = extractDOM(c);
+      return dom !== null && dom > 0;
+    });
+    if (withDOM.length === 0) {
+      issues.push('Days on market data not available');
+    }
+
+    const withSqft = comparables.filter(c => {
+      const sqft = extractSqft(c);
+      return sqft !== null && sqft > 0;
+    });
+    if (withSqft.length < comparables.length) {
+      issues.push(`Square footage missing for ${comparables.length - withSqft.length} comparables`);
+    }
+  }
+
+  return issues;
+}
+
+function CoverSlideContent({ address, agent }: { address: string; agent: AgentProfile }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center">
+      <div className="mb-4">
+        <div className="w-16 h-16 bg-[#EF4923] rounded-full flex items-center justify-center mx-auto mb-2">
+          <Home className="w-8 h-8 text-white" />
+        </div>
+        <h1 className="text-2xl font-bold text-[#222222]">COMPARATIVE MARKET ANALYSIS</h1>
+      </div>
+      <p className="text-lg text-zinc-700 mb-4">{address}</p>
+      <div className="mt-4 pt-4 border-t border-zinc-200">
+        <p className="text-sm text-zinc-600">Prepared by</p>
+        <p className="font-medium text-[#222222]">{agent?.name || 'Agent Name'}</p>
+        <p className="text-sm text-zinc-500">{agent?.company || 'Spyglass Realty'}</p>
+      </div>
+    </div>
+  );
+}
+
+function AgentResumeContent({ agent }: { agent: AgentProfile }) {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-start gap-4 mb-4">
+        <div className="w-16 h-16 bg-zinc-200 rounded-full flex items-center justify-center">
+          <User className="w-8 h-8 text-zinc-400" />
+        </div>
+        <div>
+          <h2 className="font-bold text-lg text-[#222222]">{agent?.name || 'Agent Name'}</h2>
+          <p className="text-sm text-zinc-600">{agent?.company || 'Spyglass Realty'}</p>
+          {agent?.phone && <p className="text-sm text-zinc-500">{agent.phone}</p>}
+          {agent?.email && <p className="text-sm text-zinc-500">{agent.email}</p>}
+        </div>
+      </div>
+      <div className="flex-1">
+        <h3 className="font-medium text-sm mb-2">About</h3>
+        <p className="text-sm text-zinc-600 leading-relaxed">
+          {agent?.bio || 'Agent bio will appear here. Update your profile to add your professional biography.'}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function VideoSlideContent({ title }: { title: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center bg-zinc-100 rounded">
+      <Play className="w-12 h-12 text-[#EF4923] mb-4" />
+      <p className="font-medium text-zinc-700">{title}</p>
+      <p className="text-sm text-zinc-500 mt-2">Video presentation</p>
+    </div>
+  );
+}
+
+function TestimonialsContent() {
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center">
+      <MessageSquare className="w-12 h-12 text-[#EF4923] mb-4" />
+      <p className="font-medium text-zinc-700">CLIENT TESTIMONIALS</p>
+      <p className="text-sm text-zinc-500 mt-2">What clients say about working with Spyglass Realty</p>
+    </div>
+  );
+}
+
+function MarketingContent() {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-2 mb-4">
+        <TrendingUp className="w-6 h-6 text-[#EF4923]" />
+        <h2 className="font-bold text-lg text-[#222222]">MARKETING</h2>
+      </div>
+      <p className="text-sm text-zinc-600 leading-relaxed">{MARKETING_TEXT}</p>
+    </div>
+  );
+}
+
+function CompsContent({ comparables, stats }: { 
+  comparables: CmaProperty[]; 
+  stats: ReturnType<typeof calculateCMAStats>;
+}) {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="grid grid-cols-3 gap-4 mb-4">
+        <div className="bg-zinc-50 p-3 rounded text-center">
+          <p className="text-lg font-bold text-[#EF4923]">{comparables.length}</p>
+          <p className="text-xs text-zinc-500">Properties</p>
+        </div>
+        <div className="bg-zinc-50 p-3 rounded text-center">
+          <p className="text-lg font-bold text-[#222222]">{stats.avgPrice ? formatPrice(stats.avgPrice) : 'N/A'}</p>
+          <p className="text-xs text-zinc-500">Avg Price</p>
+        </div>
+        <div className="bg-zinc-50 p-3 rounded text-center">
+          <p className="text-lg font-bold text-[#222222]">{stats.avgDOM !== null ? `${Math.round(stats.avgDOM)} days` : 'N/A'}</p>
+          <p className="text-xs text-zinc-500">Avg DOM</p>
+        </div>
+      </div>
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left py-1">Address</th>
+              <th className="text-right py-1">Price</th>
+              <th className="text-right py-1">Sq Ft</th>
+              <th className="text-right py-1">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {comparables.slice(0, 5).map((comp, i) => (
+              <tr key={i} className="border-b border-zinc-100">
+                <td className="py-1 truncate max-w-[120px]">{extractFullAddress(comp) || 'Unknown'}</td>
+                <td className="text-right py-1">{formatPrice(extractPrice(comp))}</td>
+                <td className="text-right py-1">{formatNumber(extractSqft(comp))}</td>
+                <td className="text-right py-1">
+                  <span 
+                    className="px-1 py-0.5 rounded text-[10px]"
+                    style={{ 
+                      backgroundColor: getStatusColor(normalizeStatus(comp.status)) + '20',
+                      color: getStatusColor(normalizeStatus(comp.status))
+                    }}
+                  >
+                    {normalizeStatus(comp.status)}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {comparables.length > 5 && (
+          <p className="text-xs text-zinc-400 mt-2 text-center">
+            + {comparables.length - 5} more properties
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TimeToSellContent({ stats, averageDaysOnMarket }: { 
+  stats: ReturnType<typeof calculateCMAStats>;
+  averageDaysOnMarket?: number;
+}) {
+  const avgDays = averageDaysOnMarket ?? stats.avgDOM ?? 0;
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center">
+      <Clock className="w-12 h-12 text-[#EF4923] mb-4" />
+      <p className="text-3xl font-bold text-[#222222]">{Math.round(avgDays)}</p>
+      <p className="text-lg text-zinc-600">Average Days on Market</p>
+      <p className="text-sm text-zinc-400 mt-4">
+        Based on {stats.avgDOM !== null ? 'comparable properties' : 'market data'}
+      </p>
+    </div>
+  );
+}
+
+function SuggestedPriceContent({ stats, suggestedListPrice }: { 
+  stats: ReturnType<typeof calculateCMAStats>;
+  suggestedListPrice?: number | null;
+}) {
+  const price = suggestedListPrice ?? stats.avgPrice;
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center">
+      <DollarSign className="w-12 h-12 text-[#EF4923] mb-4" />
+      <p className="text-3xl font-bold text-[#222222]">{price ? formatPrice(price) : 'N/A'}</p>
+      <p className="text-lg text-zinc-600">Suggested List Price</p>
+      {stats.priceRange && stats.priceRange !== 'N/A' && (
+        <p className="text-sm text-zinc-400 mt-4">
+          Range: {stats.priceRange}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ListingActionPlanContent() {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-2 mb-4">
+        <Calendar className="w-6 h-6 text-[#EF4923]" />
+        <h2 className="font-bold text-lg text-[#222222]">LISTING ACTION PLAN</h2>
+      </div>
+      <p className="text-sm text-zinc-600 leading-relaxed whitespace-pre-line">{LISTING_ACTION_PLAN_TEXT}</p>
+    </div>
+  );
+}
+
+function SpyglassResourcesContent() {
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center">
+      <Link className="w-12 h-12 text-[#EF4923] mb-4" />
+      <p className="font-medium text-zinc-700">SPYGLASS RESOURCES AND LINKS</p>
+      <p className="text-sm text-zinc-500 mt-2">Agent-managed resources for CMA presentations</p>
+    </div>
+  );
+}
+
+function AveragePriceAcreContent({ avgPricePerAcre, stats }: { 
+  avgPricePerAcre?: number | null;
+  stats: ReturnType<typeof calculateCMAStats>;
+}) {
+  const pricePerAcre = avgPricePerAcre ?? stats.avgPricePerAcre;
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center">
+      <Ruler className="w-12 h-12 text-[#EF4923] mb-4" />
+      <p className="text-3xl font-bold text-[#222222]">{pricePerAcre ? formatPrice(pricePerAcre) : 'N/A'}</p>
+      <p className="text-lg text-zinc-600">Average Price per Acre</p>
+    </div>
+  );
+}
+
+function StaticSlideContent({ title, widgetNumber }: { title: string; widgetNumber: number }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center bg-zinc-50 rounded">
+      <FileText className="w-12 h-12 text-zinc-400 mb-4" />
+      <p className="font-medium text-zinc-700">{title}</p>
+      <p className="text-xs text-zinc-400 mt-4">Marketing slide #{widgetNumber}</p>
+    </div>
+  );
+}
+
+function GenericSlideContent({ title }: { title: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center bg-zinc-50 rounded">
+      <FileText className="w-12 h-12 text-zinc-400 mb-4" />
+      <p className="font-medium text-zinc-700">{title}</p>
+    </div>
+  );
+}
+
+function PropertyDetailsContent({ property }: { property: CmaProperty }) {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="bg-zinc-100 h-24 rounded mb-3 flex items-center justify-center">
+        <Building className="w-8 h-8 text-zinc-400" />
+      </div>
+      <h3 className="font-medium text-sm mb-2">{extractFullAddress(property) || 'Property Address'}</h3>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div>
+          <span className="text-zinc-500">Price:</span>
+          <span className="ml-1 font-medium">{formatPrice(extractPrice(property))}</span>
+        </div>
+        <div>
+          <span className="text-zinc-500">Sq Ft:</span>
+          <span className="ml-1 font-medium">{formatNumber(extractSqft(property))}</span>
+        </div>
+        <div>
+          <span className="text-zinc-500">Beds:</span>
+          <span className="ml-1 font-medium">{extractBeds(property) ?? 'N/A'}</span>
+        </div>
+        <div>
+          <span className="text-zinc-500">Baths:</span>
+          <span className="ml-1 font-medium">{extractBaths(property) ?? 'N/A'}</span>
+        </div>
+        <div>
+          <span className="text-zinc-500">DOM:</span>
+          <span className="ml-1 font-medium">{extractDOM(property) ?? 'N/A'}</span>
+        </div>
+        <div>
+          <span className="text-zinc-500">Status:</span>
+          <span className="ml-1 font-medium">{normalizeStatus(property.status)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}

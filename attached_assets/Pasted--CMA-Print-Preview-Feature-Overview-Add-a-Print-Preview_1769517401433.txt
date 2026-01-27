@@ -1,0 +1,1051 @@
+# CMA Print Preview Feature
+
+## Overview
+
+Add a Print Preview modal that displays all CMA slides before allowing PDF download. This lets users:
+1. Review all content before generating PDF
+2. Identify any missing data or errors
+3. Make adjustments if needed
+4. Download PDF only when satisfied
+
+---
+
+## User Flow
+
+```
+Current:
+[Download PDF] → PDF generates → Download (errors discovered after)
+
+New:
+[Preview & Download] → Preview Modal opens → Review slides → [Download PDF] → PDF generates
+```
+
+---
+
+## Implementation
+
+### Step 1: Create Preview Modal Component
+
+**File: `client/src/components/cma/CmaPrintPreview.tsx`**
+
+```tsx
+import { useState, useRef } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  X, 
+  Download, 
+  ChevronLeft, 
+  ChevronRight, 
+  ZoomIn, 
+  ZoomOut,
+  Grid,
+  Maximize2,
+  AlertTriangle,
+  CheckCircle,
+  Loader2
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface CmaPrintPreviewProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onDownload: () => Promise<void>;
+  transaction: any;
+  comparables: any[];
+  agent: any;
+  enabledSections: string[];
+}
+
+export function CmaPrintPreview({
+  isOpen,
+  onClose,
+  onDownload,
+  transaction,
+  comparables,
+  agent,
+  enabledSections,
+}: CmaPrintPreviewProps) {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [viewMode, setViewMode] = useState<'single' | 'grid'>('single');
+  const [zoom, setZoom] = useState(100);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Generate slides based on enabled sections
+  const slides = generatePreviewSlides({
+    transaction,
+    comparables,
+    agent,
+    enabledSections,
+  });
+
+  // Check for data issues
+  const dataIssues = checkDataIssues({ transaction, comparables, agent });
+
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    try {
+      await onDownload();
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const goToSlide = (index: number) => {
+    setCurrentSlide(Math.max(0, Math.min(index, slides.length - 1)));
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] p-0 bg-zinc-900">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+          <div>
+            <DialogTitle className="text-xl font-semibold text-white">
+              Print Preview
+            </DialogTitle>
+            <p className="text-sm text-zinc-400 mt-1">
+              {transaction?.address} • {slides.length} slides
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-8 px-3",
+                  viewMode === 'single' && "bg-zinc-700"
+                )}
+                onClick={() => setViewMode('single')}
+              >
+                <Maximize2 className="w-4 h-4 mr-2" />
+                Single
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-8 px-3",
+                  viewMode === 'grid' && "bg-zinc-700"
+                )}
+                onClick={() => setViewMode('grid')}
+              >
+                <Grid className="w-4 h-4 mr-2" />
+                Grid
+              </Button>
+            </div>
+
+            {/* Zoom Controls (Single View) */}
+            {viewMode === 'single' && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setZoom(Math.max(50, zoom - 25))}
+                  disabled={zoom <= 50}
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </Button>
+                <span className="text-sm text-zinc-400 w-12 text-center">{zoom}%</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setZoom(Math.min(150, zoom + 25))}
+                  disabled={zoom >= 150}
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+
+            {/* Download Button */}
+            <Button
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="bg-[#EF4923] hover:bg-[#d63d1a] text-white"
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 mr-2" />
+                  Download PDF
+                </>
+              )}
+            </Button>
+
+            {/* Close Button */}
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Data Issues Warning */}
+        {dataIssues.length > 0 && (
+          <div className="mx-6 mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-yellow-500">
+                  {dataIssues.length} potential issue{dataIssues.length > 1 ? 's' : ''} detected
+                </p>
+                <ul className="mt-1 text-xs text-yellow-400/80 space-y-1">
+                  {dataIssues.slice(0, 3).map((issue, i) => (
+                    <li key={i}>• {issue}</li>
+                  ))}
+                  {dataIssues.length > 3 && (
+                    <li>• ...and {dataIssues.length - 3} more</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Content Area */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Slide Thumbnails Sidebar */}
+          <div className="w-48 border-r border-zinc-800 flex-shrink-0">
+            <ScrollArea className="h-full">
+              <div className="p-3 space-y-2">
+                {slides.map((slide, index) => (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      setCurrentSlide(index);
+                      setViewMode('single');
+                    }}
+                    className={cn(
+                      "w-full aspect-[8.5/11] rounded-lg border-2 overflow-hidden transition-all",
+                      currentSlide === index && viewMode === 'single'
+                        ? "border-[#EF4923] ring-2 ring-[#EF4923]/30"
+                        : "border-zinc-700 hover:border-zinc-600"
+                    )}
+                  >
+                    <div className="w-full h-full bg-white p-2 flex flex-col">
+                      <div className="text-[6px] font-bold text-zinc-900 truncate">
+                        {slide.title}
+                      </div>
+                      <div className="flex-1 flex items-center justify-center">
+                        {slide.hasIssue ? (
+                          <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                        ) : (
+                          <div className="w-full h-full bg-zinc-100 rounded" />
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+
+          {/* Main Preview Area */}
+          <div className="flex-1 bg-zinc-950 overflow-hidden">
+            {viewMode === 'single' ? (
+              /* Single Slide View */
+              <div className="h-full flex flex-col">
+                {/* Slide Content */}
+                <div 
+                  className="flex-1 flex items-center justify-center p-8 overflow-auto"
+                  ref={scrollRef}
+                >
+                  <div 
+                    className="bg-white shadow-2xl transition-transform"
+                    style={{
+                      width: `${8.5 * zoom * 0.8}px`,
+                      minHeight: `${11 * zoom * 0.8}px`,
+                      transform: `scale(${zoom / 100})`,
+                      transformOrigin: 'center center',
+                    }}
+                  >
+                    <SlidePreview slide={slides[currentSlide]} />
+                  </div>
+                </div>
+
+                {/* Navigation */}
+                <div className="flex items-center justify-center gap-4 py-4 border-t border-zinc-800">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => goToSlide(currentSlide - 1)}
+                    disabled={currentSlide === 0}
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </Button>
+                  <span className="text-sm text-zinc-400">
+                    Slide {currentSlide + 1} of {slides.length}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => goToSlide(currentSlide + 1)}
+                    disabled={currentSlide === slides.length - 1}
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              /* Grid View */
+              <ScrollArea className="h-full">
+                <div className="p-6 grid grid-cols-3 gap-6">
+                  {slides.map((slide, index) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        setCurrentSlide(index);
+                        setViewMode('single');
+                      }}
+                      className="aspect-[8.5/11] bg-white rounded-lg shadow-lg overflow-hidden hover:ring-2 hover:ring-[#EF4923] transition-all"
+                    >
+                      <SlidePreview slide={slide} compact />
+                    </button>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Individual Slide Preview Component
+function SlidePreview({ slide, compact = false }: { slide: PreviewSlide; compact?: boolean }) {
+  const { type, title, content, hasIssue, issueMessage } = slide;
+
+  return (
+    <div className={cn(
+      "w-full h-full flex flex-col",
+      compact ? "p-2" : "p-6"
+    )}>
+      {/* Slide Header */}
+      <div className={cn(
+        "border-b border-zinc-200 pb-2 mb-4",
+        compact && "pb-1 mb-2"
+      )}>
+        <h3 className={cn(
+          "font-bold text-zinc-900",
+          compact ? "text-[8px]" : "text-lg"
+        )}>
+          {title}
+        </h3>
+      </div>
+
+      {/* Issue Warning */}
+      {hasIssue && !compact && (
+        <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-700 flex items-center gap-2">
+          <AlertTriangle className="w-3 h-3" />
+          {issueMessage}
+        </div>
+      )}
+
+      {/* Slide Content */}
+      <div className="flex-1">
+        {content}
+      </div>
+
+      {/* Footer */}
+      <div className={cn(
+        "border-t border-zinc-200 pt-2 mt-4 flex justify-between text-zinc-500",
+        compact ? "text-[6px] pt-1 mt-2" : "text-xs"
+      )}>
+        <span>Spyglass Realty</span>
+        <span>Slide {slide.slideNumber} of {slide.totalSlides}</span>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+### Step 2: Slide Generation Logic
+
+**File: `client/src/components/cma/preview-slides.tsx`**
+
+```tsx
+import { 
+  extractPrice, 
+  extractSqft, 
+  extractDOM, 
+  extractFullAddress,
+  calculateCMAStats,
+  formatPrice,
+  formatPriceK 
+} from '@/lib/cma-data-utils';
+
+export interface PreviewSlide {
+  type: string;
+  title: string;
+  content: React.ReactNode;
+  slideNumber: number;
+  totalSlides: number;
+  hasIssue: boolean;
+  issueMessage?: string;
+}
+
+interface GeneratePreviewSlidesParams {
+  transaction: any;
+  comparables: any[];
+  agent: any;
+  enabledSections: string[];
+}
+
+export function generatePreviewSlides({
+  transaction,
+  comparables,
+  agent,
+  enabledSections,
+}: GeneratePreviewSlidesParams): PreviewSlide[] {
+  const slides: PreviewSlide[] = [];
+  const stats = calculateCMAStats(comparables);
+  const address = transaction?.address || 'Property Address';
+
+  // Helper to check if section is enabled
+  const isEnabled = (key: string) => enabledSections.includes(key);
+
+  // 1. Cover Page (always included)
+  slides.push({
+    type: 'cover',
+    title: 'COMPARATIVE MARKET ANALYSIS',
+    content: (
+      <CoverSlideContent 
+        address={address}
+        mlsNumber={transaction?.mlsNumber}
+        agent={agent}
+      />
+    ),
+    slideNumber: 1,
+    totalSlides: 0, // Will be updated
+    hasIssue: !agent?.name,
+    issueMessage: 'Agent name not configured',
+  });
+
+  // 2. Agent Resume
+  if (isEnabled('agentResume')) {
+    slides.push({
+      type: 'agentResume',
+      title: 'AGENT RESUME',
+      content: <AgentResumeContent agent={agent} />,
+      slideNumber: slides.length + 1,
+      totalSlides: 0,
+      hasIssue: !agent?.name || !agent?.bio,
+      issueMessage: 'Agent profile incomplete',
+    });
+  }
+
+  // 3. Listing With Spyglass
+  if (isEnabled('listingWithSpyglass')) {
+    slides.push({
+      type: 'listingWithSpyglass',
+      title: 'LISTING WITH SPYGLASS REALTY',
+      content: <ListingWithSpyglassContent />,
+      slideNumber: slides.length + 1,
+      totalSlides: 0,
+      hasIssue: false,
+    });
+  }
+
+  // 4. Client Testimonials
+  if (isEnabled('clientTestimonials')) {
+    slides.push({
+      type: 'clientTestimonials',
+      title: 'CLIENT TESTIMONIALS',
+      content: <ClientTestimonialsContent />,
+      slideNumber: slides.length + 1,
+      totalSlides: 0,
+      hasIssue: false,
+    });
+  }
+
+  // 5. Marketing Overview
+  if (isEnabled('marketing')) {
+    slides.push({
+      type: 'marketing',
+      title: 'MARKETING',
+      content: <MarketingOverviewContent />,
+      slideNumber: slides.length + 1,
+      totalSlides: 0,
+      hasIssue: false,
+    });
+  }
+
+  // 6. Summary of Comparables
+  if (isEnabled('summaryComparables')) {
+    const priceIssue = stats.avgPrice === null;
+    slides.push({
+      type: 'summaryComparables',
+      title: 'COMPARABLE PROPERTIES',
+      content: (
+        <SummaryComparablesContent 
+          comparables={comparables}
+          stats={stats}
+        />
+      ),
+      slideNumber: slides.length + 1,
+      totalSlides: 0,
+      hasIssue: priceIssue,
+      issueMessage: priceIssue ? 'Price data not available for comparables' : undefined,
+    });
+  }
+
+  // 7. Map of All Listings
+  if (isEnabled('mapAllListings')) {
+    const hasCoords = comparables.some(c => c.latitude && c.longitude);
+    slides.push({
+      type: 'mapAllListings',
+      title: 'MAP OF ALL LISTINGS',
+      content: (
+        <MapPreviewContent 
+          subject={transaction}
+          comparables={comparables}
+        />
+      ),
+      slideNumber: slides.length + 1,
+      totalSlides: 0,
+      hasIssue: !hasCoords,
+      issueMessage: !hasCoords ? 'Location coordinates not available' : undefined,
+    });
+  }
+
+  // 8. Time to Sell
+  if (isEnabled('timeToSell')) {
+    const domIssue = stats.avgDOM === null || stats.avgDOM === 0;
+    slides.push({
+      type: 'timeToSell',
+      title: 'TIME TO SELL',
+      content: <TimeToSellContent comparables={comparables} stats={stats} />,
+      slideNumber: slides.length + 1,
+      totalSlides: 0,
+      hasIssue: domIssue,
+      issueMessage: domIssue ? 'Days on market data not available' : undefined,
+    });
+  }
+
+  // 9. Suggested List Price
+  if (isEnabled('suggestedPrice')) {
+    const priceIssue = stats.avgPrice === null;
+    slides.push({
+      type: 'suggestedPrice',
+      title: 'SUGGESTED LIST PRICE',
+      content: (
+        <SuggestedPriceContent 
+          stats={stats}
+          transaction={transaction}
+        />
+      ),
+      slideNumber: slides.length + 1,
+      totalSlides: 0,
+      hasIssue: priceIssue,
+      issueMessage: priceIssue ? 'Cannot calculate suggested price without comparable prices' : undefined,
+    });
+  }
+
+  // 10-20+. Static Marketing Slides
+  const staticSlides = [
+    { key: 'homeSellingSystem', title: 'HOME SELLING SYSTEM' },
+    { key: 'ourProvenApproach', title: 'OUR PROVEN APPROACH' },
+    { key: 'seoDigitalMarketing', title: 'SEO & DIGITAL MARKETING' },
+    { key: 'googleMetaAds', title: 'GOOGLE + META ADS' },
+    { key: 'professionalVideography', title: 'PROFESSIONAL VIDEOGRAPHY' },
+    { key: 'why4kVideo', title: 'WHY 4K VIDEO' },
+    { key: 'exampleVideos', title: 'EXAMPLE VIDEOS' },
+    { key: 'aerialPhotography', title: 'AERIAL PHOTOGRAPHY' },
+    { key: 'inHouseDesignTeam', title: 'IN-HOUSE DESIGN TEAM' },
+    { key: 'printFlyers', title: 'PRINT & FLYERS' },
+    { key: 'customPropertyPage', title: 'CUSTOM PROPERTY PAGE' },
+    { key: 'globalMarketingReach', title: 'GLOBAL MARKETING REACH' },
+    { key: 'leadingreNetwork', title: 'LEADINGRE NETWORK STRENGTH' },
+    { key: 'featuredPropertyProgram', title: 'FEATURED PROPERTY PROGRAM' },
+    { key: 'zillowMarketingTools', title: 'ZILLOW MARKETING TOOLS' },
+    { key: 'zillowShowcase', title: 'ZILLOW SHOWCASE LISTINGS' },
+    { key: 'openHouseProcess', title: 'OPEN HOUSE PROCESS' },
+    { key: 'pricingStrategy', title: 'PRICING STRATEGY' },
+    { key: 'listingPrice', title: 'LISTING PRICE' },
+    { key: 'marketingTimeline', title: 'MARKETING TIMELINE' },
+    { key: 'selectMoveProgram', title: 'SELECT MOVE PROGRAM' },
+  ];
+
+  staticSlides.forEach(({ key, title }) => {
+    if (isEnabled(key)) {
+      slides.push({
+        type: 'static',
+        title,
+        content: <StaticSlideContent title={title} />,
+        slideNumber: slides.length + 1,
+        totalSlides: 0,
+        hasIssue: false,
+      });
+    }
+  });
+
+  // Property Details Slides
+  if (isEnabled('propertyDetails')) {
+    comparables.forEach((comp, index) => {
+      const price = extractPrice(comp);
+      const hasPhoto = comp.photos?.length > 0 || comp.primaryPhoto;
+      
+      slides.push({
+        type: 'propertyDetails',
+        title: 'PROPERTY DETAILS',
+        content: <PropertyDetailsContent property={comp} />,
+        slideNumber: slides.length + 1,
+        totalSlides: 0,
+        hasIssue: price === null || !hasPhoto,
+        issueMessage: price === null 
+          ? 'Price not available' 
+          : !hasPhoto 
+            ? 'Photo not available' 
+            : undefined,
+      });
+    });
+  }
+
+  // Thank You Slide (always last)
+  slides.push({
+    type: 'thankYou',
+    title: 'THANK YOU',
+    content: <ThankYouContent agent={agent} />,
+    slideNumber: slides.length + 1,
+    totalSlides: 0,
+    hasIssue: false,
+  });
+
+  // Update total slides count
+  const totalSlides = slides.length;
+  slides.forEach((slide, index) => {
+    slide.slideNumber = index + 1;
+    slide.totalSlides = totalSlides;
+  });
+
+  return slides;
+}
+
+// Data issue checker
+export function checkDataIssues({ transaction, comparables, agent }: {
+  transaction: any;
+  comparables: any[];
+  agent: any;
+}): string[] {
+  const issues: string[] = [];
+
+  // Agent issues
+  if (!agent?.name) issues.push('Agent name not configured');
+  if (!agent?.photoUrl) issues.push('Agent photo not uploaded');
+
+  // Comparable issues
+  if (!comparables || comparables.length === 0) {
+    issues.push('No comparable properties loaded');
+  } else {
+    const withPrice = comparables.filter(c => extractPrice(c) !== null);
+    if (withPrice.length === 0) {
+      issues.push('Price data missing for all comparables');
+    } else if (withPrice.length < comparables.length) {
+      issues.push(`Price data missing for ${comparables.length - withPrice.length} comparables`);
+    }
+
+    const withPhotos = comparables.filter(c => c.photos?.length > 0 || c.primaryPhoto);
+    if (withPhotos.length < comparables.length) {
+      issues.push(`Photos missing for ${comparables.length - withPhotos.length} comparables`);
+    }
+
+    const withCoords = comparables.filter(c => c.latitude && c.longitude);
+    if (withCoords.length === 0) {
+      issues.push('Location coordinates missing - map will not display');
+    }
+
+    const withDOM = comparables.filter(c => extractDOM(c) !== null && extractDOM(c)! > 0);
+    if (withDOM.length === 0) {
+      issues.push('Days on market data not available');
+    }
+  }
+
+  return issues;
+}
+```
+
+---
+
+### Step 3: Individual Slide Content Components
+
+**File: `client/src/components/cma/preview-slide-content.tsx`**
+
+```tsx
+import { extractPrice, extractSqft, extractDOM, extractFullAddress, formatPrice } from '@/lib/cma-data-utils';
+import { Home, MapPin, Calendar, Ruler, DollarSign, Clock, AlertTriangle } from 'lucide-react';
+
+// Cover Slide
+export function CoverSlideContent({ address, mlsNumber, agent }: any) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center">
+      <img 
+        src="/assets/spyglass-logo.png" 
+        alt="Spyglass Realty" 
+        className="w-32 mb-8"
+      />
+      <h1 className="text-2xl font-bold text-zinc-900 mb-2">
+        Comparative Market Analysis
+      </h1>
+      <p className="text-lg text-zinc-700 mb-1">{address}</p>
+      {mlsNumber && (
+        <p className="text-sm text-zinc-500">MLS# {mlsNumber}</p>
+      )}
+      <div className="mt-8 text-center">
+        <p className="text-sm text-zinc-500">Prepared by</p>
+        {agent?.photoUrl && (
+          <img 
+            src={agent.photoUrl} 
+            alt={agent.name} 
+            className="w-16 h-16 rounded-full mx-auto my-3 object-cover"
+          />
+        )}
+        <p className="font-semibold text-zinc-900">{agent?.name || 'Agent'}</p>
+        <p className="text-sm text-zinc-500">Spyglass Realty</p>
+      </div>
+    </div>
+  );
+}
+
+// Summary of Comparables
+export function SummaryComparablesContent({ comparables, stats }: any) {
+  return (
+    <div className="space-y-4">
+      {/* Stats Row */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="text-center p-3 bg-orange-50 rounded-lg">
+          <p className="text-xs text-zinc-500">Average Price</p>
+          <p className="text-lg font-bold text-[#EF4923]">
+            {stats.avgPrice ? formatPrice(stats.avgPrice) : 'N/A'}
+          </p>
+        </div>
+        <div className="text-center p-3 bg-orange-50 rounded-lg">
+          <p className="text-xs text-zinc-500">Avg Price/Sq Ft</p>
+          <p className="text-lg font-bold text-[#EF4923]">
+            {stats.avgPricePerSqft ? `$${stats.avgPricePerSqft}` : 'N/A'}
+          </p>
+        </div>
+        <div className="text-center p-3 bg-orange-50 rounded-lg">
+          <p className="text-xs text-zinc-500">Avg Days on Market</p>
+          <p className="text-lg font-bold text-[#EF4923]">
+            {stats.avgDOM !== null ? `${stats.avgDOM} days` : 'N/A'}
+          </p>
+        </div>
+      </div>
+
+      {/* Comparables Table */}
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-zinc-200">
+            <th className="text-left py-2">Address</th>
+            <th className="text-right py-2">Price</th>
+            <th className="text-center py-2">Bed/Bath</th>
+            <th className="text-right py-2">Sq Ft</th>
+            <th className="text-right py-2">$/SqFt</th>
+            <th className="text-center py-2">Status</th>
+            <th className="text-right py-2">DOM</th>
+          </tr>
+        </thead>
+        <tbody>
+          {comparables.slice(0, 6).map((comp: any, i: number) => {
+            const price = extractPrice(comp);
+            const sqft = extractSqft(comp);
+            const dom = extractDOM(comp);
+            const pricePerSqft = price && sqft ? Math.round(price / sqft) : null;
+            
+            return (
+              <tr key={i} className="border-b border-zinc-100">
+                <td className="py-2 truncate max-w-[150px]">
+                  {comp.address || extractFullAddress(comp)}
+                </td>
+                <td className="text-right py-2">
+                  {price ? formatPrice(price) : <span className="text-red-500">N/A</span>}
+                </td>
+                <td className="text-center py-2">
+                  {comp.beds || '-'}/{comp.baths || '-'}
+                </td>
+                <td className="text-right py-2">
+                  {sqft?.toLocaleString() || '-'}
+                </td>
+                <td className="text-right py-2">
+                  {pricePerSqft ? `$${pricePerSqft}` : <span className="text-red-500">N/A</span>}
+                </td>
+                <td className="text-center py-2">
+                  <span className={`px-2 py-0.5 rounded text-[10px] ${
+                    comp.status?.toLowerCase() === 'closed' 
+                      ? 'bg-green-100 text-green-700' 
+                      : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {comp.status || 'Unknown'}
+                  </span>
+                </td>
+                <td className="text-right py-2">
+                  {dom !== null ? dom : <span className="text-red-500">-</span>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      
+      {comparables.length > 6 && (
+        <p className="text-xs text-zinc-500 text-center">
+          +{comparables.length - 6} more properties
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Map Preview (placeholder for static image)
+export function MapPreviewContent({ subject, comparables }: any) {
+  const hasCoords = comparables.some((c: any) => c.latitude && c.longitude);
+  
+  if (!hasCoords) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-zinc-400">
+        <MapPin className="w-12 h-12 mb-3" />
+        <p className="text-sm">Location data not available</p>
+        <p className="text-xs">Map will not be included in PDF</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col items-center justify-center bg-zinc-100 rounded-lg">
+      <MapPin className="w-12 h-12 text-[#EF4923] mb-3" />
+      <p className="text-sm text-zinc-600">Map Preview</p>
+      <p className="text-xs text-zinc-500">
+        {comparables.length} properties will be displayed
+      </p>
+    </div>
+  );
+}
+
+// Property Details
+export function PropertyDetailsContent({ property }: { property: any }) {
+  const price = extractPrice(property);
+  const sqft = extractSqft(property);
+  const dom = extractDOM(property);
+  const pricePerSqft = price && sqft ? Math.round(price / sqft) : null;
+  const address = property.address || extractFullAddress(property);
+
+  return (
+    <div className="flex gap-4">
+      {/* Photo */}
+      <div className="w-1/2">
+        {property.photos?.[0] || property.primaryPhoto ? (
+          <img 
+            src={property.photos?.[0] || property.primaryPhoto}
+            alt={address}
+            className="w-full h-48 object-cover rounded-lg"
+          />
+        ) : (
+          <div className="w-full h-48 bg-zinc-100 rounded-lg flex items-center justify-center">
+            <Home className="w-12 h-12 text-zinc-300" />
+          </div>
+        )}
+      </div>
+
+      {/* Details */}
+      <div className="w-1/2 space-y-3">
+        <h3 className="font-bold text-zinc-900">{address}</h3>
+        <p className="text-xl font-bold text-[#EF4923]">
+          {price ? formatPrice(price) : <span className="text-red-500">Price N/A</span>}
+        </p>
+        <span className={`inline-block px-2 py-1 rounded text-xs ${
+          property.status?.toLowerCase() === 'closed' 
+            ? 'bg-green-100 text-green-700' 
+            : 'bg-blue-100 text-blue-700'
+        }`}>
+          {property.status || 'Unknown'}
+        </span>
+        
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="flex items-center gap-1">
+            <span className="text-zinc-500">Beds:</span>
+            <span className="font-medium">{property.beds || '-'}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-zinc-500">Baths:</span>
+            <span className="font-medium">{property.baths || '-'}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-zinc-500">Sq Ft:</span>
+            <span className="font-medium">{sqft?.toLocaleString() || '-'}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-zinc-500">$/SqFt:</span>
+            <span className="font-medium">
+              {pricePerSqft ? `$${pricePerSqft}` : '-'}
+            </span>
+          </div>
+          <div className="flex items-center gap-1 col-span-2">
+            <span className="text-zinc-500">Days on Market:</span>
+            <span className="font-medium">{dom ?? '-'}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Static Slide Placeholder
+export function StaticSlideContent({ title }: { title: string }) {
+  return (
+    <div className="h-full flex flex-col items-center justify-center">
+      <img 
+        src="/assets/spyglass-logo.png" 
+        alt="Spyglass" 
+        className="w-24 mb-4 opacity-50"
+      />
+      <p className="text-zinc-400 text-sm">Marketing content slide</p>
+    </div>
+  );
+}
+
+// Thank You Slide
+export function ThankYouContent({ agent }: { agent: any }) {
+  return (
+    <div className="h-full flex flex-col items-center justify-center text-center">
+      <h2 className="text-2xl font-bold text-zinc-900 mb-2">Thank You</h2>
+      <p className="text-zinc-500 mb-8">for considering Spyglass Realty</p>
+      
+      {agent?.photoUrl && (
+        <img 
+          src={agent.photoUrl} 
+          alt={agent.name} 
+          className="w-20 h-20 rounded-full mb-4 object-cover"
+        />
+      )}
+      <p className="font-semibold text-zinc-900">{agent?.name || 'Your Agent'}</p>
+      <p className="text-sm text-zinc-500">Spyglass Realty</p>
+      {agent?.phone && <p className="text-sm text-zinc-500">{agent.phone}</p>}
+      {agent?.email && <p className="text-sm text-zinc-500">{agent.email}</p>}
+    </div>
+  );
+}
+```
+
+---
+
+### Step 4: Update the CMA Page to Use Preview
+
+**In your CMA page/component, replace the direct download button:**
+
+```tsx
+import { useState } from 'react';
+import { CmaPrintPreview } from '@/components/cma/CmaPrintPreview';
+import { Button } from '@/components/ui/button';
+import { Eye, Download } from 'lucide-react';
+
+export function CmaPresentation({ transaction, comparables, agent, enabledSections }) {
+  const [showPreview, setShowPreview] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    // Your existing PDF generation logic
+    const response = await fetch(`/api/cma/${transaction.id}/pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabledSections }),
+    });
+    
+    if (response.ok) {
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `CMA-${transaction.address.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  return (
+    <>
+      {/* Replace Download button with Preview button */}
+      <Button 
+        onClick={() => setShowPreview(true)}
+        className="bg-[#EF4923] hover:bg-[#d63d1a]"
+      >
+        <Eye className="w-4 h-4 mr-2" />
+        Preview & Download
+      </Button>
+
+      {/* Print Preview Modal */}
+      <CmaPrintPreview
+        isOpen={showPreview}
+        onClose={() => setShowPreview(false)}
+        onDownload={handleDownloadPdf}
+        transaction={transaction}
+        comparables={comparables}
+        agent={agent}
+        enabledSections={enabledSections}
+      />
+    </>
+  );
+}
+```
+
+---
+
+## Mobile Optimization
+
+The preview modal should work on tablets but gracefully handle smaller screens:
+
+```tsx
+// In CmaPrintPreview, add responsive classes:
+<DialogContent className={cn(
+  "max-w-[95vw] h-[90vh] p-0 bg-zinc-900",
+  "w-full md:w-[1200px] lg:w-[1400px]"
+)}>
+
+// Hide thumbnail sidebar on mobile
+<div className="hidden md:block w-48 border-r border-zinc-800">
+
+// Adjust grid columns for smaller screens
+<div className="p-4 md:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+```
+
+---
+
+## Features Summary
+
+| Feature | Description |
+|---------|-------------|
+| **Single View** | Full-size slide preview with zoom controls |
+| **Grid View** | Thumbnail overview of all slides |
+| **Thumbnail Sidebar** | Click to jump to any slide |
+| **Issue Detection** | Yellow warnings for missing data |
+| **Zoom Controls** | 50% - 150% zoom in single view |
+| **Navigation** | Previous/Next buttons + keyboard arrows |
+| **Download** | Generate PDF after preview |
+
+---
+
+## Verification Checklist
+
+- [ ] Preview modal opens when clicking "Preview & Download"
+- [ ] All enabled sections appear as slides
+- [ ] Data issues show yellow warnings
+- [ ] Single view displays full slide with zoom
+- [ ] Grid view shows all slide thumbnails
+- [ ] Thumbnail sidebar allows slide navigation
+- [ ] Download PDF button works from preview
+- [ ] Modal closes properly
+- [ ] Works on tablet screens
+
+---
+
+Copy this prompt to Replit to add the Print Preview feature.

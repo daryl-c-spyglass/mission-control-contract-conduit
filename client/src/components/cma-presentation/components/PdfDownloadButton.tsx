@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { pdf } from '@react-pdf/renderer';
 import { CmaPdfDocument } from '../pdf/CmaPdfDocument';
+import { CmaPrintPreview } from './CmaPrintPreview';
 import type { AgentProfile, CmaProperty } from '../types';
 
 interface PdfDownloadButtonProps {
@@ -30,6 +31,7 @@ export function PdfDownloadButton({
   className = '',
 }: PdfDownloadButtonProps) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const { toast } = useToast();
 
   const handleDownload = async () => {
@@ -85,19 +87,35 @@ export function PdfDownloadButton({
   };
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={handleDownload}
-      disabled={isGenerating}
-      className={className}
-      data-testid="button-download-pdf"
-    >
-      {isGenerating ? (
-        <Loader2 className="w-5 h-5 animate-spin" />
-      ) : (
-        <Download className="w-5 h-5" />
-      )}
-    </Button>
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setShowPreview(true)}
+        disabled={isGenerating}
+        className={className}
+        data-testid="button-preview-pdf"
+        title="Preview & Download PDF"
+      >
+        {isGenerating ? (
+          <Loader2 className="w-5 h-5 animate-spin" />
+        ) : (
+          <Eye className="w-5 h-5" />
+        )}
+      </Button>
+
+      <CmaPrintPreview
+        isOpen={showPreview}
+        onClose={() => setShowPreview(false)}
+        onDownload={handleDownload}
+        propertyAddress={propertyAddress}
+        comparables={comparables}
+        agent={agent}
+        subjectProperty={subjectProperty}
+        averageDaysOnMarket={averageDaysOnMarket}
+        suggestedListPrice={suggestedListPrice}
+        avgPricePerAcre={avgPricePerAcre}
+      />
+    </>
   );
 }
