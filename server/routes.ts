@@ -4187,31 +4187,29 @@ Generate only the headline, nothing else.`;
         return res.status(404).json({ error: "Transaction not found" });
       }
 
-      // Build flyer data for the generator
+      // Build flyer data for the generator - map form fields to generator interface
       const flyerData: FlyerData = {
+        priceLabel: 'Offered at',
         price: data.price || '',
-        address: data.address || '',
-        beds: data.bedrooms || '',
-        baths: data.bathrooms || '',
+        fullAddress: data.address || '',
+        bedrooms: data.bedrooms || '',
+        bathrooms: data.bathrooms || '',
         sqft: data.sqft || '',
-        introHeading: data.introHeading || 'Prime Opportunity',
-        introDescription: data.introDescription || '',
+        headline: data.introHeading || 'Prime Opportunity',
+        description: data.introDescription || '',
         agentName: data.agentName || '',
         agentTitle: data.agentTitle || 'REALTOR®',
-        phone: data.phone || '',
-        mainPhoto: data.mainImage || null,
-        kitchenPhoto: data.kitchenImage || null,
-        roomPhoto: data.roomImage || null,
-        agentPhoto: data.agentPhoto || null,
-        companyLogo: data.companyLogo || '/logos/SpyglassRealty_Logo_Black.png',
-        secondaryLogo: data.secondaryLogo || '/logos/lre-sgr-black.png',
-        qrCode: data.qrCode || null,
-        imageTransforms: data.imageTransforms || null,
+        agentPhone: data.phone || '',
+        mainImage: data.mainImage || undefined,
+        secondaryImage1: data.kitchenImage || undefined,
+        secondaryImage2: data.roomImage || undefined,
+        agentPhoto: data.agentPhoto || undefined,
+        qrCodeUrl: data.qrCode || undefined,
       };
 
       console.log(`[FlyerGenerator] Exporting ${format} flyer for transaction ${id}`);
 
-      const outputType: OutputType = format === 'cmyk' ? 'pdf' : 'png';
+      const outputType: OutputType = format === 'cmyk' ? 'pdf' : 'pngPreview';
       const buffer = await generatePrintFlyer(flyerData, outputType);
 
       const addressSlug = (data.address || 'property').split(',')[0].replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');

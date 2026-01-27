@@ -1,0 +1,681 @@
+# Replit Prompt: Comprehensive Fix — Left Pane to Live Preview Sync + Photo List View
+
+## 🎯 Critical Issues to Fix
+
+The Advanced Flyer Builder has multiple sync issues and layout problems. This prompt addresses ALL of them.
+
+---
+
+## 📋 Issue 1: Left Pane Fields NOT Syncing to Live Preview
+
+**Every field in the Left Pane MUST sync to Live Preview in real-time.**
+
+### Fields That Must Sync:
+
+#### PROPERTY DETAILS Section:
+| Left Pane Field | Live Preview Location | Current State | Expected |
+|-----------------|----------------------|---------------|----------|
+| Listed Price | "LISTED AT $XXX,XXX" badge (top right) | ❌ Not syncing | ✅ Must sync |
+| Beds | "X bedrooms" (bottom left) | ❌ Not syncing | ✅ Must sync |
+| Baths | "X bathrooms" (bottom left) | ❌ Not syncing | ✅ Must sync |
+| Sq Ft | "X,XXX sq. ft" (bottom left) | ❌ Not syncing | ✅ Must sync |
+
+#### DESCRIPTION Section:
+| Left Pane Field | Live Preview Location | Current State | Expected |
+|-----------------|----------------------|---------------|----------|
+| Headline | "PRIME OPPORTUNITY IN..." (bottom center) | ❌ Not syncing | ✅ Must sync |
+| Property Description | Description text (bottom center) | ❌ Not syncing | ✅ Must sync |
+
+#### AGENT DETAILS Section:
+| Left Pane Field | Live Preview Location | Current State | Expected |
+|-----------------|----------------------|---------------|----------|
+| Agent Name | "Agent Name" (bottom right) | ❌ Not syncing | ✅ Must sync |
+| Title | Below agent name | ❌ Not syncing | ✅ Must sync |
+| Phone Number | Below title | ❌ Not syncing | ✅ Must sync |
+
+#### BRANDING & LOGOS Section:
+| Left Pane Field | Live Preview Location | Current State | Expected |
+|-----------------|----------------------|---------------|----------|
+| Company Logo | Top left header | ✅ Working | Keep |
+| Secondary Logo | Top center header | ✅ Working | Keep |
+| Agent Photo | Circular photo (bottom right) | ❌ Not syncing | ✅ Must sync |
+| QR Code | QR code (bottom right) | ❌ Not syncing | ✅ Must sync |
+
+#### PROPERTY IMAGES Section:
+| Left Pane Field | Live Preview Location | Current State | Expected |
+|-----------------|----------------------|---------------|----------|
+| Property Address | Below header logos | ❌ Empty | ✅ Must auto-fill & sync |
+| Main Property Photo | Large hero image | ✅ Working | Keep |
+| Kitchen Photo | Bottom left thumbnail | ✅ Working | Keep |
+| Room Photo | Bottom right thumbnail | ✅ Working | Keep |
+
+---
+
+## 🔧 Fix 1: Ensure Form Values Sync to Live Preview
+
+The form must use `form.watch()` to provide real-time values to the preview:
+
+```tsx
+// In AdvancedFlyerGenerator/index.tsx
+
+// Watch ALL form values for real-time sync
+const watchedValues = form.watch();
+
+// Debug: Log when values change
+useEffect(() => {
+  console.log('Form values updated:', watchedValues);
+}, [watchedValues]);
+
+// Pass watched values to FlyerPreview
+<FlyerPreview
+  data={watchedValues}
+  images={images}
+/>
+```
+
+---
+
+## 🔧 Fix 2: Update FlyerPreview to Use Passed Data
+
+The FlyerPreview component MUST use the `data` prop directly, not its own state:
+
+```tsx
+// In FlyerPreview.tsx
+
+interface FlyerPreviewProps {
+  data: {
+    price: string;
+    address: string;
+    bedrooms: string;
+    bathrooms: string;
+    sqft: string;
+    introHeadline: string;
+    introDescription: string;
+    agentName: string;
+    agentTitle: string;
+    phone: string;
+  };
+  images: {
+    mainImage: string | null;
+    kitchenImage: string | null;
+    roomImage: string | null;
+    agentPhoto: string | null;
+    companyLogo: string | null;
+    secondaryLogo: string | null;
+    qrCode: string | null;
+  };
+}
+
+export function FlyerPreview({ data, images }: FlyerPreviewProps) {
+  return (
+    <div 
+      className="bg-white relative"
+      style={{ width: '816px', height: '1056px' }}
+    >
+      {/* ====== HEADER ====== */}
+      <div className="flex items-center justify-between p-4 border-b">
+        {/* Company Logo */}
+        {images.companyLogo && (
+          <img src={images.companyLogo} alt="Company" className="h-10 object-contain" />
+        )}
+        
+        {/* Secondary Logo */}
+        {images.secondaryLogo && (
+          <img src={images.secondaryLogo} alt="Secondary" className="h-8 object-contain" />
+        )}
+        
+        {/* ====== PRICE BADGE - MUST USE data.price ====== */}
+        <div className="bg-[#F37216] text-white px-4 py-2 text-right">
+          <div className="text-xs uppercase">Listed At</div>
+          <div className="text-xl font-bold">{data.price || '$0'}</div>
+        </div>
+      </div>
+
+      {/* ====== ADDRESS - MUST USE data.address ====== */}
+      <div className="px-6 py-2">
+        <h1 className="text-xl font-semibold tracking-wide">
+          {data.address || 'PROPERTY ADDRESS'}
+        </h1>
+      </div>
+
+      {/* ====== MAIN PHOTO ====== */}
+      <div className="px-6">
+        <div className="h-[400px] bg-gray-200 overflow-hidden">
+          {images.mainImage ? (
+            <img src={images.mainImage} alt="Property" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-400">
+              Main Property Photo
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ====== THUMBNAIL PHOTOS ====== */}
+      <div className="px-6 py-2 grid grid-cols-2 gap-2">
+        <div className="h-[140px] bg-gray-200 overflow-hidden">
+          {images.kitchenImage ? (
+            <img src={images.kitchenImage} alt="Kitchen" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+              Kitchen Photo
+            </div>
+          )}
+        </div>
+        <div className="h-[140px] bg-gray-200 overflow-hidden">
+          {images.roomImage ? (
+            <img src={images.roomImage} alt="Room" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+              Room Photo
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ====== BOTTOM SECTION ====== */}
+      <div className="absolute bottom-0 left-0 right-0 px-6 py-4 grid grid-cols-3 gap-4">
+        
+        {/* ====== SPECS - MUST USE data.bedrooms, data.bathrooms, data.sqft ====== */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-bold">{data.bedrooms || '0'}</span>
+            <span className="text-sm">bedrooms</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-bold">{data.bathrooms || '0'}</span>
+            <span className="text-sm">bathrooms</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-bold">{data.sqft || '0'}</span>
+            <span className="text-sm">sq. ft</span>
+          </div>
+        </div>
+
+        {/* ====== DESCRIPTION - MUST USE data.introHeadline, data.introDescription ====== */}
+        <div className="space-y-2">
+          <h2 className="text-sm font-bold uppercase tracking-wide">
+            {data.introHeadline || 'PRIME OPPORTUNITY'}
+          </h2>
+          <p className="text-xs leading-relaxed line-clamp-6">
+            {data.introDescription || 'Property description will appear here...'}
+          </p>
+        </div>
+
+        {/* ====== AGENT INFO - MUST USE data.agentName, data.agentTitle, data.phone ====== */}
+        <div className="flex items-center gap-3">
+          {/* Agent Photo */}
+          <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+            {images.agentPhoto ? (
+              <img src={images.agentPhoto} alt="Agent" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                Photo
+              </div>
+            )}
+          </div>
+          
+          {/* QR Code */}
+          <div className="w-12 h-12 bg-gray-200 flex-shrink-0">
+            {images.qrCode ? (
+              <img src={images.qrCode} alt="QR" className="w-full h-full object-contain" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                QR
+              </div>
+            )}
+          </div>
+          
+          {/* Agent Details */}
+          <div className="text-right">
+            <div className="font-bold">{data.agentName || 'Agent Name'}</div>
+            <div className="text-xs">{data.agentTitle || 'REALTOR®'}</div>
+            <div className="text-xs">{data.phone || '(555) 123-4567'}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 Fix 3: Auto-Fill ALL Fields from MLS Data
+
+The form fields must auto-populate when MLS data loads:
+
+```tsx
+// In AdvancedFlyerGenerator/index.tsx
+
+useEffect(() => {
+  const mlsData = transaction?.mlsData;
+  if (!mlsData) return;
+
+  // Format price
+  const formatPrice = (price: any): string => {
+    if (!price) return '';
+    const num = typeof price === 'string' ? parseFloat(price.replace(/[^0-9.]/g, '')) : price;
+    if (isNaN(num)) return '';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(num);
+  };
+
+  // Format number with commas
+  const formatNumber = (num: any): string => {
+    if (!num) return '';
+    const n = typeof num === 'string' ? parseFloat(num) : num;
+    if (isNaN(n)) return '';
+    return new Intl.NumberFormat('en-US').format(Math.round(n));
+  };
+
+  // Build address from Repliers components
+  const buildAddress = (): string => {
+    const addr = mlsData.address || mlsData;
+    const street = [addr.streetNumber, addr.streetDirection, addr.streetName, addr.streetSuffix]
+      .filter(Boolean).join(' ');
+    const city = addr.city || mlsData.city || '';
+    const state = addr.state || mlsData.state || 'TX';
+    const zip = addr.postalCode || mlsData.postalCode || '';
+    
+    if (street && city) {
+      return `${street}, ${city}, ${state} ${zip}`.toUpperCase().trim();
+    }
+    return (transaction?.address || '').toUpperCase();
+  };
+
+  // Extract fields (check multiple possible names)
+  const price = mlsData.listPrice || mlsData.ListPrice || mlsData.price || '';
+  const beds = mlsData.bedroomsTotal || mlsData.beds || mlsData.Bedrooms || '';
+  const baths = mlsData.bathroomsTotalInteger || mlsData.baths || mlsData.Bathrooms || '';
+  const sqft = mlsData.livingArea || mlsData.buildingAreaTotal || mlsData.sqft || '';
+  const description = mlsData.publicRemarks || mlsData.remarks || '';
+  const neighborhood = mlsData.subdivision || mlsData.city || '';
+
+  // SET ALL FORM VALUES
+  form.setValue('price', formatPrice(price));
+  form.setValue('address', buildAddress());
+  form.setValue('bedrooms', beds ? String(beds) : '');
+  form.setValue('bathrooms', baths ? String(baths) : '');
+  form.setValue('sqft', formatNumber(sqft));
+  form.setValue('introHeadline', `Prime Opportunity in ${neighborhood}`);
+  form.setValue('introDescription', description.length > 150 ? description.substring(0, 147) + '...' : description);
+
+  // Trigger form update
+  form.trigger();
+
+  console.log('Form auto-filled with MLS data:', {
+    price: formatPrice(price),
+    address: buildAddress(),
+    beds, baths, sqft: formatNumber(sqft)
+  });
+
+}, [transaction?.mlsData, form]);
+```
+
+---
+
+## 🔧 Fix 4: Auto-Fill Agent Details from Settings
+
+```tsx
+// Separate useEffect for settings
+useEffect(() => {
+  if (!settings) return;
+
+  const agentName = `${settings.firstName || ''} ${settings.lastName || ''}`.trim();
+  
+  form.setValue('agentName', agentName || 'Agent Name');
+  form.setValue('agentTitle', settings.title || 'REALTOR®');
+  form.setValue('phone', settings.phone || '');
+
+  // Set images
+  setImages(prev => ({
+    ...prev,
+    agentPhoto: settings.profilePhoto || null,
+    qrCode: settings.qrCode || null,
+    companyLogo: settings.companyLogoUseDefault !== false
+      ? '/logos/SpyglassRealty_Logo_Black.png'
+      : settings.companyLogo || '/logos/SpyglassRealty_Logo_Black.png',
+    secondaryLogo: settings.secondaryLogoUseDefault !== false
+      ? '/logos/LeadingRE_Logo.png'
+      : settings.secondaryLogo || '/logos/LeadingRE_Logo.png',
+  }));
+
+  console.log('Agent details auto-filled from settings');
+
+}, [settings, form]);
+```
+
+---
+
+## 📋 Issue 2: Property Images Overlapping — Use List View
+
+The property images are overlapping on the left pane. Convert to a **list view** layout:
+
+### Current Layout (Overlapping):
+```
+MAIN PROPERTY PHOTO  [AI Selected]
+┌─────────────────────────┐
+│        [Photo]          │
+└─────────────────────────┘
+
+KITCHEN     ROOM PHOTO
+PHOTO
+┌─────┐     ┌─────┐
+│     │     │     │      ← Overlapping!
+└─────┘     └─────┘
+```
+
+### New List View Layout:
+```
+PROPERTY IMAGES
+✓ Auto-selected using Repliers AI
+
+PROPERTY ADDRESS
+┌─────────────────────────────────────┐
+│ 268 CHISHOLM TRL, BASTROP, TX       │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ 📷 Main Photo           [AI: Front] │
+│ ┌─────────────────────────────────┐ │
+│ │                                 │ │
+│ │     [Exterior Photo]            │ │
+│ │                                 │ │
+│ └─────────────────────────────────┘ │
+│ [Choose from MLS Photos (37)]       │
+├─────────────────────────────────────┤
+│ 📷 Kitchen Photo     [AI: Kitchen]  │
+│ ┌─────────────────────────────────┐ │
+│ │     [Kitchen Photo]             │ │
+│ └─────────────────────────────────┘ │
+│ [Choose from MLS Photos (37)]       │
+├─────────────────────────────────────┤
+│ 📷 Room Photo     [AI: Living Room] │
+│ ┌─────────────────────────────────┐ │
+│ │     [Room Photo]                │ │
+│ └─────────────────────────────────┘ │
+│ [Choose from MLS Photos (37)]       │
+└─────────────────────────────────────┘
+```
+
+### Updated JSX for List View:
+
+```tsx
+{/* ================================================ */}
+{/* PROPERTY IMAGES SECTION - LIST VIEW              */}
+{/* ================================================ */}
+<div className="space-y-4">
+  <div className="flex items-center gap-2">
+    <ImageIcon className="w-5 h-5 text-primary" />
+    <h2 className="text-lg font-medium">Property Images</h2>
+  </div>
+  
+  <Separator />
+  
+  {/* AI Selection Banner */}
+  <div className="flex items-center gap-2 text-green-600 text-sm">
+    <Check className="w-4 h-4" />
+    <span>Auto-selected using Repliers AI</span>
+  </div>
+
+  {/* Property Address */}
+  <div className="space-y-2">
+    <Label className="text-xs font-medium uppercase tracking-wide flex items-center gap-2">
+      <MapPin className="w-3 h-3" />
+      Property Address
+    </Label>
+    <Input
+      value={form.watch('address') || ''}
+      readOnly
+      className="bg-muted/50"
+    />
+  </div>
+
+  {/* ====== LIST VIEW FOR PHOTOS ====== */}
+  <div className="space-y-4">
+    
+    {/* Main Property Photo */}
+    <div className="border rounded-lg p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs font-medium uppercase tracking-wide">
+          Main Property Photo
+        </Label>
+        {photoAIInfo.mainImage && (
+          <Badge variant="outline" className="text-[10px] gap-1 text-blue-600 border-blue-300">
+            <Sparkles className="w-3 h-3" />
+            AI: {photoAIInfo.mainImage.classification}
+          </Badge>
+        )}
+      </div>
+      <div className="aspect-video bg-muted rounded-md overflow-hidden">
+        {images.mainImage ? (
+          <img src={images.mainImage} alt="Main" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+            No photo selected
+          </div>
+        )}
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => openPhotoGallery('mainImage')}
+        className="w-full text-xs gap-1"
+      >
+        <Images className="w-3 h-3" />
+        Choose from MLS Photos ({allMLSPhotos.length})
+      </Button>
+    </div>
+
+    {/* Kitchen Photo */}
+    <div className="border rounded-lg p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs font-medium uppercase tracking-wide">
+          Kitchen Photo
+        </Label>
+        {photoAIInfo.kitchenImage && (
+          <Badge variant="outline" className="text-[10px] gap-1 text-blue-600 border-blue-300">
+            <Sparkles className="w-3 h-3" />
+            AI: {photoAIInfo.kitchenImage.classification}
+          </Badge>
+        )}
+      </div>
+      <div className="aspect-video bg-muted rounded-md overflow-hidden">
+        {images.kitchenImage ? (
+          <img src={images.kitchenImage} alt="Kitchen" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+            No photo selected
+          </div>
+        )}
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => openPhotoGallery('kitchenImage')}
+        className="w-full text-xs gap-1"
+      >
+        <Images className="w-3 h-3" />
+        Choose from MLS Photos ({allMLSPhotos.length})
+      </Button>
+    </div>
+
+    {/* Room Photo */}
+    <div className="border rounded-lg p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs font-medium uppercase tracking-wide">
+          Room Photo
+        </Label>
+        {photoAIInfo.roomImage && (
+          <Badge variant="outline" className="text-[10px] gap-1 text-blue-600 border-blue-300">
+            <Sparkles className="w-3 h-3" />
+            AI: {photoAIInfo.roomImage.classification}
+          </Badge>
+        )}
+      </div>
+      <div className="aspect-video bg-muted rounded-md overflow-hidden">
+        {images.roomImage ? (
+          <img src={images.roomImage} alt="Room" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+            No photo selected
+          </div>
+        )}
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => openPhotoGallery('roomImage')}
+        className="w-full text-xs gap-1"
+      >
+        <Images className="w-3 h-3" />
+        Choose from MLS Photos ({allMLSPhotos.length})
+      </Button>
+    </div>
+
+  </div>
+</div>
+```
+
+---
+
+## 📋 Issue 3: Repliers AI Photo Classification
+
+Use **Repliers imageInsights** to auto-select the best photos and show classification badges.
+
+### Repliers imageInsights Structure:
+
+```typescript
+// Each photo in mlsData.photos[] may have:
+interface RepliersPhoto {
+  href: string;  // or url
+  imageInsights?: {
+    classification: {
+      imageOf: string;    // "Front of Structure", "Kitchen", "Living Room", etc.
+      prediction: number; // 0.0 - 1.0 confidence
+    };
+    quality: {
+      qualitative: string;   // "average", "above average", "excellent"
+      quantitative: number;  // 1.0 - 5.0 score
+    };
+  };
+}
+```
+
+### Room Type Classifications from Repliers:
+- **Exterior:** "Front of Structure", "Back of Structure", "Aerial"
+- **Kitchen:** "Kitchen"
+- **Living Areas:** "Living Room", "Family Room", "Dining Room", "Great Room"
+- **Bedrooms:** "Bedroom", "Master Bedroom"
+- **Bathrooms:** "Bathroom", "Master Bathroom"
+- **Other:** "Patio", "Pool", "Garage", "Laundry"
+
+### AI Photo Selection Logic:
+
+```tsx
+// Process photos from Repliers with imageInsights
+const processMLSPhotos = (photos: any[]): ProcessedPhoto[] => {
+  return photos.map((photo, index) => {
+    const url = photo.href || photo.url || '';
+    const insights = photo.imageInsights || {};
+    const classification = insights.classification || {};
+    const quality = insights.quality || {};
+    
+    return {
+      url,
+      classification: classification.imageOf || 'Unknown',
+      confidence: classification.prediction || 0,
+      qualityScore: quality.quantitative || 3,
+      qualityLabel: quality.qualitative || 'average',
+      index,
+    };
+  }).filter(p => p.url);
+};
+
+// Auto-select best photos by category
+const autoSelectPhotos = (photos: ProcessedPhoto[]) => {
+  // Sort by quality score
+  const sorted = [...photos].sort((a, b) => b.qualityScore - a.qualityScore);
+
+  // Find best exterior
+  const exteriorTypes = ['Front of Structure', 'Back of Structure', 'Aerial', 'Exterior'];
+  const mainPhoto = sorted.find(p => 
+    exteriorTypes.some(t => p.classification.toLowerCase().includes(t.toLowerCase()))
+  ) || sorted[0];
+
+  // Find best kitchen
+  const kitchenPhoto = sorted.find(p => 
+    p.classification.toLowerCase().includes('kitchen') &&
+    p.url !== mainPhoto?.url
+  ) || sorted.find(p => p.url !== mainPhoto?.url);
+
+  // Find best living area
+  const livingTypes = ['Living Room', 'Family Room', 'Dining Room', 'Great Room'];
+  const usedUrls = [mainPhoto?.url, kitchenPhoto?.url].filter(Boolean);
+  const roomPhoto = sorted.find(p => 
+    livingTypes.some(t => p.classification.toLowerCase().includes(t.toLowerCase())) &&
+    !usedUrls.includes(p.url)
+  ) || sorted.find(p => !usedUrls.includes(p.url));
+
+  return { mainPhoto, kitchenPhoto, roomPhoto };
+};
+```
+
+---
+
+## ✅ Verification Checklist
+
+### Sync: Property Details → Live Preview
+- [ ] Listed Price in left pane → "LISTED AT" badge in preview
+- [ ] Beds in left pane → "X bedrooms" in preview
+- [ ] Baths in left pane → "X bathrooms" in preview
+- [ ] Sq Ft in left pane → "X sq. ft" in preview
+
+### Sync: Description → Live Preview
+- [ ] Headline in left pane → Title in preview
+- [ ] Description in left pane → Description text in preview
+
+### Sync: Agent Details → Live Preview
+- [ ] Agent Name in left pane → Agent name in preview
+- [ ] Title in left pane → Title in preview
+- [ ] Phone in left pane → Phone in preview
+- [ ] Agent Photo in left pane → Photo in preview
+- [ ] QR Code in left pane → QR in preview
+
+### Sync: Property Images → Live Preview
+- [ ] Property Address auto-fills from MLS
+- [ ] Main Photo in left pane → Hero image in preview
+- [ ] Kitchen Photo in left pane → Left thumbnail in preview
+- [ ] Room Photo in left pane → Right thumbnail in preview
+
+### Photo List View
+- [ ] Photos display in vertical list (not overlapping grid)
+- [ ] Each photo has its own bordered card
+- [ ] AI classification badge shows room type
+- [ ] "Choose from MLS Photos" button on each
+
+### Auto-Fill
+- [ ] All Property Details auto-fill from MLS
+- [ ] All Agent Details auto-fill from Settings
+- [ ] Property Address auto-fills
+- [ ] Photos auto-select using Repliers AI
+
+---
+
+## 📋 Summary
+
+| Issue | Fix |
+|-------|-----|
+| Fields not syncing | Use `form.watch()` + pass to `FlyerPreview` |
+| Price mismatch | `FlyerPreview` must use `data.price` prop |
+| Fields empty | Auto-fill via `useEffect` on MLS data load |
+| Photos overlapping | Convert to vertical list view layout |
+| No AI classification | Use Repliers `imageInsights` for room types |
+| Property Address empty | Auto-fill from `form.watch('address')` |
+
+---
+
+*This comprehensive fix ensures the entire left pane syncs to the Live Preview and photos display properly in list view with AI classification.*
