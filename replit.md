@@ -75,15 +75,22 @@ Preferred communication style: Simple, everyday language.
   - Slide Alignment: Preview matches PDF exactly (cover + 33 WIDGETS + 3 PropertyDetail pages for top comparables)
   - Integration: Opens via Eye icon in CMA presentation header, download proceeds from modal after review
 - **CMA PDF Export System**: Client-side PDF generation using @react-pdf/renderer:
-  - Files: `pdf/CmaPdfDocument.tsx` (main document), `pdf/styles.ts` (Spyglass branding styles)
+  - Files: `pdf/CmaPdfDocument.tsx` (main document), `pdf/styles.ts` (Spyglass branding styles with 60+ style definitions)
   - Button: `PdfDownloadButton.tsx` in presentation header, opens Print Preview modal
   - Features: Landscape Letter format, all 33 widgets covered, specialized pages for dynamic content
   - Page Types: CoverPage, AgentResumePage, ComparablesSummaryPage, TimeToSellPage, SuggestedPricePage, AveragePricePerAcrePage, ListingActionPlanPage, ClientTestimonialsPage, ListingWithSpyglassPage, SpyglassResourcesPage, MarketingPage, ThankYouPage, StaticImagePage (fallback), PropertyDetailPage (top 3 comparables)
   - Data Flow: CmaPresentationPlayer → Header → PdfDownloadButton → CmaPdfDocument (props: agent, comparables, subjectProperty, averageDaysOnMarket, suggestedListPrice, avgPricePerAcre, preparedFor)
-  - Styling: Spyglass brand colors (#EF4923, #222222), built-in Helvetica font (Inter disabled due to browser font loading issues), 40+ style definitions
+  - Styling: Spyglass brand colors (#EF4923, #222222), built-in Helvetica font (Inter disabled due to browser font loading issues)
   - Output: `CMA-{address}-{date}.pdf` with toast notifications for status updates
   - **Font Handling**: Uses built-in Helvetica font family; hyphenation disabled via Font.registerHyphenationCallback to prevent font lookup issues
-  - **Image Handling**: All images removed from PDF - uses text fallbacks for logo, property photos, agent photos, and widget content to avoid cross-origin loading failures
+  - **Image Handling**: Uses text fallbacks for logo, property photos, agent photos due to cross-origin restrictions; agent initials placeholder shown for agent photos
+  - **Professional PDF Design (CloudCMA-style)**:
+    - Cover Page: Split "SPYGLASS REALTY" logo, address box, orange agent section at bottom with photo/initials placeholder
+    - Agent Resume: Two-column layout with agent photo placeholder, bio, stats grid (150+ Homes Sold, $85M Sales Volume, 4.9★ Rating)
+    - Comparables Summary: Highlighted stats row (orange boxes for key metrics), table with 8 properties, color-coded status badges (green=Closed, blue=Active)
+    - Property Details: Photo placeholder, status badges, beds/baths/sqft stat boxes, price per sqft and lot acres info
+    - Suggested Price: Green highlighted price box, visual price range slider with low/high markers
+    - Thank You: Professional logo, circular agent photo placeholder with initials, branded contact display
 - **CMA Data Extraction Utilities** (`client/src/lib/cma-data-utils.ts`): Safe data extraction functions for handling MLS/Repliers API field variations:
   - `extractPrice(comp)`: Handles soldPrice, closePrice, price, listPrice fields
   - `extractSqft(comp)`: Handles sqft, livingArea, squareFeet (including string parsing)
@@ -92,9 +99,13 @@ Preferred communication style: Simple, everyday language.
   - `extractBeds(comp)`, `extractBaths(comp)`: Handles bedroomsTotal, beds, bathroomsTotal, baths
   - `extractFullAddress(comp)`: Handles address, unparsedAddress, streetAddress, nested streetNumber/streetName
   - `calculatePricePerSqft(comp)`, `calculatePricePerAcre(comp)`: Safe calculation with null checks
-  - `calculateCMAStats(comparables)`: Calculates avgPrice, avgSqft, avgDOM, avgPricePerSqft, avgPricePerAcre, priceRange
+  - `calculateCMAStats(comparables)`: Calculates avgPrice, avgSqft, avgDOM, avgPricePerSqft, avgPricePerAcre, priceRange, count
   - `formatPrice(value)`, `formatNumber(value)`: Safe formatting with N/A fallback
+  - `formatPriceShort(value)`: Compact price format ($500K, $1.2M)
   - `normalizeStatus(status)`, `getStatusColor(status)`: Status display utilities
+  - `getAgentName(agent)`, `getAgentInitials(agent)`: Agent display helpers for PDF
+  - `getPrimaryPhoto(comp)`, `getPhotos(comp)`: Photo extraction from various field structures
+  - `getCoordinates(comp)`: Coordinate extraction from multiple field formats
 - **CMA Resources System**: Agent-managed resources (documents, links) for CMA presentations:
   - Database: `agentResources` table with id, userId, name, type (file/link), url, fileUrl, displayOrder, isActive, timestamps
   - API Endpoints: GET/POST `/api/agent/resources`, PATCH/DELETE `/api/agent/resources/:id`, POST `/api/agent/resources/reorder`, POST `/api/agent/resources/upload`
