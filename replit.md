@@ -83,7 +83,7 @@ Preferred communication style: Simple, everyday language.
   - Styling: Spyglass brand colors (#EF4923, #222222), built-in Helvetica font (Inter disabled due to browser font loading issues)
   - Output: `CMA-{address}-{date}.pdf` with toast notifications for status updates
   - **Font Handling**: Uses built-in Helvetica font family; hyphenation disabled via Font.registerHyphenationCallback to prevent font lookup issues
-  - **Image Handling**: Uses text fallbacks for logo, property photos, agent photos due to cross-origin restrictions; agent initials placeholder shown for agent photos
+  - **Image Handling in PDF**: Uses @react-pdf/renderer Image component with baseUrl prop (from window.location.origin). Agent photos use getAgentPhoto() helper for fallback chain (headshotUrl → photoUrl → photo). Property photos use getPrimaryPhoto() which checks photos[], images[] (with cdn.repliers.io prefix), imageUrl, primaryPhoto, image fields. Static widget images load from public/cma-widgets/ with URL normalization (handles absolute URLs, ensures leading slash). Fallback to text/initials when images unavailable.
   - **Professional PDF Design (CloudCMA-style)**:
     - Cover Page: Split "SPYGLASS REALTY" logo, address box, orange agent section at bottom with photo/initials placeholder
     - Agent Resume: Two-column layout with agent photo placeholder, bio, stats grid (150+ Homes Sold, $85M Sales Volume, 4.9★ Rating)
