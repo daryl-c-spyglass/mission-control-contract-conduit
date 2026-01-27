@@ -36,6 +36,11 @@ Preferred communication style: Simple, everyday language.
 ### Technical Implementations
 - **AI Integration**: GPT-4o-mini for social media tagline generation, MLS description summarization, and CMA cover letter generation.
 - **Agent Profile System**: Database-backed agent profiles with bio, default cover letter (with AI generation/enhancement), and social media links for CMA reports. Includes tone selection (professional, friendly, confident) for AI-generated cover letters.
+- **Agent Marketing Profile System**: Separate profile for flyers and marketing materials with:
+  - Database: `agentMarketingProfiles` table storing userId, agentPhoto, agentTitle, qrCode, companyLogo, secondaryLogo (all as text/base64), plus boolean flags for default logos
+  - API Endpoints: GET/POST `/api/settings/marketing-profile` with server-side validation (5MB size limit, MIME type validation for images)
+  - Settings UI: "Flyer & Marketing Branding" section with image uploads, agent title input, and toggles for default Spyglass/Leading RE logos
+  - Default logos: `/logos/SpyglassRealty_Logo_Black.png` (company), `/logos/lre-sgr-black.png` (secondary)
 - **Automatic MLS Synchronization**: Background service for regular MLS data sync.
 - **CMA (Comparative Market Analysis) System**: Database-backed storage, public share links, property data visualization (grid, stats, map), and configurable filters for search radius, price, size, and age. Includes API endpoints for CMA management and sharing.
 - **CMA Data Flow**: 
