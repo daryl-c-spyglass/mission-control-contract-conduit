@@ -318,6 +318,9 @@ export default function CMAPresentation() {
         longitude={subjectProperty?.longitude}
         comparables={presentationComparables as any}
         subjectProperty={subjectProperty as any}
+        averageDaysOnMarket={averageDaysOnMarket}
+        suggestedListPrice={suggestedListPrice}
+        avgPricePerAcre={avgPricePerAcre}
       />
 
       <div className="flex-1 overflow-auto bg-muted/30 pb-16">
