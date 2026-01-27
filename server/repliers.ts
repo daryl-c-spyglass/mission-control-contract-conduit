@@ -5,7 +5,16 @@ import { normalizedAcres, normalizedLotSquareFeet, calculatePricePerAcre, buildL
 const REPLIERS_API_BASE = "https://api.repliers.io";
 const REPLIERS_CDN_BASE = "https://cdn.repliers.io/";
 
-async function repliersRequest(endpoint: string, params?: Record<string, string>): Promise<any> {
+interface RepliersRequestOptions {
+  allow404?: boolean;
+  context?: string;
+}
+
+async function repliersRequest(
+  endpoint: string, 
+  params?: Record<string, string>,
+  options?: RepliersRequestOptions
+): Promise<any> {
   const apiKey = process.env.REPLIERS_API_KEY;
   if (!apiKey) {
     throw new Error("REPLIERS_API_KEY not configured");
@@ -30,6 +39,11 @@ async function repliersRequest(endpoint: string, params?: Record<string, string>
   const responseText = await response.text();
 
   if (!response.ok) {
+    if (response.status === 404 && options?.allow404) {
+      const context = options.context || 'unknown';
+      console.warn(`[Repliers] No data found for ${context} (404 response)`);
+      return null;
+    }
     throw new Error(`Repliers API error: ${response.status} ${response.statusText} - ${responseText}`);
   }
 
@@ -574,14 +588,21 @@ export async function fetchSimilarListings(mlsNumber: string, radius: number = 5
       ? mlsNumber 
       : `ACT${mlsNumber}`;
     
-    const data = await repliersRequest("/listings/similar", {
-      mlsNumber: formattedMlsNumber,
-      radius: radius.toString(),
-      boardId: "53", // Unlock MLS board ID
-      type: "Sale", // GLOBAL RENTAL EXCLUSION: Filter at API level
-    });
+    const data = await repliersRequest(
+      "/listings/similar", 
+      {
+        mlsNumber: formattedMlsNumber,
+        radius: radius.toString(),
+        boardId: "53", // Unlock MLS board ID
+        type: "Sale", // GLOBAL RENTAL EXCLUSION: Filter at API level
+      },
+      { 
+        allow404: true, 
+        context: `similar listings for MLS# ${formattedMlsNumber}` 
+      }
+    );
 
-    if (!data.listings || !Array.isArray(data.listings)) {
+    if (!data || !data.listings || !Array.isArray(data.listings)) {
       return [];
     }
 
@@ -638,8 +659,8 @@ export async function fetchSimilarListings(mlsNumber: string, radius: number = 5
         type: 'Sale',
       };
     });
-  } catch (error) {
-    console.error("Error fetching similar listings:", error);
+  } catch (error: any) {
+    console.warn("[Repliers] Failed to fetch similar listings:", error.message || error);
     return [];
   }
 }
