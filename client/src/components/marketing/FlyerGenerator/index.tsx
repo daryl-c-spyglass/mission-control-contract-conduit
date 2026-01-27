@@ -105,8 +105,13 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
 
   // Effect for MLS/property data - runs when transaction changes
   useEffect(() => {
+    console.log('=== DIAGNOSTIC: FlyerGenerator MLS Data Effect ===');
+    console.log('Transaction:', transaction);
+    console.log('Transaction mlsData:', transaction?.mlsData);
+    
     if (transaction) {
       const mlsData = transaction.mlsData || {};
+      console.log('MLS Data available:', Object.keys(mlsData).length > 0);
 
       // Extract data using robust utility functions that handle Repliers API field variations
       const listPrice = transaction.listPrice || mlsData.listPrice || mlsData.price || mlsData.ListPrice;
@@ -141,13 +146,31 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
       setOriginalDescription(fullDescription);
 
       // Set property-related form values
-      form.setValue('price', formatPrice(listPrice));
-      form.setValue('address', formatAddress(transaction, mlsData));
-      form.setValue('bedrooms', beds !== null && beds !== undefined && beds !== '' ? String(beds) : '');
-      form.setValue('bathrooms', baths !== null && baths !== undefined && baths !== '' ? String(baths) : '');
-      form.setValue('sqft', sqft !== null && sqft !== undefined && sqft !== '' ? formatNumber(sqft) : '');
-      form.setValue('introHeading', generateDefaultHeadline(transaction, mlsData));
+      const priceVal = formatPrice(listPrice);
+      const addressVal = formatAddress(transaction, mlsData);
+      const bedsVal = beds !== null && beds !== undefined && beds !== '' ? String(beds) : '';
+      const bathsVal = baths !== null && baths !== undefined && baths !== '' ? String(baths) : '';
+      const sqftVal = sqft !== null && sqft !== undefined && sqft !== '' ? formatNumber(sqft) : '';
+      const headlineVal = generateDefaultHeadline(transaction, mlsData);
+      
+      console.log('📝 Setting form values:');
+      console.log('  - price:', priceVal);
+      console.log('  - address:', addressVal);
+      console.log('  - beds:', bedsVal);
+      console.log('  - baths:', bathsVal);
+      console.log('  - sqft:', sqftVal);
+      console.log('  - headline:', headlineVal);
+      console.log('  - description length:', fullDescription.length);
+      
+      form.setValue('price', priceVal);
+      form.setValue('address', addressVal);
+      form.setValue('bedrooms', bedsVal);
+      form.setValue('bathrooms', bathsVal);
+      form.setValue('sqft', sqftVal);
+      form.setValue('introHeading', headlineVal);
       form.setValue('introDescription', fullDescription);
+      
+      console.log('✅ Form values after population:', form.getValues());
 
       // Get photos from mlsData - handle various Repliers API formats
       const photos = mlsData.photos || mlsData.images || mlsData.Media || [];
@@ -168,6 +191,10 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
 
   // Effect for agent data - runs when agent profile or marketing profile loads
   useEffect(() => {
+    console.log('=== DIAGNOSTIC: FlyerGenerator Agent Data Effect ===');
+    console.log('Agent Profile:', agentProfile);
+    console.log('Marketing Profile:', marketingProfile);
+    
     const user = agentProfile?.user;
     
     // Build agent name from settings or fallback to transaction
@@ -179,10 +206,21 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
     const agentTitle = user?.marketingTitle || marketingProfile?.agentTitle || 'REALTOR®';
     const phone = user?.marketingPhone || transaction?.agentPhone || '';
 
+    console.log('📝 Setting agent values:');
+    console.log('  - agentName:', agentName);
+    console.log('  - agentTitle:', agentTitle);
+    console.log('  - phone:', phone);
+
     // Only update if we have values (don't overwrite with empty)
     if (agentName) form.setValue('agentName', agentName);
     if (agentTitle) form.setValue('agentTitle', agentTitle);
     if (phone) form.setValue('phone', phone);
+    
+    console.log('✅ Agent form values after population:', {
+      agentName: form.getValues('agentName'),
+      agentTitle: form.getValues('agentTitle'),
+      phone: form.getValues('phone')
+    });
   }, [agentProfile, marketingProfile, transaction, form]);
 
   useEffect(() => {

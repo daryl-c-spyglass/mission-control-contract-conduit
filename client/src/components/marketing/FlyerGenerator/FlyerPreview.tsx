@@ -164,11 +164,11 @@ export function FlyerPreview({ data, images, imageTransforms }: FlyerPreviewProp
             </div>
           </div>
           <div className="text-[21pt] font-bold text-center mb-1">
-            {data.agentName || 'Agent Name'}
+            {data.agentName || ''}
           </div>
           <div className="text-[10pt] text-center leading-[1.4]">
-            <div>{data.agentTitle || 'REALTOR®'}</div>
-            <div>{data.phone || '(555) 123-4567'}</div>
+            <div>{data.agentTitle || ''}</div>
+            <div>{data.phone || ''}</div>
           </div>
         </div>
       </div>

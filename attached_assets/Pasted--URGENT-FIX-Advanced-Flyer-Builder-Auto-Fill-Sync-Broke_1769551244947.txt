@@ -1,0 +1,449 @@
+# 🚨 URGENT FIX: Advanced Flyer Builder — Auto-Fill & Sync Broken
+
+## ⚠️ CRITICAL ISSUE
+
+The Advanced Flyer Builder has **BROKEN AUTO-FILL AND SYNC**. This is blocking production.
+
+### Current Problems:
+
+| Field | Left Pane | Live Preview | Expected |
+|-------|-----------|--------------|----------|
+| Listed Price | ❌ **EMPTY** | Shows $499,999 (hardcoded?) | Should show actual MLS price |
+| Beds | ❌ **EMPTY** | Shows 4 | Should auto-fill from MLS |
+| Baths | ❌ **EMPTY** | Shows 4 | Should auto-fill from MLS |
+| Sq Ft | ❌ **EMPTY** | Shows 2,671 | Should auto-fill from MLS |
+| Agent Name | ❌ **EMPTY** | Shows "Agent Name" | Should auto-fill from Settings |
+| Title | ❌ **EMPTY** | Shows "AI Web Developer" | Should auto-fill from Settings |
+| Phone | ❌ **EMPTY** | Shows "(555) 123-4567" | Should auto-fill from Settings |
+| Property Address | ❌ **EMPTY** | Shows "268 CHISHOLM TRL" | Should auto-fill from MLS |
+
+**The Live Preview is showing HARDCODED or DEFAULT values, NOT reading from the form fields!**
+
+---
+
+## 🔍 STEP 1: DIAGNOSTIC — Find Where Data Is Coming From
+
+First, add console logs to understand the data flow:
+
+```tsx
+// In AdvancedFlyerGenerator/index.tsx (or main component)
+
+// At the top of the component, add these logs:
+console.log('=== DIAGNOSTIC: Advanced Flyer Builder ===');
+console.log('Transaction:', transaction);
+console.log('Transaction MLS Data:', transaction?.mlsData);
+console.log('Settings:', settings);
+
+// Check what the form currently has:
+console.log('Form Values:', form.getValues());
+
+// Check if mlsData has the fields we need:
+if (transaction?.mlsData) {
+  const mls = transaction.mlsData;
+  console.log('MLS listPrice:', mls.listPrice || mls.ListPrice || mls.price);
+  console.log('MLS beds:', mls.bedroomsTotal || mls.beds || mls.Bedrooms);
+  console.log('MLS baths:', mls.bathroomsTotalInteger || mls.baths || mls.Bathrooms);
+  console.log('MLS sqft:', mls.livingArea || mls.buildingAreaTotal || mls.sqft);
+  console.log('MLS address:', mls.address);
+  console.log('MLS publicRemarks:', mls.publicRemarks?.substring(0, 100));
+}
+```
+
+---
+
+## 🔧 STEP 2: FIX — Force Form Population from MLS Data
+
+The form fields are NOT being populated. Add this useEffect that FORCES population:
+
+```tsx
+// In AdvancedFlyerGenerator/index.tsx
+
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+
+// Inside the component:
+
+// Track if we've already populated to avoid infinite loops
+const [hasPopulated, setHasPopulated] = useState(false);
+
+useEffect(() => {
+  // Only run once when we have data
+  if (hasPopulated) return;
+  
+  const mlsData = transaction?.mlsData;
+  if (!mlsData) {
+    console.warn('No MLS data available yet');
+    return;
+  }
+
+  console.log('🔄 POPULATING FORM FROM MLS DATA');
+
+  // =====================================================
+  // HELPER FUNCTIONS
+  // =====================================================
+  
+  const formatPrice = (price: any): string => {
+    if (!price) return '';
+    const num = typeof price === 'string' 
+      ? parseFloat(price.toString().replace(/[^0-9.]/g, '')) 
+      : Number(price);
+    if (isNaN(num) || num === 0) return '';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(num);
+  };
+
+  const formatNumber = (num: any): string => {
+    if (num === null || num === undefined || num === '') return '';
+    const n = typeof num === 'string' ? parseFloat(num) : Number(num);
+    if (isNaN(n)) return '';
+    return new Intl.NumberFormat('en-US').format(Math.round(n));
+  };
+
+  const buildAddress = (): string => {
+    // Try nested address object first
+    const addr = mlsData.address || {};
+    
+    // Build street from components
+    const streetParts = [
+      addr.streetNumber || mlsData.streetNumber,
+      addr.streetDirection || mlsData.streetDirection,
+      addr.streetName || mlsData.streetName,
+      addr.streetSuffix || mlsData.streetSuffix,
+    ].filter(Boolean).join(' ');
+    
+    const city = addr.city || mlsData.city || '';
+    const state = addr.state || mlsData.state || 'TX';
+    const zip = addr.postalCode || mlsData.postalCode || '';
+    
+    if (streetParts && city) {
+      return `${streetParts}, ${city}, ${state} ${zip}`.toUpperCase().trim();
+    }
+    
+    // Fallback to transaction address
+    return (transaction?.address || 'ADDRESS UNAVAILABLE').toUpperCase();
+  };
+
+  // =====================================================
+  // EXTRACT VALUES - TRY MULTIPLE FIELD NAMES
+  // =====================================================
+  
+  // Price - Repliers uses listPrice
+  const price = mlsData.listPrice ?? mlsData.ListPrice ?? mlsData.price ?? mlsData.Price ?? '';
+  
+  // Beds - Repliers uses bedroomsTotal
+  const beds = mlsData.bedroomsTotal ?? mlsData.BedroomsTotal ?? mlsData.beds ?? mlsData.Beds ?? mlsData.bedrooms ?? '';
+  
+  // Baths - Repliers uses bathroomsTotalInteger
+  const baths = mlsData.bathroomsTotalInteger ?? mlsData.BathroomsTotalInteger ?? mlsData.baths ?? mlsData.Baths ?? mlsData.bathrooms ?? '';
+  
+  // Sq Ft - Repliers uses livingArea
+  const sqft = mlsData.livingArea ?? mlsData.LivingArea ?? mlsData.buildingAreaTotal ?? mlsData.sqft ?? mlsData.SqFt ?? '';
+  
+  // Description
+  const description = mlsData.publicRemarks ?? mlsData.PublicRemarks ?? mlsData.remarks ?? mlsData.description ?? '';
+  
+  // Neighborhood/Subdivision for headline
+  const neighborhood = mlsData.subdivision ?? mlsData.Subdivision ?? mlsData.neighborhood ?? mlsData.city ?? '';
+
+  // =====================================================
+  // SET FORM VALUES EXPLICITLY
+  // =====================================================
+  
+  const formattedPrice = formatPrice(price);
+  const formattedAddress = buildAddress();
+  const formattedSqft = formatNumber(sqft);
+  
+  console.log('📝 Setting form values:');
+  console.log('  - price:', formattedPrice);
+  console.log('  - address:', formattedAddress);
+  console.log('  - beds:', beds);
+  console.log('  - baths:', baths);
+  console.log('  - sqft:', formattedSqft);
+
+  // Use setValue for each field explicitly
+  form.setValue('price', formattedPrice);
+  form.setValue('address', formattedAddress);
+  form.setValue('bedrooms', beds ? String(beds) : '');
+  form.setValue('bathrooms', baths ? String(baths) : '');
+  form.setValue('sqft', formattedSqft);
+  form.setValue('introHeadline', neighborhood ? `Prime Opportunity in ${neighborhood}` : 'Your Dream Home Awaits');
+  form.setValue('introDescription', description.length > 150 ? description.substring(0, 147) + '...' : description);
+
+  // Mark as populated
+  setHasPopulated(true);
+  
+  console.log('✅ Form populated successfully');
+  console.log('Form values after population:', form.getValues());
+
+}, [transaction?.mlsData, form, hasPopulated, transaction?.address]);
+```
+
+---
+
+## 🔧 STEP 3: FIX — Force Agent Details Population from Settings
+
+```tsx
+// Separate useEffect for Settings
+useEffect(() => {
+  if (!settings) {
+    console.warn('No settings data available');
+    return;
+  }
+
+  console.log('🔄 POPULATING AGENT DETAILS FROM SETTINGS');
+  console.log('Settings:', settings);
+
+  // Build agent name
+  const firstName = settings.firstName || '';
+  const lastName = settings.lastName || '';
+  const agentName = `${firstName} ${lastName}`.trim();
+  
+  console.log('📝 Setting agent values:');
+  console.log('  - agentName:', agentName);
+  console.log('  - agentTitle:', settings.title);
+  console.log('  - phone:', settings.phone);
+
+  // Set agent details
+  form.setValue('agentName', agentName || 'Agent Name');
+  form.setValue('agentTitle', settings.title || 'REALTOR®');
+  form.setValue('phone', settings.phone || '');
+
+  // Set images
+  setImages(prev => ({
+    ...prev,
+    agentPhoto: settings.profilePhoto || prev.agentPhoto,
+    qrCode: settings.qrCode || prev.qrCode,
+    companyLogo: settings.companyLogoUseDefault !== false
+      ? '/logos/SpyglassRealty_Logo_Black.png'
+      : (settings.companyLogo || '/logos/SpyglassRealty_Logo_Black.png'),
+    secondaryLogo: settings.secondaryLogoUseDefault !== false
+      ? '/logos/LeadingRE_Logo.png'
+      : (settings.secondaryLogo || '/logos/LeadingRE_Logo.png'),
+  }));
+
+  console.log('✅ Agent details populated');
+
+}, [settings, form]);
+```
+
+---
+
+## 🔧 STEP 4: FIX — Live Preview MUST Read from Form (NOT Hardcoded)
+
+The FlyerPreview component appears to have HARDCODED values. Fix it:
+
+```tsx
+// In FlyerPreview.tsx
+
+// WRONG - Hardcoded values:
+// <div className="...">{data.price || '$499,999'}</div>  ❌ WRONG
+// <div className="...">Agent Name</div>  ❌ WRONG
+
+// CORRECT - Use form data with empty fallbacks:
+// <div className="...">{data.price || ''}</div>  ✅ CORRECT
+// <div className="...">{data.agentName || ''}</div>  ✅ CORRECT
+
+interface FlyerPreviewProps {
+  data: {
+    price: string;
+    address: string;
+    bedrooms: string;
+    bathrooms: string;
+    sqft: string;
+    introHeadline: string;
+    introDescription: string;
+    agentName: string;
+    agentTitle: string;
+    phone: string;
+  };
+  images: {
+    mainImage: string | null;
+    kitchenImage: string | null;
+    roomImage: string | null;
+    agentPhoto: string | null;
+    companyLogo: string | null;
+    secondaryLogo: string | null;
+    qrCode: string | null;
+  };
+}
+
+export function FlyerPreview({ data, images }: FlyerPreviewProps) {
+  // DEBUG: Log what data we're receiving
+  console.log('🖼️ FlyerPreview receiving data:', data);
+
+  return (
+    <div className="bg-white" style={{ width: '816px', height: '1056px' }}>
+      {/* PRICE - Must use data.price, NOT hardcoded */}
+      <div className="bg-[#F37216] text-white px-4 py-2">
+        <div className="text-xs">LISTED AT</div>
+        <div className="text-xl font-bold">
+          {data.price || '$0'}  {/* NOT '$499,999' */}
+        </div>
+      </div>
+
+      {/* ADDRESS - Must use data.address */}
+      <h1 className="text-xl font-semibold">
+        {data.address || 'ADDRESS'}  {/* NOT hardcoded address */}
+      </h1>
+
+      {/* BEDS/BATHS/SQFT - Must use data values */}
+      <div>
+        <span className="font-bold">{data.bedrooms || '0'}</span> bedrooms
+      </div>
+      <div>
+        <span className="font-bold">{data.bathrooms || '0'}</span> bathrooms
+      </div>
+      <div>
+        <span className="font-bold">{data.sqft || '0'}</span> sq. ft
+      </div>
+
+      {/* HEADLINE & DESCRIPTION */}
+      <h2 className="font-bold uppercase">
+        {data.introHeadline || 'HEADLINE'}
+      </h2>
+      <p>
+        {data.introDescription || 'Description...'}
+      </p>
+
+      {/* AGENT INFO - Must use data values */}
+      <div className="font-bold">
+        {data.agentName || 'Agent Name'}  {/* NOT hardcoded */}
+      </div>
+      <div className="text-sm">
+        {data.agentTitle || 'Title'}
+      </div>
+      <div className="text-sm">
+        {data.phone || 'Phone'}
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 STEP 5: FIX — Ensure form.watch() is Connected
+
+In the parent component, make sure `form.watch()` is being used:
+
+```tsx
+// In AdvancedFlyerGenerator/index.tsx
+
+// Watch ALL form values
+const watchedValues = form.watch();
+
+// Debug log
+useEffect(() => {
+  console.log('👀 Form values changed:', watchedValues);
+}, [watchedValues]);
+
+// Pass to FlyerPreview
+<FlyerPreview 
+  data={watchedValues}  // NOT some other hardcoded object
+  images={images}
+/>
+```
+
+---
+
+## 🔧 STEP 6: CHECK — Reference Working Implementation
+
+The **Create Property Flyer** in the Marketing tab WORKS correctly. Copy that pattern:
+
+```tsx
+// In create-flyer-dialog.tsx (WORKING implementation):
+
+// This dialog correctly populates fields from MLS data
+// Check how it does it and replicate in AdvancedFlyerGenerator
+
+// Key patterns to copy:
+// 1. How it accesses transaction.mlsData
+// 2. How it formats price with Intl.NumberFormat
+// 3. How it builds address from components
+// 4. How it populates form fields
+```
+
+---
+
+## ✅ VERIFICATION CHECKLIST
+
+After applying fixes, verify:
+
+### Console Logs Should Show:
+```
+=== DIAGNOSTIC: Advanced Flyer Builder ===
+Transaction: {id: "...", mlsNumber: "ACT7783651", mlsData: {...}}
+Transaction MLS Data: {listPrice: 499000, bedroomsTotal: 4, ...}
+Settings: {firstName: "Daryl", lastName: "Camingao", ...}
+
+🔄 POPULATING FORM FROM MLS DATA
+📝 Setting form values:
+  - price: $499,000
+  - address: 268 CHISHOLM TRL, BASTROP, TX 78602
+  - beds: 4
+  - baths: 4
+  - sqft: 2,671
+✅ Form populated successfully
+
+🔄 POPULATING AGENT DETAILS FROM SETTINGS
+📝 Setting agent values:
+  - agentName: Daryl Camingao
+  - agentTitle: AI Web Developer
+  - phone: (555) 123-4567
+✅ Agent details populated
+
+🖼️ FlyerPreview receiving data: {price: "$499,000", address: "268 CHISHOLM TRL...", ...}
+```
+
+### Left Pane Should Show:
+- [ ] Listed Price: **$499,000** (or actual MLS price)
+- [ ] Beds: **4**
+- [ ] Baths: **4**
+- [ ] Sq Ft: **2,671**
+- [ ] Agent Name: **Daryl Camingao**
+- [ ] Title: **AI Web Developer**
+- [ ] Phone: **(555) 123-4567** or actual phone
+- [ ] Property Address: **268 CHISHOLM TRL, BASTROP, TX 78602**
+
+### Live Preview Should Show:
+- [ ] "LISTED AT $499,000" (NOT $499,999)
+- [ ] Same values as left pane
+- [ ] Changes in left pane immediately reflect in preview
+
+---
+
+## 🔍 COMMON ISSUES TO CHECK
+
+### Issue: MLS data exists but fields still empty
+**Cause:** Form field names don't match
+**Fix:** Check form.register() names match setValue() names
+
+### Issue: Console shows data but form doesn't update
+**Cause:** Form not re-rendering
+**Fix:** Ensure form.setValue triggers re-render, try form.trigger() after setValue
+
+### Issue: Live Preview shows old values
+**Cause:** FlyerPreview not using watched values
+**Fix:** Pass form.watch() directly to FlyerPreview, not cached state
+
+### Issue: $499,999 still showing
+**Cause:** Hardcoded fallback value in FlyerPreview
+**Fix:** Search for "499" in codebase and remove all hardcoded prices
+
+---
+
+## 📋 SUMMARY
+
+| Step | Action |
+|------|--------|
+| 1 | Add diagnostic console.logs |
+| 2 | Force form population from MLS in useEffect |
+| 3 | Force agent details from Settings in useEffect |
+| 4 | Remove ALL hardcoded values in FlyerPreview |
+| 5 | Ensure form.watch() feeds FlyerPreview |
+| 6 | Reference working create-flyer-dialog.tsx |
+
+**Priority: CRITICAL — This blocks production use of the Advanced Flyer Builder**
