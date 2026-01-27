@@ -544,6 +544,7 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
           photos: compPhotos,
           mlsNumber: comp.mlsNumber || "",
           status: comp.standardStatus || comp.status || "",
+          lastStatus: comp.lastStatus || "",
           listDate: comp.listDate || "",
           soldDate: comp.soldDate || comp.closeDate || null,
           map: (compLat && compLng) ? {
@@ -624,6 +625,7 @@ export async function fetchSimilarListings(mlsNumber: string, radius: number = 5
         photos: listingPhotos,
         mlsNumber: listing.mlsNumber || "",
         status: listing.standardStatus || listing.status || "",
+        lastStatus: listing.lastStatus || "",
         listDate: listing.listDate || "",
         map: (listingLat && listingLng) ? {
           latitude: parseFloat(listingLat),
@@ -1363,7 +1365,9 @@ export async function searchNearbyComparables(
         sqft: typeof sqft === 'string' ? parseInt(sqft) || 0 : sqft,
         daysOnMarket: dom,
         distance,
+        // Include lastStatus for sold listings (lastStatus=Sld indicates sold)
         status: listing.standardStatus || listing.status || '',
+        lastStatus: listing.lastStatus || '',
         listDate: listing.listDate || listing.timestamps?.listDate || undefined,
         photos: photos.slice(0, 10),
         imageUrl: photos[0],

@@ -229,13 +229,20 @@ export default function CMAPresentationBuilder() {
   });
 
   // Helper to normalize MLS status codes to human-readable status (stable reference)
+  // Supports: standardStatus, status, lastStatus, and Repliers-specific codes (Sld, Lsd, etc.)
   const normalizeStatus = useCallback((status: string | undefined | null): string => {
     if (!status) return 'Active';
-    const s = status.toLowerCase();
-    if (s === 'u' || s === 'sc' || s.includes('pending') || s.includes('contract')) return 'Pending';
+    const s = status.toLowerCase().trim();
+    // Pending/Under Contract: U, Sc, Pc (price changed), etc.
+    if (s === 'u' || s === 'sc' || s === 'pc' || s.includes('pending') || s.includes('contract')) return 'Pending';
+    // Active listings
     if (s === 'a' || s.includes('active')) return 'Active';
-    if (s === 'c' || s === 's' || s.includes('sold') || s.includes('closed')) return 'Closed';
-    if (s.includes('expired') || s.includes('withdrawn') || s.includes('cancel')) return 'Off Market';
+    // Closed/Sold: C, S, Sld (Repliers sold code), Lsd (leased)
+    if (s === 'c' || s === 's' || s === 'sld' || s === 'lsd' || s.includes('sold') || s.includes('closed') || s.includes('leased')) return 'Closed';
+    // Off Market: Expired, Withdrawn, Cancelled
+    if (s.includes('expired') || s.includes('withdrawn') || s.includes('cancel') || s === 'exp' || s === 'wdn') return 'Off Market';
+    // Back on Market
+    if (s === 'bom' || s.includes('back on market')) return 'Active';
     return status;
   }, []);
 
@@ -265,6 +272,16 @@ export default function CMAPresentationBuilder() {
       rawComparables = propertiesData;
     } else {
       rawComparables = transactionCmaData;
+    }
+    
+    // Debug: Log the data source and status fields
+    if (rawComparables.length > 0) {
+      console.log('[CMA Debug] Data source:', propertiesData.length > 0 ? 'propertiesData' : 'transactionCmaData');
+      console.log('[CMA Debug] First comparable status fields:', {
+        status: rawComparables[0]?.status,
+        standardStatus: rawComparables[0]?.standardStatus,
+        lastStatus: rawComparables[0]?.lastStatus,
+      });
     }
     
     return rawComparables.map((comp: any, index: number) => {
@@ -308,11 +325,12 @@ export default function CMAPresentationBuilder() {
       // Price fields
       listPrice: parsedPrice,
       closePrice: comp.closePrice || comp.soldPrice || 
-        (normalizeStatus(comp.status) === 'Closed' || normalizeStatus(comp.standardStatus) === 'Closed' ? parsedPrice : null),
+        (normalizeStatus(comp.status || comp.lastStatus) === 'Closed' || normalizeStatus(comp.standardStatus || comp.lastStatus) === 'Closed' ? parsedPrice : null),
       soldPrice: comp.soldPrice || comp.closePrice,
       // Status - normalized to human-readable format
-      standardStatus: normalizeStatus(comp.standardStatus || comp.status),
-      status: normalizeStatus(comp.status || comp.standardStatus),
+      // Check all possible status fields: standardStatus, status, lastStatus (for sold/closed)
+      standardStatus: normalizeStatus(comp.standardStatus || comp.status || comp.lastStatus),
+      status: normalizeStatus(comp.status || comp.standardStatus || comp.lastStatus),
       // Bedroom/bathroom fields - multiple aliases for different components
       bedroomsTotal: parsedBeds,
       beds: parsedBeds,
