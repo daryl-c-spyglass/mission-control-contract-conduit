@@ -68,9 +68,15 @@ Preferred communication style: Simple, everyday language.
   - Widget types: AgentResume, Comps (Compare/Map/Stats tabs), TimeToSell, SuggestedPrice, AveragePricePerAcre, SpyglassResources, Static images
   - Data integration: Uses `useAgentProfile` hook for agent data, transforms `CMAComparable[]` to `CmaProperty[]` for presentation
   - Static widget images stored in `public/cma-widgets/` (1.png through 24.png map to widgets 11-34)
+- **CMA Print Preview System**: Pre-download slide preview with data validation:
+  - Files: `components/CmaPrintPreview.tsx` (modal), `components/preview-slides.tsx` (slide generation)
+  - Features: Single/grid view modes, zoom controls (50%-150%), keyboard navigation (Escape, Arrow keys)
+  - Data Issue Detection: Validates agent profile, subject property (address/price/sqft/photos), and comparables (price/photos/coordinates/DOM/sqft)
+  - Slide Alignment: Preview matches PDF exactly (cover + 33 WIDGETS + 3 PropertyDetail pages for top comparables)
+  - Integration: Opens via Eye icon in CMA presentation header, download proceeds from modal after review
 - **CMA PDF Export System**: Client-side PDF generation using @react-pdf/renderer:
   - Files: `pdf/CmaPdfDocument.tsx` (main document), `pdf/styles.ts` (Spyglass branding styles)
-  - Button: `PdfDownloadButton.tsx` in presentation header, uses `pdf().toBlob()` for generation
+  - Button: `PdfDownloadButton.tsx` in presentation header, opens Print Preview modal
   - Features: Landscape Letter format, all 33 widgets covered, specialized pages for dynamic content
   - Page Types: CoverPage, AgentResumePage, ComparablesSummaryPage, TimeToSellPage, SuggestedPricePage, AveragePricePerAcrePage, ListingActionPlanPage, ClientTestimonialsPage, ListingWithSpyglassPage, SpyglassResourcesPage, MarketingPage, ThankYouPage, StaticImagePage (fallback), PropertyDetailPage (top 3 comparables)
   - Data Flow: CmaPresentationPlayer → Header → PdfDownloadButton → CmaPdfDocument (props: agent, comparables, subjectProperty, averageDaysOnMarket, suggestedListPrice, avgPricePerAcre, preparedFor)
