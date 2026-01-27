@@ -15,6 +15,7 @@ import {
 } from 'recharts';
 import type { CmaProperty } from '../types';
 import { PropertyDetailModal } from './PropertyDetailModal';
+import { extractLotAcres, extractPrice } from '@/lib/cma-data-utils';
 
 interface AveragePriceAcreWidgetProps {
   comparables: CmaProperty[];
@@ -214,12 +215,19 @@ export function AveragePriceAcreWidget({
 
   // Minimum lot size to exclude condos/townhomes with artificially high $/acre
   const MIN_LOT_SIZE_ACRES = 0.05; // 2,178 sqft
+  // Sanity checks for price per acre (Austin market)
+  const MAX_PRICE_PER_ACRE = 20_000_000; // $20M/acre max for Austin residential
+  const MIN_PRICE_PER_ACRE = 10_000; // $10K/acre minimum
 
-  // Helper to calculate acres from various field formats
-  const getAcres = (p: CmaProperty) => {
-    return p.lotSizeAcres ?? p.lot?.acres ?? p.acres ?? 
-      (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : 0) ?? 
-      (p.lotSize ? p.lotSize / 43560 : 0);
+  // Helper to calculate acres using the improved utility function
+  const getAcres = (p: CmaProperty): number => {
+    const acres = extractLotAcres(p);
+    return acres ?? 0;
+  };
+
+  // Helper to get price using utility function
+  const getPrice = (p: CmaProperty): number => {
+    return extractPrice(p) ?? 0;
   };
 
   // All properties with any acreage data (for tracking excluded count)
@@ -249,14 +257,24 @@ export function AveragePriceAcreWidget({
       })
       .map(p => {
         const acres = getAcres(p);
-        const price = p.soldPrice || p.price;
-        const pricePerAcre = p.pricePerAcre ?? (acres && acres > 0 ? Math.round(price / acres) : 0);
+        const price = getPrice(p);
+        // Calculate price per acre with existing value fallback
+        let pricePerAcre = p.pricePerAcre ?? (acres && acres > 0 && price > 0 ? Math.round(price / acres) : 0);
+        
+        // Sanity check: exclude impossible values
+        if (pricePerAcre > MAX_PRICE_PER_ACRE || pricePerAcre < MIN_PRICE_PER_ACRE) {
+          // If value is unreasonable, it's likely a data error - set to 0 to exclude from avg
+          pricePerAcre = 0;
+        }
+        
         return {
           ...p,
           lotSizeAcres: acres as number,
           pricePerAcre: pricePerAcre as number,
         };
-      });
+      })
+      // Filter out properties with invalid price per acre
+      .filter(p => p.pricePerAcre > 0);
     
     return withAcreage;
   }, [comparables, allPropertiesWithAcreage.length, excludedSmallLotCount]);
@@ -282,13 +300,14 @@ export function AveragePriceAcreWidget({
 
   const subjectWithAcreage = useMemo<PropertyWithAcreage | null>(() => {
     if (!subjectProperty) return null;
-    const acres = subjectProperty.lotSizeAcres ?? subjectProperty.lot?.acres ?? subjectProperty.acres ?? (subjectProperty.lotSizeSquareFeet ? subjectProperty.lotSizeSquareFeet / 43560 : 0) ?? (subjectProperty.lotSize ? subjectProperty.lotSize / 43560 : 0);
+    const acres = getAcres(subjectProperty);
     if (!acres || acres <= 0) return null;
-    const price = subjectProperty.soldPrice || subjectProperty.price || (avgPricePerAcre * acres);
+    const price = getPrice(subjectProperty) || (avgPricePerAcre * acres);
+    const pricePerAcre = subjectProperty.pricePerAcre ?? (price > 0 ? Math.round(price / acres) : 0);
     return {
       ...subjectProperty,
-      lotSizeAcres: acres as number,
-      pricePerAcre: subjectProperty.pricePerAcre ?? Math.round(price / acres),
+      lotSizeAcres: acres,
+      pricePerAcre: pricePerAcre,
       isSubject: true,
     };
   }, [subjectProperty, avgPricePerAcre]);

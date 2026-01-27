@@ -512,17 +512,38 @@ const AveragePricePerAcrePage = ({
   slideNumber: number; 
   totalSlides: number;
 }) => {
+  // Sanity checks for price per acre values
+  const MIN_LOT_SIZE_ACRES = 0.05;
+  const MAX_PRICE_PER_ACRE = 20_000_000; // $20M/acre max
+  const MIN_PRICE_PER_ACRE = 10_000; // $10K/acre minimum
+  
   const propsWithAcreData = comparables
     .map(c => ({
       ...c,
       acres: extractLotAcres(c),
       pricePerAcreCalc: calculatePricePerAcre(c),
     }))
-    .filter(c => c.acres !== null && c.acres > 0);
+    .filter(c => {
+      // Filter out invalid data
+      if (c.acres === null || c.acres <= 0) return false;
+      if (c.acres < MIN_LOT_SIZE_ACRES) return false; // Exclude tiny lots
+      if (c.pricePerAcreCalc === null) return false;
+      // Sanity check the price per acre
+      if (c.pricePerAcreCalc > MAX_PRICE_PER_ACRE || c.pricePerAcreCalc < MIN_PRICE_PER_ACRE) return false;
+      return true;
+    });
   
-  const stats = calculateCMAStats(comparables);
-  const avgPrice = avgPricePerAcre || stats.avgPricePerAcre || 0;
-  const hasValidData = avgPrice > 0;
+  // Calculate average from filtered data
+  const validPricesPerAcre = propsWithAcreData.map(c => c.pricePerAcreCalc!).filter(p => p > 0);
+  const calculatedAvg = validPricesPerAcre.length > 0 
+    ? Math.round(validPricesPerAcre.reduce((a, b) => a + b, 0) / validPricesPerAcre.length) 
+    : 0;
+  
+  // Use provided value or calculated value
+  let avgPrice = avgPricePerAcre || calculatedAvg || 0;
+  // Sanity check the provided value too
+  if (avgPrice > MAX_PRICE_PER_ACRE) avgPrice = calculatedAvg || 0;
+  const hasValidData = avgPrice > 0 && avgPrice <= MAX_PRICE_PER_ACRE;
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>

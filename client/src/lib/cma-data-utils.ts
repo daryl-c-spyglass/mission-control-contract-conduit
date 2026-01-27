@@ -71,43 +71,116 @@ export function extractDOM(comp: any): number | null {
 
 /**
  * Safely extract lot size in acres
+ * Handles all Repliers API field formats with proper unit detection
  */
 export function extractLotAcres(comp: any): number | null {
   if (!comp) return null;
   
-  const acresFields = ['lotSizeAcres', 'acres', 'lotAcres'];
-  for (const field of acresFields) {
-    const value = comp?.[field];
-    if (value != null) {
-      const num = typeof value === 'string' ? parseFloat(value) : Number(value);
-      if (!isNaN(num) && num > 0) {
-        return num;
-      }
-    }
-  }
+  const SQFT_PER_ACRE = 43560;
   
-  if (comp?.lot?.acres) {
-    const num = typeof comp.lot.acres === 'string' ? parseFloat(comp.lot.acres) : Number(comp.lot.acres);
+  // Helper to parse numeric values from various formats
+  const parseNum = (value: any): number => {
+    if (value == null) return NaN;
+    const str = String(value).replace(/[,$]/g, '');
+    return parseFloat(str);
+  };
+  
+  // Priority 1: Direct acres fields (already in correct units)
+  const acresFields = ['lotSizeAcres', 'acres', 'lotAcres', 'lot_size_acres'];
+  for (const field of acresFields) {
+    const num = parseNum(comp?.[field]);
     if (!isNaN(num) && num > 0) {
       return num;
     }
   }
   
-  const sqftFields = ['lotSizeSqFt', 'lotSquareFeet', 'lotSizeSquareFeet'];
+  // Priority 2: Nested lot.acres (Repliers API format)
+  if (comp?.lot?.acres != null) {
+    const num = parseNum(comp.lot.acres);
+    if (!isNaN(num) && num > 0) {
+      return num;
+    }
+  }
+  
+  // Priority 3: lotSizeSquareFeet and similar (convert to acres)
+  const sqftFields = ['lotSizeSqFt', 'lotSquareFeet', 'lotSizeSquareFeet', 'lotSizeSF'];
   for (const field of sqftFields) {
-    const value = comp?.[field];
-    if (value != null) {
-      const num = typeof value === 'string' ? parseFloat(value.replace(/,/g, '')) : Number(value);
+    const num = parseNum(comp?.[field]);
+    if (!isNaN(num) && num > 0) {
+      return num / SQFT_PER_ACRE;
+    }
+  }
+  
+  // Priority 4: Nested lot.squareFeet (Repliers API format)
+  if (comp?.lot?.squareFeet != null) {
+    const num = parseNum(comp.lot.squareFeet);
+    if (!isNaN(num) && num > 0) {
+      return num / SQFT_PER_ACRE;
+    }
+  }
+  
+  // Priority 5: lotSizeArea (determine unit by magnitude)
+  // Values > 100 are likely sqft, values < 100 are likely acres
+  if (comp?.lotSizeArea != null) {
+    const num = parseNum(comp.lotSizeArea);
+    if (!isNaN(num) && num > 0) {
+      if (num > 100) {
+        return num / SQFT_PER_ACRE;
+      }
+      return num;
+    }
+  }
+  
+  // Priority 6: lotSize - could be string with unit or number
+  // Repliers returns "8,328.67 sqft" or similar
+  if (comp?.lot?.size != null) {
+    const sizeVal = comp.lot.size;
+    if (typeof sizeVal === 'string') {
+      const lowerSize = sizeVal.toLowerCase();
+      const numMatch = sizeVal.match(/[\d,.]+/);
+      if (numMatch) {
+        const num = parseNum(numMatch[0]);
+        if (!isNaN(num) && num > 0) {
+          if (lowerSize.includes('acre')) {
+            return num;
+          }
+          // Default to sqft for lot.size
+          return num / SQFT_PER_ACRE;
+        }
+      }
+    } else {
+      const num = parseNum(sizeVal);
       if (!isNaN(num) && num > 0) {
-        return num / 43560;
+        // lot.size without unit - determine by magnitude
+        return num > 100 ? num / SQFT_PER_ACRE : num;
       }
     }
   }
   
-  if (comp?.lot?.squareFeet) {
-    const num = typeof comp.lot.squareFeet === 'string' ? parseFloat(comp.lot.squareFeet) : Number(comp.lot.squareFeet);
-    if (!isNaN(num) && num > 0) {
-      return num / 43560;
+  // Priority 7: Generic lotSize field
+  if (comp?.lotSize != null) {
+    const lotSize = comp.lotSize;
+    if (typeof lotSize === 'string') {
+      const lowerSize = lotSize.toLowerCase();
+      const numMatch = lotSize.match(/[\d,.]+/);
+      if (numMatch) {
+        const num = parseNum(numMatch[0]);
+        if (!isNaN(num) && num > 0) {
+          if (lowerSize.includes('acre')) {
+            return num;
+          } else if (lowerSize.includes('sq') || lowerSize.includes('ft')) {
+            return num / SQFT_PER_ACRE;
+          }
+          // No unit - determine by magnitude
+          return num > 100 ? num / SQFT_PER_ACRE : num;
+        }
+      }
+    } else {
+      const num = parseNum(lotSize);
+      if (!isNaN(num) && num > 0) {
+        // Determine unit by magnitude
+        return num > 100 ? num / SQFT_PER_ACRE : num;
+      }
     }
   }
   
@@ -240,6 +313,7 @@ export function normalizeStatus(status: string): string {
 
 /**
  * Calculate all stats from comparables array
+ * Applies sanity checks for price per acre to exclude impossible values
  */
 export function calculateCMAStats(comparables: any[]) {
   if (!comparables || comparables.length === 0) {
@@ -255,10 +329,28 @@ export function calculateCMAStats(comparables: any[]) {
     };
   }
 
+  // Sanity check constants for price per acre
+  const MIN_LOT_SIZE_ACRES = 0.05;
+  const MAX_PRICE_PER_ACRE = 20_000_000; // $20M/acre max
+  const MIN_PRICE_PER_ACRE = 10_000; // $10K/acre minimum
+
   const prices = comparables.map(c => extractPrice(c)).filter((p): p is number => p !== null);
   const pricesPerSqft = comparables.map(c => calculatePricePerSqft(c)).filter((p): p is number => p !== null);
   const domValues = comparables.map(c => extractDOM(c)).filter((d): d is number => d !== null);
-  const pricesPerAcre = comparables.map(c => calculatePricePerAcre(c)).filter((p): p is number => p !== null);
+  
+  // Filter out impossible price per acre values
+  const pricesPerAcre = comparables
+    .map(c => {
+      const acres = extractLotAcres(c);
+      const pricePerAcre = calculatePricePerAcre(c);
+      // Apply sanity checks
+      if (acres !== null && acres < MIN_LOT_SIZE_ACRES) return null;
+      if (pricePerAcre !== null) {
+        if (pricePerAcre > MAX_PRICE_PER_ACRE || pricePerAcre < MIN_PRICE_PER_ACRE) return null;
+      }
+      return pricePerAcre;
+    })
+    .filter((p): p is number => p !== null);
 
   const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
 
