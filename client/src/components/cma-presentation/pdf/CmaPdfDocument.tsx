@@ -1,7 +1,7 @@
 import { Document, Page, View, Text, Image } from '@react-pdf/renderer';
 import { styles, COLORS } from './styles';
 import type { AgentProfile, CmaProperty } from '../types';
-import { WIDGETS, MARKETING_TEXT, SAMPLE_REVIEWS, type Review } from '../constants/widgets';
+import { WIDGETS, MARKETING_TEXT, LISTING_ACTION_PLAN_TEXT, SAMPLE_REVIEWS, type Review } from '../constants/widgets';
 import {
   extractPrice,
   extractSqft,
@@ -67,26 +67,23 @@ const CoverPage = ({ propertyAddress, agent, preparedFor, baseUrl, slideNumber, 
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>
-      <PageHeader title="COMPARATIVE MARKET ANALYSIS" slideNumber={slideNumber} totalSlides={totalSlides} />
-      <View style={styles.content}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Image src={logoUrl} style={{ width: 120, height: 40, marginBottom: 30 }} />
-          <Text style={{ fontSize: 28, fontWeight: 700, color: COLORS.textPrimary, textAlign: 'center', marginBottom: 30 }}>
-            COMPARATIVE MARKET ANALYSIS
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}>
+        <Image src={logoUrl} style={{ height: 48, marginBottom: 24 }} />
+        <Text style={{ fontSize: 24, fontWeight: 700, color: '#18181b', textAlign: 'center', marginBottom: 24 }}>
+          COMPARATIVE MARKET ANALYSIS
+        </Text>
+        <Text style={{ fontSize: 18, color: '#3f3f46', textAlign: 'center', marginBottom: 32 }}>
+          {propertyAddress}
+        </Text>
+        {preparedFor && (
+          <Text style={{ fontSize: 12, color: '#71717a', textAlign: 'center', marginBottom: 16 }}>
+            Prepared for {preparedFor}
           </Text>
-          <Text style={{ fontSize: 18, color: COLORS.darkGray, textAlign: 'center', marginBottom: 40 }}>
-            {propertyAddress}
-          </Text>
-          {preparedFor && (
-            <Text style={{ fontSize: 12, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 20 }}>
-              Prepared for {preparedFor}
-            </Text>
-          )}
-          <View style={{ marginTop: 20, alignItems: 'center' }}>
-            <Text style={{ fontSize: 12, color: COLORS.textSecondary, textAlign: 'center' }}>Prepared by</Text>
-            <Text style={{ fontSize: 16, fontWeight: 600, color: COLORS.textPrimary, textAlign: 'center', marginTop: 4 }}>{agentName}</Text>
-            <Text style={{ fontSize: 12, color: COLORS.darkGray, textAlign: 'center', marginTop: 2 }}>{agent.company || 'Spyglass Realty'}</Text>
-          </View>
+        )}
+        <View style={{ marginTop: 16, alignItems: 'center' }}>
+          <Text style={{ fontSize: 14, color: '#71717a', textAlign: 'center' }}>Prepared by</Text>
+          <Text style={{ fontSize: 16, fontWeight: 600, color: '#18181b', textAlign: 'center', marginTop: 4 }}>{agentName}</Text>
+          <Text style={{ fontSize: 14, color: '#52525b', textAlign: 'center', marginTop: 2 }}>{agent.company || 'Spyglass Realty'}</Text>
         </View>
       </View>
       <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} baseUrl={baseUrl} />
@@ -101,44 +98,28 @@ const AgentResumePage = ({ agent, slideNumber, totalSlides }: { agent: AgentProf
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>
-      <PageHeader title="MEET YOUR AGENT" slideNumber={slideNumber} totalSlides={totalSlides} />
+      <PageHeader title="AGENT RESUME" slideNumber={slideNumber} totalSlides={totalSlides} />
       <View style={styles.content}>
-        <View style={{ flexDirection: 'row', gap: 30 }}>
-          <View style={{ width: '35%' }}>
-            {agentPhoto ? (
-              <Image src={agentPhoto} style={{ width: '100%', height: 200, borderRadius: 4, objectFit: 'cover' }} />
-            ) : (
-              <View style={{ width: '100%', height: 200, backgroundColor: COLORS.lightGray, borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 48, color: COLORS.mediumGray }}>{agentInitials}</Text>
-              </View>
-            )}
-            <View style={{ backgroundColor: COLORS.darkBackground, padding: 12, borderRadius: 4, marginTop: 12 }}>
-              <Text style={{ fontSize: 14, fontWeight: 700, color: COLORS.white }}>{agentName}</Text>
-              <Text style={{ fontSize: 9, color: COLORS.mediumGray, marginTop: 2 }}>REALTOR | {agent.company || 'Spyglass Realty'}</Text>
-              {agent.phone && <Text style={{ fontSize: 9, color: COLORS.spyglassOrange, marginTop: 8 }}>{agent.phone}</Text>}
-              {agent.email && <Text style={{ fontSize: 9, color: COLORS.mediumGray }}>{agent.email}</Text>}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 16, marginBottom: 16 }}>
+          {agentPhoto ? (
+            <Image src={agentPhoto} style={{ width: 64, height: 64, borderRadius: 32, objectFit: 'cover' }} />
+          ) : (
+            <View style={{ width: 64, height: 64, backgroundColor: '#e4e4e7', borderRadius: 32, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 24, color: '#a1a1aa' }}>{agentInitials}</Text>
             </View>
+          )}
+          <View>
+            <Text style={{ fontSize: 18, fontWeight: 700, color: '#222222' }}>{agentName}</Text>
+            <Text style={{ fontSize: 14, color: '#52525b', marginTop: 2 }}>{agent.company || 'Spyglass Realty'}</Text>
+            {agent.phone && <Text style={{ fontSize: 14, color: '#71717a', marginTop: 2 }}>{agent.phone}</Text>}
+            {agent.email && <Text style={{ fontSize: 14, color: '#71717a', marginTop: 2 }}>{agent.email}</Text>}
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 20, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 12 }}>Your Austin Real Estate Expert</Text>
-            <Text style={{ fontSize: 10, color: COLORS.textSecondary, lineHeight: 1.6 }}>
-              {agent.bio || "As a dedicated Austin real estate professional, I specialize in helping families find their perfect home in Central Texas. My deep knowledge of Austin's diverse neighborhoods ensures you'll get expert guidance tailored to your needs."}
-            </Text>
-            <View style={{ flexDirection: 'row', marginTop: 24, gap: 8 }}>
-              <View style={{ flex: 1, backgroundColor: COLORS.lightGray, padding: 12, borderRadius: 4, alignItems: 'center' }}>
-                <Text style={{ fontSize: 24, fontWeight: 700, color: COLORS.spyglassOrange }}>150+</Text>
-                <Text style={{ fontSize: 8, color: COLORS.textSecondary, textTransform: 'uppercase' }}>Homes Sold</Text>
-              </View>
-              <View style={{ flex: 1, backgroundColor: COLORS.lightGray, padding: 12, borderRadius: 4, alignItems: 'center' }}>
-                <Text style={{ fontSize: 24, fontWeight: 700, color: COLORS.spyglassOrange }}>$85M</Text>
-                <Text style={{ fontSize: 8, color: COLORS.textSecondary, textTransform: 'uppercase' }}>Sales Volume</Text>
-              </View>
-              <View style={{ flex: 1, backgroundColor: COLORS.lightGray, padding: 12, borderRadius: 4, alignItems: 'center' }}>
-                <Text style={{ fontSize: 24, fontWeight: 700, color: COLORS.spyglassOrange }}>4.9</Text>
-                <Text style={{ fontSize: 8, color: COLORS.textSecondary, textTransform: 'uppercase' }}>Client Rating</Text>
-              </View>
-            </View>
-          </View>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 14, fontWeight: 500, marginBottom: 8 }}>About</Text>
+          <Text style={{ fontSize: 14, color: '#52525b', lineHeight: 1.5 }}>
+            {agent.bio || 'Agent bio will appear here. Update your profile to add your professional biography.'}
+          </Text>
         </View>
       </View>
       <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
@@ -161,72 +142,50 @@ const ComparablesSummaryPage = ({
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>
-      <PageHeader title="COMPARABLE PROPERTIES" slideNumber={slideNumber} totalSlides={totalSlides} />
+      <PageHeader title="COMPS" slideNumber={slideNumber} totalSlides={totalSlides} />
       <View style={styles.content}>
-        <View style={styles.statsRowPro}>
-          <View style={styles.statBoxPro}>
-            <Text style={styles.statLabelPro}>Properties</Text>
-            <Text style={styles.statValuePro}>{stats.count}</Text>
+        {/* Stats boxes matching Preview */}
+        <View style={{ flexDirection: 'row', gap: 16, marginBottom: 16 }}>
+          <View style={{ flex: 1, backgroundColor: '#fafafa', padding: 12, borderRadius: 4, alignItems: 'center' }}>
+            <Text style={{ fontSize: 18, fontWeight: 700, color: '#EF4923' }}>{comparables.length}</Text>
+            <Text style={{ fontSize: 12, color: '#71717a' }}>Properties</Text>
           </View>
-          <View style={styles.statBoxHighlight}>
-            <Text style={styles.statLabelWhite}>Average Price</Text>
-            <Text style={styles.statValueWhite}>{formatPrice(stats.avgPrice)}</Text>
+          <View style={{ flex: 1, backgroundColor: '#fafafa', padding: 12, borderRadius: 4, alignItems: 'center' }}>
+            <Text style={{ fontSize: 18, fontWeight: 700, color: '#222222' }}>{stats.avgPrice ? formatPrice(stats.avgPrice) : 'N/A'}</Text>
+            <Text style={{ fontSize: 12, color: '#71717a' }}>Avg Price</Text>
           </View>
-          <View style={styles.statBoxHighlight}>
-            <Text style={styles.statLabelWhite}>Avg $/Sq Ft</Text>
-            <Text style={styles.statValueWhite}>${stats.avgPricePerSqft || 'N/A'}</Text>
-          </View>
-          <View style={styles.statBoxPro}>
-            <Text style={styles.statLabelPro}>Avg Days on Market</Text>
-            <Text style={styles.statValuePro}>{stats.avgDOM ?? 'N/A'} days</Text>
+          <View style={{ flex: 1, backgroundColor: '#fafafa', padding: 12, borderRadius: 4, alignItems: 'center' }}>
+            <Text style={{ fontSize: 18, fontWeight: 700, color: '#222222' }}>{stats.avgDOM !== null ? `${Math.round(stats.avgDOM)} days` : 'N/A'}</Text>
+            <Text style={{ fontSize: 12, color: '#71717a' }}>Avg DOM</Text>
           </View>
         </View>
         
-        <View style={styles.table}>
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableHeaderCell, { width: '28%' }]}>Address</Text>
-            <Text style={[styles.tableHeaderCell, { width: '14%', textAlign: 'right' }]}>Price</Text>
-            <Text style={[styles.tableHeaderCell, { width: '10%', textAlign: 'center' }]}>Bed/Bath</Text>
-            <Text style={[styles.tableHeaderCell, { width: '12%', textAlign: 'right' }]}>Sq Ft</Text>
-            <Text style={[styles.tableHeaderCell, { width: '10%', textAlign: 'right' }]}>$/SqFt</Text>
-            <Text style={[styles.tableHeaderCell, { width: '14%', textAlign: 'center' }]}>Status</Text>
-            <Text style={[styles.tableHeaderCell, { width: '10%', textAlign: 'right' }]}>DOM</Text>
+        {/* Simple table matching Preview */}
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#e4e4e7', paddingBottom: 4, marginBottom: 4 }}>
+            <Text style={{ flex: 2, fontSize: 12, fontWeight: 600 }}>Address</Text>
+            <Text style={{ flex: 1, fontSize: 12, fontWeight: 600, textAlign: 'right' }}>Price</Text>
+            <Text style={{ flex: 1, fontSize: 12, fontWeight: 600, textAlign: 'right' }}>Sq Ft</Text>
+            <Text style={{ flex: 1, fontSize: 12, fontWeight: 600, textAlign: 'right' }}>Status</Text>
           </View>
           {comparables.map((comp, i) => {
-            const price = extractPrice(comp);
-            const sqft = extractSqft(comp);
-            const pricePerSqft = calculatePricePerSqft(comp);
-            const dom = extractDOM(comp);
-            const beds = extractBeds(comp);
-            const baths = extractBaths(comp);
             const status = normalizeStatus(comp.status);
-            const isClosed = status.toLowerCase() === 'closed';
-            const address = extractFullAddress(comp);
-            const streetOnly = address.split(',')[0] || address;
+            const statusColor = getStatusColor(status);
             
             return (
-              <View key={comp.id || i} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}>
-                <View style={{ width: '28%' }}>
-                  <Text style={styles.tableCellBold}>{streetOnly}</Text>
-                  <Text style={{ fontSize: 7, color: COLORS.textSecondary }}>Austin, TX</Text>
-                </View>
-                <Text style={[styles.tableCellOrange, { width: '14%', textAlign: 'right' }]}>{formatPrice(price)}</Text>
-                <Text style={[styles.tableCell, { width: '10%', textAlign: 'center' }]}>{beds}/{baths}</Text>
-                <Text style={[styles.tableCell, { width: '12%', textAlign: 'right' }]}>{formatNumber(sqft)}</Text>
-                <Text style={[styles.tableCell, { width: '10%', textAlign: 'right' }]}>{pricePerSqft ? `$${pricePerSqft}` : '-'}</Text>
-                <View style={{ width: '14%', alignItems: 'center' }}>
-                  <View style={isClosed ? styles.statusBadgeClosed : styles.statusBadgeActive}>
-                    <Text style={isClosed ? styles.statusTextClosed : styles.statusTextActive}>{status}</Text>
+              <View key={comp.id || i} style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#f4f4f5', paddingVertical: 4 }}>
+                <Text style={{ flex: 2, fontSize: 12, color: '#18181b' }} numberOfLines={1}>{extractFullAddress(comp) || 'Unknown'}</Text>
+                <Text style={{ flex: 1, fontSize: 12, textAlign: 'right' }}>{formatPrice(extractPrice(comp))}</Text>
+                <Text style={{ flex: 1, fontSize: 12, textAlign: 'right' }}>{formatNumber(extractSqft(comp))}</Text>
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                  <View style={{ paddingHorizontal: 4, paddingVertical: 2, borderRadius: 2, backgroundColor: statusColor + '20' }}>
+                    <Text style={{ fontSize: 10, color: statusColor }}>{status}</Text>
                   </View>
                 </View>
-                <Text style={[styles.tableCell, { width: '10%', textAlign: 'right' }]}>{dom != null ? dom : '-'}</Text>
               </View>
             );
           })}
         </View>
-        <Text style={{ fontSize: 8, color: COLORS.mediumGray, textAlign: 'center', marginTop: 12 }}>
-          Data sourced from Austin Board of REALTORS MLS. Information deemed reliable but not guaranteed.
-        </Text>
       </View>
       <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
     </Page>
@@ -246,90 +205,60 @@ const PropertyDetailPage = ({
 }) => {
   const price = extractPrice(property);
   const sqft = extractSqft(property);
-  const pricePerSqft = calculatePricePerSqft(property);
   const dom = extractDOM(property);
   const beds = extractBeds(property);
   const baths = extractBaths(property);
-  const lotAcres = extractLotAcres(property);
   const status = normalizeStatus(property.status);
-  const isClosed = status.toLowerCase() === 'closed';
   const address = extractFullAddress(property);
-  const streetOnly = address.split(',')[0] || address;
   const primaryPhoto = getPrimaryPhoto(property);
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>
-      <PageHeader title="COMPARABLE PROPERTY" slideNumber={slideNumber} totalSlides={totalSlides} />
+      <PageHeader title={`PROPERTY DETAILS - ${address || 'Property'}`} slideNumber={slideNumber} totalSlides={totalSlides} />
       <View style={styles.content}>
-        <View style={{ flexDirection: 'row', gap: 24 }}>
-          <View style={{ width: '45%' }}>
-            {primaryPhoto ? (
-              <Image src={primaryPhoto} style={{ width: '100%', height: 200, borderRadius: 4, objectFit: 'cover' }} />
-            ) : (
-              <View style={{ 
-                width: '100%', 
-                height: 200, 
-                backgroundColor: COLORS.lightGray, 
-                borderRadius: 4, 
-                alignItems: 'center', 
-                justifyContent: 'center' 
-              }}>
-                <Text style={{ fontSize: 11, color: COLORS.mediumGray }}>Property Photo</Text>
-                <Text style={{ fontSize: 9, color: COLORS.mediumGray, marginTop: 4 }}>(View in interactive presentation)</Text>
+        {/* Property Photo - matching Preview compact height */}
+        <View style={{ height: 96, borderRadius: 4, marginBottom: 12, overflow: 'hidden' }}>
+          {primaryPhoto ? (
+            <Image src={primaryPhoto} style={{ width: '100%', height: 96, objectFit: 'cover' }} />
+          ) : (
+            <View style={{ width: '100%', height: 96, backgroundColor: '#f4f4f5', alignItems: 'center', justifyContent: 'center' }}>
+              {/* Building icon placeholder - no emoji */}
+              <View style={{ width: 32, height: 32, borderWidth: 2, borderColor: '#a1a1aa', borderRadius: 4 }}>
+                <View style={{ position: 'absolute', top: 2, left: 2, right: 2, height: 6, borderBottomWidth: 2, borderColor: '#a1a1aa' }} />
+                <View style={{ position: 'absolute', bottom: 4, left: 8, width: 6, height: 10, borderWidth: 1, borderColor: '#a1a1aa' }} />
+                <View style={{ position: 'absolute', bottom: 4, right: 8, width: 6, height: 10, borderWidth: 1, borderColor: '#a1a1aa' }} />
               </View>
-            )}
-            <View style={{ marginTop: 12 }}>
-              <Text style={{ fontSize: 16, fontWeight: 700, color: COLORS.textPrimary }}>{streetOnly}</Text>
-              <Text style={{ fontSize: 10, color: COLORS.textSecondary, marginTop: 2 }}>
-                {getCityState(property) || 'Austin, TX'}
-              </Text>
             </View>
+          )}
+        </View>
+        
+        <Text style={{ fontSize: 14, fontWeight: 500, marginBottom: 8 }}>{address || 'Property Address'}</Text>
+        
+        {/* Grid of property details - matching Preview layout */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          <View style={{ width: '48%', flexDirection: 'row' }}>
+            <Text style={{ fontSize: 12, color: '#71717a' }}>Price: </Text>
+            <Text style={{ fontSize: 12, fontWeight: 500 }}>{formatPrice(price)}</Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-              <Text style={{ fontSize: 32, fontWeight: 700, color: COLORS.spyglassOrange }}>{formatPrice(price)}</Text>
-              <View style={isClosed ? styles.statusBadgeClosed : styles.statusBadgeActive}>
-                <Text style={isClosed ? styles.statusTextClosed : styles.statusTextActive}>{status}</Text>
-              </View>
-            </View>
-            
-            <View style={{ flexDirection: 'row', marginBottom: 16, gap: 12 }}>
-              <View style={{ flex: 1, backgroundColor: COLORS.lightGray, padding: 12, borderRadius: 4, alignItems: 'center' }}>
-                <Text style={{ fontSize: 18, fontWeight: 700, color: COLORS.textPrimary }}>{beds}</Text>
-                <Text style={{ fontSize: 8, color: COLORS.textSecondary, textTransform: 'uppercase' }}>Beds</Text>
-              </View>
-              <View style={{ flex: 1, backgroundColor: COLORS.lightGray, padding: 12, borderRadius: 4, alignItems: 'center' }}>
-                <Text style={{ fontSize: 18, fontWeight: 700, color: COLORS.textPrimary }}>{baths}</Text>
-                <Text style={{ fontSize: 8, color: COLORS.textSecondary, textTransform: 'uppercase' }}>Baths</Text>
-              </View>
-              <View style={{ flex: 1, backgroundColor: COLORS.lightGray, padding: 12, borderRadius: 4, alignItems: 'center' }}>
-                <Text style={{ fontSize: 18, fontWeight: 700, color: COLORS.textPrimary }}>{formatNumber(sqft)}</Text>
-                <Text style={{ fontSize: 8, color: COLORS.textSecondary, textTransform: 'uppercase' }}>Sq Ft</Text>
-              </View>
-            </View>
-            
-            <View style={{ backgroundColor: '#f9fafb', padding: 12, borderRadius: 4 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                <Text style={{ fontSize: 10, color: COLORS.textSecondary }}>Price per Sq Ft</Text>
-                <Text style={{ fontSize: 10, fontWeight: 600, color: COLORS.textPrimary }}>{pricePerSqft ? `$${pricePerSqft}` : 'N/A'}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                <Text style={{ fontSize: 10, color: COLORS.textSecondary }}>Days on Market</Text>
-                <Text style={{ fontSize: 10, fontWeight: 600, color: COLORS.textPrimary }}>{dom != null ? dom : 'N/A'}</Text>
-              </View>
-              {lotAcres != null && (
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <Text style={{ fontSize: 10, color: COLORS.textSecondary }}>Lot Size</Text>
-                  <Text style={{ fontSize: 10, fontWeight: 600, color: COLORS.textPrimary }}>{lotAcres.toFixed(2)} acres</Text>
-                </View>
-              )}
-              {property.yearBuilt && (
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={{ fontSize: 10, color: COLORS.textSecondary }}>Year Built</Text>
-                  <Text style={{ fontSize: 10, fontWeight: 600, color: COLORS.textPrimary }}>{property.yearBuilt}</Text>
-                </View>
-              )}
-            </View>
+          <View style={{ width: '48%', flexDirection: 'row' }}>
+            <Text style={{ fontSize: 12, color: '#71717a' }}>Sq Ft: </Text>
+            <Text style={{ fontSize: 12, fontWeight: 500 }}>{formatNumber(sqft)}</Text>
+          </View>
+          <View style={{ width: '48%', flexDirection: 'row' }}>
+            <Text style={{ fontSize: 12, color: '#71717a' }}>Beds: </Text>
+            <Text style={{ fontSize: 12, fontWeight: 500 }}>{beds ?? 'N/A'}</Text>
+          </View>
+          <View style={{ width: '48%', flexDirection: 'row' }}>
+            <Text style={{ fontSize: 12, color: '#71717a' }}>Baths: </Text>
+            <Text style={{ fontSize: 12, fontWeight: 500 }}>{baths ?? 'N/A'}</Text>
+          </View>
+          <View style={{ width: '48%', flexDirection: 'row' }}>
+            <Text style={{ fontSize: 12, color: '#71717a' }}>DOM: </Text>
+            <Text style={{ fontSize: 12, fontWeight: 500 }}>{dom ?? 'N/A'}</Text>
+          </View>
+          <View style={{ width: '48%', flexDirection: 'row' }}>
+            <Text style={{ fontSize: 12, color: '#71717a' }}>Status: </Text>
+            <Text style={{ fontSize: 12, fontWeight: 500 }}>{status}</Text>
           </View>
         </View>
       </View>
@@ -352,46 +281,24 @@ const TimeToSellPage = ({
   totalSlides: number;
 }) => {
   const stats = calculateCMAStats(comparables);
-  const avgDom = averageDaysOnMarket || stats.avgDOM || 0;
-  
-  const domValues = comparables.map(c => extractDOM(c)).filter((d): d is number => d !== null && d > 0);
-  const maxDom = domValues.length > 0 ? Math.max(...domValues) : 1;
+  const avgDays = averageDaysOnMarket ?? stats.avgDOM ?? 0;
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>
       <PageHeader title="TIME TO SELL" slideNumber={slideNumber} totalSlides={totalSlides} />
       <View style={styles.content}>
-        <Text style={styles.sectionTitle}>Average Days on Market</Text>
-        <View style={{ alignItems: 'center', marginVertical: 30 }}>
-          <Text style={{ fontSize: 64, fontWeight: 700, color: COLORS.spyglassOrange }}>
-            {avgDom > 0 ? Math.round(avgDom) : 'N/A'}
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          {/* Clock icon placeholder - centered like Preview */}
+          <View style={{ width: 48, height: 48, marginBottom: 16, borderWidth: 3, borderColor: '#EF4923', borderRadius: 24, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 2, height: 16, backgroundColor: '#EF4923', position: 'absolute', top: 8 }} />
+            <View style={{ width: 12, height: 2, backgroundColor: '#EF4923', position: 'absolute', right: 8 }} />
+          </View>
+          <Text style={{ fontSize: 36, fontWeight: 700, color: '#222222' }}>{Math.round(avgDays)}</Text>
+          <Text style={{ fontSize: 18, color: '#52525b' }}>Average Days on Market</Text>
+          <Text style={{ fontSize: 14, color: '#a1a1aa', marginTop: 16 }}>
+            Based on {stats.avgDOM !== null ? 'comparable properties' : 'market data'}
           </Text>
-          <Text style={{ fontSize: 16, color: COLORS.textSecondary }}>days average</Text>
         </View>
-        
-        <Text style={{ fontSize: 12, fontWeight: 600, marginBottom: 15 }}>Days on Market by Property</Text>
-        {comparables.map((comp, i) => {
-          const dom = extractDOM(comp);
-          const barWidth = dom != null && maxDom > 0 ? Math.min(100, (dom / maxDom) * 100) : 0;
-          const address = extractFullAddress(comp);
-          
-          return (
-            <View key={i} style={{ marginBottom: 12 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                <Text style={{ fontSize: 9, color: COLORS.textSecondary }}>{address}</Text>
-                <Text style={{ fontSize: 9, fontWeight: 600 }}>{dom != null ? `${dom} days` : 'N/A'}</Text>
-              </View>
-              <View style={{ height: 12, backgroundColor: COLORS.lightGray, borderRadius: 6 }}>
-                <View style={{ 
-                  height: 12, 
-                  width: `${barWidth}%`, 
-                  backgroundColor: COLORS.spyglassOrange, 
-                  borderRadius: 6 
-                }} />
-              </View>
-            </View>
-          );
-        })}
       </View>
       <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
     </Page>
@@ -412,72 +319,24 @@ const SuggestedPricePage = ({
   totalSlides: number;
 }) => {
   const stats = calculateCMAStats(comparables);
-  const price = suggestedListPrice || stats.avgPrice || 0;
-  const hasValidPrice = price > 0;
-  const lowPrice = hasValidPrice ? Math.round(price * 0.95) : null;
-  const highPrice = hasValidPrice ? Math.round(price * 1.05) : null;
+  const price = suggestedListPrice ?? stats.avgPrice;
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>
       <PageHeader title="SUGGESTED LIST PRICE" slideNumber={slideNumber} totalSlides={totalSlides} />
       <View style={styles.content}>
-        <Text style={styles.sectionTitle}>Recommended Listing Price</Text>
-        <Text style={styles.sectionSubtitle}>Based on {comparables.length} comparable properties</Text>
-        
-        <View style={{ alignItems: 'center', marginVertical: 24 }}>
-          <View style={{ backgroundColor: '#f0fdf4', borderWidth: 2, borderColor: '#22c55e', borderRadius: 8, padding: 20, width: '60%', alignItems: 'center' }}>
-            <Text style={{ fontSize: 12, color: '#15803d', textTransform: 'uppercase', marginBottom: 8 }}>Suggested List Price</Text>
-            <Text style={{ fontSize: 48, fontWeight: 700, color: COLORS.spyglassOrange }}>{hasValidPrice ? formatPrice(price) : 'N/A'}</Text>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          {/* Dollar sign icon placeholder - centered like Preview */}
+          <View style={{ width: 48, height: 48, marginBottom: 16, borderWidth: 3, borderColor: '#EF4923', borderRadius: 24, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 24, fontWeight: 700, color: '#EF4923' }}>$</Text>
           </View>
-        </View>
-        
-        <View style={{ width: '80%', marginHorizontal: 'auto', marginTop: 16 }}>
-          <View style={{ height: 8, backgroundColor: '#e5e7eb', borderRadius: 4, position: 'relative' }}>
-            <View style={{ 
-              position: 'absolute', 
-              left: '20%', 
-              right: '20%', 
-              height: 8, 
-              backgroundColor: COLORS.spyglassOrange, 
-              borderRadius: 4,
-              opacity: 0.7
-            }} />
-            <View style={{ 
-              position: 'absolute', 
-              left: '45%', 
-              top: -4,
-              width: 16, 
-              height: 16, 
-              borderRadius: 8, 
-              backgroundColor: COLORS.spyglassOrange, 
-              borderWidth: 2,
-              borderColor: COLORS.white
-            }} />
-          </View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
-            <View style={{ alignItems: 'flex-start' }}>
-              <Text style={{ fontSize: 9, color: COLORS.textSecondary }}>Low</Text>
-              <Text style={{ fontSize: 14, fontWeight: 600, color: COLORS.textPrimary }}>{formatPrice(lowPrice)}</Text>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ fontSize: 9, color: COLORS.textSecondary }}>High</Text>
-              <Text style={{ fontSize: 14, fontWeight: 600, color: COLORS.textPrimary }}>{formatPrice(highPrice)}</Text>
-            </View>
-          </View>
-        </View>
-        
-        <View style={{ backgroundColor: COLORS.lightGray, padding: 20, borderRadius: 8, marginTop: 24 }}>
-          <Text style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>Price Analysis</Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 10, color: COLORS.textSecondary }}>Avg $/Sq Ft</Text>
-              <Text style={{ fontSize: 14, fontWeight: 600 }}>{stats.avgPricePerSqft ? `$${stats.avgPricePerSqft}` : 'N/A'}</Text>
-            </View>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 10, color: COLORS.textSecondary }}>Price Range</Text>
-              <Text style={{ fontSize: 14, fontWeight: 600 }}>{stats.priceRange}</Text>
-            </View>
-          </View>
+          <Text style={{ fontSize: 36, fontWeight: 700, color: '#222222' }}>{price ? formatPrice(price) : 'N/A'}</Text>
+          <Text style={{ fontSize: 18, color: '#52525b' }}>Suggested List Price</Text>
+          {stats.priceRange && stats.priceRange !== 'N/A' && (
+            <Text style={{ fontSize: 14, color: '#a1a1aa', marginTop: 16 }}>
+              Range: {stats.priceRange}
+            </Text>
+          )}
         </View>
       </View>
       <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
@@ -498,76 +357,28 @@ const AveragePricePerAcrePage = ({
   slideNumber: number; 
   totalSlides: number;
 }) => {
-  // Sanity checks for price per acre values
-  const MIN_LOT_SIZE_ACRES = 0.05;
-  const MAX_PRICE_PER_ACRE = 20_000_000; // $20M/acre max
-  const MIN_PRICE_PER_ACRE = 10_000; // $10K/acre minimum
-  
-  const propsWithAcreData = comparables
-    .map(c => ({
-      ...c,
-      acres: extractLotAcres(c),
-      pricePerAcreCalc: calculatePricePerAcre(c),
-    }))
-    .filter(c => {
-      // Filter out invalid data
-      if (c.acres === null || c.acres <= 0) return false;
-      if (c.acres < MIN_LOT_SIZE_ACRES) return false; // Exclude tiny lots
-      if (c.pricePerAcreCalc === null) return false;
-      // Sanity check the price per acre
-      if (c.pricePerAcreCalc > MAX_PRICE_PER_ACRE || c.pricePerAcreCalc < MIN_PRICE_PER_ACRE) return false;
-      return true;
-    });
-  
-  // Calculate average from filtered data
-  const validPricesPerAcre = propsWithAcreData.map(c => c.pricePerAcreCalc!).filter(p => p > 0);
-  const calculatedAvg = validPricesPerAcre.length > 0 
-    ? Math.round(validPricesPerAcre.reduce((a, b) => a + b, 0) / validPricesPerAcre.length) 
-    : 0;
-  
-  // Use provided value or calculated value
-  let avgPrice = avgPricePerAcre || calculatedAvg || 0;
-  // Sanity check the provided value too
-  if (avgPrice > MAX_PRICE_PER_ACRE) avgPrice = calculatedAvg || 0;
-  const hasValidData = avgPrice > 0 && avgPrice <= MAX_PRICE_PER_ACRE;
+  const stats = calculateCMAStats(comparables);
+  const pricePerAcre = avgPricePerAcre ?? stats.avgPricePerAcre;
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>
-      <PageHeader title="AVERAGE PRICE PER ACRE" slideNumber={slideNumber} totalSlides={totalSlides} />
+      <PageHeader title="AVERAGE PRICE/ACRE" slideNumber={slideNumber} totalSlides={totalSlides} />
       <View style={styles.content}>
-        <Text style={styles.sectionTitle}>Land Value Analysis</Text>
-        
-        <View style={{ alignItems: 'center', marginVertical: 40 }}>
-          <Text style={{ fontSize: 48, fontWeight: 700, color: COLORS.spyglassOrange }}>
-            {hasValidData ? formatPrice(avgPrice) : 'N/A'}
-          </Text>
-          <Text style={{ fontSize: 16, color: COLORS.textSecondary }}>per acre (average)</Text>
-        </View>
-        
-        {propsWithAcreData.length > 0 && (
-          <View style={styles.table}>
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Property</Text>
-              <Text style={styles.tableHeaderCell}>Lot Size (acres)</Text>
-              <Text style={styles.tableHeaderCell}>Price/Acre</Text>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          {/* Ruler icon placeholder - centered like Preview */}
+          <View style={{ width: 48, height: 48, marginBottom: 16, borderWidth: 3, borderColor: '#EF4923', borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 32, height: 2, backgroundColor: '#EF4923' }} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: 32, marginTop: 2 }}>
+              <View style={{ width: 2, height: 8, backgroundColor: '#EF4923' }} />
+              <View style={{ width: 2, height: 4, backgroundColor: '#EF4923' }} />
+              <View style={{ width: 2, height: 8, backgroundColor: '#EF4923' }} />
+              <View style={{ width: 2, height: 4, backgroundColor: '#EF4923' }} />
+              <View style={{ width: 2, height: 8, backgroundColor: '#EF4923' }} />
             </View>
-            {propsWithAcreData.map((comp, i) => (
-              <View key={comp.id || i} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}>
-                <Text style={[styles.tableCell, { flex: 2 }]}>{extractFullAddress(comp)}</Text>
-                <Text style={styles.tableCell}>{comp.acres?.toFixed(2) || 'N/A'}</Text>
-                <Text style={styles.tableCell}>{comp.pricePerAcreCalc ? formatPrice(comp.pricePerAcreCalc) : 'N/A'}</Text>
-              </View>
-            ))}
           </View>
-        )}
-        
-        {propsWithAcreData.length === 0 && (
-          <View style={{ alignItems: 'center', padding: 20 }}>
-            <Text style={{ fontSize: 12, color: COLORS.textSecondary }}>
-              Lot size data not available for comparable properties
-            </Text>
-          </View>
-        )}
+          <Text style={{ fontSize: 36, fontWeight: 700, color: '#222222' }}>{pricePerAcre ? formatPrice(pricePerAcre) : 'N/A'}</Text>
+          <Text style={{ fontSize: 18, color: '#52525b' }}>Average Price per Acre</Text>
+        </View>
       </View>
       <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
     </Page>
@@ -583,45 +394,24 @@ const ListingActionPlanPage = ({
   slideNumber: number; 
   totalSlides: number;
 }) => {
-  const steps = [
-    'Pre-listing appointment',
-    'Staging Consultation',
-    'Pricing analysis',
-    'Listing preparation',
-    'Marketing period',
-    'Offer & negotiation',
-    'Contingency period',
-    'Closing',
-  ];
+  const lines = LISTING_ACTION_PLAN_TEXT.split('\n');
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>
       <PageHeader title="LISTING ACTION PLAN" slideNumber={slideNumber} totalSlides={totalSlides} />
       <View style={styles.content}>
-        <Text style={styles.sectionTitle}>What's Next?</Text>
-        <Text style={styles.sectionSubtitle}>Keeping you on top of the process</Text>
-        
-        <Text style={{ fontSize: 11, color: COLORS.textSecondary, lineHeight: 1.6, marginBottom: 25 }}>
-          Once we have negotiated and agreed to the terms on the contract, our next goal is to manage 
-          each and every step of the process to ensure your property closes successfully.
-        </Text>
-        
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-          {steps.map((step, i) => (
-            <View key={i} style={{ width: '50%', flexDirection: 'row', alignItems: 'center', marginBottom: 15, paddingRight: 20 }}>
-              <View style={{ 
-                width: 28, 
-                height: 28, 
-                borderRadius: 14, 
-                backgroundColor: COLORS.spyglassOrange, 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                marginRight: 12 
-              }}>
-                <Text style={{ color: COLORS.white, fontSize: 12, fontWeight: 600 }}>{i + 1}</Text>
-              </View>
-              <Text style={{ fontSize: 11, color: COLORS.textPrimary }}>{step}</Text>
-            </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          {/* Calendar icon placeholder */}
+          <View style={{ width: 24, height: 24, borderWidth: 2, borderColor: '#EF4923', borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 10, color: '#EF4923' }}>31</Text>
+          </View>
+          <Text style={{ fontSize: 18, fontWeight: 700, color: '#222222' }}>LISTING ACTION PLAN</Text>
+        </View>
+        <View>
+          {lines.map((line, i) => (
+            <Text key={i} style={{ fontSize: 14, color: '#52525b', lineHeight: 1.5, marginBottom: 4 }}>
+              {line}
+            </Text>
           ))}
         </View>
       </View>
@@ -642,31 +432,16 @@ const MarketingPage = ({
   <Page size="LETTER" orientation="landscape" style={styles.page}>
     <PageHeader title="MARKETING" slideNumber={slideNumber} totalSlides={totalSlides} />
     <View style={styles.content}>
-      <Text style={styles.sectionTitle}>Where Are Homebuyers Looking?</Text>
-      <Text style={{ fontSize: 11, color: COLORS.textSecondary, lineHeight: 1.6, marginBottom: 25 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+        {/* TrendingUp icon placeholder */}
+        <View style={{ width: 24, height: 24, borderWidth: 2, borderColor: '#EF4923', borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: 12, height: 8, borderBottomWidth: 2, borderRightWidth: 2, borderColor: '#EF4923', transform: [{ rotate: '-45deg' }] }} />
+        </View>
+        <Text style={{ fontSize: 18, fontWeight: 700, color: '#222222' }}>MARKETING</Text>
+      </View>
+      <Text style={{ fontSize: 14, color: '#52525b', lineHeight: 1.5 }}>
         {MARKETING_TEXT}
       </Text>
-      
-      <View style={{ flexDirection: 'row', gap: 20, marginTop: 20 }}>
-        <View style={{ flex: 1, backgroundColor: COLORS.lightGray, padding: 20, borderRadius: 8 }}>
-          <Text style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, color: COLORS.spyglassOrange }}>Digital Marketing</Text>
-          <Text style={{ fontSize: 10, color: COLORS.textSecondary, lineHeight: 1.5 }}>
-            Professional photography, virtual tours, social media campaigns, targeted ads
-          </Text>
-        </View>
-        <View style={{ flex: 1, backgroundColor: COLORS.lightGray, padding: 20, borderRadius: 8 }}>
-          <Text style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, color: COLORS.spyglassOrange }}>Traditional Marketing</Text>
-          <Text style={{ fontSize: 10, color: COLORS.textSecondary, lineHeight: 1.5 }}>
-            Print flyers, signage, open houses, broker outreach, direct mail
-          </Text>
-        </View>
-        <View style={{ flex: 1, backgroundColor: COLORS.lightGray, padding: 20, borderRadius: 8 }}>
-          <Text style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, color: COLORS.spyglassOrange }}>MLS & Syndication</Text>
-          <Text style={{ fontSize: 10, color: COLORS.textSecondary, lineHeight: 1.5 }}>
-            MLS listing, Zillow, Realtor.com, Redfin, international portals
-          </Text>
-        </View>
-      </View>
     </View>
     <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
   </Page>
@@ -851,23 +626,13 @@ const SpyglassResourcesPage = ({
   <Page size="LETTER" orientation="landscape" style={styles.page}>
     <PageHeader title="SPYGLASS RESOURCES AND LINKS" slideNumber={slideNumber} totalSlides={totalSlides} />
     <View style={styles.content}>
-      <Text style={styles.sectionTitle}>Helpful Resources</Text>
-      <Text style={styles.sectionSubtitle}>Tools and documents to help you through the selling process</Text>
-      
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 15, marginTop: 20 }}>
-        {['Home Selling Guide', 'Staging Checklist', 'Closing Timeline', 'Moving Checklist', 'Vendor Recommendations', 'Title Company Info'].map((resource, i) => (
-          <View key={i} style={{ width: '30%', backgroundColor: COLORS.lightGray, padding: 15, borderRadius: 8 }}>
-            <Text style={{ fontSize: 11, fontWeight: 600, color: COLORS.textPrimary }}>{resource}</Text>
-            <Text style={{ fontSize: 9, color: COLORS.spyglassOrange, marginTop: 5 }}>View in presentation →</Text>
-          </View>
-        ))}
-      </View>
-      
-      <View style={{ marginTop: 30, padding: 20, backgroundColor: COLORS.lightGray, borderRadius: 8 }}>
-        <Text style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>Need More Information?</Text>
-        <Text style={{ fontSize: 10, color: COLORS.textSecondary }}>
-          Contact your agent for access to additional resources and personalized documents for your specific transaction.
-        </Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        {/* Link icon placeholder - centered like Preview */}
+        <View style={{ width: 48, height: 48, marginBottom: 16, borderWidth: 3, borderColor: '#EF4923', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: 16, height: 16, borderWidth: 2, borderColor: '#EF4923', borderRadius: 4 }} />
+        </View>
+        <Text style={{ fontSize: 16, fontWeight: 500, color: '#3f3f46' }}>SPYGLASS RESOURCES AND LINKS</Text>
+        <Text style={{ fontSize: 14, color: '#71717a', marginTop: 8 }}>Agent-managed resources for CMA presentations</Text>
       </View>
     </View>
     <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
