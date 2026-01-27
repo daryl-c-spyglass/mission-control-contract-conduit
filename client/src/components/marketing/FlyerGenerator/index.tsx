@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, Download, Grid3X3, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { FlyerForm } from './FlyerForm';
@@ -13,6 +12,7 @@ import { FlyerPreview } from './FlyerPreview';
 import { GridOverlay } from './GridOverlay';
 import { useMarketingProfile } from '@/hooks/useMarketingProfile';
 import { autoSelectPhotosWithInfo, formatPrice, formatAddress, formatNumber, generateDefaultHeadline, type PhotoSelectionInfo } from '@/lib/flyer-utils';
+import { extractSqft, extractBeds, extractBaths } from '@/lib/cma-data-utils';
 import type { FlyerData, FlyerImages, ImageTransforms, ImageTransform } from '@/lib/flyer-types';
 import { DEFAULT_TRANSFORMS } from '@/lib/flyer-types';
 import { apiRequest } from '@/lib/queryClient';
@@ -108,20 +108,27 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
         || transaction.agentName 
         || '';
 
+      // Extract data using robust utility functions that handle Repliers API field variations
+      const listPrice = transaction.listPrice || mlsData.listPrice || mlsData.price;
+      const beds = extractBeds(mlsData);
+      const baths = extractBaths(mlsData);
+      const sqft = extractSqft(mlsData);
+
       form.reset({
-        price: formatPrice(transaction.listPrice || mlsData.listPrice),
+        price: formatPrice(listPrice),
         address: formatAddress(transaction, mlsData),
-        bedrooms: String(mlsData.beds || mlsData.bedroomsTotal || ''),
-        bathrooms: String(mlsData.baths || mlsData.bathroomsTotalInteger || ''),
-        sqft: formatNumber(mlsData.sqft || mlsData.livingArea || mlsData.buildingAreaTotal),
+        bedrooms: beds ? String(beds) : '',
+        bathrooms: baths ? String(baths) : '',
+        sqft: sqft ? formatNumber(sqft) : '',
         introHeading: generateDefaultHeadline(transaction, mlsData),
-        introDescription: mlsData.publicRemarks || mlsData.remarks || '',
+        introDescription: mlsData.publicRemarks || mlsData.remarks || mlsData.description || '',
         agentName,
         agentTitle: user?.marketingTitle || marketingProfile?.agentTitle || 'REALTOR®',
         phone: user?.marketingPhone || transaction.agentPhone || '',
       });
 
-      const photos = mlsData.photos || mlsData.images || [];
+      // Get photos from mlsData - handle various Repliers API formats
+      const photos = mlsData.photos || mlsData.images || mlsData.Media || [];
       if (photos.length > 0) {
         const selected = autoSelectPhotosWithInfo(photos);
         setImages(prev => ({
@@ -244,9 +251,9 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden min-h-0">
-        <div className="w-[420px] min-w-[420px] border-r border-border bg-card flex flex-col h-full overflow-hidden">
-          <ScrollArea className="flex-1 h-full" style={{ WebkitOverflowScrolling: 'touch' }}>
+      <div className="flex flex-1 min-h-0">
+        <div className="w-[420px] min-w-[420px] border-r border-border bg-card overflow-y-auto">
+          <div className="min-h-full">
             <FlyerForm
               form={form}
               images={images}
@@ -259,7 +266,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
               allMlsPhotos={allMlsPhotos}
               onSelectPhoto={(field, url) => setImages(prev => ({ ...prev, [field]: url }))}
             />
-          </ScrollArea>
+          </div>
         </div>
 
         <div className="flex-1 bg-muted/30 p-6 overflow-auto">

@@ -188,20 +188,26 @@ export function formatPrice(price: number | string | null): string {
 }
 
 export function formatAddress(transaction: any, mlsData: any): string {
-  const parts = [
-    mlsData?.streetNumber || transaction?.streetNumber,
-    mlsData?.streetName || transaction?.streetName,
-    mlsData?.streetSuffix || transaction?.streetSuffix,
-  ].filter(Boolean).join(' ');
+  // Try to build address from component parts (Repliers API format)
+  const streetNumber = mlsData?.streetNumber || mlsData?.address?.streetNumber || transaction?.streetNumber || '';
+  const streetName = mlsData?.streetName || mlsData?.address?.streetName || transaction?.streetName || '';
+  const streetSuffix = mlsData?.streetSuffix || mlsData?.address?.streetSuffix || transaction?.streetSuffix || '';
+  const unitNumber = mlsData?.unitNumber || mlsData?.address?.unitNumber || '';
+  
+  const streetParts = [streetNumber, streetName, streetSuffix].filter(Boolean).join(' ');
+  const fullStreet = unitNumber ? `${streetParts} ${unitNumber}` : streetParts;
 
-  const city = mlsData?.city || transaction?.city || '';
-  const state = mlsData?.state || transaction?.state || 'TX';
-  const zip = mlsData?.postalCode || transaction?.postalCode || '';
+  const city = mlsData?.city || mlsData?.address?.city || transaction?.city || '';
+  const state = mlsData?.state || mlsData?.address?.state || mlsData?.stateOrProvince || transaction?.state || 'TX';
+  const zip = mlsData?.postalCode || mlsData?.address?.postalCode || mlsData?.postalCodeNumber || transaction?.postalCode || '';
 
-  if (parts && city) {
-    return `${parts}, ${city}, ${state} ${zip}`.toUpperCase().trim();
+  if (fullStreet && city) {
+    return `${fullStreet}, ${city}, ${state} ${zip}`.toUpperCase().trim();
   }
-  return transaction?.address?.toUpperCase() || '';
+  
+  // Fallback to unparsedAddress or address field
+  const fallbackAddress = mlsData?.unparsedAddress || mlsData?.address?.full || mlsData?.address || transaction?.propertyAddress || transaction?.address || '';
+  return typeof fallbackAddress === 'string' ? fallbackAddress.toUpperCase() : '';
 }
 
 export function formatNumber(num: number | string | null): string {
