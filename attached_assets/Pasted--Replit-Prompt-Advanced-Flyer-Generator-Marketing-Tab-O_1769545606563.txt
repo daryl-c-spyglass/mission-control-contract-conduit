@@ -1,0 +1,1964 @@
+# Replit Prompt: Advanced Flyer Generator — Marketing Tab
+
+## 🎯 Objective
+
+Add an **Advanced Flyer Generator** to the Marketing tab that **automatically pulls ALL property data from the Repliers API** based on the transaction's MLS#. The flyer will be pre-populated with:
+- Property address (from Repliers)
+- Property details: beds, baths, sqft (from Repliers)
+- Listing price (from Repliers)
+- Property description (from Repliers `publicRemarks`)
+- Property photos with AI auto-selection (from Repliers `imageInsights`)
+- Agent info (from Settings)
+
+Agents can optionally override any auto-filled data.
+
+---
+
+## 📍 Location & Flow
+
+```
+Transaction (has MLS#)
+    │
+    ├── MLS Data Tab (already shows Repliers data)
+    │
+    └── Marketing Tab
+        └── Advanced Flyer Generator ← NEW
+            │
+            ├── Auto-loads from Repliers API via stored mlsData
+            ├── AI auto-selects best photos
+            ├── AI generates headline (optional)
+            └── Export PNG/CMYK
+```
+
+---
+
+## 🔗 Data Source: Repliers API
+
+### Repliers API Endpoint Reference
+
+```typescript
+// Base URL
+const REPLIERS_API_URL = 'https://api.repliers.io';
+
+// Get listing by MLS#
+GET /listings/{mlsNumber}
+
+// Headers
+{
+  'REPLIERS-API-KEY': process.env.REPLIERS_API_KEY,
+  'Content-Type': 'application/json'
+}
+```
+
+### Key Repliers API Response Fields
+
+```typescript
+interface RepliersListing {
+  // Identification
+  mlsNumber: string;
+  listingId: string;
+  
+  // Address Components (NOT a full address string)
+  address: {
+    streetNumber: string;      // "13106"
+    streetName: string;        // "New Boston"
+    streetSuffix: string;      // "Dr" or "Street" or "Ave"
+    streetDirection: string;   // "N", "S", "E", "W" (optional)
+    unitNumber: string;        // "#101" (optional)
+    city: string;              // "Austin"
+    state: string;             // "TX"
+    postalCode: string;        // "78729"
+    country: string;           // "US"
+  };
+  
+  // OR flat address fields (check which format your data uses)
+  streetNumber?: string;
+  streetName?: string;
+  streetSuffix?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  
+  // Pricing
+  listPrice: number;           // 434990
+  soldPrice?: number;
+  
+  // Property Details
+  bedroomsTotal: number;       // 4
+  bathroomsTotalInteger: number; // 2
+  livingArea: number;          // 1850 (sqft)
+  buildingAreaTotal?: number;  // Alternative sqft field
+  lotSizeArea?: number;
+  yearBuilt: number;           // 1984
+  
+  // Property Type
+  propertyType: string;        // "Residential"
+  propertySubType: string;     // "Single Family Residence"
+  
+  // Status
+  standardStatus: string;      // "Active", "Pending", "Sold", "Closed"
+  daysOnMarket: number;
+  
+  // Description
+  publicRemarks: string;       // Full property description
+  
+  // Location Info
+  subdivision: string;         // Neighborhood name
+  countyOrParish: string;
+  
+  // Features (arrays)
+  interiorFeatures: string[];
+  exteriorFeatures: string[];
+  appliances: string[];
+  heating: string[];
+  cooling: string[];
+  flooring: string[];
+  
+  // Construction
+  roof: string;
+  foundation: string;
+  constructionMaterials: string[];
+  
+  // Financial
+  taxAnnualAmount: number;
+  taxYear: number;
+  associationFee?: number;
+  
+  // Agent/Office
+  listAgentFullName: string;
+  listAgentEmail: string;
+  listOfficeName: string;
+  
+  // Photos with AI Insights
+  photos: Array<{
+    href: string;              // Photo URL
+    url?: string;              // Alternative URL field
+    caption?: string;
+    
+    // AI Image Analysis (imageInsights)
+    imageInsights?: {
+      classification: {
+        imageOf: string;       // "exterior_front", "kitchen", "living_room", etc.
+        confidence: number;
+      };
+      quality: {
+        score: number;         // 0-100, higher is better
+        brightness: number;
+        contrast: number;
+        sharpness: number;
+      };
+      objects?: string[];      // Detected objects
+      colors?: string[];       // Dominant colors
+    };
+  }>;
+  
+  // Timestamps
+  listDate: string;
+  modificationTimestamp: string;
+}
+```
+
+### Photo Classification Types (imageInsights.classification.imageOf)
+
+```typescript
+type PhotoClassification = 
+  // Exterior
+  | 'exterior_front'
+  | 'exterior_back'
+  | 'exterior_side'
+  | 'aerial'
+  | 'drone'
+  
+  // Interior - Main Areas
+  | 'living_room'
+  | 'family_room'
+  | 'dining_room'
+  | 'kitchen'
+  | 'breakfast_area'
+  
+  // Interior - Bedrooms
+  | 'bedroom'
+  | 'master_bedroom'
+  | 'guest_bedroom'
+  
+  // Interior - Bathrooms
+  | 'bathroom'
+  | 'master_bathroom'
+  
+  // Other Interior
+  | 'office'
+  | 'laundry'
+  | 'garage'
+  | 'basement'
+  | 'attic'
+  | 'stairs'
+  | 'hallway'
+  | 'closet'
+  
+  // Outdoor
+  | 'pool'
+  | 'patio'
+  | 'deck'
+  | 'yard'
+  | 'garden'
+  
+  // Other
+  | 'floor_plan'
+  | 'map'
+  | 'community'
+  | 'unknown';
+```
+
+---
+
+## 📁 File Structure
+
+```
+client/src/
+├── components/
+│   └── marketing/
+│       ├── AdvancedFlyerGenerator/
+│       │   ├── index.tsx              # Main container
+│       │   ├── FlyerForm.tsx          # Left panel form
+│       │   ├── FlyerPreview.tsx       # Live preview
+│       │   ├── GridOverlay.tsx        # 4x4 numbered grid
+│       │   ├── ImageUploadField.tsx   # Upload with crop controls
+│       │   ├── PhotoSelector.tsx      # AI photo selection UI
+│       │   └── AIHeadlineButton.tsx   # AI headline generator
+│       │
+│       └── MarketingTab.tsx           # Tab container
+│
+├── hooks/
+│   └── useRepliersData.ts             # Hook to fetch/access Repliers data
+│
+└── lib/
+    ├── flyer-types.ts                 # TypeScript types
+    ├── repliers-utils.ts              # Repliers data helpers
+    └── photo-selection.ts             # AI photo selection logic
+
+server/
+├── routes/
+│   ├── flyer-export.ts                # Puppeteer export
+│   ├── flyer-ai.ts                    # AI headline generation
+│   └── repliers.ts                    # Repliers API proxy (existing)
+```
+
+---
+
+## 🗄️ Database
+
+### Transaction Table (Existing)
+
+The transaction already stores MLS data from Repliers:
+
+```typescript
+// Transaction record (existing)
+interface Transaction {
+  id: string;
+  mlsNumber: string;           // MLS# used to fetch from Repliers
+  mlsData: RepliersListing;    // Cached Repliers API response
+  // ... other fields
+}
+```
+
+### Marketing Assets Table (New)
+
+```sql
+CREATE TABLE IF NOT EXISTS marketing_assets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  transaction_id UUID REFERENCES transactions(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id),
+  type VARCHAR(50) NOT NULL DEFAULT 'flyer',
+  name VARCHAR(255),
+  file_url TEXT,
+  file_type VARCHAR(50),
+  metadata JSONB,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+---
+
+## 📐 Data Types
+
+```typescript
+// lib/flyer-types.ts
+
+export interface ImageTransform {
+  scale: number;      // 1 to 3
+  positionX: number;  // -50 to 50
+  positionY: number;  // -50 to 50
+}
+
+export interface ImageTransforms {
+  mainImage: ImageTransform;
+  kitchenImage: ImageTransform;
+  roomImage: ImageTransform;
+  agentPhoto: ImageTransform;
+}
+
+export interface FlyerImages {
+  mainImage: string | null;
+  kitchenImage: string | null;
+  roomImage: string | null;
+  agentPhoto: string | null;
+  companyLogo: string | null;
+  secondaryLogo: string | null;
+  qrCode: string | null;
+}
+
+export interface FlyerData {
+  // From Repliers API (auto-filled)
+  price: string;
+  address: string;
+  bedrooms: string;
+  bathrooms: string;
+  sqft: string;
+  introDescription: string;
+  
+  // AI Generated or Manual
+  introHeading: string;
+  
+  // From Settings (auto-filled)
+  agentName: string;
+  agentTitle: string;
+  phone: string;
+}
+
+export interface SelectedPhoto {
+  url: string;
+  classification: string;
+  qualityScore: number;
+  isAutoSelected: boolean;
+}
+
+export const DEFAULT_TRANSFORM: ImageTransform = {
+  scale: 1,
+  positionX: 0,
+  positionY: 0,
+};
+```
+
+---
+
+## 🔄 Repliers Data Utilities
+
+```typescript
+// lib/repliers-utils.ts
+
+import type { RepliersListing } from './flyer-types';
+
+/**
+ * Build full address string from Repliers address components
+ */
+export function buildAddressFromRepliers(mlsData: RepliersListing): string {
+  // Handle nested address object
+  const addr = mlsData.address || mlsData;
+  
+  const streetParts = [
+    addr.streetNumber,
+    addr.streetDirection,
+    addr.streetName,
+    addr.streetSuffix,
+  ].filter(Boolean).join(' ');
+  
+  const unitPart = addr.unitNumber ? `, ${addr.unitNumber}` : '';
+  
+  const cityStateZip = [
+    addr.city,
+    addr.state,
+    addr.postalCode,
+  ].filter(Boolean).join(', ');
+  
+  if (streetParts && cityStateZip) {
+    return `${streetParts}${unitPart}, ${cityStateZip}`.toUpperCase();
+  }
+  
+  // Fallback
+  return mlsData.address?.fullAddress?.toUpperCase() || 'ADDRESS UNAVAILABLE';
+}
+
+/**
+ * Format price from Repliers
+ */
+export function formatPrice(price: number | string | null): string {
+  if (!price) return '$0';
+  const num = typeof price === 'string' ? parseFloat(price.replace(/[^0-9.]/g, '')) : price;
+  if (isNaN(num)) return '$0';
+  return new Intl.NumberFormat('en-US', { 
+    style: 'currency', 
+    currency: 'USD', 
+    maximumFractionDigits: 0 
+  }).format(num);
+}
+
+/**
+ * Format number with commas
+ */
+export function formatNumber(num: number | string | null): string {
+  if (!num) return '0';
+  const n = typeof num === 'string' ? parseFloat(num.replace(/[^0-9.]/g, '')) : num;
+  if (isNaN(n)) return '0';
+  return new Intl.NumberFormat('en-US').format(Math.round(n));
+}
+
+/**
+ * Get property details from Repliers
+ */
+export function getPropertyDetails(mlsData: RepliersListing) {
+  return {
+    beds: String(mlsData.bedroomsTotal || mlsData.beds || '0'),
+    baths: String(mlsData.bathroomsTotalInteger || mlsData.baths || '0'),
+    sqft: formatNumber(mlsData.livingArea || mlsData.buildingAreaTotal || mlsData.sqft),
+    yearBuilt: mlsData.yearBuilt ? String(mlsData.yearBuilt) : '',
+    propertyType: mlsData.propertySubType || mlsData.propertyType || 'Residential',
+    neighborhood: mlsData.subdivision || '',
+  };
+}
+
+/**
+ * Get description from Repliers
+ */
+export function getDescription(mlsData: RepliersListing): string {
+  return mlsData.publicRemarks || mlsData.remarks || '';
+}
+
+/**
+ * Truncate description for flyer
+ */
+export function truncateDescription(text: string, maxLength: number = 400): string {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  
+  // Try to break at sentence
+  const truncated = text.substring(0, maxLength);
+  const lastPeriod = truncated.lastIndexOf('.');
+  const lastSpace = truncated.lastIndexOf(' ');
+  
+  if (lastPeriod > maxLength * 0.7) {
+    return truncated.substring(0, lastPeriod + 1);
+  }
+  if (lastSpace > maxLength * 0.8) {
+    return truncated.substring(0, lastSpace) + '...';
+  }
+  return truncated.trim() + '...';
+}
+```
+
+---
+
+## 📸 AI Photo Selection Logic
+
+```typescript
+// lib/photo-selection.ts
+
+interface RepliersPhoto {
+  href?: string;
+  url?: string;
+  imageInsights?: {
+    classification?: { 
+      imageOf?: string;
+      confidence?: number;
+    };
+    quality?: { 
+      score?: number;
+    };
+  };
+}
+
+interface SelectedPhotos {
+  mainPhoto: string | null;
+  kitchenPhoto: string | null;
+  roomPhoto: string | null;
+  allPhotos: Array<{
+    url: string;
+    classification: string;
+    qualityScore: number;
+  }>;
+}
+
+/**
+ * AI Auto-Select Best Photos from Repliers imageInsights
+ * 
+ * Selection Priority:
+ * - Main Photo: exterior_front > aerial > exterior_* > highest quality
+ * - Kitchen Photo: kitchen > breakfast_area
+ * - Room Photo: living_room > family_room > master_bedroom > bedroom
+ */
+export function autoSelectPhotos(photos: RepliersPhoto[]): SelectedPhotos {
+  if (!photos || photos.length === 0) {
+    return { mainPhoto: null, kitchenPhoto: null, roomPhoto: null, allPhotos: [] };
+  }
+
+  // Normalize and sort photos by quality score
+  const normalizedPhotos = photos
+    .map(photo => ({
+      url: photo.href || photo.url || '',
+      classification: (photo.imageInsights?.classification?.imageOf || 'unknown').toLowerCase(),
+      qualityScore: photo.imageInsights?.quality?.score || 50,
+      confidence: photo.imageInsights?.classification?.confidence || 0,
+    }))
+    .filter(p => p.url) // Remove photos without URLs
+    .sort((a, b) => b.qualityScore - a.qualityScore); // Sort by quality (highest first)
+
+  // Select MAIN photo (exterior preferred)
+  const mainPhotoOptions = [
+    'exterior_front',
+    'exterior',
+    'aerial',
+    'drone',
+    'exterior_back',
+    'exterior_side',
+  ];
+  
+  let mainPhoto = normalizedPhotos.find(p => 
+    mainPhotoOptions.some(opt => p.classification.includes(opt))
+  )?.url || normalizedPhotos[0]?.url || null;
+
+  // Select KITCHEN photo
+  const kitchenPhotoOptions = ['kitchen', 'breakfast'];
+  
+  let kitchenPhoto = normalizedPhotos.find(p => 
+    kitchenPhotoOptions.some(opt => p.classification.includes(opt)) &&
+    p.url !== mainPhoto
+  )?.url || null;
+  
+  // Fallback: second best photo if no kitchen found
+  if (!kitchenPhoto && normalizedPhotos.length > 1) {
+    kitchenPhoto = normalizedPhotos.find(p => p.url !== mainPhoto)?.url || null;
+  }
+
+  // Select ROOM photo (living/bedroom)
+  const roomPhotoOptions = [
+    'living_room',
+    'living',
+    'family_room',
+    'family',
+    'master_bedroom',
+    'bedroom',
+    'dining_room',
+    'dining',
+  ];
+  
+  const usedUrls = [mainPhoto, kitchenPhoto].filter(Boolean);
+  
+  let roomPhoto = normalizedPhotos.find(p => 
+    roomPhotoOptions.some(opt => p.classification.includes(opt)) &&
+    !usedUrls.includes(p.url)
+  )?.url || null;
+  
+  // Fallback: third best photo if no room found
+  if (!roomPhoto && normalizedPhotos.length > 2) {
+    roomPhoto = normalizedPhotos.find(p => !usedUrls.includes(p.url))?.url || null;
+  }
+
+  return {
+    mainPhoto,
+    kitchenPhoto,
+    roomPhoto,
+    allPhotos: normalizedPhotos,
+  };
+}
+
+/**
+ * Get photo by specific classification type
+ */
+export function getPhotoByClassification(
+  photos: RepliersPhoto[], 
+  classifications: string[]
+): string | null {
+  const photo = photos.find(p => {
+    const imgClass = p.imageInsights?.classification?.imageOf?.toLowerCase() || '';
+    return classifications.some(c => imgClass.includes(c.toLowerCase()));
+  });
+  return photo?.href || photo?.url || null;
+}
+
+/**
+ * Get all photos sorted by quality
+ */
+export function getPhotosSortedByQuality(photos: RepliersPhoto[]): Array<{
+  url: string;
+  classification: string;
+  qualityScore: number;
+}> {
+  return photos
+    .map(p => ({
+      url: p.href || p.url || '',
+      classification: p.imageInsights?.classification?.imageOf || 'unknown',
+      qualityScore: p.imageInsights?.quality?.score || 50,
+    }))
+    .filter(p => p.url)
+    .sort((a, b) => b.qualityScore - a.qualityScore);
+}
+```
+
+---
+
+## 🖥️ Main Component: AdvancedFlyerGenerator
+
+```tsx
+// components/marketing/AdvancedFlyerGenerator/index.tsx
+
+import { useState, useRef, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ArrowLeft, Download, Grid3X3, Loader2, CheckCircle, Info } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+import { FlyerForm } from './FlyerForm';
+import { FlyerPreview } from './FlyerPreview';
+import { GridOverlay } from './GridOverlay';
+
+import { 
+  buildAddressFromRepliers, 
+  formatPrice, 
+  getPropertyDetails, 
+  getDescription,
+  truncateDescription,
+} from '@/lib/repliers-utils';
+import { autoSelectPhotos } from '@/lib/photo-selection';
+
+import type { 
+  FlyerData, 
+  FlyerImages, 
+  ImageTransforms, 
+  ImageTransform,
+} from '@/lib/flyer-types';
+
+interface AdvancedFlyerGeneratorProps {
+  transactionId: string;
+  transaction: {
+    id: string;
+    mlsNumber: string;
+    mlsData: any; // Repliers API response (cached on transaction)
+    // ... other transaction fields
+  };
+  onBack: () => void;
+}
+
+export function AdvancedFlyerGenerator({ 
+  transactionId, 
+  transaction, 
+  onBack 
+}: AdvancedFlyerGeneratorProps) {
+  const { toast } = useToast();
+  const previewRef = useRef<HTMLDivElement>(null);
+  
+  // Get Repliers data from transaction
+  const mlsData = transaction.mlsData;
+  
+  // State
+  const [showGrid, setShowGrid] = useState(false);
+  const [scale, setScale] = useState<string>('fit');
+  const [imageTransforms, setImageTransforms] = useState<ImageTransforms>({
+    mainImage: { scale: 1, positionX: 0, positionY: 0 },
+    kitchenImage: { scale: 1, positionX: 0, positionY: 0 },
+    roomImage: { scale: 1, positionX: 0, positionY: 0 },
+    agentPhoto: { scale: 1, positionX: 0, positionY: 0 },
+  });
+  
+  // Track if user has manually changed photos
+  const [manualPhotoOverride, setManualPhotoOverride] = useState({
+    mainImage: false,
+    kitchenImage: false,
+    roomImage: false,
+  });
+
+  // Images state
+  const [images, setImages] = useState<FlyerImages>({
+    mainImage: null,
+    kitchenImage: null,
+    roomImage: null,
+    agentPhoto: null,
+    companyLogo: null,
+    secondaryLogo: null,
+    qrCode: null,
+  });
+
+  // Fetch agent settings
+  const { data: settings } = useQuery({
+    queryKey: ['/api/settings'],
+  });
+
+  // Form with Repliers data as defaults
+  const form = useForm<FlyerData>({
+    defaultValues: {
+      price: '',
+      address: '',
+      bedrooms: '',
+      bathrooms: '',
+      sqft: '',
+      introHeading: '',
+      introDescription: '',
+      agentName: '',
+      agentTitle: '',
+      phone: '',
+    },
+  });
+
+  const watchedValues = form.watch();
+
+  // ============================================
+  // AUTO-FILL FROM REPLIERS API (MLS DATA)
+  // ============================================
+  useEffect(() => {
+    if (mlsData) {
+      // Build address from Repliers components
+      const fullAddress = buildAddressFromRepliers(mlsData);
+      
+      // Get property details
+      const details = getPropertyDetails(mlsData);
+      
+      // Get description
+      const description = getDescription(mlsData);
+      
+      // Generate default headline from neighborhood/city
+      const defaultHeadline = mlsData.subdivision 
+        ? `Prime Opportunity in ${mlsData.subdivision}`
+        : mlsData.city 
+          ? `Beautiful Home in ${mlsData.city}`
+          : 'Your Dream Home Awaits';
+
+      // Reset form with Repliers data
+      form.reset({
+        price: formatPrice(mlsData.listPrice),
+        address: fullAddress,
+        bedrooms: details.beds,
+        bathrooms: details.baths,
+        sqft: details.sqft,
+        introHeading: defaultHeadline,
+        introDescription: truncateDescription(description),
+        // Agent fields will be set by settings effect
+        agentName: '',
+        agentTitle: '',
+        phone: '',
+      });
+
+      // ============================================
+      // AI AUTO-SELECT PHOTOS FROM REPLIERS
+      // ============================================
+      if (mlsData.photos && mlsData.photos.length > 0) {
+        const selectedPhotos = autoSelectPhotos(mlsData.photos);
+        
+        setImages(prev => ({
+          ...prev,
+          mainImage: selectedPhotos.mainPhoto,
+          kitchenImage: selectedPhotos.kitchenPhoto,
+          roomImage: selectedPhotos.roomPhoto,
+        }));
+        
+        console.log('AI Photo Selection:', {
+          total: mlsData.photos.length,
+          mainPhoto: selectedPhotos.mainPhoto ? 'Selected' : 'None',
+          kitchenPhoto: selectedPhotos.kitchenPhoto ? 'Selected' : 'None',
+          roomPhoto: selectedPhotos.roomPhoto ? 'Selected' : 'None',
+        });
+      }
+    }
+  }, [mlsData, form]);
+
+  // ============================================
+  // AUTO-FILL FROM SETTINGS (Agent Profile)
+  // ============================================
+  useEffect(() => {
+    if (settings) {
+      // Agent info from existing Settings fields
+      const agentName = `${settings.firstName || ''} ${settings.lastName || ''}`.trim();
+      
+      form.setValue('agentName', agentName || 'Agent Name');
+      form.setValue('agentTitle', settings.title || 'REALTOR®');
+      form.setValue('phone', settings.phone || '');
+
+      // Branding from Settings (new fields from Prompt 1)
+      setImages(prev => ({
+        ...prev,
+        agentPhoto: settings.profilePhoto || null,
+        qrCode: settings.qrCode || null,
+        companyLogo: settings.companyLogoUseDefault !== false
+          ? '/logos/SpyglassRealty_Logo_Black.png'
+          : settings.companyLogo || '/logos/SpyglassRealty_Logo_Black.png',
+        secondaryLogo: settings.secondaryLogoUseDefault !== false
+          ? '/logos/LeadingRE_Logo.png'
+          : settings.secondaryLogo || '/logos/LeadingRE_Logo.png',
+      }));
+    }
+  }, [settings, form]);
+
+  // Handle image upload (manual override)
+  const handleImageUpload = (field: keyof FlyerImages) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast({ title: 'File too large', description: 'Max 10MB', variant: 'destructive' });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImages(prev => ({ ...prev, [field]: reader.result as string }));
+        
+        // Mark as manual override
+        if (field in manualPhotoOverride) {
+          setManualPhotoOverride(prev => ({ ...prev, [field]: true }));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle selecting a different photo from the gallery
+  const handleSelectFromGallery = (field: keyof FlyerImages, photoUrl: string) => {
+    setImages(prev => ({ ...prev, [field]: photoUrl }));
+    if (field in manualPhotoOverride) {
+      setManualPhotoOverride(prev => ({ ...prev, [field]: true }));
+    }
+  };
+
+  // Reset to AI-selected photo
+  const handleResetToAI = (field: 'mainImage' | 'kitchenImage' | 'roomImage') => {
+    if (mlsData?.photos) {
+      const selectedPhotos = autoSelectPhotos(mlsData.photos);
+      const photoMap = {
+        mainImage: selectedPhotos.mainPhoto,
+        kitchenImage: selectedPhotos.kitchenPhoto,
+        roomImage: selectedPhotos.roomPhoto,
+      };
+      setImages(prev => ({ ...prev, [field]: photoMap[field] }));
+      setManualPhotoOverride(prev => ({ ...prev, [field]: false }));
+    }
+  };
+
+  // Handle transform change
+  const handleTransformChange = (field: keyof ImageTransforms) => (transform: ImageTransform) => {
+    setImageTransforms(prev => ({ ...prev, [field]: transform }));
+  };
+
+  // Export mutation
+  const exportMutation = useMutation({
+    mutationFn: async (format: 'png' | 'cmyk') => {
+      const response = await fetch(`/api/transactions/${transactionId}/export-flyer?format=${format}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...watchedValues,
+          ...images,
+          imageTransforms,
+          mlsNumber: transaction.mlsNumber,
+        }),
+      });
+      if (!response.ok) throw new Error('Export failed');
+      return response.blob();
+    },
+    onSuccess: (blob, format) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const safeAddress = watchedValues.address.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 50);
+      a.download = `flyer-${safeAddress}.${format === 'cmyk' ? 'tiff' : 'png'}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({ 
+        title: 'Flyer Exported', 
+        description: 'Your flyer has been downloaded and saved to Marketing Assets.' 
+      });
+    },
+    onError: () => {
+      toast({ title: 'Export Failed', description: 'Please try again.', variant: 'destructive' });
+    },
+  });
+
+  // Preview scale
+  const getPreviewScale = () => {
+    if (scale === 'fit') return 0.55;
+    return parseFloat(scale);
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-background">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Marketing
+          </button>
+          
+          {/* MLS Badge */}
+          <div className="flex items-center gap-2 px-3 py-1 bg-primary/10 rounded-full">
+            <CheckCircle className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium text-primary">
+              MLS# {transaction.mlsNumber}
+            </span>
+          </div>
+        </div>
+        
+        <div className="flex gap-2">
+          <Button
+            onClick={() => exportMutation.mutate('png')}
+            disabled={exportMutation.isPending}
+            className="gap-2 bg-primary hover:bg-primary/90"
+          >
+            {exportMutation.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            Export PNG
+          </Button>
+          <Button
+            onClick={() => exportMutation.mutate('cmyk')}
+            disabled={exportMutation.isPending}
+            variant="outline"
+            className="gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Export CMYK (Print)
+          </Button>
+        </div>
+      </div>
+
+      {/* Data Source Alert */}
+      <div className="px-6 py-3 bg-green-500/10 border-b border-green-500/20">
+        <div className="flex items-center gap-2 text-green-600">
+          <CheckCircle className="w-4 h-4" />
+          <span className="text-sm">
+            Property data auto-filled from Repliers MLS. Photos AI-selected by quality & classification.
+          </span>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Panel - Form */}
+        <div className="w-[420px] min-w-[420px] border-r border-border bg-card">
+          <ScrollArea className="h-full">
+            <FlyerForm
+              form={form}
+              images={images}
+              imageTransforms={imageTransforms}
+              onImageUpload={handleImageUpload}
+              onTransformChange={handleTransformChange}
+              onSelectFromGallery={handleSelectFromGallery}
+              onResetToAI={handleResetToAI}
+              manualPhotoOverride={manualPhotoOverride}
+              transactionId={transactionId}
+              mlsData={mlsData}
+              allPhotos={mlsData?.photos || []}
+            />
+          </ScrollArea>
+        </div>
+
+        {/* Right Panel - Preview */}
+        <div className="flex-1 bg-muted/30 p-6 overflow-auto">
+          <div className="sticky top-0">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-medium text-muted-foreground">Live Preview</h2>
+              <div className="flex items-center gap-4">
+                {/* Grid Toggle */}
+                <div className="flex items-center gap-2">
+                  <Grid3X3 className="h-4 w-4 text-muted-foreground" />
+                  <Label htmlFor="grid-toggle" className="text-xs text-muted-foreground cursor-pointer">
+                    Grid
+                  </Label>
+                  <Switch id="grid-toggle" checked={showGrid} onCheckedChange={setShowGrid} />
+                </div>
+
+                {/* Scale Selector */}
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground">Scale:</Label>
+                  <Select value={scale} onValueChange={setScale}>
+                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fit">Fit to screen</SelectItem>
+                      <SelectItem value="0.5">50%</SelectItem>
+                      <SelectItem value="0.75">75%</SelectItem>
+                      <SelectItem value="1">100%</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* Preview Container */}
+            <div className="overflow-auto rounded-lg shadow-2xl inline-block">
+              <div
+                ref={previewRef}
+                className="origin-top-left relative bg-white"
+                style={{
+                  transform: `scale(${getPreviewScale()})`,
+                  transformOrigin: 'top left',
+                  width: '816px',
+                  height: '1056px',
+                }}
+              >
+                <FlyerPreview
+                  data={watchedValues}
+                  images={images}
+                  imageTransforms={imageTransforms}
+                />
+                {showGrid && <GridOverlay />}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 📝 FlyerForm with Repliers Data Indicators
+
+```tsx
+// components/marketing/AdvancedFlyerGenerator/FlyerForm.tsx
+
+import { UseFormReturn } from 'react-hook-form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { 
+  FileText, DollarSign, BedDouble, Bath, Ruler, User, Phone, MapPin, 
+  Image as ImageIcon, Check, Sparkles, Database, RotateCcw
+} from 'lucide-react';
+
+import { ImageUploadField } from './ImageUploadField';
+import { PhotoSelector } from './PhotoSelector';
+import { AIHeadlineButton } from './AIHeadlineButton';
+
+import type { FlyerData, FlyerImages, ImageTransforms, ImageTransform } from '@/lib/flyer-types';
+
+interface FlyerFormProps {
+  form: UseFormReturn<FlyerData>;
+  images: FlyerImages;
+  imageTransforms: ImageTransforms;
+  onImageUpload: (field: keyof FlyerImages) => (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onTransformChange: (field: keyof ImageTransforms) => (transform: ImageTransform) => void;
+  onSelectFromGallery: (field: keyof FlyerImages, photoUrl: string) => void;
+  onResetToAI: (field: 'mainImage' | 'kitchenImage' | 'roomImage') => void;
+  manualPhotoOverride: { mainImage: boolean; kitchenImage: boolean; roomImage: boolean };
+  transactionId: string;
+  mlsData: any;
+  allPhotos: any[];
+}
+
+export function FlyerForm({
+  form,
+  images,
+  imageTransforms,
+  onImageUpload,
+  onTransformChange,
+  onSelectFromGallery,
+  onResetToAI,
+  manualPhotoOverride,
+  transactionId,
+  mlsData,
+  allPhotos,
+}: FlyerFormProps) {
+  const { register, setValue, watch } = form;
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Property Details Section - FROM REPLIERS */}
+      <Section 
+        icon={<FileText className="w-5 h-5 text-primary" />} 
+        title="Property Details"
+        badge={<DataSourceBadge source="Repliers MLS" />}
+      >
+        <div className="space-y-4">
+          <FormField
+            icon={<DollarSign className="w-4 h-4" />}
+            label="Listed Price"
+            {...register('price')}
+            readOnly
+          />
+
+          <div className="grid grid-cols-3 gap-3">
+            <FormField 
+              icon={<BedDouble className="w-4 h-4" />} 
+              label="Beds" 
+              {...register('bedrooms')} 
+              readOnly
+            />
+            <FormField 
+              icon={<Bath className="w-4 h-4" />} 
+              label="Baths" 
+              {...register('bathrooms')} 
+              readOnly
+            />
+            <FormField 
+              icon={<Ruler className="w-4 h-4" />} 
+              label="Sq Ft" 
+              {...register('sqft')} 
+              readOnly
+            />
+          </div>
+
+          <FormField
+            icon={<MapPin className="w-4 h-4" />}
+            label="Property Address"
+            {...register('address')}
+            readOnly
+          />
+        </div>
+      </Section>
+
+      {/* Description Section - FROM REPLIERS + AI */}
+      <Section 
+        icon={<FileText className="w-5 h-5 text-primary" />} 
+        title="Description"
+        badge={<DataSourceBadge source="Repliers MLS" />}
+      >
+        <div className="space-y-4">
+          {/* Headline with AI Generate Button */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-medium uppercase tracking-wide">
+                Headline
+              </Label>
+              <AIHeadlineButton
+                transactionId={transactionId}
+                mlsData={mlsData}
+                onGenerated={(headline) => setValue('introHeading', headline)}
+              />
+            </div>
+            <Input
+              {...register('introHeading')}
+              placeholder="Prime Opportunity in Travis County"
+            />
+            <p className="text-xs text-muted-foreground">
+              Click "AI Generate" to create a headline based on property description
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs font-medium uppercase tracking-wide">
+              Property Description
+            </Label>
+            <Textarea
+              {...register('introDescription')}
+              placeholder="Property description from MLS..."
+              className="min-h-[120px] resize-none"
+            />
+            <p className="text-xs text-muted-foreground">
+              Auto-filled from Repliers publicRemarks. Edit as needed.
+            </p>
+          </div>
+        </div>
+      </Section>
+
+      {/* Agent Details Section - FROM SETTINGS */}
+      <Section 
+        icon={<User className="w-5 h-5 text-primary" />} 
+        title="Agent Details"
+        badge={<DataSourceBadge source="Settings" />}
+      >
+        <div className="space-y-4">
+          <FormField label="Agent Name" {...register('agentName')} />
+          <FormField label="Title" {...register('agentTitle')} />
+          <FormField icon={<Phone className="w-4 h-4" />} label="Phone Number" {...register('phone')} />
+        </div>
+      </Section>
+
+      {/* Branding Section - FROM SETTINGS */}
+      <Section 
+        icon={<ImageIcon className="w-5 h-5 text-primary" />} 
+        title="Branding & Logos"
+        badge={<DataSourceBadge source="Settings" />}
+      >
+        <div className="grid grid-cols-2 gap-3">
+          <ImageUploadField
+            label="Company Logo"
+            id="companyLogo"
+            preview={images.companyLogo}
+            onChange={onImageUpload('companyLogo')}
+            compact
+          />
+          <ImageUploadField
+            label="Secondary Logo"
+            id="secondaryLogo"
+            preview={images.secondaryLogo}
+            onChange={onImageUpload('secondaryLogo')}
+            compact
+          />
+        </div>
+      </Section>
+
+      {/* Property Images Section - FROM REPLIERS + AI SELECTION */}
+      <Section 
+        icon={<ImageIcon className="w-5 h-5 text-primary" />} 
+        title="Property Images"
+        badge={<DataSourceBadge source="Repliers + AI" />}
+      >
+        <div className="mb-4 p-3 bg-blue-500/10 rounded-lg">
+          <div className="flex items-start gap-2 text-blue-600 text-sm">
+            <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-medium">AI Auto-Selected Photos</p>
+              <p className="text-xs text-blue-500">
+                Photos selected based on quality score and classification from Repliers imageInsights. 
+                Click "Choose Different" to browse all {allPhotos.length} photos.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {/* Main Property Photo */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-medium uppercase tracking-wide">
+                Main Property Photo
+              </Label>
+              {manualPhotoOverride.mainImage && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onResetToAI('mainImage')}
+                  className="h-6 text-xs gap-1"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Reset to AI
+                </Button>
+              )}
+            </div>
+            <ImageUploadField
+              label=""
+              id="mainImage"
+              preview={images.mainImage}
+              onChange={onImageUpload('mainImage')}
+              transform={imageTransforms.mainImage}
+              onTransformChange={onTransformChange('mainImage')}
+              showCropControls
+            />
+            <PhotoSelector
+              photos={allPhotos}
+              currentPhoto={images.mainImage}
+              onSelect={(url) => onSelectFromGallery('mainImage', url)}
+              label="Choose Different Main Photo"
+            />
+          </div>
+
+          {/* Kitchen & Room */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-medium uppercase tracking-wide">Kitchen</Label>
+                {manualPhotoOverride.kitchenImage && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onResetToAI('kitchenImage')}
+                    className="h-5 text-[10px] gap-1 px-1"
+                  >
+                    <RotateCcw className="w-2.5 h-2.5" />
+                    Reset
+                  </Button>
+                )}
+              </div>
+              <ImageUploadField
+                label=""
+                id="kitchenImage"
+                preview={images.kitchenImage}
+                onChange={onImageUpload('kitchenImage')}
+                transform={imageTransforms.kitchenImage}
+                onTransformChange={onTransformChange('kitchenImage')}
+                showCropControls
+                compact
+              />
+              <PhotoSelector
+                photos={allPhotos}
+                currentPhoto={images.kitchenImage}
+                onSelect={(url) => onSelectFromGallery('kitchenImage', url)}
+                label="Choose Different"
+                compact
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-medium uppercase tracking-wide">Room</Label>
+                {manualPhotoOverride.roomImage && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onResetToAI('roomImage')}
+                    className="h-5 text-[10px] gap-1 px-1"
+                  >
+                    <RotateCcw className="w-2.5 h-2.5" />
+                    Reset
+                  </Button>
+                )}
+              </div>
+              <ImageUploadField
+                label=""
+                id="roomImage"
+                preview={images.roomImage}
+                onChange={onImageUpload('roomImage')}
+                transform={imageTransforms.roomImage}
+                onTransformChange={onTransformChange('roomImage')}
+                showCropControls
+                compact
+              />
+              <PhotoSelector
+                photos={allPhotos}
+                currentPhoto={images.roomImage}
+                onSelect={(url) => onSelectFromGallery('roomImage', url)}
+                label="Choose Different"
+                compact
+              />
+            </div>
+          </div>
+
+          {/* Agent Photo & QR Code */}
+          <div className="grid grid-cols-2 gap-3">
+            <ImageUploadField
+              label="Agent Photo"
+              id="agentPhoto"
+              preview={images.agentPhoto}
+              onChange={onImageUpload('agentPhoto')}
+              transform={imageTransforms.agentPhoto}
+              onTransformChange={onTransformChange('agentPhoto')}
+              showCropControls
+              circular
+            />
+            <ImageUploadField
+              label="QR Code"
+              id="qrCode"
+              preview={images.qrCode}
+              onChange={onImageUpload('qrCode')}
+              compact
+            />
+          </div>
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+// Section wrapper
+function Section({ 
+  icon, 
+  title, 
+  badge,
+  children 
+}: { 
+  icon: React.ReactNode; 
+  title: string; 
+  badge?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {icon}
+          <h2 className="text-lg font-medium">{title}</h2>
+        </div>
+        {badge}
+      </div>
+      <Separator className="bg-border" />
+      {children}
+    </div>
+  );
+}
+
+// Data source badge
+function DataSourceBadge({ source }: { source: string }) {
+  const isRepliers = source.includes('Repliers');
+  const isAI = source.includes('AI');
+  
+  return (
+    <Badge 
+      variant="outline" 
+      className={`text-xs gap-1 ${
+        isRepliers ? 'border-green-500/50 text-green-600' : 
+        isAI ? 'border-blue-500/50 text-blue-600' :
+        'border-orange-500/50 text-orange-600'
+      }`}
+    >
+      {isRepliers && <Database className="w-3 h-3" />}
+      {isAI && <Sparkles className="w-3 h-3" />}
+      {!isRepliers && !isAI && <Check className="w-3 h-3" />}
+      {source}
+    </Badge>
+  );
+}
+
+// Form field component
+function FormField({ 
+  icon, 
+  label, 
+  readOnly,
+  ...props 
+}: { 
+  icon?: React.ReactNode; 
+  label: string;
+  readOnly?: boolean;
+} & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <div className="space-y-2">
+      {label && (
+        <Label className="text-xs font-medium uppercase tracking-wide flex items-center gap-2">
+          {icon && <span className="text-muted-foreground">{icon}</span>}
+          {label}
+          {readOnly && (
+            <span className="text-[10px] text-green-500 font-normal">(MLS)</span>
+          )}
+        </Label>
+      )}
+      <Input 
+        {...props} 
+        className={`bg-background ${readOnly ? 'bg-muted/50' : ''}`}
+        readOnly={readOnly}
+      />
+    </div>
+  );
+}
+```
+
+---
+
+## 📷 PhotoSelector Component
+
+```tsx
+// components/marketing/AdvancedFlyerGenerator/PhotoSelector.tsx
+
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+import { Check, Images } from 'lucide-react';
+
+interface Photo {
+  href?: string;
+  url?: string;
+  imageInsights?: {
+    classification?: { imageOf?: string };
+    quality?: { score?: number };
+  };
+}
+
+interface PhotoSelectorProps {
+  photos: Photo[];
+  currentPhoto: string | null;
+  onSelect: (url: string) => void;
+  label: string;
+  compact?: boolean;
+}
+
+export function PhotoSelector({ 
+  photos, 
+  currentPhoto, 
+  onSelect, 
+  label,
+  compact = false 
+}: PhotoSelectorProps) {
+  const [open, setOpen] = useState(false);
+
+  const handleSelect = (url: string) => {
+    onSelect(url);
+    setOpen(false);
+  };
+
+  if (photos.length === 0) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={`gap-1 text-primary hover:text-primary ${compact ? 'h-6 text-[10px] px-2' : 'h-7 text-xs'}`}
+        >
+          <Images className={compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+          {label}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl max-h-[80vh]">
+        <DialogHeader>
+          <DialogTitle>Select Photo ({photos.length} available)</DialogTitle>
+        </DialogHeader>
+        <ScrollArea className="h-[60vh]">
+          <div className="grid grid-cols-3 gap-3 p-1">
+            {photos.map((photo, index) => {
+              const url = photo.href || photo.url || '';
+              const classification = photo.imageInsights?.classification?.imageOf || 'unknown';
+              const quality = photo.imageInsights?.quality?.score || 0;
+              const isSelected = url === currentPhoto;
+
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => handleSelect(url)}
+                  className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all hover:border-primary ${
+                    isSelected ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'
+                  }`}
+                >
+                  <img
+                    src={url}
+                    alt={`Photo ${index + 1}`}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  
+                  {/* Classification & Quality Badge */}
+                  <div className="absolute bottom-1 left-1 right-1 flex gap-1 flex-wrap">
+                    <Badge variant="secondary" className="text-[9px] h-4 bg-black/60 text-white">
+                      {classification.replace(/_/g, ' ')}
+                    </Badge>
+                    <Badge variant="secondary" className="text-[9px] h-4 bg-black/60 text-white">
+                      Q: {quality}
+                    </Badge>
+                  </div>
+                  
+                  {/* Selected indicator */}
+                  {isSelected && (
+                    <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                      <Check className="w-4 h-4 text-white" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+---
+
+## 🤖 AI Headline Generator (Uses Property Description)
+
+```tsx
+// components/marketing/AdvancedFlyerGenerator/AIHeadlineButton.tsx
+
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Sparkles, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+interface AIHeadlineButtonProps {
+  transactionId: string;
+  mlsData: any;
+  onGenerated: (headline: string) => void;
+}
+
+export function AIHeadlineButton({ transactionId, mlsData, onGenerated }: AIHeadlineButtonProps) {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const { toast } = useToast();
+
+  const handleGenerate = async () => {
+    if (!mlsData?.publicRemarks) {
+      toast({
+        title: 'No Description Available',
+        description: 'Property description is required to generate a headline.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/flyer/generate-headline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId,
+          // Send ALL relevant Repliers data for context
+          propertyData: {
+            // Address info
+            city: mlsData.city || mlsData.address?.city || '',
+            state: mlsData.state || mlsData.address?.state || 'TX',
+            neighborhood: mlsData.subdivision || '',
+            
+            // Property details
+            beds: mlsData.bedroomsTotal || mlsData.beds || '',
+            baths: mlsData.bathroomsTotalInteger || mlsData.baths || '',
+            sqft: mlsData.livingArea || mlsData.buildingAreaTotal || '',
+            yearBuilt: mlsData.yearBuilt || '',
+            propertyType: mlsData.propertySubType || mlsData.propertyType || 'Residential',
+            
+            // Price
+            price: mlsData.listPrice || '',
+            
+            // Description - KEY INPUT for AI headline
+            description: mlsData.publicRemarks || '',
+            
+            // Features for context
+            features: [
+              ...(mlsData.interiorFeatures || []),
+              ...(mlsData.exteriorFeatures || []),
+            ].slice(0, 10), // Limit to 10 features
+          },
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to generate');
+
+      const { headline } = await response.json();
+      onGenerated(headline);
+      
+      toast({
+        title: 'Headline Generated',
+        description: 'AI created a headline based on the property description.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Generation Failed',
+        description: 'Could not generate headline. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={handleGenerate}
+      disabled={isGenerating || !mlsData?.publicRemarks}
+      className="h-7 text-xs gap-1 text-primary hover:text-primary hover:bg-primary/10"
+    >
+      {isGenerating ? (
+        <>
+          <Loader2 className="w-3 h-3 animate-spin" />
+          Generating...
+        </>
+      ) : (
+        <>
+          <Sparkles className="w-3 h-3" />
+          AI Generate
+        </>
+      )}
+    </Button>
+  );
+}
+```
+
+---
+
+## 🔌 API Endpoints
+
+### POST /api/flyer/generate-headline
+
+```typescript
+// server/routes/flyer-ai.ts
+
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+app.post('/api/flyer/generate-headline', async (req, res) => {
+  try {
+    const { propertyData } = req.body;
+
+    // Validate we have a description
+    if (!propertyData.description) {
+      return res.status(400).json({ error: 'Property description is required' });
+    }
+
+    const prompt = `Generate a compelling, professional real estate flyer headline for this property.
+
+REQUIREMENTS:
+- Keep it under 60 characters
+- Make it attention-grabbing and emotional
+- Highlight the property's best features
+- Do NOT use quotes around the headline
+- Do NOT start with "Welcome to" or generic phrases
+
+PROPERTY DETAILS (from MLS):
+- Location: ${propertyData.city || 'N/A'}, ${propertyData.state || 'TX'}
+- Neighborhood: ${propertyData.neighborhood || 'N/A'}
+- Bedrooms: ${propertyData.beds || 'N/A'}
+- Bathrooms: ${propertyData.baths || 'N/A'}
+- Square Feet: ${propertyData.sqft || 'N/A'}
+- Year Built: ${propertyData.yearBuilt || 'N/A'}
+- Property Type: ${propertyData.propertyType || 'Residential'}
+- Price: ${propertyData.price ? '$' + Number(propertyData.price).toLocaleString() : 'N/A'}
+- Key Features: ${propertyData.features?.join(', ') || 'N/A'}
+
+PROPERTY DESCRIPTION (from MLS publicRemarks):
+${propertyData.description.substring(0, 800)}
+
+Based on the description above, generate ONLY the headline text, nothing else.`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a professional real estate copywriter. Generate compelling, concise headlines that capture the essence of a property. Always keep headlines under 60 characters.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      max_tokens: 100,
+      temperature: 0.7,
+    });
+
+    const headline = completion.choices[0]?.message?.content?.trim() || 'Beautiful Home in Prime Location';
+
+    res.json({ headline });
+  } catch (error) {
+    console.error('AI headline generation error:', error);
+    res.status(500).json({ error: 'Failed to generate headline' });
+  }
+});
+```
+
+### POST /api/transactions/:id/export-flyer
+
+```typescript
+// server/routes/flyer-export.ts
+
+import puppeteer from 'puppeteer';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs';
+import path from 'path';
+import { generateFlyerHTML } from '../lib/flyer-html-template';
+
+const execAsync = promisify(exec);
+
+app.post('/api/transactions/:id/export-flyer', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const format = req.query.format as string || 'png';
+    const data = req.body;
+
+    // Generate HTML
+    const html = generateFlyerHTML(data);
+
+    // Launch Puppeteer
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+    });
+
+    const page = await browser.newPage();
+    await page.setViewport({
+      width: 816,
+      height: 1056,
+      deviceScaleFactor: 3.125, // ~300 DPI
+    });
+    
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+
+    // Wait for images to load
+    await page.evaluate(() => {
+      return Promise.all(
+        Array.from(document.images)
+          .filter(img => !img.complete)
+          .map(img => new Promise(resolve => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          }))
+      );
+    });
+
+    const screenshot = await page.screenshot({
+      type: 'png',
+      clip: { x: 0, y: 0, width: 816, height: 1056 },
+    });
+
+    await browser.close();
+
+    // Save to marketing assets
+    const assetName = `Flyer - ${data.address || 'Property'} - ${new Date().toISOString().split('T')[0]}`;
+    await db.insert(marketingAssets).values({
+      transactionId: id,
+      userId: req.user?.id,
+      type: 'flyer',
+      name: assetName,
+      fileUrl: `data:image/png;base64,${screenshot.toString('base64')}`,
+      fileType: format === 'cmyk' ? 'image/tiff' : 'image/png',
+      metadata: {
+        mlsNumber: data.mlsNumber,
+        formData: data,
+      },
+    });
+
+    // Convert to CMYK if requested
+    if (format === 'cmyk') {
+      const tempDir = '/tmp';
+      const timestamp = Date.now();
+      const inputPath = path.join(tempDir, `flyer_${timestamp}.png`);
+      const outputPath = path.join(tempDir, `flyer_${timestamp}_cmyk.tiff`);
+
+      fs.writeFileSync(inputPath, screenshot);
+      await execAsync(
+        `convert "${inputPath}" -colorspace CMYK -density 300 -units PixelsPerInch "${outputPath}"`
+      );
+      const cmykBuffer = fs.readFileSync(outputPath);
+
+      fs.unlinkSync(inputPath);
+      fs.unlinkSync(outputPath);
+
+      res.setHeader('Content-Type', 'image/tiff');
+      res.setHeader('Content-Disposition', `attachment; filename="flyer_cmyk.tiff"`);
+      return res.send(cmykBuffer);
+    }
+
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `attachment; filename="flyer.png"`);
+    res.send(screenshot);
+  } catch (error) {
+    console.error('Flyer export error:', error);
+    res.status(500).json({ error: 'Failed to export flyer' });
+  }
+});
+```
+
+---
+
+## 📱 Mobile Optimization
+
+```css
+/* Desktop: Side-by-side */
+@media (min-width: 1024px) {
+  .flyer-generator-container { display: flex; }
+  .flyer-form-panel { width: 420px; }
+  .flyer-preview-panel { flex: 1; }
+}
+
+/* Tablet: Stacked */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .flyer-generator-container { flex-direction: column; }
+  .flyer-preview-panel { order: -1; max-height: 400px; }
+}
+
+/* Mobile: Tabbed */
+@media (max-width: 767px) {
+  .flyer-form-panel, .flyer-preview-panel { display: none; }
+  .flyer-form-panel.active, .flyer-preview-panel.active { display: block; }
+}
+
+/* Touch-friendly */
+input[type="range"] { height: 8px; }
+input[type="range"]::-webkit-slider-thumb { width: 24px; height: 24px; }
+```
+
+---
+
+## ✅ Verification Checklist
+
+### Repliers API Integration
+- [ ] Address builds correctly from Repliers components (streetNumber, streetName, streetSuffix, city, state)
+- [ ] Price displays from Repliers `listPrice`
+- [ ] Beds/Baths/Sqft populate from Repliers fields
+- [ ] Description pulls from Repliers `publicRemarks`
+- [ ] MLS# badge shows in header
+
+### AI Photo Selection
+- [ ] Photos auto-select on load using `imageInsights`
+- [ ] Main photo prioritizes exterior shots
+- [ ] Kitchen photo prioritizes kitchen classification
+- [ ] Room photo prioritizes living/bedroom
+- [ ] Quality scores used for ranking
+- [ ] "Choose Different" opens photo gallery
+- [ ] "Reset to AI" restores auto-selection
+
+### AI Headline Generation
+- [ ] AI Generate button works
+- [ ] Uses property description from `publicRemarks`
+- [ ] Generated headline populates field
+- [ ] Disabled if no description available
+
+### Agent Data (Settings)
+- [ ] Agent name from `firstName` + `lastName`
+- [ ] Agent title from `title` field
+- [ ] Phone from `phone` field
+- [ ] Profile photo from `profilePhoto`
+- [ ] QR code from `qrCode`
+- [ ] Logos from settings with default toggles
+
+### Image Crop Controls
+- [ ] Zoom (1x-3x) works for all photos
+- [ ] Pan X/Y works (-50% to +50%)
+- [ ] Reset button works
+- [ ] Preview updates in real-time
+
+### Export
+- [ ] PNG export works (300 DPI)
+- [ ] CMYK export works (TIFF)
+- [ ] Saves to Marketing Assets
+- [ ] Download triggers
+
+---
+
+## 📋 Data Flow Summary
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        ADVANCED FLYER GENERATOR                      │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  TRANSACTION (MLS#)                                                  │
+│       │                                                              │
+│       ▼                                                              │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │              REPLIERS API (via cached mlsData)               │    │
+│  ├─────────────────────────────────────────────────────────────┤    │
+│  │  • Address: streetNumber + streetName + streetSuffix + city  │    │
+│  │  • Price: listPrice                                          │    │
+│  │  • Details: bedroomsTotal, bathroomsTotalInteger, livingArea │    │
+│  │  • Description: publicRemarks                                │    │
+│  │  • Photos: photos[] with imageInsights                       │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                             │                                        │
+│       ┌─────────────────────┼─────────────────────┐                 │
+│       ▼                     ▼                     ▼                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────┐     │
+│  │ AUTO-FILL   │    │ AI SELECT   │    │ AI HEADLINE         │     │
+│  │ Form Fields │    │ Best Photos │    │ (from description)  │     │
+│  └─────────────┘    └─────────────┘    └─────────────────────┘     │
+│                                                                      │
+│  SETTINGS (Agent Marketing Profile)                                  │
+│       │                                                              │
+│       ▼                                                              │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │  • Agent: firstName, lastName, title, phone, profilePhoto   │    │
+│  │  • Branding: qrCode, companyLogo, secondaryLogo             │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+*This prompt creates a fully automated flyer generator that pulls ALL data from Repliers API via the transaction's MLS#. Agents can optionally override any auto-filled data.*
