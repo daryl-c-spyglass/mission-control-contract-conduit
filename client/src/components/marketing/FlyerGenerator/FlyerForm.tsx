@@ -203,9 +203,6 @@ export function FlyerForm({
             id="agentPhoto"
             preview={images.agentPhoto}
             onChange={onImageUpload('agentPhoto')}
-            transform={imageTransforms.agentPhoto}
-            onTransformChange={onTransformChange('agentPhoto')}
-            showCropControls
             circular
           />
           <ImageUploadField
