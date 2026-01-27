@@ -103,6 +103,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CreateFlyerDialog, FlyerAssetConfig } from "./create-flyer-dialog";
 import { MarketingMaterialsDialog, SocialGraphicConfig } from "./marketing-materials-dialog";
 import { GraphicGeneratorDialog } from "./graphic-generator-dialog";
+import { FlyerGenerator } from "./marketing/FlyerGenerator";
 import { PhotoGalleryModal } from "./photo-gallery-modal";
 import { CMATab } from "./cma-tab";
 import { TimelineTab } from "./timeline-tab";
@@ -632,6 +633,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [activeTab, setActiveTab] = useState(initialTab);
   const { toast } = useToast();
   const [flyerDialogOpen, setFlyerDialogOpen] = useState(false);
+  const [showFlyerGenerator, setShowFlyerGenerator] = useState(false);
   const [editFlyerAsset, setEditFlyerAsset] = useState<{ id: string; config: FlyerAssetConfig } | null>(null);
   const [editGraphicsAsset, setEditGraphicsAsset] = useState<{ id: string; config: SocialGraphicConfig } | null>(null);
   const [graphicsDialogOpen, setGraphicsDialogOpen] = useState(false);
@@ -2950,6 +2952,14 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         </TabsContent>
 
         <TabsContent value="marketing" className="space-y-6">
+          {showFlyerGenerator ? (
+            <FlyerGenerator
+              transactionId={transaction.id}
+              transaction={transaction}
+              onBack={() => setShowFlyerGenerator(false)}
+            />
+          ) : (
+            <>
           {/* Header */}
           <div>
             <h2 className="text-xl font-bold">Marketing</h2>
@@ -3304,6 +3314,45 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                     </TooltipContent>
                   </Tooltip>
 
+                  {/* Advanced Flyer Generator Card */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Card 
+                        className={cn(
+                          "transition-colors",
+                          hasPhotosForMarketing 
+                            ? "cursor-pointer hover:border-primary hover-elevate" 
+                            : "opacity-60 cursor-not-allowed"
+                        )}
+                        onClick={() => hasPhotosForMarketing && setShowFlyerGenerator(true)}
+                        data-testid="card-flyer-generator"
+                      >
+                        <CardContent className="pt-6">
+                          <div className="flex items-center gap-4">
+                            <div className={cn(
+                              "p-3 rounded-lg",
+                              hasPhotosForMarketing ? "bg-blue-500/10" : "bg-muted"
+                            )}>
+                              <Layout className={cn(
+                                "h-6 w-6",
+                                hasPhotosForMarketing ? "text-blue-500" : "text-muted-foreground"
+                              )} />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold">Advanced Flyer</h3>
+                              <p className="text-sm text-muted-foreground">
+                                {hasPhotosForMarketing ? "AI headlines, image controls, grid overlay" : disabledMessage}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{hasPhotosForMarketing ? "Full-featured flyer generator with AI and crop controls" : disabledMessage}</p>
+                    </TooltipContent>
+                  </Tooltip>
+
                   {/* Graphic Generator Card - Opens in iframe modal */}
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -3451,6 +3500,8 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 </p>
               </CardContent>
             </Card>
+          )}
+            </>
           )}
         </TabsContent>
 

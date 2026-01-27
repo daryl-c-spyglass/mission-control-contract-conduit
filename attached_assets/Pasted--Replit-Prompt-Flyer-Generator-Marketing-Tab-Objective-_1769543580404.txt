@@ -1,0 +1,1584 @@
+# Replit Prompt: Flyer Generator — Marketing Tab
+
+## 🎯 Objective
+
+Add a **Flyer Generator** to the Marketing tab that allows agents to create professional property flyers with:
+- Auto-filled data from MLS/Transaction
+- AI-generated headlines (OpenAI)
+- Image cropping controls (zoom, pan, reset)
+- Live preview with grid overlay
+- Export to PNG/CMYK
+- Auto-save to Marketing Assets
+
+---
+
+## 📍 Location
+
+**Marketing Tab** → Flyer Generator
+
+```
+Transaction Detail
+├── Overview
+├── MLS Data
+├── CMA
+├── Documents
+├── Marketing ← ADD HERE
+│   ├── Flyer Generator ← NEW
+│   └── Marketing Assets (existing)
+├── Timeline
+└── Templates
+```
+
+---
+
+## 📁 File Structure
+
+```
+client/src/
+├── components/
+│   └── marketing/
+│       ├── FlyerGenerator/
+│       │   ├── index.tsx              # Main container
+│       │   ├── FlyerForm.tsx          # Left panel form
+│       │   ├── FlyerPreview.tsx       # Live preview component
+│       │   ├── GridOverlay.tsx        # 4x4 numbered grid
+│       │   ├── ImageUploadField.tsx   # Upload with crop controls
+│       │   └── AIHeadlineButton.tsx   # AI generate headline
+│       │
+│       └── MarketingTab.tsx           # Marketing tab container
+│
+├── hooks/
+│   ├── useFlyerGenerator.ts           # Form state + auto-fill
+│   └── useMarketingProfile.ts         # Settings data hook
+│
+└── lib/
+    └── flyer-utils.ts                 # Photo selection, transforms
+
+server/
+├── routes/
+│   ├── flyer-export.ts                # Puppeteer export endpoint
+│   └── flyer-ai.ts                    # AI headline generation
+```
+
+---
+
+## 🗄️ Database Schema
+
+### Marketing Assets Table
+
+```sql
+CREATE TABLE IF NOT EXISTS marketing_assets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  transaction_id UUID REFERENCES transactions(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id),
+  type VARCHAR(50) NOT NULL DEFAULT 'flyer',
+  name VARCHAR(255),
+  file_url TEXT,
+  file_type VARCHAR(50),
+  metadata JSONB,  -- Store form data for potential re-editing
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_marketing_assets_transaction ON marketing_assets(transaction_id);
+```
+
+### Drizzle Schema
+
+```typescript
+// Add to schema.ts
+export const marketingAssets = pgTable('marketing_assets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  transactionId: uuid('transaction_id').references(() => transactions.id),
+  userId: uuid('user_id').references(() => users.id),
+  type: varchar('type', { length: 50 }).notNull().default('flyer'),
+  name: varchar('name', { length: 255 }),
+  fileUrl: text('file_url'),
+  fileType: varchar('file_type', { length: 50 }),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+```
+
+---
+
+## 📐 Data Types
+
+```typescript
+// lib/flyer-types.ts
+
+export interface ImageTransform {
+  scale: number;      // 1 to 3
+  positionX: number;  // -50 to 50
+  positionY: number;  // -50 to 50
+}
+
+export interface ImageTransforms {
+  mainImage: ImageTransform;
+  kitchenImage: ImageTransform;
+  roomImage: ImageTransform;
+  agentPhoto: ImageTransform;
+}
+
+export interface FlyerImages {
+  mainImage: string | null;
+  kitchenImage: string | null;
+  roomImage: string | null;
+  agentPhoto: string | null;
+  companyLogo: string | null;
+  secondaryLogo: string | null;
+  qrCode: string | null;
+}
+
+export interface FlyerData {
+  price: string;
+  address: string;
+  bedrooms: string;
+  bathrooms: string;
+  sqft: string;
+  introHeading: string;
+  introDescription: string;
+  agentName: string;
+  agentTitle: string;
+  phone: string;
+}
+
+export const DEFAULT_TRANSFORM: ImageTransform = {
+  scale: 1,
+  positionX: 0,
+  positionY: 0,
+};
+
+export const DEFAULT_TRANSFORMS: ImageTransforms = {
+  mainImage: { ...DEFAULT_TRANSFORM },
+  kitchenImage: { ...DEFAULT_TRANSFORM },
+  roomImage: { ...DEFAULT_TRANSFORM },
+  agentPhoto: { ...DEFAULT_TRANSFORM },
+};
+```
+
+---
+
+## 🖥️ Main Component: FlyerGenerator
+
+```tsx
+// components/marketing/FlyerGenerator/index.tsx
+
+import { useState, useRef, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { ArrowLeft, Download, Grid3X3, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { FlyerForm } from './FlyerForm';
+import { FlyerPreview } from './FlyerPreview';
+import { GridOverlay } from './GridOverlay';
+import { useMarketingProfile } from '@/hooks/useMarketingProfile';
+import { autoSelectPhotos } from '@/lib/flyer-utils';
+import type { FlyerData, FlyerImages, ImageTransforms, DEFAULT_TRANSFORMS } from '@/lib/flyer-types';
+
+interface FlyerGeneratorProps {
+  transactionId: string;
+  transaction: any; // Transaction with MLS data
+  onBack: () => void;
+}
+
+export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGeneratorProps) {
+  const { toast } = useToast();
+  const previewRef = useRef<HTMLDivElement>(null);
+  
+  // State
+  const [isExporting, setIsExporting] = useState(false);
+  const [showGrid, setShowGrid] = useState(false);
+  const [scale, setScale] = useState<string>('fit');
+  const [imageTransforms, setImageTransforms] = useState<ImageTransforms>(DEFAULT_TRANSFORMS);
+
+  // Fetch marketing profile from Settings
+  const { data: marketingProfile } = useMarketingProfile();
+
+  // Images state
+  const [images, setImages] = useState<FlyerImages>({
+    mainImage: null,
+    kitchenImage: null,
+    roomImage: null,
+    agentPhoto: null,
+    companyLogo: null,
+    secondaryLogo: null,
+    qrCode: null,
+  });
+
+  // Form with default values from transaction
+  const form = useForm<FlyerData>({
+    defaultValues: {
+      price: '',
+      address: '',
+      bedrooms: '',
+      bathrooms: '',
+      sqft: '',
+      introHeading: '',
+      introDescription: '',
+      agentName: '',
+      agentTitle: '',
+      phone: '',
+    },
+  });
+
+  const watchedValues = form.watch();
+
+  // Auto-fill from transaction/MLS data and Settings
+  useEffect(() => {
+    if (transaction) {
+      const mlsData = transaction.mlsData || {};
+      
+      // Auto-fill form from MLS
+      form.reset({
+        price: formatPrice(transaction.listPrice || mlsData.listPrice),
+        address: formatAddress(transaction, mlsData),
+        bedrooms: String(mlsData.beds || mlsData.bedroomsTotal || ''),
+        bathrooms: String(mlsData.baths || mlsData.bathroomsTotalInteger || ''),
+        sqft: formatNumber(mlsData.sqft || mlsData.livingArea || mlsData.buildingAreaTotal),
+        introHeading: generateDefaultHeadline(transaction, mlsData),
+        introDescription: mlsData.publicRemarks || mlsData.remarks || '',
+        agentName: marketingProfile?.agentName || transaction.agentName || '',
+        agentTitle: marketingProfile?.agentTitle || 'REALTOR®',
+        phone: marketingProfile?.phone || transaction.agentPhone || '',
+      });
+
+      // Auto-select photos using imageInsights
+      if (mlsData.photos && mlsData.photos.length > 0) {
+        const selected = autoSelectPhotos(mlsData.photos);
+        setImages(prev => ({
+          ...prev,
+          mainImage: selected.mainPhoto,
+          kitchenImage: selected.kitchenPhoto,
+          roomImage: selected.roomPhoto,
+        }));
+      }
+    }
+  }, [transaction, form]);
+
+  // Auto-fill images from marketing profile
+  useEffect(() => {
+    if (marketingProfile) {
+      setImages(prev => ({
+        ...prev,
+        agentPhoto: marketingProfile.agentPhoto || null,
+        qrCode: marketingProfile.qrCode || null,
+        companyLogo: marketingProfile.companyLogoUseDefault
+          ? '/logos/SpyglassRealty_Logo_Black.png'
+          : marketingProfile.companyLogo || '/logos/SpyglassRealty_Logo_Black.png',
+        secondaryLogo: marketingProfile.secondaryLogoUseDefault
+          ? '/logos/LeadingRE_Logo.png'
+          : marketingProfile.secondaryLogo || '/logos/LeadingRE_Logo.png',
+      }));
+    }
+  }, [marketingProfile]);
+
+  // Handle image upload
+  const handleImageUpload = (field: keyof FlyerImages) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast({ title: 'File too large', description: 'Max 10MB', variant: 'destructive' });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImages(prev => ({ ...prev, [field]: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle transform change
+  const handleTransformChange = (field: keyof ImageTransforms) => (transform: ImageTransform) => {
+    setImageTransforms(prev => ({ ...prev, [field]: transform }));
+  };
+
+  // Export mutation
+  const exportMutation = useMutation({
+    mutationFn: async (format: 'png' | 'cmyk') => {
+      const response = await fetch(`/api/transactions/${transactionId}/export-flyer?format=${format}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...watchedValues,
+          ...images,
+          imageTransforms,
+        }),
+      });
+      if (!response.ok) throw new Error('Export failed');
+      return response.blob();
+    },
+    onSuccess: (blob, format) => {
+      // Download file
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `flyer-${watchedValues.address.replace(/[^a-zA-Z0-9]/g, '-')}.${format === 'cmyk' ? 'tiff' : 'png'}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({ title: 'Flyer Exported', description: 'Your flyer has been downloaded and saved.' });
+    },
+    onError: () => {
+      toast({ title: 'Export Failed', description: 'Please try again.', variant: 'destructive' });
+    },
+  });
+
+  // Calculate preview scale
+  const getPreviewScale = () => {
+    if (scale === 'fit') return 0.55; // Fit to typical screen
+    return parseFloat(scale);
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-background">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Marketing
+        </button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => exportMutation.mutate('png')}
+            disabled={exportMutation.isPending}
+            className="gap-2"
+          >
+            {exportMutation.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            Export PNG
+          </Button>
+          <Button
+            onClick={() => exportMutation.mutate('cmyk')}
+            disabled={exportMutation.isPending}
+            variant="outline"
+            className="gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Export CMYK (Print)
+          </Button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Panel - Form */}
+        <div className="w-[420px] min-w-[420px] border-r border-border bg-card">
+          <ScrollArea className="h-full">
+            <FlyerForm
+              form={form}
+              images={images}
+              imageTransforms={imageTransforms}
+              onImageUpload={handleImageUpload}
+              onTransformChange={handleTransformChange}
+              transactionId={transactionId}
+              mlsData={transaction?.mlsData}
+            />
+          </ScrollArea>
+        </div>
+
+        {/* Right Panel - Preview */}
+        <div className="flex-1 bg-muted/30 p-6 overflow-auto">
+          <div className="sticky top-0">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-medium text-muted-foreground">Live Preview</h2>
+              <div className="flex items-center gap-4">
+                {/* Grid Toggle */}
+                <div className="flex items-center gap-2">
+                  <Grid3X3 className="h-4 w-4 text-muted-foreground" />
+                  <Label htmlFor="grid-toggle" className="text-xs text-muted-foreground cursor-pointer">
+                    Grid
+                  </Label>
+                  <Switch
+                    id="grid-toggle"
+                    checked={showGrid}
+                    onCheckedChange={setShowGrid}
+                  />
+                </div>
+
+                {/* Scale Selector */}
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground">Scale:</Label>
+                  <Select value={scale} onValueChange={setScale}>
+                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fit">Fit to screen</SelectItem>
+                      <SelectItem value="0.5">50%</SelectItem>
+                      <SelectItem value="0.75">75%</SelectItem>
+                      <SelectItem value="1">100%</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* Preview Container */}
+            <div className="overflow-auto rounded-lg shadow-2xl bg-white">
+              <div
+                ref={previewRef}
+                className="origin-top-left relative"
+                style={{
+                  transform: `scale(${getPreviewScale()})`,
+                  transformOrigin: 'top left',
+                  width: '816px',
+                }}
+              >
+                <FlyerPreview
+                  data={watchedValues}
+                  images={images}
+                  imageTransforms={imageTransforms}
+                />
+                {showGrid && <GridOverlay />}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Helper functions
+function formatPrice(price: number | string | null): string {
+  if (!price) return '';
+  const num = typeof price === 'string' ? parseFloat(price.replace(/[^0-9.]/g, '')) : price;
+  if (isNaN(num)) return '';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(num);
+}
+
+function formatAddress(transaction: any, mlsData: any): string {
+  const parts = [
+    mlsData?.streetNumber || transaction?.streetNumber,
+    mlsData?.streetName || transaction?.streetName,
+    mlsData?.streetSuffix || transaction?.streetSuffix,
+  ].filter(Boolean).join(' ');
+  
+  const city = mlsData?.city || transaction?.city || '';
+  const state = mlsData?.state || transaction?.state || 'TX';
+  const zip = mlsData?.postalCode || transaction?.postalCode || '';
+  
+  if (parts && city) {
+    return `${parts}, ${city}, ${state} ${zip}`.toUpperCase().trim();
+  }
+  return transaction?.address?.toUpperCase() || '';
+}
+
+function formatNumber(num: number | string | null): string {
+  if (!num) return '';
+  const n = typeof num === 'string' ? parseFloat(num.replace(/[^0-9.]/g, '')) : num;
+  if (isNaN(n)) return '';
+  return new Intl.NumberFormat('en-US').format(Math.round(n));
+}
+
+function generateDefaultHeadline(transaction: any, mlsData: any): string {
+  const city = mlsData?.city || transaction?.city || '';
+  const propertyType = mlsData?.propertyType || 'Property';
+  if (city) {
+    return `Prime Opportunity in ${city}`;
+  }
+  return `Beautiful ${propertyType}`;
+}
+```
+
+---
+
+## 📝 FlyerForm Component with AI Headline
+
+```tsx
+// components/marketing/FlyerGenerator/FlyerForm.tsx
+
+import { UseFormReturn } from 'react-hook-form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import { 
+  FileText, DollarSign, BedDouble, Bath, Ruler, User, Phone, MapPin, 
+  Image as ImageIcon, Sparkles, Loader2, Check 
+} from 'lucide-react';
+import { ImageUploadField } from './ImageUploadField';
+import { AIHeadlineButton } from './AIHeadlineButton';
+import type { FlyerData, FlyerImages, ImageTransforms, ImageTransform } from '@/lib/flyer-types';
+
+interface FlyerFormProps {
+  form: UseFormReturn<FlyerData>;
+  images: FlyerImages;
+  imageTransforms: ImageTransforms;
+  onImageUpload: (field: keyof FlyerImages) => (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onTransformChange: (field: keyof ImageTransforms) => (transform: ImageTransform) => void;
+  transactionId: string;
+  mlsData: any;
+}
+
+export function FlyerForm({
+  form,
+  images,
+  imageTransforms,
+  onImageUpload,
+  onTransformChange,
+  transactionId,
+  mlsData,
+}: FlyerFormProps) {
+  const { register, setValue, watch } = form;
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Property Details Section */}
+      <Section icon={<FileText className="w-5 h-5 text-primary" />} title="Property Details">
+        <div className="flex items-center gap-2 text-green-500 text-sm mb-4">
+          <Check className="w-4 h-4" />
+          Auto-filled from MLS
+        </div>
+
+        <div className="space-y-4">
+          <FormField
+            icon={<DollarSign />}
+            label="Listed Price"
+            {...register('price')}
+          />
+
+          <div className="grid grid-cols-3 gap-3">
+            <FormField icon={<BedDouble />} label="Beds" {...register('bedrooms')} />
+            <FormField icon={<Bath />} label="Baths" {...register('bathrooms')} />
+            <FormField icon={<Ruler />} label="Sq Ft" {...register('sqft')} />
+          </div>
+        </div>
+      </Section>
+
+      {/* Description Section */}
+      <Section icon={<FileText className="w-5 h-5 text-primary" />} title="Description">
+        <div className="space-y-4">
+          {/* Headline with AI Generate Button */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-medium uppercase tracking-wide">
+                Headline
+              </Label>
+              <AIHeadlineButton
+                transactionId={transactionId}
+                mlsData={mlsData}
+                onGenerated={(headline) => setValue('introHeading', headline)}
+              />
+            </div>
+            <Input
+              {...register('introHeading')}
+              placeholder="Prime Opportunity in Travis County"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs font-medium uppercase tracking-wide">
+              Property Description
+            </Label>
+            <Textarea
+              {...register('introDescription')}
+              placeholder="Describe the property..."
+              className="min-h-[120px] resize-none"
+            />
+          </div>
+        </div>
+      </Section>
+
+      {/* Agent Details Section */}
+      <Section icon={<User className="w-5 h-5 text-primary" />} title="Agent Details">
+        <div className="flex items-center gap-2 text-green-500 text-sm mb-4">
+          <Check className="w-4 h-4" />
+          Using data from Settings
+        </div>
+
+        <div className="space-y-4">
+          <FormField label="Agent Name" {...register('agentName')} />
+          <FormField label="Title" {...register('agentTitle')} />
+          <FormField icon={<Phone />} label="Phone Number" {...register('phone')} />
+        </div>
+      </Section>
+
+      {/* Branding & Logos Section */}
+      <Section icon={<ImageIcon className="w-5 h-5 text-primary" />} title="Branding & Logos">
+        <div className="flex items-center gap-2 text-green-500 text-sm mb-4">
+          <Check className="w-4 h-4" />
+          Using saved marketing profile
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <ImageUploadField
+            label="Company Logo"
+            id="companyLogo"
+            preview={images.companyLogo}
+            onChange={onImageUpload('companyLogo')}
+            compact
+          />
+          <ImageUploadField
+            label="Secondary Logo"
+            id="secondaryLogo"
+            preview={images.secondaryLogo}
+            onChange={onImageUpload('secondaryLogo')}
+            compact
+          />
+        </div>
+      </Section>
+
+      {/* Property Images Section */}
+      <Section icon={<ImageIcon className="w-5 h-5 text-primary" />} title="Property Images">
+        <div className="flex items-center gap-2 text-green-500 text-sm mb-4">
+          <Check className="w-4 h-4" />
+          Auto-selected using image quality
+        </div>
+
+        <div className="space-y-4">
+          <FormField
+            icon={<MapPin />}
+            label="Property Address"
+            {...register('address')}
+          />
+
+          {/* Main Property Photo with Crop Controls */}
+          <ImageUploadField
+            label="Main Property Photo"
+            id="mainImage"
+            preview={images.mainImage}
+            onChange={onImageUpload('mainImage')}
+            transform={imageTransforms.mainImage}
+            onTransformChange={onTransformChange('mainImage')}
+            showCropControls
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <ImageUploadField
+              label="Kitchen"
+              id="kitchenImage"
+              preview={images.kitchenImage}
+              onChange={onImageUpload('kitchenImage')}
+              transform={imageTransforms.kitchenImage}
+              onTransformChange={onTransformChange('kitchenImage')}
+              showCropControls
+              compact
+            />
+            <ImageUploadField
+              label="Room"
+              id="roomImage"
+              preview={images.roomImage}
+              onChange={onImageUpload('roomImage')}
+              transform={imageTransforms.roomImage}
+              onTransformChange={onTransformChange('roomImage')}
+              showCropControls
+              compact
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <ImageUploadField
+              label="Agent Photo"
+              id="agentPhoto"
+              preview={images.agentPhoto}
+              onChange={onImageUpload('agentPhoto')}
+              transform={imageTransforms.agentPhoto}
+              onTransformChange={onTransformChange('agentPhoto')}
+              showCropControls
+              circular
+            />
+            <ImageUploadField
+              label="QR Code"
+              id="qrCode"
+              preview={images.qrCode}
+              onChange={onImageUpload('qrCode')}
+              compact
+            />
+          </div>
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+// Section wrapper component
+function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        {icon}
+        <h2 className="text-lg font-medium">{title}</h2>
+      </div>
+      <Separator />
+      {children}
+    </div>
+  );
+}
+
+// Form field component
+function FormField({ icon, label, ...props }: { icon?: React.ReactNode; label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs font-medium uppercase tracking-wide flex items-center gap-2">
+        {icon && <span className="text-muted-foreground">{icon}</span>}
+        {label}
+      </Label>
+      <Input {...props} />
+    </div>
+  );
+}
+```
+
+---
+
+## 🤖 AI Headline Generator Button
+
+```tsx
+// components/marketing/FlyerGenerator/AIHeadlineButton.tsx
+
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Sparkles, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+interface AIHeadlineButtonProps {
+  transactionId: string;
+  mlsData: any;
+  onGenerated: (headline: string) => void;
+}
+
+export function AIHeadlineButton({ transactionId, mlsData, onGenerated }: AIHeadlineButtonProps) {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const { toast } = useToast();
+
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/flyer/generate-headline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId,
+          propertyData: {
+            address: mlsData?.address || '',
+            city: mlsData?.city || '',
+            state: mlsData?.state || 'TX',
+            beds: mlsData?.beds || mlsData?.bedroomsTotal,
+            baths: mlsData?.baths || mlsData?.bathroomsTotalInteger,
+            sqft: mlsData?.sqft || mlsData?.livingArea,
+            propertyType: mlsData?.propertyType || 'Residential',
+            description: mlsData?.publicRemarks || '',
+            features: mlsData?.features || [],
+            neighborhood: mlsData?.subdivision || mlsData?.neighborhood || '',
+            yearBuilt: mlsData?.yearBuilt,
+            price: mlsData?.listPrice,
+          },
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to generate');
+
+      const { headline } = await response.json();
+      onGenerated(headline);
+      
+      toast({
+        title: 'Headline Generated',
+        description: 'AI has created a headline for your flyer.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Generation Failed',
+        description: 'Could not generate headline. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={handleGenerate}
+      disabled={isGenerating}
+      className="h-7 text-xs gap-1 text-primary hover:text-primary"
+    >
+      {isGenerating ? (
+        <>
+          <Loader2 className="w-3 h-3 animate-spin" />
+          Generating...
+        </>
+      ) : (
+        <>
+          <Sparkles className="w-3 h-3" />
+          AI Generate
+        </>
+      )}
+    </Button>
+  );
+}
+```
+
+---
+
+## 🖼️ ImageUploadField with Crop Controls
+
+```tsx
+// components/marketing/FlyerGenerator/ImageUploadField.tsx
+
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Upload, ZoomIn, MoveHorizontal, MoveVertical, RotateCcw } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { ImageTransform } from '@/lib/flyer-types';
+
+interface ImageUploadFieldProps {
+  label: string;
+  id: string;
+  preview: string | null;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  transform?: ImageTransform;
+  onTransformChange?: (transform: ImageTransform) => void;
+  showCropControls?: boolean;
+  compact?: boolean;
+  circular?: boolean;
+}
+
+export function ImageUploadField({
+  label,
+  id,
+  preview,
+  onChange,
+  transform = { scale: 1, positionX: 0, positionY: 0 },
+  onTransformChange,
+  showCropControls = false,
+  compact = false,
+  circular = false,
+}: ImageUploadFieldProps) {
+  const handleReset = () => {
+    onTransformChange?.({ scale: 1, positionX: 0, positionY: 0 });
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs font-medium uppercase tracking-wide">
+        {label}
+      </Label>
+
+      {/* Upload Area */}
+      <label
+        htmlFor={id}
+        className={cn(
+          "flex cursor-pointer items-center justify-center border-2 border-dashed",
+          "border-muted-foreground/25 bg-muted/50 transition-colors",
+          "hover:border-primary/50 hover:bg-muted",
+          compact ? "h-24" : circular ? "h-32 w-32 mx-auto" : "h-32",
+          circular ? "rounded-full" : "rounded-lg",
+          preview ? "p-0 border-solid border-primary/30 overflow-hidden" : "p-4"
+        )}
+      >
+        {preview ? (
+          <div className="w-full h-full overflow-hidden">
+            <img
+              src={preview}
+              alt={label}
+              className={cn(
+                "w-full h-full object-cover transition-transform",
+                circular && "rounded-full"
+              )}
+              style={{
+                transform: `scale(${transform.scale}) translate(${transform.positionX}%, ${transform.positionY}%)`,
+              }}
+            />
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+            <Upload className="h-6 w-6" />
+            <span className="text-xs">Click to upload</span>
+          </div>
+        )}
+        <input
+          type="file"
+          id={id}
+          accept="image/*"
+          onChange={onChange}
+          className="hidden"
+        />
+      </label>
+
+      {/* Crop Controls - Only show when image is uploaded and controls enabled */}
+      {preview && showCropControls && onTransformChange && (
+        <div className="space-y-3 pt-2 px-1">
+          {/* Zoom Slider */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <ZoomIn className="w-3 h-3" /> Zoom
+              </span>
+              <span>{transform.scale.toFixed(1)}x</span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="3"
+              step="0.1"
+              value={transform.scale}
+              onChange={(e) => onTransformChange({
+                ...transform,
+                scale: parseFloat(e.target.value)
+              })}
+              className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+            />
+          </div>
+
+          {/* Horizontal Position Slider */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <MoveHorizontal className="w-3 h-3" /> Horizontal
+              </span>
+              <span>{transform.positionX}%</span>
+            </div>
+            <input
+              type="range"
+              min="-50"
+              max="50"
+              step="1"
+              value={transform.positionX}
+              onChange={(e) => onTransformChange({
+                ...transform,
+                positionX: parseInt(e.target.value)
+              })}
+              className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+            />
+          </div>
+
+          {/* Vertical Position Slider */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <MoveVertical className="w-3 h-3" /> Vertical
+              </span>
+              <span>{transform.positionY}%</span>
+            </div>
+            <input
+              type="range"
+              min="-50"
+              max="50"
+              step="1"
+              value={transform.positionY}
+              onChange={(e) => onTransformChange({
+                ...transform,
+                positionY: parseInt(e.target.value)
+              })}
+              className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+            />
+          </div>
+
+          {/* Reset Button */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleReset}
+            className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+          >
+            <RotateCcw className="w-3 h-3" />
+            Reset
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## 🔲 Grid Overlay Component
+
+```tsx
+// components/marketing/FlyerGenerator/GridOverlay.tsx
+
+export function GridOverlay() {
+  const cellLabels = [
+    [1, 2, 3, 4],
+    [5, 6, 7, 8],
+    [9, 10, 11, 12],
+    [13, 14, 15, 16]
+  ];
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '816px',
+        height: '1056px',
+        pointerEvents: 'none',
+        zIndex: 1000,
+      }}
+    >
+      {/* Major grid lines (25% divisions) */}
+      {[0, 25, 50, 75, 100].map((percent) => (
+        <div key={`major-${percent}`}>
+          <div
+            style={{
+              position: 'absolute',
+              left: `${percent}%`,
+              top: 0,
+              width: '2px',
+              height: '100%',
+              backgroundColor: 'rgba(0, 180, 216, 0.7)',
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              top: `${percent}%`,
+              left: 0,
+              height: '2px',
+              width: '100%',
+              backgroundColor: 'rgba(0, 180, 216, 0.7)',
+            }}
+          />
+        </div>
+      ))}
+
+      {/* Minor grid lines (2.5% divisions) */}
+      {Array.from({ length: 40 }, (_, i) => i * 2.5).map((percent) => (
+        percent % 25 !== 0 && (
+          <div key={`minor-${percent}`}>
+            <div
+              style={{
+                position: 'absolute',
+                left: `${percent}%`,
+                top: 0,
+                width: '1px',
+                height: '100%',
+                backgroundColor: 'rgba(0, 180, 216, 0.25)',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                top: `${percent}%`,
+                left: 0,
+                height: '1px',
+                width: '100%',
+                backgroundColor: 'rgba(0, 180, 216, 0.25)',
+              }}
+            />
+          </div>
+        )
+      ))}
+
+      {/* Cell number labels */}
+      {cellLabels.map((row, rowIndex) =>
+        row.map((cellNum, colIndex) => (
+          <div
+            key={`label-${cellNum}`}
+            style={{
+              position: 'absolute',
+              left: `${colIndex * 25 + 12.5}%`,
+              top: `${rowIndex * 25 + 12.5}%`,
+              transform: 'translate(-50%, -50%)',
+              fontSize: '24px',
+              fontWeight: 'bold',
+              color: 'rgba(0, 180, 216, 0.5)',
+            }}
+          >
+            {cellNum}
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## 🔌 API Endpoints
+
+### POST /api/flyer/generate-headline (AI)
+
+```typescript
+// server/routes/flyer-ai.ts
+
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+app.post('/api/flyer/generate-headline', async (req, res) => {
+  try {
+    const { propertyData } = req.body;
+
+    const prompt = `Generate a compelling, professional real estate flyer headline for this property. 
+The headline should be attention-grabbing, highlight key features, and be suitable for marketing materials.
+Keep it under 60 characters. Do not use quotes around the headline.
+
+Property Details:
+- Location: ${propertyData.city}, ${propertyData.state}
+- Beds: ${propertyData.beds || 'N/A'}
+- Baths: ${propertyData.baths || 'N/A'}
+- Sqft: ${propertyData.sqft || 'N/A'}
+- Property Type: ${propertyData.propertyType}
+- Neighborhood: ${propertyData.neighborhood || 'N/A'}
+- Year Built: ${propertyData.yearBuilt || 'N/A'}
+- Price: ${propertyData.price ? '$' + Number(propertyData.price).toLocaleString() : 'N/A'}
+- Description snippet: ${propertyData.description?.substring(0, 200) || 'N/A'}
+
+Generate only the headline, nothing else.`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a professional real estate copywriter. Generate compelling, concise headlines for property flyers.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      max_tokens: 100,
+      temperature: 0.7,
+    });
+
+    const headline = completion.choices[0]?.message?.content?.trim() || 'Beautiful Home in Prime Location';
+
+    res.json({ headline });
+  } catch (error) {
+    console.error('AI headline generation error:', error);
+    res.status(500).json({ error: 'Failed to generate headline' });
+  }
+});
+```
+
+### POST /api/transactions/:id/export-flyer
+
+```typescript
+// server/routes/flyer-export.ts
+
+import puppeteer from 'puppeteer';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs';
+import path from 'path';
+
+const execAsync = promisify(exec);
+
+app.post('/api/transactions/:id/export-flyer', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const format = req.query.format as string || 'png';
+    const data = req.body;
+
+    // Generate HTML
+    const html = generateFlyerHTML(data);
+
+    // Launch Puppeteer
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+    });
+
+    const page = await browser.newPage();
+    await page.setViewport({
+      width: 816,
+      height: 1056,
+      deviceScaleFactor: 3.125, // Results in ~300 DPI
+    });
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+
+    const screenshot = await page.screenshot({
+      type: 'png',
+      clip: { x: 0, y: 0, width: 816, height: 1056 },
+    });
+
+    await browser.close();
+
+    // Save to marketing assets
+    const assetName = `Flyer - ${data.address || 'Property'} - ${new Date().toISOString().split('T')[0]}`;
+    await db.insert(marketingAssets).values({
+      transactionId: id,
+      userId: req.user?.id,
+      type: 'flyer',
+      name: assetName,
+      fileUrl: `data:image/png;base64,${screenshot.toString('base64')}`,
+      fileType: format === 'cmyk' ? 'image/tiff' : 'image/png',
+      metadata: data,
+    });
+
+    // Convert to CMYK if requested
+    if (format === 'cmyk') {
+      const tempDir = '/tmp';
+      const timestamp = Date.now();
+      const inputPath = path.join(tempDir, `flyer_${timestamp}.png`);
+      const outputPath = path.join(tempDir, `flyer_${timestamp}_cmyk.tiff`);
+
+      fs.writeFileSync(inputPath, screenshot);
+      await execAsync(`convert "${inputPath}" -colorspace CMYK -density 300 -units PixelsPerInch "${outputPath}"`);
+      const cmykBuffer = fs.readFileSync(outputPath);
+
+      // Cleanup
+      fs.unlinkSync(inputPath);
+      fs.unlinkSync(outputPath);
+
+      res.setHeader('Content-Type', 'image/tiff');
+      res.setHeader('Content-Disposition', 'attachment; filename="flyer_cmyk.tiff"');
+      return res.send(cmykBuffer);
+    }
+
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', 'attachment; filename="flyer.png"');
+    res.send(screenshot);
+  } catch (error) {
+    console.error('Flyer export error:', error);
+    res.status(500).json({ error: 'Failed to export flyer' });
+  }
+});
+```
+
+### generateFlyerHTML Function
+
+```typescript
+// server/lib/flyer-html-template.ts
+
+interface FlyerExportData {
+  price: string;
+  address: string;
+  bedrooms: string;
+  bathrooms: string;
+  sqft: string;
+  introHeading: string;
+  introDescription: string;
+  agentName: string;
+  agentTitle: string;
+  phone: string;
+  mainImage?: string;
+  kitchenImage?: string;
+  roomImage?: string;
+  agentPhoto?: string;
+  companyLogo?: string;
+  secondaryLogo?: string;
+  qrCode?: string;
+  imageTransforms?: {
+    mainImage?: { scale: number; positionX: number; positionY: number };
+    kitchenImage?: { scale: number; positionX: number; positionY: number };
+    roomImage?: { scale: number; positionX: number; positionY: number };
+    agentPhoto?: { scale: number; positionX: number; positionY: number };
+  };
+}
+
+export function generateFlyerHTML(data: FlyerExportData): string {
+  const accentColor = "#8b7d6b";
+
+  // Helper to generate transform style
+  const getTransformStyle = (transform?: { scale: number; positionX: number; positionY: number }) => {
+    if (!transform) return '';
+    return `transform: scale(${transform.scale}) translate(${transform.positionX}%, ${transform.positionY}%); transform-origin: center center;`;
+  };
+
+  // Generate image HTML with transforms
+  const mainImageHtml = data.mainImage
+    ? `<img src="${data.mainImage}" style="width: 100%; height: 100%; object-fit: cover; ${getTransformStyle(data.imageTransforms?.mainImage)}">`
+    : `<div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: #e5e5e5; color: #999;">Main Property Photo</div>`;
+
+  const kitchenImageHtml = data.kitchenImage
+    ? `<img src="${data.kitchenImage}" style="width: 100%; height: 100%; object-fit: cover; ${getTransformStyle(data.imageTransforms?.kitchenImage)}">`
+    : `<div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: #e5e5e5; color: #999;">Kitchen</div>`;
+
+  const roomImageHtml = data.roomImage
+    ? `<img src="${data.roomImage}" style="width: 100%; height: 100%; object-fit: cover; ${getTransformStyle(data.imageTransforms?.roomImage)}">`
+    : `<div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: #e5e5e5; color: #999;">Room</div>`;
+
+  const agentPhotoHtml = data.agentPhoto
+    ? `<img src="${data.agentPhoto}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%; ${getTransformStyle(data.imageTransforms?.agentPhoto)}">`
+    : `<div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: #e5e5e5; border-radius: 50%;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>`;
+
+  const companyLogoHtml = data.companyLogo
+    ? `<img src="${data.companyLogo}" style="height: 100%; object-fit: contain;">`
+    : `<div style="color: #999; font-size: 10px;">LOGO</div>`;
+
+  const secondaryLogoHtml = data.secondaryLogo
+    ? `<img src="${data.secondaryLogo}" style="height: 100%; object-fit: contain;">`
+    : `<div style="color: #999; font-size: 8px;">SECONDARY</div>`;
+
+  const qrCodeHtml = data.qrCode
+    ? `<img src="${data.qrCode}" style="width: 100%; height: 100%; object-fit: contain;">`
+    : `<div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/></svg>
+      </div>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Property Flyer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: white; }
+    .container { width: 816px; height: 1056px; background: white; position: relative; padding: 24px; }
+    .inner { width: 768px; height: 1008px; position: relative; }
+    
+    .header { position: absolute; left: 24px; top: 16px; right: 24px; height: 60px; }
+    .gold-bar { position: absolute; left: 0; top: 0; width: 6px; height: 83px; background: ${accentColor}; }
+    .main-logo { position: absolute; left: 16px; top: 0; width: 100px; height: 55px; display: flex; align-items: center; }
+    .header-divider { position: absolute; left: 126px; top: 5px; width: 1px; height: 45px; background: #888; }
+    .secondary-logo { position: absolute; left: 140px; top: 0; width: 180px; height: 55px; display: flex; align-items: center; }
+    .price-box { position: absolute; right: 0; top: 0; width: 144px; height: 58px; background: #6b7b6e; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; }
+    .price-label { font-size: 7pt; letter-spacing: 2px; }
+    .price-value { font-size: 14pt; font-weight: bold; }
+    
+    .address { position: absolute; left: 40px; top: 89px; font-size: 11pt; color: #333; letter-spacing: 2px; text-transform: uppercase; font-weight: 500; }
+    
+    .hero-image { position: absolute; left: 24px; top: 132px; width: 720px; height: 360px; border-radius: 10px; overflow: hidden; }
+    .secondary-images { position: absolute; left: 24px; top: 506px; width: 720px; display: flex; gap: 10px; }
+    .secondary-left, .secondary-right { width: 355px; height: 230px; border-radius: 10px; overflow: hidden; }
+    
+    .bottom-section { position: absolute; left: 24px; top: 766px; right: 24px; height: 270px; display: flex; }
+    .specs-column { width: 150px; padding-top: 35px; padding-left: 8px; }
+    .spec-item { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; font-size: 13.5pt; }
+    .spec-icon { width: 31px; height: 31px; }
+    
+    .divider { width: 4px; height: 148px; background: ${accentColor}; margin-top: 35px; flex-shrink: 0; }
+    .divider-1 { margin-left: 42px; }
+    .divider-2 { margin-left: 22px; }
+    
+    .description-column { width: 432px; padding-left: 32px; padding-right: 10px; }
+    .intro-title { font-size: 11pt; font-weight: 500; text-transform: uppercase; letter-spacing: 2px; line-height: 1.3; margin-bottom: 16px; margin-top: 8px; color: #333; }
+    .intro-description { font-size: 11pt; line-height: 1.5; }
+    
+    .agent-column { width: 335px; padding-left: 27px; display: flex; flex-direction: column; align-items: center; padding-top: 16px; }
+    .agent-top-row { display: flex; gap: 16px; align-items: center; margin-bottom: 8px; }
+    .agent-photo { width: 106px; height: 106px; border-radius: 50%; overflow: hidden; }
+    .qr-code { width: 74px; height: 74px; border: 2px solid #000; padding: 3px; }
+    .agent-name { font-size: 21pt; font-weight: bold; text-align: center; margin-bottom: 4px; }
+    .agent-details { font-size: 10pt; text-align: center; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="inner">
+      <div class="header">
+        <div class="gold-bar"></div>
+        <div class="main-logo">${companyLogoHtml}</div>
+        <div class="header-divider"></div>
+        <div class="secondary-logo">${secondaryLogoHtml}</div>
+        <div class="price-box">
+          <div class="price-label">LISTED AT</div>
+          <div class="price-value">${data.price}</div>
+        </div>
+      </div>
+      
+      <div class="address">${data.address}</div>
+      
+      <div class="hero-image">${mainImageHtml}</div>
+      
+      <div class="secondary-images">
+        <div class="secondary-left">${kitchenImageHtml}</div>
+        <div class="secondary-right">${roomImageHtml}</div>
+      </div>
+      
+      <div class="bottom-section">
+        <div class="specs-column">
+          <div class="spec-item">
+            <svg class="spec-icon" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.5"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>
+            <span>${data.bedrooms} bedrooms</span>
+          </div>
+          <div class="spec-item">
+            <svg class="spec-icon" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.5"><path d="M9 6 6.5 3.5a1.5 1.5 0 0 0-1-.5C4.683 3 4 3.683 4 4.5V17a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/><line x1="10" x2="8" y1="5" y2="7"/><line x1="2" x2="22" y1="12" y2="12"/></svg>
+            <span>${data.bathrooms} bathrooms</span>
+          </div>
+          <div class="spec-item">
+            <svg class="spec-icon" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.5"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/></svg>
+            <span>${data.sqft} sq. ft</span>
+          </div>
+        </div>
+        
+        <div class="divider divider-1"></div>
+        
+        <div class="description-column">
+          <div class="intro-title">${data.introHeading}</div>
+          <div class="intro-description">${data.introDescription}</div>
+        </div>
+        
+        <div class="divider divider-2"></div>
+        
+        <div class="agent-column">
+          <div class="agent-top-row">
+            <div class="agent-photo">${agentPhotoHtml}</div>
+            <div class="qr-code">${qrCodeHtml}</div>
+          </div>
+          <div class="agent-name">${data.agentName}</div>
+          <div class="agent-details">
+            ${data.agentTitle}<br>
+            ${data.phone}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+```
+
+---
+
+## 📸 Photo Auto-Selection Utility
+
+```typescript
+// lib/flyer-utils.ts
+
+interface PhotoWithInsights {
+  url?: string;
+  href?: string;
+  imageInsights?: {
+    classification?: { imageOf?: string };
+    quality?: { score?: number };
+  };
+}
+
+export function autoSelectPhotos(photos: PhotoWithInsights[]) {
+  if (!photos || photos.length === 0) {
+    return { mainPhoto: null, kitchenPhoto: null, roomPhoto: null };
+  }
+
+  // Normalize photo URLs
+  const normalizedPhotos = photos.map(p => ({
+    url: p.url || p.href || '',
+    classification: p.imageInsights?.classification?.imageOf?.toLowerCase() || '',
+    quality: p.imageInsights?.quality?.score || 50,
+  }));
+
+  // Sort by quality (highest first)
+  const sortedByQuality = [...normalizedPhotos].sort((a, b) => b.quality - a.quality);
+
+  // Find best photo for each slot
+  const mainPhoto = sortedByQuality.find(p =>
+    p.classification.includes('exterior') ||
+    p.classification.includes('front') ||
+    p.classification.includes('aerial')
+  )?.url || sortedByQuality[0]?.url || null;
+
+  const kitchenPhoto = sortedByQuality.find(p =>
+    p.classification.includes('kitchen')
+  )?.url || sortedByQuality[1]?.url || null;
+
+  const roomPhoto = sortedByQuality.find(p =>
+    p.classification.includes('living') ||
+    p.classification.includes('bedroom') ||
+    p.classification.includes('interior') ||
+    p.classification.includes('family')
+  )?.url || sortedByQuality[2]?.url || null;
+
+  return { mainPhoto, kitchenPhoto, roomPhoto };
+}
+```
+
+---
+
+## 📱 Mobile Optimization
+
+### Responsive Breakpoints
+```css
+/* Desktop: Side-by-side layout */
+@media (min-width: 1024px) {
+  .flyer-generator { display: flex; }
+  .form-panel { width: 420px; }
+  .preview-panel { flex: 1; }
+}
+
+/* Tablet: Stacked with smaller preview */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .flyer-generator { flex-direction: column; }
+  .preview-panel { order: -1; }
+}
+
+/* Mobile: Tabbed interface */
+@media (max-width: 767px) {
+  .form-panel, .preview-panel { display: none; }
+  .form-panel.active, .preview-panel.active { display: block; }
+}
+```
+
+### Touch-Friendly Controls
+- All sliders: minimum 44px touch target
+- Buttons: minimum 44px height
+- Upload areas: minimum 80px × 80px
+
+---
+
+## ✅ Verification Checklist
+
+### Settings Integration
+- [ ] Marketing Profile data loads into form
+- [ ] Agent photo, QR code, logos appear correctly
+- [ ] Default logos work when enabled
+
+### Auto-Fill
+- [ ] Price auto-fills from MLS
+- [ ] Address formats correctly
+- [ ] Beds/Baths/Sqft auto-fill
+- [ ] Description pulls from publicRemarks
+- [ ] Agent info loads from Settings
+
+### Photo Selection
+- [ ] Photos auto-select using imageInsights
+- [ ] Best exterior photo selected as main
+- [ ] Kitchen photo detected
+- [ ] Interior/room photo detected
+
+### AI Headline
+- [ ] AI Generate button appears
+- [ ] Clicking generates headline via OpenAI
+- [ ] Generated headline populates field
+- [ ] Loading state shows during generation
+
+### Image Cropping
+- [ ] Zoom slider works (1x-3x)
+- [ ] Horizontal position works (-50% to +50%)
+- [ ] Vertical position works (-50% to +50%)
+- [ ] Reset button restores defaults
+- [ ] Preview updates in real-time
+- [ ] All 4 photos have crop controls
+
+### Preview
+- [ ] Live preview updates as form changes
+- [ ] Grid overlay toggles on/off
+- [ ] Grid shows numbered cells 1-16
+- [ ] Scale selector works (Fit, 50%, 75%, 100%)
+
+### Export
+- [ ] Export PNG downloads correctly
+- [ ] Export CMYK downloads TIFF
+- [ ] Transforms applied in export
+- [ ] File auto-saves to Marketing Assets
+- [ ] File names include address
+
+### Mobile
+- [ ] Responsive on iPad (portrait & landscape)
+- [ ] Responsive on iPhone
+- [ ] Touch targets adequate (44px+)
+- [ ] Sliders work with touch
+
+---
+
+*This prompt creates the complete Flyer Generator. Requires Settings > Agent Marketing Profile (Prompt 1) to be implemented first.*

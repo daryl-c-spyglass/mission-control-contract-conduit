@@ -1,0 +1,587 @@
+# Replit Prompt: Enhance Agent Marketing Profile — Add Branding Section
+
+## 🎯 Objective
+
+**Enhance the existing "Agent Marketing Profile"** in Settings by adding a new "Branding" subsection for:
+- QR Code upload
+- Company Logo (custom OR Spyglass default)
+- Secondary Logo (custom OR Leading RE default)
+
+**DO NOT** replace or modify the existing fields (Profile Photo, Name, Email, Phone, Title, Company).
+
+---
+
+## 📍 Location
+
+**Settings → Agent Marketing Profile** (existing section)
+
+```
+Agent Marketing Profile (EXISTING)
+├── Profile Photo ✓ (keep)
+├── First Name / Last Name ✓ (keep)
+├── Email / Phone ✓ (keep)
+├── Title / Company ✓ (keep)
+│
+└── Flyer & Marketing Branding ← ADD THIS SUBSECTION
+    ├── QR Code (upload)
+    ├── Company Logo (upload OR default toggle)
+    └── Secondary Logo (upload OR default toggle)
+```
+
+---
+
+## 🗄️ Database Schema Update
+
+Add these columns to the existing settings/users table (or wherever Agent Marketing Profile data is stored):
+
+```sql
+-- Add new columns for branding
+ALTER TABLE users ADD COLUMN IF NOT EXISTS qr_code TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS company_logo TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS company_logo_use_default BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS secondary_logo TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS secondary_logo_use_default BOOLEAN DEFAULT true;
+```
+
+### Drizzle Schema Update
+
+```typescript
+// Add to existing users table in schema.ts
+// Find the users table definition and add these columns:
+
+qrCode: text('qr_code'),
+companyLogo: text('company_logo'),
+companyLogoUseDefault: boolean('company_logo_use_default').default(true),
+secondaryLogo: text('secondary_logo'),
+secondaryLogoUseDefault: boolean('secondary_logo_use_default').default(true),
+```
+
+---
+
+## 🖥️ UI Implementation
+
+### Add Below Existing "Agent Marketing Profile" Card
+
+Add a new card/section below the existing Agent Marketing Profile form:
+
+```tsx
+// Add this component below the existing Agent Marketing Profile section
+// File: client/src/pages/settings.tsx (or wherever settings is)
+
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Upload, QrCode, Image as ImageIcon, Save, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+interface FlyerBrandingData {
+  qrCode: string | null;
+  companyLogo: string | null;
+  companyLogoUseDefault: boolean;
+  secondaryLogo: string | null;
+  secondaryLogoUseDefault: boolean;
+}
+
+export function FlyerBrandingSection() {
+  const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Form state
+  const [formData, setFormData] = useState<FlyerBrandingData>({
+    qrCode: null,
+    companyLogo: null,
+    companyLogoUseDefault: true,
+    secondaryLogo: null,
+    secondaryLogoUseDefault: true,
+  });
+
+  // Load existing data (integrate with your existing settings fetch)
+  useEffect(() => {
+    // Fetch from your existing settings endpoint
+    // Example: GET /api/settings or wherever user settings are stored
+    fetch('/api/settings')
+      .then(res => res.json())
+      .then(data => {
+        setFormData({
+          qrCode: data.qrCode || null,
+          companyLogo: data.companyLogo || null,
+          companyLogoUseDefault: data.companyLogoUseDefault ?? true,
+          secondaryLogo: data.secondaryLogo || null,
+          secondaryLogoUseDefault: data.secondaryLogoUseDefault ?? true,
+        });
+      })
+      .catch(console.error);
+  }, []);
+
+  // Image upload handler
+  const handleImageUpload = (field: keyof FlyerBrandingData) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: 'File Too Large',
+          description: 'Please upload an image under 5MB.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, [field]: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Clear image
+  const handleClearImage = (field: keyof FlyerBrandingData) => {
+    setFormData(prev => ({ ...prev, [field]: null }));
+  };
+
+  // Save handler - integrate with your existing save endpoint
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      // POST/PATCH to your existing settings endpoint
+      const response = await fetch('/api/settings', {
+        method: 'PATCH', // or POST, depending on your API
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          qrCode: formData.qrCode,
+          companyLogo: formData.companyLogo,
+          companyLogoUseDefault: formData.companyLogoUseDefault,
+          secondaryLogo: formData.secondaryLogo,
+          secondaryLogoUseDefault: formData.secondaryLogoUseDefault,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to save');
+
+      toast({
+        title: 'Branding Saved',
+        description: 'Your flyer branding has been updated.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to save branding settings.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <ImageIcon className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <CardTitle className="text-lg">Flyer & Marketing Branding</CardTitle>
+            <CardDescription>
+              Logos, photos, and QR code used across all marketing materials
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      
+      <CardContent className="space-y-6">
+        {/* Agent Photo & QR Code Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Agent Photo - Note: This might already exist, skip if duplicate */}
+          {/* If Agent Photo is already in the section above, remove this */}
+          <div className="space-y-3">
+            <Label className="text-xs font-medium uppercase tracking-wide">
+              Agent Photo
+            </Label>
+            <div className="flex items-center gap-4">
+              <label
+                htmlFor="agent-photo-branding"
+                className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/25 bg-muted/50 hover:border-primary/50 transition-colors overflow-hidden"
+              >
+                {formData.qrCode ? (
+                  <span className="text-xs text-muted-foreground">Using Profile Photo</span>
+                ) : (
+                  <div className="flex flex-col items-center text-muted-foreground">
+                    <Upload className="h-5 w-5" />
+                    <span className="text-[10px]">Upload</span>
+                  </div>
+                )}
+              </label>
+              <div>
+                <p className="text-sm text-muted-foreground">Upload your professional headshot</p>
+                <p className="text-xs text-muted-foreground/60">PNG or JPG, max 5MB</p>
+              </div>
+            </div>
+          </div>
+
+          {/* QR Code */}
+          <div className="space-y-3">
+            <Label className="text-xs font-medium uppercase tracking-wide">
+              QR Code
+            </Label>
+            <div className="flex items-center gap-4">
+              <label
+                htmlFor="qr-code-upload"
+                className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/50 hover:border-primary/50 transition-colors overflow-hidden"
+              >
+                {formData.qrCode ? (
+                  <img
+                    src={formData.qrCode}
+                    alt="QR Code"
+                    className="h-full w-full object-contain p-2"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center text-muted-foreground">
+                    <QrCode className="h-6 w-6" />
+                    <span className="text-[10px]">Upload</span>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  id="qr-code-upload"
+                  accept="image/*"
+                  onChange={handleImageUpload('qrCode')}
+                  className="hidden"
+                />
+              </label>
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground">Upload your personal QR code</p>
+                <p className="text-xs text-muted-foreground/60">
+                  Links to your website, vCard, or contact page
+                </p>
+                {formData.qrCode && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleClearImage('qrCode')}
+                    className="mt-1 h-7 text-xs text-destructive hover:text-destructive"
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Company Logos */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Company Logo */}
+          <div className="space-y-4">
+            <Label className="text-xs font-medium uppercase tracking-wide">
+              Company Logo
+            </Label>
+            
+            {/* Default Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="use-spyglass-default" className="text-sm cursor-pointer">
+                  Use Spyglass Default
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Use the standard Spyglass Realty logo
+                </p>
+              </div>
+              <Switch
+                id="use-spyglass-default"
+                checked={formData.companyLogoUseDefault}
+                onCheckedChange={(checked) => 
+                  setFormData(prev => ({ ...prev, companyLogoUseDefault: checked }))
+                }
+              />
+            </div>
+
+            {/* Logo Preview / Upload */}
+            <div className="h-20 rounded-lg border border-border bg-muted/30 flex items-center justify-center overflow-hidden">
+              {formData.companyLogoUseDefault ? (
+                <img
+                  src="/logos/SpyglassRealty_Logo_Black.png"
+                  alt="Spyglass Realty"
+                  className="h-12 object-contain"
+                />
+              ) : formData.companyLogo ? (
+                <div className="relative w-full h-full flex items-center justify-center">
+                  <img
+                    src={formData.companyLogo}
+                    alt="Company Logo"
+                    className="h-full object-contain p-2"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleClearImage('companyLogo')}
+                    className="absolute top-1 right-1 h-6 w-6 p-0 text-destructive"
+                  >
+                    ×
+                  </Button>
+                </div>
+              ) : (
+                <label
+                  htmlFor="company-logo-upload"
+                  className="flex flex-col items-center gap-1 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Upload className="h-5 w-5" />
+                  <span className="text-xs">Upload Custom Logo</span>
+                  <input
+                    type="file"
+                    id="company-logo-upload"
+                    accept="image/*"
+                    onChange={handleImageUpload('companyLogo')}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
+          </div>
+
+          {/* Secondary Logo */}
+          <div className="space-y-4">
+            <Label className="text-xs font-medium uppercase tracking-wide">
+              Secondary Logo
+            </Label>
+            
+            {/* Default Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="use-leadingre-default" className="text-sm cursor-pointer">
+                  Use Leading RE Default
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Use the standard Leading Real Estate logo
+                </p>
+              </div>
+              <Switch
+                id="use-leadingre-default"
+                checked={formData.secondaryLogoUseDefault}
+                onCheckedChange={(checked) => 
+                  setFormData(prev => ({ ...prev, secondaryLogoUseDefault: checked }))
+                }
+              />
+            </div>
+
+            {/* Logo Preview / Upload */}
+            <div className="h-20 rounded-lg border border-border bg-muted/30 flex items-center justify-center overflow-hidden">
+              {formData.secondaryLogoUseDefault ? (
+                <img
+                  src="/logos/LeadingRE_Logo.png"
+                  alt="Leading Real Estate"
+                  className="h-12 object-contain"
+                />
+              ) : formData.secondaryLogo ? (
+                <div className="relative w-full h-full flex items-center justify-center">
+                  <img
+                    src={formData.secondaryLogo}
+                    alt="Secondary Logo"
+                    className="h-full object-contain p-2"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleClearImage('secondaryLogo')}
+                    className="absolute top-1 right-1 h-6 w-6 p-0 text-destructive"
+                  >
+                    ×
+                  </Button>
+                </div>
+              ) : (
+                <label
+                  htmlFor="secondary-logo-upload"
+                  className="flex flex-col items-center gap-1 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Upload className="h-5 w-5" />
+                  <span className="text-xs">Upload Custom Logo</span>
+                  <input
+                    type="file"
+                    id="secondary-logo-upload"
+                    accept="image/*"
+                    onChange={handleImageUpload('secondaryLogo')}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Save Button */}
+        <div className="flex justify-end pt-2">
+          <Button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="bg-primary hover:bg-primary/90"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Save Flyer Branding
+              </>
+            )}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+---
+
+## 🔌 API Update
+
+Update your existing settings API endpoint to handle the new fields:
+
+```typescript
+// In your existing settings route handler
+// Add these fields to the PATCH/POST handler
+
+app.patch('/api/settings', async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    
+    // Destructure new branding fields along with existing fields
+    const {
+      // ... existing fields (firstName, lastName, email, phone, title, company, profilePhoto)
+      qrCode,
+      companyLogo,
+      companyLogoUseDefault,
+      secondaryLogo,
+      secondaryLogoUseDefault,
+    } = req.body;
+
+    // Update user with new fields
+    const [updated] = await db
+      .update(users)
+      .set({
+        // ... existing fields
+        qrCode,
+        companyLogo,
+        companyLogoUseDefault,
+        secondaryLogo,
+        secondaryLogoUseDefault,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Settings update error:', error);
+    res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+```
+
+---
+
+## 🖼️ Default Logo Files
+
+Ensure these files exist in `/public/logos/`:
+- `SpyglassRealty_Logo_Black.png` — Spyglass Realty logo
+- `LeadingRE_Logo.png` — Leading Real Estate logo (or combined Spyglass + Leading RE)
+
+---
+
+## 📱 Mobile Optimization
+
+```css
+/* Stack cards vertically on mobile */
+@media (max-width: 768px) {
+  .grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+  
+  /* Upload areas should be touch-friendly */
+  label[for*="upload"] {
+    min-height: 80px;
+  }
+}
+```
+
+---
+
+## 🔗 Integration with Flyer Generator
+
+The Flyer Generator will pull from the existing settings:
+
+```typescript
+// hooks/useMarketingProfile.ts (or add to existing settings hook)
+
+export function useMarketingProfile() {
+  const { data: settings } = useQuery({
+    queryKey: ['/api/settings'],
+  });
+
+  return {
+    // Existing fields (already available)
+    agentName: `${settings?.firstName || ''} ${settings?.lastName || ''}`.trim(),
+    agentTitle: settings?.title || 'REALTOR®',
+    phone: settings?.phone || '',
+    agentPhoto: settings?.profilePhoto || null,
+    
+    // NEW branding fields
+    qrCode: settings?.qrCode || null,
+    companyLogo: settings?.companyLogoUseDefault 
+      ? '/logos/SpyglassRealty_Logo_Black.png' 
+      : settings?.companyLogo,
+    secondaryLogo: settings?.secondaryLogoUseDefault 
+      ? '/logos/LeadingRE_Logo.png' 
+      : settings?.secondaryLogo,
+  };
+}
+```
+
+---
+
+## ✅ Verification Checklist
+
+### Database
+- [ ] New columns added to users/settings table
+- [ ] Migration runs successfully
+- [ ] Default values set correctly
+
+### UI
+- [ ] "Flyer & Marketing Branding" section appears below existing profile
+- [ ] QR Code upload works
+- [ ] Company Logo toggle works (default ↔ custom)
+- [ ] Secondary Logo toggle works (default ↔ custom)
+- [ ] Default logos display correctly
+- [ ] Custom upload replaces default
+- [ ] Remove button clears uploaded image
+- [ ] Save button persists changes
+
+### API
+- [ ] GET /api/settings returns new fields
+- [ ] PATCH /api/settings saves new fields
+- [ ] Data persists after page refresh
+
+### Mobile
+- [ ] Responsive layout on tablet/phone
+- [ ] Touch targets adequate (44px+)
+- [ ] Upload areas easy to tap
+
+---
+
+## 📋 Summary of Changes
+
+| What | Change |
+|------|--------|
+| **Database** | Add 5 columns: qrCode, companyLogo, companyLogoUseDefault, secondaryLogo, secondaryLogoUseDefault |
+| **Settings UI** | Add "Flyer & Marketing Branding" card below existing Agent Marketing Profile |
+| **API** | Update existing settings endpoint to handle new fields |
+| **Assets** | Ensure default logo files exist in /public/logos/ |
+
+---
+
+*This is a minimal addition to the existing system. The Flyer Generator (Prompt 2) will read from these same settings.*

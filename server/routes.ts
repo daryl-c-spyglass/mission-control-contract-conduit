@@ -4119,6 +4119,134 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
     }
   });
 
+  // ============ Flyer Generator AI Headline ============
+  app.post("/api/flyer/generate-headline", isAuthenticated, async (req, res) => {
+    try {
+      const { propertyData } = req.body;
+
+      if (!propertyData) {
+        return res.status(400).json({ error: "Property data is required" });
+      }
+
+      const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
+
+      const prompt = `Generate a compelling, professional real estate flyer headline for this property. 
+The headline should be attention-grabbing, highlight key features, and be suitable for marketing materials.
+Keep it under 60 characters. Do not use quotes around the headline.
+
+Property Details:
+- Location: ${propertyData.city || 'Unknown'}, ${propertyData.state || 'TX'}
+- Beds: ${propertyData.beds || 'N/A'}
+- Baths: ${propertyData.baths || 'N/A'}
+- Sqft: ${propertyData.sqft || 'N/A'}
+- Property Type: ${propertyData.propertyType || 'Residential'}
+- Neighborhood: ${propertyData.neighborhood || 'N/A'}
+- Year Built: ${propertyData.yearBuilt || 'N/A'}
+- Price: ${propertyData.price ? '$' + Number(propertyData.price).toLocaleString() : 'N/A'}
+- Description snippet: ${propertyData.description?.substring(0, 200) || 'N/A'}
+
+Generate only the headline, nothing else.`;
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a professional real estate copywriter. Generate compelling, concise headlines for property flyers.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        max_tokens: 100,
+        temperature: 0.7,
+      });
+
+      const headline = completion.choices[0]?.message?.content?.trim() || 'Beautiful Home in Prime Location';
+
+      res.json({ headline });
+    } catch (error: any) {
+      console.error('AI headline generation error:', error);
+      res.status(500).json({ error: 'Failed to generate headline' });
+    }
+  });
+
+  // ============ Flyer Generator Export ============
+  app.post("/api/transactions/:id/export-flyer", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const format = req.query.format as string || 'png';
+      const data = req.body;
+
+      // Validate transaction exists
+      const transaction = await storage.getTransaction(id);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+
+      // Build flyer data for the generator
+      const flyerData: FlyerData = {
+        price: data.price || '',
+        address: data.address || '',
+        beds: data.bedrooms || '',
+        baths: data.bathrooms || '',
+        sqft: data.sqft || '',
+        introHeading: data.introHeading || 'Prime Opportunity',
+        introDescription: data.introDescription || '',
+        agentName: data.agentName || '',
+        agentTitle: data.agentTitle || 'REALTOR®',
+        phone: data.phone || '',
+        mainPhoto: data.mainImage || null,
+        kitchenPhoto: data.kitchenImage || null,
+        roomPhoto: data.roomImage || null,
+        agentPhoto: data.agentPhoto || null,
+        companyLogo: data.companyLogo || '/logos/SpyglassRealty_Logo_Black.png',
+        secondaryLogo: data.secondaryLogo || '/logos/lre-sgr-black.png',
+        qrCode: data.qrCode || null,
+        imageTransforms: data.imageTransforms || null,
+      };
+
+      console.log(`[FlyerGenerator] Exporting ${format} flyer for transaction ${id}`);
+
+      const outputType: OutputType = format === 'cmyk' ? 'pdf' : 'png';
+      const buffer = await generatePrintFlyer(flyerData, outputType);
+
+      const addressSlug = (data.address || 'property').split(',')[0].replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+
+      // Save to marketing assets
+      try {
+        const userId = req.user?.claims?.sub;
+        const assetName = `Flyer - ${data.address || 'Property'} - ${new Date().toISOString().split('T')[0]}`;
+        await storage.createMarketingAsset({
+          transactionId: id,
+          type: 'flyer',
+          imageData: buffer.toString('base64'),
+          fileName: `${addressSlug}_flyer.${outputType}`,
+          metadata: { format, createdBy: userId, flyerData: data },
+        });
+        console.log(`[FlyerGenerator] Saved flyer to marketing assets`);
+      } catch (saveError: any) {
+        console.error('[FlyerGenerator] Failed to save to marketing assets:', saveError.message);
+      }
+
+      if (format === 'cmyk') {
+        res.set('Content-Type', 'application/pdf');
+        res.set('Content-Disposition', `attachment; filename="${addressSlug}_flyer_cmyk.pdf"`);
+      } else {
+        res.set('Content-Type', 'image/png');
+        res.set('Content-Disposition', `attachment; filename="${addressSlug}_flyer.png"`);
+      }
+
+      res.send(buffer);
+    } catch (error: any) {
+      console.error('[FlyerGenerator] Export error:', error);
+      res.status(500).json({ error: 'Failed to export flyer', details: error.message });
+    }
+  });
+
   // ============ Social Media Graphics Render ============
   app.post("/api/graphics/render", isAuthenticated, async (req, res) => {
     try {
