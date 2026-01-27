@@ -45,7 +45,7 @@ const PageHeader = ({ title, slideNumber, totalSlides }: { title: string; slideN
 );
 
 const PageFooter = ({ propertyAddress, slideNumber = 2, baseUrl }: { propertyAddress: string; slideNumber?: number; baseUrl?: string }) => {
-  const logoUrl = baseUrl ? `${baseUrl}/logos/LRE_SGR_White.png` : '/logos/LRE_SGR_White.png';
+  const logoUrl = baseUrl ? `${baseUrl}/logos/SpyglassRealty_Logo_White.png` : '/logos/SpyglassRealty_Logo_White.png';
   const showLogo = slideNumber > 1;
   
   return (
@@ -69,20 +69,13 @@ const CoverPage = ({ propertyAddress, agent, preparedFor, baseUrl }: { propertyA
   const addressParts = propertyAddress.split(',');
   const streetAddress = addressParts[0]?.trim() || propertyAddress;
   const cityState = addressParts.slice(1).join(',').trim();
-  const logoUrl = baseUrl ? `${baseUrl}/logos/spyglass-logo-white.png` : '';
+  const logoUrl = baseUrl ? `${baseUrl}/logos/LRE_SGR_White.png` : '/logos/LRE_SGR_White.png';
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.darkPage}>
       <View style={styles.coverPagePro}>
         <View style={styles.coverContentPro}>
-          {baseUrl ? (
-            <Image src={logoUrl} style={{ width: 180, height: 40, marginBottom: 20 }} />
-          ) : (
-            <View style={styles.coverLogoPro}>
-              <Text style={styles.coverLogoOrange}>SPYGLASS</Text>
-              <Text style={styles.coverLogoWhite}>REALTY</Text>
-            </View>
-          )}
+          <Image src={logoUrl} style={{ width: 300, height: 60, marginBottom: 20, borderRadius: 8 }} />
           <Text style={styles.coverTitle}>Comparative Market Analysis</Text>
           {preparedFor && (
             <Text style={styles.coverSubtitle}>Prepared for {preparedFor}</Text>

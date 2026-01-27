@@ -1,0 +1,380 @@
+# CMA Presentation Builder — Logo Fix (Updated)
+
+## 🎯 Logo Assignments
+
+| Location | Logo File | Description |
+|----------|-----------|-------------|
+| **Slide 1 (Cover Page)** | `LRE_SGR_White.png` | Combined: Spyglass + Leading RE |
+| **Footer (Slides 2-44)** | `SpyglassRealty_Logo_White.png` | Spyglass logo only |
+
+---
+
+## 📁 Logo Files to Upload
+
+Copy these to `public/logos/`:
+
+1. **`LRE_SGR_White.png`** — Combined logo (Spyglass + Leading Real Estate Companies of the World)
+   - Use on: Slide 1 cover page
+   - Logo already has black background in image
+
+2. **`SpyglassRealty_Logo_White.png`** — Spyglass only logo (with red-orange accent curves)
+   - Use on: Footer of slides 2-44
+   - Logo already has black background in image
+
+---
+
+## 🔧 FIX 1: Slide 1 (Cover Page) — Use Combined Logo
+
+**Current:** Small black "SPYGLASS REALTY" text logo
+**New:** `LRE_SGR_White.png` (combined Spyglass + Leading RE logo)
+
+### Component Update:
+
+```tsx
+// File: Find the Cover Page slide component
+
+const LRE_COMBINED_LOGO = '/logos/LRE_SGR_White.png';
+
+function CoverPageSlide({ address, agentName, agentCompany }) {
+  return (
+    <div className="h-full flex flex-col bg-white p-8">
+      {/* Header */}
+      <div className="text-left">
+        <h1 className="text-lg font-bold text-gray-800 tracking-wide">
+          COMPARATIVE MARKET ANALYSIS
+        </h1>
+      </div>
+      
+      {/* Main Content - Centered */}
+      <div className="flex-1 flex flex-col items-center justify-center">
+        {/* Combined Logo (Spyglass + Leading RE) - NO container needed */}
+        <img 
+          src={LRE_COMBINED_LOGO}
+          alt="Spyglass Realty - Leading Real Estate Companies of the World"
+          className="w-full max-w-md h-auto mb-8 rounded-lg"
+        />
+        
+        {/* Title */}
+        <h2 className="text-3xl font-bold text-gray-900 mb-4 text-center">
+          COMPARATIVE MARKET ANALYSIS
+        </h2>
+        
+        {/* Property Address */}
+        <p className="text-xl text-gray-600 mb-8 text-center">
+          {address}
+        </p>
+        
+        {/* Divider */}
+        <div className="w-24 h-px bg-gray-300 mb-8" />
+        
+        {/* Prepared By */}
+        <p className="text-sm text-gray-500 mb-2">Prepared by</p>
+        <p className="text-lg font-semibold text-gray-800">{agentName}</p>
+        <p className="text-gray-600">{agentCompany || 'Spyglass Realty'}</p>
+      </div>
+      
+      {/* Footer - Text only for Slide 1 */}
+      <div className="flex justify-between items-center text-sm text-gray-400 pt-4 border-t border-gray-100">
+        <span>Spyglass Realty</span>
+        <span>Slide 1 of 44</span>
+      </div>
+    </div>
+  );
+}
+```
+
+### For PDF Export:
+
+```tsx
+// Using @react-pdf/renderer
+import { Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
+
+function CoverPageSlidePdf({ address, agentName, agentCompany, totalSlides }) {
+  return (
+    <Page size="LETTER" style={styles.page}>
+      {/* Header */}
+      <Text style={styles.header}>COMPARATIVE MARKET ANALYSIS</Text>
+      
+      {/* Combined Logo - NO container needed, logo has its own background */}
+      <Image 
+        src="/logos/LRE_SGR_White.png"
+        style={styles.combinedLogo}
+      />
+      
+      {/* Title */}
+      <Text style={styles.title}>COMPARATIVE MARKET ANALYSIS</Text>
+      
+      {/* Address */}
+      <Text style={styles.address}>{address}</Text>
+      
+      {/* Divider */}
+      <View style={styles.divider} />
+      
+      {/* Prepared By */}
+      <Text style={styles.preparedByLabel}>Prepared by</Text>
+      <Text style={styles.agentName}>{agentName}</Text>
+      <Text style={styles.agentCompany}>{agentCompany || 'Spyglass Realty'}</Text>
+      
+      {/* Footer - Text only for cover page */}
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>Spyglass Realty</Text>
+        <Text style={styles.footerText}>Slide 1 of {totalSlides}</Text>
+      </View>
+    </Page>
+  );
+}
+
+const styles = StyleSheet.create({
+  page: {
+    padding: 40,
+    backgroundColor: 'white',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  header: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    letterSpacing: 1,
+  },
+  combinedLogo: {
+    width: '70%',
+    height: 'auto',
+    alignSelf: 'center',
+    marginTop: 60,
+    marginBottom: 30,
+    borderRadius: 8,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  address: {
+    fontSize: 18,
+    color: '#4b5563',
+    textAlign: 'center',
+    marginBottom: 40,
+  },
+  divider: {
+    width: 80,
+    height: 1,
+    backgroundColor: '#d1d5db',
+    alignSelf: 'center',
+    marginBottom: 40,
+  },
+  preparedByLabel: {
+    fontSize: 10,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  agentName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  agentCompany: {
+    fontSize: 14,
+    color: '#4b5563',
+    textAlign: 'center',
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 30,
+    left: 40,
+    right: 40,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingTop: 12,
+  },
+  footerText: {
+    fontSize: 10,
+    color: '#9ca3af',
+  },
+});
+```
+
+---
+
+## 🔧 FIX 2: Footer Logo (Slides 2-44) — Use Spyglass Logo Only
+
+**Current:** "Spyglass Realty" text
+**New:** `SpyglassRealty_Logo_White.png` image
+
+### Footer Component:
+
+```tsx
+// File: components/cma-presentation/SlideFooter.tsx
+
+interface SlideFooterProps {
+  slideNumber: number;
+  totalSlides: number;
+}
+
+const SPYGLASS_LOGO = '/logos/SpyglassRealty_Logo_White.png';
+
+export function SlideFooter({ slideNumber, totalSlides }: SlideFooterProps) {
+  // Slide 1 uses text, Slides 2+ use logo
+  const showLogo = slideNumber > 1;
+  
+  return (
+    <div className="flex justify-between items-center px-6 py-3 border-t border-gray-100">
+      {/* Left: Logo (slides 2-44) or Text (slide 1) */}
+      <div className="flex items-center h-8">
+        {showLogo ? (
+          <img 
+            src={SPYGLASS_LOGO}
+            alt="Spyglass Realty"
+            className="h-6 w-auto rounded"
+          />
+        ) : (
+          <span className="text-sm text-gray-500">Spyglass Realty</span>
+        )}
+      </div>
+      
+      {/* Right: Slide number */}
+      <span className="text-sm text-gray-400">
+        Slide {slideNumber} of {totalSlides}
+      </span>
+    </div>
+  );
+}
+```
+
+### For PDF Footer:
+
+```tsx
+// File: components/pdf/PdfSlideFooter.tsx
+import { View, Text, Image, StyleSheet } from '@react-pdf/renderer';
+
+interface PdfSlideFooterProps {
+  slideNumber: number;
+  totalSlides: number;
+}
+
+export function PdfSlideFooter({ slideNumber, totalSlides }: PdfSlideFooterProps) {
+  const showLogo = slideNumber > 1;
+  
+  return (
+    <View style={styles.footer}>
+      {/* Left: Logo or Text */}
+      {showLogo ? (
+        <Image 
+          src="/logos/SpyglassRealty_Logo_White.png"
+          style={styles.footerLogo}
+        />
+      ) : (
+        <Text style={styles.footerText}>Spyglass Realty</Text>
+      )}
+      
+      {/* Right: Slide number */}
+      <Text style={styles.slideNumber}>Slide {slideNumber} of {totalSlides}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  footer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 40,
+    right: 40,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingTop: 10,
+  },
+  footerLogo: {
+    height: 20,
+    width: 'auto',
+  },
+  footerText: {
+    fontSize: 10,
+    color: '#6b7280',
+  },
+  slideNumber: {
+    fontSize: 10,
+    color: '#9ca3af',
+  },
+});
+```
+
+---
+
+## 📋 Quick Summary
+
+| Slide | Element | Logo File | Notes |
+|-------|---------|-----------|-------|
+| 1 | Main logo (center) | `LRE_SGR_White.png` | No container needed |
+| 1 | Footer | Text: "Spyglass Realty" | — |
+| 2-44 | Footer logo | `SpyglassRealty_Logo_White.png` | No container needed |
+
+---
+
+## 📁 File Setup
+
+```bash
+# Copy logos to public folder
+cp LRE_SGR_White.png public/logos/LRE_SGR_White.png
+cp SpyglassRealty_Logo_White.png public/logos/SpyglassRealty_Logo_White.png
+
+# Verify files exist
+ls -la public/logos/
+```
+
+---
+
+## 🎨 Brand Colors Reference
+
+| Color | Hex | Usage |
+|-------|-----|-------|
+| **Spyglass Black** | `#222222` | Text, dark elements |
+| **Spyglass Orange** | `#EF4923` | Accent color, links |
+| **White** | `#FFFFFF` | Slide backgrounds |
+
+---
+
+## ✅ Verification Checklist
+
+### Slide 1 (Cover Page)
+- [ ] `LRE_SGR_White.png` logo displays above title
+- [ ] Logo displays directly (no extra container)
+- [ ] Footer shows "Spyglass Realty" text (no logo)
+- [ ] Agent name displays correctly
+- [ ] Same in Preview and PDF
+
+### Slides 2-44 (All Other Slides)
+- [ ] Footer shows `SpyglassRealty_Logo_White.png`
+- [ ] Logo displays directly (no extra container)
+- [ ] "Slide X of 44" on right side
+- [ ] Consistent across all slides
+- [ ] Same in Preview and PDF
+
+### General
+- [ ] Both logo files uploaded to `public/logos/`
+- [ ] Preview matches PDF export exactly
+- [ ] No broken image icons
+- [ ] Logos render correctly at all sizes
+
+---
+
+## 📱 Mobile Optimization
+
+- [ ] Logos scale appropriately on small screens
+- [ ] Footer readable on mobile devices
+- [ ] Touch targets adequate (if clickable)
+- [ ] No horizontal overflow
+
+---
+
+*Copy this entire prompt to Replit for Contract Conduit project.*
+*Upload both logo files: `LRE_SGR_White.png` and `SpyglassRealty_Logo_White.png`*

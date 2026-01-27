@@ -368,7 +368,7 @@ function SlidePreview({ slide, compact = false }: { slide: PreviewSlide; compact
             compact ? "px-1 py-0.5" : ""
           )}>
             <img 
-              src="/logos/LRE_SGR_White.png"
+              src="/logos/SpyglassRealty_Logo_White.png"
               alt="Spyglass Realty"
               className={cn(compact ? "h-2" : "h-4")}
             />

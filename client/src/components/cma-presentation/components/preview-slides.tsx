@@ -250,23 +250,23 @@ export function checkDataIssues({ comparables, agent, subjectProperty }: {
 
 function CoverSlideContent({ address, agent }: { address: string; agent: AgentProfile }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center">
+    <div className="flex flex-col items-center justify-center h-full text-center bg-[#222222] -m-6 p-6">
       <div className="mb-4">
         <img 
-          src="/logos/spyglass-logo-black.png"
-          alt="Spyglass Realty"
-          className="h-12 w-auto mx-auto mb-4"
+          src="/logos/LRE_SGR_White.png"
+          alt="Spyglass Realty - Leading Real Estate Companies of the World"
+          className="w-full max-w-md h-auto mx-auto mb-6 rounded-lg"
           onError={(e) => {
             e.currentTarget.style.display = 'none';
           }}
         />
-        <h1 className="text-2xl font-bold text-[#222222]">COMPARATIVE MARKET ANALYSIS</h1>
+        <h1 className="text-2xl font-bold text-white">COMPARATIVE MARKET ANALYSIS</h1>
       </div>
-      <p className="text-lg text-zinc-700 mb-4">{address}</p>
-      <div className="mt-4 pt-4 border-t border-zinc-200">
-        <p className="text-sm text-zinc-600">Prepared by</p>
-        <p className="font-medium text-[#222222]">{agent?.name || 'Agent Name'}</p>
-        <p className="text-sm text-zinc-500">{agent?.company || 'Spyglass Realty'}</p>
+      <p className="text-lg text-zinc-300 mb-4">{address}</p>
+      <div className="mt-4 pt-4 border-t border-zinc-600">
+        <p className="text-sm text-zinc-400">Prepared by</p>
+        <p className="font-medium text-white">{agent?.name || 'Agent Name'}</p>
+        <p className="text-sm text-zinc-400">{agent?.company || 'Spyglass Realty'}</p>
       </div>
     </div>
   );
