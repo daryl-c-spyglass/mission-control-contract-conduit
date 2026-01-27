@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Download, Grid3X3, Loader2 } from 'lucide-react';
+import { ArrowLeft, Download, Grid3X3, Loader2, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { FlyerForm } from './FlyerForm';
 import { FlyerPreview } from './FlyerPreview';
@@ -16,7 +16,7 @@ import { autoSelectPhotosWithInfo, formatPrice, formatAddress, formatNumber, gen
 import { extractSqft, extractBeds, extractBaths } from '@/lib/cma-data-utils';
 import type { FlyerData, FlyerImages, ImageTransforms } from '@/lib/flyer-types';
 import { DEFAULT_TRANSFORMS } from '@/lib/flyer-types';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 
 interface AgentProfileResponse {
   profile: any;
@@ -267,6 +267,59 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
     },
   });
 
+  const saveAssetMutation = useMutation({
+    mutationFn: async () => {
+      // First, generate the PNG to get image data
+      const response = await apiRequest('POST', `/api/transactions/${transactionId}/export-flyer?format=png`, {
+        ...watchedValues,
+        ...images,
+        imageTransforms,
+      });
+      if (!response.ok) throw new Error('Failed to generate flyer');
+      
+      const blob = await response.blob();
+      
+      // Convert blob to base64
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          resolve(result);
+        };
+        reader.onerror = reject;
+      });
+      reader.readAsDataURL(blob);
+      const imageData = await base64Promise;
+
+      // Save to marketing assets
+      const safeAddress = watchedValues.address?.replace(/[^a-zA-Z0-9]/g, '-') || 'property';
+      const fileName = `flyer-${safeAddress}-${Date.now()}.png`;
+      
+      const saveResponse = await apiRequest('POST', `/api/transactions/${transactionId}/marketing-assets`, {
+        type: 'flyer',
+        imageData,
+        fileName,
+      });
+      
+      if (!saveResponse.ok) throw new Error('Failed to save asset');
+      return saveResponse.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/transactions/${transactionId}/marketing-assets`] });
+      toast({ 
+        title: 'Saved to My Assets', 
+        description: 'Your flyer has been saved to My Assets.' 
+      });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: 'Save Failed', 
+        description: error.message || 'Please try again.', 
+        variant: 'destructive' 
+      });
+    },
+  });
+
   const getPreviewScale = () => {
     if (scale === 'fit') return 0.55;
     return parseFloat(scale);
@@ -285,8 +338,22 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
         </button>
         <div className="flex gap-2">
           <Button
+            onClick={() => saveAssetMutation.mutate()}
+            disabled={saveAssetMutation.isPending || exportMutation.isPending}
+            variant="outline"
+            className="gap-2"
+            data-testid="button-save-to-assets"
+          >
+            {saveAssetMutation.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            Save to My Assets
+          </Button>
+          <Button
             onClick={() => exportMutation.mutate('png')}
-            disabled={exportMutation.isPending}
+            disabled={exportMutation.isPending || saveAssetMutation.isPending}
             className="gap-2"
             data-testid="button-export-png"
           >
@@ -299,7 +366,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
           </Button>
           <Button
             onClick={() => exportMutation.mutate('cmyk')}
-            disabled={exportMutation.isPending}
+            disabled={exportMutation.isPending || saveAssetMutation.isPending}
             variant="outline"
             className="gap-2"
             data-testid="button-export-cmyk"
