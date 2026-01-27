@@ -81,6 +81,11 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   // All available MLS photos for gallery selection
   const [allMlsPhotos, setAllMlsPhotos] = useState<Array<{ url: string; classification: string; quality: number }>>([]);
 
+  // Description management for AI summarize
+  const [originalDescription, setOriginalDescription] = useState<string>('');
+  const [previousDescription, setPreviousDescription] = useState<string>('');
+  const [hasUsedAISummarize, setHasUsedAISummarize] = useState(false);
+
   const form = useForm<FlyerData>({
     defaultValues: {
       price: '',
@@ -138,6 +143,10 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
       const sqft = sqftValue !== null && sqftValue !== undefined ? sqftValue : '';
 
 
+      // Store original description for AI summarize feature
+      const fullDescription = mlsData.publicRemarks || mlsData.remarks || mlsData.description || '';
+      setOriginalDescription(fullDescription);
+
       form.reset({
         price: formatPrice(listPrice),
         address: formatAddress(transaction, mlsData),
@@ -145,7 +154,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
         bathrooms: baths !== null && baths !== undefined && baths !== '' ? String(baths) : '',
         sqft: sqft !== null && sqft !== undefined && sqft !== '' ? formatNumber(sqft) : '',
         introHeading: generateDefaultHeadline(transaction, mlsData),
-        introDescription: mlsData.publicRemarks || mlsData.remarks || mlsData.description || '',
+        introDescription: fullDescription,
         agentName,
         agentTitle: user?.marketingTitle || marketingProfile?.agentTitle || 'REALTOR®',
         phone: user?.marketingPhone || transaction.agentPhone || '',
@@ -203,6 +212,24 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
 
   const handleTransformChange = (field: keyof ImageTransforms) => (transform: ImageTransform) => {
     setImageTransforms(prev => ({ ...prev, [field]: transform }));
+  };
+
+  // Handle AI summarization
+  const handleSummarized = (summary: string) => {
+    const currentDescription = form.getValues('introDescription') || '';
+    setPreviousDescription(currentDescription);
+    form.setValue('introDescription', summary);
+    setHasUsedAISummarize(true);
+  };
+
+  // Handle revert to previous or original description
+  const handleRevertDescription = (type: 'previous' | 'original') => {
+    if (type === 'previous' && previousDescription) {
+      form.setValue('introDescription', previousDescription);
+    } else if (type === 'original') {
+      form.setValue('introDescription', originalDescription);
+      setHasUsedAISummarize(false);
+    }
   };
 
   const exportMutation = useMutation({
@@ -290,6 +317,11 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
               photoSelectionInfo={photoSelectionInfo}
               allMlsPhotos={allMlsPhotos}
               onSelectPhoto={(field, url) => setImages(prev => ({ ...prev, [field]: url }))}
+              originalDescription={originalDescription}
+              previousDescription={previousDescription}
+              hasUsedAISummarize={hasUsedAISummarize}
+              onSummarized={handleSummarized}
+              onRevertDescription={handleRevertDescription}
             />
           </ScrollArea>
         </div>

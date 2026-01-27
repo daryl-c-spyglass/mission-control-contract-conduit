@@ -9,8 +9,12 @@ import {
 } from 'lucide-react';
 import { ImageUploadField } from './ImageUploadField';
 import { AIHeadlineButton } from './AIHeadlineButton';
+import { AISummarizeButton } from './AISummarizeButton';
+import { CharacterCounter } from './CharacterCounter';
 import type { FlyerData, FlyerImages, ImageTransforms, ImageTransform } from '@/lib/flyer-types';
 import type { PhotoSelectionInfo } from '@/lib/flyer-utils';
+
+const MAX_DESCRIPTION_LENGTH = 150;
 
 interface FlyerFormProps {
   form: UseFormReturn<FlyerData>;
@@ -27,6 +31,11 @@ interface FlyerFormProps {
   };
   allMlsPhotos?: Array<{ url: string; classification: string; quality: number }>;
   onSelectPhoto?: (field: keyof FlyerImages, url: string) => void;
+  originalDescription?: string;
+  previousDescription?: string;
+  hasUsedAISummarize?: boolean;
+  onSummarized?: (summary: string) => void;
+  onRevertDescription?: (type: 'previous' | 'original') => void;
 }
 
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
@@ -72,8 +81,15 @@ export function FlyerForm({
   photoSelectionInfo,
   allMlsPhotos,
   onSelectPhoto,
+  originalDescription = '',
+  previousDescription = '',
+  hasUsedAISummarize = false,
+  onSummarized,
+  onRevertDescription,
 }: FlyerFormProps) {
-  const { register, setValue } = form;
+  const { register, setValue, watch } = form;
+  const descriptionValue = watch('introDescription') || '';
+  const addressValue = watch('address') || '';
 
   return (
     <div className="p-6 space-y-6">
@@ -135,15 +151,36 @@ export function FlyerForm({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs font-medium uppercase tracking-wide">
-              Property Description
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-medium uppercase tracking-wide">
+                Property Description
+              </Label>
+              {onSummarized && onRevertDescription && (
+                <AISummarizeButton
+                  currentDescription={descriptionValue}
+                  originalDescription={originalDescription}
+                  previousDescription={previousDescription}
+                  propertyAddress={addressValue}
+                  maxLength={MAX_DESCRIPTION_LENGTH}
+                  onSummarized={onSummarized}
+                  onRevert={onRevertDescription}
+                  hasUsedAI={hasUsedAISummarize}
+                />
+              )}
+            </div>
             <Textarea
               {...register('introDescription')}
               placeholder="Describe the property..."
-              className="min-h-[120px] resize-none"
+              className="min-h-[100px] resize-none"
               data-testid="input-flyer-description"
             />
+            <CharacterCounter
+              current={descriptionValue.length}
+              max={MAX_DESCRIPTION_LENGTH}
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Click "AI Summarize" to create a concise summary. Click again for different variations.
+            </p>
           </div>
         </div>
       </Section>

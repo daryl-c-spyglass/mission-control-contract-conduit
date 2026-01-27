@@ -1,0 +1,528 @@
+# Replit Prompt: Fix Property Description — AI Summarize (Max 150 Characters)
+
+## 🎯 Objective
+
+Add **AI Summarization** to the Property Description field in the Advanced Flyer Builder, matching the existing implementation from "Create Property Flyer" dialog.
+
+**Requirements:**
+- Max **150 characters** for description
+- **AI Summarize** button to generate concise summary from MLS `publicRemarks`
+- Character counter with color coding
+- Revert to original option
+- Re-runnable for different variations
+
+---
+
+## 📍 Reference: Existing Implementation
+
+The "Create Property Flyer" dialog already has this feature. Match that pattern:
+
+- **Endpoint:** `POST /api/summarize-description`
+- **AI Model:** OpenAI GPT-4o (or Claude)
+- **Character Limit:** 150 (Advanced Flyer) vs 115 (Print Flyer)
+
+---
+
+## 🔧 Fix 1: Update Server Endpoint (If Not Already Exists)
+
+Check if `/api/summarize-description` exists. If not, create it:
+
+```typescript
+// server/routes/flyer-ai.ts or server/routes.ts
+
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+app.post('/api/summarize-description', async (req, res) => {
+  try {
+    const { description, maxLength = 150, propertyInfo } = req.body;
+
+    if (!description) {
+      return res.status(400).json({ error: 'Description is required' });
+    }
+
+    const prompt = `Summarize this real estate listing description into exactly ${maxLength} characters or less.
+Keep the most compelling selling points. Write in an engaging, professional tone.
+Do not include the address, beds, baths, or sqft (those are shown separately).
+Create complete sentences that don't cut off mid-thought.
+
+Property: ${propertyInfo?.address || 'Property'}
+
+Original description:
+${description}
+
+Provide only the summary, no quotes or explanation.`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a professional real estate copywriter. Create concise, compelling property descriptions that fit within strict character limits while maintaining complete sentences.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      max_tokens: 100,
+      temperature: 0.7, // Some variation for re-runs
+    });
+
+    const summary = completion.choices[0]?.message?.content?.trim() || '';
+
+    // Ensure it's within limit (fallback truncation if AI exceeded)
+    const finalSummary = summary.length > maxLength 
+      ? summary.substring(0, maxLength - 3).trim() + '...'
+      : summary;
+
+    res.json({ summary: finalSummary });
+  } catch (error) {
+    console.error('AI summarization error:', error);
+    
+    // Fallback: truncate original description
+    const { description, maxLength = 150 } = req.body;
+    const fallback = description 
+      ? description.substring(0, maxLength - 3).trim() + '...'
+      : '';
+    
+    res.json({ summary: fallback, fallback: true });
+  }
+});
+```
+
+---
+
+## 🔧 Fix 2: Add State for Description Management
+
+In the Advanced Flyer component, add state to track description versions:
+
+```tsx
+// In AdvancedFlyerGenerator/index.tsx or FlyerForm.tsx
+
+// State for description management
+const [originalDescription, setOriginalDescription] = useState<string>('');
+const [previousDescription, setPreviousDescription] = useState<string>('');
+const [hasUsedAISummarize, setHasUsedAISummarize] = useState(false);
+const [isSummarizing, setIsSummarizing] = useState(false);
+
+// Store original description when MLS data loads
+useEffect(() => {
+  if (mlsData?.publicRemarks) {
+    const original = mlsData.publicRemarks || '';
+    setOriginalDescription(original);
+  }
+}, [mlsData]);
+```
+
+---
+
+## 🔧 Fix 3: Create AI Summarize Button Component
+
+```tsx
+// components/marketing/AdvancedFlyerGenerator/AISummarizeButton.tsx
+
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
+import { Sparkles, Loader2, Undo2, ChevronDown } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+interface AISummarizeButtonProps {
+  currentDescription: string;
+  originalDescription: string;
+  previousDescription: string;
+  propertyAddress: string;
+  maxLength: number;
+  onSummarized: (summary: string) => void;
+  onRevert: (type: 'previous' | 'original') => void;
+  hasUsedAI: boolean;
+}
+
+export function AISummarizeButton({
+  currentDescription,
+  originalDescription,
+  previousDescription,
+  propertyAddress,
+  maxLength,
+  onSummarized,
+  onRevert,
+  hasUsedAI,
+}: AISummarizeButtonProps) {
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+
+  const handleSummarize = async () => {
+    if (!originalDescription) {
+      toast({
+        title: 'No Description',
+        description: 'No MLS description available to summarize.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/summarize-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: originalDescription, // Always summarize from original
+          maxLength,
+          propertyInfo: {
+            address: propertyAddress,
+          },
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to summarize');
+
+      const { summary, fallback } = await response.json();
+      onSummarized(summary);
+
+      toast({
+        title: fallback ? 'Description Truncated' : 'Description Summarized',
+        description: fallback 
+          ? 'AI unavailable, description was truncated.' 
+          : 'Click again for a different variation.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Summarization Failed',
+        description: 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      {/* AI Summarize Button */}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={handleSummarize}
+        disabled={isLoading || !originalDescription}
+        className="h-7 text-xs gap-1.5 text-primary border-primary/30 hover:bg-primary/10"
+      >
+        {isLoading ? (
+          <>
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Summarizing...
+          </>
+        ) : (
+          <>
+            <Sparkles className="w-3.5 h-3.5" />
+            AI Summarize
+          </>
+        )}
+      </Button>
+
+      {/* Revert Dropdown - Only show after AI has been used */}
+      {hasUsedAI && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs gap-1 text-muted-foreground"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+              Revert
+              <ChevronDown className="w-3 h-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {previousDescription && previousDescription !== currentDescription && (
+              <DropdownMenuItem onClick={() => onRevert('previous')}>
+                <Undo2 className="w-4 h-4 mr-2" />
+                Revert to Previous
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={() => onRevert('original')}>
+              <Undo2 className="w-4 h-4 mr-2" />
+              Revert to Original (Full MLS)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 Fix 4: Add Character Counter Component
+
+```tsx
+// components/marketing/AdvancedFlyerGenerator/CharacterCounter.tsx
+
+import { cn } from '@/lib/utils';
+
+interface CharacterCounterProps {
+  current: number;
+  max: number;
+}
+
+export function CharacterCounter({ current, max }: CharacterCounterProps) {
+  const remaining = max - current;
+  const percentage = (current / max) * 100;
+
+  // Color coding
+  const getColor = () => {
+    if (current > max) return 'text-red-500';
+    if (remaining <= 15) return 'text-yellow-500';
+    return 'text-muted-foreground';
+  };
+
+  const getMessage = () => {
+    if (current > max) return `${current - max} over limit - will be truncated`;
+    if (current === 0) return 'No description';
+    return null;
+  };
+
+  return (
+    <div className="flex items-center justify-between text-xs">
+      <span className={cn('font-medium', getColor())}>
+        {current}/{max} characters
+      </span>
+      {getMessage() && (
+        <span className={cn('text-xs', current > max ? 'text-red-500' : 'text-yellow-500')}>
+          {getMessage()}
+        </span>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 Fix 5: Update Description Section in FlyerForm
+
+Replace the Property Description field with the enhanced version:
+
+```tsx
+// In FlyerForm.tsx - Description Section
+
+import { AISummarizeButton } from './AISummarizeButton';
+import { CharacterCounter } from './CharacterCounter';
+
+const MAX_DESCRIPTION_LENGTH = 150;
+
+// Inside the component:
+
+// Watch the description field
+const descriptionValue = form.watch('introDescription') || '';
+
+// Handle AI summarization
+const handleSummarized = (summary: string) => {
+  // Store current as previous before updating
+  setPreviousDescription(descriptionValue);
+  form.setValue('introDescription', summary);
+  setHasUsedAISummarize(true);
+};
+
+// Handle revert
+const handleRevert = (type: 'previous' | 'original') => {
+  if (type === 'previous' && previousDescription) {
+    form.setValue('introDescription', previousDescription);
+  } else if (type === 'original') {
+    // Truncate original to max length for display
+    const truncated = originalDescription.length > MAX_DESCRIPTION_LENGTH
+      ? originalDescription.substring(0, MAX_DESCRIPTION_LENGTH - 3) + '...'
+      : originalDescription;
+    form.setValue('introDescription', truncated);
+    setHasUsedAISummarize(false);
+  }
+};
+
+// JSX:
+{/* ================================================ */}
+{/* DESCRIPTION SECTION                              */}
+{/* ================================================ */}
+<div className="space-y-4">
+  <div className="flex items-center gap-2">
+    <FileText className="w-5 h-5 text-primary" />
+    <h2 className="text-lg font-medium">Description</h2>
+  </div>
+  
+  <Separator />
+
+  {/* Headline with AI Generate (existing) */}
+  <div className="space-y-2">
+    <div className="flex items-center justify-between">
+      <Label className="text-xs font-medium uppercase tracking-wide">
+        Headline
+      </Label>
+      <AIHeadlineButton
+        transactionId={transactionId}
+        mlsData={mlsData}
+        onGenerated={(headline) => form.setValue('introHeadline', headline)}
+      />
+    </div>
+    <Input
+      {...form.register('introHeadline')}
+      placeholder="Prime Opportunity in Austin"
+    />
+  </div>
+
+  {/* Property Description with AI Summarize */}
+  <div className="space-y-2">
+    <div className="flex items-center justify-between">
+      <Label className="text-xs font-medium uppercase tracking-wide">
+        Property Description
+      </Label>
+      <AISummarizeButton
+        currentDescription={descriptionValue}
+        originalDescription={originalDescription}
+        previousDescription={previousDescription}
+        propertyAddress={form.watch('address') || ''}
+        maxLength={MAX_DESCRIPTION_LENGTH}
+        onSummarized={handleSummarized}
+        onRevert={handleRevert}
+        hasUsedAI={hasUsedAISummarize}
+      />
+    </div>
+    
+    <Textarea
+      {...form.register('introDescription')}
+      placeholder="Describe the property..."
+      className="min-h-[100px] resize-none"
+      maxLength={MAX_DESCRIPTION_LENGTH + 50} // Allow some overflow for editing
+    />
+    
+    {/* Character Counter */}
+    <CharacterCounter
+      current={descriptionValue.length}
+      max={MAX_DESCRIPTION_LENGTH}
+    />
+    
+    {/* Helper Text */}
+    <p className="text-[10px] text-muted-foreground">
+      💡 Click "AI Summarize" to create a concise summary. Click again for different variations.
+    </p>
+  </div>
+</div>
+```
+
+---
+
+## 🔧 Fix 6: Auto-Truncate on Initial Load
+
+When MLS data loads, auto-summarize or truncate the description:
+
+```tsx
+// In the useEffect that loads MLS data:
+
+useEffect(() => {
+  if (mlsData) {
+    const fullDescription = mlsData.publicRemarks || mlsData.remarks || '';
+    
+    // Store original
+    setOriginalDescription(fullDescription);
+    
+    // If description is too long, truncate for initial display
+    // (Agent can click AI Summarize for better version)
+    const initialDescription = fullDescription.length > MAX_DESCRIPTION_LENGTH
+      ? fullDescription.substring(0, MAX_DESCRIPTION_LENGTH - 3).trim() + '...'
+      : fullDescription;
+    
+    form.setValue('introDescription', initialDescription);
+    
+    // ... rest of the form population
+  }
+}, [mlsData]);
+```
+
+---
+
+## 📊 Visual Layout
+
+```
+┌─────────────────────────────────────────────────────┐
+│ 📄 DESCRIPTION                                      │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│ HEADLINE                        [✨ AI Generate]    │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ Prime Opportunity in Bastrop                    │ │
+│ └─────────────────────────────────────────────────┘ │
+│                                                     │
+│ PROPERTY DESCRIPTION    [✨ AI Summarize] [↩ Revert]│
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ Beautiful move-in ready home nestled in a      │ │
+│ │ sought-after NW Austin neighborhood with       │ │
+│ │ nearby trails, parks, and walkable coffee...   │ │
+│ └─────────────────────────────────────────────────┘ │
+│ 142/150 characters                                  │
+│ 💡 Click "AI Summarize" for a concise summary.      │
+│    Click again for different variations.            │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## ✅ Verification Checklist
+
+### AI Summarize Button
+- [ ] Shows "✨ AI Summarize" button
+- [ ] Calls `/api/summarize-description` endpoint
+- [ ] Shows loading spinner while processing
+- [ ] Replaces description with AI summary
+- [ ] Can click multiple times for variations
+- [ ] Shows success toast
+
+### Revert Functionality
+- [ ] "Revert" dropdown appears after AI is used
+- [ ] "Revert to Previous" restores last version
+- [ ] "Revert to Original" restores full MLS description
+- [ ] Hidden until AI Summarize is used
+
+### Character Counter
+- [ ] Shows current/max (e.g., "142/150 characters")
+- [ ] Green when under limit
+- [ ] Yellow when within 15 chars of limit
+- [ ] Red when over limit
+- [ ] Shows "will be truncated" warning when over
+
+### Initial Load
+- [ ] Full description stored as `originalDescription`
+- [ ] Displayed description truncated to 150 chars
+- [ ] Truncation preserves complete words
+
+### Live Preview Sync
+- [ ] Description changes update preview immediately
+- [ ] AI summarized text shows in preview
+
+---
+
+## 📋 Summary
+
+| Feature | Implementation |
+|---------|----------------|
+| **Max Length** | 150 characters |
+| **AI Button** | "✨ AI Summarize" - generates concise summary |
+| **Source** | Always uses original MLS `publicRemarks` |
+| **Variations** | Click multiple times for different summaries |
+| **Revert** | Dropdown with "Previous" and "Original" options |
+| **Counter** | Color-coded character count |
+| **Fallback** | Simple truncation if AI fails |
+
+---
+
+*This matches the existing "Create Property Flyer" implementation but with 150 character limit for Advanced Flyer.*
