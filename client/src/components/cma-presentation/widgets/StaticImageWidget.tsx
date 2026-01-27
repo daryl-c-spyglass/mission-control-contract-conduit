@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { SlideImageZoom } from '../components/SlideImageZoom';
 
 interface StaticImageWidgetProps {
   title: string;
@@ -18,8 +17,8 @@ export function StaticImageWidget({ title, imagePath }: StaticImageWidgetProps) 
 
   return (
     <div className="flex flex-col h-full bg-background" data-testid="static-image-widget">
-      <div className="flex-1 overflow-auto p-4">
-        <div className="max-w-5xl mx-auto">
+      <div className="flex-1 flex items-center justify-center p-6 bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-5xl w-full">
           {!isLoaded && !hasError && (
             <div className="flex items-center justify-center">
               <Skeleton className="w-full aspect-[4/3] rounded-lg" />
@@ -32,23 +31,16 @@ export function StaticImageWidget({ title, imagePath }: StaticImageWidgetProps) 
             </div>
           )}
           
-          <div className={`transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'} ${hasError ? 'hidden' : ''}`}>
-            <SlideImageZoom
-              src={imagePath}
-              alt={title}
-              className="w-full"
-            />
-          </div>
-          
           <img 
             src={imagePath}
-            alt=""
-            className="hidden"
+            alt={title}
+            className={`max-w-full max-h-[70vh] mx-auto object-contain rounded-lg shadow-sm transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'} ${hasError ? 'hidden' : ''}`}
             onLoad={() => setIsLoaded(true)}
             onError={() => {
               console.error(`Failed to load image: ${imagePath}`);
               setHasError(true);
             }}
+            data-testid="img-static-widget"
           />
         </div>
       </div>

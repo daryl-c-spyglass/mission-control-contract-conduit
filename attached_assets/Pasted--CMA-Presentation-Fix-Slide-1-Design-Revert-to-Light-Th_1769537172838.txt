@@ -1,0 +1,346 @@
+# CMA Presentation — Fix Slide 1 Design (Revert to Light Theme)
+
+## 🚨 Problem
+
+Replit implemented the WRONG design for Slide 1:
+
+**What Replit Did (WRONG):**
+```
+┌─────────────────────────────────────────┐
+│ [Dark Background - #18181b]             │  ← WRONG!
+│                                         │
+│     [LRE + Spyglass Logo - White]       │
+│                                         │
+│     Comparative Market Analysis         │
+│                                         │
+│     268 Chisholm TRL                    │
+│     Bastrop, TX                         │
+│                                         │
+│     January 28, 2026                    │
+│                                         │
+├─────────────────────────────────────────┤
+│ [Orange Bar - #EF4923]                  │  ← WRONG!
+│  [Photo] PREPARED BY                    │
+│          Agent Name                     │
+│          REALTOR | Spyglass Realty      │
+└─────────────────────────────────────────┘
+```
+
+**What I Want (CORRECT - See Attached Screenshot):**
+```
+┌─────────────────────────────────────────┐
+│ COMPARATIVE MARKET ANALYSIS             │  ← Header text (top left)
+│                                         │
+│         ┌─────────────────┐             │
+│         │   SPYGLASS      │             │  ← Small black logo
+│         │    REALTY       │             │     (centered)
+│         └─────────────────┘             │
+│                                         │
+│    COMPARATIVE MARKET ANALYSIS          │  ← Title (centered, bold)
+│                                         │
+│    242 Seven Seas, Kyle, TX 78640       │  ← Address (centered)
+│                                         │
+│    ────────────────────────             │  ← Simple divider line
+│                                         │
+│              Prepared by                │  ← Label
+│            Daryl Camingao               │  ← Agent name (bold)
+│            Spyglass Realty              │  ← Company
+│                                         │
+├─────────────────────────────────────────┤
+│ Spyglass Realty            Slide 1 of 44│  ← Footer (text only)
+└─────────────────────────────────────────┘
+
+Background: WHITE (#FFFFFF)
+Text: Dark gray/black
+Footer: Simple text, no orange bar
+```
+
+---
+
+## 🎯 Requirements
+
+1. **Single View** = Same as **Grid View** = Same as **PDF Export**
+2. **Background:** White (#FFFFFF)
+3. **No dark theme for Slide 1**
+4. **No orange bar at bottom**
+5. **Simple, clean, professional design**
+
+---
+
+## 🔧 Correct Slide 1 Component
+
+```tsx
+// File: Find and REPLACE the Slide 1 / Cover Page component
+
+interface CoverPageSlideProps {
+  address: string;
+  agentName?: string;
+  agentCompany?: string;
+  slideNumber?: number;
+  totalSlides?: number;
+}
+
+function CoverPageSlide({ 
+  address, 
+  agentName = 'Agent',
+  agentCompany = 'Spyglass Realty',
+  slideNumber = 1,
+  totalSlides = 44 
+}: CoverPageSlideProps) {
+  return (
+    <div className="h-full flex flex-col bg-white">
+      {/* Header - Top Left Label */}
+      <div className="px-8 pt-6">
+        <p className="text-xs font-semibold text-gray-700 tracking-widest uppercase">
+          COMPARATIVE MARKET ANALYSIS
+        </p>
+      </div>
+      
+      {/* Main Content - Centered */}
+      <div className="flex-1 flex flex-col items-center justify-center px-8">
+        {/* Logo - Small, centered */}
+        <div className="mb-8">
+          <img 
+            src="/logos/SpyglassRealty_Logo_Black.png"
+            alt="Spyglass Realty"
+            className="h-12 w-auto"
+          />
+        </div>
+        
+        {/* Title */}
+        <h1 className="text-3xl font-bold text-gray-900 text-center mb-6">
+          COMPARATIVE MARKET ANALYSIS
+        </h1>
+        
+        {/* Address */}
+        <p className="text-xl text-gray-600 text-center mb-8">
+          {address}
+        </p>
+        
+        {/* Divider Line */}
+        <div className="w-32 h-px bg-gray-300 mb-8" />
+        
+        {/* Prepared By Section */}
+        <div className="text-center">
+          <p className="text-sm text-gray-500 mb-2">Prepared by</p>
+          <p className="text-lg font-semibold text-gray-900">{agentName}</p>
+          <p className="text-gray-600">{agentCompany}</p>
+        </div>
+      </div>
+      
+      {/* Footer - Simple Text */}
+      <div className="px-8 pb-6">
+        <div className="flex justify-between items-center text-sm text-gray-400 pt-4 border-t border-gray-200">
+          <span>Spyglass Realty</span>
+          <span>Slide {slideNumber} of {totalSlides}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default CoverPageSlide;
+```
+
+---
+
+## 🔧 PDF Export Component (Must Match Preview)
+
+```tsx
+// File: PDF export component for Slide 1
+import { Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
+
+function CoverPageSlidePdf({ address, agentName, agentCompany, slideNumber, totalSlides }) {
+  return (
+    <Page size="LETTER" style={styles.page}>
+      {/* Header - Top Left */}
+      <Text style={styles.headerLabel}>COMPARATIVE MARKET ANALYSIS</Text>
+      
+      {/* Main Content */}
+      <View style={styles.content}>
+        {/* Logo */}
+        <Image 
+          src="/logos/SpyglassRealty_Logo_Black.png"
+          style={styles.logo}
+        />
+        
+        {/* Title */}
+        <Text style={styles.title}>COMPARATIVE MARKET ANALYSIS</Text>
+        
+        {/* Address */}
+        <Text style={styles.address}>{address}</Text>
+        
+        {/* Divider */}
+        <View style={styles.divider} />
+        
+        {/* Prepared By */}
+        <Text style={styles.preparedByLabel}>Prepared by</Text>
+        <Text style={styles.agentName}>{agentName || 'Agent'}</Text>
+        <Text style={styles.agentCompany}>{agentCompany || 'Spyglass Realty'}</Text>
+      </View>
+      
+      {/* Footer */}
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>Spyglass Realty</Text>
+        <Text style={styles.footerText}>Slide {slideNumber} of {totalSlides}</Text>
+      </View>
+    </Page>
+  );
+}
+
+const styles = StyleSheet.create({
+  page: {
+    backgroundColor: '#FFFFFF',  // WHITE background
+    padding: 40,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  headerLabel: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: '#374151',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
+  content: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logo: {
+    width: 120,
+    height: 'auto',
+    marginBottom: 40,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  address: {
+    fontSize: 16,
+    color: '#4b5563',
+    textAlign: 'center',
+    marginBottom: 30,
+  },
+  divider: {
+    width: 100,
+    height: 1,
+    backgroundColor: '#d1d5db',
+    marginBottom: 30,
+  },
+  preparedByLabel: {
+    fontSize: 10,
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  agentName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  agentCompany: {
+    fontSize: 12,
+    color: '#4b5563',
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingTop: 12,
+  },
+  footerText: {
+    fontSize: 10,
+    color: '#9ca3af',
+  },
+});
+```
+
+---
+
+## ❌ DO NOT USE
+
+Remove/revert any of these elements:
+
+- ❌ Dark background (#18181b or similar)
+- ❌ Orange bar at bottom (#EF4923 bar)
+- ❌ Agent photo on cover page
+- ❌ Date on cover page
+- ❌ "REALTOR" title
+- ❌ Any colored backgrounds
+
+---
+
+## ✅ MUST HAVE
+
+- ✅ White background (#FFFFFF)
+- ✅ Small Spyglass logo (black version) at top center
+- ✅ "COMPARATIVE MARKET ANALYSIS" as title
+- ✅ Property address
+- ✅ Simple horizontal divider line
+- ✅ "Prepared by" + Agent Name + Company Name
+- ✅ Simple text footer: "Spyglass Realty" | "Slide 1 of 44"
+
+---
+
+## 🔄 Consistency Check
+
+All three views MUST be identical:
+
+| View | Background | Footer | Design |
+|------|------------|--------|--------|
+| Single View | White | Text only | Clean/light |
+| Grid View | White | Text only | Clean/light |
+| PDF Export | White | Text only | Clean/light |
+
+---
+
+## 📋 Quick Replit Instructions
+
+```
+REVERT Slide 1 (Cover Page) to match the attached screenshot:
+
+1. REMOVE: Dark background
+2. REMOVE: Orange bar at bottom  
+3. REMOVE: Agent photo
+4. REMOVE: Date field
+
+USE THIS DESIGN:
+- Background: WHITE (#FFFFFF)
+- Logo: SpyglassRealty_Logo_Black.png (small, centered)
+- Title: "COMPARATIVE MARKET ANALYSIS" (bold, centered)
+- Address: Property address (gray text, centered)
+- Divider: Simple gray line
+- Prepared by: Agent name + company (centered, no photo)
+- Footer: "Spyglass Realty" on left, "Slide 1 of 44" on right (text only, no orange)
+
+ENSURE: Single view = Grid view = PDF export (all identical)
+```
+
+---
+
+## ✅ Verification Checklist
+
+- [ ] Slide 1 has WHITE background
+- [ ] No dark theme elements
+- [ ] No orange bar at bottom
+- [ ] Small black Spyglass logo centered
+- [ ] Title is bold and centered
+- [ ] Address displays correctly
+- [ ] Simple divider line (not decorative)
+- [ ] "Prepared by" section centered
+- [ ] Footer is simple text (no colors)
+- [ ] Single view matches Grid view
+- [ ] Grid view matches PDF export
+- [ ] PDF export matches screenshot
+
+---
+
+*Copy this entire prompt to Replit for Contract Conduit project.*
+*Reference the attached screenshot as the correct design.*

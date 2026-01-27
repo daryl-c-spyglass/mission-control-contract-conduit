@@ -1,0 +1,161 @@
+# CMA Presentation — REVERT: Remove Zoom Controls
+
+## 🚨 Issue
+
+The zoom in/out feature added to slides 11-33 looks unprofessional. 
+
+**REMOVE this implementation and revert to the original clean design.**
+
+---
+
+## ❌ REMOVE These Elements
+
+Remove the entire zoom toolbar:
+- ❌ "Scroll to pan" label
+- ❌ Zoom out button (−)
+- ❌ Zoom percentage display (50%)
+- ❌ Zoom in button (+)
+- ❌ Reset button
+- ❌ "Expand" button
+- ❌ Scrollable/pannable container
+- ❌ Any zoom-related state or functionality
+
+---
+
+## ✅ Revert To Original Design
+
+The static widget slides (11-33) should display simply:
+
+```
+┌─────────────────────────────────────────┐
+│  SELECT MOVE PROGRAM                    │  ← Dark header
+│  31 / 33                                │
+├─────────────────────────────────────────┤
+│                                         │
+│     [Static Widget Image]               │  ← Just the image
+│     (Full size, no zoom controls)       │     Clean display
+│                                         │
+│                                         │
+├─────────────────────────────────────────┤
+│ [Logo]                   Slide 31 of 33 │  ← Footer
+└─────────────────────────────────────────┘
+```
+
+**No zoom controls. No scroll to pan. No expand button. Just clean, professional slides.**
+
+---
+
+## 🔧 Reverted Component Code
+
+```tsx
+// File: Static Widget Slide component for slides 11-33
+
+interface StaticWidgetSlideProps {
+  slideId: string;
+  title: string;
+  imageSrc: string;
+  slideNumber: number;
+  totalSlides: number;
+}
+
+function StaticWidgetSlide({ 
+  slideId,
+  title,
+  imageSrc, 
+  slideNumber, 
+  totalSlides 
+}: StaticWidgetSlideProps) {
+  return (
+    <div className="h-full flex flex-col bg-white">
+      {/* Header */}
+      <div className="bg-[#222222] text-white text-center py-4">
+        <h2 className="text-lg font-bold uppercase tracking-wide">{title}</h2>
+        <p className="text-orange-400 text-sm">{slideNumber} / {totalSlides}</p>
+      </div>
+      
+      {/* Content - Simple image display, NO zoom controls */}
+      <div className="flex-1 flex items-center justify-center p-6 bg-gray-50">
+        <img 
+          src={imageSrc}
+          alt={title}
+          className="max-w-full max-h-full object-contain rounded-lg shadow-sm"
+        />
+      </div>
+      
+      {/* Footer */}
+      <SlideFooter slideNumber={slideNumber} totalSlides={totalSlides} />
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 Remove Zoom-Related Code
+
+Delete or comment out these files/components if they were created:
+
+```bash
+# Files to remove or revert:
+- components/cma-presentation/SlideImageZoom.tsx
+- components/cma-presentation/ImageLightbox.tsx
+- hooks/useZoom.ts (if created)
+```
+
+Remove zoom-related imports:
+
+```tsx
+// REMOVE these imports
+// import { SlideImageZoom } from './SlideImageZoom';
+// import { ImageLightbox } from './ImageLightbox';
+// import { ZoomIn, ZoomOut, Maximize2, RotateCcw, Move } from 'lucide-react';
+```
+
+Remove zoom-related state:
+
+```tsx
+// REMOVE these state variables
+// const [zoomLevel, setZoomLevel] = useState(100);
+// const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+```
+
+---
+
+## 📋 Quick Replit Instructions
+
+```
+REVERT the CMA Presentation static widget slides (11-33):
+
+1. REMOVE: All zoom controls (zoom in, zoom out, percentage, expand button)
+2. REMOVE: "Scroll to pan" label
+3. REMOVE: Scrollable/pannable container
+4. REMOVE: Any zoom-related state or functionality
+5. REMOVE: Lightbox/expand modal
+
+RESTORE: Simple, clean slide display
+- Dark header with title and slide number
+- Static image displayed at natural size (centered, max-width/height constrained)
+- Footer with logo and slide number
+- NO interactive zoom features
+
+The slides should look PROFESSIONAL and CLEAN, just displaying the widget image.
+```
+
+---
+
+## ✅ Verification Checklist
+
+After reverting:
+
+- [ ] No zoom controls visible on slides 11-33
+- [ ] No "Scroll to pan" text
+- [ ] No zoom percentage display
+- [ ] No expand button
+- [ ] Images display cleanly and professionally
+- [ ] Slides look the same in Single view and Grid view
+- [ ] PDF export renders the same as Preview
+- [ ] No JavaScript errors related to removed zoom code
+
+---
+
+*Copy this entire prompt to Replit for Contract Conduit project.*
