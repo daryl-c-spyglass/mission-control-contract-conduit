@@ -1,0 +1,369 @@
+# CMA PDF Data Audit - Diagnostic Prompt
+
+## Goal
+
+Before making any changes, audit ALL data sources currently available for CMA PDF generation. Report what exists, what's missing, and what needs to be fixed.
+
+---
+
+## Run This Diagnostic
+
+Create a temporary API endpoint or console script that outputs a complete data audit:
+
+```typescript
+// server/routes.ts - Add temporary diagnostic endpoint
+
+app.get('/api/debug/cma-pdf-audit/:transactionId', async (req, res) => {
+  const { transactionId } = req.params;
+  
+  try {
+    // 1. TRANSACTION DATA
+    const transaction = await storage.getTransaction(parseInt(transactionId));
+    
+    // 2. CMA/COMPARABLES DATA
+    const cmaData = transaction?.cmaData;
+    const comparables = cmaData?.comparables || [];
+    
+    // 3. AGENT/USER DATA
+    const userId = transaction?.userId;
+    const user = userId ? await storage.getUser(userId) : null;
+    const agentProfile = userId ? await storage.getAgentProfile(userId) : null;
+    const graphicsSettings = userId ? await storage.getGraphicsSettings(userId) : null;
+    
+    // 4. MLS DATA
+    const mlsData = transaction?.mlsData;
+    
+    // Build comprehensive audit report
+    const audit = {
+      // === TRANSACTION ===
+      transaction: {
+        exists: !!transaction,
+        id: transaction?.id,
+        address: transaction?.address,
+        mlsNumber: transaction?.mlsNumber,
+        status: transaction?.status,
+        listPrice: transaction?.listPrice,
+        closingDate: transaction?.closingDate,
+        contractDate: transaction?.contractDate,
+      },
+      
+      // === AGENT PROFILE ===
+      agent: {
+        exists: !!agentProfile,
+        name: agentProfile?.name || user?.name || user?.firstName + ' ' + user?.lastName,
+        email: agentProfile?.email || user?.email,
+        phone: agentProfile?.phone,
+        photoUrl: agentProfile?.photoUrl || graphicsSettings?.headshotUrl,
+        bio: agentProfile?.bio,
+        title: agentProfile?.title,
+        license: agentProfile?.licenseNumber,
+        // What's missing
+        missing: {
+          name: !agentProfile?.name && !user?.name,
+          photo: !agentProfile?.photoUrl && !graphicsSettings?.headshotUrl,
+          bio: !agentProfile?.bio,
+          phone: !agentProfile?.phone,
+        }
+      },
+      
+      // === GRAPHICS SETTINGS ===
+      graphicsSettings: {
+        exists: !!graphicsSettings,
+        headshotUrl: graphicsSettings?.headshotUrl,
+        logoUrl: graphicsSettings?.logoUrl,
+        companyName: graphicsSettings?.companyName,
+        brandColor: graphicsSettings?.brandColor,
+      },
+      
+      // === MLS DATA (Subject Property) ===
+      mlsData: {
+        exists: !!mlsData,
+        address: mlsData?.address,
+        city: mlsData?.city,
+        state: mlsData?.state,
+        zip: mlsData?.zip,
+        listPrice: mlsData?.listPrice,
+        beds: mlsData?.beds || mlsData?.bedrooms,
+        baths: mlsData?.baths || mlsData?.bathrooms,
+        sqft: mlsData?.sqft || mlsData?.livingArea,
+        lotSize: mlsData?.lotSize || mlsData?.lotSizeAcres,
+        yearBuilt: mlsData?.yearBuilt,
+        propertyType: mlsData?.propertyType,
+        description: mlsData?.description,
+        // Photos
+        photos: {
+          count: mlsData?.photos?.length || 0,
+          firstPhotoUrl: mlsData?.photos?.[0] || mlsData?.primaryPhoto,
+          hasPhotos: (mlsData?.photos?.length || 0) > 0,
+        },
+        // Location
+        coordinates: {
+          latitude: mlsData?.latitude,
+          longitude: mlsData?.longitude,
+          hasCoordinates: !!(mlsData?.latitude && mlsData?.longitude),
+        },
+      },
+      
+      // === COMPARABLES ===
+      comparables: {
+        count: comparables.length,
+        source: cmaData?.source || 'unknown',
+        generatedAt: cmaData?.generatedAt,
+        
+        // Audit each comparable
+        items: comparables.map((comp: any, index: number) => ({
+          index,
+          address: comp.address || `${comp.streetNumber} ${comp.streetName}`,
+          city: comp.city,
+          state: comp.state,
+          
+          // Price fields available
+          priceFields: {
+            price: comp.price,
+            listPrice: comp.listPrice,
+            soldPrice: comp.soldPrice,
+            closePrice: comp.closePrice,
+            hasAnyPrice: !!(comp.price || comp.listPrice || comp.soldPrice || comp.closePrice),
+          },
+          
+          // Property details
+          details: {
+            beds: comp.beds || comp.bedrooms,
+            baths: comp.baths || comp.bathrooms,
+            sqft: comp.sqft || comp.livingArea,
+            lotSize: comp.lotSize || comp.lotSizeAcres,
+            yearBuilt: comp.yearBuilt,
+            status: comp.status,
+          },
+          
+          // Days on market
+          dom: {
+            dom: comp.dom,
+            daysOnMarket: comp.daysOnMarket,
+            cumulativeDom: comp.cumulativeDom,
+            hasDOM: !!(comp.dom || comp.daysOnMarket || comp.cumulativeDom),
+          },
+          
+          // Photos
+          photos: {
+            count: comp.photos?.length || 0,
+            primaryPhoto: comp.primaryPhoto || comp.photos?.[0],
+            hasPhotos: (comp.photos?.length || 0) > 0 || !!comp.primaryPhoto,
+          },
+          
+          // Location
+          coordinates: {
+            latitude: comp.latitude,
+            longitude: comp.longitude,
+            hasCoordinates: !!(comp.latitude && comp.longitude),
+          },
+        })),
+        
+        // Summary stats
+        summary: {
+          withPrices: comparables.filter((c: any) => c.price || c.listPrice || c.soldPrice || c.closePrice).length,
+          withPhotos: comparables.filter((c: any) => c.photos?.length > 0 || c.primaryPhoto).length,
+          withDOM: comparables.filter((c: any) => c.dom || c.daysOnMarket).length,
+          withCoordinates: comparables.filter((c: any) => c.latitude && c.longitude).length,
+        },
+      },
+      
+      // === STATIC ASSETS CHECK ===
+      staticAssets: {
+        // Check if these files exist in public folder
+        spyglassLogo: '/assets/spyglass-logo.png',
+        marketingSlides: [
+          'home-selling-system',
+          'our-proven-approach',
+          'seo-digital-marketing',
+          'google-meta-ads',
+          'professional-videography',
+          'why-4k-video',
+          'aerial-photography',
+          'in-house-design-team',
+          'print-flyers',
+          'zillow-showcase',
+        ].map(name => ({
+          name,
+          expectedPath: `/assets/slides/${name}.png`,
+          // Note: Actual file check would need server-side fs access
+        })),
+      },
+      
+      // === PDF READINESS SCORE ===
+      readiness: {
+        agent: {
+          score: calculateScore([
+            !!agentProfile?.name || !!user?.name,
+            !!agentProfile?.photoUrl || !!graphicsSettings?.headshotUrl,
+            !!agentProfile?.phone,
+            !!agentProfile?.bio,
+          ]),
+          issues: [],
+        },
+        comparables: {
+          score: calculateScore([
+            comparables.length >= 3,
+            comparables.filter((c: any) => c.price || c.listPrice || c.soldPrice).length === comparables.length,
+            comparables.filter((c: any) => c.photos?.length > 0).length > 0,
+          ]),
+          issues: [],
+        },
+        subject: {
+          score: calculateScore([
+            !!mlsData?.address,
+            !!mlsData?.listPrice,
+            (mlsData?.photos?.length || 0) > 0,
+            !!(mlsData?.latitude && mlsData?.longitude),
+          ]),
+          issues: [],
+        },
+      },
+    };
+    
+    // Add issues to readiness
+    if (!audit.agent.name) audit.readiness.agent.issues.push('Agent name missing');
+    if (!audit.agent.photoUrl) audit.readiness.agent.issues.push('Agent photo missing');
+    if (!audit.agent.bio) audit.readiness.agent.issues.push('Agent bio missing');
+    
+    if (audit.comparables.summary.withPrices < audit.comparables.count) {
+      audit.readiness.comparables.issues.push(`${audit.comparables.count - audit.comparables.summary.withPrices} comparables missing price data`);
+    }
+    if (audit.comparables.summary.withPhotos === 0) {
+      audit.readiness.comparables.issues.push('No comparable photos available');
+    }
+    
+    res.json(audit);
+    
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+function calculateScore(checks: boolean[]): string {
+  const passed = checks.filter(Boolean).length;
+  const total = checks.length;
+  const percentage = Math.round((passed / total) * 100);
+  return `${passed}/${total} (${percentage}%)`;
+}
+```
+
+---
+
+## Expected Output Format
+
+After hitting `/api/debug/cma-pdf-audit/[transactionId]`, you should see:
+
+```json
+{
+  "transaction": {
+    "exists": true,
+    "id": 123,
+    "address": "612 Twelve Oaks LN, Austin, TX",
+    "mlsNumber": "ACT1234567"
+  },
+  
+  "agent": {
+    "exists": true,
+    "name": "Daryl Camingao",
+    "email": "daryl@spyglassrealty.com",
+    "phone": "546-546-5123",
+    "photoUrl": null,  // <-- MISSING
+    "bio": "Test Professional Bio",
+    "missing": {
+      "name": false,
+      "photo": true,  // <-- ISSUE
+      "bio": false,
+      "phone": false
+    }
+  },
+  
+  "comparables": {
+    "count": 10,
+    "summary": {
+      "withPrices": 10,
+      "withPhotos": 0,  // <-- ISSUE: No photos
+      "withDOM": 5,
+      "withCoordinates": 8
+    }
+  },
+  
+  "readiness": {
+    "agent": { "score": "3/4 (75%)", "issues": ["Agent photo missing"] },
+    "comparables": { "score": "2/3 (67%)", "issues": ["No comparable photos available"] },
+    "subject": { "score": "4/4 (100%)", "issues": [] }
+  }
+}
+```
+
+---
+
+## What to Report Back
+
+After running this diagnostic, tell me:
+
+### 1. Agent Profile Data
+- [ ] Where is agent name stored? (users table? agent_profiles table?)
+- [ ] Where is agent photo stored? (graphics_settings? agent_profiles?)
+- [ ] Where is agent bio stored?
+- [ ] Where is agent phone stored?
+- [ ] Show the actual values found
+
+### 2. Comparables Data Structure
+- [ ] What price field names exist? (price, listPrice, soldPrice, closePrice?)
+- [ ] What sqft field names exist? (sqft, livingArea, squareFeet?)
+- [ ] What DOM field names exist? (dom, daysOnMarket, cumulativeDom?)
+- [ ] Are photos included in comparables? (Show sample photo URL if exists)
+- [ ] Are coordinates included? (latitude, longitude)
+
+### 3. Static Marketing Assets
+- [ ] Do marketing slide images exist in /public/assets/slides/?
+- [ ] If not, where should they be uploaded?
+- [ ] What format? (PNG, JPG?)
+
+### 4. Missing Data Summary
+List everything that is NULL or missing that prevents a complete PDF.
+
+---
+
+## Console Version (Alternative)
+
+If you prefer, run this in the Replit console:
+
+```typescript
+// In server/index.ts or a test file
+import { storage } from './storage';
+
+async function auditCmaPdfData(transactionId: number) {
+  const transaction = await storage.getTransaction(transactionId);
+  console.log('=== TRANSACTION ===');
+  console.log(JSON.stringify(transaction, null, 2));
+  
+  console.log('\n=== CMA DATA ===');
+  console.log('Comparables count:', transaction?.cmaData?.comparables?.length);
+  console.log('First comparable:', JSON.stringify(transaction?.cmaData?.comparables?.[0], null, 2));
+  
+  console.log('\n=== AGENT PROFILE ===');
+  const agentProfile = await storage.getAgentProfile(transaction?.userId);
+  console.log(JSON.stringify(agentProfile, null, 2));
+  
+  console.log('\n=== GRAPHICS SETTINGS ===');
+  const graphicsSettings = await storage.getGraphicsSettings(transaction?.userId);
+  console.log(JSON.stringify(graphicsSettings, null, 2));
+}
+
+// Run with a specific transaction ID
+auditCmaPdfData(123);
+```
+
+---
+
+## After Running Diagnostic
+
+Once you have the audit results, report back with:
+
+1. **Screenshot or JSON output** of the audit
+2. **List of missing data** that needs to be populated
+3. **Confirmation of field names** so we can map them correctly
+
+This will let us create an accurate visualization and implementation plan.

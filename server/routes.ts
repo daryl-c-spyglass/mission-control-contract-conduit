@@ -4789,5 +4789,248 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
     }
   });
 
+  // ============ CMA PDF Data Audit (Diagnostic) ============
+  
+  function calculateAuditScore(checks: boolean[]): string {
+    const passed = checks.filter(Boolean).length;
+    const total = checks.length;
+    const percentage = Math.round((passed / total) * 100);
+    return `${passed}/${total} (${percentage}%)`;
+  }
+
+  app.get('/api/debug/cma-pdf-audit/:transactionId', isAuthenticated, async (req, res) => {
+    const { transactionId } = req.params;
+    
+    try {
+      // 1. TRANSACTION DATA
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+      
+      // 2. CMA/COMPARABLES DATA
+      const cmaData = transaction?.cmaData;
+      const comparables = Array.isArray(cmaData) ? cmaData : [];
+      
+      // 3. AGENT/USER DATA
+      const userId = transaction?.userId;
+      const user = userId ? await authStorage.getUser(userId) : null;
+      const agentProfile = userId ? await storage.getAgentProfile(userId) : null;
+      
+      // 4. MLS DATA
+      const mlsData = transaction?.mlsData as any;
+      
+      // Build comprehensive audit report
+      const audit = {
+        // === TRANSACTION ===
+        transaction: {
+          exists: !!transaction,
+          id: transaction?.id,
+          address: transaction?.propertyAddress,
+          mlsNumber: transaction?.mlsNumber,
+          status: transaction?.status,
+          listPrice: transaction?.listPrice,
+          closingDate: transaction?.closingDate,
+          contractDate: transaction?.contractDate,
+        },
+        
+        // === AGENT PROFILE ===
+        agent: {
+          exists: !!agentProfile,
+          name: user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : null,
+          email: user?.email,
+          headshotUrl: agentProfile?.headshotUrl,
+          bio: agentProfile?.bio,
+          title: agentProfile?.title,
+          company: agentProfile?.marketingCompany,
+          // What's missing
+          missing: {
+            name: !user?.firstName,
+            photo: !agentProfile?.headshotUrl,
+            bio: !agentProfile?.bio,
+          }
+        },
+        
+        // === MLS DATA (Subject Property) ===
+        mlsData: {
+          exists: !!mlsData,
+          address: mlsData?.address || mlsData?.unparsedAddress,
+          city: mlsData?.city,
+          state: mlsData?.state,
+          zip: mlsData?.zip || mlsData?.postalCode,
+          listPrice: mlsData?.listPrice,
+          beds: mlsData?.beds || mlsData?.bedroomsTotal,
+          baths: mlsData?.baths || mlsData?.bathroomsTotalInteger,
+          sqft: mlsData?.sqft || mlsData?.livingArea,
+          lotSize: mlsData?.lotSize || mlsData?.lotSizeAcres || mlsData?.lot?.acres,
+          yearBuilt: mlsData?.yearBuilt,
+          propertyType: mlsData?.propertyType,
+          description: mlsData?.description || mlsData?.publicRemarks,
+          // Photos
+          photos: {
+            count: mlsData?.images?.length || mlsData?.photos?.length || 0,
+            firstPhotoUrl: mlsData?.images?.[0] || mlsData?.photos?.[0] || mlsData?.primaryPhoto,
+            hasPhotos: (mlsData?.images?.length || mlsData?.photos?.length || 0) > 0,
+          },
+          // Location
+          coordinates: {
+            latitude: mlsData?.coordinates?.latitude || mlsData?.latitude || mlsData?.map?.latitude,
+            longitude: mlsData?.coordinates?.longitude || mlsData?.longitude || mlsData?.map?.longitude,
+            hasCoordinates: !!(
+              (mlsData?.coordinates?.latitude && mlsData?.coordinates?.longitude) ||
+              (mlsData?.latitude && mlsData?.longitude) ||
+              (mlsData?.map?.latitude && mlsData?.map?.longitude)
+            ),
+          },
+        },
+        
+        // === COMPARABLES ===
+        comparables: {
+          count: comparables.length,
+          source: 'repliers',
+          
+          // Audit each comparable
+          items: comparables.slice(0, 5).map((comp: any, index: number) => ({
+            index,
+            address: comp.address || comp.unparsedAddress || `${comp.streetNumber} ${comp.streetName}`,
+            city: comp.city,
+            state: comp.state,
+            mlsNumber: comp.mlsNumber,
+            
+            // Price fields available
+            priceFields: {
+              price: comp.price,
+              listPrice: comp.listPrice,
+              soldPrice: comp.soldPrice,
+              closePrice: comp.closePrice,
+              hasAnyPrice: !!(comp.price || comp.listPrice || comp.soldPrice || comp.closePrice),
+            },
+            
+            // Property details
+            details: {
+              beds: comp.beds || comp.bedroomsTotal,
+              baths: comp.baths || comp.bathroomsTotalInteger,
+              sqft: comp.sqft || comp.livingArea,
+              lotSize: comp.lotSize || comp.lotSizeAcres || comp.lot?.acres,
+              yearBuilt: comp.yearBuilt,
+              status: comp.status || comp.standardStatus,
+            },
+            
+            // Days on market
+            dom: {
+              dom: comp.dom,
+              daysOnMarket: comp.daysOnMarket,
+              cumulativeDom: comp.cumulativeDom,
+              simpleDaysOnMarket: comp.simpleDaysOnMarket,
+              hasDOM: !!(comp.dom || comp.daysOnMarket || comp.cumulativeDom || comp.simpleDaysOnMarket),
+            },
+            
+            // Photos
+            photos: {
+              count: comp.images?.length || comp.photos?.length || 0,
+              primaryPhoto: comp.images?.[0] || comp.photos?.[0] || comp.primaryPhoto,
+              hasPhotos: (comp.images?.length || comp.photos?.length || 0) > 0 || !!comp.primaryPhoto,
+            },
+            
+            // Location
+            coordinates: {
+              latitude: comp.latitude || comp.map?.latitude,
+              longitude: comp.longitude || comp.map?.longitude,
+              hasCoordinates: !!(
+                (comp.latitude && comp.longitude) ||
+                (comp.map?.latitude && comp.map?.longitude)
+              ),
+            },
+          })),
+          
+          // Summary stats
+          summary: {
+            total: comparables.length,
+            withPrices: comparables.filter((c: any) => c.price || c.listPrice || c.soldPrice || c.closePrice).length,
+            withPhotos: comparables.filter((c: any) => (c.images?.length || c.photos?.length) > 0 || c.primaryPhoto).length,
+            withDOM: comparables.filter((c: any) => c.dom || c.daysOnMarket || c.cumulativeDom || c.simpleDaysOnMarket).length,
+            withCoordinates: comparables.filter((c: any) => 
+              (c.latitude && c.longitude) || (c.map?.latitude && c.map?.longitude)
+            ).length,
+            withSqft: comparables.filter((c: any) => c.sqft || c.livingArea).length,
+          },
+        },
+        
+        // === PDF READINESS SCORE ===
+        readiness: {
+          agent: {
+            score: calculateAuditScore([
+              !!user?.firstName,
+              !!agentProfile?.headshotUrl,
+              !!agentProfile?.bio,
+            ]),
+            issues: [] as string[],
+          },
+          comparables: {
+            score: calculateAuditScore([
+              comparables.length >= 3,
+              comparables.filter((c: any) => c.price || c.listPrice || c.soldPrice).length === comparables.length,
+              comparables.filter((c: any) => (c.images?.length || c.photos?.length) > 0).length > 0,
+            ]),
+            issues: [] as string[],
+          },
+          subject: {
+            score: calculateAuditScore([
+              !!mlsData?.address || !!mlsData?.unparsedAddress,
+              !!mlsData?.listPrice,
+              (mlsData?.images?.length || mlsData?.photos?.length || 0) > 0,
+              !!(
+                (mlsData?.coordinates?.latitude && mlsData?.coordinates?.longitude) ||
+                (mlsData?.latitude && mlsData?.longitude) ||
+                (mlsData?.map?.latitude && mlsData?.map?.longitude)
+              ),
+            ]),
+            issues: [] as string[],
+          },
+        },
+      };
+      
+      // Add issues to readiness
+      if (!audit.agent.name) {
+        audit.readiness.agent.issues.push('Agent name missing');
+      }
+      if (!audit.agent.headshotUrl) {
+        audit.readiness.agent.issues.push('Agent photo missing');
+      }
+      if (!audit.agent.bio) {
+        audit.readiness.agent.issues.push('Agent bio missing');
+      }
+      
+      if (audit.comparables.summary.withPrices < audit.comparables.count) {
+        audit.readiness.comparables.issues.push(`${audit.comparables.count - audit.comparables.summary.withPrices} comparables missing price data`);
+      }
+      if (audit.comparables.summary.withPhotos === 0) {
+        audit.readiness.comparables.issues.push('No comparable photos available');
+      }
+      if (audit.comparables.summary.withCoordinates < audit.comparables.count) {
+        audit.readiness.comparables.issues.push(`${audit.comparables.count - audit.comparables.summary.withCoordinates} comparables missing coordinates`);
+      }
+      
+      if (!audit.mlsData.address) {
+        audit.readiness.subject.issues.push('Subject property address missing');
+      }
+      if (!audit.mlsData.listPrice) {
+        audit.readiness.subject.issues.push('Subject property list price missing');
+      }
+      if (!audit.mlsData.photos.hasPhotos) {
+        audit.readiness.subject.issues.push('Subject property photos missing');
+      }
+      if (!audit.mlsData.coordinates.hasCoordinates) {
+        audit.readiness.subject.issues.push('Subject property coordinates missing');
+      }
+      
+      res.json(audit);
+      
+    } catch (error: any) {
+      console.error("Error in CMA PDF audit:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   return httpServer;
 }
