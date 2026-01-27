@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, Download, Grid3X3, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { FlyerForm } from './FlyerForm';
@@ -109,17 +110,40 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
         || '';
 
       // Extract data using robust utility functions that handle Repliers API field variations
-      const listPrice = transaction.listPrice || mlsData.listPrice || mlsData.price;
-      const beds = extractBeds(mlsData);
-      const baths = extractBaths(mlsData);
-      const sqft = extractSqft(mlsData);
+      const listPrice = transaction.listPrice || mlsData.listPrice || mlsData.price || mlsData.ListPrice;
+      
+      // extractBeds/extractBaths return 'N/A' if not found - handle this with comprehensive fallbacks
+      const rawBeds = extractBeds(mlsData);
+      const rawBaths = extractBaths(mlsData);
+      const rawSqft = extractSqft(mlsData);
+      
+      // Comprehensive Repliers field fallbacks with all known field variations
+      const bedsValue = rawBeds !== 'N/A' && rawBeds !== null && rawBeds !== undefined
+        ? rawBeds 
+        : (mlsData.beds ?? mlsData.bedrooms ?? mlsData.bedroomsTotal ?? mlsData.BedroomsTotal ?? 
+           mlsData.numBedrooms ?? mlsData.BedroomsTotalInteger ?? mlsData.bedroomsTotalInteger ?? null);
+      const beds = bedsValue !== null && bedsValue !== undefined ? bedsValue : '';
+      
+      const bathsValue = rawBaths !== 'N/A' && rawBaths !== null && rawBaths !== undefined
+        ? rawBaths 
+        : (mlsData.baths ?? mlsData.bathrooms ?? mlsData.bathroomsTotalInteger ?? mlsData.BathroomsTotalInteger ?? 
+           mlsData.bathroomsTotal ?? mlsData.BathroomsTotal ?? mlsData.numBathrooms ?? mlsData.bathroomsFull ?? 
+           mlsData.BathroomsFull ?? null);
+      const baths = bathsValue !== null && bathsValue !== undefined ? bathsValue : '';
+      
+      // Handle sqft with all variations, preserving 0 as valid value
+      const sqftValue = rawSqft ?? mlsData.sqft ?? mlsData.livingArea ?? mlsData.LivingArea ?? 
+                        mlsData.buildingAreaTotal ?? mlsData.BuildingAreaTotal ?? mlsData.size ?? 
+                        mlsData.squareFeet ?? mlsData.SquareFeet ?? null;
+      const sqft = sqftValue !== null && sqftValue !== undefined ? sqftValue : '';
+
 
       form.reset({
         price: formatPrice(listPrice),
         address: formatAddress(transaction, mlsData),
-        bedrooms: beds ? String(beds) : '',
-        bathrooms: baths ? String(baths) : '',
-        sqft: sqft ? formatNumber(sqft) : '',
+        bedrooms: beds !== null && beds !== undefined && beds !== '' ? String(beds) : '',
+        bathrooms: baths !== null && baths !== undefined && baths !== '' ? String(baths) : '',
+        sqft: sqft !== null && sqft !== undefined && sqft !== '' ? formatNumber(sqft) : '',
         introHeading: generateDefaultHeadline(transaction, mlsData),
         introDescription: mlsData.publicRemarks || mlsData.remarks || mlsData.description || '',
         agentName,
@@ -129,6 +153,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
 
       // Get photos from mlsData - handle various Repliers API formats
       const photos = mlsData.photos || mlsData.images || mlsData.Media || [];
+      
       if (photos.length > 0) {
         const selected = autoSelectPhotosWithInfo(photos);
         setImages(prev => ({
@@ -214,7 +239,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   };
 
   return (
-    <div className="h-full flex flex-col bg-background overflow-hidden">
+    <div className="h-full min-h-0 flex flex-col bg-background overflow-hidden">
       <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
         <button
           onClick={onBack}
@@ -251,9 +276,9 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
         </div>
       </div>
 
-      <div className="flex flex-1 min-h-0">
-        <div className="w-[420px] min-w-[420px] border-r border-border bg-card overflow-y-auto">
-          <div className="min-h-full">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <div className="w-[420px] min-w-[420px] border-r border-border bg-card flex flex-col overflow-hidden">
+          <ScrollArea className="flex-1 h-full [&>[data-radix-scroll-area-viewport]]:h-full">
             <FlyerForm
               form={form}
               images={images}
@@ -266,7 +291,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
               allMlsPhotos={allMlsPhotos}
               onSelectPhoto={(field, url) => setImages(prev => ({ ...prev, [field]: url }))}
             />
-          </div>
+          </ScrollArea>
         </div>
 
         <div className="flex-1 bg-muted/30 p-6 overflow-auto">

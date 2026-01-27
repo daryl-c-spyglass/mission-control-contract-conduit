@@ -180,38 +180,55 @@ export function autoSelectPhotosWithInfo(photos: PhotoWithInsights[]): PhotoSele
   };
 }
 
-export function formatPrice(price: number | string | null): string {
-  if (!price) return '';
+export function formatPrice(price: number | string | null | undefined): string {
+  if (price === null || price === undefined || price === '') return '';
   const num = typeof price === 'string' ? parseFloat(price.replace(/[^0-9.]/g, '')) : price;
   if (isNaN(num)) return '';
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(num);
 }
 
 export function formatAddress(transaction: any, mlsData: any): string {
-  // Try to build address from component parts (Repliers API format)
-  const streetNumber = mlsData?.streetNumber || mlsData?.address?.streetNumber || transaction?.streetNumber || '';
-  const streetName = mlsData?.streetName || mlsData?.address?.streetName || transaction?.streetName || '';
-  const streetSuffix = mlsData?.streetSuffix || mlsData?.address?.streetSuffix || transaction?.streetSuffix || '';
-  const unitNumber = mlsData?.unitNumber || mlsData?.address?.unitNumber || '';
+  // First check for pre-formatted full address fields (most reliable)
+  const preformattedAddress = 
+    mlsData?.fullAddress ||
+    mlsData?.unparsedAddress ||
+    mlsData?.address?.fullAddress ||
+    mlsData?.address?.full ||
+    (typeof mlsData?.address === 'string' ? mlsData.address : null);
   
-  const streetParts = [streetNumber, streetName, streetSuffix].filter(Boolean).join(' ');
-  const fullStreet = unitNumber ? `${streetParts} ${unitNumber}` : streetParts;
+  if (preformattedAddress && typeof preformattedAddress === 'string' && preformattedAddress.trim()) {
+    return preformattedAddress.toUpperCase().trim();
+  }
+  
+  // Build address from component parts (Repliers API format)
+  const addr = (typeof mlsData?.address === 'object' && mlsData?.address) ? mlsData.address : mlsData || {};
+  
+  const streetNumber = mlsData?.streetNumber || addr?.streetNumber || transaction?.streetNumber || '';
+  const streetDirection = mlsData?.streetDirection || addr?.streetDirection || mlsData?.streetDir || addr?.streetDir || '';
+  const streetName = mlsData?.streetName || addr?.streetName || transaction?.streetName || '';
+  const streetSuffix = mlsData?.streetSuffix || addr?.streetSuffix || mlsData?.streetType || addr?.streetType || '';
+  const unitNumber = mlsData?.unitNumber || addr?.unitNumber || mlsData?.unit || addr?.unit || '';
+  
+  // Build street address with direction (normalize direction abbreviations)
+  const dirNormalized = streetDirection ? streetDirection.replace(/\./g, '').toUpperCase() : '';
+  const streetParts = [streetNumber, dirNormalized, streetName, streetSuffix].filter(Boolean).join(' ');
+  const fullStreet = unitNumber ? `${streetParts}, Unit ${unitNumber}` : streetParts;
 
-  const city = mlsData?.city || mlsData?.address?.city || transaction?.city || '';
-  const state = mlsData?.state || mlsData?.address?.state || mlsData?.stateOrProvince || transaction?.state || 'TX';
-  const zip = mlsData?.postalCode || mlsData?.address?.postalCode || mlsData?.postalCodeNumber || transaction?.postalCode || '';
+  const city = mlsData?.city || addr?.city || transaction?.city || '';
+  const state = mlsData?.state || addr?.state || mlsData?.stateOrProvince || addr?.stateOrProvince || mlsData?.province || transaction?.state || 'TX';
+  const zip = mlsData?.postalCode || addr?.postalCode || mlsData?.postalCodeNumber || addr?.postalCodeNumber || mlsData?.zip || transaction?.postalCode || '';
 
   if (fullStreet && city) {
     return `${fullStreet}, ${city}, ${state} ${zip}`.toUpperCase().trim();
   }
   
-  // Fallback to unparsedAddress or address field
-  const fallbackAddress = mlsData?.unparsedAddress || mlsData?.address?.full || mlsData?.address || transaction?.propertyAddress || transaction?.address || '';
+  // Final fallback to transaction address
+  const fallbackAddress = transaction?.propertyAddress || transaction?.address || '';
   return typeof fallbackAddress === 'string' ? fallbackAddress.toUpperCase() : '';
 }
 
-export function formatNumber(num: number | string | null): string {
-  if (!num) return '';
+export function formatNumber(num: number | string | null | undefined): string {
+  if (num === null || num === undefined || num === '') return '';
   const n = typeof num === 'string' ? parseFloat(num.replace(/[^0-9.]/g, '')) : num;
   if (isNaN(n)) return '';
   return new Intl.NumberFormat('en-US').format(Math.round(n));

@@ -1,0 +1,871 @@
+# Replit Prompt: Fix Property Images Section — Repliers AI Photo Selection
+
+## 🎯 Objective
+
+Fix the **Property Images** section in the Advanced Flyer Builder to:
+
+1. Make the left pane **scrollable**
+2. Auto-fill **Property Address** from the transaction's MLS#
+3. Auto-populate photos using **Repliers AI imageInsights**
+4. Show **AI selection banner** with classification & quality info
+5. Allow agents to **browse MLS photos** or **upload custom**
+
+---
+
+## 📍 Current State vs Expected
+
+| Element | Current | Expected |
+|---------|---------|----------|
+| Left Pane | Not scrollable, content cuts off | Smooth scrolling with momentum |
+| Property Address | Empty field | Auto-filled from MLS# transaction |
+| Main Property Photo | "Click to upload" (empty) | Auto-filled with Repliers AI-selected exterior photo |
+| Kitchen Photo | "Click to upload" (empty) | Auto-filled with Repliers AI-selected kitchen photo |
+| Room Photo | "Click to upload" (empty) | Auto-filled with Repliers AI-selected interior photo |
+| AI Banner | None | Shows classification, quality %, reason |
+| Photo Options | Upload only | Browse MLS photos + Upload custom |
+
+---
+
+## 🔧 Fix 1: Make Left Pane Scrollable
+
+Find the left panel container and wrap with ScrollArea:
+
+```tsx
+// In AdvancedFlyerGenerator/index.tsx or FlyerForm parent
+
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+// The left panel container
+<div className="w-[420px] min-w-[420px] border-r border-border bg-card flex flex-col">
+  {/* Make this scrollable */}
+  <ScrollArea className="flex-1">
+    <div className="p-6 space-y-6">
+      {/* PROPERTY DETAILS section */}
+      {/* DESCRIPTION section */}
+      {/* AGENT DETAILS section */}
+      {/* BRANDING & LOGOS section */}
+      {/* PROPERTY IMAGES section */}
+    </div>
+  </ScrollArea>
+</div>
+```
+
+### Add CSS for smooth scrolling:
+
+```css
+/* In your global CSS or component styles */
+
+/* Ensure ScrollArea viewport is full height */
+[data-radix-scroll-area-viewport] {
+  height: 100% !important;
+}
+
+/* iOS momentum scrolling */
+.scroll-area-viewport {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Parent container needs fixed height */
+.flyer-builder-container {
+  height: calc(100vh - 140px); /* Subtract header + toolbar height */
+  display: flex;
+  overflow: hidden;
+}
+```
+
+---
+
+## 🔧 Fix 2: Auto-Fill Property Address from MLS#
+
+The Property Address should come from the transaction's Repliers MLS data:
+
+```tsx
+// In the component that renders Property Images section
+
+interface PropertyImagesSectionProps {
+  transaction: {
+    id: string;
+    mlsNumber: string;
+    address?: string;
+    mlsData: any; // Repliers API response
+  };
+  // ... other props
+}
+
+// Build address from Repliers MLS data
+const buildAddressFromMLS = (mlsData: any, fallbackAddress?: string): string => {
+  if (!mlsData) return fallbackAddress?.toUpperCase() || '';
+  
+  // Repliers stores address in nested object OR flat fields
+  const addr = mlsData.address || mlsData;
+  
+  // Build street address from components
+  const streetParts = [
+    addr.streetNumber,
+    addr.streetDirection,
+    addr.streetName,
+    addr.streetSuffix,
+  ].filter(Boolean).join(' ');
+  
+  const unit = addr.unitNumber ? `, Unit ${addr.unitNumber}` : '';
+  const city = addr.city || '';
+  const state = addr.state || 'TX';
+  const zip = addr.postalCode || '';
+  
+  if (streetParts && city) {
+    return `${streetParts}${unit}, ${city}, ${state} ${zip}`.toUpperCase().trim();
+  }
+  
+  // Fallback to transaction address or full address field
+  return (mlsData.fullAddress || fallbackAddress || '').toUpperCase();
+};
+
+// Usage
+const propertyAddress = buildAddressFromMLS(transaction.mlsData, transaction.address);
+```
+
+### Update the Property Address field:
+
+```tsx
+{/* PROPERTY ADDRESS - Read-only, auto-filled from MLS */}
+<div className="space-y-2">
+  <div className="flex items-center gap-2">
+    <MapPin className="w-4 h-4 text-muted-foreground" />
+    <Label className="text-xs font-medium uppercase tracking-wide">
+      Property Address
+    </Label>
+    <Badge variant="outline" className="text-[9px] h-4 border-green-500/50 text-green-600">
+      MLS# {transaction.mlsNumber}
+    </Badge>
+  </div>
+  <Input
+    value={propertyAddress}
+    readOnly
+    className="bg-muted/50 text-sm font-medium"
+  />
+</div>
+```
+
+---
+
+## 🔧 Fix 3: Repliers AI Photo Auto-Selection
+
+### Fetch and process photos from Repliers MLS data:
+
+```tsx
+// State for photos and AI selection info
+const [selectedPhotos, setSelectedPhotos] = useState<{
+  mainImage: string | null;
+  kitchenImage: string | null;
+  roomImage: string | null;
+}>({
+  mainImage: null,
+  kitchenImage: null,
+  roomImage: null,
+});
+
+const [aiSelectionInfo, setAiSelectionInfo] = useState<{
+  mainImage: PhotoAIInfo | null;
+  kitchenImage: PhotoAIInfo | null;
+  roomImage: PhotoAIInfo | null;
+}>({
+  mainImage: null,
+  kitchenImage: null,
+  roomImage: null,
+});
+
+interface PhotoAIInfo {
+  classification: string;
+  quality: number;
+  confidence: number;
+  reason: string;
+}
+
+// All available photos from MLS
+const [allMLSPhotos, setAllMLSPhotos] = useState<ProcessedPhoto[]>([]);
+
+interface ProcessedPhoto {
+  url: string;
+  classification: string;
+  quality: number;
+  confidence: number;
+  index: number;
+}
+```
+
+### Process photos from Repliers on mount:
+
+```tsx
+useEffect(() => {
+  const mlsPhotos = transaction.mlsData?.photos;
+  
+  if (!mlsPhotos || mlsPhotos.length === 0) {
+    console.log('No photos available from Repliers MLS# ' + transaction.mlsNumber);
+    return;
+  }
+
+  console.log(`Processing ${mlsPhotos.length} photos from MLS# ${transaction.mlsNumber}`);
+
+  // =====================================================
+  // NORMALIZE REPLIERS PHOTO DATA
+  // =====================================================
+  const processedPhotos: ProcessedPhoto[] = mlsPhotos
+    .map((photo: any, index: number) => {
+      // Repliers may use different field names
+      const url = photo.href || photo.url || photo.Uri || photo.mediaUrl || '';
+      
+      // Get imageInsights (Repliers AI classification)
+      const insights = photo.imageInsights || photo.ImageInsights || {};
+      const classification = insights.classification || insights.Classification || {};
+      const qualityData = insights.quality || insights.Quality || {};
+      
+      return {
+        url,
+        classification: (classification.imageOf || classification.ImageOf || 'unknown').toLowerCase(),
+        quality: qualityData.score || qualityData.Score || 50,
+        confidence: classification.confidence || classification.Confidence || 0,
+        index,
+      };
+    })
+    .filter((p: ProcessedPhoto) => p.url); // Remove photos without URLs
+
+  // Sort by quality score (highest first)
+  const sortedByQuality = [...processedPhotos].sort((a, b) => b.quality - a.quality);
+  
+  setAllMLSPhotos(sortedByQuality);
+
+  // =====================================================
+  // AI SELECT: MAIN PHOTO (Exterior preferred)
+  // =====================================================
+  const exteriorKeywords = ['exterior', 'front', 'aerial', 'drone', 'facade', 'street'];
+  
+  let mainPhoto = sortedByQuality.find(p => 
+    exteriorKeywords.some(kw => p.classification.includes(kw))
+  );
+  
+  // Fallback to highest quality if no exterior found
+  if (!mainPhoto && sortedByQuality.length > 0) {
+    mainPhoto = sortedByQuality[0];
+  }
+
+  // =====================================================
+  // AI SELECT: KITCHEN PHOTO
+  // =====================================================
+  const kitchenKeywords = ['kitchen', 'breakfast', 'cooking'];
+  
+  let kitchenPhoto = sortedByQuality.find(p => 
+    kitchenKeywords.some(kw => p.classification.includes(kw)) &&
+    p.url !== mainPhoto?.url
+  );
+  
+  // Fallback to second highest quality
+  if (!kitchenPhoto && sortedByQuality.length > 1) {
+    kitchenPhoto = sortedByQuality.find(p => p.url !== mainPhoto?.url);
+  }
+
+  // =====================================================
+  // AI SELECT: ROOM PHOTO (Living/Bedroom preferred)
+  // =====================================================
+  const roomKeywords = ['living', 'family', 'great_room', 'bedroom', 'master', 'dining', 'den'];
+  const usedUrls = [mainPhoto?.url, kitchenPhoto?.url].filter(Boolean);
+  
+  let roomPhoto = sortedByQuality.find(p => 
+    roomKeywords.some(kw => p.classification.includes(kw)) &&
+    !usedUrls.includes(p.url)
+  );
+  
+  // Fallback to third highest quality
+  if (!roomPhoto) {
+    roomPhoto = sortedByQuality.find(p => !usedUrls.includes(p.url));
+  }
+
+  // =====================================================
+  // SET SELECTED PHOTOS
+  // =====================================================
+  setSelectedPhotos({
+    mainImage: mainPhoto?.url || null,
+    kitchenImage: kitchenPhoto?.url || null,
+    roomImage: roomPhoto?.url || null,
+  });
+
+  // =====================================================
+  // SET AI SELECTION INFO (for banners)
+  // =====================================================
+  const getAIReason = (photo: ProcessedPhoto | undefined, preferredType: string): string => {
+    if (!photo) return '';
+    const matchesPreferred = photo.classification.includes(preferredType);
+    if (matchesPreferred) {
+      return `Detected as ${photo.classification.replace(/_/g, ' ')}`;
+    }
+    return `Highest quality available (${photo.quality}%)`;
+  };
+
+  setAiSelectionInfo({
+    mainImage: mainPhoto ? {
+      classification: mainPhoto.classification,
+      quality: mainPhoto.quality,
+      confidence: mainPhoto.confidence,
+      reason: getAIReason(mainPhoto, 'exterior'),
+    } : null,
+    kitchenImage: kitchenPhoto ? {
+      classification: kitchenPhoto.classification,
+      quality: kitchenPhoto.quality,
+      confidence: kitchenPhoto.confidence,
+      reason: getAIReason(kitchenPhoto, 'kitchen'),
+    } : null,
+    roomImage: roomPhoto ? {
+      classification: roomPhoto.classification,
+      quality: roomPhoto.quality,
+      confidence: roomPhoto.confidence,
+      reason: getAIReason(roomPhoto, 'living'),
+    } : null,
+  });
+
+  console.log('AI Photo Selection Complete:', {
+    main: mainPhoto?.classification,
+    kitchen: kitchenPhoto?.classification,
+    room: roomPhoto?.classification,
+    totalPhotos: processedPhotos.length,
+  });
+
+}, [transaction.mlsData?.photos, transaction.mlsNumber]);
+```
+
+---
+
+## 🔧 Fix 4: Photo Card Component with AI Banner
+
+Create a reusable component for each photo slot:
+
+```tsx
+// components/marketing/AdvancedFlyerGenerator/MLSPhotoCard.tsx
+
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Label } from '@/components/ui/label';
+import { 
+  Tooltip, 
+  TooltipContent, 
+  TooltipProvider, 
+  TooltipTrigger 
+} from '@/components/ui/tooltip';
+import { 
+  Upload, 
+  Images, 
+  Sparkles, 
+  Info, 
+  Check, 
+  ImageIcon,
+  ExternalLink
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface PhotoAIInfo {
+  classification: string;
+  quality: number;
+  confidence: number;
+  reason: string;
+}
+
+interface ProcessedPhoto {
+  url: string;
+  classification: string;
+  quality: number;
+  confidence: number;
+  index: number;
+}
+
+interface MLSPhotoCardProps {
+  label: string;
+  photoUrl: string | null;
+  aiInfo: PhotoAIInfo | null;
+  allMLSPhotos: ProcessedPhoto[];
+  mlsNumber: string;
+  onSelectFromMLS: (url: string) => void;
+  onUploadCustom: (file: File) => void;
+  compact?: boolean;
+}
+
+export function MLSPhotoCard({
+  label,
+  photoUrl,
+  aiInfo,
+  allMLSPhotos,
+  mlsNumber,
+  onSelectFromMLS,
+  onUploadCustom,
+  compact = false,
+}: MLSPhotoCardProps) {
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [isCustomUpload, setIsCustomUpload] = useState(false);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File too large. Maximum size is 10MB.');
+        return;
+      }
+      setIsCustomUpload(true);
+      onUploadCustom(file);
+    }
+  };
+
+  const handleSelectFromGallery = (url: string) => {
+    setIsCustomUpload(false);
+    onSelectFromMLS(url);
+    setGalleryOpen(false);
+  };
+
+  return (
+    <div className="space-y-2">
+      {/* Label Row */}
+      <div className="flex items-center justify-between">
+        <Label className="text-xs font-medium uppercase tracking-wide">
+          {label}
+        </Label>
+        
+        {/* Browse MLS Photos Button */}
+        {allMLSPhotos.length > 0 && (
+          <Dialog open={galleryOpen} onOpenChange={setGalleryOpen}>
+            <DialogTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 text-[10px] gap-1 text-primary hover:text-primary"
+              >
+                <Images className="w-3 h-3" />
+                Browse MLS Photos ({allMLSPhotos.length})
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[85vh]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <ImageIcon className="w-5 h-5" />
+                  Select {label} — MLS# {mlsNumber}
+                </DialogTitle>
+              </DialogHeader>
+              <ScrollArea className="h-[65vh]">
+                <div className="grid grid-cols-3 gap-3 p-2">
+                  {allMLSPhotos.map((photo, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => handleSelectFromGallery(photo.url)}
+                      className={cn(
+                        "relative aspect-video rounded-lg overflow-hidden border-2 transition-all",
+                        "hover:border-primary hover:shadow-lg",
+                        photo.url === photoUrl 
+                          ? "border-primary ring-2 ring-primary/20" 
+                          : "border-muted"
+                      )}
+                    >
+                      <img
+                        src={photo.url}
+                        alt={`MLS Photo ${index + 1}`}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      
+                      {/* Photo Info Badges */}
+                      <div className="absolute bottom-1 left-1 right-1 flex gap-1 flex-wrap">
+                        <Badge className="text-[8px] h-4 bg-black/75 text-white border-0 capitalize">
+                          {photo.classification.replace(/_/g, ' ')}
+                        </Badge>
+                        <Badge 
+                          className={cn(
+                            "text-[8px] h-4 border-0",
+                            photo.quality >= 70 ? "bg-green-600 text-white" :
+                            photo.quality >= 40 ? "bg-yellow-600 text-white" :
+                            "bg-red-600 text-white"
+                          )}
+                        >
+                          {photo.quality}% quality
+                        </Badge>
+                      </div>
+                      
+                      {/* Selected Indicator */}
+                      {photo.url === photoUrl && (
+                        <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center shadow-lg">
+                          <Check className="w-4 h-4 text-white" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </ScrollArea>
+              
+              {/* Upload Custom Option in Gallery */}
+              <div className="border-t pt-4 mt-2">
+                <label className="flex items-center justify-center gap-2 p-3 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors">
+                  <Upload className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Or upload your own photo</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+
+      {/* AI Selection Banner */}
+      {photoUrl && aiInfo && !isCustomUpload && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md cursor-help">
+                <Sparkles className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <span className="text-[11px] text-blue-700 dark:text-blue-300 font-medium">
+                    AI Selected from Repliers
+                  </span>
+                  <span className="text-[10px] text-blue-500 dark:text-blue-400 ml-2">
+                    {aiInfo.classification.replace(/_/g, ' ')} • {aiInfo.quality}% quality
+                  </span>
+                </div>
+                <Info className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs p-3">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Sparkles className="w-4 h-4 text-blue-500" />
+                  Repliers AI Photo Selection
+                </div>
+                <div className="space-y-1 text-xs">
+                  <p><strong>Classification:</strong> {aiInfo.classification.replace(/_/g, ' ')}</p>
+                  <p><strong>Quality Score:</strong> {aiInfo.quality}%</p>
+                  {aiInfo.confidence > 0 && (
+                    <p><strong>Confidence:</strong> {Math.round(aiInfo.confidence * 100)}%</p>
+                  )}
+                  <p><strong>Selection Reason:</strong> {aiInfo.reason}</p>
+                </div>
+                <p className="text-[10px] text-blue-500 pt-1 border-t">
+                  💡 Click "Browse MLS Photos" to select a different photo
+                </p>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+
+      {/* Custom Upload Indicator */}
+      {photoUrl && isCustomUpload && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-md">
+          <Upload className="w-3.5 h-3.5 text-orange-500" />
+          <span className="text-[11px] text-orange-700 dark:text-orange-300">
+            Custom uploaded photo
+          </span>
+        </div>
+      )}
+
+      {/* Photo Preview / Upload Area */}
+      <div
+        className={cn(
+          "relative rounded-lg overflow-hidden border-2 transition-all",
+          photoUrl 
+            ? "border-primary/30 bg-muted/10" 
+            : "border-dashed border-muted-foreground/30 bg-muted/50 hover:border-primary/50",
+          compact ? "h-28" : "h-36"
+        )}
+      >
+        {photoUrl ? (
+          <>
+            <img
+              src={photoUrl}
+              alt={label}
+              className="w-full h-full object-cover"
+            />
+            {/* Hover overlay to change photo */}
+            <div 
+              className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+              onClick={() => setGalleryOpen(true)}
+            >
+              <span className="text-white text-sm font-medium">Click to change</span>
+            </div>
+          </>
+        ) : (
+          <label className="flex flex-col items-center justify-center w-full h-full cursor-pointer">
+            <Upload className="h-6 w-6 text-muted-foreground mb-1" />
+            <span className="text-xs text-muted-foreground">Click to upload</span>
+            <span className="text-[10px] text-muted-foreground/60 mt-1">
+              or browse MLS photos above
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </label>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 Fix 5: Updated Property Images Section
+
+Replace the current Property Images section with:
+
+```tsx
+// In FlyerForm.tsx or wherever Property Images section is rendered
+
+import { MLSPhotoCard } from './MLSPhotoCard';
+
+// ... inside the component
+
+{/* ================================================ */}
+{/* PROPERTY IMAGES SECTION                          */}
+{/* ================================================ */}
+<div className="space-y-4">
+  <div className="flex items-center gap-2">
+    <ImageIcon className="w-5 h-5 text-primary" />
+    <h2 className="text-lg font-medium">Property Images</h2>
+  </div>
+  
+  <Separator />
+  
+  {/* Info Banner */}
+  <div className="flex items-start gap-2 p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
+    <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+    <div>
+      <p className="text-sm text-green-700 dark:text-green-300 font-medium">
+        Auto-selected using Repliers AI
+      </p>
+      <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
+        Photos are selected based on image quality and classification from MLS# {transaction.mlsNumber}
+      </p>
+    </div>
+  </div>
+
+  {/* Property Address (Read-only from MLS) */}
+  <div className="space-y-2">
+    <div className="flex items-center gap-2">
+      <MapPin className="w-4 h-4 text-muted-foreground" />
+      <Label className="text-xs font-medium uppercase tracking-wide">
+        Property Address
+      </Label>
+      <Badge variant="outline" className="text-[9px] h-4 border-green-500/50 text-green-600 gap-1">
+        <ExternalLink className="w-2.5 h-2.5" />
+        MLS# {transaction.mlsNumber}
+      </Badge>
+    </div>
+    <Input
+      value={propertyAddress}
+      readOnly
+      className="bg-muted/50 font-medium"
+    />
+  </div>
+
+  {/* Main Property Photo */}
+  <MLSPhotoCard
+    label="Main Property Photo"
+    photoUrl={selectedPhotos.mainImage}
+    aiInfo={aiSelectionInfo.mainImage}
+    allMLSPhotos={allMLSPhotos}
+    mlsNumber={transaction.mlsNumber}
+    onSelectFromMLS={(url) => setSelectedPhotos(prev => ({ ...prev, mainImage: url }))}
+    onUploadCustom={(file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedPhotos(prev => ({ ...prev, mainImage: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }}
+  />
+
+  {/* Kitchen & Room Photos (Side by Side) */}
+  <div className="grid grid-cols-2 gap-4">
+    <MLSPhotoCard
+      label="Kitchen Photo"
+      photoUrl={selectedPhotos.kitchenImage}
+      aiInfo={aiSelectionInfo.kitchenImage}
+      allMLSPhotos={allMLSPhotos}
+      mlsNumber={transaction.mlsNumber}
+      onSelectFromMLS={(url) => setSelectedPhotos(prev => ({ ...prev, kitchenImage: url }))}
+      onUploadCustom={(file) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setSelectedPhotos(prev => ({ ...prev, kitchenImage: reader.result as string }));
+        };
+        reader.readAsDataURL(file);
+      }}
+      compact
+    />
+
+    <MLSPhotoCard
+      label="Room Photo"
+      photoUrl={selectedPhotos.roomImage}
+      aiInfo={aiSelectionInfo.roomImage}
+      allMLSPhotos={allMLSPhotos}
+      mlsNumber={transaction.mlsNumber}
+      onSelectFromMLS={(url) => setSelectedPhotos(prev => ({ ...prev, roomImage: url }))}
+      onUploadCustom={(file) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setSelectedPhotos(prev => ({ ...prev, roomImage: reader.result as string }));
+        };
+        reader.readAsDataURL(file);
+      }}
+      compact
+    />
+  </div>
+</div>
+```
+
+---
+
+## 📱 Mobile Optimization
+
+```css
+/* Left pane scroll on all devices */
+.flyer-left-pane {
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* Photo gallery grid on mobile */
+@media (max-width: 640px) {
+  .photo-gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Touch targets */
+.photo-card-container {
+  min-height: 100px;
+}
+
+.browse-photos-btn {
+  min-height: 32px;
+  min-width: 44px;
+}
+
+/* AI banner touch-friendly */
+.ai-selection-banner {
+  min-height: 40px;
+  padding: 8px 12px;
+}
+```
+
+---
+
+## 📊 Visual Layout After Fix
+
+```
+┌────────────────────────────────────────────────────────┐
+│ 🖼️ PROPERTY IMAGES                                     │
+├────────────────────────────────────────────────────────┤
+│ ┌────────────────────────────────────────────────────┐ │
+│ │ ✓ Auto-selected using Repliers AI                 │ │
+│ │   Photos selected based on quality from MLS#...   │ │
+│ └────────────────────────────────────────────────────┘ │
+│                                                        │
+│ 📍 PROPERTY ADDRESS              [MLS# ACT7703651]    │
+│ ┌────────────────────────────────────────────────────┐ │
+│ │ 268 CHISHOLM TRL, BASTROP, TX 78602               │ │
+│ └────────────────────────────────────────────────────┘ │
+│                                                        │
+│ MAIN PROPERTY PHOTO         [Browse MLS Photos (24)]  │
+│ ┌────────────────────────────────────────────────────┐ │
+│ │ ✨ AI Selected from Repliers                       │ │
+│ │    exterior_front • 87% quality        ℹ️          │ │
+│ └────────────────────────────────────────────────────┘ │
+│ ┌────────────────────────────────────────────────────┐ │
+│ │                                                    │ │
+│ │              [Property Exterior Photo]             │ │
+│ │                                                    │ │
+│ │           (hover: "Click to change")              │ │
+│ └────────────────────────────────────────────────────┘ │
+│                                                        │
+│ KITCHEN PHOTO                    ROOM PHOTO           │
+│ [Browse MLS (24)]                [Browse MLS (24)]    │
+│ ┌──────────────────┐             ┌──────────────────┐ │
+│ │ ✨ AI: kitchen   │             │ ✨ AI: living    │ │
+│ │    82% quality   │             │    79% quality   │ │
+│ └──────────────────┘             └──────────────────┘ │
+│ ┌──────────────────┐             ┌──────────────────┐ │
+│ │                  │             │                  │ │
+│ │ [Kitchen Photo]  │             │ [Living Photo]   │ │
+│ │                  │             │                  │ │
+│ └──────────────────┘             └──────────────────┘ │
+└────────────────────────────────────────────────────────┘
+```
+
+---
+
+## ✅ Verification Checklist
+
+### Scrolling
+- [ ] Left pane scrolls smoothly
+- [ ] Momentum scrolling works on iOS
+- [ ] Content doesn't cut off at bottom
+- [ ] Scroll position maintained when changing photos
+
+### Property Address
+- [ ] Auto-filled from transaction's MLS data
+- [ ] Shows MLS# badge
+- [ ] Field is read-only
+- [ ] Address displays in uppercase
+
+### Photo Auto-Selection
+- [ ] Main photo auto-selects on page load
+- [ ] Kitchen photo auto-selects
+- [ ] Room photo auto-selects
+- [ ] Prioritizes correct classifications
+- [ ] Falls back to quality score if no match
+
+### AI Banners
+- [ ] Shows for each AI-selected photo
+- [ ] Displays classification type
+- [ ] Displays quality percentage
+- [ ] Tooltip shows detailed info on hover
+- [ ] Banner hidden for custom uploads
+
+### Photo Gallery
+- [ ] "Browse MLS Photos" button shows count
+- [ ] Modal opens with all MLS photos
+- [ ] Photos show classification badges
+- [ ] Photos show quality percentage
+- [ ] Selected photo has checkmark
+- [ ] Clicking photo selects it
+- [ ] "Upload your own" option in gallery
+
+### Custom Upload
+- [ ] File input accepts images
+- [ ] Validates file size (max 10MB)
+- [ ] Shows "Custom uploaded" indicator
+- [ ] Replaces AI banner with upload banner
+
+---
+
+## 📋 Summary
+
+| Component | Source | Behavior |
+|-----------|--------|----------|
+| **Property Address** | `transaction.mlsData.address.*` | Read-only, auto-filled |
+| **Main Photo** | Repliers `imageInsights` | AI selects exterior, agent can change |
+| **Kitchen Photo** | Repliers `imageInsights` | AI selects kitchen, agent can change |
+| **Room Photo** | Repliers `imageInsights` | AI selects living/bedroom, agent can change |
+| **AI Banner** | Repliers classification + quality | Shows selection reasoning |
+| **Photo Gallery** | `transaction.mlsData.photos[]` | All MLS photos with metadata |
+
+---
+
+*This fix focuses specifically on the Property Images section. Apply this first, then address other sections.*
