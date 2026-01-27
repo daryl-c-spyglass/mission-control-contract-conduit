@@ -45,7 +45,7 @@ const PageHeader = ({ title, slideNumber, totalSlides }: { title: string; slideN
 );
 
 const PageFooter = ({ propertyAddress, slideNumber = 2, baseUrl }: { propertyAddress: string; slideNumber?: number; baseUrl?: string }) => {
-  const logoUrl = baseUrl ? `${baseUrl}/logos/spyglass-logo-black.png` : '/logos/spyglass-logo-black.png';
+  const logoUrl = baseUrl ? `${baseUrl}/logos/SpyglassRealty_Logo_Black.png` : '/logos/SpyglassRealty_Logo_Black.png';
   const showLogo = slideNumber > 1;
   
   return (

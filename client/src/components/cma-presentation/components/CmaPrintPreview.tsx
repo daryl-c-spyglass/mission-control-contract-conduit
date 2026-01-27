@@ -366,7 +366,7 @@ function SlidePreview({ slide, compact = false }: { slide: PreviewSlide; compact
       )}>
         {slideNumber > 1 ? (
           <img 
-            src="/logos/spyglass-logo-black.png"
+            src="/logos/SpyglassRealty_Logo_Black.png"
             alt="Spyglass Realty"
             className={cn(compact ? "h-3" : "h-5")}
           />
