@@ -24,6 +24,8 @@ import {
   type AgentResource,
   type InsertAgentResource,
   type UserNotificationPreferences,
+  type AgentMarketingProfile,
+  type InsertAgentMarketingProfile,
   transactions,
   coordinators,
   integrationSettings,
@@ -37,6 +39,7 @@ import {
   agentProfiles,
   agentResources,
   userNotificationPreferences,
+  agentMarketingProfiles,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, isNull, and } from "drizzle-orm";
@@ -126,6 +129,10 @@ export interface IStorage {
     userId: string, 
     data: Partial<Omit<UserNotificationPreferences, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>
   ): Promise<UserNotificationPreferences>;
+
+  // Agent Marketing Profiles
+  getAgentMarketingProfile(userId: string): Promise<AgentMarketingProfile | undefined>;
+  upsertAgentMarketingProfile(userId: string, profile: Partial<InsertAgentMarketingProfile>): Promise<AgentMarketingProfile>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -632,6 +639,38 @@ export class DatabaseStorage implements IStorage {
       const [created] = await db
         .insert(userNotificationPreferences)
         .values({ userId, ...data })
+        .returning();
+      return created;
+    }
+  }
+
+  // Agent Marketing Profiles
+  async getAgentMarketingProfile(userId: string): Promise<AgentMarketingProfile | undefined> {
+    const [profile] = await db
+      .select()
+      .from(agentMarketingProfiles)
+      .where(eq(agentMarketingProfiles.userId, userId))
+      .limit(1);
+    return profile;
+  }
+
+  async upsertAgentMarketingProfile(
+    userId: string,
+    profile: Partial<InsertAgentMarketingProfile>
+  ): Promise<AgentMarketingProfile> {
+    const existing = await this.getAgentMarketingProfile(userId);
+
+    if (existing) {
+      const [updated] = await db
+        .update(agentMarketingProfiles)
+        .set({ ...profile, updatedAt: new Date() })
+        .where(eq(agentMarketingProfiles.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(agentMarketingProfiles)
+        .values({ userId, ...profile })
         .returning();
       return created;
     }

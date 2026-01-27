@@ -4588,6 +4588,101 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
     }
   });
 
+  // ============ Agent Marketing Profile ============
+
+  // Get marketing profile for the current user
+  app.get("/api/settings/marketing-profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const profile = await storage.getAgentMarketingProfile(userId);
+
+      // Return profile or default values
+      res.json(profile || {
+        agentPhoto: null,
+        agentTitle: 'REALTOR®',
+        qrCode: null,
+        companyLogo: null,
+        companyLogoUseDefault: true,
+        secondaryLogo: null,
+        secondaryLogoUseDefault: true,
+      });
+    } catch (error: any) {
+      console.error("[Marketing Profile] Error fetching:", error.message);
+      res.status(500).json({ error: "Failed to fetch marketing profile" });
+    }
+  });
+
+  // Save marketing profile for the current user
+  app.post("/api/settings/marketing-profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const {
+        agentPhoto,
+        agentTitle,
+        qrCode,
+        companyLogo,
+        companyLogoUseDefault,
+        secondaryLogo,
+        secondaryLogoUseDefault,
+      } = req.body;
+
+      // Server-side validation for base64 images
+      const MAX_BASE64_SIZE = 7 * 1024 * 1024; // 7MB limit for base64 (accounts for ~33% overhead)
+      const VALID_DATA_URI_PREFIX = /^data:image\/(jpeg|jpg|png|gif|webp);base64,/;
+
+      const validateBase64Image = (base64: string | null, fieldName: string): string | null => {
+        if (!base64) return null;
+        if (typeof base64 !== 'string') {
+          throw new Error(`${fieldName} must be a string`);
+        }
+        if (base64.length > MAX_BASE64_SIZE) {
+          throw new Error(`${fieldName} exceeds maximum size (5MB)`);
+        }
+        if (!VALID_DATA_URI_PREFIX.test(base64)) {
+          throw new Error(`${fieldName} must be a valid image data URI (jpeg, png, gif, or webp)`);
+        }
+        return base64;
+      };
+
+      // Validate all image fields
+      const validatedAgentPhoto = validateBase64Image(agentPhoto, 'agentPhoto');
+      const validatedQrCode = validateBase64Image(qrCode, 'qrCode');
+      const validatedCompanyLogo = validateBase64Image(companyLogo, 'companyLogo');
+      const validatedSecondaryLogo = validateBase64Image(secondaryLogo, 'secondaryLogo');
+
+      // Validate agentTitle
+      const validatedAgentTitle = typeof agentTitle === 'string' && agentTitle.length <= 100 
+        ? agentTitle 
+        : 'REALTOR®';
+
+      const profile = await storage.upsertAgentMarketingProfile(userId, {
+        agentPhoto: validatedAgentPhoto,
+        agentTitle: validatedAgentTitle,
+        qrCode: validatedQrCode,
+        companyLogo: validatedCompanyLogo,
+        companyLogoUseDefault: companyLogoUseDefault ?? true,
+        secondaryLogo: validatedSecondaryLogo,
+        secondaryLogoUseDefault: secondaryLogoUseDefault ?? true,
+      });
+
+      res.json(profile);
+    } catch (error: any) {
+      console.error("[Marketing Profile] Error saving:", error.message);
+      if (error.message.includes('must be') || error.message.includes('exceeds')) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to save marketing profile" });
+    }
+  });
+
   // ============ Agent Resources ============
 
   // Get all resources for the current user
