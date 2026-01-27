@@ -312,29 +312,37 @@ function AgentResumeContent({ agent }: { agent: AgentProfile }) {
 }
 
 function VideoSlideContent({ title }: { title: string }) {
-  // YouTube video ID for Listing with Spyglass Realty
-  const youtubeVideoId = 'iB_u-ksW3ts';
+  const youtubeVideoUrl = 'https://www.youtube.com/watch?v=iB_u-ksW3ts';
   
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center">
-      <div className="relative w-full max-w-md aspect-video">
+    <div className="flex flex-col items-center justify-center h-full text-center px-4">
+      {/* LRE Combined Logo on black background */}
+      <div className="w-full max-w-md bg-black rounded-lg p-6 mb-4">
         <img 
-          src={`https://img.youtube.com/vi/${youtubeVideoId}/maxresdefault.jpg`}
-          alt={title}
-          className="w-full h-full object-cover rounded-lg"
-          onError={(e) => {
-            // Fallback to medium quality if maxres not available
-            e.currentTarget.src = `https://img.youtube.com/vi/${youtubeVideoId}/hqdefault.jpg`;
-          }}
+          src="/logos/LRE_SGR_White.png"
+          alt="Spyglass Realty - Leading Real Estate Companies of the World"
+          className="w-full h-auto"
         />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="bg-[#EF4923] rounded-full p-3 shadow-lg">
-            <Play className="w-6 h-6 text-white fill-white" />
-          </div>
-        </div>
       </div>
-      <p className="font-medium text-zinc-700 mt-4">{title}</p>
-      <p className="text-sm text-zinc-500 mt-1">Video presentation</p>
+      
+      {/* Video Presentation Label */}
+      <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">
+        Video Presentation
+      </p>
+      
+      {/* YouTube Link */}
+      <a 
+        href={youtubeVideoUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[#EF4923] hover:text-[#d63d18] underline text-sm font-medium"
+      >
+        {youtubeVideoUrl}
+      </a>
+      
+      <p className="text-sm text-[#EF4923] font-medium mt-2">
+        Watch our video presentation
+      </p>
     </div>
   );
 }

@@ -44,12 +44,23 @@ const PageHeader = ({ title, slideNumber, totalSlides }: { title: string; slideN
   </View>
 );
 
-const PageFooter = ({ propertyAddress }: { propertyAddress: string }) => (
-  <View style={styles.footer}>
-    <Text style={styles.footerText}>{propertyAddress}</Text>
-    <Text style={styles.footerText}>Spyglass Realty</Text>
-  </View>
-);
+const PageFooter = ({ propertyAddress, slideNumber = 2, baseUrl }: { propertyAddress: string; slideNumber?: number; baseUrl?: string }) => {
+  const logoUrl = baseUrl ? `${baseUrl}/logos/LRE_SGR_White.png` : '/logos/LRE_SGR_White.png';
+  const showLogo = slideNumber > 1;
+  
+  return (
+    <View style={styles.footer}>
+      {showLogo ? (
+        <View style={{ backgroundColor: '#000000', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4 }}>
+          <Image src={logoUrl} style={{ height: 16, width: 120 }} />
+        </View>
+      ) : (
+        <Text style={styles.footerText}>Spyglass Realty</Text>
+      )}
+      <Text style={styles.footerText}>{propertyAddress}</Text>
+    </View>
+  );
+};
 
 const CoverPage = ({ propertyAddress, agent, preparedFor, baseUrl }: { propertyAddress: string; agent: AgentProfile; preparedFor?: string; baseUrl: string }) => {
   const agentName = getAgentName(agent);
@@ -747,75 +758,71 @@ const ListingWithSpyglassPage = ({
   agent,
   propertyAddress,
   slideNumber, 
-  totalSlides 
+  totalSlides,
+  baseUrl
 }: { 
   agent: AgentProfile;
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
-}) => (
-  <Page size="LETTER" orientation="landscape" style={styles.page}>
-    <PageHeader title="LISTING WITH SPYGLASS REALTY" slideNumber={slideNumber} totalSlides={totalSlides} />
-    <View style={styles.content}>
-      <Text style={styles.sectionTitle}>Why List With Spyglass Realty?</Text>
-      
-      <View style={{ flexDirection: 'row', gap: 30, marginTop: 20 }}>
-        <View style={{ flex: 1 }}>
-          <View style={{ marginBottom: 20 }}>
-            <View style={styles.listItem}>
-              <View style={styles.listBullet} />
-              <Text style={styles.listText}>Award-winning marketing strategy designed to sell your home quickly</Text>
-            </View>
-            <View style={styles.listItem}>
-              <View style={styles.listBullet} />
-              <Text style={styles.listText}>Professional photography, videography, and aerial drone footage</Text>
-            </View>
-            <View style={styles.listItem}>
-              <View style={styles.listBullet} />
-              <Text style={styles.listText}>Maximum exposure across MLS, Zillow, Realtor.com, and more</Text>
-            </View>
-            <View style={styles.listItem}>
-              <View style={styles.listBullet} />
-              <Text style={styles.listText}>Dedicated transaction coordination from contract to close</Text>
-            </View>
-            <View style={styles.listItem}>
-              <View style={styles.listBullet} />
-              <Text style={styles.listText}>Proven negotiation strategies to maximize your sale price</Text>
-            </View>
-          </View>
-        </View>
-        <View style={{ flex: 1 }}>
-          {/* YouTube Video Thumbnail */}
-          <View style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+  baseUrl: string;
+}) => {
+  const logoUrl = baseUrl ? `${baseUrl}/logos/LRE_SGR_White.png` : '/logos/LRE_SGR_White.png';
+  const youtubeVideoUrl = 'https://www.youtube.com/watch?v=iB_u-ksW3ts';
+  
+  return (
+    <Page size="LETTER" orientation="landscape" style={styles.page}>
+      <PageHeader title="LISTING WITH SPYGLASS REALTY" slideNumber={slideNumber} totalSlides={totalSlides} />
+      <View style={styles.content}>
+        <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+          {/* LRE Combined Logo on black background */}
+          <View style={{ 
+            backgroundColor: '#000000', 
+            borderRadius: 8, 
+            padding: 30, 
+            marginBottom: 24,
+            width: '60%'
+          }}>
             <Image 
-              src="https://img.youtube.com/vi/iB_u-ksW3ts/hqdefault.jpg"
-              style={{ width: '100%', height: 150, borderRadius: 8, objectFit: 'cover' }}
+              src={logoUrl}
+              style={{ width: '100%', height: 60 }}
             />
-            <View style={{ 
-              position: 'absolute', 
-              top: '50%', 
-              left: '50%', 
-              marginTop: -20,
-              marginLeft: -20,
-              width: 40, 
-              height: 40, 
-              backgroundColor: COLORS.spyglassOrange, 
-              borderRadius: 20,
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Text style={{ fontSize: 18, color: COLORS.white }}>▶</Text>
-            </View>
           </View>
-          <Text style={{ fontSize: 10, color: COLORS.textSecondary, textAlign: 'center' }}>
-            Watch our introduction video at <Text style={{ color: COLORS.spyglassOrange, fontWeight: 600 }}>spyglassrealty.com</Text>
+          
+          {/* Video Presentation Label */}
+          <Text style={{ 
+            fontSize: 10, 
+            color: COLORS.mediumGray, 
+            textTransform: 'uppercase', 
+            letterSpacing: 2, 
+            marginBottom: 10 
+          }}>
+            Video Presentation
+          </Text>
+          
+          {/* YouTube Link */}
+          <Text style={{ 
+            fontSize: 12, 
+            color: COLORS.spyglassOrange, 
+            textDecoration: 'underline',
+            marginBottom: 8
+          }}>
+            {youtubeVideoUrl}
+          </Text>
+          
+          <Text style={{ 
+            fontSize: 12, 
+            color: COLORS.spyglassOrange, 
+            fontWeight: 600 
+          }}>
+            Watch our video presentation
           </Text>
         </View>
       </View>
-    </View>
-    <PageFooter propertyAddress={propertyAddress} />
-  </Page>
-);
+      <PageFooter propertyAddress={propertyAddress} slideNumber={slideNumber} baseUrl={baseUrl} />
+    </Page>
+  );
+};
 
 const SpyglassResourcesPage = ({ 
   propertyAddress,
@@ -1069,7 +1076,7 @@ export function CmaPdfDocument({
             return <AgentResumePage key={widget.id} agent={agent} slideNumber={slideNum} totalSlides={totalSlides} />;
           
           case 'listing_with_spyglass':
-            return <ListingWithSpyglassPage key={widget.id} agent={agent} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} />;
+            return <ListingWithSpyglassPage key={widget.id} agent={agent} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} baseUrl={baseUrl} />;
           
           case 'client_testimonials':
             return <ClientTestimonialsPage key={widget.id} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} />;

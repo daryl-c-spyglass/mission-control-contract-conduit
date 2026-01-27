@@ -359,10 +359,23 @@ function SlidePreview({ slide, compact = false }: { slide: PreviewSlide; compact
       </div>
 
       <div className={cn(
-        "border-t border-zinc-200 pt-2 mt-4 flex justify-between text-zinc-500",
+        "border-t border-zinc-200 pt-2 mt-4 flex justify-between items-center text-zinc-500",
         compact ? "text-[6px] pt-1 mt-2" : "text-xs"
       )}>
-        <span>Spyglass Realty</span>
+        {slideNumber > 1 ? (
+          <div className={cn(
+            "bg-black rounded px-2 py-1",
+            compact ? "px-1 py-0.5" : ""
+          )}>
+            <img 
+              src="/logos/LRE_SGR_White.png"
+              alt="Spyglass Realty"
+              className={cn(compact ? "h-2" : "h-4")}
+            />
+          </div>
+        ) : (
+          <span>Spyglass Realty</span>
+        )}
         <span>Slide {slideNumber} of {totalSlides}</span>
       </div>
     </div>

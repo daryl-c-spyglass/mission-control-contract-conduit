@@ -1,0 +1,484 @@
+# CMA Presentation Builder — Logo & YouTube Link Fix
+
+## 🎯 Changes Required
+
+| Change | Description |
+|--------|-------------|
+| 1 | **Slide 3**: Use `LRE_SGR_White.png` logo with YouTube link text below |
+| 2 | **Footer**: Add `LRE_SGR_White.png` logo to footer of slides 2-44 |
+| 3 | **Mirror**: Preview and PDF Export must be IDENTICAL |
+
+---
+
+## 📁 Logo Asset
+
+**File:** `LRE_SGR_White.png` (already uploaded to Replit)
+
+**Location:** Copy to `public/logos/LRE_SGR_White.png`
+
+**Description:** Combined logo with Spyglass Realty + Leading Real Estate Companies of the World (white version for dark backgrounds, or can invert for light)
+
+---
+
+## 🔧 FIX 1: Slide 3 — LISTING WITH SPYGLASS REALTY
+
+**Current State:** Gray YouTube placeholder icon with play button
+
+**New Design:** 
+- Display the `LRE_SGR_White.png` logo (centered)
+- Show YouTube link as clickable text below
+- Clean, professional layout
+
+**YouTube Link:** `https://www.youtube.com/watch?v=iB_u-ksW3ts`
+
+### Component Code:
+
+```tsx
+// File: Find the "Listing with Spyglass Realty" slide component
+// Could be: ListingWithSpyglassSlide.tsx, VideoSlide.tsx, or in slide renderer
+
+const YOUTUBE_VIDEO_URL = 'https://www.youtube.com/watch?v=iB_u-ksW3ts';
+const LRE_LOGO_PATH = '/logos/LRE_SGR_White.png';
+
+function ListingWithSpyglassSlide() {
+  return (
+    <div className="h-full flex flex-col bg-white">
+      {/* Header */}
+      <div className="p-6 pb-0">
+        <h2 className="text-xl font-bold text-gray-800">
+          LISTING WITH SPYGLASS REALTY
+        </h2>
+      </div>
+      
+      {/* Main Content - Centered Logo + Link */}
+      <div className="flex-1 flex flex-col items-center justify-center px-8">
+        {/* Combined Logo (Spyglass + Leading RE) */}
+        <div className="bg-black rounded-lg p-8 mb-6 w-full max-w-xl">
+          <img 
+            src={LRE_LOGO_PATH}
+            alt="Spyglass Realty - Leading Real Estate Companies of the World"
+            className="w-full h-auto"
+          />
+        </div>
+        
+        {/* Video Presentation Label */}
+        <p className="text-gray-500 text-sm uppercase tracking-wider mb-4">
+          Video Presentation
+        </p>
+        
+        {/* YouTube Link - Clickable in Preview, visible URL in PDF */}
+        <a 
+          href={YOUTUBE_VIDEO_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-orange-500 hover:text-orange-600 underline text-lg font-medium"
+        >
+          {YOUTUBE_VIDEO_URL}
+        </a>
+        
+        {/* Or display as non-link for PDF consistency */}
+        <p className="text-orange-500 text-lg font-medium mt-2">
+          Watch our video presentation
+        </p>
+      </div>
+      
+      {/* Footer - with new logo */}
+      <SlideFooter slideNumber={3} totalSlides={44} />
+    </div>
+  );
+}
+```
+
+### For PDF Export (must match Preview exactly):
+
+```tsx
+// Using @react-pdf/renderer
+import { Page, View, Text, Image, Link, StyleSheet } from '@react-pdf/renderer';
+
+const LRE_LOGO_URL = '/logos/LRE_SGR_White.png'; // Or absolute URL
+
+function ListingWithSpyglassSlidePdf({ slideNumber, totalSlides }) {
+  return (
+    <Page size="LETTER" style={styles.page}>
+      {/* Header */}
+      <Text style={styles.header}>LISTING WITH SPYGLASS REALTY</Text>
+      
+      {/* Logo Container - Black background */}
+      <View style={styles.logoContainer}>
+        <Image 
+          src={LRE_LOGO_URL}
+          style={styles.logo}
+        />
+      </View>
+      
+      {/* Video Presentation Label */}
+      <Text style={styles.label}>Video Presentation</Text>
+      
+      {/* YouTube Link */}
+      <Link src="https://www.youtube.com/watch?v=iB_u-ksW3ts" style={styles.link}>
+        https://www.youtube.com/watch?v=iB_u-ksW3ts
+      </Link>
+      
+      {/* Footer with logo */}
+      <View style={styles.footer}>
+        <Image src={LRE_LOGO_URL} style={styles.footerLogo} />
+        <Text style={styles.slideNumber}>Slide {slideNumber} of {totalSlides}</Text>
+      </View>
+    </Page>
+  );
+}
+
+const styles = StyleSheet.create({
+  page: {
+    padding: 40,
+    backgroundColor: 'white',
+  },
+  header: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 40,
+  },
+  logoContainer: {
+    backgroundColor: '#000000',
+    borderRadius: 8,
+    padding: 30,
+    alignSelf: 'center',
+    width: '80%',
+    marginBottom: 30,
+  },
+  logo: {
+    width: '100%',
+    height: 'auto',
+  },
+  label: {
+    fontSize: 10,
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  link: {
+    fontSize: 14,
+    color: '#F37216',
+    textAlign: 'center',
+    textDecoration: 'underline',
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 30,
+    left: 40,
+    right: 40,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  footerLogo: {
+    height: 20,
+    width: 'auto',
+  },
+  slideNumber: {
+    fontSize: 10,
+    color: '#9ca3af',
+  },
+});
+```
+
+---
+
+## 🔧 FIX 2: Add Logo to Footer (Slides 2-44)
+
+**Current Footer:** "Spyglass Realty" text on left, "Slide X of 44" on right
+
+**New Footer:** `LRE_SGR_White.png` logo on left, "Slide X of 44" on right
+
+### Create Reusable Footer Component:
+
+```tsx
+// File: components/cma-presentation/SlideFooter.tsx
+
+interface SlideFooterProps {
+  slideNumber: number;
+  totalSlides: number;
+  showLogo?: boolean; // Default true for slides 2+
+}
+
+const LRE_LOGO_PATH = '/logos/LRE_SGR_White.png';
+
+// For Preview (React component)
+export function SlideFooter({ 
+  slideNumber, 
+  totalSlides, 
+  showLogo = slideNumber > 1 // Show logo on slides 2-44
+}: SlideFooterProps) {
+  return (
+    <div className="flex justify-between items-center px-6 py-4 border-t border-gray-100">
+      {/* Left: Logo (slides 2-44) or Text (slide 1) */}
+      <div className="flex items-center">
+        {showLogo ? (
+          <img 
+            src={LRE_LOGO_PATH}
+            alt="Spyglass Realty"
+            className="h-6 w-auto"
+            style={{ filter: 'invert(1)' }} // Invert if using white logo on light background
+          />
+        ) : (
+          <span className="text-sm text-gray-500">Spyglass Realty</span>
+        )}
+      </div>
+      
+      {/* Right: Slide number */}
+      <span className="text-sm text-gray-400">
+        Slide {slideNumber} of {totalSlides}
+      </span>
+    </div>
+  );
+}
+
+// Alternative: Use the logo as-is with black background strip
+export function SlideFooterWithLogoBg({ slideNumber, totalSlides }: SlideFooterProps) {
+  return (
+    <div className="flex justify-between items-center px-6 py-3 bg-black">
+      {/* Left: Logo on black background */}
+      <img 
+        src={LRE_LOGO_PATH}
+        alt="Spyglass Realty - Leading RE"
+        className="h-5 w-auto"
+      />
+      
+      {/* Right: Slide number */}
+      <span className="text-sm text-gray-400">
+        Slide {slideNumber} of {totalSlides}
+      </span>
+    </div>
+  );
+}
+```
+
+### For PDF Footer:
+
+```tsx
+// File: components/pdf/PdfSlideFooter.tsx
+import { View, Text, Image, StyleSheet } from '@react-pdf/renderer';
+
+interface PdfSlideFooterProps {
+  slideNumber: number;
+  totalSlides: number;
+}
+
+const LRE_LOGO_URL = '/logos/LRE_SGR_White.png';
+
+export function PdfSlideFooter({ slideNumber, totalSlides }: PdfSlideFooterProps) {
+  // Slide 1 (cover) - no logo, just text
+  if (slideNumber === 1) {
+    return (
+      <View style={styles.footer}>
+        <Text style={styles.companyText}>Spyglass Realty</Text>
+        <Text style={styles.slideNumber}>Slide {slideNumber} of {totalSlides}</Text>
+      </View>
+    );
+  }
+  
+  // Slides 2-44 - with logo
+  return (
+    <View style={styles.footerWithLogo}>
+      <Image src={LRE_LOGO_URL} style={styles.footerLogo} />
+      <Text style={styles.slideNumber}>Slide {slideNumber} of {totalSlides}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  footer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 40,
+    right: 40,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingTop: 10,
+  },
+  footerWithLogo: {
+    position: 'absolute',
+    bottom: 20,
+    left: 40,
+    right: 40,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+    padding: 10,
+    borderRadius: 4,
+  },
+  footerLogo: {
+    height: 16,
+    width: 'auto',
+  },
+  companyText: {
+    fontSize: 10,
+    color: '#6b7280',
+  },
+  slideNumber: {
+    fontSize: 10,
+    color: '#9ca3af',
+  },
+});
+```
+
+---
+
+## 🔧 FIX 3: Ensure Preview = PDF Export
+
+**Principle:** Use a SHARED component/data structure for both Preview and PDF
+
+### Option A: Shared Slide Data
+
+```typescript
+// File: lib/slide-content.ts
+
+export interface SlideContent {
+  id: string;
+  title: string;
+  type: 'cover' | 'video' | 'content' | 'comps' | 'property';
+  showFooterLogo: boolean;
+  content: any;
+}
+
+export function getSlideContent(slideId: string, slideNumber: number): SlideContent {
+  return {
+    id: slideId,
+    title: getSlideTitleById(slideId),
+    type: getSlideTypeById(slideId),
+    showFooterLogo: slideNumber > 1, // Logo on slides 2-44
+    content: getSlideContentById(slideId),
+  };
+}
+```
+
+### Option B: Shared Style Constants
+
+```typescript
+// File: lib/slide-styles.ts
+
+export const SLIDE_STYLES = {
+  footer: {
+    logoHeight: 24, // px for web, points for PDF
+    slideNumberColor: '#9ca3af',
+    borderColor: '#e5e7eb',
+  },
+  videoSlide: {
+    logoContainerBg: '#000000',
+    logoPadding: 32,
+    linkColor: '#F37216',
+  },
+};
+
+// Use same values in both Preview and PDF components
+```
+
+### Implementation Pattern:
+
+```tsx
+// Preview Component
+function VideoSlidePreview({ slide }: { slide: SlideContent }) {
+  return (
+    <div className="h-full flex flex-col">
+      <h2>{slide.title}</h2>
+      <div className="flex-1 flex flex-col items-center justify-center">
+        <div className="bg-black p-8 rounded-lg">
+          <img src="/logos/LRE_SGR_White.png" />
+        </div>
+        <p className="text-orange-500">{YOUTUBE_VIDEO_URL}</p>
+      </div>
+      <SlideFooter slideNumber={3} totalSlides={44} showLogo={slide.showFooterLogo} />
+    </div>
+  );
+}
+
+// PDF Component - MUST MATCH PREVIEW
+function VideoSlidePdf({ slide }: { slide: SlideContent }) {
+  return (
+    <Page>
+      <Text>{slide.title}</Text>
+      <View style={{ backgroundColor: '#000000', padding: 30 }}>
+        <Image src="/logos/LRE_SGR_White.png" />
+      </View>
+      <Link src={YOUTUBE_VIDEO_URL}>{YOUTUBE_VIDEO_URL}</Link>
+      <PdfSlideFooter slideNumber={3} totalSlides={44} />
+    </Page>
+  );
+}
+```
+
+---
+
+## 📋 Quick Copy for Replit
+
+```
+## CHANGES REQUIRED:
+
+### 1. Copy logo to public folder:
+cp [uploaded-path]/LRE_SGR_White.png public/logos/LRE_SGR_White.png
+
+### 2. Update Slide 3 (LISTING WITH SPYGLASS REALTY):
+- REMOVE: Gray YouTube placeholder image
+- ADD: LRE_SGR_White.png logo on black background (centered)
+- ADD: YouTube link text below: https://www.youtube.com/watch?v=iB_u-ksW3ts
+- Style link in orange (#F37216)
+
+### 3. Update Footer for Slides 2-44:
+- REPLACE: "Spyglass Realty" text 
+- WITH: LRE_SGR_White.png logo image
+- KEEP: "Slide X of 44" on the right
+
+### 4. Ensure Preview = PDF Export:
+- Both must use same layout
+- Both must show same logo
+- Both must display same YouTube link
+- Footer logo must appear in both
+
+### Logo Path: /logos/LRE_SGR_White.png
+### YouTube URL: https://www.youtube.com/watch?v=iB_u-ksW3ts
+```
+
+---
+
+## 📱 Mobile Optimization
+
+- [ ] Logo scales appropriately on small screens
+- [ ] YouTube link has minimum 44x44px touch target area
+- [ ] Footer logo visible but not too large on mobile
+- [ ] Text remains readable at all screen sizes
+
+---
+
+## ✅ Verification Checklist
+
+### Slide 3 - Listing with Spyglass
+- [ ] Shows LRE_SGR_White.png logo (not YouTube placeholder)
+- [ ] Logo has black background container
+- [ ] YouTube link displayed as text below
+- [ ] Link is orange (#F37216)
+- [ ] Same appearance in Preview and PDF
+
+### Footer (Slides 2-44)
+- [ ] Slide 1 (Cover): Text "Spyglass Realty" (no logo)
+- [ ] Slides 2-44: LRE_SGR_White.png logo on left
+- [ ] All slides: "Slide X of 44" on right
+- [ ] Logo renders in PDF export
+- [ ] Consistent sizing across all slides
+
+### Preview = PDF Match
+- [ ] Slide 3 layout identical
+- [ ] Footer layout identical
+- [ ] Logo sizes match
+- [ ] Colors match
+- [ ] Typography matches
+
+---
+
+*Copy this entire prompt to Replit for Contract Conduit project.*
