@@ -370,4 +370,223 @@ export const styles = StyleSheet.create({
     color: COLORS.mediumGray,
     textAlign: 'center',
   },
+  
+  // Professional Cover Page Styles
+  coverPagePro: {
+    flex: 1,
+    backgroundColor: COLORS.darkBackground,
+  },
+  coverContentPro: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 48,
+  },
+  coverLogoPro: {
+    flexDirection: 'row',
+    marginBottom: 32,
+  },
+  coverLogoOrange: {
+    fontSize: 28,
+    fontWeight: 700,
+    color: COLORS.spyglassOrange,
+    letterSpacing: 2,
+  },
+  coverLogoWhite: {
+    fontSize: 28,
+    fontWeight: 700,
+    color: COLORS.white,
+    letterSpacing: 2,
+    marginLeft: 8,
+  },
+  coverAddressBox: {
+    borderWidth: 1,
+    borderColor: '#4a4a4a',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    marginTop: 24,
+  },
+  coverAddressPro: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: COLORS.white,
+    textAlign: 'center',
+  },
+  coverCityPro: {
+    fontSize: 12,
+    color: COLORS.mediumGray,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  
+  // Agent Section (Orange Footer on Cover)
+  coverAgentSection: {
+    backgroundColor: COLORS.spyglassOrange,
+    padding: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  coverAgentPhoto: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 3,
+    borderColor: COLORS.white,
+    marginRight: 16,
+  },
+  coverAgentPhotoPlaceholder: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#d1d5db',
+    borderWidth: 3,
+    borderColor: COLORS.white,
+    marginRight: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverAgentInitials: {
+    fontSize: 20,
+    fontWeight: 700,
+    color: '#6b7280',
+  },
+  
+  // Enhanced Stats Grid
+  statsRowPro: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    gap: 8,
+  },
+  statBoxPro: {
+    flex: 1,
+    backgroundColor: COLORS.lightGray,
+    padding: 12,
+    borderRadius: 4,
+    alignItems: 'center',
+  },
+  statBoxHighlight: {
+    flex: 1,
+    backgroundColor: COLORS.spyglassOrange,
+    padding: 12,
+    borderRadius: 4,
+    alignItems: 'center',
+  },
+  statLabelPro: {
+    fontSize: 8,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  statLabelWhite: {
+    fontSize: 8,
+    color: 'rgba(255,255,255,0.8)',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  statValuePro: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: COLORS.darkBackground,
+  },
+  statValueWhite: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: COLORS.white,
+  },
+  
+  // Status Badges
+  statusBadgeClosed: {
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  statusBadgeActive: {
+    backgroundColor: '#dbeafe',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  statusTextClosed: {
+    fontSize: 8,
+    color: '#166534',
+  },
+  statusTextActive: {
+    fontSize: 8,
+    color: '#1e40af',
+  },
+  
+  // Property Detail Enhancements
+  propertyRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  propertyPhoto: {
+    width: '45%',
+    height: 180,
+    borderRadius: 4,
+    marginRight: 16,
+  },
+  propertyPhotoPlaceholder: {
+    width: '45%',
+    height: 180,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 4,
+    marginRight: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  propertyInfo: {
+    flex: 1,
+  },
+  propertyStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  propertyStatItem: {
+    width: '50%',
+    marginBottom: 8,
+  },
+  propertyStatLabel: {
+    fontSize: 8,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+  },
+  propertyStatValue: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: COLORS.textPrimary,
+  },
+  
+  // Price Display Box
+  priceDisplayContainer: {
+    alignItems: 'center',
+    marginVertical: 24,
+  },
+  priceDisplayBox: {
+    backgroundColor: COLORS.spyglassOrange,
+    paddingHorizontal: 48,
+    paddingVertical: 24,
+    borderRadius: 8,
+  },
+  priceDisplayValue: {
+    fontSize: 40,
+    fontWeight: 700,
+    color: COLORS.white,
+    textAlign: 'center',
+  },
+  
+  // Table Enhancements
+  tableCellBold: {
+    flex: 1,
+    fontSize: 10,
+    fontWeight: 700,
+    color: COLORS.textPrimary,
+  },
+  tableCellOrange: {
+    flex: 1,
+    fontSize: 10,
+    fontWeight: 700,
+    color: COLORS.spyglassOrange,
+  },
 });

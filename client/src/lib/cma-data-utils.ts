@@ -303,3 +303,103 @@ export function formatPricePerUnit(value: number | null | undefined, unit: strin
   if (value == null || isNaN(value) || value === 0) return 'N/A';
   return `$${value.toLocaleString()}/${unit}`;
 }
+
+/**
+ * Format price in K/M shorthand
+ */
+export function formatPriceShort(value: number | null | undefined): string {
+  if (value == null || isNaN(value)) return 'N/A';
+  if (value >= 1000000) {
+    return `$${(value / 1000000).toFixed(2)}M`;
+  }
+  return `$${Math.round(value / 1000)}K`;
+}
+
+/**
+ * Get primary photo URL from a comparable
+ */
+export function getPrimaryPhoto(comp: any): string | null {
+  if (!comp) return null;
+  if (comp.photos && Array.isArray(comp.photos) && comp.photos.length > 0) {
+    return comp.photos[0];
+  }
+  if (comp.imageUrl) return comp.imageUrl;
+  if (comp.primaryPhoto) return comp.primaryPhoto;
+  if (comp.image) return comp.image;
+  return null;
+}
+
+/**
+ * Get all photo URLs from a comparable
+ */
+export function getPhotos(comp: any): string[] {
+  if (!comp) return [];
+  if (comp.photos && Array.isArray(comp.photos)) {
+    return comp.photos;
+  }
+  if (comp.images && Array.isArray(comp.images)) {
+    return comp.images;
+  }
+  return [];
+}
+
+/**
+ * Get agent display name
+ */
+export function getAgentName(agent: any): string {
+  if (!agent) return 'Your Spyglass Agent';
+  if (agent.name) return agent.name;
+  if (agent.firstName && agent.lastName) {
+    return `${agent.firstName} ${agent.lastName}`;
+  }
+  if (agent.firstName) return agent.firstName;
+  return 'Your Spyglass Agent';
+}
+
+/**
+ * Get agent photo URL with fallback
+ */
+export function getAgentPhoto(agent: any): string | null {
+  if (!agent) return null;
+  return agent.headshotUrl || agent.photoUrl || agent.photo || null;
+}
+
+/**
+ * Get agent initials for placeholder
+ */
+export function getAgentInitials(agent: any): string {
+  const name = getAgentName(agent);
+  return name
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+/**
+ * Extract coordinates from a property
+ */
+export function getCoordinates(comp: any): { lat: number; lng: number } | null {
+  if (!comp) return null;
+  
+  // Check map object first (Repliers format)
+  if (comp.map?.latitude && comp.map?.longitude) {
+    return { lat: comp.map.latitude, lng: comp.map.longitude };
+  }
+  
+  // Check coordinates object
+  if (comp.coordinates?.latitude && comp.coordinates?.longitude) {
+    return { lat: comp.coordinates.latitude, lng: comp.coordinates.longitude };
+  }
+  
+  // Check direct properties
+  if (comp.latitude && comp.longitude) {
+    return { lat: comp.latitude, lng: comp.longitude };
+  }
+  if (comp.lat && comp.lng) {
+    return { lat: comp.lat, lng: comp.lng };
+  }
+  
+  return null;
+}

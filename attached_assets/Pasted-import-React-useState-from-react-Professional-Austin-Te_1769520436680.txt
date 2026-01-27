@@ -1,0 +1,897 @@
+import React, { useState } from 'react';
+
+// Professional Austin Texas Real Estate CMA PDF Visualization
+// Spyglass Realty Branding
+
+export default function ProfessionalCMAPDFMockup() {
+  const [currentPage, setCurrentPage] = useState(0);
+  
+  const pages = [
+    'cover',
+    'agentResume',
+    'whySpyglass',
+    'testimonials',
+    'marketingOverview',
+    'comparablesSummary',
+    'mapOfListings',
+    'timeToSell',
+    'suggestedPrice',
+    'propertyDetails1',
+    'propertyDetails2',
+    'homeSellingSystem',
+    'pricingStrategy',
+    'actionPlan',
+    'thankYou',
+  ];
+
+  const nextPage = () => setCurrentPage((p) => Math.min(p + 1, pages.length - 1));
+  const prevPage = () => setCurrentPage((p) => Math.max(p - 1, 0));
+
+  return (
+    <div className="min-h-screen bg-zinc-900 p-8">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Professional CMA PDF - Austin, TX</h1>
+            <p className="text-zinc-400">Spyglass Realty Brand Standards</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={prevPage} 
+              disabled={currentPage === 0}
+              className="px-4 py-2 bg-zinc-800 text-white rounded disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <span className="text-white">
+              Page {currentPage + 1} of {pages.length}
+            </span>
+            <button 
+              onClick={nextPage}
+              disabled={currentPage === pages.length - 1}
+              className="px-4 py-2 bg-orange-500 text-white rounded disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+
+        {/* PDF Page Preview */}
+        <div className="bg-white rounded-lg shadow-2xl overflow-hidden" style={{ aspectRatio: '8.5/11' }}>
+          {pages[currentPage] === 'cover' && <CoverPage />}
+          {pages[currentPage] === 'agentResume' && <AgentResumePage />}
+          {pages[currentPage] === 'whySpyglass' && <WhySpyglassPage />}
+          {pages[currentPage] === 'testimonials' && <TestimonialsPage />}
+          {pages[currentPage] === 'marketingOverview' && <MarketingOverviewPage />}
+          {pages[currentPage] === 'comparablesSummary' && <ComparablesSummaryPage />}
+          {pages[currentPage] === 'mapOfListings' && <MapOfListingsPage />}
+          {pages[currentPage] === 'timeToSell' && <TimeToSellPage />}
+          {pages[currentPage] === 'suggestedPrice' && <SuggestedPricePage />}
+          {pages[currentPage] === 'propertyDetails1' && <PropertyDetailsPage index={1} />}
+          {pages[currentPage] === 'propertyDetails2' && <PropertyDetailsPage index={2} />}
+          {pages[currentPage] === 'homeSellingSystem' && <HomeSellingSystemPage />}
+          {pages[currentPage] === 'pricingStrategy' && <PricingStrategyPage />}
+          {pages[currentPage] === 'actionPlan' && <ActionPlanPage />}
+          {pages[currentPage] === 'thankYou' && <ThankYouPage />}
+        </div>
+
+        {/* Page Thumbnails */}
+        <div className="mt-6 flex gap-2 overflow-x-auto pb-4">
+          {pages.map((page, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrentPage(i)}
+              className={`flex-shrink-0 w-20 h-28 bg-white rounded border-2 flex items-center justify-center text-xs ${
+                i === currentPage ? 'border-orange-500' : 'border-zinc-300'
+              }`}
+            >
+              {i + 1}
+            </button>
+          ))}
+        </div>
+
+        {/* Design Notes */}
+        <div className="mt-8 p-6 bg-zinc-800 rounded-lg">
+          <h2 className="text-lg font-semibold text-white mb-4">Design Standards</h2>
+          <div className="grid grid-cols-2 gap-6 text-sm">
+            <div>
+              <h3 className="text-orange-500 font-medium mb-2">Colors</h3>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded bg-[#EF4923]"></div>
+                  <span className="text-zinc-300">Spyglass Orange #EF4923</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded bg-[#1a1a1a]"></div>
+                  <span className="text-zinc-300">Dark #1A1A1A</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded bg-white border"></div>
+                  <span className="text-zinc-300">White #FFFFFF</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded bg-[#f5f5f5]"></div>
+                  <span className="text-zinc-300">Light Gray #F5F5F5</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-orange-500 font-medium mb-2">Typography</h3>
+              <div className="space-y-2 text-zinc-300">
+                <p>Headlines: Inter Bold, 24-32pt</p>
+                <p>Subheads: Inter SemiBold, 16-20pt</p>
+                <p>Body: Inter Regular, 11-12pt</p>
+                <p>Captions: Inter Regular, 9-10pt</p>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-orange-500 font-medium mb-2">Austin Market Focus</h3>
+              <div className="space-y-1 text-zinc-300">
+                <p>• Central Texas neighborhoods</p>
+                <p>• Austin-area school districts</p>
+                <p>• Local market statistics</p>
+                <p>• Texas-specific disclosures</p>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-orange-500 font-medium mb-2">Required Elements</h3>
+              <div className="space-y-1 text-zinc-300">
+                <p>• Agent photo on cover & resume</p>
+                <p>• Property photos for each comp</p>
+                <p>• Actual market data (no placeholders)</p>
+                <p>• Professional headings (no "View in presentation")</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// PAGE COMPONENTS
+// ============================================================
+
+function CoverPage() {
+  return (
+    <div className="h-full bg-gradient-to-b from-[#1a1a1a] to-[#2d2d2d] flex flex-col">
+      {/* Top Section */}
+      <div className="flex-1 flex flex-col items-center justify-center text-center px-12">
+        {/* Logo */}
+        <div className="mb-8">
+          <div className="text-3xl font-bold text-white tracking-wider">
+            <span className="text-[#EF4923]">SPYGLASS</span>
+            <span className="text-white ml-2">REALTY</span>
+          </div>
+        </div>
+        
+        {/* Title */}
+        <h1 className="text-4xl font-light text-white mb-2 tracking-wide">
+          Comparative Market Analysis
+        </h1>
+        
+        {/* Property Address Box */}
+        <div className="mt-8 px-8 py-4 border border-zinc-600">
+          <p className="text-xl text-white font-medium">612 Twelve Oaks Lane</p>
+          <p className="text-zinc-400">Austin, TX 78746</p>
+        </div>
+        
+        {/* Date */}
+        <p className="mt-6 text-zinc-500 text-sm">January 27, 2026</p>
+      </div>
+      
+      {/* Agent Section */}
+      <div className="bg-[#EF4923] py-8 px-12">
+        <div className="flex items-center gap-6">
+          {/* Agent Photo */}
+          <div className="w-20 h-20 rounded-full bg-zinc-300 border-4 border-white overflow-hidden">
+            <div className="w-full h-full bg-gradient-to-br from-zinc-400 to-zinc-500 flex items-center justify-center text-white text-2xl font-bold">
+              DC
+            </div>
+          </div>
+          
+          {/* Agent Info */}
+          <div className="text-white">
+            <p className="text-sm uppercase tracking-wider opacity-80">Prepared by</p>
+            <p className="text-2xl font-semibold">Daryl Camingao</p>
+            <p className="text-sm opacity-90">REALTOR® | Spyglass Realty</p>
+            <p className="text-sm opacity-80">512-555-1234 | daryl@spyglassrealty.com</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgentResumePage() {
+  return (
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <PageHeader title="MEET YOUR AGENT" slideNumber={1} />
+      
+      <div className="flex-1 p-8">
+        <div className="flex gap-8">
+          {/* Left Column - Photo */}
+          <div className="w-1/3">
+            <div className="aspect-[3/4] bg-gradient-to-br from-zinc-200 to-zinc-300 rounded-lg mb-4 flex items-center justify-center">
+              <div className="text-6xl font-bold text-zinc-400">DC</div>
+            </div>
+            
+            {/* Contact Card */}
+            <div className="bg-[#1a1a1a] text-white p-4 rounded-lg">
+              <p className="font-semibold text-lg">Daryl Camingao</p>
+              <p className="text-sm text-zinc-400">REALTOR® | License #12345678</p>
+              <div className="mt-3 space-y-1 text-sm">
+                <p className="flex items-center gap-2">
+                  <span className="text-[#EF4923]">✆</span> 512-555-1234
+                </p>
+                <p className="flex items-center gap-2">
+                  <span className="text-[#EF4923]">✉</span> daryl@spyglassrealty.com
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Right Column - Bio */}
+          <div className="w-2/3">
+            <h2 className="text-2xl font-bold text-[#1a1a1a] mb-4">
+              Your Austin Real Estate Expert
+            </h2>
+            
+            <p className="text-zinc-600 leading-relaxed mb-4">
+              With over 10 years of experience in the Austin real estate market, I specialize 
+              in helping families find their perfect home in Central Texas. My deep knowledge 
+              of Austin's diverse neighborhoods—from the hills of Westlake to the urban energy 
+              of East Austin—ensures you'll get expert guidance tailored to your needs.
+            </p>
+            
+            <p className="text-zinc-600 leading-relaxed mb-6">
+              As a lifelong Texan and Austin resident, I understand what makes our city special. 
+              Whether you're relocating to Austin or selling your family home, I'm committed to 
+              making your real estate journey smooth and successful.
+            </p>
+            
+            {/* Stats */}
+            <div className="grid grid-cols-3 gap-4 mt-6">
+              <div className="bg-[#f5f5f5] p-4 rounded-lg text-center">
+                <p className="text-3xl font-bold text-[#EF4923]">150+</p>
+                <p className="text-xs text-zinc-500 uppercase">Homes Sold</p>
+              </div>
+              <div className="bg-[#f5f5f5] p-4 rounded-lg text-center">
+                <p className="text-3xl font-bold text-[#EF4923]">$85M</p>
+                <p className="text-xs text-zinc-500 uppercase">Sales Volume</p>
+              </div>
+              <div className="bg-[#f5f5f5] p-4 rounded-lg text-center">
+                <p className="text-3xl font-bold text-[#EF4923]">4.9★</p>
+                <p className="text-xs text-zinc-500 uppercase">Client Rating</p>
+              </div>
+            </div>
+            
+            {/* Credentials */}
+            <div className="mt-6 pt-4 border-t border-zinc-200">
+              <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Certifications & Affiliations</p>
+              <p className="text-sm text-zinc-600">
+                ABR® | CRS® | Austin Board of REALTORS® | Texas REALTORS®
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <PageFooter address="612 Twelve Oaks Lane, Austin, TX" />
+    </div>
+  );
+}
+
+function ComparablesSummaryPage() {
+  const comparables = [
+    { address: '2007 Alameda DR', city: 'Austin', price: 950000, beds: 2, baths: 2, sqft: 1114, status: 'Closed', dom: 129 },
+    { address: '1604 Garner Ave', city: 'Austin', price: 2499995, beds: 4, baths: 4, sqft: 2752, status: 'Active', dom: 332 },
+    { address: '5204 Hedgewood', city: 'Austin', price: 480000, beds: 3, baths: 2, sqft: 1491, status: 'Closed', dom: 76 },
+    { address: '5026 Lansing DR', city: 'Austin', price: 610000, beds: 4, baths: 3, sqft: 1671, status: 'Closed', dom: 3 },
+    { address: '1304 Summit ST', city: 'Austin', price: 299000, beds: 2, baths: 1, sqft: 764, status: 'Active', dom: 0 },
+    { address: '800 5th ST', city: 'Austin', price: 1485000, beds: 2, baths: 2, sqft: 2422, status: 'Active', dom: 1 },
+  ];
+  
+  const avgPrice = Math.round(comparables.reduce((a, c) => a + c.price, 0) / comparables.length);
+  const avgSqft = Math.round(comparables.reduce((a, c) => a + (c.price / c.sqft), 0) / comparables.length);
+  const avgDom = Math.round(comparables.reduce((a, c) => a + c.dom, 0) / comparables.length);
+
+  return (
+    <div className="h-full flex flex-col">
+      <PageHeader title="COMPARABLE PROPERTIES" slideNumber={5} />
+      
+      <div className="flex-1 p-8">
+        {/* Stats Row */}
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <StatBox label="Properties Analyzed" value="10" />
+          <StatBox label="Average Price" value={`$${avgPrice.toLocaleString()}`} highlight />
+          <StatBox label="Avg $/Sq Ft" value={`$${avgSqft}`} highlight />
+          <StatBox label="Avg Days on Market" value={`${avgDom} days`} />
+        </div>
+        
+        {/* Table */}
+        <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-[#1a1a1a] text-white">
+              <tr>
+                <th className="text-left py-3 px-4">Address</th>
+                <th className="text-right py-3 px-4">Price</th>
+                <th className="text-center py-3 px-4">Bed/Bath</th>
+                <th className="text-right py-3 px-4">Sq Ft</th>
+                <th className="text-right py-3 px-4">$/Sq Ft</th>
+                <th className="text-center py-3 px-4">Status</th>
+                <th className="text-right py-3 px-4">DOM</th>
+              </tr>
+            </thead>
+            <tbody>
+              {comparables.map((comp, i) => (
+                <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-zinc-50'}>
+                  <td className="py-3 px-4">
+                    <p className="font-medium text-zinc-900">{comp.address}</p>
+                    <p className="text-xs text-zinc-500">{comp.city}, TX</p>
+                  </td>
+                  <td className="text-right py-3 px-4 font-semibold text-[#EF4923]">
+                    ${comp.price.toLocaleString()}
+                  </td>
+                  <td className="text-center py-3 px-4">{comp.beds}/{comp.baths}</td>
+                  <td className="text-right py-3 px-4">{comp.sqft.toLocaleString()}</td>
+                  <td className="text-right py-3 px-4">${Math.round(comp.price / comp.sqft)}</td>
+                  <td className="text-center py-3 px-4">
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      comp.status === 'Closed' 
+                        ? 'bg-green-100 text-green-700' 
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {comp.status}
+                    </span>
+                  </td>
+                  <td className="text-right py-3 px-4">{comp.dom}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        
+        <p className="mt-4 text-xs text-zinc-500 text-center">
+          Data sourced from Austin Board of REALTORS® MLS. Information deemed reliable but not guaranteed.
+        </p>
+      </div>
+      
+      <PageFooter address="612 Twelve Oaks Lane, Austin, TX" />
+    </div>
+  );
+}
+
+function MapOfListingsPage() {
+  return (
+    <div className="h-full flex flex-col">
+      <PageHeader title="MAP OF ALL LISTINGS" slideNumber={6} />
+      
+      <div className="flex-1 p-8">
+        {/* Map Placeholder */}
+        <div className="h-[70%] bg-zinc-100 rounded-lg border border-zinc-200 flex items-center justify-center relative overflow-hidden">
+          {/* Fake map background */}
+          <div className="absolute inset-0 opacity-30">
+            <div className="w-full h-full" style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cpath d='M0 0h100v100H0z' fill='%23e5e7eb'/%3E%3Cpath d='M0 50h100M50 0v100' stroke='%23d1d5db' stroke-width='0.5'/%3E%3C/svg%3E")`,
+              backgroundSize: '50px 50px'
+            }}></div>
+          </div>
+          
+          {/* Map markers */}
+          <div className="relative w-full h-full">
+            {/* Subject Property - Orange */}
+            <div className="absolute top-[40%] left-[45%] w-8 h-8 bg-[#EF4923] rounded-full border-4 border-white shadow-lg flex items-center justify-center">
+              <span className="text-white text-xs font-bold">★</span>
+            </div>
+            
+            {/* Sold - Green */}
+            <div className="absolute top-[30%] left-[35%] w-6 h-6 bg-green-500 rounded-full border-2 border-white shadow"></div>
+            <div className="absolute top-[55%] left-[55%] w-6 h-6 bg-green-500 rounded-full border-2 border-white shadow"></div>
+            <div className="absolute top-[45%] left-[65%] w-6 h-6 bg-green-500 rounded-full border-2 border-white shadow"></div>
+            
+            {/* Active - Blue */}
+            <div className="absolute top-[25%] left-[50%] w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow"></div>
+            <div className="absolute top-[60%] left-[30%] w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow"></div>
+          </div>
+          
+          {/* Map label */}
+          <div className="absolute bottom-4 right-4 bg-white px-3 py-1 rounded shadow text-xs text-zinc-500">
+            Austin, TX Area
+          </div>
+        </div>
+        
+        {/* Legend */}
+        <div className="mt-4 flex items-center justify-center gap-8">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-[#EF4923] rounded-full"></div>
+            <span className="text-sm text-zinc-600">Subject Property</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-green-500 rounded-full"></div>
+            <span className="text-sm text-zinc-600">Sold</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
+            <span className="text-sm text-zinc-600">Active</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
+            <span className="text-sm text-zinc-600">Pending</span>
+          </div>
+        </div>
+      </div>
+      
+      <PageFooter address="612 Twelve Oaks Lane, Austin, TX" />
+    </div>
+  );
+}
+
+function SuggestedPricePage() {
+  return (
+    <div className="h-full flex flex-col">
+      <PageHeader title="SUGGESTED LIST PRICE" slideNumber={8} />
+      
+      <div className="flex-1 p-8 flex flex-col items-center justify-center">
+        {/* Main Price Display */}
+        <div className="text-center mb-8">
+          <p className="text-sm text-zinc-500 uppercase tracking-wider mb-2">
+            Recommended Listing Price
+          </p>
+          <div className="bg-gradient-to-r from-[#EF4923] to-[#f97316] text-white px-12 py-6 rounded-xl">
+            <p className="text-5xl font-bold">$1,050,000</p>
+          </div>
+          <p className="mt-2 text-sm text-zinc-500">Based on 10 comparable properties</p>
+        </div>
+        
+        {/* Price Range */}
+        <div className="w-full max-w-lg mb-8">
+          <div className="flex justify-between text-sm text-zinc-500 mb-2">
+            <span>Conservative</span>
+            <span>Aggressive</span>
+          </div>
+          <div className="h-3 bg-zinc-200 rounded-full relative">
+            <div 
+              className="absolute h-full bg-gradient-to-r from-green-400 via-[#EF4923] to-red-400 rounded-full"
+              style={{ width: '100%' }}
+            ></div>
+            <div 
+              className="absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-white border-4 border-[#EF4923] rounded-full shadow"
+              style={{ left: '50%', transform: 'translate(-50%, -50%)' }}
+            ></div>
+          </div>
+          <div className="flex justify-between mt-2">
+            <div className="text-center">
+              <p className="text-lg font-semibold text-zinc-700">$989,710</p>
+              <p className="text-xs text-zinc-500">Low</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold text-[#EF4923]">$1,050,000</p>
+              <p className="text-xs text-zinc-500">Recommended</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold text-zinc-700">$1,093,890</p>
+              <p className="text-xs text-zinc-500">High</p>
+            </div>
+          </div>
+        </div>
+        
+        {/* Stats Grid */}
+        <div className="grid grid-cols-4 gap-4 w-full max-w-2xl">
+          <div className="bg-zinc-100 p-4 rounded-lg text-center">
+            <p className="text-xs text-zinc-500 uppercase">Avg Price</p>
+            <p className="text-xl font-bold text-zinc-800">$1,041,800</p>
+          </div>
+          <div className="bg-zinc-100 p-4 rounded-lg text-center">
+            <p className="text-xs text-zinc-500 uppercase">Avg $/Sq Ft</p>
+            <p className="text-xl font-bold text-zinc-800">$531</p>
+          </div>
+          <div className="bg-zinc-100 p-4 rounded-lg text-center">
+            <p className="text-xs text-zinc-500 uppercase">Price Range</p>
+            <p className="text-lg font-bold text-zinc-800">$299K - $2.5M</p>
+          </div>
+          <div className="bg-zinc-100 p-4 rounded-lg text-center">
+            <p className="text-xs text-zinc-500 uppercase"># Comps</p>
+            <p className="text-xl font-bold text-zinc-800">10</p>
+          </div>
+        </div>
+      </div>
+      
+      <PageFooter address="612 Twelve Oaks Lane, Austin, TX" />
+    </div>
+  );
+}
+
+function PropertyDetailsPage({ index }: { index: number }) {
+  const property = index === 1 
+    ? { address: '2007 Alameda DR', city: 'Austin, TX 78733', price: 950000, beds: 2, baths: 2, sqft: 1114, status: 'Closed', dom: 129, yearBuilt: 1985 }
+    : { address: '5204 Hedgewood DR', city: 'Austin, TX 78745', price: 480000, beds: 3, baths: 2, sqft: 1491, status: 'Closed', dom: 76, yearBuilt: 1972 };
+  
+  return (
+    <div className="h-full flex flex-col">
+      <PageHeader title="PROPERTY DETAILS" slideNumber={9 + index} />
+      
+      <div className="flex-1 p-8">
+        <div className="flex gap-6 h-full">
+          {/* Photo */}
+          <div className="w-1/2">
+            <div className="aspect-[4/3] bg-gradient-to-br from-zinc-200 to-zinc-300 rounded-lg overflow-hidden flex items-center justify-center">
+              <div className="text-center text-zinc-400">
+                <div className="text-4xl mb-2">🏠</div>
+                <p className="text-sm">Property Photo</p>
+              </div>
+            </div>
+            
+            {/* Thumbnail row */}
+            <div className="flex gap-2 mt-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex-1 aspect-square bg-zinc-200 rounded"></div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Details */}
+          <div className="w-1/2">
+            <div className="mb-4">
+              <h2 className="text-2xl font-bold text-zinc-900">{property.address}</h2>
+              <p className="text-zinc-500">{property.city}</p>
+            </div>
+            
+            <div className="flex items-center gap-4 mb-6">
+              <span className="text-3xl font-bold text-[#EF4923]">
+                ${property.price.toLocaleString()}
+              </span>
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                property.status === 'Closed' 
+                  ? 'bg-green-100 text-green-700' 
+                  : 'bg-blue-100 text-blue-700'
+              }`}>
+                {property.status}
+              </span>
+            </div>
+            
+            {/* Property Features */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-zinc-100 p-4 rounded-lg">
+                <p className="text-xs text-zinc-500 uppercase">Bedrooms</p>
+                <p className="text-2xl font-bold">{property.beds}</p>
+              </div>
+              <div className="bg-zinc-100 p-4 rounded-lg">
+                <p className="text-xs text-zinc-500 uppercase">Bathrooms</p>
+                <p className="text-2xl font-bold">{property.baths}</p>
+              </div>
+              <div className="bg-zinc-100 p-4 rounded-lg">
+                <p className="text-xs text-zinc-500 uppercase">Square Feet</p>
+                <p className="text-2xl font-bold">{property.sqft.toLocaleString()}</p>
+              </div>
+              <div className="bg-zinc-100 p-4 rounded-lg">
+                <p className="text-xs text-zinc-500 uppercase">Price/Sq Ft</p>
+                <p className="text-2xl font-bold">${Math.round(property.price / property.sqft)}</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="border-l-4 border-[#EF4923] pl-3">
+                <p className="text-xs text-zinc-500 uppercase">Days on Market</p>
+                <p className="text-xl font-semibold">{property.dom} days</p>
+              </div>
+              <div className="border-l-4 border-[#EF4923] pl-3">
+                <p className="text-xs text-zinc-500 uppercase">Year Built</p>
+                <p className="text-xl font-semibold">{property.yearBuilt}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <PageFooter address="612 Twelve Oaks Lane, Austin, TX" />
+    </div>
+  );
+}
+
+function HomeSellingSystemPage() {
+  return (
+    <div className="h-full flex flex-col">
+      <PageHeader title="OUR HOME SELLING SYSTEM" slideNumber={15} />
+      
+      <div className="flex-1 p-8">
+        <p className="text-center text-zinc-600 mb-8 max-w-2xl mx-auto">
+          Our proven step-by-step system designed to sell your home quickly and for top dollar.
+        </p>
+        
+        <div className="grid grid-cols-3 gap-6">
+          {[
+            { num: '01', title: 'Strategic Pricing', desc: 'Data-driven pricing analysis to position your home competitively' },
+            { num: '02', title: 'Professional Staging', desc: 'Expert staging consultation to showcase your home\'s best features' },
+            { num: '03', title: 'Premium Marketing', desc: 'Professional photography, video, and targeted digital campaigns' },
+            { num: '04', title: 'Maximum Exposure', desc: 'MLS syndication to Zillow, Realtor.com, and 500+ websites' },
+            { num: '05', title: 'Expert Negotiation', desc: 'Skilled negotiation to maximize your sale price' },
+            { num: '06', title: 'Smooth Closing', desc: 'Dedicated coordination from contract to keys' },
+          ].map((item, i) => (
+            <div key={i} className="bg-zinc-50 p-5 rounded-lg border border-zinc-200">
+              <div className="text-3xl font-bold text-[#EF4923] mb-2">{item.num}</div>
+              <h3 className="font-semibold text-zinc-900 mb-1">{item.title}</h3>
+              <p className="text-sm text-zinc-600">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      <PageFooter address="612 Twelve Oaks Lane, Austin, TX" />
+    </div>
+  );
+}
+
+function TimeToSellPage() {
+  const data = [
+    { address: '2007 Alameda DR', dom: 129 },
+    { address: '1604 Garner Ave', dom: 332 },
+    { address: '5204 Hedgewood', dom: 76 },
+    { address: '5026 Lansing DR', dom: 3 },
+    { address: '1304 Summit ST', dom: 0 },
+  ];
+  const avgDom = Math.round(data.reduce((a, d) => a + d.dom, 0) / data.length);
+  const maxDom = Math.max(...data.map(d => d.dom));
+
+  return (
+    <div className="h-full flex flex-col">
+      <PageHeader title="TIME TO SELL" slideNumber={7} />
+      
+      <div className="flex-1 p-8">
+        <div className="flex gap-8">
+          {/* Left - Big number */}
+          <div className="w-1/3 flex flex-col items-center justify-center bg-[#EF4923] text-white rounded-xl p-8">
+            <p className="text-6xl font-bold">{avgDom}</p>
+            <p className="text-lg">days average</p>
+            <p className="text-sm opacity-80 mt-2">Austin Market Average: 45 days</p>
+          </div>
+          
+          {/* Right - Bar chart */}
+          <div className="w-2/3">
+            <h3 className="font-semibold text-zinc-900 mb-4">Days on Market by Property</h3>
+            <div className="space-y-3">
+              {data.map((item, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="w-32 text-sm text-zinc-600 truncate">{item.address}</div>
+                  <div className="flex-1 h-8 bg-zinc-100 rounded overflow-hidden">
+                    <div 
+                      className="h-full bg-[#EF4923] flex items-center justify-end px-2"
+                      style={{ width: `${Math.max((item.dom / maxDom) * 100, 5)}%` }}
+                    >
+                      <span className="text-xs font-semibold text-white">{item.dom}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <PageFooter address="612 Twelve Oaks Lane, Austin, TX" />
+    </div>
+  );
+}
+
+function WhySpyglassPage() {
+  return (
+    <div className="h-full flex flex-col">
+      <PageHeader title="WHY LIST WITH SPYGLASS REALTY" slideNumber={2} />
+      <div className="flex-1 p-8">
+        <div className="grid grid-cols-2 gap-6">
+          {[
+            { icon: '📸', title: 'Professional Photography', desc: 'High-end photography, videography, and aerial drone footage' },
+            { icon: '📱', title: 'Digital Marketing', desc: 'Targeted social media campaigns and Google/Meta advertising' },
+            { icon: '🌐', title: 'Maximum Exposure', desc: 'MLS, Zillow, Realtor.com, and 500+ websites worldwide' },
+            { icon: '🤝', title: 'Expert Negotiation', desc: 'Proven strategies to maximize your sale price' },
+            { icon: '📋', title: 'Transaction Coordination', desc: 'Dedicated support from contract to close' },
+            { icon: '⭐', title: 'Award-Winning Service', desc: 'Consistently ranked top Austin real estate team' },
+          ].map((item, i) => (
+            <div key={i} className="flex gap-4 p-4 bg-zinc-50 rounded-lg">
+              <div className="text-3xl">{item.icon}</div>
+              <div>
+                <h3 className="font-semibold text-zinc-900">{item.title}</h3>
+                <p className="text-sm text-zinc-600">{item.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <PageFooter address="612 Twelve Oaks Lane, Austin, TX" />
+    </div>
+  );
+}
+
+function TestimonialsPage() {
+  return (
+    <div className="h-full flex flex-col">
+      <PageHeader title="WHAT OUR CLIENTS SAY" slideNumber={3} />
+      <div className="flex-1 p-8">
+        <div className="space-y-6">
+          {[
+            { quote: 'Daryl made selling our home in Westlake a breeze. His market knowledge and negotiation skills got us $50K over asking!', author: 'Sarah & Mike T.', location: 'Westlake Hills' },
+            { quote: 'Professional, responsive, and truly cares about his clients. We couldn\'t have asked for a better experience relocating to Austin.', author: 'Jennifer L.', location: 'Mueller' },
+            { quote: 'From staging to closing, every step was handled with expertise. Highly recommend Spyglass Realty!', author: 'David & Maria R.', location: 'Circle C Ranch' },
+          ].map((t, i) => (
+            <div key={i} className="bg-zinc-50 p-6 rounded-lg border-l-4 border-[#EF4923]">
+              <p className="text-zinc-700 italic mb-3">"{t.quote}"</p>
+              <p className="text-sm font-semibold text-zinc-900">— {t.author}</p>
+              <p className="text-xs text-zinc-500">{t.location}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <PageFooter address="612 Twelve Oaks Lane, Austin, TX" />
+    </div>
+  );
+}
+
+function MarketingOverviewPage() {
+  return (
+    <div className="h-full flex flex-col">
+      <PageHeader title="MARKETING YOUR HOME" slideNumber={4} />
+      <div className="flex-1 p-8">
+        <div className="grid grid-cols-3 gap-6">
+          <div className="bg-[#1a1a1a] text-white p-6 rounded-lg">
+            <h3 className="text-lg font-semibold mb-3 text-[#EF4923]">Digital Marketing</h3>
+            <ul className="space-y-2 text-sm text-zinc-300">
+              <li>• Professional photography</li>
+              <li>• Virtual 3D tours</li>
+              <li>• Social media campaigns</li>
+              <li>• Targeted Google/Meta ads</li>
+            </ul>
+          </div>
+          <div className="bg-[#1a1a1a] text-white p-6 rounded-lg">
+            <h3 className="text-lg font-semibold mb-3 text-[#EF4923]">Traditional Marketing</h3>
+            <ul className="space-y-2 text-sm text-zinc-300">
+              <li>• Professional flyers</li>
+              <li>• Premium signage</li>
+              <li>• Open houses</li>
+              <li>• Broker outreach</li>
+            </ul>
+          </div>
+          <div className="bg-[#1a1a1a] text-white p-6 rounded-lg">
+            <h3 className="text-lg font-semibold mb-3 text-[#EF4923]">MLS & Syndication</h3>
+            <ul className="space-y-2 text-sm text-zinc-300">
+              <li>• Austin MLS listing</li>
+              <li>• Zillow & Realtor.com</li>
+              <li>• International portals</li>
+              <li>• 500+ websites</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <PageFooter address="612 Twelve Oaks Lane, Austin, TX" />
+    </div>
+  );
+}
+
+function PricingStrategyPage() {
+  return (
+    <div className="h-full flex flex-col">
+      <PageHeader title="PRICING STRATEGY" slideNumber={20} />
+      <div className="flex-1 p-8">
+        <div className="max-w-2xl mx-auto">
+          <p className="text-center text-zinc-600 mb-8">
+            Strategic pricing is crucial for a successful sale. Here's how we determine the optimal list price.
+          </p>
+          <div className="space-y-4">
+            {[
+              { title: 'Market Analysis', desc: 'Comprehensive review of recent sales and active listings in your area' },
+              { title: 'Condition Assessment', desc: 'Evaluation of your home\'s unique features and improvements' },
+              { title: 'Market Conditions', desc: 'Analysis of current buyer demand and inventory levels in Austin' },
+              { title: 'Pricing Psychology', desc: 'Strategic price points to maximize buyer interest and showings' },
+            ].map((item, i) => (
+              <div key={i} className="flex gap-4 items-start">
+                <div className="w-8 h-8 bg-[#EF4923] text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">
+                  {i + 1}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-zinc-900">{item.title}</h3>
+                  <p className="text-sm text-zinc-600">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <PageFooter address="612 Twelve Oaks Lane, Austin, TX" />
+    </div>
+  );
+}
+
+function ActionPlanPage() {
+  return (
+    <div className="h-full flex flex-col">
+      <PageHeader title="LISTING ACTION PLAN" slideNumber={25} />
+      <div className="flex-1 p-8">
+        <div className="grid grid-cols-4 gap-4">
+          {[
+            { step: 1, title: 'Pre-Listing', items: ['Initial consultation', 'Pricing analysis', 'Staging recommendations'] },
+            { step: 2, title: 'Preparation', items: ['Professional photos', 'Marketing materials', 'MLS listing prep'] },
+            { step: 3, title: 'Marketing', items: ['Launch campaigns', 'Open houses', 'Buyer feedback'] },
+            { step: 4, title: 'Closing', items: ['Offer negotiation', 'Inspections', 'Final walkthrough'] },
+          ].map((phase) => (
+            <div key={phase.step} className="bg-zinc-50 p-4 rounded-lg">
+              <div className="w-10 h-10 bg-[#EF4923] text-white rounded-full flex items-center justify-center font-bold mb-3">
+                {phase.step}
+              </div>
+              <h3 className="font-semibold text-zinc-900 mb-2">{phase.title}</h3>
+              <ul className="space-y-1 text-sm text-zinc-600">
+                {phase.items.map((item, i) => (
+                  <li key={i}>• {item}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+      <PageFooter address="612 Twelve Oaks Lane, Austin, TX" />
+    </div>
+  );
+}
+
+function ThankYouPage() {
+  return (
+    <div className="h-full bg-gradient-to-b from-[#1a1a1a] to-[#2d2d2d] flex flex-col items-center justify-center text-center px-12">
+      <div className="text-3xl font-bold text-white tracking-wider mb-8">
+        <span className="text-[#EF4923]">SPYGLASS</span>
+        <span className="text-white ml-2">REALTY</span>
+      </div>
+      
+      <h1 className="text-4xl font-light text-white mb-4">Thank You</h1>
+      <p className="text-zinc-400 mb-8">for considering Spyglass Realty</p>
+      
+      <div className="w-24 h-24 rounded-full bg-zinc-700 border-4 border-[#EF4923] mb-6 flex items-center justify-center">
+        <span className="text-3xl font-bold text-white">DC</span>
+      </div>
+      
+      <p className="text-xl font-semibold text-white">Daryl Camingao</p>
+      <p className="text-zinc-400">REALTOR® | Spyglass Realty</p>
+      
+      <div className="mt-6 text-zinc-400 text-sm">
+        <p>512-555-1234</p>
+        <p>daryl@spyglassrealty.com</p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// SHARED COMPONENTS
+// ============================================================
+
+function PageHeader({ title, slideNumber }: { title: string; slideNumber: number }) {
+  return (
+    <div className="bg-[#1a1a1a] text-white px-8 py-4 flex items-center justify-between">
+      <h1 className="text-lg font-bold tracking-wider">{title}</h1>
+      <div className="flex items-center gap-4">
+        <div className="text-2xl font-bold tracking-wider">
+          <span className="text-[#EF4923]">SPYGLASS</span>
+        </div>
+        <span className="text-zinc-500 text-sm">Slide {slideNumber}</span>
+      </div>
+    </div>
+  );
+}
+
+function PageFooter({ address }: { address: string }) {
+  return (
+    <div className="bg-zinc-100 px-8 py-3 flex items-center justify-between text-xs text-zinc-500">
+      <span>{address}</span>
+      <span>© 2026 Spyglass Realty | spyglassrealty.com</span>
+    </div>
+  );
+}
+
+function StatBox({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className={`p-4 rounded-lg text-center ${highlight ? 'bg-[#EF4923] text-white' : 'bg-zinc-100'}`}>
+      <p className={`text-xs uppercase mb-1 ${highlight ? 'text-orange-100' : 'text-zinc-500'}`}>{label}</p>
+      <p className="text-xl font-bold">{value}</p>
+    </div>
+  );
+}
