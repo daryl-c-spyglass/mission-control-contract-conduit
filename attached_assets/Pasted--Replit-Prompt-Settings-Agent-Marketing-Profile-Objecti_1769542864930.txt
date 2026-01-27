@@ -1,0 +1,689 @@
+# Replit Prompt: Settings > Agent Marketing Profile
+
+## 🎯 Objective
+
+Add a new **"Agent Marketing Profile"** section to the Settings page. This section stores agent branding assets (photos, logos, QR code) that will be used across all marketing materials, starting with the Flyer Generator.
+
+---
+
+## 📍 Location
+
+**Settings Page** — Add as a new section/tab
+
+```
+Settings
+├── Profile (existing)
+├── Notifications (existing)
+├── Graphics Settings (existing)
+└── Agent Marketing Profile ← NEW
+```
+
+---
+
+## 🗄️ Database Schema
+
+### Add to existing settings/users table or create new table:
+
+```sql
+-- Option A: Add columns to existing users/settings table
+ALTER TABLE users ADD COLUMN IF NOT EXISTS marketing_profile JSONB DEFAULT '{}';
+
+-- Option B: Create dedicated table
+CREATE TABLE IF NOT EXISTS agent_marketing_profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+  agent_photo TEXT,                    -- Base64 or URL
+  agent_title VARCHAR(100) DEFAULT 'REALTOR®',
+  qr_code TEXT,                        -- Base64 or URL (agent uploads their own)
+  company_logo TEXT,                   -- Base64 or URL (custom upload)
+  company_logo_use_default BOOLEAN DEFAULT true,
+  secondary_logo TEXT,                 -- Base64 or URL (custom upload)
+  secondary_logo_use_default BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### Drizzle Schema (shared/schema.ts):
+
+```typescript
+// Add to schema.ts
+export const agentMarketingProfiles = pgTable('agent_marketing_profiles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id).notNull().unique(),
+  agentPhoto: text('agent_photo'),
+  agentTitle: varchar('agent_title', { length: 100 }).default('REALTOR®'),
+  qrCode: text('qr_code'),
+  companyLogo: text('company_logo'),
+  companyLogoUseDefault: boolean('company_logo_use_default').default(true),
+  secondaryLogo: text('secondary_logo'),
+  secondaryLogoUseDefault: boolean('secondary_logo_use_default').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export type AgentMarketingProfile = typeof agentMarketingProfiles.$inferSelect;
+export type InsertAgentMarketingProfile = typeof agentMarketingProfiles.$inferInsert;
+```
+
+---
+
+## 🖥️ UI Implementation
+
+### Settings Page — Agent Marketing Profile Section
+
+```tsx
+// client/src/pages/settings.tsx or settings/marketing-profile.tsx
+
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Upload, User, QrCode, Building2, Image as ImageIcon, Save, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+export default function AgentMarketingProfileSettings() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch existing profile
+  const { data: profile, isLoading } = useQuery({
+    queryKey: ['/api/settings/marketing-profile'],
+  });
+
+  // Form state
+  const [formData, setFormData] = useState({
+    agentPhoto: null as string | null,
+    agentTitle: 'REALTOR®',
+    qrCode: null as string | null,
+    companyLogo: null as string | null,
+    companyLogoUseDefault: true,
+    secondaryLogo: null as string | null,
+    secondaryLogoUseDefault: true,
+  });
+
+  // Populate form when data loads
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        agentPhoto: profile.agentPhoto || null,
+        agentTitle: profile.agentTitle || 'REALTOR®',
+        qrCode: profile.qrCode || null,
+        companyLogo: profile.companyLogo || null,
+        companyLogoUseDefault: profile.companyLogoUseDefault ?? true,
+        secondaryLogo: profile.secondaryLogo || null,
+        secondaryLogoUseDefault: profile.secondaryLogoUseDefault ?? true,
+      });
+    }
+  }, [profile]);
+
+  // Save mutation
+  const saveMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const response = await fetch('/api/settings/marketing-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Failed to save');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings/marketing-profile'] });
+      toast({
+        title: 'Profile Saved',
+        description: 'Your marketing profile has been updated.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to save marketing profile.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Image upload handler
+  const handleImageUpload = (field: keyof typeof formData) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: 'File Too Large',
+          description: 'Please upload an image under 5MB.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, [field]: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Clear image handler
+  const handleClearImage = (field: keyof typeof formData) => {
+    setFormData(prev => ({ ...prev, [field]: null }));
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-white">Agent Marketing Profile</h2>
+        <p className="text-muted-foreground">
+          Configure your branding for all marketing materials
+        </p>
+      </div>
+
+      {/* Agent Photo & QR Code */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="text-lg">Personal Branding</CardTitle>
+          <CardDescription>Your photo and QR code for marketing materials</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Agent Photo */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium uppercase tracking-wide">
+                Agent Photo
+              </Label>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <label
+                    htmlFor="agent-photo"
+                    className="flex h-24 w-24 cursor-pointer items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/25 bg-muted/50 hover:border-primary/50 transition-colors overflow-hidden"
+                  >
+                    {formData.agentPhoto ? (
+                      <img
+                        src={formData.agentPhoto}
+                        alt="Agent"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <User className="h-8 w-8 text-muted-foreground" />
+                    )}
+                    <input
+                      type="file"
+                      id="agent-photo"
+                      accept="image/*"
+                      onChange={handleImageUpload('agentPhoto')}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">
+                    Upload your professional headshot
+                  </p>
+                  <p className="text-xs text-muted-foreground/60">
+                    PNG or JPG, max 5MB
+                  </p>
+                  {formData.agentPhoto && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleClearImage('agentPhoto')}
+                      className="mt-2 text-destructive hover:text-destructive"
+                    >
+                      Remove Photo
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* QR Code */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium uppercase tracking-wide">
+                QR Code
+              </Label>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <label
+                    htmlFor="qr-code"
+                    className="flex h-24 w-24 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/50 hover:border-primary/50 transition-colors overflow-hidden"
+                  >
+                    {formData.qrCode ? (
+                      <img
+                        src={formData.qrCode}
+                        alt="QR Code"
+                        className="h-full w-full object-contain p-2"
+                      />
+                    ) : (
+                      <QrCode className="h-8 w-8 text-muted-foreground" />
+                    )}
+                    <input
+                      type="file"
+                      id="qr-code"
+                      accept="image/*"
+                      onChange={handleImageUpload('qrCode')}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">
+                    Upload your personal QR code
+                  </p>
+                  <p className="text-xs text-muted-foreground/60">
+                    Links to your website, vCard, or contact page
+                  </p>
+                  {formData.qrCode && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleClearImage('qrCode')}
+                      className="mt-2 text-destructive hover:text-destructive"
+                    >
+                      Remove QR Code
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Agent Title */}
+          <div className="space-y-2">
+            <Label htmlFor="agent-title" className="text-sm font-medium uppercase tracking-wide">
+              Agent Title
+            </Label>
+            <Input
+              id="agent-title"
+              value={formData.agentTitle}
+              onChange={(e) => setFormData(prev => ({ ...prev, agentTitle: e.target.value }))}
+              placeholder="REALTOR®"
+              className="max-w-xs"
+            />
+            <p className="text-xs text-muted-foreground">
+              Your professional title (e.g., REALTOR®, Broker, Agent)
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Company Logos */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="text-lg">Company Branding</CardTitle>
+          <CardDescription>Logos for your marketing materials</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Company Logo */}
+            <div className="space-y-4">
+              <Label className="text-sm font-medium uppercase tracking-wide">
+                Company Logo
+              </Label>
+              
+              {/* Default Toggle */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="use-default-company" className="text-sm">
+                    Use Spyglass Default
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Use the standard Spyglass Realty logo
+                  </p>
+                </div>
+                <Switch
+                  id="use-default-company"
+                  checked={formData.companyLogoUseDefault}
+                  onCheckedChange={(checked) => 
+                    setFormData(prev => ({ ...prev, companyLogoUseDefault: checked }))
+                  }
+                />
+              </div>
+
+              {/* Default Logo Preview */}
+              {formData.companyLogoUseDefault && (
+                <div className="h-20 bg-muted/50 rounded-lg flex items-center justify-center border border-border">
+                  <img
+                    src="/logos/SpyglassRealty_Logo_Black.png"
+                    alt="Spyglass Realty"
+                    className="h-12 object-contain"
+                  />
+                </div>
+              )}
+
+              {/* Custom Upload */}
+              {!formData.companyLogoUseDefault && (
+                <div className="space-y-2">
+                  <label
+                    htmlFor="company-logo"
+                    className="flex h-20 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/50 hover:border-primary/50 transition-colors overflow-hidden"
+                  >
+                    {formData.companyLogo ? (
+                      <img
+                        src={formData.companyLogo}
+                        alt="Company Logo"
+                        className="h-full object-contain p-2"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                        <Upload className="h-5 w-5" />
+                        <span className="text-xs">Upload Custom Logo</span>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      id="company-logo"
+                      accept="image/*"
+                      onChange={handleImageUpload('companyLogo')}
+                      className="hidden"
+                    />
+                  </label>
+                  {formData.companyLogo && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleClearImage('companyLogo')}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Secondary Logo */}
+            <div className="space-y-4">
+              <Label className="text-sm font-medium uppercase tracking-wide">
+                Secondary Logo
+              </Label>
+              
+              {/* Default Toggle */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="use-default-secondary" className="text-sm">
+                    Use Leading RE Default
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Use the standard Leading Real Estate logo
+                  </p>
+                </div>
+                <Switch
+                  id="use-default-secondary"
+                  checked={formData.secondaryLogoUseDefault}
+                  onCheckedChange={(checked) => 
+                    setFormData(prev => ({ ...prev, secondaryLogoUseDefault: checked }))
+                  }
+                />
+              </div>
+
+              {/* Default Logo Preview */}
+              {formData.secondaryLogoUseDefault && (
+                <div className="h-20 bg-muted/50 rounded-lg flex items-center justify-center border border-border">
+                  <img
+                    src="/logos/LeadingRE_Logo.png"
+                    alt="Leading Real Estate"
+                    className="h-12 object-contain"
+                  />
+                </div>
+              )}
+
+              {/* Custom Upload */}
+              {!formData.secondaryLogoUseDefault && (
+                <div className="space-y-2">
+                  <label
+                    htmlFor="secondary-logo"
+                    className="flex h-20 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/50 hover:border-primary/50 transition-colors overflow-hidden"
+                  >
+                    {formData.secondaryLogo ? (
+                      <img
+                        src={formData.secondaryLogo}
+                        alt="Secondary Logo"
+                        className="h-full object-contain p-2"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                        <Upload className="h-5 w-5" />
+                        <span className="text-xs">Upload Custom Logo</span>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      id="secondary-logo"
+                      accept="image/*"
+                      onChange={handleImageUpload('secondaryLogo')}
+                      className="hidden"
+                    />
+                  </label>
+                  {formData.secondaryLogo && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleClearImage('secondaryLogo')}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Save Button */}
+      <div className="flex justify-end">
+        <Button
+          onClick={() => saveMutation.mutate(formData)}
+          disabled={saveMutation.isPending}
+          className="bg-primary hover:bg-primary/90"
+        >
+          {saveMutation.isPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="mr-2 h-4 w-4" />
+              Save Marketing Profile
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 🔌 API Endpoints
+
+### GET /api/settings/marketing-profile
+
+```typescript
+// server/routes/settings.ts
+
+app.get('/api/settings/marketing-profile', async (req, res) => {
+  try {
+    const userId = req.user?.id; // From auth middleware
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const profile = await db.query.agentMarketingProfiles.findFirst({
+      where: eq(agentMarketingProfiles.userId, userId),
+    });
+
+    // Return profile or default values
+    res.json(profile || {
+      agentPhoto: null,
+      agentTitle: 'REALTOR®',
+      qrCode: null,
+      companyLogo: null,
+      companyLogoUseDefault: true,
+      secondaryLogo: null,
+      secondaryLogoUseDefault: true,
+    });
+  } catch (error) {
+    console.error('Error fetching marketing profile:', error);
+    res.status(500).json({ error: 'Failed to fetch marketing profile' });
+  }
+});
+```
+
+### POST /api/settings/marketing-profile
+
+```typescript
+app.post('/api/settings/marketing-profile', async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const {
+      agentPhoto,
+      agentTitle,
+      qrCode,
+      companyLogo,
+      companyLogoUseDefault,
+      secondaryLogo,
+      secondaryLogoUseDefault,
+    } = req.body;
+
+    // Upsert profile
+    const existing = await db.query.agentMarketingProfiles.findFirst({
+      where: eq(agentMarketingProfiles.userId, userId),
+    });
+
+    let profile;
+    if (existing) {
+      // Update
+      [profile] = await db
+        .update(agentMarketingProfiles)
+        .set({
+          agentPhoto,
+          agentTitle,
+          qrCode,
+          companyLogo,
+          companyLogoUseDefault,
+          secondaryLogo,
+          secondaryLogoUseDefault,
+          updatedAt: new Date(),
+        })
+        .where(eq(agentMarketingProfiles.userId, userId))
+        .returning();
+    } else {
+      // Insert
+      [profile] = await db
+        .insert(agentMarketingProfiles)
+        .values({
+          userId,
+          agentPhoto,
+          agentTitle,
+          qrCode,
+          companyLogo,
+          companyLogoUseDefault,
+          secondaryLogo,
+          secondaryLogoUseDefault,
+        })
+        .returning();
+    }
+
+    res.json(profile);
+  } catch (error) {
+    console.error('Error saving marketing profile:', error);
+    res.status(500).json({ error: 'Failed to save marketing profile' });
+  }
+});
+```
+
+---
+
+## 🖼️ Default Logo Files
+
+Ensure these files exist in `/public/logos/`:
+- `SpyglassRealty_Logo_Black.png` — Spyglass Realty logo
+- `LeadingRE_Logo.png` — Leading Real Estate logo
+
+---
+
+## 📱 Mobile Optimization
+
+### Responsive Layout
+```css
+/* Stack cards vertically on mobile */
+@media (max-width: 768px) {
+  .grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+}
+```
+
+### Touch Targets
+- All upload areas: minimum 80x80px
+- Buttons: minimum 44px height
+- Toggle switches: standard size with adequate spacing
+
+---
+
+## ✅ Verification Checklist
+
+- [ ] Agent Marketing Profile section appears in Settings
+- [ ] Agent Photo upload works (displays in circular frame)
+- [ ] QR Code upload works
+- [ ] Agent Title field saves correctly
+- [ ] Company Logo toggle between default/custom works
+- [ ] Secondary Logo toggle between default/custom works
+- [ ] All uploads persist after page refresh
+- [ ] Error handling for oversized files (>5MB)
+- [ ] Loading states display correctly
+- [ ] Success toast appears after save
+- [ ] Mobile responsive layout works
+
+---
+
+## 🔗 Integration Hook (for Flyer Generator)
+
+```typescript
+// hooks/useMarketingProfile.ts
+
+export function useMarketingProfile() {
+  return useQuery({
+    queryKey: ['/api/settings/marketing-profile'],
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+}
+
+// Usage in Flyer Generator:
+const { data: marketingProfile } = useMarketingProfile();
+
+// Auto-fill flyer with profile data
+const agentPhoto = marketingProfile?.agentPhoto || null;
+const qrCode = marketingProfile?.qrCode || null;
+const companyLogo = marketingProfile?.companyLogoUseDefault 
+  ? '/logos/SpyglassRealty_Logo_Black.png' 
+  : marketingProfile?.companyLogo;
+const secondaryLogo = marketingProfile?.secondaryLogoUseDefault 
+  ? '/logos/LeadingRE_Logo.png' 
+  : marketingProfile?.secondaryLogo;
+```
+
+---
+
+*This prompt creates the Settings foundation needed for the Flyer Generator. Implement this first, then proceed to the Flyer Generator prompt.*
