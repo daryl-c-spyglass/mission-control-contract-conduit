@@ -6,9 +6,12 @@ export async function imageUrlToBase64(url: string): Promise<string | null> {
   }
   
   try {
-    const response = await fetch(url);
+    // Use server-side proxy to avoid CORS issues with external CDN images
+    const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
+    
+    const response = await fetch(proxyUrl);
     if (!response.ok) {
-      console.warn(`[imageToBase64] Failed to fetch image: ${url} (${response.status})`);
+      console.warn(`[imageToBase64] Failed to fetch image via proxy: ${url} (${response.status})`);
       return null;
     }
     

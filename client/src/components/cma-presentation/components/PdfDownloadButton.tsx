@@ -47,27 +47,39 @@ export function PdfDownloadButton({
 
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
-      console.log('[PdfDownloadButton] Converting comparable photos to base64...');
+      console.log(`[PdfDownloadButton] Converting ${comparables.length} comparable photos to base64 via proxy...`);
+      let successCount = 0;
+      let failCount = 0;
+      
       const processedComparables = await Promise.all(
         comparables.map(async (comp, index) => {
           const photoUrl = getPrimaryPhoto(comp);
           if (!photoUrl) {
-            console.log(`[PdfDownloadButton] Comparable ${index + 1}: no photo found`);
+            console.log(`[PdfDownloadButton] Comparable ${index + 1}: no photo URL found`);
+            failCount++;
             return comp;
           }
           
           try {
+            console.log(`[PdfDownloadButton] Comparable ${index + 1}: converting ${photoUrl.substring(0, 60)}...`);
             const base64Photo = await imageUrlToBase64(photoUrl);
             if (base64Photo) {
-              console.log(`[PdfDownloadButton] Comparable ${index + 1}: photo converted`);
+              console.log(`[PdfDownloadButton] Comparable ${index + 1}: photo converted (${Math.round(base64Photo.length / 1024)}KB)`);
+              successCount++;
               return { ...comp, base64PrimaryPhoto: base64Photo };
+            } else {
+              console.warn(`[PdfDownloadButton] Comparable ${index + 1}: conversion returned null`);
+              failCount++;
             }
           } catch (err) {
             console.warn(`[PdfDownloadButton] Comparable ${index + 1}: conversion failed`, err);
+            failCount++;
           }
           return comp;
         })
       );
+      
+      console.log(`[PdfDownloadButton] Image conversion complete: ${successCount} success, ${failCount} failed`);
       
       console.log('[PdfDownloadButton] Image conversion complete, generating PDF...');
 
