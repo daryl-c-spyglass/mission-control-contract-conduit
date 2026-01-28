@@ -26,6 +26,8 @@ import {
   type UserNotificationPreferences,
   type AgentMarketingProfile,
   type InsertAgentMarketingProfile,
+  type Flyer,
+  type InsertFlyer,
   transactions,
   coordinators,
   integrationSettings,
@@ -40,6 +42,7 @@ import {
   agentResources,
   userNotificationPreferences,
   agentMarketingProfiles,
+  flyers,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, isNull, and } from "drizzle-orm";
@@ -133,6 +136,13 @@ export interface IStorage {
   // Agent Marketing Profiles
   getAgentMarketingProfile(userId: string): Promise<AgentMarketingProfile | undefined>;
   upsertAgentMarketingProfile(userId: string, profile: Partial<InsertAgentMarketingProfile>): Promise<AgentMarketingProfile>;
+
+  // Flyers
+  getFlyer(id: string): Promise<Flyer | undefined>;
+  getFlyersByUser(userId: string): Promise<Flyer[]>;
+  createFlyer(flyer: InsertFlyer): Promise<Flyer>;
+  updateFlyer(id: string, data: Partial<InsertFlyer>): Promise<Flyer | undefined>;
+  incrementFlyerViews(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -673,6 +683,42 @@ export class DatabaseStorage implements IStorage {
         .values({ userId, ...profile })
         .returning();
       return created;
+    }
+  }
+
+  // Flyers
+  async getFlyer(id: string): Promise<Flyer | undefined> {
+    const [flyer] = await db.select().from(flyers).where(eq(flyers.id, id));
+    return flyer;
+  }
+
+  async getFlyersByUser(userId: string): Promise<Flyer[]> {
+    return await db.select().from(flyers)
+      .where(eq(flyers.userId, userId))
+      .orderBy(desc(flyers.createdAt));
+  }
+
+  async createFlyer(flyer: InsertFlyer): Promise<Flyer> {
+    const [newFlyer] = await db.insert(flyers).values(flyer).returning();
+    return newFlyer;
+  }
+
+  async updateFlyer(id: string, data: Partial<InsertFlyer>): Promise<Flyer | undefined> {
+    const [updated] = await db
+      .update(flyers)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(flyers.id, id))
+      .returning();
+    return updated;
+  }
+
+  async incrementFlyerViews(id: string): Promise<void> {
+    const flyer = await this.getFlyer(id);
+    if (flyer) {
+      await db
+        .update(flyers)
+        .set({ viewCount: (flyer.viewCount || 0) + 1, updatedAt: new Date() })
+        .where(eq(flyers.id, id));
     }
   }
 }

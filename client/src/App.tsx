@@ -20,6 +20,7 @@ import Archive from "@/pages/archive";
 import Settings from "@/pages/settings";
 import Admin from "@/pages/admin";
 import SharedCMAPage from "@/pages/shared-cma";
+import PublicFlyerPage from "@/pages/flyer-viewer";
 import CMAs from "@/pages/CMAs";
 import CMANew from "@/pages/CMANew";
 import CMADetailPage from "@/pages/CMADetailPage";
@@ -256,6 +257,16 @@ function AppContent() {
     return (
       <Switch>
         <Route path="/shared/cma/:token" component={SharedCMAPage} />
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
+
+  // Public flyer viewer route - no auth required
+  if (window.location.pathname.startsWith('/flyer/')) {
+    return (
+      <Switch>
+        <Route path="/flyer/:id" component={PublicFlyerPage} />
         <Route component={NotFound} />
       </Switch>
     );

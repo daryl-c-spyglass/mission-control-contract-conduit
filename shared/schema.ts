@@ -104,6 +104,52 @@ export const marketingAssets = pgTable("marketing_assets", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Flyers table - shareable property flyers with QR codes
+export const flyers = pgTable("flyers", {
+  id: varchar("id", { length: 12 }).primaryKey(), // Short unique ID for URL (e.g., "abc123xyz")
+  transactionId: varchar("transaction_id"),
+  userId: varchar("user_id").notNull(),
+  
+  // Property Data (snapshot at time of creation)
+  propertyAddress: text("property_address").notNull(),
+  propertyCity: text("property_city"),
+  propertyState: text("property_state"),
+  propertyZip: text("property_zip"),
+  listPrice: text("list_price"),
+  bedrooms: integer("bedrooms"),
+  bathrooms: text("bathrooms"),
+  squareFeet: integer("square_feet"),
+  headline: text("headline"),
+  description: text("description"),
+  
+  // Images
+  mainPhoto: text("main_photo"),
+  kitchenPhoto: text("kitchen_photo"),
+  roomPhoto: text("room_photo"),
+  additionalPhotos: jsonb("additional_photos").$type<string[]>().default([]),
+  
+  // Agent Data (from Settings at time of creation)
+  agentName: text("agent_name"),
+  agentTitle: text("agent_title"),
+  agentPhone: text("agent_phone"),
+  agentEmail: text("agent_email"),
+  agentPhoto: text("agent_photo"),
+  
+  // Branding
+  companyLogo: text("company_logo"),
+  secondaryLogo: text("secondary_logo"),
+  logoScales: jsonb("logo_scales").$type<{ primary: number; secondary: number }>().default({ primary: 1, secondary: 1 }),
+  dividerPosition: integer("divider_position").default(148),
+  secondaryLogoOffsetY: integer("secondary_logo_offset_y").default(0),
+  
+  // Metadata
+  status: text("status").default("active"),
+  viewCount: integer("view_count").default(0),
+  mlsNumber: text("mls_number"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // CMA Brochure type
 export interface CmaBrochure {
   type: "pdf" | "image";
@@ -371,6 +417,11 @@ export const insertMarketingAssetSchema = createInsertSchema(marketingAssets).om
   createdAt: true,
 });
 
+export const insertFlyerSchema = createInsertSchema(flyers).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertContractDocumentSchema = createInsertSchema(contractDocuments).omit({
   id: true,
   createdAt: true,
@@ -478,6 +529,9 @@ export type InsertActivity = z.infer<typeof insertActivitySchema>;
 
 export type MarketingAsset = typeof marketingAssets.$inferSelect;
 export type InsertMarketingAsset = z.infer<typeof insertMarketingAssetSchema>;
+
+export type Flyer = typeof flyers.$inferSelect;
+export type InsertFlyer = z.infer<typeof insertFlyerSchema>;
 
 export type ContractDocument = typeof contractDocuments.$inferSelect;
 export type InsertContractDocument = z.infer<typeof insertContractDocumentSchema>;

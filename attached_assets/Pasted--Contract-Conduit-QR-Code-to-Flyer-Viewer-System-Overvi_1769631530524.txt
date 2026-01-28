@@ -1,0 +1,772 @@
+# Contract Conduit — QR Code to Flyer Viewer System
+
+## 📌 Overview
+
+Implement a complete system where:
+1. **Flyers auto-save** to database when created
+2. **Each flyer gets a unique public URL** (e.g., `/flyer/abc123xyz`)
+3. **QR code auto-generates** pointing to that URL
+4. **Public viewer page** displays beautiful, mobile-optimized flyer
+5. **Call Agent** — Opens phone dialer with agent phone from Settings
+6. **Email Agent** — Opens email with pre-filled subject/body, agent email from Settings
+7. **Schedule Showing** — Opens email with showing request template to agent email
+8. **Share buttons** — Facebook, X, LinkedIn, WhatsApp, SMS, Email, Copy Link
+
+---
+
+## 🎯 User Flows
+
+```
+AGENT FLOW:
+Create Flyer → Save to DB → Get Unique URL → QR Generated → Export/Print
+
+BUYER FLOW:
+Scan QR → View Flyer Page → Call/Email/Schedule Showing → Lead Captured
+```
+
+---
+
+## 🗄️ Part 1: Database Schema
+
+### Create `flyers` Table (Drizzle ORM)
+
+```typescript
+// server/db/schema/flyers.ts
+
+import { pgTable, text, integer, decimal, timestamp, jsonb } from 'drizzle-orm/pg-core';
+import { users } from './users';
+import { transactions } from './transactions';
+
+export const flyers = pgTable('flyers', {
+  id: text('id').primaryKey(),                    // Unique ID for URL (e.g., "abc123xyz")
+  transactionId: integer('transaction_id').references(() => transactions.id),
+  userId: integer('user_id').references(() => users.id).notNull(),
+  
+  // Property Data (snapshot)
+  propertyAddress: text('property_address').notNull(),
+  propertyCity: text('property_city'),
+  propertyState: text('property_state'),
+  propertyZip: text('property_zip'),
+  listPrice: decimal('list_price', { precision: 12, scale: 2 }),
+  bedrooms: integer('bedrooms'),
+  bathrooms: decimal('bathrooms', { precision: 3, scale: 1 }),
+  squareFeet: integer('square_feet'),
+  headline: text('headline'),
+  description: text('description'),
+  
+  // Images
+  mainPhoto: text('main_photo'),
+  kitchenPhoto: text('kitchen_photo'),
+  roomPhoto: text('room_photo'),
+  additionalPhotos: jsonb('additional_photos').$type<string[]>().default([]),
+  
+  // Agent Data (from Settings at time of creation)
+  agentName: text('agent_name'),
+  agentTitle: text('agent_title'),
+  agentPhone: text('agent_phone'),
+  agentEmail: text('agent_email'),
+  agentPhoto: text('agent_photo'),
+  
+  // Branding
+  companyLogo: text('company_logo'),
+  secondaryLogo: text('secondary_logo'),
+  logoScales: jsonb('logo_scales').$type<{ primary: number; secondary: number }>().default({ primary: 1, secondary: 1 }),
+  dividerPosition: integer('divider_position').default(148),
+  secondaryLogoOffsetY: integer('secondary_logo_offset_y').default(0),
+  
+  // Metadata
+  status: text('status').default('active'),
+  viewCount: integer('view_count').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  mlsNumber: text('mls_number'),
+});
+
+export type Flyer = typeof flyers.$inferSelect;
+export type NewFlyer = typeof flyers.$inferInsert;
+```
+
+### Push Schema
+
+```bash
+npm run db:push
+```
+
+---
+
+## 🔌 Part 2: Flyer Service
+
+### Install Dependencies
+
+```bash
+npm install nanoid qrcode
+npm install -D @types/qrcode
+```
+
+### Service Implementation
+
+```typescript
+// server/services/flyer-service.ts
+
+import { nanoid } from 'nanoid';
+import QRCode from 'qrcode';
+import { db } from '../db';
+import { flyers, NewFlyer } from '../db/schema/flyers';
+import { eq, desc, sql } from 'drizzle-orm';
+
+export function generateFlyerId(): string {
+  return nanoid(9); // 9 char URL-safe ID
+}
+
+function getBaseUrl(): string {
+  // Use your production domain
+  return process.env.PUBLIC_URL || 'https://your-domain.com';
+}
+
+export async function generateQRCode(flyerId: string): Promise<string> {
+  const url = `${getBaseUrl()}/flyer/${flyerId}`;
+  return QRCode.toDataURL(url, {
+    width: 200,
+    margin: 1,
+    color: { dark: '#000000', light: '#ffffff' },
+    errorCorrectionLevel: 'M',
+  });
+}
+
+export async function createFlyer(data: Omit<NewFlyer, 'id' | 'createdAt' | 'updatedAt'>) {
+  const flyerId = generateFlyerId();
+  
+  const [flyer] = await db.insert(flyers).values({
+    id: flyerId,
+    ...data,
+  }).returning();
+  
+  const qrCode = await generateQRCode(flyerId);
+  const flyerUrl = `${getBaseUrl()}/flyer/${flyerId}`;
+  
+  return { flyer, flyerId, flyerUrl, qrCode };
+}
+
+export async function getFlyer(flyerId: string) {
+  const [flyer] = await db.select().from(flyers).where(eq(flyers.id, flyerId)).limit(1);
+  return flyer;
+}
+
+export async function incrementViews(flyerId: string) {
+  await db.update(flyers)
+    .set({ viewCount: sql`${flyers.viewCount} + 1`, updatedAt: new Date() })
+    .where(eq(flyers.id, flyerId));
+}
+
+export async function getUserFlyers(userId: number) {
+  return db.select().from(flyers).where(eq(flyers.userId, userId)).orderBy(desc(flyers.createdAt));
+}
+```
+
+---
+
+## 🛣️ Part 3: API Routes
+
+### Protected Routes (Auth Required)
+
+```typescript
+// server/routes/flyers.ts
+
+import { Router } from 'express';
+import { createFlyer, getUserFlyers, generateQRCode } from '../services/flyer-service';
+import { requireAuth } from '../middleware/auth';
+
+const router = Router();
+
+// Create flyer
+router.post('/', requireAuth, async (req, res) => {
+  try {
+    const result = await createFlyer({ ...req.body, userId: req.user.id });
+    res.json({
+      success: true,
+      flyerId: result.flyerId,
+      flyerUrl: result.flyerUrl,
+      qrCode: result.qrCode,
+    });
+  } catch (error) {
+    console.error('[Flyer] Create error:', error);
+    res.status(500).json({ error: 'Failed to create flyer' });
+  }
+});
+
+// Get user's flyers
+router.get('/', requireAuth, async (req, res) => {
+  try {
+    const flyers = await getUserFlyers(req.user.id);
+    res.json(flyers);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get flyers' });
+  }
+});
+
+// Regenerate QR for existing flyer
+router.get('/:id/qr', requireAuth, async (req, res) => {
+  try {
+    const qrCode = await generateQRCode(req.params.id);
+    res.json({ qrCode });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to generate QR' });
+  }
+});
+
+export default router;
+```
+
+### Public Route (NO Auth)
+
+```typescript
+// server/routes/public-flyer.ts
+
+import { Router } from 'express';
+import { getFlyer, incrementViews } from '../services/flyer-service';
+
+const router = Router();
+
+// Get flyer for public viewing - NO AUTH REQUIRED
+router.get('/:id', async (req, res) => {
+  try {
+    const flyer = await getFlyer(req.params.id);
+    
+    if (!flyer || flyer.status !== 'active') {
+      return res.status(404).json({ error: 'Flyer not found' });
+    }
+    
+    // Track view (async)
+    incrementViews(req.params.id).catch(console.error);
+    
+    res.json(flyer);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load flyer' });
+  }
+});
+
+export default router;
+```
+
+### Register Routes
+
+```typescript
+// server/index.ts or server/routes.ts
+
+import flyersRouter from './routes/flyers';
+import publicFlyerRouter from './routes/public-flyer';
+
+app.use('/api/flyers', flyersRouter);          // Protected
+app.use('/api/public/flyer', publicFlyerRouter); // Public
+```
+
+---
+
+## 📱 Part 4: Public Flyer Viewer Page
+
+### Page Component
+
+```tsx
+// client/src/pages/flyer/[id].tsx
+
+import { useEffect, useState } from 'react';
+import { useParams } from 'wouter';
+import {
+  Phone, Mail, Calendar, Share2, MapPin,
+  Bed, Bath, Maximize, ChevronLeft, ChevronRight,
+  Facebook, Linkedin, MessageCircle, Link2, Check
+} from 'lucide-react';
+
+// Twitter X icon (custom since lucide doesn't have new X logo)
+const XIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
+
+interface Flyer {
+  id: string;
+  propertyAddress: string;
+  propertyCity: string;
+  propertyState: string;
+  propertyZip: string;
+  listPrice: string;
+  bedrooms: number;
+  bathrooms: number;
+  squareFeet: number;
+  headline: string;
+  description: string;
+  mainPhoto: string;
+  kitchenPhoto: string;
+  roomPhoto: string;
+  additionalPhotos: string[];
+  agentName: string;
+  agentTitle: string;
+  agentPhone: string;
+  agentEmail: string;
+  agentPhoto: string;
+  companyLogo: string;
+  secondaryLogo: string;
+}
+
+export default function PublicFlyerPage() {
+  const { id } = useParams<{ id: string }>();
+  const [flyer, setFlyer] = useState<Flyer | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [photoIndex, setPhotoIndex] = useState(0);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [showFullDesc, setShowFullDesc] = useState(false);
+
+  // All photos for gallery
+  const photos = flyer ? [
+    flyer.mainPhoto,
+    flyer.kitchenPhoto,
+    flyer.roomPhoto,
+    ...(flyer.additionalPhotos || [])
+  ].filter(Boolean) : [];
+
+  // Fetch flyer
+  useEffect(() => {
+    fetch(`/api/public/flyer/${id}`)
+      .then(res => res.ok ? res.json() : Promise.reject('Not found'))
+      .then(setFlyer)
+      .catch(() => setError('Flyer not found'))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-10 h-10 border-4 border-[#8B7355] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error || !flyer) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🏠</div>
+          <h1 className="text-2xl font-bold mb-2">Flyer Not Found</h1>
+          <p className="text-gray-600">This flyer may have been removed.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const price = new Intl.NumberFormat('en-US', {
+    style: 'currency', currency: 'USD', maximumFractionDigits: 0
+  }).format(parseFloat(flyer.listPrice) || 0);
+
+  const fullAddress = `${flyer.propertyAddress}, ${flyer.propertyCity}, ${flyer.propertyState} ${flyer.propertyZip}`;
+  const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
+
+  // ============================================
+  // CONTACT HANDLERS
+  // ============================================
+
+  // CALL AGENT - Uses phone from Settings
+  const handleCall = () => {
+    if (flyer.agentPhone) {
+      window.location.href = `tel:${flyer.agentPhone.replace(/[^0-9+]/g, '')}`;
+    }
+  };
+
+  // EMAIL AGENT - Uses email from Settings
+  const handleEmail = () => {
+    if (flyer.agentEmail) {
+      const subject = encodeURIComponent(`Inquiry about ${flyer.propertyAddress}`);
+      const body = encodeURIComponent(
+`Hi ${flyer.agentName},
+
+I'm interested in the property at:
+${flyer.propertyAddress}
+${flyer.propertyCity}, ${flyer.propertyState} ${flyer.propertyZip}
+Listed at ${price}
+
+Please contact me at your earliest convenience.
+
+Thank you!`
+      );
+      window.location.href = `mailto:${flyer.agentEmail}?subject=${subject}&body=${body}`;
+    }
+  };
+
+  // SCHEDULE A SHOWING - Pre-filled email template
+  const handleScheduleShowing = () => {
+    if (flyer.agentEmail) {
+      const subject = encodeURIComponent(`Showing Request: ${flyer.propertyAddress}`);
+      const body = encodeURIComponent(
+`Hi ${flyer.agentName},
+
+I would like to schedule a showing for:
+
+📍 Property: ${flyer.propertyAddress}
+   ${flyer.propertyCity}, ${flyer.propertyState} ${flyer.propertyZip}
+💰 Price: ${price}
+🛏️ ${flyer.bedrooms} beds | 🛁 ${flyer.bathrooms} baths | 📐 ${flyer.squareFeet?.toLocaleString()} sq ft
+
+My preferred showing times:
+• Option 1: [DATE/TIME]
+• Option 2: [DATE/TIME]
+• Option 3: [DATE/TIME]
+
+My contact information:
+• Name: [YOUR NAME]
+• Phone: [YOUR PHONE]
+• Email: [YOUR EMAIL]
+
+I look forward to hearing from you!
+
+Best regards`
+      );
+      window.location.href = `mailto:${flyer.agentEmail}?subject=${subject}&body=${body}`;
+    }
+  };
+
+  // ============================================
+  // SHARE HANDLERS
+  // ============================================
+
+  const shareText = `Check out this property: ${flyer.propertyAddress} - ${price}`;
+  const encodedUrl = encodeURIComponent(currentUrl);
+  const encodedText = encodeURIComponent(shareText);
+
+  const shareToFacebook = () => {
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`, '_blank', 'width=600,height=400');
+  };
+
+  const shareToTwitter = () => {
+    window.open(`https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedText}`, '_blank', 'width=600,height=400');
+  };
+
+  const shareToLinkedIn = () => {
+    window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`, '_blank', 'width=600,height=400');
+  };
+
+  const shareToWhatsApp = () => {
+    window.open(`https://wa.me/?text=${encodedText}%20${encodedUrl}`, '_blank');
+  };
+
+  const shareViaSMS = () => {
+    window.location.href = `sms:?body=${encodedText}%20${encodedUrl}`;
+  };
+
+  const shareViaEmail = () => {
+    const subject = encodeURIComponent(`Property: ${flyer.propertyAddress}`);
+    const body = encodeURIComponent(`${shareText}\n\nView details: ${currentUrl}`);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  };
+
+  const copyLink = async () => {
+    await navigator.clipboard.writeText(currentUrl);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
+  // Photo navigation
+  const nextPhoto = () => setPhotoIndex(i => (i + 1) % photos.length);
+  const prevPhoto = () => setPhotoIndex(i => (i - 1 + photos.length) % photos.length);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b sticky top-0 z-50">
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+          {flyer.companyLogo ? (
+            <img src={flyer.companyLogo} alt="Logo" className="h-8 object-contain" />
+          ) : (
+            <span className="font-bold">Spyglass Realty</span>
+          )}
+          <div className="text-right">
+            <div className="text-xs text-gray-500 uppercase">Offered At</div>
+            <div className="text-lg font-bold text-[#8B7355]">{price}</div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-lg mx-auto pb-8">
+        {/* Address */}
+        <div className="bg-white px-4 py-3 border-b">
+          <h1 className="text-xl font-bold">{flyer.propertyAddress}</h1>
+          <p className="text-gray-600">{flyer.propertyCity}, {flyer.propertyState} {flyer.propertyZip}</p>
+        </div>
+
+        {/* Photo Gallery */}
+        <div className="relative bg-black">
+          <div className="aspect-[4/3]">
+            {photos.length > 0 ? (
+              <img src={photos[photoIndex]} alt="Property" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                No photos
+              </div>
+            )}
+          </div>
+          
+          {photos.length > 1 && (
+            <>
+              <button onClick={prevPhoto} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full">
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <button onClick={nextPhoto} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full">
+                <ChevronRight className="w-6 h-6" />
+              </button>
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                {photos.map((_, i) => (
+                  <button key={i} onClick={() => setPhotoIndex(i)}
+                    className={`w-2 h-2 rounded-full ${i === photoIndex ? 'bg-white' : 'bg-white/50'}`} />
+                ))}
+              </div>
+            </>
+          )}
+          
+          <div className="absolute bottom-3 right-3 bg-black/60 text-white text-sm px-2 py-1 rounded">
+            {photoIndex + 1}/{photos.length}
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="bg-white px-4 py-4 border-b grid grid-cols-3 gap-2">
+          <div className="text-center p-3 bg-gray-50 rounded-lg">
+            <Bed className="w-5 h-5 mx-auto text-[#8B7355] mb-1" />
+            <div className="font-bold">{flyer.bedrooms}</div>
+            <div className="text-xs text-gray-500">Beds</div>
+          </div>
+          <div className="text-center p-3 bg-gray-50 rounded-lg">
+            <Bath className="w-5 h-5 mx-auto text-[#8B7355] mb-1" />
+            <div className="font-bold">{flyer.bathrooms}</div>
+            <div className="text-xs text-gray-500">Baths</div>
+          </div>
+          <div className="text-center p-3 bg-gray-50 rounded-lg">
+            <Maximize className="w-5 h-5 mx-auto text-[#8B7355] mb-1" />
+            <div className="font-bold">{flyer.squareFeet?.toLocaleString()}</div>
+            <div className="text-xs text-gray-500">Sq Ft</div>
+          </div>
+        </div>
+
+        {/* Description */}
+        <div className="bg-white px-4 py-4 border-b">
+          {flyer.headline && <h2 className="font-bold text-lg mb-2">{flyer.headline}</h2>}
+          <p className="text-gray-700 leading-relaxed">
+            {showFullDesc || !flyer.description || flyer.description.length <= 200
+              ? flyer.description
+              : `${flyer.description.slice(0, 200)}...`}
+          </p>
+          {flyer.description?.length > 200 && (
+            <button onClick={() => setShowFullDesc(!showFullDesc)} className="text-[#8B7355] font-medium mt-2">
+              {showFullDesc ? 'Show Less' : 'Read More'}
+            </button>
+          )}
+        </div>
+
+        {/* Agent Card */}
+        <div className="bg-white px-4 py-6 border-b">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+              {flyer.agentPhoto ? (
+                <img src={flyer.agentPhoto} alt={flyer.agentName} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-2xl">👤</div>
+              )}
+            </div>
+            <div>
+              <h3 className="font-bold text-lg">{flyer.agentName}</h3>
+              <p className="text-gray-600">{flyer.agentTitle}</p>
+              <p className="text-gray-500 text-sm">Spyglass Realty</p>
+            </div>
+          </div>
+
+          {/* Contact Buttons */}
+          <div className="space-y-3">
+            <button onClick={handleCall} disabled={!flyer.agentPhone}
+              className="w-full flex items-center justify-center gap-2 bg-[#8B7355] text-white py-3 rounded-lg font-medium hover:bg-[#7a6548] disabled:opacity-50 min-h-[48px]">
+              <Phone className="w-5 h-5" />
+              Call {flyer.agentName?.split(' ')[0]}
+            </button>
+            
+            <button onClick={handleEmail} disabled={!flyer.agentEmail}
+              className="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-800 py-3 rounded-lg font-medium hover:bg-gray-200 disabled:opacity-50 min-h-[48px]">
+              <Mail className="w-5 h-5" />
+              Send Email
+            </button>
+            
+            <button onClick={handleScheduleShowing} disabled={!flyer.agentEmail}
+              className="w-full flex items-center justify-center gap-2 bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 min-h-[48px]">
+              <Calendar className="w-5 h-5" />
+              Schedule a Showing
+            </button>
+          </div>
+
+          {(flyer.agentPhone || flyer.agentEmail) && (
+            <div className="mt-4 pt-4 border-t text-center text-sm text-gray-500">
+              {flyer.agentPhone && <p>{flyer.agentPhone}</p>}
+              {flyer.agentEmail && <p>{flyer.agentEmail}</p>}
+            </div>
+          )}
+        </div>
+
+        {/* Map Link */}
+        <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`}
+          target="_blank" rel="noopener noreferrer"
+          className="block bg-white px-4 py-4 border-b hover:bg-gray-50">
+          <div className="flex items-center justify-center gap-2 text-[#8B7355] font-medium">
+            <MapPin className="w-5 h-5" />
+            View on Google Maps
+          </div>
+        </a>
+
+        {/* Share Section */}
+        <div className="bg-white px-4 py-5 border-b">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Share2 className="w-5 h-5 text-[#8B7355]" />
+            <h3 className="font-medium">Share This Property</h3>
+          </div>
+
+          <div className="grid grid-cols-4 gap-3">
+            {/* Facebook */}
+            <button onClick={shareToFacebook} className="flex flex-col items-center gap-1.5 p-2">
+              <div className="w-11 h-11 rounded-full bg-[#1877F2] flex items-center justify-center">
+                <Facebook className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xs text-gray-600">Facebook</span>
+            </button>
+
+            {/* X (Twitter) */}
+            <button onClick={shareToTwitter} className="flex flex-col items-center gap-1.5 p-2">
+              <div className="w-11 h-11 rounded-full bg-black flex items-center justify-center text-white">
+                <XIcon />
+              </div>
+              <span className="text-xs text-gray-600">X</span>
+            </button>
+
+            {/* LinkedIn */}
+            <button onClick={shareToLinkedIn} className="flex flex-col items-center gap-1.5 p-2">
+              <div className="w-11 h-11 rounded-full bg-[#0A66C2] flex items-center justify-center">
+                <Linkedin className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xs text-gray-600">LinkedIn</span>
+            </button>
+
+            {/* WhatsApp */}
+            <button onClick={shareToWhatsApp} className="flex flex-col items-center gap-1.5 p-2">
+              <div className="w-11 h-11 rounded-full bg-[#25D366] flex items-center justify-center">
+                <MessageCircle className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xs text-gray-600">WhatsApp</span>
+            </button>
+
+            {/* SMS */}
+            <button onClick={shareViaSMS} className="flex flex-col items-center gap-1.5 p-2">
+              <div className="w-11 h-11 rounded-full bg-green-500 flex items-center justify-center">
+                <MessageCircle className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xs text-gray-600">Text</span>
+            </button>
+
+            {/* Email */}
+            <button onClick={shareViaEmail} className="flex flex-col items-center gap-1.5 p-2">
+              <div className="w-11 h-11 rounded-full bg-gray-600 flex items-center justify-center">
+                <Mail className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xs text-gray-600">Email</span>
+            </button>
+
+            {/* Copy Link */}
+            <button onClick={copyLink} className="flex flex-col items-center gap-1.5 p-2">
+              <div className={`w-11 h-11 rounded-full flex items-center justify-center ${linkCopied ? 'bg-green-500' : 'bg-gray-400'}`}>
+                {linkCopied ? <Check className="w-5 h-5 text-white" /> : <Link2 className="w-5 h-5 text-white" />}
+              </div>
+              <span className="text-xs text-gray-600">{linkCopied ? 'Copied!' : 'Copy'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <footer className="bg-white px-4 py-6 text-center">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            {flyer.companyLogo && <img src={flyer.companyLogo} alt="" className="h-6" />}
+            {flyer.secondaryLogo && (
+              <>
+                <div className="w-px h-4 bg-gray-300" />
+                <img src={flyer.secondaryLogo} alt="" className="h-5" />
+              </>
+            )}
+          </div>
+          <p className="text-gray-500 text-xs">© {new Date().getFullYear()} Spyglass Realty</p>
+        </footer>
+      </main>
+    </div>
+  );
+}
+```
+
+---
+
+## 📱 Part 5: Mobile Optimization
+
+Add to global CSS:
+
+```css
+/* Minimum touch targets */
+button, a {
+  min-height: 44px;
+}
+
+/* Safe area for notched devices */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent pull-to-refresh interfering */
+body {
+  overscroll-behavior-y: contain;
+}
+```
+
+---
+
+## ✅ Testing Checklist
+
+### Database
+- [ ] `flyers` table created
+- [ ] Can insert new flyers
+- [ ] Can query by ID
+
+### API
+- [ ] POST `/api/flyers` creates flyer + returns QR
+- [ ] GET `/api/public/flyer/:id` returns data (no auth)
+- [ ] View count increments
+
+### Public Page
+- [ ] Loads without login
+- [ ] Shows 404 for invalid ID
+- [ ] Photos load and swipe
+- [ ] All property info displays
+
+### Contact (Agent data from Settings)
+- [ ] **Call** opens phone dialer with agent phone
+- [ ] **Email** opens email with pre-filled subject/body
+- [ ] **Schedule Showing** opens email with template
+
+### Share
+- [ ] Facebook opens share dialog
+- [ ] X (Twitter) opens with text
+- [ ] LinkedIn opens share
+- [ ] WhatsApp opens with message
+- [ ] SMS opens messaging
+- [ ] Email opens mail client
+- [ ] Copy link copies URL
+
+### Mobile
+- [ ] Responsive on all sizes
+- [ ] Touch targets 44px+
+- [ ] Photo swipe works
+- [ ] No horizontal overflow

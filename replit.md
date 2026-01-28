@@ -68,6 +68,23 @@ Preferred communication style: Simple, everyday language.
 - **CMA Data Extraction Utilities**: Comprehensive client-side utilities (`client/src/lib/cma-data-utils.ts`) for safe data extraction and normalization from various MLS/Repliers API field structures, including price, square footage, DOM, lot acres, beds/baths, address, coordinates, and status. Includes calculation of CMA statistics and robust formatting functions.
 - **CMA Resources System**: Agent-managed resources (documents, links) for CMA presentations, stored in a database with API endpoints for CRUD, reordering, and file uploads. Supports public access for shared CMAs.
 - **User Notification Preferences System**: Per-user Slack notification settings stored in a database, with API endpoints and a reusable component for managing preferences.
+- **Shareable Flyer System**: Database-backed storage for property flyers with public viewing pages accessible via QR codes.
+  - **Flyer Storage**: Flyers table stores snapshot of property data, images, agent info, branding settings, and metadata
+  - **Short URLs**: Uses nanoid(9) for URL-friendly 9-character IDs (e.g., /flyer/abc123xyz)
+  - **API Routes**:
+    - POST /api/flyers - Create flyer (authenticated, validates with Zod schema)
+    - GET /api/flyers - Get user's flyers (authenticated)
+    - GET /api/flyers/:id/qr - Regenerate QR code (authenticated)
+    - GET /api/public/flyer/:id - Public viewing (NO AUTH, increments view count)
+  - **Public Flyer Viewer** (client/src/pages/flyer-viewer.tsx):
+    - Mobile-optimized responsive design
+    - Photo gallery with prev/next navigation
+    - Property stats display (beds, baths, sqft)
+    - Agent contact buttons (call, email, schedule showing)
+    - Google Maps integration
+    - Social share options (Facebook, X, LinkedIn, WhatsApp, SMS, Email, Copy Link)
+    - Uses TanStack Query for data fetching
+    - Complies with UI guidelines (shadcn Button components, no custom hover states)
 
 ## External Dependencies
 - **Slack**: Team coordination.

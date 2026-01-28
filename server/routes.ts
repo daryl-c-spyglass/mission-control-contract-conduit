@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import path from "path";
 import fs from "fs";
 import { storage } from "./storage";
-import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema, insertCmaSchema, insertNotificationSettingsSchema } from "@shared/schema";
+import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema, insertCmaSchema, insertNotificationSettingsSchema, insertFlyerSchema } from "@shared/schema";
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages, watchUserMailbox } from "./gmail";
 import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel, postDocumentUploadNotification, postMLSListingNotification, sendMarketingNotification } from "./slack";
 import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess, getBestPhotosForFlyer, getAISelectedPhotosForFlyer, searchNearbyComparables, type CMASearchFilters } from "./repliers";
@@ -15,6 +15,8 @@ import { getSyncStatus, triggerManualSync } from "./repliers-sync";
 import OpenAI from "openai";
 import { generatePrintFlyer, formatAddressForFlyer, type FlyerData, type OutputType } from "./services/flyer-generator";
 import { generateGraphic, type GraphicsFormat, type GraphicsData } from "./services/graphics-generator";
+import { nanoid } from "nanoid";
+import QRCode from "qrcode";
 
 // Helper to generate a Slack channel name in format: buy-123main-joeywilkes or sell-123main-joeywilkes
 function generateSlackChannelName(address: string, transactionType: string = "buy", agentName: string = ""): string {
@@ -5368,6 +5370,151 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
     } catch (error: any) {
       console.error("Error in CMA PDF audit:", error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============ Flyers (Protected) ============
+
+  // Helper to get base URL for flyer links
+  function getBaseUrl(req: any): string {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    return `${protocol}://${host}`;
+  }
+
+  // Helper to generate QR code for a flyer URL
+  async function generateFlyerQRCode(flyerUrl: string): Promise<string> {
+    return QRCode.toDataURL(flyerUrl, {
+      width: 200,
+      margin: 1,
+      color: { dark: '#000000', light: '#ffffff' },
+      errorCorrectionLevel: 'M',
+    });
+  }
+
+  // Create a new flyer
+  app.post("/api/flyers", isAuthenticated, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user?.id) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      // Generate a unique short ID for the flyer URL
+      const flyerId = nanoid(9);
+      
+      // Build flyer data with required fields
+      const flyerPayload = {
+        id: flyerId,
+        userId: user.id,
+        propertyAddress: req.body.propertyAddress || '',
+        propertyCity: req.body.propertyCity,
+        propertyState: req.body.propertyState,
+        propertyZip: req.body.propertyZip,
+        listPrice: req.body.listPrice,
+        bedrooms: req.body.bedrooms,
+        bathrooms: req.body.bathrooms,
+        squareFeet: req.body.squareFeet,
+        headline: req.body.headline,
+        description: req.body.description,
+        mainPhoto: req.body.mainPhoto,
+        kitchenPhoto: req.body.kitchenPhoto,
+        roomPhoto: req.body.roomPhoto,
+        additionalPhotos: req.body.additionalPhotos || [],
+        agentName: req.body.agentName,
+        agentTitle: req.body.agentTitle,
+        agentPhone: req.body.agentPhone,
+        agentEmail: req.body.agentEmail,
+        agentPhoto: req.body.agentPhoto,
+        companyLogo: req.body.companyLogo,
+        secondaryLogo: req.body.secondaryLogo,
+        logoScales: req.body.logoScales || { primary: 1, secondary: 1 },
+        dividerPosition: req.body.dividerPosition || 148,
+        secondaryLogoOffsetY: req.body.secondaryLogoOffsetY || 0,
+        transactionId: req.body.transactionId,
+        mlsNumber: req.body.mlsNumber,
+        status: 'active',
+      };
+
+      // Validate with Zod schema
+      const validationResult = insertFlyerSchema.safeParse(flyerPayload);
+      if (!validationResult.success) {
+        console.error("[Flyer] Validation error:", validationResult.error.flatten());
+        return res.status(400).json({ 
+          error: "Invalid flyer data", 
+          details: validationResult.error.flatten().fieldErrors 
+        });
+      }
+
+      const flyer = await storage.createFlyer(validationResult.data);
+      
+      // Generate the flyer URL and QR code
+      const baseUrl = getBaseUrl(req);
+      const flyerUrl = `${baseUrl}/flyer/${flyer.id}`;
+      const qrCode = await generateFlyerQRCode(flyerUrl);
+
+      console.log(`[Flyer] Created flyer ${flyer.id} for user ${user.id}`);
+
+      res.json({
+        success: true,
+        flyer,
+        flyerId: flyer.id,
+        flyerUrl,
+        qrCode,
+      });
+    } catch (error: any) {
+      console.error("[Flyer] Create error:", error);
+      res.status(500).json({ error: "Failed to create flyer" });
+    }
+  });
+
+  // Get user's flyers
+  app.get("/api/flyers", isAuthenticated, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user?.id) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const userFlyers = await storage.getFlyersByUser(user.id);
+      res.json(userFlyers);
+    } catch (error: any) {
+      console.error("[Flyer] Get user flyers error:", error);
+      res.status(500).json({ error: "Failed to get flyers" });
+    }
+  });
+
+  // Regenerate QR code for existing flyer
+  app.get("/api/flyers/:id/qr", isAuthenticated, async (req, res) => {
+    try {
+      const baseUrl = getBaseUrl(req);
+      const flyerUrl = `${baseUrl}/flyer/${req.params.id}`;
+      const qrCode = await generateFlyerQRCode(flyerUrl);
+      res.json({ qrCode, flyerUrl });
+    } catch (error: any) {
+      console.error("[Flyer] Generate QR error:", error);
+      res.status(500).json({ error: "Failed to generate QR" });
+    }
+  });
+
+  // ============ Public Flyer Routes (NO AUTH) ============
+
+  // Get flyer for public viewing - NO AUTH REQUIRED
+  app.get("/api/public/flyer/:id", async (req, res) => {
+    try {
+      const flyer = await storage.getFlyer(req.params.id);
+      
+      if (!flyer || flyer.status !== 'active') {
+        return res.status(404).json({ error: "Flyer not found" });
+      }
+      
+      // Track view asynchronously
+      storage.incrementFlyerViews(req.params.id).catch(console.error);
+      
+      res.json(flyer);
+    } catch (error: any) {
+      console.error("[Flyer] Public get error:", error);
+      res.status(500).json({ error: "Failed to load flyer" });
     }
   });
 
