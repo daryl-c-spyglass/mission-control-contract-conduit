@@ -1,0 +1,293 @@
+# Contract Conduit — Advanced Flyer Left Pane Scroll Implementation
+
+## 📌 Purpose
+
+Implement the same left pane scroll behavior from the Flyer Maker app in Contract Conduit's Advanced Flyer Builder.
+
+---
+
+## 🔧 Implementation
+
+### Required Import
+
+```tsx
+import { ScrollArea } from "@/components/ui/scroll-area";
+```
+
+> Note: If ScrollArea is not already installed, install shadcn/ui scroll-area:
+> ```bash
+> npx shadcn-ui@latest add scroll-area
+> ```
+
+---
+
+### Layout Structure
+
+```tsx
+export function AdvancedFlyerGenerator({ transactionId }: Props) {
+  return (
+    <div className="min-h-screen bg-background">
+      
+      {/* Header - Fixed height, sticky at top */}
+      <header className="sticky top-0 z-50 h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex h-full items-center justify-between gap-4 px-6">
+          {/* Back Button + Title */}
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2 min-h-11">
+              <ArrowLeft className="w-4 h-4" />
+              Back to Marketing
+            </Button>
+            <div>
+              <h1 className="text-lg font-semibold">Flyer Generator</h1>
+              <p className="text-sm text-muted-foreground">Create stunning property flyers</p>
+            </div>
+          </div>
+          
+          {/* Export Buttons */}
+          <div className="flex items-center gap-2">
+            <Button onClick={handleExportPNG} disabled={isExporting} className="gap-2 min-h-11">
+              <Download className="w-4 h-4" />
+              Export PNG
+            </Button>
+            <Button variant="outline" onClick={handleExportCMYK} disabled={isExporting} className="gap-2 min-h-11">
+              <Download className="w-4 h-4" />
+              Export CMYK
+            </Button>
+          </div>
+        </div>
+      </header>
+      
+      {/* Main Content - Two Column Layout */}
+      <div className="flex flex-col lg:flex-row">
+        
+        {/* ========================================= */}
+        {/* LEFT PANE - Scrollable Form Panel        */}
+        {/* ========================================= */}
+        <div className="w-full lg:w-[420px] lg:min-w-[420px] border-r bg-card">
+          <ScrollArea className="h-[calc(100vh-64px)]">
+            <div className="p-6 space-y-6">
+              
+              {/* Section 1: Property Details */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Home className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-medium">Property Details</h2>
+                </div>
+                <Separator />
+                {/* Price, Beds, Baths, Sq Ft fields */}
+              </div>
+              
+              {/* Section 2: Description */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-medium">Description</h2>
+                </div>
+                <Separator />
+                {/* Headline, Description fields */}
+              </div>
+              
+              {/* Section 3: Agent Details */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <User className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-medium">Agent Details</h2>
+                </div>
+                <Separator />
+                {/* Name, Title, Phone fields */}
+              </div>
+              
+              {/* Section 4: Branding & Logos */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Palette className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-medium">Branding & Logos</h2>
+                </div>
+                <Separator />
+                {/* Logo previews, size sliders, divider position */}
+              </div>
+              
+              {/* Section 5: Property Images */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-medium">Property Images</h2>
+                </div>
+                <Separator />
+                {/* Address, Photo uploads, Agent photo, QR code */}
+              </div>
+              
+            </div>
+          </ScrollArea>
+        </div>
+        
+        {/* ========================================= */}
+        {/* RIGHT PANE - Live Preview (Sticky)       */}
+        {/* ========================================= */}
+        <div className="flex-1 bg-muted/30 p-6 lg:p-8">
+          <div className="sticky top-24">
+            {/* Preview Controls */}
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-medium text-muted-foreground">Live Preview</h2>
+              <div className="flex items-center gap-4">
+                {/* Grid Toggle */}
+                {/* Scale Selector */}
+              </div>
+            </div>
+            
+            {/* Flyer Preview */}
+            <div className="overflow-auto rounded-lg shadow-2xl inline-block bg-white">
+              <FlyerPreview {...previewProps} />
+            </div>
+          </div>
+        </div>
+        
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 📐 Key CSS Classes Explained
+
+| Element | Classes | Purpose |
+|---------|---------|---------|
+| Page wrapper | `min-h-screen bg-background` | Full viewport minimum height |
+| Header | `sticky top-0 z-50 h-16` | Fixed 64px height, sticks to top |
+| Header bg | `bg-background/95 backdrop-blur` | Semi-transparent with blur effect |
+| Main container | `flex flex-col lg:flex-row` | Stack on mobile, side-by-side on desktop |
+| Left pane | `w-full lg:w-[420px] lg:min-w-[420px]` | Full width mobile, fixed 420px desktop |
+| ScrollArea | `h-[calc(100vh-64px)]` | Viewport height minus header (64px) |
+| Content wrapper | `p-6 space-y-6` | 24px padding, 24px gap between sections |
+| Each section | `space-y-4` | 16px gap between items within section |
+| Right pane | `flex-1 bg-muted/30 p-6 lg:p-8` | Fill remaining space |
+| Preview container | `sticky top-24` | Stays visible while scrolling |
+
+---
+
+## 📏 Height Calculation
+
+```
+┌────────────────────────────────┐
+│   Header (h-16 = 64px)         │  ← sticky top-0
+├────────────────────────────────┤
+│                                │
+│   ScrollArea                   │  ← h-[calc(100vh-64px)]
+│   (viewport height - 64px)     │
+│                                │
+│   This area scrolls            │
+│   independently                │
+│                                │
+└────────────────────────────────┘
+```
+
+**Formula:** `h-[calc(100vh-Xpx)]` where X = header height
+
+If your header is different height, adjust accordingly:
+- 64px header → `h-[calc(100vh-64px)]`
+- 80px header → `h-[calc(100vh-80px)]`
+- 72px header → `h-[calc(100vh-72px)]`
+
+---
+
+## 📱 Mobile Responsiveness
+
+The layout automatically adjusts for mobile:
+
+```tsx
+{/* Mobile: Stacked (flex-col), Desktop: Side-by-side (lg:flex-row) */}
+<div className="flex flex-col lg:flex-row">
+
+  {/* Mobile: Full width, Desktop: Fixed 420px */}
+  <div className="w-full lg:w-[420px] lg:min-w-[420px]">
+```
+
+### Mobile View (< 1024px)
+```
+┌─────────────────────┐
+│      Header         │
+├─────────────────────┤
+│                     │
+│   Left Pane         │
+│   (full width)      │
+│   (scrolls)         │
+│                     │
+├─────────────────────┤
+│                     │
+│   Right Pane        │
+│   (full width)      │
+│                     │
+└─────────────────────┘
+```
+
+### Desktop View (≥ 1024px)
+```
+┌─────────────────────────────────────────┐
+│               Header                     │
+├──────────────┬──────────────────────────┤
+│              │                          │
+│  Left Pane   │      Right Pane          │
+│  (420px)     │      (flex-1)            │
+│  (scrolls)   │      (sticky preview)    │
+│              │                          │
+└──────────────┴──────────────────────────┘
+```
+
+---
+
+## ✅ Scroll Behavior Features
+
+| Feature | Status | How It Works |
+|---------|--------|--------------|
+| Independent scroll | ✅ | ScrollArea creates isolated scroll container |
+| Form changes persist scroll | ✅ | React state updates don't reset position |
+| Image upload persists scroll | ✅ | Async FileReader doesn't remount |
+| Modal open persists scroll | ✅ | Modals are separate components |
+| Custom scrollbar styling | ✅ | Radix UI provides styled scrollbar |
+| Touch scrolling | ✅ | Radix handles cross-browser touch |
+| Keyboard scrolling | ✅ | Native scroll behavior preserved |
+
+---
+
+## 🔧 If ScrollArea Not Available
+
+If you can't use shadcn/ui ScrollArea, use native CSS:
+
+```tsx
+{/* Alternative without ScrollArea component */}
+<div className="w-full lg:w-[420px] lg:min-w-[420px] border-r bg-card">
+  <div className="h-[calc(100vh-64px)] overflow-y-auto">
+    <div className="p-6 space-y-6">
+      {/* Form sections */}
+    </div>
+  </div>
+</div>
+```
+
+Add smooth scrolling for iOS:
+
+```css
+/* In your global CSS */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+```
+
+---
+
+## 🧪 Testing Checklist
+
+- [ ] Left pane scrolls independently from right pane
+- [ ] Header stays fixed at top while scrolling
+- [ ] Preview stays visible (sticky) while scrolling form
+- [ ] Scroll position persists when changing form values
+- [ ] Scroll position persists when uploading images
+- [ ] Scroll position persists when opening/closing crop modal
+- [ ] Mobile: Left pane takes full width
+- [ ] Mobile: Scroll works with touch gestures
+- [ ] Desktop: Left pane is fixed at 420px
+- [ ] Scrollbar appears when content overflows
+- [ ] Scrollbar is styled (not browser default)

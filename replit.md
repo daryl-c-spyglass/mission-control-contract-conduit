@@ -38,6 +38,12 @@ Preferred communication style: Simple, everyday language.
     - Room Photo: `coverImage=living room` - AI selects best living room photo
   - Falls back to `imageInsights` classification when coverImage API unavailable
   - Endpoint: `/api/listings/:mlsNumber/ai-photos` with 5-minute client-side cache
+  - **Modal-Based Image Cropping**: CropModal component with drag-to-pan, zoom slider (1-3x), touch support, grid overlay, and reset functionality for precise image positioning
+  - **QR Code Generation**: URL input field with generate button that creates QR codes using the qrcode library. Supports prepopulation from settings/transaction data with proper state synchronization
+  - **Auto-Population Data Flow**:
+    - Active Listings (has MLS #): Auto-populates price, beds, baths, sqft, address, description from Repliers API
+    - Off-Market Listings (no MLS #): Shows empty fields for manual entry
+    - Agent Details: Always loads from Settings (name, title, phone, photo, logos)
 - **CMA Presentation Player**: Fullscreen interactive slideshow with 33 widgets for client presentations, featuring responsive layout, Mapbox header, agent profile popover, sidebar navigation, keyboard controls, and mobile optimization. Uses Spyglass branding.
 - **CMA Print Preview System**: Pre-download slide preview with data validation, single/grid view modes, zoom controls, and keyboard navigation. Ensures preview matches PDF output.
 - **CMA PDF Export System**: Client-side PDF generation using `@react-pdf/renderer` in landscape letter format, covering all 33 widgets with specialized pages for dynamic content. Incorporates Spyglass brand colors and professional design elements.

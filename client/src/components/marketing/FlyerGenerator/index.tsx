@@ -134,6 +134,19 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
 
   const watchedValues = form.watch();
 
+  // Debug logging at component mount / when key data loads
+  useEffect(() => {
+    console.log('=== FLYER GENERATOR DEBUG ===');
+    console.log('[Flyer] Transaction ID:', transactionId);
+    console.log('[Flyer] Transaction:', transaction);
+    console.log('[Flyer] Has MLS #:', transaction?.mlsNumber);
+    console.log('[Flyer] MLS Data exists:', !!transaction?.mlsData);
+    console.log('[Flyer] MLS Photos count:', transaction?.mlsData?.photos?.length || 0);
+    console.log('[Flyer] Marketing Profile:', marketingProfile);
+    console.log('[Flyer] Agent Profile:', agentProfile);
+    console.log('=============================');
+  }, [transaction, marketingProfile, agentProfile, transactionId]);
+
   // Effect for MLS/property data - runs when transaction changes
   useEffect(() => {
     console.log('[Flyer Debug] Transaction effect triggered:', { 
