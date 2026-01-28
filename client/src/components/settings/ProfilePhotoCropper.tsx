@@ -15,6 +15,8 @@ interface ProfilePhotoCropperProps {
   onError?: (error: string) => void;
 }
 
+const DEFAULT_ZOOM = 1.2;
+
 export function ProfilePhotoCropper({
   isOpen,
   onClose,
@@ -23,7 +25,7 @@ export function ProfilePhotoCropper({
   onError,
 }: ProfilePhotoCropperProps) {
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -78,7 +80,7 @@ export function ProfilePhotoCropper({
 
   const resetAndClose = () => {
     setCrop({ x: 0, y: 0 });
-    setZoom(1);
+    setZoom(DEFAULT_ZOOM);
     setCroppedAreaPixels(null);
     setIsLoading(true);
     setImageError(null);
