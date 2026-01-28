@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
 import { ZoomIn, RotateCcw } from 'lucide-react';
 
 interface CropModalProps {
@@ -146,13 +145,18 @@ export function CropModal({
 
         <div className="flex items-center gap-3 mt-4">
           <ZoomIn className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-          <Slider
-            value={[zoom]}
-            onValueChange={([value]) => setZoom(value)}
+          <input
+            type="range"
             min={1}
             max={3}
             step={0.05}
-            className="flex-1"
+            value={zoom}
+            onChange={(e) => {
+              const newValue = parseFloat(e.target.value);
+              console.log('[CropModal] Zoom changed:', newValue);
+              setZoom(newValue);
+            }}
+            className="flex-1 h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
             data-testid="slider-crop-zoom"
           />
           <span className="text-sm text-muted-foreground w-12 text-right">{zoom.toFixed(1)}x</span>
