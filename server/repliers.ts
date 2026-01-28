@@ -1054,6 +1054,174 @@ export async function getBestPhotosForFlyer(mlsNumber: string, count: number = 3
   }
 }
 
+// Result type for AI-selected photos using coverImage parameter
+export interface AISelectedPhotos {
+  mainPhoto: {
+    url: string;
+    classification: string;
+    confidence: number;
+    quality: number;
+  } | null;
+  kitchenPhoto: {
+    url: string;
+    classification: string;
+    confidence: number;
+    quality: number;
+  } | null;
+  roomPhoto: {
+    url: string;
+    classification: string;
+    confidence: number;
+    quality: number;
+  } | null;
+  allPhotos: Array<{
+    url: string;
+    classification: string;
+    confidence: number;
+    quality: number;
+    index: number;
+  }>;
+  totalPhotos: number;
+  selectionMethod: "coverImage" | "imageInsights" | "fallback";
+}
+
+/**
+ * Fetch AI-selected photos using Repliers coverImage parameter
+ * This uses the recommended Method 1 from Repliers API for best photo selection
+ * - Main Photo: coverImage=exterior front
+ * - Kitchen Photo: coverImage=kitchen
+ * - Room Photo: coverImage=living room
+ */
+export async function getAISelectedPhotosForFlyer(mlsNumber: string): Promise<AISelectedPhotos> {
+  const formattedMLS = mlsNumber.startsWith("ACT") ? mlsNumber : `ACT${mlsNumber}`;
+  
+  /**
+   * Helper to fetch listing with coverImage parameter and extract AI-selected photo
+   */
+  const fetchWithCoverImage = async (coverImageType: string): Promise<{
+    url: string;
+    classification: string;
+    confidence: number;
+    quality: number;
+  } | null> => {
+    try {
+      const data = await repliersRequest(`/listings/${formattedMLS}`, {
+        boardId: "53",
+        coverImage: coverImageType,
+      });
+      
+      if (!data) return null;
+      
+      const listing = data.listings?.[0] || data;
+      const rawImages = listing.media || listing.images || listing.photos || [];
+      const photos = normalizeImageUrls(rawImages);
+      const firstImage = photos[0];
+      
+      if (!firstImage) return null;
+      
+      // Get imageInsights for this photo if available
+      const imageInsights = listing.imageInsights;
+      let classification = coverImageType;
+      let confidence = 0;
+      let quality = 50;
+      
+      if (imageInsights?.images && Array.isArray(imageInsights.images)) {
+        // Try to find matching insight for the first image
+        const firstImageFilename = firstImage.split('/').pop()?.toLowerCase() || '';
+        const matchingInsight = imageInsights.images.find((img: any) => {
+          const insightFilename = (img.image || img.url || '').split('/').pop()?.toLowerCase() || '';
+          return insightFilename === firstImageFilename;
+        }) || imageInsights.images[0];
+        
+        if (matchingInsight) {
+          classification = matchingInsight.classification?.imageOf || coverImageType;
+          confidence = Math.round((matchingInsight.classification?.prediction || 0) * 100);
+          quality = matchingInsight.quality?.quantitative 
+            ? Math.round(((matchingInsight.quality.quantitative - 1) / 4) * 100)
+            : 50;
+        }
+      }
+      
+      return { url: firstImage, classification, confidence, quality };
+    } catch (error) {
+      console.error(`[AI Photos] Error fetching with coverImage=${coverImageType}:`, error);
+      return null;
+    }
+  };
+  
+  try {
+    console.log(`[AI Photos] Fetching AI-selected photos for ${formattedMLS} using coverImage parameter...`);
+    
+    // Fetch all three photo types in parallel using coverImage parameter
+    const [mainPhoto, kitchenPhoto, roomPhoto] = await Promise.all([
+      fetchWithCoverImage("exterior front"),  // Main property photo
+      fetchWithCoverImage("kitchen"),          // Kitchen photo
+      fetchWithCoverImage("living room"),      // Room photo (living room preferred)
+    ]);
+    
+    // Also fetch all photos with imageInsights for manual selection
+    let allPhotos: AISelectedPhotos["allPhotos"] = [];
+    let totalPhotos = 0;
+    
+    try {
+      const fullData = await repliersRequest(`/listings/${formattedMLS}`, { boardId: "53" });
+      const fullListing = fullData?.listings?.[0] || fullData;
+      const rawImages = fullListing?.media || fullListing?.images || fullListing?.photos || [];
+      const photos = normalizeImageUrls(rawImages);
+      totalPhotos = photos.length;
+      
+      const imageInsights = fullListing?.imageInsights;
+      
+      allPhotos = photos.map((url: string, index: number) => {
+        let classification = "Unknown";
+        let confidence = 0;
+        let quality = 50;
+        
+        if (imageInsights?.images && Array.isArray(imageInsights.images)) {
+          const filename = url.split('/').pop()?.toLowerCase() || '';
+          const matchingInsight = imageInsights.images.find((img: any) => {
+            const insightFilename = (img.image || img.url || '').split('/').pop()?.toLowerCase() || '';
+            return insightFilename === filename;
+          });
+          
+          if (matchingInsight) {
+            classification = matchingInsight.classification?.imageOf || "Unknown";
+            confidence = Math.round((matchingInsight.classification?.prediction || 0) * 100);
+            quality = matchingInsight.quality?.quantitative 
+              ? Math.round(((matchingInsight.quality.quantitative - 1) / 4) * 100)
+              : 50;
+          }
+        }
+        
+        return { url, classification, confidence, quality, index };
+      });
+    } catch (e) {
+      console.error("[AI Photos] Error fetching all photos:", e);
+    }
+    
+    console.log(`[AI Photos] Results - Main: ${mainPhoto ? 'Found' : 'Not found'}, Kitchen: ${kitchenPhoto ? 'Found' : 'Not found'}, Room: ${roomPhoto ? 'Found' : 'Not found'}`);
+    
+    return {
+      mainPhoto,
+      kitchenPhoto,
+      roomPhoto,
+      allPhotos,
+      totalPhotos,
+      selectionMethod: "coverImage",
+    };
+  } catch (error) {
+    console.error("[AI Photos] Error in getAISelectedPhotosForFlyer:", error);
+    return {
+      mainPhoto: null,
+      kitchenPhoto: null,
+      roomPhoto: null,
+      allPhotos: [],
+      totalPhotos: 0,
+      selectionMethod: "fallback",
+    };
+  }
+}
+
 // Diagnostic function to check if Image Insights is enabled on the account
 export async function checkImageInsights(mlsNumber: string): Promise<{
   mlsNumber: string;

@@ -1,0 +1,554 @@
+# Fix: Advanced Flyer Builder — Optimize Repliers API AI Photo Classification
+
+## Overview
+
+The Property Images section in Advanced Flyer Builder needs to properly use **Repliers API AI** for photo classification:
+
+| Photo Slot | Repliers AI Method |
+|------------|-------------------|
+| **Main Property Photo** | `coverImage=exterior front` parameter |
+| **Kitchen Photo** | `coverImage=kitchen` parameter OR `imageInsights` classification |
+| **Room Photo** | `coverImage=living room` parameter OR `imageInsights` classification |
+
+---
+
+## Repliers Photo AI — Two Methods
+
+### Method 1: `coverImage` Query Parameter (Recommended for Main Photo)
+
+**Endpoint:** `GET https://api.repliers.io/listings`
+
+**How it works:** Reorders the `images[]` array so the **AI-picked best photo** for that room type appears **FIRST**.
+
+```typescript
+// Get listing with AI-selected exterior photo first
+const response = await fetch(
+  `https://api.repliers.io/listings/${mlsNumber}?coverImage=exterior front`,
+  { headers: { 'REPLIERS-API-KEY': apiKey } }
+);
+
+const data = await response.json();
+const mainPhoto = data.images[0]; // AI-selected exterior front photo
+```
+
+**Supported `coverImage` values:**
+- `exterior front` — Front of house (best for Main Photo)
+- `kitchen` — Kitchen photos
+- `living room` — Living room
+- `primary bedroom` — Master bedroom
+- `bathroom` — Bathroom
+- `backyard` — Backyard/exterior rear
+- `garage` — Garage
+
+### Method 2: `imageInsights` Response Data (For All Photos)
+
+**Returned in listing response:**
+
+```json
+{
+  "images": [
+    {
+      "href": "unlock-mls/IMG-ACT7783651_1.jpg",
+      "imageInsights": {
+        "classification": {
+          "imageOf": "Front of Structure",
+          "prediction": 0.95
+        },
+        "quality": {
+          "qualitative": "excellent",
+          "quantitative": 4.8
+        }
+      }
+    },
+    {
+      "href": "unlock-mls/IMG-ACT7783651_5.jpg",
+      "imageInsights": {
+        "classification": {
+          "imageOf": "Kitchen",
+          "prediction": 0.99
+        },
+        "quality": {
+          "qualitative": "above average",
+          "quantitative": 4.5
+        }
+      }
+    }
+  ]
+}
+```
+
+---
+
+## Implementation Strategy
+
+### Option A: Multiple API Calls with `coverImage` (Most Accurate)
+
+Make separate API calls to get the best AI-selected photo for each slot:
+
+```typescript
+// utils/repliersPhotoAI.ts
+
+const REPLIERS_API_BASE = 'https://api.repliers.io';
+const CDN_BASE = 'https://cdn.repliers.io/';
+
+interface AISelectedPhotos {
+  mainPhoto: string | null;      // exterior front
+  kitchenPhoto: string | null;   // kitchen
+  roomPhoto: string | null;      // living room
+}
+
+/**
+ * Fetch AI-selected photos using Repliers coverImage parameter
+ */
+export async function getAISelectedPhotos(
+  mlsNumber: string,
+  apiKey: string
+): Promise<AISelectedPhotos> {
+  
+  const fetchWithCoverImage = async (coverImageType: string): Promise<string | null> => {
+    try {
+      const response = await fetch(
+        `${REPLIERS_API_BASE}/listings/${mlsNumber}?coverImage=${encodeURIComponent(coverImageType)}`,
+        {
+          headers: {
+            'REPLIERS-API-KEY': apiKey,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      const firstImage = data.images?.[0];
+      
+      if (!firstImage) return null;
+      
+      // Build full CDN URL
+      const imagePath = firstImage.href || firstImage.url;
+      return imagePath.startsWith('http') ? imagePath : `${CDN_BASE}${imagePath}`;
+      
+    } catch (error) {
+      console.error(`Failed to fetch coverImage=${coverImageType}:`, error);
+      return null;
+    }
+  };
+  
+  // Fetch all three in parallel
+  const [mainPhoto, kitchenPhoto, roomPhoto] = await Promise.all([
+    fetchWithCoverImage('exterior front'),  // Main property photo
+    fetchWithCoverImage('kitchen'),          // Kitchen photo
+    fetchWithCoverImage('living room'),      // Room photo
+  ]);
+  
+  console.log('Repliers AI Photo Selection:', {
+    mainPhoto: mainPhoto ? 'Found' : 'Not found',
+    kitchenPhoto: kitchenPhoto ? 'Found' : 'Not found',
+    roomPhoto: roomPhoto ? 'Found' : 'Not found',
+  });
+  
+  return { mainPhoto, kitchenPhoto, roomPhoto };
+}
+```
+
+### Option B: Single API Call with `imageInsights` (Efficient)
+
+Use the `imageInsights` data from a single listing fetch:
+
+```typescript
+// utils/repliersPhotoAI.ts
+
+interface ProcessedPhoto {
+  url: string;
+  classification: string;
+  confidence: number;
+  qualityScore: number;
+}
+
+interface AISelectedPhotos {
+  mainPhoto: ProcessedPhoto | null;
+  kitchenPhoto: ProcessedPhoto | null;
+  roomPhoto: ProcessedPhoto | null;
+  allPhotos: ProcessedPhoto[];
+}
+
+const CDN_BASE = 'https://cdn.repliers.io/';
+
+/**
+ * Process listing images using imageInsights AI classification
+ */
+export function selectPhotosFromImageInsights(images: any[]): AISelectedPhotos {
+  if (!images || !Array.isArray(images)) {
+    return { mainPhoto: null, kitchenPhoto: null, roomPhoto: null, allPhotos: [] };
+  }
+  
+  // Process all photos with their AI classification
+  const processedPhotos: ProcessedPhoto[] = images
+    .map((img) => {
+      const insights = img.imageInsights || {};
+      const classification = insights.classification || {};
+      const quality = insights.quality || {};
+      
+      let url = img.href || img.url || '';
+      if (url && !url.startsWith('http')) {
+        url = `${CDN_BASE}${url}`;
+      }
+      
+      return {
+        url,
+        classification: classification.imageOf || 'Unknown',
+        confidence: classification.prediction || 0,
+        qualityScore: quality.quantitative || 3.0,
+      };
+    })
+    .filter((p) => p.url);
+  
+  // Sort by quality score (highest first)
+  const sortedByQuality = [...processedPhotos].sort(
+    (a, b) => b.qualityScore - a.qualityScore
+  );
+  
+  // ========== MAIN PHOTO: Exterior Front ==========
+  const exteriorTypes = [
+    'Front of Structure',
+    'Exterior Front',
+    'Exterior',
+    'Aerial',
+    'Back of Structure',
+  ];
+  
+  const mainPhoto = sortedByQuality.find(
+    (p) =>
+      exteriorTypes.some((type) =>
+        p.classification.toLowerCase().includes(type.toLowerCase())
+      ) && p.confidence >= 0.7
+  ) || sortedByQuality[0]; // Fallback to highest quality
+  
+  console.log(
+    `Main Photo AI Selection: "${mainPhoto?.classification}" (${(
+      (mainPhoto?.confidence || 0) * 100
+    ).toFixed(0)}% confidence)`
+  );
+  
+  // ========== KITCHEN PHOTO ==========
+  const kitchenTypes = ['Kitchen', 'Breakfast'];
+  
+  const kitchenPhoto = sortedByQuality.find(
+    (p) =>
+      kitchenTypes.some((type) =>
+        p.classification.toLowerCase().includes(type.toLowerCase())
+      ) &&
+      p.confidence >= 0.7 &&
+      p.url !== mainPhoto?.url
+  );
+  
+  if (kitchenPhoto) {
+    console.log(
+      `Kitchen Photo AI Selection: "${kitchenPhoto.classification}" (${(
+        kitchenPhoto.confidence * 100
+      ).toFixed(0)}% confidence)`
+    );
+  } else {
+    console.log('Kitchen Photo: No kitchen photo found in imageInsights');
+  }
+  
+  // ========== ROOM PHOTO: Living Room / Bedroom ==========
+  const roomTypes = [
+    'Living Room',
+    'Family Room',
+    'Great Room',
+    'Dining Room',
+    'Bedroom',
+    'Primary Bedroom',
+    'Master Bedroom',
+  ];
+  
+  const usedUrls = [mainPhoto?.url, kitchenPhoto?.url].filter(Boolean);
+  
+  const roomPhoto = sortedByQuality.find(
+    (p) =>
+      roomTypes.some((type) =>
+        p.classification.toLowerCase().includes(type.toLowerCase())
+      ) &&
+      p.confidence >= 0.7 &&
+      !usedUrls.includes(p.url)
+  );
+  
+  if (roomPhoto) {
+    console.log(
+      `Room Photo AI Selection: "${roomPhoto.classification}" (${(
+        roomPhoto.confidence * 100
+      ).toFixed(0)}% confidence)`
+    );
+  } else {
+    console.log('Room Photo: No living/family room found in imageInsights');
+  }
+  
+  return {
+    mainPhoto: mainPhoto || null,
+    kitchenPhoto: kitchenPhoto || null,
+    roomPhoto: roomPhoto || null,
+    allPhotos: processedPhotos,
+  };
+}
+```
+
+---
+
+## Backend API Enhancement
+
+### Add Endpoint to Fetch AI-Selected Photos
+
+```typescript
+// server/routes/repliers.ts
+
+/**
+ * GET /api/listings/:mlsNumber/ai-photos
+ * Returns AI-selected photos for flyer builder
+ */
+app.get('/api/listings/:mlsNumber/ai-photos', requireAuth, async (req, res) => {
+  const { mlsNumber } = req.params;
+  const apiKey = process.env.REPLIERS_API_KEY;
+  
+  try {
+    // Fetch photos for each slot using coverImage parameter
+    const fetchCoverImage = async (type: string) => {
+      const response = await fetch(
+        `https://api.repliers.io/listings/${mlsNumber}?coverImage=${encodeURIComponent(type)}`,
+        {
+          headers: { 'REPLIERS-API-KEY': apiKey },
+        }
+      );
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      const image = data.images?.[0];
+      
+      if (!image) return null;
+      
+      const url = image.href?.startsWith('http')
+        ? image.href
+        : `https://cdn.repliers.io/${image.href}`;
+      
+      return {
+        url,
+        classification: image.imageInsights?.classification?.imageOf || type,
+        confidence: image.imageInsights?.classification?.prediction || 0,
+        quality: image.imageInsights?.quality?.quantitative || 3,
+      };
+    };
+    
+    // Parallel fetch for all three photo types
+    const [mainPhoto, kitchenPhoto, roomPhoto] = await Promise.all([
+      fetchCoverImage('exterior front'),
+      fetchCoverImage('kitchen'),
+      fetchCoverImage('living room'),
+    ]);
+    
+    // Also fetch all photos with imageInsights for manual selection
+    const allPhotosResponse = await fetch(
+      `https://api.repliers.io/listings/${mlsNumber}`,
+      { headers: { 'REPLIERS-API-KEY': apiKey } }
+    );
+    
+    const allData = await allPhotosResponse.json();
+    const allPhotos = (allData.images || []).map((img: any) => ({
+      url: img.href?.startsWith('http')
+        ? img.href
+        : `https://cdn.repliers.io/${img.href}`,
+      classification: img.imageInsights?.classification?.imageOf || 'Unknown',
+      confidence: img.imageInsights?.classification?.prediction || 0,
+      quality: img.imageInsights?.quality?.quantitative || 3,
+    }));
+    
+    res.json({
+      aiSelected: {
+        mainPhoto,
+        kitchenPhoto,
+        roomPhoto,
+      },
+      allPhotos,
+      totalPhotos: allPhotos.length,
+    });
+    
+  } catch (error) {
+    console.error('Repliers AI photos error:', error);
+    res.status(500).json({ error: 'Failed to fetch AI-selected photos' });
+  }
+});
+```
+
+---
+
+## Frontend Integration
+
+### In Advanced Flyer Builder
+
+```tsx
+// components/flyer/AdvancedFlyerGenerator.tsx
+
+import { useQuery } from '@tanstack/react-query';
+
+export function AdvancedFlyerGenerator({ transaction }) {
+  const mlsNumber = transaction?.mlsNumber;
+  
+  // Fetch AI-selected photos from Repliers
+  const { data: photoData, isLoading: photosLoading } = useQuery({
+    queryKey: ['ai-photos', mlsNumber],
+    queryFn: async () => {
+      const response = await fetch(`/api/listings/${mlsNumber}/ai-photos`);
+      if (!response.ok) throw new Error('Failed to fetch AI photos');
+      return response.json();
+    },
+    enabled: !!mlsNumber,
+  });
+  
+  // Photo state with AI defaults
+  const [images, setImages] = useState({
+    mainImage: null as string | null,
+    kitchenImage: null as string | null,
+    roomImage: null as string | null,
+  });
+  
+  const [photoAIInfo, setPhotoAIInfo] = useState({
+    mainImage: null as { classification: string; confidence: number } | null,
+    kitchenImage: null as { classification: string; confidence: number } | null,
+    roomImage: null as { classification: string; confidence: number } | null,
+  });
+  
+  // Set AI-selected photos when data loads
+  useEffect(() => {
+    if (photoData?.aiSelected) {
+      const { mainPhoto, kitchenPhoto, roomPhoto } = photoData.aiSelected;
+      
+      setImages({
+        mainImage: mainPhoto?.url || null,
+        kitchenImage: kitchenPhoto?.url || null,
+        roomImage: roomPhoto?.url || null,
+      });
+      
+      setPhotoAIInfo({
+        mainImage: mainPhoto
+          ? { classification: mainPhoto.classification, confidence: mainPhoto.confidence }
+          : null,
+        kitchenImage: kitchenPhoto
+          ? { classification: kitchenPhoto.classification, confidence: kitchenPhoto.confidence }
+          : null,
+        roomImage: roomPhoto
+          ? { classification: roomPhoto.classification, confidence: roomPhoto.confidence }
+          : null,
+      });
+      
+      console.log('Repliers AI Photo Selection Applied:', {
+        main: mainPhoto?.classification,
+        kitchen: kitchenPhoto?.classification,
+        room: roomPhoto?.classification,
+      });
+    }
+  }, [photoData]);
+  
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <ImageIcon className="w-5 h-5 text-primary" />
+        <h2 className="text-lg font-medium">Property Images</h2>
+      </div>
+      
+      <div className="flex items-center gap-2 text-green-600 text-sm">
+        <Sparkles className="w-4 h-4" />
+        <span>Auto-selected using Repliers AI</span>
+      </div>
+      
+      {photosLoading ? (
+        <div className="text-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+          <span className="text-sm text-muted-foreground">
+            Loading AI-selected photos...
+          </span>
+        </div>
+      ) : (
+        <>
+          {/* Main Property Photo */}
+          <PhotoSlot
+            label="Main Property Photo"
+            photoUrl={images.mainImage}
+            aiInfo={photoAIInfo.mainImage}
+            expectedCategory="Exterior Front"
+            allPhotos={photoData?.allPhotos || []}
+            onPhotoSelect={(url) => setImages((prev) => ({ ...prev, mainImage: url }))}
+          />
+          
+          {/* Kitchen Photo */}
+          <PhotoSlot
+            label="Kitchen Photo"
+            photoUrl={images.kitchenImage}
+            aiInfo={photoAIInfo.kitchenImage}
+            isMissing={!images.kitchenImage}
+            expectedCategory="Kitchen"
+            allPhotos={photoData?.allPhotos || []}
+            onPhotoSelect={(url) => setImages((prev) => ({ ...prev, kitchenImage: url }))}
+          />
+          
+          {/* Room Photo */}
+          <PhotoSlot
+            label="Room Photo"
+            photoUrl={images.roomImage}
+            aiInfo={photoAIInfo.roomImage}
+            isMissing={!images.roomImage}
+            expectedCategory="Living Room"
+            allPhotos={photoData?.allPhotos || []}
+            onPhotoSelect={(url) => setImages((prev) => ({ ...prev, roomImage: url }))}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## Summary: Repliers API Photo AI Usage
+
+| Photo Slot | API Method | Parameter/Field |
+|------------|-----------|-----------------|
+| **Main Photo** | `coverImage` param | `coverImage=exterior front` |
+| **Kitchen Photo** | `coverImage` param | `coverImage=kitchen` |
+| **Room Photo** | `coverImage` param | `coverImage=living room` |
+| **All Photos** | `imageInsights` response | Classification + confidence in each image |
+
+### API Reference Links
+
+- **coverImage Parameter:** https://docs.repliers.io/reference/listings-search
+- **imageInsights:** https://docs.repliers.io/reference/image-insights
+- **Image CDN:** https://docs.repliers.io/docs/images
+
+---
+
+## Verification Checklist
+
+### API Integration
+- [ ] `/api/listings/:mlsNumber/ai-photos` endpoint created
+- [ ] Uses `coverImage=exterior front` for main photo
+- [ ] Uses `coverImage=kitchen` for kitchen photo
+- [ ] Uses `coverImage=living room` for room photo
+- [ ] Falls back to `imageInsights` classification if coverImage fails
+- [ ] Returns all photos with classification data for manual selection
+
+### Frontend
+- [ ] Calls AI photos endpoint when flyer builder loads
+- [ ] Main Photo auto-selects AI exterior front
+- [ ] Kitchen Photo auto-selects AI kitchen (or shows warning if none)
+- [ ] Room Photo auto-selects AI living room (or shows warning if none)
+- [ ] Shows "AI Selected" badge with classification and confidence
+- [ ] User can manually override and select from all photos
+
+### Console Output (Expected)
+```
+Repliers AI Photo Selection Applied: {
+  main: "Front of Structure",
+  kitchen: "Kitchen", 
+  room: "Living Room"
+}
+```

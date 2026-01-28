@@ -31,7 +31,13 @@ Preferred communication style: Simple, everyday language.
 - **Social Media Graphics**: Client-side canvas rendering for various social media formats with agent branding and status badges.
 - **Agent Marketing Profile**: Dedicated settings for agent branding on marketing materials.
 - **Mobile/WebView Optimizations**: Full-screen viewport, PWA meta tags, safe area utilities, touch optimizations, and scroll behavior controls.
-- **Advanced Flyer Generator**: Full-page view within Marketing tab for professional flyer creation with auto-filled MLS data, AI-generated headlines, image upload with crop controls, live preview, optional grid overlay, auto-selection of MLS photos, and integration of agent marketing profiles. Exports to PNG or CMYK PDF.
+- **Advanced Flyer Generator**: Full-page view within Marketing tab for professional flyer creation with auto-filled MLS data, AI-generated headlines, image upload with crop controls, live preview, optional grid overlay, AI-powered photo selection using Repliers `coverImage` parameter, and integration of agent marketing profiles. Exports to PNG or CMYK PDF.
+  - **AI Photo Selection**: Uses Repliers API `coverImage` parameter for optimal photo selection:
+    - Main Photo: `coverImage=exterior front` - AI selects best exterior/front photo
+    - Kitchen Photo: `coverImage=kitchen` - AI selects best kitchen photo
+    - Room Photo: `coverImage=living room` - AI selects best living room photo
+  - Falls back to `imageInsights` classification when coverImage API unavailable
+  - Endpoint: `/api/listings/:mlsNumber/ai-photos` with 5-minute client-side cache
 - **CMA Presentation Player**: Fullscreen interactive slideshow with 33 widgets for client presentations, featuring responsive layout, Mapbox header, agent profile popover, sidebar navigation, keyboard controls, and mobile optimization. Uses Spyglass branding.
 - **CMA Print Preview System**: Pre-download slide preview with data validation, single/grid view modes, zoom controls, and keyboard navigation. Ensures preview matches PDF output.
 - **CMA PDF Export System**: Client-side PDF generation using `@react-pdf/renderer` in landscape letter format, covering all 33 widgets with specialized pages for dynamic content. Incorporates Spyglass brand colors and professional design elements.

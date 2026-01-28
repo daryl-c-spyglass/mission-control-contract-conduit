@@ -6,7 +6,7 @@ import { storage } from "./storage";
 import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema, insertCmaSchema, insertNotificationSettingsSchema } from "@shared/schema";
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages, watchUserMailbox } from "./gmail";
 import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel, postDocumentUploadNotification, postMLSListingNotification, sendMarketingNotification } from "./slack";
-import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess, getBestPhotosForFlyer, searchNearbyComparables, type CMASearchFilters } from "./repliers";
+import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess, getBestPhotosForFlyer, getAISelectedPhotosForFlyer, searchNearbyComparables, type CMASearchFilters } from "./repliers";
 import { isRentalOrLease } from "../shared/lib/listings";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
@@ -3064,6 +3064,42 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to get best photos" });
+    }
+  });
+
+  /**
+   * GET /api/listings/:mlsNumber/ai-photos
+   * Returns AI-selected photos for flyer builder using Repliers coverImage parameter
+   * Uses Method 1 (coverImage) for optimal AI photo selection:
+   * - Main Photo: coverImage=exterior front
+   * - Kitchen Photo: coverImage=kitchen
+   * - Room Photo: coverImage=living room
+   */
+  app.get("/api/listings/:mlsNumber/ai-photos", isAuthenticated, async (req, res) => {
+    try {
+      const { mlsNumber } = req.params;
+      
+      if (!mlsNumber) {
+        return res.status(400).json({ message: "MLS number is required" });
+      }
+      
+      console.log(`[AI Photos API] Fetching AI-selected photos for MLS# ${mlsNumber}`);
+      
+      const result = await getAISelectedPhotosForFlyer(mlsNumber);
+      
+      res.json({
+        aiSelected: {
+          mainPhoto: result.mainPhoto,
+          kitchenPhoto: result.kitchenPhoto,
+          roomPhoto: result.roomPhoto,
+        },
+        allPhotos: result.allPhotos,
+        totalPhotos: result.totalPhotos,
+        selectionMethod: result.selectionMethod,
+      });
+    } catch (error: any) {
+      console.error("[AI Photos API] Error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch AI-selected photos" });
     }
   });
 

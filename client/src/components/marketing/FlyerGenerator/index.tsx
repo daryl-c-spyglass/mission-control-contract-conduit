@@ -57,6 +57,24 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
     refetchOnWindowFocus: false,
   });
 
+  // Fetch AI-selected photos using Repliers coverImage parameter
+  const mlsNumber = transaction?.mlsNumber;
+  const { data: aiPhotoData, isLoading: aiPhotosLoading } = useQuery<{
+    aiSelected: {
+      mainPhoto: { url: string; classification: string; confidence: number; quality: number } | null;
+      kitchenPhoto: { url: string; classification: string; confidence: number; quality: number } | null;
+      roomPhoto: { url: string; classification: string; confidence: number; quality: number } | null;
+    };
+    allPhotos: Array<{ url: string; classification: string; confidence: number; quality: number; index: number }>;
+    totalPhotos: number;
+    selectionMethod: string;
+  }>({
+    queryKey: [`/api/listings/${mlsNumber}/ai-photos`],
+    enabled: !!mlsNumber,
+    staleTime: 300000, // Cache for 5 minutes
+    refetchOnWindowFocus: false,
+  });
+
   const [images, setImages] = useState<FlyerImages>({
     mainImage: null,
     kitchenImage: null,
@@ -237,18 +255,76 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
         }
         
         const selected = autoSelectPhotosWithInfo(photosWithInsights);
-        setImages(prev => ({
-          ...prev,
-          mainImage: selected.mainPhoto,
-          kitchenImage: selected.kitchenPhoto,
-          roomImage: selected.roomPhoto,
-        }));
-        setPhotoSelectionInfo(selected.selectionInfo);
+        
+        // Only set photos from imageInsights if we don't have coverImage API data
+        // coverImage API provides better AI selection and takes priority
+        if (!aiPhotoData?.aiSelected) {
+          setImages(prev => ({
+            ...prev,
+            mainImage: selected.mainPhoto,
+            kitchenImage: selected.kitchenPhoto,
+            roomImage: selected.roomPhoto,
+          }));
+          setPhotoSelectionInfo(selected.selectionInfo);
+        }
+        
+        // Always set allMlsPhotos from imageInsights for gallery selection
         setAllMlsPhotos(selected.allPhotos);
         setMissingCategories(selected.missingCategories || []);
       }
     }
-  }, [transaction, form]);
+  }, [transaction, form, aiPhotoData]);
+
+  // Effect for AI-selected photos from coverImage API (takes priority over imageInsights)
+  useEffect(() => {
+    if (aiPhotoData?.aiSelected && !aiPhotosLoading) {
+      const { mainPhoto, kitchenPhoto, roomPhoto } = aiPhotoData.aiSelected;
+      
+      console.log(`[Flyer AI] Using coverImage API selection (method: ${aiPhotoData.selectionMethod})`);
+      
+      // Set images from coverImage API selection
+      setImages(prev => ({
+        ...prev,
+        mainImage: mainPhoto?.url || prev.mainImage,
+        kitchenImage: kitchenPhoto?.url || prev.kitchenImage,
+        roomImage: roomPhoto?.url || prev.roomImage,
+      }));
+      
+      // Update selection info with coverImage API data
+      const buildSelectionInfo = (photo: typeof mainPhoto, type: string): PhotoSelectionInfo | null => {
+        if (!photo) return null;
+        return {
+          classification: photo.classification.toLowerCase(),
+          displayClassification: photo.classification,
+          confidence: photo.confidence,
+          quality: photo.quality,
+          reason: `AI detected: ${photo.classification}`,
+          isAISelected: photo.confidence >= 70,
+        };
+      };
+      
+      setPhotoSelectionInfo({
+        mainImage: buildSelectionInfo(mainPhoto, 'main'),
+        kitchenImage: buildSelectionInfo(kitchenPhoto, 'kitchen'),
+        roomImage: buildSelectionInfo(roomPhoto, 'room'),
+      });
+      
+      // Track missing categories
+      const missing: string[] = [];
+      if (!mainPhoto) missing.push('Exterior');
+      if (!kitchenPhoto) missing.push('Kitchen');
+      if (!roomPhoto) missing.push('Living Room');
+      setMissingCategories(missing);
+      
+      // Use allPhotos from coverImage API if available
+      if (aiPhotoData.allPhotos && aiPhotoData.allPhotos.length > 0) {
+        setAllMlsPhotos(aiPhotoData.allPhotos.map(p => ({
+          ...p,
+          displayClassification: p.classification,
+        })));
+      }
+    }
+  }, [aiPhotoData, aiPhotosLoading]);
 
   // Effect for agent data - runs when agent profile or marketing profile loads
   useEffect(() => {
