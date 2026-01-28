@@ -108,7 +108,18 @@ export default function CMAPresentation() {
     };
   }, [agentProfileData]);
 
-  const normalizeStatus = useCallback((status: string | undefined | null): string => {
+  // Normalize status checking both status and lastStatus fields
+  // lastStatus="Sld" indicates a sold property even when status="Active"
+  const normalizeStatusWithLastStatus = useCallback((status: string | undefined | null, lastStatus: string | undefined | null): string => {
+    // First check lastStatus - "Sld" or "Sold" means the property is closed/sold
+    if (lastStatus) {
+      const ls = lastStatus.toLowerCase();
+      if (ls === 'sld' || ls === 'sold' || ls === 's' || ls.includes('sold') || ls.includes('closed')) {
+        return 'Closed';
+      }
+    }
+    
+    // Then check the primary status field
     if (!status) return 'Active';
     const s = status.toLowerCase();
     if (s === 'u' || s === 'sc' || s.includes('pending') || s.includes('contract')) return 'Pending';
@@ -165,6 +176,12 @@ export default function CMAPresentation() {
         (comp.lotSizeSquareFeet ? comp.lotSizeSquareFeet / 43560 : null) ??
         (comp.lotSize && comp.lotSize > 100 ? comp.lotSize / 43560 : comp.lotSize) ?? null;
       
+      // Get normalized status using both status and lastStatus fields
+      const normalizedStatus = normalizeStatusWithLastStatus(
+        comp.status || comp.standardStatus,
+        comp.lastStatus
+      );
+      
       return {
         id: comp.mlsNumber || `comp-${index}`,
         mlsNumber: comp.mlsNumber || '',
@@ -174,8 +191,8 @@ export default function CMAPresentation() {
         city: comp.city || comp.location?.city || '',
         listPrice: parsedPrice,
         closePrice: comp.closePrice || comp.soldPrice,
-        standardStatus: normalizeStatus(comp.standardStatus || comp.status),
-        status: normalizeStatus(comp.status || comp.standardStatus),
+        standardStatus: normalizedStatus,
+        status: normalizedStatus,
         bedroomsTotal: parsedBeds,
         beds: parsedBeds,
         bathroomsTotal: parsedBaths,
@@ -190,7 +207,7 @@ export default function CMAPresentation() {
         longitude: lng,
       };
     });
-  }, [savedCma?.propertiesData, transaction?.cmaData, normalizeStatus]);
+  }, [savedCma?.propertiesData, transaction?.cmaData, normalizeStatusWithLastStatus]);
 
   const subjectProperty = useMemo(() => {
     const rawSubject = transaction?.mlsData as any;
@@ -207,13 +224,13 @@ export default function CMAPresentation() {
       baths: rawSubject.bathroomsTotal || rawSubject.bathrooms || 0,
       livingArea: typeof rawSubject.sqft === 'string' ? parseFloat(rawSubject.sqft) : (rawSubject.sqft || rawSubject.livingArea || 0),
       sqft: typeof rawSubject.sqft === 'string' ? parseFloat(rawSubject.sqft) : (rawSubject.sqft || rawSubject.livingArea || 0),
-      standardStatus: normalizeStatus(rawSubject.standardStatus || rawSubject.status),
+      standardStatus: normalizeStatusWithLastStatus(rawSubject.standardStatus || rawSubject.status, rawSubject.lastStatus),
       latitude: rawSubject.latitude || rawSubject.coordinates?.latitude,
       longitude: rawSubject.longitude || rawSubject.coordinates?.longitude,
       map: rawSubject.map || (rawSubject.coordinates?.latitude && rawSubject.coordinates?.longitude ? 
         { latitude: rawSubject.coordinates.latitude, longitude: rawSubject.coordinates.longitude } : null),
     };
-  }, [transaction?.mlsData, normalizeStatus]);
+  }, [transaction?.mlsData, normalizeStatusWithLastStatus]);
 
   const averageDaysOnMarket = useMemo(() => {
     if (!presentationComparables.length) return 30;
