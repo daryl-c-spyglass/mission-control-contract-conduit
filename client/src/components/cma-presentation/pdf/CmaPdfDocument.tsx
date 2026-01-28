@@ -36,6 +36,7 @@ interface CmaPdfDocumentProps {
   avgPricePerAcre?: number | null;
   preparedFor?: string;
   baseUrl?: string;
+  logoBase64?: string | null;
 }
 
 const PageHeader = ({ title, slideNumber, totalSlides }: { title: string; slideNumber: number; totalSlides: number }) => (
@@ -45,30 +46,32 @@ const PageHeader = ({ title, slideNumber, totalSlides }: { title: string; slideN
   </View>
 );
 
-const PageFooter = ({ slideNumber = 2, totalSlides = 44, baseUrl }: { slideNumber?: number; totalSlides?: number; baseUrl?: string }) => {
-  const logoUrl = baseUrl ? `${baseUrl}/logos/SpyglassRealty_Logo_Black.png` : '/logos/SpyglassRealty_Logo_Black.png';
+const PageFooter = ({ slideNumber = 2, totalSlides = 44, logoBase64 }: { slideNumber?: number; totalSlides?: number; logoBase64?: string | null }) => {
   const showLogo = slideNumber > 1;
   
   return (
     <View style={styles.footer}>
-      {showLogo ? (
-        <Image src={logoUrl} style={{ height: 18, width: 100 }} />
+      {showLogo && logoBase64 ? (
+        <Image src={logoBase64} style={{ height: 28, width: 'auto' }} />
       ) : (
-        <Text style={styles.footerText}>Spyglass Realty</Text>
+        <Text style={{ fontSize: 10, fontWeight: 600, color: '#18181b' }}>Spyglass Realty</Text>
       )}
       <Text style={styles.footerText}>Slide {slideNumber} of {totalSlides}</Text>
     </View>
   );
 };
 
-const CoverPage = ({ propertyAddress, agent, preparedFor, baseUrl, slideNumber, totalSlides }: { propertyAddress: string; agent: AgentProfile; preparedFor?: string; baseUrl: string; slideNumber: number; totalSlides: number }) => {
+const CoverPage = ({ propertyAddress, agent, preparedFor, logoBase64, slideNumber, totalSlides }: { propertyAddress: string; agent: AgentProfile; preparedFor?: string; logoBase64?: string | null; slideNumber: number; totalSlides: number }) => {
   const agentName = getAgentName(agent);
-  const logoUrl = baseUrl ? `${baseUrl}/logos/SpyglassRealty_Logo_Black.png` : '/logos/SpyglassRealty_Logo_Black.png';
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}>
-        <Image src={logoUrl} style={{ height: 48, marginBottom: 24 }} />
+        {logoBase64 ? (
+          <Image src={logoBase64} style={{ height: 56, marginBottom: 24 }} />
+        ) : (
+          <Text style={{ fontSize: 24, fontWeight: 700, color: '#18181b', marginBottom: 24 }}>Spyglass Realty</Text>
+        )}
         <Text style={{ fontSize: 24, fontWeight: 700, color: '#18181b', textAlign: 'center', marginBottom: 24 }}>
           COMPARATIVE MARKET ANALYSIS
         </Text>
@@ -86,12 +89,12 @@ const CoverPage = ({ propertyAddress, agent, preparedFor, baseUrl, slideNumber, 
           <Text style={{ fontSize: 14, color: '#52525b', textAlign: 'center', marginTop: 2 }}>{agent.company || 'Spyglass Realty'}</Text>
         </View>
       </View>
-      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} baseUrl={baseUrl} />
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} logoBase64={logoBase64} />
     </Page>
   );
 };
 
-const AgentResumePage = ({ agent, slideNumber, totalSlides }: { agent: AgentProfile; slideNumber: number; totalSlides: number }) => {
+const AgentResumePage = ({ agent, slideNumber, totalSlides, logoBase64 }: { agent: AgentProfile; slideNumber: number; totalSlides: number; logoBase64?: string | null }) => {
   const agentName = getAgentName(agent);
   const agentInitials = getAgentInitials(agent);
   const agentPhoto = getAgentPhoto(agent) || '';
@@ -122,7 +125,7 @@ const AgentResumePage = ({ agent, slideNumber, totalSlides }: { agent: AgentProf
           </Text>
         </View>
       </View>
-      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} logoBase64={logoBase64} />
     </Page>
   );
 };
@@ -131,12 +134,14 @@ const ComparablesSummaryPage = ({
   comparables, 
   propertyAddress,
   slideNumber, 
-  totalSlides 
+  totalSlides,
+  logoBase64
 }: { 
   comparables: CmaProperty[]; 
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
+  logoBase64?: string | null;
 }) => {
   const stats = calculateCMAStats(comparables);
   
@@ -174,7 +179,7 @@ const ComparablesSummaryPage = ({
             
             return (
               <View key={comp.id || i} style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#f4f4f5', paddingVertical: 4 }}>
-                <Text style={{ flex: 2, fontSize: 12, color: '#18181b' }} numberOfLines={1}>{extractFullAddress(comp) || 'Unknown'}</Text>
+                <Text style={{ flex: 2, fontSize: 12, color: '#18181b' }}>{extractFullAddress(comp) || 'Unknown'}</Text>
                 <Text style={{ flex: 1, fontSize: 12, textAlign: 'right' }}>{formatPrice(extractPrice(comp))}</Text>
                 <Text style={{ flex: 1, fontSize: 12, textAlign: 'right' }}>{formatNumber(extractSqft(comp))}</Text>
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
@@ -187,7 +192,7 @@ const ComparablesSummaryPage = ({
           })}
         </View>
       </View>
-      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} logoBase64={logoBase64} />
     </Page>
   );
 };
@@ -196,12 +201,14 @@ const PropertyDetailPage = ({
   property, 
   propertyAddress,
   slideNumber, 
-  totalSlides 
+  totalSlides,
+  logoBase64
 }: { 
   property: CmaProperty & { base64PrimaryPhoto?: string }; 
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
+  logoBase64?: string | null;
 }) => {
   const price = extractPrice(property);
   const sqft = extractSqft(property);
@@ -264,7 +271,7 @@ const PropertyDetailPage = ({
           </View>
         </View>
       </View>
-      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} logoBase64={logoBase64} />
     </Page>
   );
 };
@@ -274,13 +281,15 @@ const TimeToSellPage = ({
   comparables,
   propertyAddress,
   slideNumber, 
-  totalSlides 
+  totalSlides,
+  logoBase64
 }: { 
   averageDaysOnMarket: number;
   comparables: CmaProperty[];
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
+  logoBase64?: string | null;
 }) => {
   const stats = calculateCMAStats(comparables);
   const avgDays = averageDaysOnMarket ?? stats.avgDOM ?? 0;
@@ -302,7 +311,7 @@ const TimeToSellPage = ({
           </Text>
         </View>
       </View>
-      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} logoBase64={logoBase64} />
     </Page>
   );
 };
@@ -312,13 +321,15 @@ const SuggestedPricePage = ({
   comparables,
   propertyAddress,
   slideNumber, 
-  totalSlides 
+  totalSlides,
+  logoBase64
 }: { 
   suggestedListPrice: number | null | undefined;
   comparables: CmaProperty[];
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
+  logoBase64?: string | null;
 }) => {
   const stats = calculateCMAStats(comparables);
   const price = suggestedListPrice ?? stats.avgPrice;
@@ -341,7 +352,7 @@ const SuggestedPricePage = ({
           )}
         </View>
       </View>
-      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} logoBase64={logoBase64} />
     </Page>
   );
 };
@@ -351,13 +362,15 @@ const AveragePricePerAcrePage = ({
   comparables,
   propertyAddress,
   slideNumber, 
-  totalSlides 
+  totalSlides,
+  logoBase64
 }: { 
   avgPricePerAcre: number | null | undefined;
   comparables: CmaProperty[];
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
+  logoBase64?: string | null;
 }) => {
   const stats = calculateCMAStats(comparables);
   const pricePerAcre = avgPricePerAcre ?? stats.avgPricePerAcre;
@@ -382,7 +395,7 @@ const AveragePricePerAcrePage = ({
           <Text style={{ fontSize: 18, color: '#52525b' }}>Average Price per Acre</Text>
         </View>
       </View>
-      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} logoBase64={logoBase64} />
     </Page>
   );
 };
@@ -390,11 +403,13 @@ const AveragePricePerAcrePage = ({
 const ListingActionPlanPage = ({ 
   propertyAddress,
   slideNumber, 
-  totalSlides 
+  totalSlides,
+  logoBase64
 }: { 
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
+  logoBase64?: string | null;
 }) => {
   const lines = LISTING_ACTION_PLAN_TEXT.split('\n');
   
@@ -417,7 +432,7 @@ const ListingActionPlanPage = ({
           ))}
         </View>
       </View>
-      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} logoBase64={logoBase64} />
     </Page>
   );
 };
@@ -425,11 +440,13 @@ const ListingActionPlanPage = ({
 const MarketingPage = ({ 
   propertyAddress,
   slideNumber, 
-  totalSlides 
+  totalSlides,
+  logoBase64
 }: { 
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
+  logoBase64?: string | null;
 }) => (
   <Page size="LETTER" orientation="landscape" style={styles.page}>
     <PageHeader title="MARKETING" slideNumber={slideNumber} totalSlides={totalSlides} />
@@ -437,7 +454,7 @@ const MarketingPage = ({
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
         {/* TrendingUp icon placeholder */}
         <View style={{ width: 24, height: 24, borderWidth: 2, borderColor: '#EF4923', borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>
-          <View style={{ width: 12, height: 8, borderBottomWidth: 2, borderRightWidth: 2, borderColor: '#EF4923', transform: [{ rotate: '-45deg' }] }} />
+          <View style={{ width: 12, height: 8, borderBottomWidth: 2, borderRightWidth: 2, borderColor: '#EF4923' }} />
         </View>
         <Text style={{ fontSize: 18, fontWeight: 700, color: '#222222' }}>MARKETING</Text>
       </View>
@@ -445,7 +462,7 @@ const MarketingPage = ({
         {MARKETING_TEXT}
       </Text>
     </View>
-    <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
+    <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} logoBase64={logoBase64} />
   </Page>
 );
 
@@ -516,11 +533,13 @@ const ReviewCardPdf = ({ review }: { review: Review }) => (
 const ClientTestimonialsPage = ({ 
   propertyAddress,
   slideNumber, 
-  totalSlides 
+  totalSlides,
+  logoBase64
 }: { 
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
+  logoBase64?: string | null;
 }) => (
   <Page size="LETTER" orientation="landscape" style={styles.page}>
     <PageHeader title="CLIENT TESTIMONIALS" slideNumber={slideNumber} totalSlides={totalSlides} />
@@ -542,7 +561,7 @@ const ClientTestimonialsPage = ({
         </Text>
       </View>
     </View>
-    <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
+    <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} logoBase64={logoBase64} />
   </Page>
 );
 
@@ -551,15 +570,14 @@ const ListingWithSpyglassPage = ({
   propertyAddress,
   slideNumber, 
   totalSlides,
-  baseUrl
+  logoBase64
 }: { 
   agent: AgentProfile;
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
-  baseUrl: string;
+  logoBase64?: string | null;
 }) => {
-  const logoUrl = baseUrl ? `${baseUrl}/logos/LRE_SGR_White.png` : '/logos/LRE_SGR_White.png';
   const youtubeVideoUrl = 'https://www.youtube.com/watch?v=iB_u-ksW3ts';
   
   return (
@@ -573,12 +591,14 @@ const ListingWithSpyglassPage = ({
             borderRadius: 8, 
             padding: 30, 
             marginBottom: 24,
-            width: '60%'
+            width: '60%',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}>
-            <Image 
-              src={logoUrl}
-              style={{ width: '100%', height: 60 }}
-            />
+            <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+              <Text style={{ fontSize: 28, fontWeight: 700, color: '#EF4923' }}>SPYGLASS</Text>
+              <Text style={{ fontSize: 28, fontWeight: 400, color: '#ffffff', marginLeft: 8 }}>REALTY</Text>
+            </View>
           </View>
           
           {/* Video Presentation Label */}
@@ -611,7 +631,7 @@ const ListingWithSpyglassPage = ({
           </Text>
         </View>
       </View>
-      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} baseUrl={baseUrl} />
+      <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} logoBase64={logoBase64} />
     </Page>
   );
 };
@@ -619,11 +639,13 @@ const ListingWithSpyglassPage = ({
 const SpyglassResourcesPage = ({ 
   propertyAddress,
   slideNumber, 
-  totalSlides 
+  totalSlides,
+  logoBase64
 }: { 
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
+  logoBase64?: string | null;
 }) => (
   <Page size="LETTER" orientation="landscape" style={styles.page}>
     <PageHeader title="SPYGLASS RESOURCES AND LINKS" slideNumber={slideNumber} totalSlides={totalSlides} />
@@ -637,7 +659,7 @@ const SpyglassResourcesPage = ({
         <Text style={{ fontSize: 14, color: '#71717a', marginTop: 8 }}>Agent-managed resources for CMA presentations</Text>
       </View>
     </View>
-    <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
+    <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} logoBase64={logoBase64} />
   </Page>
 );
 
@@ -741,13 +763,15 @@ const StaticImagePage = ({
   propertyAddress,
   slideNumber, 
   totalSlides,
-  baseUrl
+  baseUrl,
+  logoBase64
 }: { 
   widget: { id?: string; title: string; imagePath?: string };
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
   baseUrl: string;
+  logoBase64?: string | null;
 }) => {
   const hasImage = widget.imagePath && widget.imagePath.length > 0 && baseUrl;
   const normalizedPath = widget.imagePath?.startsWith('/') ? widget.imagePath : `/${widget.imagePath}`;
@@ -775,7 +799,7 @@ const StaticImagePage = ({
               </Text>
             </View>
           </View>
-          <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} />
+          <PageFooter slideNumber={slideNumber} totalSlides={totalSlides} logoBase64={logoBase64} />
         </>
       )}
     </Page>
@@ -839,6 +863,7 @@ export function CmaPdfDocument({
   avgPricePerAcre,
   preparedFor,
   baseUrl = '',
+  logoBase64,
 }: CmaPdfDocumentProps) {
   const totalSlides = WIDGETS.length;
   const stats = calculateCMAStats(comparables);
@@ -848,47 +873,47 @@ export function CmaPdfDocument({
   
   return (
     <Document>
-      <CoverPage propertyAddress={propertyAddress} agent={agent} preparedFor={preparedFor} baseUrl={baseUrl} slideNumber={1} totalSlides={totalSlides} />
+      <CoverPage propertyAddress={propertyAddress} agent={agent} preparedFor={preparedFor} logoBase64={logoBase64} slideNumber={1} totalSlides={totalSlides} />
       
       {WIDGETS.map((widget, index) => {
         slideNum = index + 1;
         
         switch (widget.id) {
           case 'agent_resume':
-            return <AgentResumePage key={widget.id} agent={agent} slideNumber={slideNum} totalSlides={totalSlides} />;
+            return <AgentResumePage key={widget.id} agent={agent} slideNumber={slideNum} totalSlides={totalSlides} logoBase64={logoBase64} />;
           
           case 'listing_with_spyglass':
-            return <ListingWithSpyglassPage key={widget.id} agent={agent} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} baseUrl={baseUrl} />;
+            return <ListingWithSpyglassPage key={widget.id} agent={agent} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} logoBase64={logoBase64} />;
           
           case 'client_testimonials':
-            return <ClientTestimonialsPage key={widget.id} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} />;
+            return <ClientTestimonialsPage key={widget.id} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} logoBase64={logoBase64} />;
           
           case 'comps':
-            return <ComparablesSummaryPage key={widget.id} comparables={comparables} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} />;
+            return <ComparablesSummaryPage key={widget.id} comparables={comparables} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} logoBase64={logoBase64} />;
           
           case 'time_to_sell':
-            return <TimeToSellPage key={widget.id} averageDaysOnMarket={avgDom} comparables={comparables} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} />;
+            return <TimeToSellPage key={widget.id} averageDaysOnMarket={avgDom} comparables={comparables} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} logoBase64={logoBase64} />;
           
           case 'suggested_list_price':
-            return <SuggestedPricePage key={widget.id} suggestedListPrice={suggestedListPrice} comparables={comparables} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} />;
+            return <SuggestedPricePage key={widget.id} suggestedListPrice={suggestedListPrice} comparables={comparables} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} logoBase64={logoBase64} />;
           
           case 'average_price_acre':
-            return <AveragePricePerAcrePage key={widget.id} avgPricePerAcre={avgPricePerAcre} comparables={comparables} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} />;
+            return <AveragePricePerAcrePage key={widget.id} avgPricePerAcre={avgPricePerAcre} comparables={comparables} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} logoBase64={logoBase64} />;
           
           case 'listing_action_plan':
-            return <ListingActionPlanPage key={widget.id} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} />;
+            return <ListingActionPlanPage key={widget.id} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} logoBase64={logoBase64} />;
           
           case 'spyglass_resources':
-            return <SpyglassResourcesPage key={widget.id} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} />;
+            return <SpyglassResourcesPage key={widget.id} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} logoBase64={logoBase64} />;
           
           case 'marketing':
-            return <MarketingPage key={widget.id} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} />;
+            return <MarketingPage key={widget.id} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} logoBase64={logoBase64} />;
           
           case 'thank_you':
             return <ThankYouPage key={widget.id} agent={agent} slideNumber={slideNum} totalSlides={totalSlides} />;
           
           default:
-            return <StaticImagePage key={widget.id} widget={widget} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} baseUrl={baseUrl} />;
+            return <StaticImagePage key={widget.id} widget={widget} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} baseUrl={baseUrl} logoBase64={logoBase64} />;
         }
       })}
       
@@ -898,7 +923,8 @@ export function CmaPdfDocument({
           property={comp} 
           propertyAddress={propertyAddress}
           slideNumber={totalSlides + i + 1} 
-          totalSlides={totalSlides + comparables.length} 
+          totalSlides={totalSlides + comparables.length}
+          logoBase64={logoBase64}
         />
       ))}
     </Document>

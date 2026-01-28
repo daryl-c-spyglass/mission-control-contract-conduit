@@ -1,0 +1,139 @@
+# Fix: CMA Presentation PDF — Spyglass Logo Unreadable in Footer
+
+## Problem
+
+The **Spyglass Realty logo** in the footer of CMA Presentation PDF export is **unreadable/unclear**.
+
+## Screenshot Reference
+
+**User will attach screenshot showing the issue.**
+
+---
+
+## Possible Causes
+
+1. **Logo too small** - Logo scaled down too much for footer
+2. **Low resolution image** - Source logo file is low quality
+3. **Dark logo on dark background** - Contrast issue
+4. **Compression artifacts** - PDF generation compressing the image
+5. **Wrong logo variant** - Using wrong version (e.g., full color on dark bg)
+
+---
+
+## Fix Options
+
+### Option 1: Use Higher Resolution Logo
+
+```tsx
+// Use a higher resolution version of the logo
+// Minimum 300 DPI for print quality
+
+// Instead of:
+<img src="/logos/spyglass-logo.png" />
+
+// Use:
+<img src="/logos/spyglass-logo-hd.png" /> // Higher resolution version
+// OR
+<img src="/logos/spyglass-logo.svg" />   // SVG scales perfectly
+```
+
+### Option 2: Increase Logo Size in Footer
+
+```tsx
+// Current (too small):
+<img src={logo} className="h-4" />
+
+// Fixed (larger):
+<img src={logo} className="h-8" /> // or h-6 minimum
+```
+
+### Option 3: Use Appropriate Logo Variant
+
+```tsx
+// For dark backgrounds:
+<img src="/logos/spyglass-logo-white.png" />
+
+// For light backgrounds:
+<img src="/logos/spyglass-logo-dark.png" />
+
+// Or use the full color version that works on both:
+<img src="/logos/spyglass-logo-color.png" />
+```
+
+### Option 4: Add Background/Padding for Contrast
+
+```tsx
+// Add white background behind logo for visibility
+<div className="bg-white px-2 py-1 rounded">
+  <img src={logo} className="h-6" alt="Spyglass Realty" />
+</div>
+```
+
+### Option 5: Ensure Logo Loads in PDF Generation
+
+```tsx
+// When using Puppeteer for PDF generation, ensure images are loaded:
+
+// Convert logo to base64 to embed directly in PDF
+const logoBase64 = await imageToBase64('/logos/spyglass-logo.png');
+
+// Use in slide:
+<img src={`data:image/png;base64,${logoBase64}`} className="h-8" />
+```
+
+---
+
+## Recommended Fix
+
+1. **Use SVG logo** if available (scales perfectly at any size)
+2. **Minimum height of 24px (h-6)** for footer logos
+3. **Ensure proper contrast** (white logo on dark footer, or add white bg)
+4. **Convert to base64** for PDF generation to prevent loading issues
+
+---
+
+## Footer Component Update
+
+```tsx
+// CMA Slide Footer Component
+
+interface SlideFooterProps {
+  slideNumber: number;
+  totalSlides: number;
+}
+
+export function SlideFooter({ slideNumber, totalSlides }: SlideFooterProps) {
+  return (
+    <div className="absolute bottom-0 left-0 right-0 px-6 py-3 flex justify-between items-center border-t bg-white">
+      {/* Spyglass Logo - Ensure readable */}
+      <img 
+        src="/logos/spyglass-logo.svg"  // Use SVG for best quality
+        alt="Spyglass Realty"
+        className="h-8 w-auto"  // Minimum h-8 for readability
+        style={{ minHeight: '32px' }}  // Fallback minimum
+      />
+      
+      {/* Slide Number */}
+      <span className="text-sm text-gray-500">
+        Slide {slideNumber} of {totalSlides}
+      </span>
+    </div>
+  );
+}
+```
+
+---
+
+## Verification
+
+After fix:
+- [ ] Logo is clearly visible in PDF preview
+- [ ] Logo is readable when PDF is exported/downloaded
+- [ ] Logo maintains quality when PDF is printed
+- [ ] Logo has proper contrast against footer background
+
+---
+
+## Note
+
+User will attach screenshot showing the current unreadable logo for reference.

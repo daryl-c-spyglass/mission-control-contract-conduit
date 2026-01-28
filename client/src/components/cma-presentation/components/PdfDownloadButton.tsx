@@ -47,6 +47,25 @@ export function PdfDownloadButton({
 
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
+      // Convert Spyglass logo to base64 for reliable PDF rendering
+      console.log('[PdfDownloadButton] Converting Spyglass logo to base64...');
+      const logoUrl = `${baseUrl}/logos/SpyglassRealty_Logo_Black.png`;
+      let logoBase64: string | null = null;
+      try {
+        const logoResponse = await fetch(logoUrl);
+        if (logoResponse.ok) {
+          const logoBlob = await logoResponse.blob();
+          logoBase64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(logoBlob);
+          });
+          console.log('[PdfDownloadButton] Logo converted to base64 successfully');
+        }
+      } catch (err) {
+        console.warn('[PdfDownloadButton] Failed to convert logo to base64:', err);
+      }
+
       console.log(`[PdfDownloadButton] Converting ${comparables.length} comparable photos to base64 via proxy...`);
       let successCount = 0;
       let failCount = 0;
@@ -94,6 +113,7 @@ export function PdfDownloadButton({
           avgPricePerAcre={avgPricePerAcre}
           preparedFor={preparedFor}
           baseUrl={baseUrl}
+          logoBase64={logoBase64}
         />
       );
 
