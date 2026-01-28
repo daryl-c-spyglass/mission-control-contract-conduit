@@ -9,6 +9,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { OnboardingDialog } from "@/components/onboarding-dialog";
+import { CreateTransactionDialog } from "@/components/create-transaction-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -237,6 +238,11 @@ function AuthenticatedApp() {
       <OnboardingDialog
         open={showOnboarding}
         onComplete={() => setShowOnboarding(false)}
+      />
+      
+      <CreateTransactionDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
       />
     </SidebarProvider>
   );

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TransactionCard } from "@/components/transaction-card";
 import { TransactionDetails } from "@/components/transaction-details";
-import { CreateTransactionDialog } from "@/components/create-transaction-dialog";
 import { TransactionToolbar } from "@/components/transactions/transaction-toolbar";
 import { TransactionListView } from "@/components/transactions/transaction-list-view";
 import { TransactionTableView } from "@/components/transactions/transaction-table-view";
@@ -250,11 +249,6 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen, trans
       />
 
       {renderTransactionView()}
-
-      <CreateTransactionDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-      />
       
       <Dialog open={addMlsDialogOpen} onOpenChange={setAddMlsDialogOpen}>
         <DialogContent>
