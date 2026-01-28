@@ -1082,7 +1082,75 @@ export interface AISelectedPhotos {
     index: number;
   }>;
   totalPhotos: number;
-  selectionMethod: "coverImage" | "imageInsights" | "fallback";
+  selectionMethod: "coverImage" | "imageInsights" | "diversified" | "fallback";
+}
+
+/**
+ * Select diversified photos when coverImage API returns identical images
+ * Prioritizes imageInsights classifications if available, otherwise uses index-based selection
+ */
+function selectDiversifiedPhotos(
+  allPhotos: AISelectedPhotos["allPhotos"],
+  firstPhotoUrl: string
+): {
+  main: AISelectedPhotos["mainPhoto"];
+  kitchen: AISelectedPhotos["kitchenPhoto"];
+  room: AISelectedPhotos["roomPhoto"];
+} {
+  if (allPhotos.length === 0) {
+    return { main: null, kitchen: null, room: null };
+  }
+  
+  // Check if we have real imageInsights classifications
+  const hasInsights = allPhotos.some(p => p.classification !== "Unknown");
+  
+  if (hasInsights) {
+    // Use imageInsights-based selection
+    const exteriorCategories = ["exterior", "exterior front", "front", "house", "building"];
+    const kitchenCategories = ["kitchen", "cook", "dining"];
+    const livingCategories = ["living", "family", "room", "interior", "bedroom", "den"];
+    
+    const findBestMatch = (categories: string[], exclude: string[] = []): typeof allPhotos[0] | null => {
+      for (const cat of categories) {
+        const match = allPhotos.find(p => 
+          !exclude.includes(p.url) &&
+          p.classification.toLowerCase().includes(cat.toLowerCase())
+        );
+        if (match) return match;
+      }
+      return null;
+    };
+    
+    const mainPhoto = findBestMatch(exteriorCategories) || allPhotos[0];
+    const excludeUrls = mainPhoto ? [mainPhoto.url] : [];
+    
+    const kitchenPhoto = findBestMatch(kitchenCategories, excludeUrls) || 
+      allPhotos.find(p => !excludeUrls.includes(p.url) && p.index > 0) || 
+      (allPhotos.length > 1 ? allPhotos[1] : null);
+    
+    if (kitchenPhoto) excludeUrls.push(kitchenPhoto.url);
+    
+    const roomPhoto = findBestMatch(livingCategories, excludeUrls) ||
+      allPhotos.find(p => !excludeUrls.includes(p.url) && p.index > 1) ||
+      (allPhotos.length > 2 ? allPhotos[2] : null);
+    
+    return {
+      main: mainPhoto ? { url: mainPhoto.url, classification: mainPhoto.classification, confidence: mainPhoto.confidence, quality: mainPhoto.quality } : null,
+      kitchen: kitchenPhoto ? { url: kitchenPhoto.url, classification: kitchenPhoto.classification, confidence: kitchenPhoto.confidence, quality: kitchenPhoto.quality } : null,
+      room: roomPhoto ? { url: roomPhoto.url, classification: roomPhoto.classification, confidence: roomPhoto.confidence, quality: roomPhoto.quality } : null,
+    };
+  }
+  
+  // No imageInsights - just use first three different photos
+  const main = allPhotos[0];
+  const kitchen = allPhotos.length > 1 ? allPhotos[1] : null;
+  const room = allPhotos.length > 2 ? allPhotos[2] : null;
+  
+  return {
+    main: main ? { url: main.url, classification: "Exterior", confidence: 0, quality: 50 } : null,
+    kitchen: kitchen ? { url: kitchen.url, classification: "Interior", confidence: 0, quality: 50 } : null,
+    room: room ? { url: room.url, classification: "Interior", confidence: 0, quality: 50 } : null,
+  };
 }
 
 /**
@@ -1200,6 +1268,27 @@ export async function getAISelectedPhotosForFlyer(mlsNumber: string): Promise<AI
     }
     
     console.log(`[AI Photos] Results - Main: ${mainPhoto ? 'Found' : 'Not found'}, Kitchen: ${kitchenPhoto ? 'Found' : 'Not found'}, Room: ${roomPhoto ? 'Found' : 'Not found'}`);
+    
+    // Check if coverImage API returned identical photos for all slots
+    // This happens when imageInsights is not available for the listing
+    const allSamePhoto = mainPhoto && kitchenPhoto && roomPhoto &&
+      mainPhoto.url === kitchenPhoto.url && kitchenPhoto.url === roomPhoto.url;
+    
+    if (allSamePhoto) {
+      console.log(`[AI Photos] All photos identical (imageInsights unavailable) - falling back to diversified selection`);
+      
+      // Use imageInsights-based selection if available, or diversify photos manually
+      const diversifiedPhotos = selectDiversifiedPhotos(allPhotos, mainPhoto.url);
+      
+      return {
+        mainPhoto: diversifiedPhotos.main,
+        kitchenPhoto: diversifiedPhotos.kitchen,
+        roomPhoto: diversifiedPhotos.room,
+        allPhotos,
+        totalPhotos,
+        selectionMethod: allPhotos.some(p => p.classification !== "Unknown") ? "imageInsights" : "diversified",
+      };
+    }
     
     return {
       mainPhoto,

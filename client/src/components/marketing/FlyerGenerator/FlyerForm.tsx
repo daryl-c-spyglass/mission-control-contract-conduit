@@ -41,6 +41,7 @@ interface FlyerFormProps {
   onSummarized?: (summary: string) => void;
   onRevertDescription?: (type: 'previous' | 'original') => void;
   missingCategories?: string[];
+  selectionMethod?: string;
 }
 
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
@@ -94,6 +95,7 @@ export function FlyerForm({
   onSummarized,
   onRevertDescription,
   missingCategories = [],
+  selectionMethod,
 }: FlyerFormProps) {
   const { register, setValue, watch } = form;
   
@@ -282,7 +284,10 @@ export function FlyerForm({
       <Section icon={<ImageIcon className="w-5 h-5 text-primary" />} title="Property Images">
         <div className="flex items-center gap-2 text-green-500 text-sm mb-4">
           <Sparkles className="w-4 h-4" />
-          Auto-selected using Repliers AI
+          {selectionMethod === 'coverImage' && 'Auto-selected using Repliers AI'}
+          {selectionMethod === 'imageInsights' && 'Auto-selected using image classification'}
+          {selectionMethod === 'diversified' && 'Auto-selected from available photos'}
+          {!selectionMethod && 'Auto-selected using Repliers AI'}
         </div>
 
         <div className="space-y-4">

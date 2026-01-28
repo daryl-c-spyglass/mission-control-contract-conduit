@@ -539,6 +539,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
               onSummarized={handleSummarized}
               onRevertDescription={handleRevertDescription}
               missingCategories={missingCategories}
+              selectionMethod={aiPhotoData?.selectionMethod}
             />
           </ScrollArea>
         </div>
