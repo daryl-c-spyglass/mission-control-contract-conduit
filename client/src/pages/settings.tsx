@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Trash2, Loader2, UserPlus, Save, Mail, CheckCircle2, ExternalLink, User, Camera, Bell, FileText, Sparkles, Link as LinkIcon, Upload, GripVertical, Pencil, FolderOpen, QrCode, Building2, Image as ImageIcon, Crop, Move } from "lucide-react";
+import { Plus, Trash2, Loader2, UserPlus, Save, Mail, CheckCircle2, ExternalLink, User, Camera, Bell, FileText, Sparkles, Link as LinkIcon, Upload, GripVertical, Pencil, FolderOpen, Building2, Image as ImageIcon, Crop, Move } from "lucide-react";
 import { formatPhoneNumber, formatPhoneAsYouType } from "@/lib/formatPhone";
 import { ProfilePhotoCropper } from "@/components/settings/ProfilePhotoCropper";
 import { SiFacebook, SiInstagram, SiLinkedin, SiX } from "react-icons/si";
@@ -150,15 +150,13 @@ export default function Settings() {
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const resourceFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Marketing Branding state (QR Code, Company Logo, Secondary Logo only - Agent Photo uses marketingProfile.headshotUrl)
+  // Marketing Branding state (Company Logo, Secondary Logo only - Agent Photo uses marketingProfile.headshotUrl)
   const [marketingBranding, setMarketingBranding] = useState({
-    qrCode: null as string | null,
     companyLogo: null as string | null,
     companyLogoUseDefault: true,
     secondaryLogo: null as string | null,
     secondaryLogoUseDefault: true,
   });
-  const qrCodeInputRef = useRef<HTMLInputElement>(null);
   const companyLogoInputRef = useRef<HTMLInputElement>(null);
   const secondaryLogoInputRef = useRef<HTMLInputElement>(null);
 
@@ -166,7 +164,6 @@ export default function Settings() {
   const { data: marketingBrandingData, isLoading: marketingBrandingLoading } = useQuery<{
     agentPhoto: string | null;
     agentTitle: string;
-    qrCode: string | null;
     companyLogo: string | null;
     companyLogoUseDefault: boolean;
     secondaryLogo: string | null;
@@ -181,7 +178,6 @@ export default function Settings() {
   useEffect(() => {
     if (marketingBrandingData) {
       setMarketingBranding({
-        qrCode: marketingBrandingData.qrCode || null,
         companyLogo: marketingBrandingData.companyLogo || null,
         companyLogoUseDefault: marketingBrandingData.companyLogoUseDefault ?? true,
         secondaryLogo: marketingBrandingData.secondaryLogo || null,
@@ -546,12 +542,11 @@ export default function Settings() {
       marketingHeadshotUrl: marketingProfile.headshotUrl || undefined,
     });
 
-    // Also save branding fields (QR code, company logo, secondary logo)
+    // Also save branding fields (company logo, secondary logo)
     try {
       await apiRequest("POST", "/api/settings/marketing-profile", {
         agentPhoto: marketingProfile.headshotUrl || null, // Use the profile photo as agent photo
         agentTitle: marketingProfile.title || 'REALTOR®', // Use the title field
-        qrCode: marketingBranding.qrCode,
         companyLogo: marketingBranding.companyLogo,
         companyLogoUseDefault: marketingBranding.companyLogoUseDefault,
         secondaryLogo: marketingBranding.secondaryLogo,
@@ -824,58 +819,6 @@ export default function Settings() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* QR Code */}
-                  <div>
-                    <Label className="text-xs font-medium uppercase tracking-wide mb-2 block">
-                      QR Code
-                    </Label>
-                    <div className="flex items-center gap-4">
-                      <label
-                        htmlFor="qr-code-upload"
-                        className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/50 hover:border-primary/50 transition-colors overflow-hidden"
-                      >
-                        {marketingBranding.qrCode ? (
-                          <img
-                            src={marketingBranding.qrCode}
-                            alt="QR Code"
-                            className="h-full w-full object-contain p-2"
-                          />
-                        ) : (
-                          <QrCode className="h-8 w-8 text-muted-foreground" />
-                        )}
-                        <input
-                          type="file"
-                          id="qr-code-upload"
-                          accept="image/*"
-                          ref={qrCodeInputRef}
-                          onChange={handleBrandingImageUpload('qrCode')}
-                          className="hidden"
-                          data-testid="input-qr-code-upload"
-                        />
-                      </label>
-                      <div className="flex-1">
-                        <p className="text-sm text-muted-foreground">
-                          Upload your personal QR code
-                        </p>
-                        <p className="text-xs text-muted-foreground/60">
-                          Links to your website, vCard, or contact page
-                        </p>
-                        {marketingBranding.qrCode && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            type="button"
-                            onClick={() => handleClearBrandingImage('qrCode')}
-                            className="mt-1 text-destructive hover:text-destructive p-0 h-auto"
-                            data-testid="button-remove-qr-code"
-                          >
-                            Remove
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Logos Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Company Logo */}
