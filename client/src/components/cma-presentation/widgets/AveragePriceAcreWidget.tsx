@@ -213,8 +213,9 @@ export function AveragePriceAcreWidget({
   const [showSubject, setShowSubject] = useState(true);
   const [showTrendline, setShowTrendline] = useState(true);
 
-  // Minimum lot size to exclude condos/townhomes with artificially high $/acre
-  const MIN_LOT_SIZE_ACRES = 0.05; // 2,178 sqft
+  // Minimum lot size to exclude small residential lots where $/acre is not meaningful
+  // 0.25 acres = 10,890 sqft - ensures only properties where land value matters are included
+  const MIN_LOT_SIZE_ACRES = 0.25;
   // Sanity checks for price per acre (Austin market)
   const MAX_PRICE_PER_ACRE = 20_000_000; // $20M/acre max for Austin residential
   const MIN_PRICE_PER_ACRE = 10_000; // $10K/acre minimum
@@ -430,7 +431,7 @@ export function AveragePriceAcreWidget({
                 </p>
                 {excludedSmallLotCount > 0 && (
                   <p className="text-xs text-muted-foreground/70 mt-1">
-                    {excludedSmallLotCount} propert{excludedSmallLotCount === 1 ? 'y' : 'ies'} excluded (lots under 0.05 acres)
+                    {excludedSmallLotCount} propert{excludedSmallLotCount === 1 ? 'y' : 'ies'} excluded (lots under 0.25 acres)
                   </p>
                 )}
               </div>
@@ -442,17 +443,21 @@ export function AveragePriceAcreWidget({
                 >
                   <Info className="w-4 h-4" />
                 </button>
-                <div className="absolute left-0 top-full mt-1 w-64 p-3 bg-popover 
+                <div className="absolute left-0 top-full mt-1 w-72 p-3 bg-popover 
                                 rounded-lg shadow-lg border border-border
                                 opacity-0 invisible group-hover:opacity-100 group-hover:visible 
                                 transition-all z-50 text-xs text-muted-foreground">
-                  <p className="font-medium text-foreground mb-1">Price Per Acre Analysis</p>
+                  <p className="font-medium text-foreground mb-1">How This Is Calculated</p>
                   <p>
-                    This chart shows the relationship between property price and lot size (acres). 
-                    The trendline represents the average price per acre based on sold listings only.
+                    The average price per acre is calculated by dividing each property's sale price by its lot size in acres, 
+                    then averaging the results from <span className="font-medium text-foreground">closed/sold properties only</span>.
+                  </p>
+                  <p className="mt-2">
+                    <span className="font-medium text-foreground">Note:</span> Properties with lots under 0.25 acres (10,890 sqft) are excluded 
+                    because price-per-acre is not a meaningful metric for small residential lots where home value dominates land value.
                   </p>
                   <p className="mt-2 text-muted-foreground/70">
-                    Properties below the trendline may be undervalued; those above may be premium-priced.
+                    The trendline shows the average $/acre rate. Properties below may be undervalued; those above may be premium-priced.
                   </p>
                 </div>
               </div>

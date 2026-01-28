@@ -476,7 +476,8 @@ export function calculateCMAStats(comparables: any[]) {
   }
 
   // Sanity check constants for price per acre
-  const MIN_LOT_SIZE_ACRES = 0.05;
+  // 0.25 acres = 10,890 sqft - excludes small residential lots where $/acre is not meaningful
+  const MIN_LOT_SIZE_ACRES = 0.25;
   const MAX_PRICE_PER_ACRE = 20_000_000; // $20M/acre max
   const MIN_PRICE_PER_ACRE = 10_000; // $10K/acre minimum
 
