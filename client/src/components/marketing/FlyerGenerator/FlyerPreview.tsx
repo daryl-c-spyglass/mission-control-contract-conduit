@@ -100,22 +100,22 @@ export function FlyerPreview({ data, images, imageTransforms }: FlyerPreviewProp
       </div>
 
       <div className="absolute left-6 top-[766px] right-6 h-[270px] flex">
-        <div className="w-[150px] pt-[35px] pl-2">
-          <div className="flex items-center gap-2.5 mb-5 text-[13.5pt]">
-            <svg className="w-[31px] h-[31px]" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
+        <div className="pt-[35px] pl-2">
+          <div className="flex items-center gap-2.5 mb-5 text-[13.5pt] whitespace-nowrap">
+            <svg className="w-[31px] h-[31px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
               <path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/>
             </svg>
             <span>{data.bedrooms || '0'} bedrooms</span>
           </div>
-          <div className="flex items-center gap-2.5 mb-5 text-[13.5pt]">
-            <svg className="w-[31px] h-[31px]" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
+          <div className="flex items-center gap-2.5 mb-5 text-[13.5pt] whitespace-nowrap">
+            <svg className="w-[31px] h-[31px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
               <path d="M9 6 6.5 3.5a1.5 1.5 0 0 0-1-.5C4.683 3 4 3.683 4 4.5V17a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/>
               <line x1="10" x2="8" y1="5" y2="7"/><line x1="2" x2="22" y1="12" y2="12"/>
             </svg>
             <span>{data.bathrooms || '0'} bathrooms</span>
           </div>
-          <div className="flex items-center gap-2.5 mb-5 text-[13.5pt]">
-            <svg className="w-[31px] h-[31px]" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
+          <div className="flex items-center gap-2.5 mb-5 text-[13.5pt] whitespace-nowrap">
+            <svg className="w-[31px] h-[31px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
               <path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/>
             </svg>
             <span>{data.sqft || '0'} sq. ft</span>
