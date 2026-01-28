@@ -72,7 +72,8 @@ import {
   Info,
   Trash2,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle
 } from "lucide-react";
 
 const STATUS_FILTERS = [
@@ -1127,8 +1128,12 @@ export function CMATab({ transaction }: CMATabProps) {
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                         ) : (
-                          <div className="flex items-center justify-center h-full text-muted-foreground">
+                          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
                             <Home className="w-12 h-12" />
+                            <span className="text-xs text-yellow-600 font-medium flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3" />
+                              No Photo
+                            </span>
                           </div>
                         )}
                       </div>
@@ -1212,8 +1217,12 @@ export function CMATab({ transaction }: CMATabProps) {
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <div className="flex items-center justify-center h-full text-muted-foreground">
+                            <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-1">
                               <Home className="w-8 h-8" />
+                              <span className="text-xs text-yellow-600 font-medium flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3" />
+                                No Photo
+                              </span>
                             </div>
                           )}
                         </div>

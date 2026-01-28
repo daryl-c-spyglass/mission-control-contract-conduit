@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, Map as MapIcon, TrendingUp, List, LayoutGrid, Table2, Bed, Bath, Square, Clock, MapPin } from 'lucide-react';
+import { BarChart3, Map as MapIcon, TrendingUp, List, LayoutGrid, Table2, Bed, Bath, Square, Clock, MapPin, Home, AlertTriangle } from 'lucide-react';
 import { CMAMap } from '@/components/cma-map';
 import { PropertyDetailModal } from './PropertyDetailModal';
 import { extractPrice, extractSqft, extractDOM, calculatePricePerSqft, getCityState } from '@/lib/cma-data-utils';
@@ -211,8 +211,12 @@ function PropertyCard({ property, isSubject = false, onClick }: { property: CmaP
             data-testid={`property-image-${property.id}`}
           />
         ) : (
-          <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
-            No Photo
+          <div className="w-full h-full bg-muted flex flex-col items-center justify-center text-muted-foreground gap-1">
+            <Home className="w-8 h-8" />
+            <span className="text-xs text-yellow-600 font-medium flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" />
+              No Photo
+            </span>
           </div>
         )}
         <div className="absolute top-3 left-3 flex items-center gap-2 flex-wrap">
@@ -282,8 +286,12 @@ function PropertyListItem({ property, isSubject = false, onClick }: { property: 
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-xs">
-            No Photo
+          <div className="w-full h-full bg-muted flex flex-col items-center justify-center text-muted-foreground gap-1">
+            <Home className="w-6 h-6" />
+            <span className="text-[10px] text-yellow-600 font-medium flex items-center gap-0.5">
+              <AlertTriangle className="w-2.5 h-2.5" />
+              No Photo
+            </span>
           </div>
         )}
       </div>
