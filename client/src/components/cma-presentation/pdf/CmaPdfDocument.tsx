@@ -198,7 +198,7 @@ const PropertyDetailPage = ({
   slideNumber, 
   totalSlides 
 }: { 
-  property: CmaProperty; 
+  property: CmaProperty & { base64PrimaryPhoto?: string }; 
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
@@ -210,7 +210,9 @@ const PropertyDetailPage = ({
   const baths = extractBaths(property);
   const status = normalizeStatus(property.status);
   const address = extractFullAddress(property);
-  const primaryPhoto = getPrimaryPhoto(property);
+  const base64Photo = (property as any).base64PrimaryPhoto;
+  const urlPhoto = getPrimaryPhoto(property);
+  const primaryPhoto = base64Photo || urlPhoto;
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>

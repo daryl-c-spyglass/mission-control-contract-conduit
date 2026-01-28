@@ -1,0 +1,426 @@
+# URGENT FIX: CMA PDF Export Must Match Live Preview Exactly
+
+## 🎯 Critical Issues
+
+1. **Slides 35-44 (Property Photos) NOT appearing in PDF export**
+2. **PDF export looks DIFFERENT from Live Preview** - Must be identical
+
+---
+
+## 📋 Problem Description
+
+The CMA Presentation has a Live Preview that displays correctly, but when exporting to PDF:
+
+| Issue | Live Preview | PDF Export |
+|-------|-------------|------------|
+| Property Photos (Slides 35-44) | ✅ Shows photos | ❌ Missing/blank |
+| Overall layout | ✅ Correct | ❌ Different from preview |
+| Styling/formatting | ✅ Correct | ❌ Inconsistent |
+
+**Expectation:** PDF export must be a pixel-perfect match to the Live Preview.
+
+---
+
+## 🔍 STEP 1: DIAGNOSTIC — Compare Preview vs PDF Generation
+
+### 1.1 Find Both Implementations
+
+```bash
+# Search for Preview component
+grep -r "CMAPreview" client/src/
+grep -r "PresentationPreview" client/src/
+grep -r "LivePreview" client/src/
+
+# Search for PDF generation
+grep -r "export.*pdf" server/ --ignore-case
+grep -r "puppeteer" server/
+grep -r "react-pdf" client/src/
+grep -r "generatePDF" server/
+grep -r "PDFDocument" client/src/
+```
+
+### 1.2 Document What Renders Each
+
+**Preview Component:**
+- File location: _______________
+- How it renders slides: _______________
+- How it loads property photos: _______________
+- Slides 35-44 implementation: _______________
+
+**PDF Export:**
+- File location: _______________
+- PDF library used: _______________
+- How it renders slides: _______________
+- How it loads property photos: _______________
+- Slides 35-44 implementation: _______________
+
+---
+
+## 🔍 STEP 2: Identify Why Property Photos Missing (Slides 35-44)
+
+### 2.1 Check if Photos Are Being Passed to PDF
+
+Add diagnostic logging in the PDF export function:
+
+```typescript
+// In the PDF export endpoint or function
+console.log('=== PDF EXPORT DIAGNOSTIC ===');
+console.log('Total slides:', slides.length);
+console.log('Slides 35-44 data:');
+slides.slice(34, 44).forEach((slide, index) => {
+  console.log(`Slide ${35 + index}:`, {
+    type: slide.type,
+    hasPhotos: !!slide.photos,
+    photoCount: slide.photos?.length || 0,
+    photoUrls: slide.photos?.map(p => p.url || p.href)?.slice(0, 2) || 'none'
+  });
+});
+```
+
+### 2.2 Common Causes for Missing Photos in PDF
+
+| Cause | Check | Fix |
+|-------|-------|-----|
+| **External URLs blocked** | Photos hosted externally (cdn.repliers.io) | Convert to base64 before PDF generation |
+| **Async loading not waited** | Photos load async but PDF generates immediately | Add waitUntil: 'networkidle0' or pre-fetch images |
+| **CORS issues** | Cross-origin images blocked | Proxy through server or convert to base64 |
+| **Slides not included** | PDF only renders first N slides | Check slide loop includes slides 35-44 |
+| **Conditional rendering** | Photo slides have different render logic | Ensure PDF handles all slide types |
+
+### 2.3 Check Photo URL Sources
+
+```typescript
+// In PDF generation, log photo sources
+const propertyPhotos = cmaData.photos || mlsData.images || [];
+console.log('Property photos for PDF:', propertyPhotos.length);
+propertyPhotos.forEach((photo, i) => {
+  console.log(`Photo ${i}:`, photo.url || photo.href || photo);
+});
+```
+
+---
+
+## 🔧 STEP 3: FIX — Ensure PDF Matches Preview Exactly
+
+### Option A: Use Puppeteer to Screenshot Preview (Recommended)
+
+If using Puppeteer, render the EXACT same preview component:
+
+```typescript
+// server/pdf-export.ts
+
+import puppeteer from 'puppeteer';
+
+export async function exportCMAToPDF(transactionId: string, sections: any[], customContent: any) {
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+  
+  const page = await browser.newPage();
+  
+  // Set viewport to match preview dimensions
+  await page.setViewport({
+    width: 1056,  // Letter width at 96 DPI
+    height: 816,  // Letter height at 96 DPI (landscape) or adjust for portrait
+    deviceScaleFactor: 2  // Higher quality
+  });
+  
+  // Navigate to the preview page (internal route)
+  const previewUrl = `${process.env.APP_URL}/api/cma/${transactionId}/preview-html`;
+  await page.goto(previewUrl, {
+    waitUntil: 'networkidle0',  // CRITICAL: Wait for all images to load
+    timeout: 60000  // 60 second timeout for image loading
+  });
+  
+  // Wait for all images to be loaded
+  await page.evaluate(async () => {
+    const images = document.querySelectorAll('img');
+    await Promise.all(
+      Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = resolve; // Don't fail on missing images
+        });
+      })
+    );
+  });
+  
+  // Generate PDF
+  const pdfBuffer = await page.pdf({
+    format: 'Letter',
+    printBackground: true,  // CRITICAL: Include background colors/images
+    preferCSSPageSize: true,
+    margin: { top: 0, right: 0, bottom: 0, left: 0 }
+  });
+  
+  await browser.close();
+  return pdfBuffer;
+}
+```
+
+### Option B: If Using @react-pdf/renderer — Match Preview Components
+
+The PDF components MUST mirror the preview components exactly:
+
+```tsx
+// Compare these two implementations:
+
+// PREVIEW (client-side React component)
+const PropertyPhotoSlide = ({ photos }) => (
+  <div className="slide property-photos">
+    <h2>Property Photos</h2>
+    <div className="photo-grid">
+      {photos.map((photo, i) => (
+        <img key={i} src={photo.url} alt={`Property ${i+1}`} />
+      ))}
+    </div>
+  </div>
+);
+
+// PDF (must match exactly)
+const PropertyPhotoSlidePDF = ({ photos }) => (
+  <Page size="LETTER" style={styles.page}>
+    <View style={styles.slide}>
+      <Text style={styles.heading}>Property Photos</Text>
+      <View style={styles.photoGrid}>
+        {photos.map((photo, i) => (
+          <Image key={i} src={photo.url} style={styles.photo} />
+        ))}
+      </View>
+    </View>
+  </Page>
+);
+```
+
+---
+
+## 🔧 STEP 4: FIX — Property Photos (Slides 35-44) Specifically
+
+### 4.1 Pre-fetch and Convert Images to Base64
+
+External image URLs often fail in PDF. Convert to base64 first:
+
+```typescript
+// server/utils/image-to-base64.ts
+
+import fetch from 'node-fetch';
+
+export async function imageUrlToBase64(url: string): Promise<string> {
+  try {
+    const response = await fetch(url);
+    const buffer = await response.buffer();
+    const base64 = buffer.toString('base64');
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    return `data:${contentType};base64,${base64}`;
+  } catch (error) {
+    console.error(`Failed to convert image: ${url}`, error);
+    return ''; // Return empty string, handle in PDF component
+  }
+}
+
+export async function convertAllPhotosToBase64(photos: any[]): Promise<any[]> {
+  console.log(`Converting ${photos.length} photos to base64...`);
+  
+  const converted = await Promise.all(
+    photos.map(async (photo, index) => {
+      const url = photo.url || photo.href || photo;
+      console.log(`Converting photo ${index + 1}: ${url.substring(0, 50)}...`);
+      const base64 = await imageUrlToBase64(url);
+      return {
+        ...photo,
+        base64Url: base64,
+        originalUrl: url
+      };
+    })
+  );
+  
+  console.log(`Converted ${converted.filter(p => p.base64Url).length} photos successfully`);
+  return converted;
+}
+```
+
+### 4.2 Use Base64 in PDF Generation
+
+```typescript
+// In PDF export endpoint
+
+// Before generating PDF, convert all photos
+const photosWithBase64 = await convertAllPhotosToBase64(propertyPhotos);
+
+// Pass to PDF generator
+const pdfData = {
+  ...cmaData,
+  photos: photosWithBase64.map(p => ({
+    ...p,
+    url: p.base64Url || p.originalUrl  // Use base64 if available
+  }))
+};
+```
+
+### 4.3 Ensure Slides 35-44 Are Included in PDF Loop
+
+```typescript
+// Check the PDF generation loop
+const allSlides = generateAllSlides(cmaData);
+
+console.log('Total slides to render:', allSlides.length);
+
+// Make sure the loop includes ALL slides
+allSlides.forEach((slide, index) => {
+  const slideNumber = index + 1;
+  console.log(`Rendering slide ${slideNumber}: ${slide.type}`);
+  
+  // CRITICAL: Don't skip any slides!
+  renderSlideToPDF(slide, slideNumber);
+});
+
+// Verify slides 35-44 exist
+const photoSlides = allSlides.filter(s => s.type === 'property-photos' || s.type === 'photo');
+console.log('Photo slides found:', photoSlides.length);
+```
+
+---
+
+## 🔧 STEP 5: Ensure Styling Matches
+
+### 5.1 Use Same CSS/Styles
+
+If preview uses Tailwind CSS classes, the PDF must use equivalent styles:
+
+```typescript
+// Map Tailwind classes to PDF styles
+const pdfStyles = StyleSheet.create({
+  // Match preview's .slide class
+  slide: {
+    width: '100%',
+    height: '100%',
+    padding: 40,
+    backgroundColor: '#FFFFFF',
+  },
+  
+  // Match preview's heading style
+  heading: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    marginBottom: 20,
+  },
+  
+  // Match preview's photo grid
+  photoGrid: {
+    display: 'flex',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  
+  // Match preview's photo style
+  photo: {
+    width: '48%',
+    height: 200,
+    objectFit: 'cover',
+    borderRadius: 8,
+  },
+});
+```
+
+### 5.2 Match Fonts
+
+```typescript
+import { Font } from '@react-pdf/renderer';
+
+// Register the same fonts used in preview
+Font.register({
+  family: 'Inter',
+  fonts: [
+    { src: '/fonts/Inter-Regular.ttf', fontWeight: 'normal' },
+    { src: '/fonts/Inter-Bold.ttf', fontWeight: 'bold' },
+    { src: '/fonts/Inter-Medium.ttf', fontWeight: 500 },
+  ]
+});
+
+// If fonts fail, use system fallback
+const fontFamily = 'Inter, Helvetica, Arial, sans-serif';
+```
+
+---
+
+## 📊 Slide Structure (Slides 35-44 = Property Photos)
+
+Based on your CMA structure, slides 35-44 should be:
+
+| Slide # | Content | Data Source |
+|---------|---------|-------------|
+| 35 | Property Photos Grid 1 | mlsData.photos[0-5] |
+| 36 | Property Photos Grid 2 | mlsData.photos[6-11] |
+| 37 | Property Photos Grid 3 | mlsData.photos[12-17] |
+| 38 | Property Photos Grid 4 | mlsData.photos[18-23] |
+| 39 | Property Photos Grid 5 | mlsData.photos[24-29] |
+| 40 | Property Photos Grid 6 | mlsData.photos[30-35] |
+| 41-44 | Additional photos or variations | Remaining photos |
+
+**Verify these slides exist in both Preview AND PDF export.**
+
+---
+
+## ✅ Verification Checklist
+
+After applying fixes:
+
+### PDF Export
+- [ ] Slides 35-44 show property photos (not blank)
+- [ ] All photos load correctly (no broken images)
+- [ ] Photo quality matches preview
+
+### Preview vs PDF Match
+- [ ] Same fonts used
+- [ ] Same colors used
+- [ ] Same layout/spacing
+- [ ] Same slide dimensions
+- [ ] Background colors/images render in PDF
+
+### Console Logs Should Show
+```
+=== PDF EXPORT DIAGNOSTIC ===
+Total slides: 44
+Converting 24 photos to base64...
+Converting photo 1: https://cdn.repliers.io/...
+Converting photo 2: https://cdn.repliers.io/...
+...
+Converted 24 photos successfully
+Rendering slide 35: property-photos
+Rendering slide 36: property-photos
+...
+Rendering slide 44: property-photos
+PDF generated successfully: 44 pages
+```
+
+---
+
+## 🔄 Quick Fix Summary
+
+| Issue | Root Cause | Fix |
+|-------|------------|-----|
+| Photos missing in PDF | External URLs not loading | Convert to base64 before PDF |
+| PDF looks different | Different rendering logic | Use Puppeteer to screenshot preview OR match styles exactly |
+| Slides 35-44 blank | Photos not included in PDF data | Verify slide loop includes all slides |
+| Layout mismatch | CSS not matching | Map preview CSS to PDF styles |
+
+---
+
+## 📋 Testing Steps
+
+1. Open CMA Presentation Builder
+2. Enable all sections, including Property Photos
+3. View Live Preview - note slides 35-44 appearance
+4. Click Export PDF
+5. Open exported PDF
+6. Compare slide-by-slide with preview
+7. Specifically check slides 35-44 for photos
+8. Report any remaining differences
+
+---
+
+**Priority: HIGH — PDF export must match preview exactly for professional client presentations**
