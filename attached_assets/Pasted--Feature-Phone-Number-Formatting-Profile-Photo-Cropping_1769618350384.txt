@@ -1,0 +1,640 @@
+# Feature: Phone Number Formatting & Profile Photo Cropping in Settings
+
+## Overview
+
+Two enhancements to **Settings > Agent Marketing Profile**:
+
+1. **Phone Number Auto-Formatting**: Format as `(512) 555-1234`
+2. **Profile Photo Crop/Position Tool**: Allow pan, zoom, and positioning within circle
+
+Both features must **sync across ALL integrated features** that use Agent Marketing Profile data.
+
+---
+
+## Feature 1: Phone Number Auto-Formatting
+
+### Format Specification
+
+```
+Input:  5125551234
+Output: (512) 555-1234
+
+Input:  512-555-1234
+Output: (512) 555-1234
+
+Input:  512.555.1234
+Output: (512) 555-1234
+
+Input:  +1 512 555 1234
+Output: (512) 555-1234
+```
+
+### Implementation
+
+#### Phone Formatting Utility
+
+```typescript
+// utils/formatPhone.ts
+
+/**
+ * Format phone number to (XXX) XXX-XXXX format
+ * Handles various input formats and strips non-numeric characters
+ */
+export function formatPhoneNumber(phone: string): string {
+  if (!phone) return '';
+  
+  // Remove all non-numeric characters
+  const cleaned = phone.replace(/\D/g, '');
+  
+  // Handle numbers with country code (1)
+  const digits = cleaned.startsWith('1') && cleaned.length === 11 
+    ? cleaned.slice(1) 
+    : cleaned;
+  
+  // Must have exactly 10 digits for US format
+  if (digits.length !== 10) {
+    return phone; // Return original if can't format
+  }
+  
+  // Format as (XXX) XXX-XXXX
+  const areaCode = digits.slice(0, 3);
+  const prefix = digits.slice(3, 6);
+  const lineNumber = digits.slice(6, 10);
+  
+  return `(${areaCode}) ${prefix}-${lineNumber}`;
+}
+
+/**
+ * Format phone as user types (for input onChange)
+ */
+export function formatPhoneAsYouType(value: string): string {
+  const cleaned = value.replace(/\D/g, '');
+  
+  if (cleaned.length === 0) return '';
+  if (cleaned.length <= 3) return `(${cleaned}`;
+  if (cleaned.length <= 6) return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+  return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+}
+```
+
+#### Update Phone Input in Settings
+
+```tsx
+// In Agent Marketing Profile settings form
+
+import { formatPhoneAsYouType, formatPhoneNumber } from '@/utils/formatPhone';
+
+// Phone input with auto-formatting
+<div className="space-y-2">
+  <Label htmlFor="phone">Phone Number</Label>
+  <Input
+    id="phone"
+    type="tel"
+    placeholder="(512) 555-1234"
+    value={form.watch('marketingPhone') || ''}
+    onChange={(e) => {
+      const formatted = formatPhoneAsYouType(e.target.value);
+      form.setValue('marketingPhone', formatted);
+    }}
+    onBlur={(e) => {
+      // Final format on blur
+      const formatted = formatPhoneNumber(e.target.value);
+      form.setValue('marketingPhone', formatted);
+    }}
+    maxLength={14} // (XXX) XXX-XXXX = 14 chars
+  />
+  <p className="text-xs text-muted-foreground">
+    Format: (512) 555-1234
+  </p>
+</div>
+```
+
+#### Sync Phone Format Across Features
+
+Ensure these components use the formatted phone from Settings:
+
+- [ ] **Advanced Flyer Builder** - Agent contact section
+- [ ] **CMA Presentation Builder** - Agent info on cover/slides
+- [ ] **Marketing Materials Modal** - Agent details
+- [ ] **Create Flyer Dialog** - Agent info
+- [ ] **Profile Popover** - Phone display
+- [ ] **Email signatures** (if applicable)
+
+```typescript
+// When loading agent data in any feature:
+const agentPhone = settings?.marketingPhone || user?.phone || '';
+// Phone should already be formatted from Settings, but ensure it:
+const displayPhone = formatPhoneNumber(agentPhone);
+```
+
+---
+
+## Feature 2: Profile Photo Crop/Position Tool
+
+### Requirements
+
+1. **Upload Photo** → Opens crop/position modal
+2. **Pan/Move** - Drag photo left/right/up/down within circle frame
+3. **Zoom** - Slider to zoom in/out
+4. **Preview** - Real-time preview in circular frame
+5. **Save** - On "Save Marketing Profile", save the cropped/positioned version
+6. **Sync** - Cropped photo syncs to all features using profile photo
+
+### Implementation
+
+#### Install Required Package
+
+```bash
+npm install react-easy-crop
+```
+
+#### Create Photo Cropper Component
+
+```tsx
+// components/settings/ProfilePhotoCropper.tsx
+
+import { useState, useCallback } from 'react';
+import Cropper from 'react-easy-crop';
+import type { Area, Point } from 'react-easy-crop';
+import { Slider } from '@/components/ui/slider';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ZoomIn, ZoomOut, Move } from 'lucide-react';
+
+interface ProfilePhotoCropperProps {
+  isOpen: boolean;
+  onClose: () => void;
+  imageUrl: string;
+  onCropComplete: (croppedImageUrl: string) => void;
+}
+
+export function ProfilePhotoCropper({
+  isOpen,
+  onClose,
+  imageUrl,
+  onCropComplete,
+}: ProfilePhotoCropperProps) {
+  const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+
+  const onCropChange = useCallback((location: Point) => {
+    setCrop(location);
+  }, []);
+
+  const onZoomChange = useCallback((newZoom: number) => {
+    setZoom(newZoom);
+  }, []);
+
+  const onCropCompleteCallback = useCallback(
+    (_croppedArea: Area, croppedAreaPixels: Area) => {
+      setCroppedAreaPixels(croppedAreaPixels);
+    },
+    []
+  );
+
+  const handleSave = async () => {
+    if (!croppedAreaPixels) return;
+
+    try {
+      const croppedImage = await getCroppedImg(imageUrl, croppedAreaPixels);
+      onCropComplete(croppedImage);
+      onClose();
+    } catch (error) {
+      console.error('Error cropping image:', error);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Adjust Profile Photo</DialogTitle>
+        </DialogHeader>
+
+        {/* Cropper Area */}
+        <div className="relative w-full h-80 bg-gray-900 rounded-lg overflow-hidden">
+          <Cropper
+            image={imageUrl}
+            crop={crop}
+            zoom={zoom}
+            aspect={1} // Square/circle aspect ratio
+            cropShape="round" // Circular crop
+            showGrid={false}
+            onCropChange={onCropChange}
+            onZoomChange={onZoomChange}
+            onCropComplete={onCropCompleteCallback}
+          />
+        </div>
+
+        {/* Instructions */}
+        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <Move className="w-4 h-4" />
+          <span>Drag to reposition</span>
+        </div>
+
+        {/* Zoom Control */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm">Zoom</Label>
+            <span className="text-sm text-muted-foreground">{zoom.toFixed(1)}x</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <ZoomOut className="w-4 h-4 text-muted-foreground" />
+            <Slider
+              value={[zoom]}
+              onValueChange={([value]) => setZoom(value)}
+              min={1}
+              max={3}
+              step={0.1}
+              className="flex-1"
+            />
+            <ZoomIn className="w-4 h-4 text-muted-foreground" />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave}>
+            Apply Crop
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Creates a cropped image from the source image
+ */
+async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<string> {
+  const image = await createImage(imageSrc);
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  if (!ctx) throw new Error('Could not get canvas context');
+
+  // Set canvas size to the crop size
+  canvas.width = pixelCrop.width;
+  canvas.height = pixelCrop.height;
+
+  // Draw the cropped image
+  ctx.drawImage(
+    image,
+    pixelCrop.x,
+    pixelCrop.y,
+    pixelCrop.width,
+    pixelCrop.height,
+    0,
+    0,
+    pixelCrop.width,
+    pixelCrop.height
+  );
+
+  // Return as base64 data URL
+  return canvas.toDataURL('image/jpeg', 0.9);
+}
+
+function createImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener('load', () => resolve(image));
+    image.addEventListener('error', (error) => reject(error));
+    image.crossOrigin = 'anonymous';
+    image.src = url;
+  });
+}
+```
+
+#### Update Profile Photo Section in Settings
+
+```tsx
+// In Agent Marketing Profile settings
+
+import { ProfilePhotoCropper } from './ProfilePhotoCropper';
+
+const [showCropper, setShowCropper] = useState(false);
+const [tempPhotoUrl, setTempPhotoUrl] = useState<string | null>(null);
+const [croppedPhotoUrl, setCroppedPhotoUrl] = useState<string | null>(null);
+
+// Handle file upload
+const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  // Create temporary URL for cropping
+  const url = URL.createObjectURL(file);
+  setTempPhotoUrl(url);
+  setShowCropper(true);
+};
+
+// Handle crop complete
+const handleCropComplete = (croppedUrl: string) => {
+  setCroppedPhotoUrl(croppedUrl);
+  form.setValue('marketingHeadshotUrl', croppedUrl);
+  
+  // Clean up temp URL
+  if (tempPhotoUrl) {
+    URL.revokeObjectURL(tempPhotoUrl);
+    setTempPhotoUrl(null);
+  }
+};
+
+// Handle re-crop existing photo
+const handleRecrop = () => {
+  const currentPhoto = form.watch('marketingHeadshotUrl');
+  if (currentPhoto) {
+    setTempPhotoUrl(currentPhoto);
+    setShowCropper(true);
+  }
+};
+
+return (
+  <>
+    {/* Profile Photo Section */}
+    <div className="space-y-4">
+      <Label>Profile Photo</Label>
+      
+      {/* Current Photo Preview */}
+      <div className="flex items-center gap-4">
+        <div className="relative">
+          <Avatar className="w-24 h-24 border-2 border-muted">
+            <AvatarImage 
+              src={croppedPhotoUrl || form.watch('marketingHeadshotUrl')} 
+              alt="Profile"
+            />
+            <AvatarFallback className="text-2xl">
+              {getInitials(form.watch('marketingDisplayName'))}
+            </AvatarFallback>
+          </Avatar>
+          
+          {/* Re-crop button on hover */}
+          {form.watch('marketingHeadshotUrl') && (
+            <button
+              type="button"
+              onClick={handleRecrop}
+              className="absolute inset-0 bg-black/50 rounded-full opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center"
+            >
+              <Move className="w-6 h-6 text-white" />
+            </button>
+          )}
+        </div>
+        
+        <div className="space-y-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Upload Photo
+          </Button>
+          
+          {form.watch('marketingHeadshotUrl') && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleRecrop}
+            >
+              <Crop className="w-4 h-4 mr-2" />
+              Adjust Position
+            </Button>
+          )}
+          
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePhotoUpload}
+          />
+        </div>
+      </div>
+      
+      <p className="text-xs text-muted-foreground">
+        Upload a photo, then drag to position and zoom to fit the circle frame.
+      </p>
+    </div>
+
+    {/* Photo Cropper Modal */}
+    {tempPhotoUrl && (
+      <ProfilePhotoCropper
+        isOpen={showCropper}
+        onClose={() => {
+          setShowCropper(false);
+          if (tempPhotoUrl && !tempPhotoUrl.startsWith('http')) {
+            URL.revokeObjectURL(tempPhotoUrl);
+          }
+          setTempPhotoUrl(null);
+        }}
+        imageUrl={tempPhotoUrl}
+        onCropComplete={handleCropComplete}
+      />
+    )}
+  </>
+);
+```
+
+#### Save Cropped Photo to Server
+
+When "Save Marketing Profile" is clicked, upload the cropped image:
+
+```typescript
+// In the save handler
+
+const handleSaveProfile = async (data: FormData) => {
+  try {
+    let headshotUrl = data.marketingHeadshotUrl;
+    
+    // If it's a base64 data URL (from cropping), upload to server first
+    if (headshotUrl?.startsWith('data:image')) {
+      const uploadResponse = await fetch('/api/upload/profile-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          image: headshotUrl,
+          filename: `profile-${user.id}-${Date.now()}.jpg`
+        }),
+      });
+      
+      if (uploadResponse.ok) {
+        const { url } = await uploadResponse.json();
+        headshotUrl = url;
+      }
+    }
+    
+    // Save profile with formatted phone and cropped photo URL
+    await fetch('/api/settings/marketing-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...data,
+        marketingPhone: formatPhoneNumber(data.marketingPhone),
+        marketingHeadshotUrl: headshotUrl,
+      }),
+    });
+    
+    toast.success('Marketing profile saved!');
+  } catch (error) {
+    toast.error('Failed to save profile');
+  }
+};
+```
+
+#### Server-side Upload Endpoint
+
+```typescript
+// server/routes/upload.ts
+
+app.post('/api/upload/profile-photo', requireAuth, async (req, res) => {
+  try {
+    const { image, filename } = req.body;
+    
+    // Decode base64
+    const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    // Save to storage (local, S3, Cloudflare R2, etc.)
+    // Example for local storage:
+    const uploadPath = path.join(process.cwd(), 'uploads', 'profiles', filename);
+    await fs.writeFile(uploadPath, buffer);
+    
+    // Return the URL
+    const url = `/uploads/profiles/${filename}`;
+    
+    res.json({ url });
+  } catch (error) {
+    console.error('Profile photo upload error:', error);
+    res.status(500).json({ error: 'Failed to upload photo' });
+  }
+});
+```
+
+---
+
+## Sync Across All Features
+
+### Features That Use Agent Marketing Profile
+
+Ensure these all use the **formatted phone** and **cropped photo**:
+
+| Feature | Phone | Photo |
+|---------|-------|-------|
+| Advanced Flyer Builder | ✅ | ✅ |
+| CMA Presentation Builder | ✅ | ✅ |
+| Marketing Materials Modal | ✅ | ✅ |
+| Create Flyer Dialog | ✅ | ✅ |
+| Profile Popover (CMA) | ✅ | ✅ |
+| PDF Exports | ✅ | ✅ |
+
+### Standard Way to Load Agent Data
+
+```typescript
+// Create a shared hook or utility
+
+export function useAgentMarketingProfile() {
+  const { data: settings } = useQuery({
+    queryKey: ['marketing-profile'],
+    queryFn: () => fetch('/api/settings/marketing-profile').then(r => r.json()),
+  });
+  
+  return {
+    name: settings?.marketingDisplayName || '',
+    title: settings?.marketingTitle || '',
+    phone: settings?.marketingPhone || '', // Already formatted from Settings
+    email: settings?.marketingEmail || '',
+    photo: settings?.marketingHeadshotUrl || '', // Already cropped from Settings
+    company: settings?.marketingCompany || 'Spyglass Realty',
+  };
+}
+
+// Use in any component:
+const agent = useAgentMarketingProfile();
+// agent.phone = "(512) 555-1234"
+// agent.photo = cropped version
+```
+
+---
+
+## Visual Flow
+
+### Phone Number Input
+```
+┌────────────────────────────────────────┐
+│ Phone Number                           │
+│ ┌────────────────────────────────────┐ │
+│ │ (512) 555-1234                     │ │
+│ └────────────────────────────────────┘ │
+│ Format: (512) 555-1234                 │
+└────────────────────────────────────────┘
+```
+
+### Profile Photo Cropper
+```
+┌────────────────────────────────────────────┐
+│ Adjust Profile Photo                    ✕  │
+├────────────────────────────────────────────┤
+│  ┌──────────────────────────────────────┐  │
+│  │                                      │  │
+│  │      ┌──────────────────┐            │  │
+│  │      │    ○ ○           │ ← Drag to  │  │
+│  │      │   ╱─╲            │   move     │  │
+│  │      │  │   │           │            │  │
+│  │      └──────────────────┘            │  │
+│  │                                      │  │
+│  └──────────────────────────────────────┘  │
+│                                            │
+│            ↔ Drag to reposition            │
+│                                            │
+│  Zoom                               1.5x   │
+│  🔍- ═══════════●══════════════ 🔍+        │
+│                                            │
+│              [Cancel]  [Apply Crop]        │
+└────────────────────────────────────────────┘
+```
+
+---
+
+## Verification Checklist
+
+### Phone Number Formatting
+- [ ] Input auto-formats as user types
+- [ ] Final format on blur: (XXX) XXX-XXXX
+- [ ] Handles various input formats (dashes, dots, spaces)
+- [ ] Saved in formatted state to database
+- [ ] Displays formatted in Advanced Flyer Builder
+- [ ] Displays formatted in CMA Presentation
+- [ ] Displays formatted in Profile Popover
+- [ ] Displays formatted in PDF exports
+
+### Profile Photo Cropping
+- [ ] Upload opens crop modal
+- [ ] Can drag/pan photo within circle
+- [ ] Zoom slider works (1x to 3x)
+- [ ] Circular preview shows result
+- [ ] "Apply Crop" saves cropped version
+- [ ] Cropped photo displays in Settings
+- [ ] Can re-adjust existing photo ("Adjust Position" button)
+- [ ] Cropped photo syncs to Advanced Flyer Builder
+- [ ] Cropped photo syncs to CMA Presentation
+- [ ] Cropped photo syncs to Profile Popover
+- [ ] Cropped photo appears in PDF exports
+
+---
+
+## Dependencies
+
+```json
+{
+  "react-easy-crop": "^5.0.0"
+}
+```
+
+Install with:
+```bash
+npm install react-easy-crop
+```
