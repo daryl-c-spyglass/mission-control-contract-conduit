@@ -4244,6 +4244,12 @@ Generate only the headline, nothing else.`;
         secondaryImage2: data.roomImage || undefined,
         agentPhoto: data.agentPhoto || undefined,
         qrCodeUrl: data.qrCode || undefined,
+        // Logos and branding controls
+        logoUrl: data.companyLogo || undefined,
+        secondaryLogoUrl: data.secondaryLogo || undefined,
+        logoScales: data.logoScales || { primary: 1, secondary: 1 },
+        dividerPosition: data.dividerPosition || 148,
+        secondaryLogoOffsetY: data.secondaryLogoOffsetY || 0,
       };
 
       console.log(`[FlyerGenerator] ${saveOnly ? 'Saving' : 'Exporting'} ${format} flyer for transaction ${id}`);

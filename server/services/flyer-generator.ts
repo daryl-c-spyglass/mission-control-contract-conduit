@@ -229,6 +229,7 @@ function findChromiumPath(): string {
 
 export interface FlyerData {
   logoUrl?: string;
+  secondaryLogoUrl?: string;
   priceLabel: string;
   price: string;
   fullAddress: string;
@@ -252,6 +253,10 @@ export interface FlyerData {
   listingUrl?: string;
   statusBadge?: string;
   statusColorClass?: string;
+  // Branding controls
+  logoScales?: { primary: number; secondary: number };
+  dividerPosition?: number;
+  secondaryLogoOffsetY?: number;
 }
 
 // Template version for cache invalidation
@@ -321,12 +326,14 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
   console.log(`[FlyerGenerator] Media type: ${RENDER_CONFIG.mediaType}`);
   console.log(`[FlyerGenerator] Converting images to base64...`);
   
-  // Default logo path
+  // Default logo paths
   const logoPath = data.logoUrl || path.join(process.cwd(), 'public', 'assets', 'SpyglassRealty_Logo_Black.png');
+  const secondaryLogoPath = data.secondaryLogoUrl || path.join(process.cwd(), 'public', 'logos', 'lre-sgr-black.png');
   
   // Convert all images to base64 in parallel (including stat icons)
-  const [logoB64, mainImageB64, secondaryImage1B64, secondaryImage2B64, agentPhotoB64, qrCodeB64, bedroomIconB64, bathroomIconB64, sqftIconB64] = await Promise.all([
+  const [logoB64, secondaryLogoB64, mainImageB64, secondaryImage1B64, secondaryImage2B64, agentPhotoB64, qrCodeB64, bedroomIconB64, bathroomIconB64, sqftIconB64] = await Promise.all([
     imageToBase64(logoPath),
+    imageToBase64(secondaryLogoPath),
     data.mainImage ? imageToBase64(data.mainImage) : Promise.resolve(''),
     data.secondaryImage1 ? imageToBase64(data.secondaryImage1) : Promise.resolve(''),
     data.secondaryImage2 ? imageToBase64(data.secondaryImage2) : Promise.resolve(''),
@@ -339,6 +346,7 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
   
   console.log('[FlyerGenerator] Images converted:', {
     logo: logoB64 ? 'OK' : 'FAILED',
+    secondaryLogo: secondaryLogoB64 ? 'OK' : 'FAILED',
     mainImage: mainImageB64 ? 'OK' : 'EMPTY',
     secondaryImage1: secondaryImage1B64 ? 'OK' : 'EMPTY',
     secondaryImage2: secondaryImage2B64 ? 'OK' : 'EMPTY',
@@ -350,9 +358,17 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
   });
   
   // Create data with base64 images for template
+  // Calculate logo widths from dividerPosition (default 148 = ~50% split at 300px width)
+  const dividerPos = data.dividerPosition || 148;
+  const primaryLogoWidth = Math.round(dividerPos * 1.1); // Scale for print resolution
+  const secondaryLogoWidth = Math.round((300 - dividerPos) * 1.1);
+  const logoScales = data.logoScales || { primary: 1, secondary: 1 };
+  const secondaryLogoOffsetY = data.secondaryLogoOffsetY || 0;
+  
   const dataWithBase64 = {
     ...data,
     logoUrl: logoB64,
+    secondaryLogoUrl: secondaryLogoB64,
     mainImage: mainImageB64,
     secondaryImage1: secondaryImage1B64,
     secondaryImage2: secondaryImage2B64,
@@ -360,7 +376,13 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     qrCodeUrl: qrCodeB64,
     bedroomIcon: bedroomIconB64,
     bathroomIcon: bathroomIconB64,
-    sqftIcon: sqftIconB64
+    sqftIcon: sqftIconB64,
+    // Branding controls for template
+    primaryLogoWidth,
+    secondaryLogoWidth,
+    primaryLogoScale: logoScales.primary,
+    secondaryLogoScale: logoScales.secondary,
+    secondaryLogoOffsetY
   };
   
   const templatePath = path.resolve(process.cwd(), 'server/templates/flyer-template.hbs');

@@ -571,11 +571,26 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
 
   const exportMutation = useMutation({
     mutationFn: async (format: 'png' | 'cmyk') => {
-      const response = await apiRequest('POST', `/api/transactions/${transactionId}/export-flyer?format=${format}`, {
+      const exportData = {
         ...watchedValues,
         ...images,
         imageTransforms,
+        // Branding controls - ensure these are included
+        logoScales,
+        dividerPosition,
+        secondaryLogoOffsetY,
+      };
+      
+      console.log('[Export] Sending data:', {
+        agentName: exportData.agentName,
+        agentTitle: exportData.agentTitle,
+        phone: exportData.phone,
+        qrCode: exportData.qrCode ? 'present' : 'missing',
+        secondaryLogo: exportData.secondaryLogo ? 'present' : 'missing',
+        logoScales: exportData.logoScales,
       });
+      
+      const response = await apiRequest('POST', `/api/transactions/${transactionId}/export-flyer?format=${format}`, exportData);
       if (!response.ok) throw new Error('Export failed');
       return response.blob();
     },
@@ -600,11 +615,17 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   const saveAssetMutation = useMutation({
     mutationFn: async () => {
       // The export-flyer endpoint already saves to marketing assets internally
-      const response = await apiRequest('POST', `/api/transactions/${transactionId}/export-flyer?format=png&saveOnly=true`, {
+      const exportData = {
         ...watchedValues,
         ...images,
         imageTransforms,
-      });
+        // Branding controls - ensure these are included
+        logoScales,
+        dividerPosition,
+        secondaryLogoOffsetY,
+      };
+      
+      const response = await apiRequest('POST', `/api/transactions/${transactionId}/export-flyer?format=png&saveOnly=true`, exportData);
       
       if (!response.ok) {
         const errorText = await response.text();
