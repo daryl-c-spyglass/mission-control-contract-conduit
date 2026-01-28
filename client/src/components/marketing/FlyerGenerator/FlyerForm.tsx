@@ -489,15 +489,12 @@ export function FlyerForm({
             onChange={onImageUpload('agentPhoto')}
             circular
           />
-          <div className="space-y-2 p-3 bg-muted/50 rounded-lg border border-border/50">
+          <div className="space-y-2">
             <Label className="text-xs font-medium uppercase tracking-wide">
               Shareable Flyer Link
             </Label>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Generate a shareable link for this flyer. The QR code will open a mobile-friendly property page.
-            </p>
             {images.qrCode && localQrUrl ? (
-              <div className="flex items-start gap-3 p-2 bg-background rounded-lg border">
+              <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg border border-border/50">
                 <div className="relative flex-shrink-0">
                   <img 
                     src={images.qrCode} 
@@ -516,7 +513,7 @@ export function FlyerForm({
                     <X className="h-3 w-3" />
                   </Button>
                 </div>
-                <div className="flex-1 min-w-0 py-1">
+                <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-foreground">Link Ready</p>
                   <p className="text-xs text-muted-foreground truncate" title={localQrUrl}>
                     {localQrUrl}
@@ -524,26 +521,31 @@ export function FlyerForm({
                 </div>
               </div>
             ) : (
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={onGenerateShareableLink}
-                disabled={isGeneratingShareableLink}
-                className="w-full mt-1"
-                data-testid="button-generate-shareable-link"
-              >
-                {isGeneratingShareableLink ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <QrCode className="h-4 w-4 mr-2" />
-                    Generate Shareable Link
-                  </>
-                )}
-              </Button>
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Generate a shareable link for this flyer. The QR code will open a mobile-friendly property page.
+                </p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={onGenerateShareableLink}
+                  disabled={isGeneratingShareableLink}
+                  className="w-full"
+                  data-testid="button-generate-shareable-link"
+                >
+                  {isGeneratingShareableLink ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <QrCode className="h-4 w-4 mr-2" />
+                      Generate Shareable Link
+                    </>
+                  )}
+                </Button>
+              </div>
             )}
           </div>
         </div>
