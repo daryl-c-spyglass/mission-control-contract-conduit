@@ -335,25 +335,29 @@ export function FlyerForm({
             onChange={onImageUpload('agentPhoto')}
             circular
           />
-          <div className="space-y-2">
+          <div className="space-y-3">
             <Label className="text-xs font-medium uppercase tracking-wide">
               QR Code
             </Label>
+            <p className="text-xs text-muted-foreground">
+              Enter a URL for the QR code. When scanned, it will direct users to this link.
+            </p>
             <div className="flex gap-2">
               <Input
-                placeholder="Enter URL for QR code..."
+                placeholder="https://spyglassrealty.com/listing/..."
                 value={localQrUrl}
                 onChange={handleQrUrlChange}
-                className="flex-1 h-9"
+                className="flex-1 min-h-11 text-sm"
                 data-testid="input-qr-url"
               />
               <Button
                 type="button"
                 variant="secondary"
                 size="icon"
-                className="h-9 w-9 flex-shrink-0"
+                className="min-h-11 min-w-11"
                 onClick={() => generateQRCode(localQrUrl)}
                 disabled={!localQrUrl.trim() || isGeneratingQR}
+                title="Generate QR Code"
                 data-testid="button-generate-qr"
               >
                 {isGeneratingQR ? (
@@ -363,20 +367,37 @@ export function FlyerForm({
                 )}
               </Button>
             </div>
-            {images.qrCode && (
-              <div className="relative w-20 h-20 border rounded-lg overflow-hidden bg-white">
-                <img src={images.qrCode} alt="QR Code" className="w-full h-full object-contain" />
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="secondary"
-                  className="absolute top-1 right-1 h-6 w-6"
-                  onClick={handleClearQR}
-                  data-testid="button-clear-qr"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
+            {images.qrCode ? (
+              <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
+                <div className="relative">
+                  <img 
+                    src={images.qrCode} 
+                    alt="QR Code" 
+                    className="w-20 h-20 rounded border bg-white"
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="destructive"
+                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                    onClick={handleClearQR}
+                    title="Remove QR Code"
+                    data-testid="button-clear-qr"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-foreground">QR Code Generated</p>
+                  <p className="text-xs text-muted-foreground truncate" title={localQrUrl}>
+                    {localQrUrl}
+                  </p>
+                </div>
               </div>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">
+                Enter a URL and click the QR button to generate
+              </p>
             )}
           </div>
         </div>
