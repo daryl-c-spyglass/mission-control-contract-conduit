@@ -1,0 +1,1087 @@
+# Contract Conduit — Advanced Flyer Builder Implementation
+
+## 🎯 Objective
+
+Implement a fully-functional Advanced Flyer Builder in the Marketing tab that:
+1. **Auto-populates** all property data from the transaction's MLS data (Repliers API)
+2. **Auto-populates** agent details from Settings
+3. **Uses AI** to classify and select best photos (Repliers imageInsights)
+4. **Generates AI headlines** and **summarizes descriptions**
+5. **Syncs form changes to Live Preview** in real-time
+6. **Exports** to PNG (300 DPI) and CMYK (.tiff)
+
+---
+
+## 📍 Location
+
+Marketing Tab → When user clicks "Create Flyer" or navigates to Advanced Flyer Builder
+
+---
+
+## 📁 File Structure
+
+```
+client/src/
+├── components/
+│   └── marketing/
+│       └── AdvancedFlyerGenerator/
+│           ├── index.tsx              # Main container
+│           ├── FlyerForm.tsx          # Left pane form
+│           ├── FlyerPreview.tsx       # Live preview component
+│           ├── GridOverlay.tsx        # 4x4 numbered grid
+│           ├── ImageUploadField.tsx   # Upload with crop modal
+│           ├── PhotoSelector.tsx      # AI photo selection
+│           └── LogoControls.tsx       # Logo sliders + defaults
+│
+├── hooks/
+│   └── useFlyer.ts                    # Form state + data loading
+│
+└── lib/
+    └── flyer-utils.ts                 # Photo selection, transforms
+
+server/
+├── routes/
+│   └── flyer.ts                       # Export endpoints
+│
+├── services/
+│   └── flyer-generator.ts             # Puppeteer + ImageMagick
+│
+└── templates/
+    └── flyer-template.html            # HTML template for export
+```
+
+---
+
+## 🗄️ Data Sources
+
+### 1. Transaction MLS Data (Repliers API)
+
+The transaction object contains `mlsData` with these fields:
+
+```typescript
+// From transaction.mlsData
+interface MLSData {
+  listPrice: number;
+  streetNumber: string;
+  streetName: string;
+  streetSuffix: string;
+  city: string;
+  state: string;
+  zip: string;
+  beds: number;
+  baths: number;
+  sqft: number;
+  publicRemarks: string;
+  photos: Array<{
+    url: string;
+    imageInsights?: {
+      classification?: {
+        imageOf?: string; // "kitchen", "living room", "front of structure"
+      };
+      quality?: {
+        score?: number; // 1-5 scale
+      };
+    };
+  }>;
+}
+```
+
+### 2. User Settings
+
+```typescript
+// From Settings / user profile
+interface UserSettings {
+  firstName: string;
+  lastName: string;
+  title: string;           // "REALTOR®"
+  phone: string;
+  profilePhoto: string;    // URL
+  qrCodeUrl?: string;      // For QR code generation
+  companyLogo?: string;    // Custom logo URL
+  companyLogoUseDefault?: boolean;
+  secondaryLogo?: string;
+  secondaryLogoUseDefault?: boolean;
+}
+```
+
+---
+
+## 📝 Form Schema
+
+```typescript
+// shared/flyer-schema.ts
+import { z } from 'zod';
+
+export const flyerDataSchema = z.object({
+  // Property Details
+  price: z.string().default(''),
+  address: z.string().default(''),
+  bedrooms: z.string().default(''),
+  bathrooms: z.string().default(''),
+  sqft: z.string().default(''),
+  
+  // Description
+  introHeadline: z.string().max(100).default(''),
+  introDescription: z.string().max(500).default(''),
+  
+  // Agent Details
+  agentName: z.string().default(''),
+  agentTitle: z.string().default('REALTOR®'),
+  phone: z.string().default(''),
+  
+  // QR Code
+  qrCodeUrl: z.string().url().optional().or(z.literal('')),
+});
+
+export type FlyerData = z.infer<typeof flyerDataSchema>;
+```
+
+---
+
+## 🔧 Main Component Implementation
+
+```tsx
+// client/src/components/marketing/AdvancedFlyerGenerator/index.tsx
+
+import { useState, useEffect, useRef } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useLocation } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
+
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { ArrowLeft, Grid3X3, Download } from 'lucide-react';
+
+import { FlyerForm } from './FlyerForm';
+import { FlyerPreview } from './FlyerPreview';
+import { GridOverlay } from './GridOverlay';
+import { flyerDataSchema, FlyerData } from '@shared/flyer-schema';
+import { autoSelectPhotos, formatPrice, formatAddress } from '@/lib/flyer-utils';
+
+interface FlyerImages {
+  mainImage: string | null;
+  kitchenImage: string | null;
+  roomImage: string | null;
+  agentPhoto: string | null;
+  companyLogo: string | null;
+  secondaryLogo: string | null;
+  qrCode: string | null;
+}
+
+interface ImageTransform {
+  scale: number;
+  x: number;
+  y: number;
+}
+
+interface AdvancedFlyerGeneratorProps {
+  transactionId: string;
+}
+
+export function AdvancedFlyerGenerator({ transactionId }: AdvancedFlyerGeneratorProps) {
+  const [, setLocation] = useLocation();
+  const previewRef = useRef<HTMLDivElement>(null);
+  
+  // UI State
+  const [showGrid, setShowGrid] = useState(false);
+  const [scale, setScale] = useState('fit');
+  const [isExporting, setIsExporting] = useState(false);
+  
+  // Image State
+  const [images, setImages] = useState<FlyerImages>({
+    mainImage: null,
+    kitchenImage: null,
+    roomImage: null,
+    agentPhoto: null,
+    companyLogo: '/logos/SpyglassRealty_Logo_Black.png',
+    secondaryLogo: '/logos/LeadingRE_Logo.png',
+    qrCode: null,
+  });
+  
+  // Image Transform State (for cropping)
+  const [imageTransforms, setImageTransforms] = useState<Record<string, ImageTransform>>({
+    mainImage: { scale: 1, x: 0, y: 0 },
+    kitchenImage: { scale: 1, x: 0, y: 0 },
+    roomImage: { scale: 1, x: 0, y: 0 },
+    agentPhoto: { scale: 1, x: 0, y: 0 },
+  });
+  
+  // Logo Controls
+  const [logoScales, setLogoScales] = useState({ primary: 1, secondary: 1 });
+  const [dividerPosition, setDividerPosition] = useState(148);
+  const [secondaryLogoOffsetY, setSecondaryLogoOffsetY] = useState(0);
+  const [useDefaultCompanyLogo, setUseDefaultCompanyLogo] = useState(true);
+  const [useDefaultSecondaryLogo, setUseDefaultSecondaryLogo] = useState(true);
+  
+  // Photo classification data
+  const [photoClassifications, setPhotoClassifications] = useState<Map<string, { imageOf: string; quality: number }>>(new Map());
+  
+  // Fetch transaction data
+  const { data: transaction } = useQuery({
+    queryKey: ['transaction', transactionId],
+    queryFn: async () => {
+      const res = await fetch(`/api/transactions/${transactionId}`);
+      if (!res.ok) throw new Error('Failed to fetch transaction');
+      return res.json();
+    },
+  });
+  
+  // Fetch user settings
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: async () => {
+      const res = await fetch('/api/settings');
+      if (!res.ok) throw new Error('Failed to fetch settings');
+      return res.json();
+    },
+  });
+  
+  // Form setup
+  const form = useForm<FlyerData>({
+    resolver: zodResolver(flyerDataSchema),
+    defaultValues: {
+      price: '',
+      address: '',
+      bedrooms: '',
+      bathrooms: '',
+      sqft: '',
+      introHeadline: '',
+      introDescription: '',
+      agentName: '',
+      agentTitle: 'REALTOR®',
+      phone: '',
+      qrCodeUrl: '',
+    },
+  });
+  
+  // Watch all form values for real-time preview sync
+  const watchedValues = form.watch();
+  
+  // ============================================
+  // AUTO-POPULATE FROM MLS DATA (Repliers API)
+  // ============================================
+  useEffect(() => {
+    if (transaction?.mlsData) {
+      const mlsData = transaction.mlsData;
+      
+      console.log('[Flyer] Auto-populating from MLS:', mlsData);
+      
+      // Auto-fill form fields from MLS
+      form.setValue('price', formatPrice(mlsData.listPrice || transaction.listPrice));
+      form.setValue('address', formatAddress(mlsData));
+      form.setValue('bedrooms', String(mlsData.beds || mlsData.bedroomsTotal || ''));
+      form.setValue('bathrooms', String(mlsData.baths || mlsData.bathroomsTotalInteger || ''));
+      form.setValue('sqft', formatNumber(mlsData.sqft || mlsData.livingArea || mlsData.buildingAreaTotal));
+      form.setValue('introDescription', mlsData.publicRemarks || mlsData.remarks || '');
+      
+      // Generate default headline from location
+      const city = mlsData.city || '';
+      const neighborhood = mlsData.neighborhood || mlsData.subdivision || '';
+      const headline = neighborhood 
+        ? `Prime Opportunity in ${neighborhood}`
+        : city 
+          ? `Prime Opportunity in ${city}`
+          : 'Prime Opportunity';
+      form.setValue('introHeadline', headline);
+      
+      // ============================================
+      // AUTO-SELECT PHOTOS USING imageInsights
+      // ============================================
+      if (mlsData.photos && mlsData.photos.length > 0) {
+        console.log('[Flyer] Processing photos with imageInsights:', mlsData.photos.length);
+        
+        // Store classification data for display
+        const classifications = new Map();
+        mlsData.photos.forEach((photo: any, index: number) => {
+          if (photo.imageInsights) {
+            classifications.set(photo.url, {
+              imageOf: photo.imageInsights.classification?.imageOf || 'Unknown',
+              quality: photo.imageInsights.quality?.score || 0,
+            });
+          }
+        });
+        setPhotoClassifications(classifications);
+        
+        // Auto-select best photos
+        const selected = autoSelectPhotos(mlsData.photos);
+        console.log('[Flyer] Auto-selected photos:', selected);
+        
+        setImages(prev => ({
+          ...prev,
+          mainImage: selected.mainPhoto?.url || null,
+          kitchenImage: selected.kitchenPhoto?.url || null,
+          roomImage: selected.roomPhoto?.url || null,
+        }));
+      }
+    }
+  }, [transaction, form]);
+  
+  // ============================================
+  // AUTO-POPULATE FROM SETTINGS
+  // ============================================
+  useEffect(() => {
+    if (settings) {
+      console.log('[Flyer] Auto-populating from Settings:', settings);
+      
+      // Agent details
+      const fullName = `${settings.firstName || ''} ${settings.lastName || ''}`.trim();
+      form.setValue('agentName', fullName);
+      form.setValue('agentTitle', settings.title || 'REALTOR®');
+      form.setValue('phone', settings.phone || '');
+      
+      // Agent photo
+      if (settings.profilePhoto) {
+        setImages(prev => ({ ...prev, agentPhoto: settings.profilePhoto }));
+      }
+      
+      // QR Code URL
+      if (settings.qrCodeUrl) {
+        form.setValue('qrCodeUrl', settings.qrCodeUrl);
+      }
+      
+      // Logos
+      if (settings.companyLogoUseDefault === false && settings.companyLogo) {
+        setUseDefaultCompanyLogo(false);
+        setImages(prev => ({ ...prev, companyLogo: settings.companyLogo }));
+      }
+      if (settings.secondaryLogoUseDefault === false && settings.secondaryLogo) {
+        setUseDefaultSecondaryLogo(false);
+        setImages(prev => ({ ...prev, secondaryLogo: settings.secondaryLogo }));
+      }
+    }
+  }, [settings, form]);
+  
+  // ============================================
+  // PREVIEW SCALE CALCULATION
+  // ============================================
+  const getPreviewScale = () => {
+    if (scale === 'fit') {
+      // Calculate fit-to-container scale
+      const container = previewRef.current?.parentElement;
+      if (container) {
+        const containerWidth = container.clientWidth - 48; // padding
+        const previewWidth = 816; // 8.5" at 96dpi
+        return Math.min(containerWidth / previewWidth, 1);
+      }
+      return 0.65;
+    }
+    return parseFloat(scale);
+  };
+  
+  // ============================================
+  // EXPORT HANDLERS
+  // ============================================
+  const handleExportPNG = async () => {
+    setIsExporting(true);
+    try {
+      const response = await fetch('/api/flyer/export-png', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId,
+          formData: watchedValues,
+          images,
+          imageTransforms,
+          logoScales,
+          dividerPosition,
+          secondaryLogoOffsetY,
+        }),
+      });
+      
+      if (!response.ok) throw new Error('Export failed');
+      
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `flyer-${watchedValues.address.replace(/[^a-z0-9]/gi, '-')}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('[Flyer] Export PNG failed:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+  
+  const handleExportCMYK = async () => {
+    setIsExporting(true);
+    try {
+      const response = await fetch('/api/flyer/export-cmyk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId,
+          formData: watchedValues,
+          images,
+          imageTransforms,
+          logoScales,
+          dividerPosition,
+          secondaryLogoOffsetY,
+        }),
+      });
+      
+      if (!response.ok) throw new Error('Export failed');
+      
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `flyer-${watchedValues.address.replace(/[^a-z0-9]/gi, '-')}-cmyk.tiff`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('[Flyer] Export CMYK failed:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+  
+  // ============================================
+  // NAVIGATION
+  // ============================================
+  const handleBack = () => {
+    setLocation(`/transactions/${transactionId}/marketing`);
+  };
+  
+  // ============================================
+  // RENDER
+  // ============================================
+  return (
+    <div className="h-full flex flex-col bg-background">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleBack}
+            className="gap-2 min-h-11" // 44px touch target
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Marketing
+          </Button>
+          <div>
+            <h1 className="text-lg font-semibold">Flyer Generator</h1>
+            <p className="text-sm text-muted-foreground">Create stunning property flyers</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={handleExportPNG} 
+            disabled={isExporting}
+            className="gap-2 min-h-11 bg-primary"
+          >
+            <Download className="w-4 h-4" />
+            Export PNG
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={handleExportCMYK} 
+            disabled={isExporting}
+            className="gap-2 min-h-11"
+          >
+            <Download className="w-4 h-4" />
+            Export CMYK (Print)
+          </Button>
+        </div>
+      </div>
+      
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Pane - Scrollable Form */}
+        <div className="w-[420px] min-w-[420px] border-r border-border bg-card flex flex-col h-full overflow-hidden">
+          <ScrollArea className="flex-1 h-full">
+            <div className="p-6 space-y-6">
+              <FlyerForm
+                form={form}
+                images={images}
+                setImages={setImages}
+                imageTransforms={imageTransforms}
+                setImageTransforms={setImageTransforms}
+                logoScales={logoScales}
+                setLogoScales={setLogoScales}
+                dividerPosition={dividerPosition}
+                setDividerPosition={setDividerPosition}
+                secondaryLogoOffsetY={secondaryLogoOffsetY}
+                setSecondaryLogoOffsetY={setSecondaryLogoOffsetY}
+                useDefaultCompanyLogo={useDefaultCompanyLogo}
+                setUseDefaultCompanyLogo={setUseDefaultCompanyLogo}
+                useDefaultSecondaryLogo={useDefaultSecondaryLogo}
+                setUseDefaultSecondaryLogo={setUseDefaultSecondaryLogo}
+                photoClassifications={photoClassifications}
+                mlsPhotos={transaction?.mlsData?.photos || []}
+              />
+            </div>
+          </ScrollArea>
+        </div>
+        
+        {/* Right Pane - Live Preview */}
+        <div className="flex-1 bg-muted/30 p-6 overflow-auto">
+          <div className="sticky top-0">
+            {/* Preview Controls */}
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-medium text-muted-foreground">Live Preview</h2>
+              <div className="flex items-center gap-4">
+                {/* Grid Toggle */}
+                <div className="flex items-center gap-2">
+                  <Grid3X3 className="h-4 w-4 text-muted-foreground" />
+                  <Label htmlFor="grid-toggle" className="text-xs text-muted-foreground cursor-pointer">
+                    Grid
+                  </Label>
+                  <Switch
+                    id="grid-toggle"
+                    checked={showGrid}
+                    onCheckedChange={setShowGrid}
+                  />
+                </div>
+                
+                {/* Scale Selector */}
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground">Scale:</Label>
+                  <Select value={scale} onValueChange={setScale}>
+                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fit">Fit to screen</SelectItem>
+                      <SelectItem value="0.5">50%</SelectItem>
+                      <SelectItem value="0.75">75%</SelectItem>
+                      <SelectItem value="1">100%</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+            
+            {/* Preview Container */}
+            <div className="overflow-auto rounded-lg shadow-2xl inline-block bg-white">
+              <div
+                ref={previewRef}
+                className="origin-top-left relative"
+                style={{
+                  transform: `scale(${getPreviewScale()})`,
+                  transformOrigin: 'top left',
+                  width: '816px',
+                  height: '1056px',
+                }}
+              >
+                <FlyerPreview
+                  data={watchedValues}
+                  images={images}
+                  imageTransforms={imageTransforms}
+                  logoScales={logoScales}
+                  dividerPosition={dividerPosition}
+                  secondaryLogoOffsetY={secondaryLogoOffsetY}
+                />
+                {showGrid && <GridOverlay />}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+function formatPrice(price: number | string | null): string {
+  if (!price) return '';
+  const num = typeof price === 'string' ? parseFloat(price.replace(/[^0-9.]/g, '')) : price;
+  if (isNaN(num)) return '';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(num);
+}
+
+function formatNumber(num: number | string | null): string {
+  if (!num) return '';
+  const n = typeof num === 'string' ? parseFloat(num.replace(/[^0-9.]/g, '')) : num;
+  if (isNaN(n)) return '';
+  return new Intl.NumberFormat('en-US').format(n);
+}
+
+function formatAddress(mlsData: any): string {
+  const parts = [
+    mlsData.streetNumber,
+    mlsData.streetName,
+    mlsData.streetSuffix,
+  ].filter(Boolean).join(' ');
+  
+  const cityStateZip = [
+    mlsData.city,
+    mlsData.state,
+    mlsData.zip,
+  ].filter(Boolean).join(', ');
+  
+  return parts && cityStateZip ? `${parts}, ${cityStateZip}` : parts || cityStateZip || '';
+}
+```
+
+---
+
+## 📸 Photo Auto-Selection Utility
+
+```typescript
+// client/src/lib/flyer-utils.ts
+
+interface PhotoWithInsights {
+  url: string;
+  imageInsights?: {
+    classification?: {
+      imageOf?: string;
+    };
+    quality?: {
+      score?: number;
+    };
+  };
+}
+
+interface SelectedPhotos {
+  mainPhoto: PhotoWithInsights | null;
+  kitchenPhoto: PhotoWithInsights | null;
+  roomPhoto: PhotoWithInsights | null;
+}
+
+export function autoSelectPhotos(photos: PhotoWithInsights[]): SelectedPhotos {
+  if (!photos || photos.length === 0) {
+    return { mainPhoto: null, kitchenPhoto: null, roomPhoto: null };
+  }
+  
+  // Sort by quality score (highest first)
+  const sorted = [...photos].sort((a, b) => {
+    const scoreA = a.imageInsights?.quality?.score || 0;
+    const scoreB = b.imageInsights?.quality?.score || 0;
+    return scoreB - scoreA;
+  });
+  
+  // Find best EXTERIOR/FRONT photo for main
+  const mainPhoto = sorted.find(p => {
+    const imageOf = p.imageInsights?.classification?.imageOf?.toLowerCase() || '';
+    return ['front of structure', 'exterior', 'front', 'facade'].some(term => imageOf.includes(term));
+  }) || sorted[0]; // Fallback to highest quality
+  
+  // Find best KITCHEN photo
+  const kitchenPhoto = sorted.find(p => {
+    const imageOf = p.imageInsights?.classification?.imageOf?.toLowerCase() || '';
+    return imageOf.includes('kitchen');
+  }) || null;
+  
+  // Find best LIVING ROOM / INTERIOR photo (excluding already selected)
+  const usedUrls = new Set([mainPhoto?.url, kitchenPhoto?.url].filter(Boolean));
+  const roomPhoto = sorted.find(p => {
+    if (usedUrls.has(p.url)) return false;
+    const imageOf = p.imageInsights?.classification?.imageOf?.toLowerCase() || '';
+    return ['living room', 'living', 'interior', 'bedroom', 'great room', 'family room'].some(term => imageOf.includes(term));
+  }) || sorted.find(p => !usedUrls.has(p.url)) || null; // Fallback to next best
+  
+  console.log('[autoSelectPhotos] Results:', {
+    mainPhoto: mainPhoto?.imageInsights?.classification?.imageOf,
+    kitchenPhoto: kitchenPhoto?.imageInsights?.classification?.imageOf,
+    roomPhoto: roomPhoto?.imageInsights?.classification?.imageOf,
+  });
+  
+  return { mainPhoto, kitchenPhoto, roomPhoto };
+}
+
+export function getQualityStars(score: number): string {
+  const fullStars = Math.floor(score);
+  const hasHalf = score - fullStars >= 0.5;
+  let stars = '★'.repeat(fullStars);
+  if (hasHalf) stars += '½';
+  stars += '☆'.repeat(5 - fullStars - (hasHalf ? 1 : 0));
+  return stars;
+}
+
+export function formatClassification(imageOf: string): string {
+  // Capitalize first letter of each word
+  return imageOf
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+```
+
+---
+
+## 🖼️ FlyerPreview Component
+
+```tsx
+// client/src/components/marketing/AdvancedFlyerGenerator/FlyerPreview.tsx
+
+interface FlyerPreviewProps {
+  data: {
+    price: string;
+    address: string;
+    bedrooms: string;
+    bathrooms: string;
+    sqft: string;
+    introHeadline: string;
+    introDescription: string;
+    agentName: string;
+    agentTitle: string;
+    phone: string;
+  };
+  images: {
+    mainImage: string | null;
+    kitchenImage: string | null;
+    roomImage: string | null;
+    agentPhoto: string | null;
+    companyLogo: string | null;
+    secondaryLogo: string | null;
+    qrCode: string | null;
+  };
+  imageTransforms: Record<string, { scale: number; x: number; y: number }>;
+  logoScales: { primary: number; secondary: number };
+  dividerPosition: number;
+  secondaryLogoOffsetY: number;
+}
+
+export function FlyerPreview({ 
+  data, 
+  images, 
+  imageTransforms,
+  logoScales,
+  dividerPosition,
+  secondaryLogoOffsetY,
+}: FlyerPreviewProps) {
+  return (
+    <div 
+      className="bg-white relative"
+      style={{ width: '816px', height: '1056px' }}
+    >
+      {/* ====== HEADER ====== */}
+      <div className="flex items-center h-[80px] px-4 border-b">
+        {/* Company Logo */}
+        <div 
+          className="flex items-center justify-center"
+          style={{ width: `${dividerPosition}px` }}
+        >
+          {images.companyLogo && (
+            <img 
+              src={images.companyLogo} 
+              alt="Company" 
+              className="max-h-[60px] object-contain"
+              style={{ transform: `scale(${logoScales.primary})` }}
+            />
+          )}
+        </div>
+        
+        {/* Divider Line */}
+        <div className="w-px h-[50px] bg-gray-300 mx-2" />
+        
+        {/* Secondary Logo */}
+        <div 
+          className="flex items-center justify-center flex-1"
+          style={{ transform: `translateY(${secondaryLogoOffsetY}px)` }}
+        >
+          {images.secondaryLogo && (
+            <img 
+              src={images.secondaryLogo} 
+              alt="Secondary" 
+              className="max-h-[50px] object-contain"
+              style={{ transform: `scale(${logoScales.secondary})` }}
+            />
+          )}
+        </div>
+        
+        {/* Price Badge */}
+        <div className="bg-[#4A7C59] text-white px-6 py-3 text-right ml-auto">
+          <div className="text-[10px] uppercase tracking-wider opacity-80">Listed At</div>
+          <div className="text-xl font-bold">{data.price || '$0'}</div>
+        </div>
+      </div>
+      
+      {/* ====== ADDRESS ====== */}
+      <div className="px-6 py-3 bg-white">
+        <h1 className="text-lg font-semibold tracking-wide uppercase text-gray-800">
+          {data.address || 'PROPERTY ADDRESS'}
+        </h1>
+      </div>
+      
+      {/* ====== MAIN PHOTO ====== */}
+      <div className="px-6">
+        <div className="h-[380px] bg-gray-200 overflow-hidden">
+          {images.mainImage ? (
+            <img 
+              src={images.mainImage} 
+              alt="Main Property" 
+              className="w-full h-full object-cover"
+              style={{
+                transform: `scale(${imageTransforms.mainImage?.scale || 1}) translate(${imageTransforms.mainImage?.x || 0}%, ${imageTransforms.mainImage?.y || 0}%)`,
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-400">
+              <div className="text-center">
+                <div className="text-4xl mb-2">🏠</div>
+                <div>Main Property Photo</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* ====== SECONDARY PHOTOS ====== */}
+      <div className="px-6 py-3 grid grid-cols-2 gap-3">
+        {/* Kitchen */}
+        <div className="h-[180px] bg-gray-200 overflow-hidden">
+          {images.kitchenImage ? (
+            <img 
+              src={images.kitchenImage} 
+              alt="Kitchen" 
+              className="w-full h-full object-cover"
+              style={{
+                transform: `scale(${imageTransforms.kitchenImage?.scale || 1}) translate(${imageTransforms.kitchenImage?.x || 0}%, ${imageTransforms.kitchenImage?.y || 0}%)`,
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+              Kitchen
+            </div>
+          )}
+        </div>
+        
+        {/* Room */}
+        <div className="h-[180px] bg-gray-200 overflow-hidden">
+          {images.roomImage ? (
+            <img 
+              src={images.roomImage} 
+              alt="Room" 
+              className="w-full h-full object-cover"
+              style={{
+                transform: `scale(${imageTransforms.roomImage?.scale || 1}) translate(${imageTransforms.roomImage?.x || 0}%, ${imageTransforms.roomImage?.y || 0}%)`,
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+              Room
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* ====== BOTTOM SECTION (3 columns) ====== */}
+      <div className="px-6 py-4 grid grid-cols-3 gap-4">
+        {/* Stats Column */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-gray-700">
+            <span className="text-lg">🛏</span>
+            <span className="font-medium">{data.bedrooms || '0'} bedrooms</span>
+          </div>
+          <div className="flex items-center gap-2 text-gray-700">
+            <span className="text-lg">🛁</span>
+            <span className="font-medium">{data.bathrooms || '0'} bathrooms</span>
+          </div>
+          <div className="flex items-center gap-2 text-gray-700">
+            <span className="text-lg">📐</span>
+            <span className="font-medium">{data.sqft || '0'} sq. ft</span>
+          </div>
+        </div>
+        
+        {/* Description Column */}
+        <div className="border-l border-r border-gray-200 px-4">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-gray-800 mb-2">
+            {data.introHeadline || 'PROPERTY HEADLINE'}
+          </h2>
+          <p className="text-xs text-gray-600 leading-relaxed line-clamp-5">
+            {data.introDescription || 'Property description will appear here...'}
+          </p>
+        </div>
+        
+        {/* Agent Column */}
+        <div className="flex flex-col items-center text-center">
+          {/* Agent Photo */}
+          <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden mb-2">
+            {images.agentPhoto ? (
+              <img 
+                src={images.agentPhoto} 
+                alt={data.agentName} 
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400 text-2xl">
+                👤
+              </div>
+            )}
+          </div>
+          
+          <div className="font-semibold text-gray-800">{data.agentName || 'Agent Name'}</div>
+          <div className="text-xs text-gray-600">{data.agentTitle || 'REALTOR®'}</div>
+          <div className="text-xs text-gray-600">{data.phone || '(512) 555-1234'}</div>
+          
+          {/* QR Code */}
+          {images.qrCode && (
+            <img src={images.qrCode} alt="QR Code" className="w-12 h-12 mt-2" />
+          )}
+        </div>
+      </div>
+      
+      {/* Decorative Footer */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1">
+        <div className="w-3 h-3 bg-black" />
+        <div className="w-3 h-3 bg-white border border-gray-300" />
+        <div className="w-3 h-3 bg-black" />
+        <div className="w-3 h-3 bg-white border border-gray-300" />
+        <div className="w-3 h-3 bg-black" />
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 🔲 Grid Overlay Component
+
+```tsx
+// client/src/components/marketing/AdvancedFlyerGenerator/GridOverlay.tsx
+
+export function GridOverlay() {
+  return (
+    <div 
+      className="absolute inset-0 pointer-events-none"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gridTemplateRows: 'repeat(4, 1fr)',
+      }}
+    >
+      {Array.from({ length: 16 }, (_, i) => (
+        <div
+          key={i}
+          className="border border-cyan-500/50 flex items-center justify-center"
+        >
+          <span className="text-cyan-500 text-xs font-mono bg-cyan-500/10 px-1 rounded">
+            {i + 1}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+## 📱 Mobile Optimization
+
+Add these responsive styles:
+
+```tsx
+// In the main component, update the layout classes:
+
+// Mobile: Stack vertically
+// Tablet: Side by side with smaller form
+// Desktop: Full width
+
+<div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+  {/* Left Pane - Form */}
+  <div className="
+    w-full md:w-[360px] lg:w-[420px] 
+    md:min-w-[360px] lg:min-w-[420px]
+    border-b md:border-b-0 md:border-r 
+    border-border bg-card 
+    flex flex-col 
+    h-[50vh] md:h-full 
+    overflow-hidden
+  ">
+    {/* ScrollArea content */}
+  </div>
+  
+  {/* Right Pane - Preview */}
+  <div className="flex-1 bg-muted/30 p-4 md:p-6 overflow-auto">
+    {/* Preview content */}
+  </div>
+</div>
+```
+
+Add to global CSS:
+
+```css
+/* Smooth scrolling for iOS */
+.scroll-area-viewport {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Safe areas for notched devices */
+.flyer-generator {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Minimum touch targets */
+.min-h-11 {
+  min-height: 44px;
+}
+```
+
+---
+
+## ✅ Testing Checklist
+
+### Data Auto-Population
+- [ ] Open flyer from transaction with MLS data
+- [ ] Verify price auto-fills from `mlsData.listPrice`
+- [ ] Verify beds/baths/sqft auto-fill from mlsData
+- [ ] Verify address constructs from streetNumber + streetName + streetSuffix + city/state/zip
+- [ ] Verify description auto-fills from `publicRemarks`
+- [ ] Verify agent details auto-fill from Settings
+
+### Photo AI Selection
+- [ ] Verify photos load from `mlsData.photos[]`
+- [ ] Verify classification badges display (Kitchen, Exterior, etc.)
+- [ ] Verify quality scores display (★★★★☆)
+- [ ] Verify mainPhoto selects best exterior/front
+- [ ] Verify kitchenPhoto selects best kitchen
+- [ ] Verify roomPhoto selects best living room/interior
+
+### Live Preview Sync
+- [ ] Change price → preview price badge updates
+- [ ] Change beds → preview stats update
+- [ ] Change headline → preview headline updates
+- [ ] Upload new photo → preview image updates
+- [ ] Adjust logo size slider → preview logo scales
+
+### Logo Controls
+- [ ] Primary logo size slider (50%-200%) works
+- [ ] Secondary logo size slider works
+- [ ] Divider position slider (100-200px) works
+- [ ] Secondary logo Y position (±20px) works
+- [ ] "Use Default" toggles load Spyglass/Leading RE logos
+
+### Grid & Scale
+- [ ] Grid toggle shows/hides 4x4 numbered overlay
+- [ ] Scale dropdown: Fit to screen works
+- [ ] Scale dropdown: 50%, 75%, 100% work
+
+### Export
+- [ ] Export PNG downloads file
+- [ ] PNG is 2550x3300 @ 300 DPI
+- [ ] PNG matches Live Preview exactly
+- [ ] Export CMYK downloads .tiff
+- [ ] CMYK uses correct color profile
+
+### Navigation
+- [ ] Back button returns to Marketing tab (not Transactions home)
+
+### Mobile
+- [ ] iPad Safari: Layout displays correctly
+- [ ] iPhone Safari: Stacked layout, form on top
+- [ ] All buttons are 44px minimum touch target
+- [ ] Scrolling is smooth with momentum
+- [ ] No horizontal overflow
+- [ ] Safe area insets respected on notched devices
