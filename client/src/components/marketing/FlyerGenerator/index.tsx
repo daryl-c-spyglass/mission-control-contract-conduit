@@ -542,9 +542,10 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
       const data = await response.json() as { success: boolean; flyerUrl?: string; qrCode?: string };
 
       if (data.success && data.flyerUrl && data.qrCode) {
+        const qrCodeImage = data.qrCode;
         // Update the QR code URL and image
         setQrCodeUrl(data.flyerUrl);
-        setImages(prev => ({ ...prev, qrCode: data.qrCode }));
+        setImages(prev => ({ ...prev, qrCode: qrCodeImage }));
         
         toast({
           title: 'Shareable Link Created',
@@ -636,24 +637,27 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header - Fixed height, sticky at top */}
-      <header className="sticky top-0 z-50 h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex h-full items-center justify-between gap-4 px-6">
+      {/* Header - Scrolls with content (NOT sticky) */}
+      <header className="border-b bg-background">
+        <div className="flex items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-4">
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onBack}
-              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+              className="gap-2 text-muted-foreground"
               data-testid="button-back-to-marketing"
             >
               <ArrowLeft className="w-4 h-4" />
               Back to Marketing
-            </button>
+            </Button>
+            <div className="h-8 w-px bg-border" />
             <div>
-              <h1 className="text-lg font-semibold">Flyer Generator</h1>
+              <h1 className="text-lg font-semibold tracking-tight">Flyer Generator</h1>
               <p className="text-sm text-muted-foreground">Create stunning property flyers</p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Button
               onClick={() => saveAssetMutation.mutate()}
               disabled={saveAssetMutation.isPending || exportMutation.isPending}
@@ -671,7 +675,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
             <Button
               onClick={() => exportMutation.mutate('png')}
               disabled={exportMutation.isPending || saveAssetMutation.isPending}
-              className="gap-2"
+              className="gap-2 bg-[#F37216] hover:bg-[#E06510] text-white"
               data-testid="button-export-png"
             >
               {exportMutation.isPending ? (

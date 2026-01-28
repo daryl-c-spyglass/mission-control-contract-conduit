@@ -1,0 +1,360 @@
+# Contract Conduit — Fix Flyer Generator Header
+
+## 📌 Problem
+
+The Flyer Generator header section (containing "Back to Marketing", title, and export buttons) is currently **static/fixed** and stays in place when scrolling. It should **scroll with the page content**.
+
+Also, the "Flyer Generator / Create stunning property flyers" title styling needs improvement.
+
+---
+
+## 🖼️ Current Issue
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Overview   MLS Data   Docs   Marketing 1   CMA   Timeline                  │  ← Main nav (can stay sticky)
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ← Back to Marketing   Flyer Generator          Save   Export PNG   Export  │  ← THIS SHOULD SCROLL
+│                        Create stunning...                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  [Left Pane Form]                    [Right Pane Preview]                   │
+│                                                                              │
+│  Currently when user scrolls,                                               │
+│  the header stays fixed - WRONG!                                            │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## ✅ Expected Behavior
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Overview   MLS Data   Docs   Marketing 1   CMA   Timeline                  │  ← Main nav (sticky OK)
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  When user scrolls down, the entire flyer generator                         │
+│  content scrolls up INCLUDING the header section                            │
+│                                                                              │
+│  The "Back to Marketing" + Title + Buttons should                           │
+│  scroll away with the content                                               │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔧 Fix Implementation
+
+### Remove `sticky` from Flyer Header
+
+Find the header section that contains "Back to Marketing", "Flyer Generator", and the export buttons.
+
+**REMOVE** any of these classes:
+- `sticky`
+- `fixed`
+- `top-0`
+- `top-[...]`
+- `z-50` / `z-40` (if used for sticking)
+
+### Before (WRONG)
+
+```tsx
+{/* This is wrong - header sticks to top */}
+<div className="sticky top-0 z-40 bg-white border-b">
+  <div className="flex items-center justify-between px-6 py-4">
+    <div className="flex items-center gap-4">
+      <Button variant="ghost" onClick={handleBack}>
+        ← Back to Marketing
+      </Button>
+      <div>
+        <h1>Flyer Generator</h1>
+        <p>Create stunning property flyers</p>
+      </div>
+    </div>
+    <div className="flex gap-2">
+      <Button>Save to My Assets</Button>
+      <Button>Export PNG</Button>
+      <Button>Export CMYK</Button>
+    </div>
+  </div>
+</div>
+```
+
+### After (CORRECT)
+
+```tsx
+{/* Header scrolls with content - no sticky */}
+<div className="bg-white border-b">
+  <div className="flex items-center justify-between px-6 py-4">
+    <div className="flex items-center gap-4">
+      <Button 
+        variant="ghost" 
+        size="sm"
+        onClick={handleBack}
+        className="gap-2 text-muted-foreground hover:text-foreground min-h-11"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to Marketing
+      </Button>
+      
+      {/* Vertical divider */}
+      <div className="h-8 w-px bg-border" />
+      
+      {/* Title - improved styling */}
+      <div>
+        <h1 className="text-lg font-semibold text-foreground">Flyer Generator</h1>
+        <p className="text-sm text-muted-foreground">Create stunning property flyers</p>
+      </div>
+    </div>
+    
+    {/* Action Buttons */}
+    <div className="flex items-center gap-2">
+      <Button 
+        variant="outline" 
+        onClick={handleSaveToAssets}
+        className="gap-2 min-h-11"
+      >
+        <Save className="w-4 h-4" />
+        Save to My Assets
+      </Button>
+      <Button 
+        onClick={handleExportPNG}
+        disabled={isExporting}
+        className="gap-2 min-h-11 bg-[#F37216] hover:bg-[#E06510]"
+      >
+        <Download className="w-4 h-4" />
+        Export PNG
+      </Button>
+      <Button 
+        variant="outline"
+        onClick={handleExportCMYK}
+        disabled={isExporting}
+        className="gap-2 min-h-11"
+      >
+        <Download className="w-4 h-4" />
+        Export CMYK (Print)
+      </Button>
+    </div>
+  </div>
+</div>
+```
+
+---
+
+## 🎨 Improved Header Styling
+
+### Title Section
+```tsx
+<div className="flex items-center gap-4">
+  {/* Back Button */}
+  <Button 
+    variant="ghost" 
+    size="sm"
+    onClick={handleBack}
+    className="gap-2 text-muted-foreground hover:text-foreground"
+  >
+    <ArrowLeft className="w-4 h-4" />
+    Back to Marketing
+  </Button>
+  
+  {/* Vertical Divider */}
+  <div className="h-8 w-px bg-border" />
+  
+  {/* Title */}
+  <div>
+    <h1 className="text-lg font-semibold tracking-tight">Flyer Generator</h1>
+    <p className="text-sm text-muted-foreground">Create stunning property flyers</p>
+  </div>
+</div>
+```
+
+### Export Buttons (Spyglass Orange)
+```tsx
+<div className="flex items-center gap-2">
+  {/* Save Button - Outline style */}
+  <Button 
+    variant="outline"
+    onClick={handleSaveToAssets}
+    className="gap-2"
+  >
+    <Save className="w-4 h-4" />
+    Save to My Assets
+  </Button>
+  
+  {/* Export PNG - Primary Spyglass Orange */}
+  <Button 
+    onClick={handleExportPNG}
+    className="gap-2 bg-[#F37216] hover:bg-[#E06510] text-white"
+  >
+    <Download className="w-4 h-4" />
+    Export PNG
+  </Button>
+  
+  {/* Export CMYK - Outline style */}
+  <Button 
+    variant="outline"
+    onClick={handleExportCMYK}
+    className="gap-2"
+  >
+    <Download className="w-4 h-4" />
+    Export CMYK (Print)
+  </Button>
+</div>
+```
+
+---
+
+## 📐 Complete Layout Structure
+
+The page structure should be:
+
+```tsx
+export function FlyerGenerator({ transactionId }: Props) {
+  return (
+    <div className="min-h-screen bg-background">
+      
+      {/* ================================================ */}
+      {/* HEADER - Scrolls with content (NOT sticky)       */}
+      {/* ================================================ */}
+      <div className="bg-white border-b">
+        <div className="flex items-center justify-between px-6 py-4">
+          {/* Left: Back + Title */}
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
+              <ArrowLeft className="w-4 h-4" />
+              Back to Marketing
+            </Button>
+            <div className="h-8 w-px bg-border" />
+            <div>
+              <h1 className="text-lg font-semibold">Flyer Generator</h1>
+              <p className="text-sm text-muted-foreground">Create stunning property flyers</p>
+            </div>
+          </div>
+          
+          {/* Right: Action Buttons */}
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleSaveToAssets} className="gap-2">
+              <Save className="w-4 h-4" />
+              Save to My Assets
+            </Button>
+            <Button onClick={handleExportPNG} className="gap-2 bg-[#F37216] hover:bg-[#E06510]">
+              <Download className="w-4 h-4" />
+              Export PNG
+            </Button>
+            <Button variant="outline" onClick={handleExportCMYK} className="gap-2">
+              <Download className="w-4 h-4" />
+              Export CMYK (Print)
+            </Button>
+          </div>
+        </div>
+      </div>
+      
+      {/* ================================================ */}
+      {/* MAIN CONTENT - Two Column Layout                 */}
+      {/* ================================================ */}
+      <div className="flex flex-col lg:flex-row">
+        
+        {/* Left Pane - Form with ScrollArea */}
+        <div className="w-full lg:w-[420px] lg:min-w-[420px] border-r bg-card">
+          <ScrollArea className="h-[calc(100vh-140px)]">
+            {/* Adjust height based on header height */}
+            <div className="p-6 space-y-6">
+              {/* Form sections... */}
+            </div>
+          </ScrollArea>
+        </div>
+        
+        {/* Right Pane - Preview */}
+        <div className="flex-1 bg-muted/30 p-6 lg:p-8">
+          {/* Preview content */}
+        </div>
+        
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 📱 Mobile Responsive Header
+
+On mobile, stack the header elements:
+
+```tsx
+{/* Header with responsive layout */}
+<div className="bg-white border-b">
+  <div className="px-4 py-3 lg:px-6 lg:py-4">
+    {/* Mobile: Stack, Desktop: Row */}
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      
+      {/* Title Row */}
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2 -ml-2">
+          <ArrowLeft className="w-4 h-4" />
+          <span className="hidden sm:inline">Back to Marketing</span>
+          <span className="sm:hidden">Back</span>
+        </Button>
+        <div className="h-6 w-px bg-border hidden sm:block" />
+        <div>
+          <h1 className="text-base lg:text-lg font-semibold">Flyer Generator</h1>
+          <p className="text-xs lg:text-sm text-muted-foreground hidden sm:block">
+            Create stunning property flyers
+          </p>
+        </div>
+      </div>
+      
+      {/* Button Row */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
+        <Button variant="outline" size="sm" onClick={handleSaveToAssets} className="gap-1.5 whitespace-nowrap min-h-10 lg:min-h-11">
+          <Save className="w-4 h-4" />
+          <span className="hidden sm:inline">Save to My Assets</span>
+          <span className="sm:hidden">Save</span>
+        </Button>
+        <Button size="sm" onClick={handleExportPNG} className="gap-1.5 whitespace-nowrap min-h-10 lg:min-h-11 bg-[#F37216] hover:bg-[#E06510]">
+          <Download className="w-4 h-4" />
+          Export PNG
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleExportCMYK} className="gap-1.5 whitespace-nowrap min-h-10 lg:min-h-11">
+          <Download className="w-4 h-4" />
+          <span className="hidden sm:inline">Export CMYK (Print)</span>
+          <span className="sm:hidden">CMYK</span>
+        </Button>
+      </div>
+      
+    </div>
+  </div>
+</div>
+```
+
+---
+
+## ✅ Testing Checklist
+
+### Scroll Behavior
+- [ ] Header scrolls up when scrolling down the page
+- [ ] Header is NOT sticky/fixed
+- [ ] Main navigation tabs can remain sticky (if desired)
+- [ ] Left pane ScrollArea works independently
+
+### Header Styling
+- [ ] "← Back to Marketing" button visible and functional
+- [ ] Vertical divider between back button and title
+- [ ] "Flyer Generator" title is bold/semibold
+- [ ] "Create stunning property flyers" subtitle is muted gray
+- [ ] Buttons are properly spaced
+
+### Buttons
+- [ ] "Save to My Assets" is outline style
+- [ ] "Export PNG" is Spyglass orange (#F37216)
+- [ ] "Export CMYK (Print)" is outline style
+- [ ] All buttons have min-height 44px for touch
+
+### Mobile
+- [ ] Header stacks on small screens
+- [ ] Button text abbreviates on mobile
+- [ ] No horizontal overflow
+- [ ] Touch targets are adequate
