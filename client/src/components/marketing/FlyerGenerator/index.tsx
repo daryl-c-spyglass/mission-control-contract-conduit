@@ -551,60 +551,71 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   };
 
   return (
-    <div className="h-full min-h-0 flex flex-col bg-background overflow-hidden">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-          data-testid="button-back-to-marketing"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Marketing
-        </button>
-        <div className="flex gap-2">
-          <Button
-            onClick={() => saveAssetMutation.mutate()}
-            disabled={saveAssetMutation.isPending || exportMutation.isPending}
-            variant="outline"
-            className="gap-2"
-            data-testid="button-save-to-assets"
-          >
-            {saveAssetMutation.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            Save to My Assets
-          </Button>
-          <Button
-            onClick={() => exportMutation.mutate('png')}
-            disabled={exportMutation.isPending || saveAssetMutation.isPending}
-            className="gap-2"
-            data-testid="button-export-png"
-          >
-            {exportMutation.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
+    <div className="min-h-screen bg-background">
+      {/* Header - Fixed height, sticky at top */}
+      <header className="sticky top-0 z-50 h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex h-full items-center justify-between gap-4 px-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+              data-testid="button-back-to-marketing"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Marketing
+            </button>
+            <div>
+              <h1 className="text-lg font-semibold">Flyer Generator</h1>
+              <p className="text-sm text-muted-foreground">Create stunning property flyers</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => saveAssetMutation.mutate()}
+              disabled={saveAssetMutation.isPending || exportMutation.isPending}
+              variant="outline"
+              className="gap-2"
+              data-testid="button-save-to-assets"
+            >
+              {saveAssetMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              Save to My Assets
+            </Button>
+            <Button
+              onClick={() => exportMutation.mutate('png')}
+              disabled={exportMutation.isPending || saveAssetMutation.isPending}
+              className="gap-2"
+              data-testid="button-export-png"
+            >
+              {exportMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              Export PNG
+            </Button>
+            <Button
+              onClick={() => exportMutation.mutate('cmyk')}
+              disabled={exportMutation.isPending || saveAssetMutation.isPending}
+              variant="outline"
+              className="gap-2"
+              data-testid="button-export-cmyk"
+            >
               <Download className="w-4 h-4" />
-            )}
-            Export PNG
-          </Button>
-          <Button
-            onClick={() => exportMutation.mutate('cmyk')}
-            disabled={exportMutation.isPending || saveAssetMutation.isPending}
-            variant="outline"
-            className="gap-2"
-            data-testid="button-export-cmyk"
-          >
-            <Download className="w-4 h-4" />
-            Export CMYK (Print)
-          </Button>
+              Export CMYK (Print)
+            </Button>
+          </div>
         </div>
-      </div>
+      </header>
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="w-[420px] min-w-[420px] border-r border-border bg-card flex flex-col overflow-hidden">
-          <ScrollArea className="flex-1 h-full [&>[data-radix-scroll-area-viewport]]:h-full">
+      {/* Main Content - Two Column Layout */}
+      <div className="flex flex-col lg:flex-row">
+        {/* Left Pane - Scrollable Form Panel */}
+        <div className="w-full lg:w-[420px] lg:min-w-[420px] border-r border-border bg-card">
+          <ScrollArea className="h-[calc(100vh-64px)]">
             <FlyerForm
               form={form}
               images={images}
@@ -628,8 +639,9 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
           </ScrollArea>
         </div>
 
-        <div className="flex-1 bg-muted/30 p-6 overflow-auto">
-          <div className="sticky top-0">
+        {/* Right Pane - Live Preview (Sticky) */}
+        <div className="flex-1 bg-muted/30 p-6 lg:p-8 overflow-auto">
+          <div className="sticky top-24">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-medium text-muted-foreground">Live Preview</h2>
               <div className="flex items-center gap-4">

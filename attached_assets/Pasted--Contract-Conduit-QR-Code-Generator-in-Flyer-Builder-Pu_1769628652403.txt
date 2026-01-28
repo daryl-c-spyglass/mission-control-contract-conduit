@@ -1,0 +1,316 @@
+# Contract Conduit — QR Code Generator in Flyer Builder
+
+## 📌 Purpose
+
+Add a QR code generator to the Advanced Flyer Builder that:
+1. Takes a URL input (listing page, property website, etc.)
+2. Generates a QR code on button click
+3. Displays the QR code in the Live Preview and Export
+4. When scanned, directs users to the specific listing/flyer
+
+**Note:** Remove any QR code URL from Settings — the QR code is specific to each flyer, not a global setting.
+
+---
+
+## 🔧 Implementation
+
+### Step 1: Install QR Code Package
+
+```bash
+npm install qrcode
+npm install --save-dev @types/qrcode
+```
+
+### Step 2: Add State for QR Code
+
+```typescript
+// In the main Flyer Generator component
+
+import QRCode from 'qrcode';
+
+// State
+const [qrCodeUrl, setQrCodeUrl] = useState('');
+const [generatedQR, setGeneratedQR] = useState<string | null>(null);
+const [isGeneratingQR, setIsGeneratingQR] = useState(false);
+```
+
+### Step 3: QR Code Generation Function
+
+```typescript
+// Generate QR code from URL
+const generateQRCode = async (url: string) => {
+  if (!url) {
+    setGeneratedQR(null);
+    setImages(prev => ({ ...prev, qrCode: null }));
+    return;
+  }
+  
+  // Validate URL format
+  try {
+    new URL(url); // Throws if invalid
+  } catch {
+    // If not a valid URL, try adding https://
+    if (!url.startsWith('http')) {
+      url = 'https://' + url;
+    }
+  }
+  
+  setIsGeneratingQR(true);
+  
+  try {
+    const qrDataUrl = await QRCode.toDataURL(url, {
+      width: 200,
+      margin: 1,
+      color: {
+        dark: '#000000',
+        light: '#ffffff',
+      },
+      errorCorrectionLevel: 'M',
+    });
+    
+    setGeneratedQR(qrDataUrl);
+    setImages(prev => ({ ...prev, qrCode: qrDataUrl }));
+    
+    console.log('[Flyer] QR code generated for:', url);
+  } catch (error) {
+    console.error('[Flyer] QR code generation failed:', error);
+  } finally {
+    setIsGeneratingQR(false);
+  }
+};
+
+// Remove QR code
+const removeQRCode = () => {
+  setQrCodeUrl('');
+  setGeneratedQR(null);
+  setImages(prev => ({ ...prev, qrCode: null }));
+};
+```
+
+### Step 4: Auto-Generate Default URL (Optional)
+
+```typescript
+// When transaction loads, suggest a default URL based on MLS listing
+useEffect(() => {
+  if (transaction?.mlsNumber && !qrCodeUrl) {
+    // Suggest a default listing URL format
+    // Adjust this based on your actual listing page URLs
+    const defaultUrl = `https://spyglassrealty.com/listing/${transaction.mlsNumber}`;
+    setQrCodeUrl(defaultUrl);
+    // Don't auto-generate - let user confirm/modify first
+  }
+}, [transaction]);
+```
+
+### Step 5: QR Code UI Component
+
+Add this to the **Property Images** section in the left pane:
+
+```tsx
+{/* QR Code Generator */}
+<div className="space-y-3">
+  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+    QR Code
+  </Label>
+  <p className="text-xs text-muted-foreground">
+    Enter a URL for the QR code. When scanned, it will direct users to this link.
+  </p>
+  
+  {/* URL Input + Generate Button */}
+  <div className="flex gap-2">
+    <Input
+      placeholder="https://spyglassrealty.com/listing/..."
+      value={qrCodeUrl}
+      onChange={(e) => setQrCodeUrl(e.target.value)}
+      className="flex-1 min-h-11 text-sm"
+    />
+    <Button
+      type="button"
+      variant="secondary"
+      size="icon"
+      className="min-h-11 min-w-11"
+      onClick={() => generateQRCode(qrCodeUrl)}
+      disabled={!qrCodeUrl || isGeneratingQR}
+      title="Generate QR Code"
+    >
+      {isGeneratingQR ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <QrCode className="h-4 w-4" />
+      )}
+    </Button>
+  </div>
+  
+  {/* QR Code Preview */}
+  {generatedQR && (
+    <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
+      <div className="relative">
+        <img 
+          src={generatedQR} 
+          alt="QR Code" 
+          className="w-20 h-20 rounded border bg-white"
+        />
+        <Button
+          type="button"
+          size="icon"
+          variant="destructive"
+          className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+          onClick={removeQRCode}
+          title="Remove QR Code"
+        >
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-foreground">QR Code Generated</p>
+        <p className="text-xs text-muted-foreground truncate" title={qrCodeUrl}>
+          {qrCodeUrl}
+        </p>
+      </div>
+    </div>
+  )}
+  
+  {/* Hint when no QR code */}
+  {!generatedQR && (
+    <p className="text-xs text-muted-foreground italic">
+      Enter a URL and click the QR button to generate
+    </p>
+  )}
+</div>
+```
+
+### Step 6: Required Imports
+
+```typescript
+import { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { QrCode, X, Loader2 } from 'lucide-react';
+```
+
+---
+
+## 🖼️ Display in Live Preview
+
+In the `FlyerPreview` component, display the QR code:
+
+```tsx
+{/* Agent Column with QR Code */}
+<div className="flex flex-col items-center text-center">
+  {/* Agent Photo */}
+  <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden mb-2">
+    {images.agentPhoto ? (
+      <img src={images.agentPhoto} alt={data.agentName} className="w-full h-full object-cover" />
+    ) : (
+      <div className="w-full h-full flex items-center justify-center text-gray-400 text-2xl">👤</div>
+    )}
+  </div>
+  
+  <div className="font-semibold text-gray-800">{data.agentName || 'Agent Name'}</div>
+  <div className="text-xs text-gray-600">{data.agentTitle || 'REALTOR®'}</div>
+  <div className="text-xs text-gray-600">{data.phone || '(512) 555-1234'}</div>
+  
+  {/* QR Code */}
+  {images.qrCode && (
+    <img 
+      src={images.qrCode} 
+      alt="Scan for listing" 
+      className="w-14 h-14 mt-2"
+    />
+  )}
+</div>
+```
+
+---
+
+## 📤 Include in Export
+
+Make sure the QR code is passed to the export endpoint:
+
+```typescript
+const handleExportPNG = async () => {
+  const response = await fetch('/api/flyer/export-png', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      transactionId,
+      formData: watchedValues,
+      images: {
+        ...images,
+        qrCode: generatedQR, // Include the generated QR code
+      },
+      // ... other data
+    }),
+  });
+  // ...
+};
+```
+
+In the server-side HTML template, include the QR code:
+
+```html
+<!-- In the agent section of the export template -->
+<div class="agent-qr">
+  {{#if qrCode}}
+    <img src="{{qrCode}}" alt="QR Code" style="width: 56px; height: 56px; margin-top: 8px;" />
+  {{/if}}
+</div>
+```
+
+---
+
+## 🎯 Suggested URL Formats
+
+The QR code URL could link to:
+
+| URL Type | Example | Use Case |
+|----------|---------|----------|
+| MLS Listing | `https://spyglassrealty.com/listing/ACT2572987` | Direct to your website listing |
+| Property Page | `https://spyglassrealty.com/properties/13106-new-boston` | SEO-friendly URL |
+| Virtual Tour | `https://my.matterport.com/show/?m=ABC123` | Matterport/3D tour |
+| Landing Page | `https://spyglassrealty.com/open-house/13106-new-boston` | Special event page |
+| Agent Profile | `https://spyglassrealty.com/agents/daryl` | Agent contact page |
+
+---
+
+## ❌ Remove QR from Settings
+
+If there's currently a QR code URL field in Settings, remove it:
+
+```typescript
+// In Settings auto-population useEffect, REMOVE this:
+// if (settings.qrCodeUrl) {
+//   form.setValue('qrCodeUrl', settings.qrCodeUrl);
+// }
+
+// The QR code is now specific to each flyer, not a global setting
+```
+
+---
+
+## 📱 Mobile Optimization
+
+Ensure touch targets are 44px minimum:
+
+```tsx
+<Button className="min-h-11 min-w-11">  {/* 44px */}
+<Input className="min-h-11">            {/* 44px */}
+```
+
+---
+
+## ✅ Testing Checklist
+
+- [ ] QR code URL input field exists in Property Images section
+- [ ] Enter URL → click QR button → QR code generates
+- [ ] QR code preview appears with URL truncated
+- [ ] X button removes QR code and clears input
+- [ ] QR code appears in Live Preview (agent section)
+- [ ] QR code exports correctly in PNG
+- [ ] QR code exports correctly in CMYK
+- [ ] Scan QR code with phone → opens correct URL
+- [ ] Empty URL → generate button disabled
+- [ ] Invalid URL → still generates (QR codes can encode any text)
+- [ ] Mobile: Buttons are 44px touch targets
