@@ -257,10 +257,10 @@ Best regards`
           {flyer.description && flyer.description.length > 200 && (
             <div className="mt-2">
               <Button 
-                variant="link" 
+                variant="ghost" 
                 size="sm"
                 onClick={() => setShowFullDesc(!showFullDesc)} 
-                className="text-[#8B7355]" 
+                className="text-[#8B7355] underline p-0 h-auto" 
                 data-testid="button-read-more"
               >
                 {showFullDesc ? 'Show Less' : 'Read More'}
