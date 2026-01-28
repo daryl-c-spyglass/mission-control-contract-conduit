@@ -170,6 +170,22 @@ export interface MLSListingData {
   
   // Raw API response for debugging (dev mode only)
   rawData?: any;
+  
+  // Image Insights from Repliers AI for photo classification
+  imageInsights?: {
+    images?: Array<{
+      image?: string;
+      url?: string;
+      classification?: {
+        imageOf?: string;
+        prediction?: number;
+      };
+      quality?: {
+        qualitative?: string;
+        quantitative?: number;
+      };
+    }>;
+  } | null;
 }
 
 export interface CMAComparable {
@@ -524,6 +540,9 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
       
       // Store raw API response for dev mode debugging
       rawData: listing,
+      
+      // Store imageInsights for AI photo classification in Flyer Generator
+      imageInsights: listing.imageInsights || null,
     };
 
     // Extract comparables from the listing response if available

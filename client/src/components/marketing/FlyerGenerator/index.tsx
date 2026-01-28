@@ -160,11 +160,83 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
       form.setValue('introDescription', fullDescription);
 
       // Get photos from mlsData - handle various Repliers API formats
-      const photos = mlsData.photos || mlsData.images || mlsData.Media || [];
+      const photoUrls = mlsData.photos || mlsData.images || mlsData.Media || [];
       
-      if (photos.length > 0) {
-        console.log(`[Flyer AI] Processing ${photos.length} MLS photos for AI selection...`);
-        const selected = autoSelectPhotosWithInfo(photos);
+      // Get imageInsights from mlsData (added to server response), with fallback to rawData
+      const imageInsights = mlsData.imageInsights || mlsData.rawData?.imageInsights;
+      
+      if (photoUrls.length > 0) {
+        console.log(`[Flyer AI] Processing ${photoUrls.length} MLS photos for AI selection...`);
+        
+        // Helper function to extract canonical image identifier from URL
+        const extractImageId = (url: string): string => {
+          if (!url) return '';
+          // Remove query params and hash
+          let cleanUrl = url.split('?')[0].split('#')[0];
+          // Remove CDN base URL variations
+          cleanUrl = cleanUrl.replace(/^https?:\/\/cdn\.repliers\.io\/?/i, '');
+          cleanUrl = cleanUrl.replace(/^https?:\/\/[^/]+\/?/i, '');
+          // Remove leading slashes and common prefixes
+          cleanUrl = cleanUrl.replace(/^\/+/, '').replace(/^area\//i, '');
+          // Get filename or use full path
+          const filename = cleanUrl.split('/').pop() || cleanUrl;
+          return filename.toLowerCase();
+        };
+        
+        // Merge photo URLs with imageInsights data if available
+        let photosWithInsights = photoUrls;
+        if (imageInsights?.images && Array.isArray(imageInsights.images)) {
+          console.log(`[Flyer AI] Found ${imageInsights.images.length} photos with AI classification data`);
+          
+          // Build maps from multiple possible identifiers to insights
+          const insightByFilename = new Map<string, typeof imageInsights.images[0]>();
+          const insightByFullPath = new Map<string, typeof imageInsights.images[0]>();
+          const insightByIndex = new Map<number, typeof imageInsights.images[0]>();
+          
+          imageInsights.images.forEach((insight: typeof imageInsights.images[0], index: number) => {
+            const imgUrl = insight.image || insight.url || '';
+            const imgId = extractImageId(imgUrl);
+            if (imgId) {
+              insightByFilename.set(imgId, insight);
+            }
+            // Also store by full normalized path for fallback
+            const normalizedPath = imgUrl.replace(/^https?:\/\/[^/]+\/?/i, '').toLowerCase();
+            if (normalizedPath) {
+              insightByFullPath.set(normalizedPath, insight);
+            }
+            // Store by index as last resort
+            insightByIndex.set(index, insight);
+          });
+          
+          let matchedCount = 0;
+          
+          // Map photo URLs to objects with embedded insights
+          photosWithInsights = photoUrls.map((url: string, index: number) => {
+            const urlId = extractImageId(url);
+            const normalizedUrl = url.replace(/^https?:\/\/[^/]+\/?/i, '').toLowerCase();
+            
+            // Try multiple matching strategies
+            let insight = insightByFilename.get(urlId) || 
+                          insightByFullPath.get(normalizedUrl) ||
+                          insightByIndex.get(index); // Fall back to index-based match
+            
+            if (insight) {
+              matchedCount++;
+              return {
+                url,
+                imageInsights: {
+                  classification: insight.classification,
+                  quality: insight.quality,
+                },
+              };
+            }
+            return url; // Return as plain string if no matching insight
+          });
+          
+          console.log(`[Flyer AI] Matched ${matchedCount}/${photoUrls.length} photos with AI insights`);
+        }
+        
+        const selected = autoSelectPhotosWithInfo(photosWithInsights);
         setImages(prev => ({
           ...prev,
           mainImage: selected.mainPhoto,
