@@ -395,8 +395,9 @@ export function CMATab({ transaction }: CMATabProps) {
   }, [presentationComparables]);
 
   // Calculate average price per acre from sold comparables with lot data
+  // Only include properties with lots >= 0.25 acres where price/acre is meaningful
   const avgPricePerAcre = useMemo(() => {
-    const MIN_LOT_SIZE_ACRES = 0.05; // Exclude small lots (condos, etc.)
+    const MIN_LOT_SIZE_ACRES = 0.25; // Exclude small residential lots where $/acre isn't meaningful
     const soldWithAcres = presentationComparables.filter(c => 
       c.status === 'Closed' && 
       c.lotSizeAcres && c.lotSizeAcres >= MIN_LOT_SIZE_ACRES &&

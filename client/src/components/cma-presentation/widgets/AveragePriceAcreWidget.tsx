@@ -252,7 +252,7 @@ export function AveragePriceAcreWidget({
       .filter(p => {
         if (p.type === 'Lease') return false;
         const acres = getAcres(p);
-        // Exclude properties with lots < 0.05 acres (condos, tiny lots)
+        // Exclude small residential lots where $/acre isn't meaningful
         if (acres < MIN_LOT_SIZE_ACRES) return false;
         return acres > 0;
       })
