@@ -5396,7 +5396,8 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
   app.post("/api/flyers", isAuthenticated, async (req, res) => {
     try {
       const user = (req as any).user;
-      if (!user?.id) {
+      const userId = user?.id || user?.claims?.sub;
+      if (!userId) {
         return res.status(401).json({ error: "User not authenticated" });
       }
 
@@ -5406,7 +5407,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       // Build flyer data with required fields
       const flyerPayload = {
         id: flyerId,
-        userId: user.id,
+        userId: userId,
         propertyAddress: req.body.propertyAddress || '',
         propertyCity: req.body.propertyCity,
         propertyState: req.body.propertyState,
@@ -5453,7 +5454,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       const flyerUrl = `${baseUrl}/flyer/${flyer.id}`;
       const qrCode = await generateFlyerQRCode(flyerUrl);
 
-      console.log(`[Flyer] Created flyer ${flyer.id} for user ${user.id}`);
+      console.log(`[Flyer] Created flyer ${flyer.id} for user ${userId}`);
 
       res.json({
         success: true,
@@ -5472,11 +5473,12 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
   app.get("/api/flyers", isAuthenticated, async (req, res) => {
     try {
       const user = (req as any).user;
-      if (!user?.id) {
+      const userId = user?.id || user?.claims?.sub;
+      if (!userId) {
         return res.status(401).json({ error: "User not authenticated" });
       }
 
-      const userFlyers = await storage.getFlyersByUser(user.id);
+      const userFlyers = await storage.getFlyersByUser(userId);
       res.json(userFlyers);
     } catch (error: any) {
       console.error("[Flyer] Get user flyers error:", error);

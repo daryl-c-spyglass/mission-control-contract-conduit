@@ -489,26 +489,26 @@ export function FlyerForm({
             onChange={onImageUpload('agentPhoto')}
             circular
           />
-          <div className="space-y-3">
+          <div className="space-y-2 p-3 bg-muted/50 rounded-lg border border-border/50">
             <Label className="text-xs font-medium uppercase tracking-wide">
               Shareable Flyer Link
             </Label>
-            <p className="text-xs text-muted-foreground">
-              Generate a shareable link for this flyer. When scanned, the QR code will open a mobile-friendly property page.
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Generate a shareable link for this flyer. The QR code will open a mobile-friendly property page.
             </p>
             {images.qrCode && localQrUrl ? (
-              <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                <div className="relative">
+              <div className="flex items-start gap-3 p-2 bg-background rounded-lg border">
+                <div className="relative flex-shrink-0">
                   <img 
                     src={images.qrCode} 
                     alt="QR Code" 
-                    className="w-20 h-20 rounded border bg-white"
+                    className="w-16 h-16 rounded border bg-white"
                   />
                   <Button
                     type="button"
                     size="icon"
                     variant="destructive"
-                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                    className="absolute -top-2 -right-2 h-5 w-5 rounded-full"
                     onClick={handleClearQR}
                     title="Remove QR Code"
                     data-testid="button-clear-qr"
@@ -516,8 +516,8 @@ export function FlyerForm({
                     <X className="h-3 w-3" />
                   </Button>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-foreground">Shareable Link Ready</p>
+                <div className="flex-1 min-w-0 py-1">
+                  <p className="text-xs font-medium text-foreground">Link Ready</p>
                   <p className="text-xs text-muted-foreground truncate" title={localQrUrl}>
                     {localQrUrl}
                   </p>
@@ -529,7 +529,7 @@ export function FlyerForm({
                 variant="secondary"
                 onClick={onGenerateShareableLink}
                 disabled={isGeneratingShareableLink}
-                className="w-full"
+                className="w-full mt-1"
                 data-testid="button-generate-shareable-link"
               >
                 {isGeneratingShareableLink ? (
