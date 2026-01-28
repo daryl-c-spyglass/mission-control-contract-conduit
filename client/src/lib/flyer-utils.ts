@@ -53,6 +53,8 @@ export interface PhotoSelectionInfo {
   reason: string;
   isAISelected: boolean;        // Whether AI classification was used
   isMissing?: boolean;          // Whether this category had no matching photo
+  categoryMismatch?: boolean;   // Whether the photo doesn't match expected category
+  expectedCategory?: string;    // The expected category for this slot
 }
 
 export interface PhotoSelectionResult {
@@ -107,6 +109,56 @@ const ROOM_CLASSIFICATIONS = [
 ];
 
 const CDN_BASE = 'https://cdn.repliers.io/';
+
+// Export category classifications for external use
+export const KITCHEN_MATCH_CLASSIFICATIONS = [
+  'kitchen',
+  'breakfast area',
+  'breakfast',
+  'breakfast room'
+];
+
+export const ROOM_MATCH_CLASSIFICATIONS = [
+  'living room',
+  'family room',
+  'great room',
+  'dining room',
+  'bedroom',
+  'primary bedroom',
+  'master bedroom',
+  'living',
+  'family',
+  'dining',
+  'interior'
+];
+
+// Check if a classification matches expected category
+export function doesClassificationMatchCategory(
+  classification: string,
+  expectedCategory: 'Kitchen' | 'Living Room' | 'Exterior'
+): boolean {
+  const normalizedClassification = classification.toLowerCase().trim();
+  
+  if (expectedCategory === 'Kitchen') {
+    return KITCHEN_MATCH_CLASSIFICATIONS.some(cat => 
+      normalizedClassification.includes(cat.toLowerCase())
+    );
+  }
+  
+  if (expectedCategory === 'Living Room') {
+    return ROOM_MATCH_CLASSIFICATIONS.some(cat => 
+      normalizedClassification.includes(cat.toLowerCase())
+    );
+  }
+  
+  if (expectedCategory === 'Exterior') {
+    return EXTERIOR_CLASSIFICATIONS.some(cat => 
+      normalizedClassification.includes(cat.toLowerCase())
+    );
+  }
+  
+  return false;
+}
 
 export function autoSelectPhotos(photos: PhotoWithInsights[]): SelectedPhotos {
   const result = autoSelectPhotosWithInfo(photos);
@@ -306,19 +358,33 @@ export function autoSelectPhotosWithInfo(photos: (PhotoWithInsights | string)[])
   ): PhotoSelectionInfo | null => {
     if (!photo) return null;
 
+    // Map type to expected category
+    const expectedCategoryMap: Record<string, 'Kitchen' | 'Living Room' | 'Exterior'> = {
+      'main': 'Exterior',
+      'kitchen': 'Kitchen',
+      'room': 'Living Room',
+    };
+    const expectedCategory = expectedCategoryMap[type];
+    
+    // Check if photo matches expected category
+    const matchesCategory = doesClassificationMatchCategory(photo.classification, expectedCategory);
+    
+    // Consider it a mismatch if classification doesn't match OR confidence is low
+    const categoryMismatch = !matchesCategory || photo.confidence < 50;
+
     let reason = '';
     if (type === 'main') {
       reason = isAISelected 
         ? `AI detected: ${photo.displayClassification}` 
         : `Highest quality image (${photo.quality}%)`;
     } else if (type === 'kitchen') {
-      reason = isAISelected 
+      reason = matchesCategory
         ? `AI detected: ${photo.displayClassification}`
-        : `Selected by quality (${photo.quality}%)`;
+        : `Selected from available photos (not a kitchen photo)`;
     } else {
-      reason = isAISelected 
+      reason = matchesCategory 
         ? `AI detected: ${photo.displayClassification}`
-        : `Selected by quality (${photo.quality}%)`;
+        : `Selected from available photos (not a room photo)`;
     }
 
     return {
@@ -327,7 +393,9 @@ export function autoSelectPhotosWithInfo(photos: (PhotoWithInsights | string)[])
       confidence: photo.confidence,
       quality: photo.quality,
       reason,
-      isAISelected,
+      isAISelected: isAISelected && matchesCategory,
+      categoryMismatch,
+      expectedCategory,
     };
   };
 

@@ -12,7 +12,7 @@ import { FlyerForm } from './FlyerForm';
 import { FlyerPreview } from './FlyerPreview';
 import { GridOverlay } from './GridOverlay';
 import { useMarketingProfile } from '@/hooks/useMarketingProfile';
-import { autoSelectPhotosWithInfo, formatPrice, formatAddress, formatNumber, generateDefaultHeadline, type PhotoSelectionInfo } from '@/lib/flyer-utils';
+import { autoSelectPhotosWithInfo, formatPrice, formatAddress, formatNumber, generateDefaultHeadline, doesClassificationMatchCategory, type PhotoSelectionInfo } from '@/lib/flyer-utils';
 import { extractSqft, extractBeds, extractBaths } from '@/lib/cma-data-utils';
 import type { FlyerData, FlyerImages, ImageTransforms } from '@/lib/flyer-types';
 import { DEFAULT_TRANSFORMS } from '@/lib/flyer-types';
@@ -291,22 +291,39 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
       }));
       
       // Update selection info with coverImage API data
-      const buildSelectionInfo = (photo: typeof mainPhoto, type: string): PhotoSelectionInfo | null => {
+      const buildSelectionInfo = (
+        photo: typeof mainPhoto, 
+        expectedCategory: 'Kitchen' | 'Living Room' | 'Exterior'
+      ): PhotoSelectionInfo | null => {
         if (!photo) return null;
+        
+        // Check if the photo's classification matches the expected category
+        const matchesCategory = doesClassificationMatchCategory(photo.classification, expectedCategory);
+        
+        // Consider it a mismatch if:
+        // 1. Classification doesn't match expected category, OR
+        // 2. Low confidence score (below 50%)
+        // This applies regardless of selection method
+        const isCategoryMismatch = !matchesCategory || photo.confidence < 50;
+        
         return {
           classification: photo.classification.toLowerCase(),
           displayClassification: photo.classification,
           confidence: photo.confidence,
           quality: photo.quality,
-          reason: `AI detected: ${photo.classification}`,
-          isAISelected: photo.confidence >= 70,
+          reason: matchesCategory 
+            ? `AI detected: ${photo.classification}` 
+            : `Selected from available photos (not a ${expectedCategory.toLowerCase()} photo)`,
+          isAISelected: photo.confidence >= 70 && matchesCategory,
+          categoryMismatch: isCategoryMismatch,
+          expectedCategory,
         };
       };
       
       setPhotoSelectionInfo({
-        mainImage: buildSelectionInfo(mainPhoto, 'main'),
-        kitchenImage: buildSelectionInfo(kitchenPhoto, 'kitchen'),
-        roomImage: buildSelectionInfo(roomPhoto, 'room'),
+        mainImage: buildSelectionInfo(mainPhoto, 'Exterior'),
+        kitchenImage: buildSelectionInfo(kitchenPhoto, 'Kitchen'),
+        roomImage: buildSelectionInfo(roomPhoto, 'Living Room'),
       });
       
       // Track missing categories

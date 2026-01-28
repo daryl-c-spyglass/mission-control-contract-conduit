@@ -74,6 +74,9 @@ export function ImageUploadField({
   // Check if category is missing (AI couldn't find a matching photo)
   // Don't show warning if AI successfully selected a photo for this slot
   const showMissingWarning = isMissing && !aiSelectionInfo?.isAISelected;
+  
+  // Check if AI selected a photo that doesn't match expected category
+  const showCategoryMismatchWarning = aiSelectionInfo?.categoryMismatch === true;
 
   return (
     <div className="space-y-2">
@@ -81,7 +84,7 @@ export function ImageUploadField({
         <Label className="text-xs font-medium uppercase tracking-wide">
           {label}
         </Label>
-        {aiSelectionInfo?.isAISelected && (
+        {aiSelectionInfo?.isAISelected && !showCategoryMismatchWarning && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Badge
@@ -100,6 +103,28 @@ export function ImageUploadField({
                   Type: {aiSelectionInfo.displayClassification || aiSelectionInfo.classification} | 
                   Confidence: {aiSelectionInfo.confidence}% | 
                   Quality: {aiSelectionInfo.quality}%
+                </p>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        )}
+        {showCategoryMismatchWarning && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge
+                variant="outline"
+                className="text-[10px] gap-1 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/30 cursor-help"
+                data-testid={`category-mismatch-${id}`}
+              >
+                <AlertCircle className="w-3 h-3" />
+                Not a {expectedCategory?.toLowerCase()} photo
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs" data-testid={`category-mismatch-tooltip-${id}`}>
+              <div className="space-y-1.5 text-xs">
+                <p className="font-medium">This doesn't appear to be a {expectedCategory?.toLowerCase()} photo</p>
+                <p className="text-muted-foreground">
+                  Please select a better photo from the MLS gallery below, or upload your own.
                 </p>
               </div>
             </TooltipContent>
@@ -267,6 +292,19 @@ export function ImageUploadField({
             <RotateCcw className="w-3 h-3" />
             Reset
           </Button>
+        </div>
+      )}
+
+      {/* Category mismatch warning message */}
+      {showCategoryMismatchWarning && (
+        <div className="flex items-start gap-2 p-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-xs">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <p className="font-medium">This doesn't look like a {expectedCategory?.toLowerCase()} photo</p>
+            <p className="text-amber-600 dark:text-amber-400">
+              Select a better photo from MLS gallery or upload your own below.
+            </p>
+          </div>
         </div>
       )}
 
