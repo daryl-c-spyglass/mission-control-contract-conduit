@@ -1,0 +1,112 @@
+# Fix: Flyer Preview Should Match PDF Export
+
+## Problem
+
+In the Advanced Flyer Builder **Live Preview**, the beds/baths display is broken:
+- Shows: `3` (line break) `Bedrooms`
+- Should show: `3 Bedrooms` (on same line, like the PDF)
+
+The **exported PNG/PDF is correct** — the preview just needs to match it.
+
+---
+
+## Reference Screenshots
+
+| Image | Description | Status |
+|-------|-------------|--------|
+| **Image 1** | Exported PNG from Flyer Maker | ✅ PERFECT - Don't change |
+| **Image 2** | Live Preview in builder | ❌ Text wrapping issue |
+
+---
+
+## Issue Details
+
+**In Preview (broken):**
+```
+3
+Bedrooms
+
+4
+Bathrooms
+```
+
+**In PDF Export (correct):**
+```
+3 Bedrooms    4 Bathrooms
+```
+
+---
+
+## Fix
+
+The preview component has different CSS/layout than the PDF export. Update the preview to match:
+
+### Find the Preview Component
+
+```bash
+grep -r "Bedrooms" client/src/components/flyer/
+grep -r "beds\|baths" client/src/components/flyer/
+```
+
+### Current (Broken) - Likely Issue
+
+```tsx
+// Preview might have:
+<div className="flex flex-col">
+  <span className="text-2xl font-bold">{beds}</span>
+  <span className="text-sm">Bedrooms</span>
+</div>
+```
+
+### Fixed - Match PDF Layout
+
+```tsx
+// Should be inline like PDF:
+<div className="flex items-baseline gap-1">
+  <span className="text-2xl font-bold">{beds}</span>
+  <span className="text-sm">Bedrooms</span>
+</div>
+
+// OR single line:
+<span className="text-lg">
+  <span className="font-bold">{beds}</span> Bedrooms
+</span>
+```
+
+### Alternative: Use Same Component for Both
+
+If using different components for preview vs export, consider using the **same component** for both to ensure consistency:
+
+```tsx
+// Shared FlyerCard component used by both preview and export
+export function FlyerPropertyStats({ beds, baths, sqft }: Props) {
+  return (
+    <div className="flex gap-6">
+      <span className="text-lg">
+        <strong>{beds}</strong> Bedrooms
+      </span>
+      <span className="text-lg">
+        <strong>{baths}</strong> Bathrooms
+      </span>
+      <span className="text-lg">
+        <strong>{sqft?.toLocaleString()}</strong> Sq Ft
+      </span>
+    </div>
+  );
+}
+```
+
+---
+
+## Verification
+
+1. Open Advanced Flyer Builder
+2. Check Live Preview shows: `3 Bedrooms` (same line)
+3. Export PNG/PDF
+4. Confirm both preview and export match exactly
+
+---
+
+## Note
+
+**DO NOT modify the PDF export** — it's already correct. Only fix the Live Preview to match the export.

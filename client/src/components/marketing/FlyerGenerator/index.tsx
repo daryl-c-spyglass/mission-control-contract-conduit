@@ -79,7 +79,17 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   });
 
   // All available MLS photos for gallery selection
-  const [allMlsPhotos, setAllMlsPhotos] = useState<Array<{ url: string; classification: string; quality: number }>>([]);
+  const [allMlsPhotos, setAllMlsPhotos] = useState<Array<{ 
+    url: string; 
+    classification: string;
+    displayClassification?: string;
+    confidence?: number;
+    quality: number;
+    index?: number;
+  }>>([]);
+
+  // Missing photo categories from AI selection
+  const [missingCategories, setMissingCategories] = useState<string[]>([]);
 
   // Description management for AI summarize
   const [originalDescription, setOriginalDescription] = useState<string>('');
@@ -153,6 +163,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
       const photos = mlsData.photos || mlsData.images || mlsData.Media || [];
       
       if (photos.length > 0) {
+        console.log(`[Flyer AI] Processing ${photos.length} MLS photos for AI selection...`);
         const selected = autoSelectPhotosWithInfo(photos);
         setImages(prev => ({
           ...prev,
@@ -162,6 +173,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
         }));
         setPhotoSelectionInfo(selected.selectionInfo);
         setAllMlsPhotos(selected.allPhotos);
+        setMissingCategories(selected.missingCategories || []);
       }
     }
   }, [transaction, form]);
@@ -378,6 +390,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
               hasUsedAISummarize={hasUsedAISummarize}
               onSummarized={handleSummarized}
               onRevertDescription={handleRevertDescription}
+              missingCategories={missingCategories}
             />
           </ScrollArea>
         </div>

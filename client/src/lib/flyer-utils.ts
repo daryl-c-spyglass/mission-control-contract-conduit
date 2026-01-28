@@ -1,31 +1,39 @@
+// Repliers API Photo Interface with imageInsights
 interface PhotoWithInsights {
   url?: string;
   href?: string;
   highResUrl?: string;
   largeUrl?: string;
   Uri?: string;
+  // Repliers API imageInsights format
   imageInsights?: {
     room?: string;
     description?: string;
     tags?: string[];
     isExterior?: boolean;
     classification?: {
-      imageOf?: string;
-      confidence?: number;
+      imageOf?: string;       // "Kitchen", "Living Room", "Front of Structure", etc.
+      prediction?: number;    // Confidence 0.0 - 1.0 (e.g., 0.987 = 98.7%)
     };
     quality?: {
-      score?: number;
+      qualitative?: string;   // "average", "above average", "excellent"
+      quantitative?: number;  // Quality score 1.0 - 5.0
+      score?: number;         // Legacy field
       brightness?: number;
       contrast?: number;
       sharpness?: number;
     };
   };
+  // Alternate casing for some APIs
   ImageInsights?: {
     Classification?: {
       ImageOf?: string;
+      Prediction?: number;
       Confidence?: number;
     };
     Quality?: {
+      Qualitative?: string;
+      Quantitative?: number;
       Score?: number;
     };
   };
@@ -39,8 +47,12 @@ interface SelectedPhotos {
 
 export interface PhotoSelectionInfo {
   classification: string;
-  quality: number;
+  displayClassification: string; // Original casing for display
+  confidence: number;           // 0-100 percentage
+  quality: number;              // 0-100 percentage
   reason: string;
+  isAISelected: boolean;        // Whether AI classification was used
+  isMissing?: boolean;          // Whether this category had no matching photo
 }
 
 export interface PhotoSelectionResult {
@@ -52,8 +64,49 @@ export interface PhotoSelectionResult {
     kitchenImage: PhotoSelectionInfo | null;
     roomImage: PhotoSelectionInfo | null;
   };
-  allPhotos: Array<{ url: string; classification: string; quality: number }>;
+  allPhotos: Array<{ 
+    url: string; 
+    classification: string;
+    displayClassification: string;
+    confidence: number;
+    quality: number;
+    index: number;
+  }>;
+  missingCategories: string[];
 }
+
+// Repliers classification values to match
+const EXTERIOR_CLASSIFICATIONS = [
+  'front of structure',
+  'exterior',
+  'back of structure',
+  'aerial',
+  'drone',
+  'front',
+  'exterior_front'
+];
+
+const KITCHEN_CLASSIFICATIONS = [
+  'kitchen',
+  'breakfast area',
+  'breakfast',
+  'breakfast room'
+];
+
+const ROOM_CLASSIFICATIONS = [
+  'living room',
+  'family room',
+  'great room',
+  'dining room',
+  'bedroom',
+  'primary bedroom',
+  'master bedroom',
+  'living',
+  'family',
+  'dining'
+];
+
+const CDN_BASE = 'https://cdn.repliers.io/';
 
 export function autoSelectPhotos(photos: PhotoWithInsights[]): SelectedPhotos {
   const result = autoSelectPhotosWithInfo(photos);
@@ -72,99 +125,210 @@ export function autoSelectPhotosWithInfo(photos: (PhotoWithInsights | string)[])
       roomPhoto: null,
       selectionInfo: { mainImage: null, kitchenImage: null, roomImage: null },
       allPhotos: [],
+      missingCategories: ['Exterior', 'Kitchen', 'Living Room'],
     };
   }
 
   const getPhotoUrl = (photo: PhotoWithInsights | string): string => {
-    // Handle string URLs directly (common format from Repliers API)
     if (typeof photo === 'string') {
+      // Handle relative paths from Repliers
+      if (photo && !photo.startsWith('http')) {
+        return `${CDN_BASE}${photo}`;
+      }
       return photo;
     }
-    return photo.href || photo.highResUrl || photo.largeUrl || photo.url || photo.Uri || '';
+    let url = photo.href || photo.highResUrl || photo.largeUrl || photo.url || photo.Uri || '';
+    // Handle relative paths
+    if (url && !url.startsWith('http')) {
+      url = `${CDN_BASE}${url}`;
+    }
+    return url;
   };
 
-  const getClassification = (photo: PhotoWithInsights | string): string => {
-    // String photos don't have classification metadata
+  const getClassification = (photo: PhotoWithInsights | string): { raw: string; display: string } => {
     if (typeof photo === 'string') {
-      return 'unknown';
+      return { raw: 'unknown', display: 'Unknown' };
     }
-    return (
+    
+    const classification = 
       photo.imageInsights?.classification?.imageOf ||
       photo.ImageInsights?.Classification?.ImageOf ||
       photo.imageInsights?.room ||
-      'unknown'
-    ).toLowerCase();
+      '';
+    
+    return {
+      raw: classification.toLowerCase(),
+      display: classification || 'Unknown'
+    };
+  };
+
+  const getConfidence = (photo: PhotoWithInsights | string): number => {
+    if (typeof photo === 'string') {
+      return 0;
+    }
+    
+    // Repliers uses 'prediction' field with 0.0-1.0 scale
+    const prediction = 
+      photo.imageInsights?.classification?.prediction ||
+      photo.ImageInsights?.Classification?.Prediction ||
+      photo.ImageInsights?.Classification?.Confidence ||
+      0;
+    
+    // Convert to 0-100 scale
+    return Math.round(prediction * 100);
   };
 
   const getQualityScore = (photo: PhotoWithInsights | string): number => {
-    // String photos don't have quality metadata - use default
     if (typeof photo === 'string') {
       return 50;
     }
-    return (
+    
+    // Repliers uses 'quantitative' field with 1.0-5.0 scale
+    const quantitative = 
+      photo.imageInsights?.quality?.quantitative ||
+      photo.ImageInsights?.Quality?.Quantitative ||
       photo.imageInsights?.quality?.score ||
       photo.ImageInsights?.Quality?.Score ||
-      50
-    );
+      null;
+    
+    if (quantitative !== null) {
+      // Convert 1.0-5.0 scale to 0-100 percentage
+      return Math.round(((quantitative - 1) / 4) * 100);
+    }
+    
+    return 50; // Default quality
   };
 
-  // Normalize photos with classification and quality
-  const normalizedPhotos = photos.map((photo, index) => ({
-    url: getPhotoUrl(photo),
-    classification: getClassification(photo),
-    quality: getQualityScore(photo),
-    index,
-  })).filter(p => p.url);
+  // Normalize all photos with classification, confidence, and quality
+  const normalizedPhotos = photos.map((photo, index) => {
+    const classInfo = getClassification(photo);
+    return {
+      url: getPhotoUrl(photo),
+      classification: classInfo.raw,
+      displayClassification: classInfo.display,
+      confidence: getConfidence(photo),
+      quality: getQualityScore(photo),
+      index,
+    };
+  }).filter(p => p.url);
 
   // Sort by quality (highest first)
   const sortedByQuality = [...normalizedPhotos].sort((a, b) => b.quality - a.quality);
 
-  // Main photo priorities: exterior_front > aerial > exterior_* > highest quality
-  const mainOptions = ['exterior_front', 'exterior', 'front', 'aerial', 'drone'];
+  const missingCategories: string[] = [];
+
+  // ========== MAIN PHOTO ==========
+  // Priority: Front of Structure > Exterior > Aerial > Highest Quality
+  // Only use AI-classified photos with >= 70% confidence for "AI Selected" status
   let mainPhotoData = sortedByQuality.find(p =>
-    mainOptions.some(opt => p.classification.includes(opt))
+    EXTERIOR_CLASSIFICATIONS.some(type => p.classification.includes(type)) &&
+    p.confidence >= 70
   );
+  
+  let mainPhotoIsAISelected = !!mainPhotoData;
+  
+  // Fallback: Any exterior photo regardless of confidence (mark as not AI-selected)
+  if (!mainPhotoData) {
+    const lowConfidenceExterior = sortedByQuality.find(p =>
+      EXTERIOR_CLASSIFICATIONS.some(type => p.classification.includes(type))
+    );
+    
+    if (lowConfidenceExterior) {
+      mainPhotoData = lowConfidenceExterior;
+      mainPhotoIsAISelected = false;
+      // Low-confidence exterior still counts as missing the proper exterior category
+      missingCategories.push('Exterior');
+      console.log(`[Flyer AI] Main Photo: Using low-confidence exterior "${mainPhotoData.displayClassification}" (${mainPhotoData.confidence}% < 70% threshold)`);
+    }
+  }
+  
+  // Final fallback: Highest quality photo (no exterior found at all)
   if (!mainPhotoData) {
     mainPhotoData = sortedByQuality[0];
+    mainPhotoIsAISelected = false;
+    missingCategories.push('Exterior');
+    console.log('[Flyer AI] Main Photo: No exterior found, using highest quality photo');
+  } else if (mainPhotoIsAISelected) {
+    console.log(`[Flyer AI] Main Photo: Selected "${mainPhotoData.displayClassification}" (${mainPhotoData.confidence}% confidence)`);
   }
 
-  // Kitchen photo: kitchen > breakfast_area
-  const kitchenOptions = ['kitchen', 'breakfast'];
-  let kitchenPhotoData = sortedByQuality.find(p =>
-    kitchenOptions.some(opt => p.classification.includes(opt)) &&
-    p.url !== mainPhotoData?.url
-  );
-  if (!kitchenPhotoData && sortedByQuality.length > 1) {
-    kitchenPhotoData = sortedByQuality.find(p => p.url !== mainPhotoData?.url);
+  // ========== KITCHEN PHOTO ==========
+  const kitchenPhotos = normalizedPhotos
+    .filter(p =>
+      KITCHEN_CLASSIFICATIONS.some(type => p.classification.includes(type)) &&
+      p.url !== mainPhotoData?.url
+    )
+    .sort((a, b) => b.confidence - a.confidence);
+
+  let kitchenPhotoData = kitchenPhotos[0] || null;
+  let kitchenPhotoIsAISelected = !!kitchenPhotoData && kitchenPhotoData.confidence > 0;
+
+  if (!kitchenPhotoData) {
+    missingCategories.push('Kitchen');
+    console.log('[Flyer AI] Kitchen Photo: No kitchen photo found in MLS images');
+  } else if (kitchenPhotoIsAISelected) {
+    console.log(`[Flyer AI] Kitchen Photo: Selected "${kitchenPhotoData.displayClassification}" (${kitchenPhotoData.confidence}% confidence)`);
   }
 
-  // Room photo: living_room > family_room > master_bedroom > bedroom
-  const roomOptions = ['living', 'family', 'bedroom', 'master', 'dining', 'great_room'];
+  // ========== ROOM PHOTO ==========
   const usedUrls = [mainPhotoData?.url, kitchenPhotoData?.url].filter(Boolean);
-  let roomPhotoData = sortedByQuality.find(p =>
-    roomOptions.some(opt => p.classification.includes(opt)) &&
-    !usedUrls.includes(p.url)
-  );
+  
+  const roomPhotos = normalizedPhotos
+    .filter(p =>
+      ROOM_CLASSIFICATIONS.some(type => p.classification.includes(type)) &&
+      !usedUrls.includes(p.url)
+    )
+    .sort((a, b) => {
+      // Sort by room type priority first, then confidence
+      const aPriority = ROOM_CLASSIFICATIONS.findIndex(t => a.classification.includes(t));
+      const bPriority = ROOM_CLASSIFICATIONS.findIndex(t => b.classification.includes(t));
+      if (aPriority !== -1 && bPriority !== -1 && aPriority !== bPriority) {
+        return aPriority - bPriority;
+      }
+      return b.confidence - a.confidence;
+    });
+
+  let roomPhotoData = roomPhotos[0] || null;
+  let roomPhotoIsAISelected = !!roomPhotoData && roomPhotoData.confidence > 0;
+
   if (!roomPhotoData) {
-    roomPhotoData = sortedByQuality.find(p => !usedUrls.includes(p.url));
+    missingCategories.push('Living Room');
+    console.log('[Flyer AI] Room Photo: No living/family/dining room photo found in MLS images');
+  } else if (roomPhotoIsAISelected) {
+    console.log(`[Flyer AI] Room Photo: Selected "${roomPhotoData.displayClassification}" (${roomPhotoData.confidence}% confidence)`);
   }
 
-  // Build selection info for tooltips
-  const buildReason = (photo: typeof normalizedPhotos[0] | undefined, type: 'main' | 'kitchen' | 'room'): string => {
-    if (!photo) return '';
+  // Build selection info with confidence and AI selection status
+  const buildSelectionInfo = (
+    photo: typeof normalizedPhotos[0] | null,
+    type: 'main' | 'kitchen' | 'room',
+    isAISelected: boolean
+  ): PhotoSelectionInfo | null => {
+    if (!photo) return null;
+
+    let reason = '';
     if (type === 'main') {
-      return mainOptions.some(opt => photo.classification.includes(opt))
-        ? `Best exterior shot (${photo.classification})`
+      reason = isAISelected 
+        ? `AI detected: ${photo.displayClassification}` 
         : `Highest quality image (${photo.quality}%)`;
+    } else if (type === 'kitchen') {
+      reason = isAISelected 
+        ? `AI detected: ${photo.displayClassification}`
+        : `Selected by quality (${photo.quality}%)`;
+    } else {
+      reason = isAISelected 
+        ? `AI detected: ${photo.displayClassification}`
+        : `Selected by quality (${photo.quality}%)`;
     }
-    if (type === 'kitchen') {
-      return kitchenOptions.some(opt => photo.classification.includes(opt))
-        ? `Kitchen area detected (${photo.quality}%)`
-        : `Second best quality (${photo.quality}%)`;
-    }
-    return roomOptions.some(opt => photo.classification.includes(opt))
-      ? `Living area detected (${photo.classification})`
-      : `High quality interior (${photo.quality}%)`;
+
+    return {
+      classification: photo.classification,
+      displayClassification: photo.displayClassification,
+      confidence: photo.confidence,
+      quality: photo.quality,
+      reason,
+      isAISelected,
+    };
   };
 
   return {
@@ -172,23 +336,12 @@ export function autoSelectPhotosWithInfo(photos: (PhotoWithInsights | string)[])
     kitchenPhoto: kitchenPhotoData?.url || null,
     roomPhoto: roomPhotoData?.url || null,
     selectionInfo: {
-      mainImage: mainPhotoData ? {
-        classification: mainPhotoData.classification,
-        quality: mainPhotoData.quality,
-        reason: buildReason(mainPhotoData, 'main'),
-      } : null,
-      kitchenImage: kitchenPhotoData ? {
-        classification: kitchenPhotoData.classification,
-        quality: kitchenPhotoData.quality,
-        reason: buildReason(kitchenPhotoData, 'kitchen'),
-      } : null,
-      roomImage: roomPhotoData ? {
-        classification: roomPhotoData.classification,
-        quality: roomPhotoData.quality,
-        reason: buildReason(roomPhotoData, 'room'),
-      } : null,
+      mainImage: buildSelectionInfo(mainPhotoData, 'main', mainPhotoIsAISelected),
+      kitchenImage: buildSelectionInfo(kitchenPhotoData, 'kitchen', kitchenPhotoIsAISelected),
+      roomImage: buildSelectionInfo(roomPhotoData, 'room', roomPhotoIsAISelected),
     },
     allPhotos: normalizedPhotos,
+    missingCategories,
   };
 }
 

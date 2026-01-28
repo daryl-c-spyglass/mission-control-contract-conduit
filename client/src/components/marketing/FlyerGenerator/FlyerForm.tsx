@@ -27,13 +27,20 @@ interface FlyerFormProps {
     kitchenImage: PhotoSelectionInfo | null;
     roomImage: PhotoSelectionInfo | null;
   };
-  allMlsPhotos?: Array<{ url: string; classification: string; quality: number }>;
+  allMlsPhotos?: Array<{ 
+    url: string; 
+    classification: string;
+    displayClassification?: string;
+    confidence?: number;
+    quality: number;
+  }>;
   onSelectPhoto?: (field: keyof FlyerImages, url: string) => void;
   originalDescription?: string;
   previousDescription?: string;
   hasUsedAISummarize?: boolean;
   onSummarized?: (summary: string) => void;
   onRevertDescription?: (type: 'previous' | 'original') => void;
+  missingCategories?: string[];
 }
 
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
@@ -86,6 +93,7 @@ export function FlyerForm({
   hasUsedAISummarize = false,
   onSummarized,
   onRevertDescription,
+  missingCategories = [],
 }: FlyerFormProps) {
   const { register, setValue, watch } = form;
   
@@ -295,6 +303,8 @@ export function FlyerForm({
               aiSelectionInfo={photoSelectionInfo?.mainImage}
               availablePhotos={allMlsPhotos}
               onSelectPhoto={(url) => onSelectPhoto?.('mainImage', url)}
+              expectedCategory="Exterior"
+              isMissing={missingCategories.includes('Exterior')}
             />
 
             <ImageUploadField
@@ -305,6 +315,8 @@ export function FlyerForm({
               aiSelectionInfo={photoSelectionInfo?.kitchenImage}
               availablePhotos={allMlsPhotos}
               onSelectPhoto={(url) => onSelectPhoto?.('kitchenImage', url)}
+              expectedCategory="Kitchen"
+              isMissing={missingCategories.includes('Kitchen')}
             />
 
             <ImageUploadField
@@ -315,6 +327,8 @@ export function FlyerForm({
               aiSelectionInfo={photoSelectionInfo?.roomImage}
               availablePhotos={allMlsPhotos}
               onSelectPhoto={(url) => onSelectPhoto?.('roomImage', url)}
+              expectedCategory="Living Room"
+              isMissing={missingCategories.includes('Living Room')}
             />
           </div>
         </div>

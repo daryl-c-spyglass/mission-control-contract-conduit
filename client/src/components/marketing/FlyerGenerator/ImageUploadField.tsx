@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Upload, ZoomIn, MoveHorizontal, MoveVertical, RotateCcw, Sparkles, Images, Check } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { Upload, ZoomIn, MoveHorizontal, MoveVertical, RotateCcw, Sparkles, Images, Check, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ImageTransform } from '@/lib/flyer-types';
 import type { PhotoSelectionInfo } from '@/lib/flyer-utils';
@@ -19,8 +20,16 @@ interface ImageUploadFieldProps {
   compact?: boolean;
   circular?: boolean;
   aiSelectionInfo?: PhotoSelectionInfo | null;
-  availablePhotos?: Array<{ url: string; classification: string; quality: number }>;
+  availablePhotos?: Array<{ 
+    url: string; 
+    classification: string;
+    displayClassification?: string;
+    confidence?: number;
+    quality: number;
+  }>;
   onSelectPhoto?: (url: string) => void;
+  expectedCategory?: string;
+  isMissing?: boolean;
 }
 
 export function ImageUploadField({
@@ -36,8 +45,11 @@ export function ImageUploadField({
   aiSelectionInfo,
   availablePhotos,
   onSelectPhoto,
+  expectedCategory,
+  isMissing = false,
 }: ImageUploadFieldProps) {
   const [galleryOpen, setGalleryOpen] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
   const handleReset = () => {
     onTransformChange?.({ scale: 1, positionX: 0, positionY: 0 });
@@ -48,33 +60,60 @@ export function ImageUploadField({
     setGalleryOpen(false);
   };
 
+  // Get unique categories from available photos
+  const categories = availablePhotos 
+    ? ['all', ...Array.from(new Set(availablePhotos.map(p => p.displayClassification || p.classification).filter(Boolean)))]
+    : ['all'];
+
+  // Filter photos by category
+  const filteredPhotos = availablePhotos?.filter(p => {
+    if (categoryFilter === 'all') return true;
+    return (p.displayClassification || p.classification) === categoryFilter;
+  }) || [];
+
+  // Check if category is missing (AI couldn't find a matching photo)
+  // Don't show warning if AI successfully selected a photo for this slot
+  const showMissingWarning = isMissing && !aiSelectionInfo?.isAISelected;
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
         <Label className="text-xs font-medium uppercase tracking-wide">
           {label}
         </Label>
-        {aiSelectionInfo && (
+        {aiSelectionInfo?.isAISelected && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <button
-                type="button"
-                className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 cursor-help"
+              <Badge
+                variant="outline"
+                className="text-[10px] gap-1 text-green-600 dark:text-green-400 border-green-300 dark:border-green-600 bg-green-50 dark:bg-green-950/30 cursor-help"
                 data-testid={`ai-selection-trigger-${id}`}
               >
                 <Sparkles className="w-3 h-3" />
-                <span>AI Selected</span>
-              </button>
+                AI {aiSelectionInfo.confidence}%
+              </Badge>
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-xs" data-testid={`ai-selection-tooltip-${id}`}>
               <div className="space-y-1 text-xs">
                 <p className="font-medium">{aiSelectionInfo.reason}</p>
                 <p className="text-muted-foreground">
-                  Type: {aiSelectionInfo.classification} | Quality: {aiSelectionInfo.quality}%
+                  Type: {aiSelectionInfo.displayClassification || aiSelectionInfo.classification} | 
+                  Confidence: {aiSelectionInfo.confidence}% | 
+                  Quality: {aiSelectionInfo.quality}%
                 </p>
               </div>
             </TooltipContent>
           </Tooltip>
+        )}
+        {showMissingWarning && (
+          <Badge
+            variant="outline"
+            className="text-[10px] gap-1 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/30"
+            data-testid={`missing-warning-${id}`}
+          >
+            <AlertCircle className="w-3 h-3" />
+            No {expectedCategory || 'matching'} photo
+          </Badge>
         )}
       </div>
 
@@ -86,12 +125,13 @@ export function ImageUploadField({
           "hover:border-primary/50 hover:bg-muted",
           compact ? "h-24" : circular ? "h-32 w-32 mx-auto" : "h-32",
           circular ? "rounded-full" : "rounded-lg",
-          preview ? "p-0 border-solid border-primary/30 overflow-hidden" : "p-4"
+          preview ? "p-0 border-solid border-primary/30 overflow-hidden" : "p-4",
+          showMissingWarning && !preview && "border-amber-400/50"
         )}
         data-testid={`upload-${id}`}
       >
         {preview ? (
-          <div className="w-full h-full overflow-hidden">
+          <div className="w-full h-full overflow-hidden relative group">
             <img
               src={preview}
               alt={label}
@@ -103,11 +143,39 @@ export function ImageUploadField({
                 transform: `scale(${transform.scale}) translate(${transform.positionX}%, ${transform.positionY}%)`,
               }}
             />
+            {aiSelectionInfo?.isAISelected ? (
+              <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex justify-between items-center">
+                  <span className="truncate">{aiSelectionInfo.displayClassification || aiSelectionInfo.classification}</span>
+                  <span className="text-green-400 ml-1 whitespace-nowrap">{aiSelectionInfo.confidence}%</span>
+                </div>
+              </div>
+            ) : showMissingWarning && (
+              <div className="absolute bottom-0 left-0 right-0 bg-amber-900/80 text-amber-100 text-xs p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                  <span className="truncate">Fallback - no {expectedCategory} found</span>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2 text-muted-foreground">
-            <Upload className="h-6 w-6" />
-            <span className="text-xs">Click to upload</span>
+            {showMissingWarning ? (
+              <>
+                <AlertCircle className="h-6 w-6 text-amber-500" />
+                <span className="text-xs text-center text-amber-600">
+                  No {expectedCategory || 'matching'} photo found
+                  <br />
+                  <span className="text-muted-foreground">Click to upload or choose from MLS</span>
+                </span>
+              </>
+            ) : (
+              <>
+                <Upload className="h-6 w-6" />
+                <span className="text-xs">Click to upload</span>
+              </>
+            )}
           </div>
         )}
         <input
@@ -203,7 +271,10 @@ export function ImageUploadField({
       )}
 
       {availablePhotos && availablePhotos.length > 0 && onSelectPhoto && (
-        <Dialog open={galleryOpen} onOpenChange={setGalleryOpen}>
+        <Dialog open={galleryOpen} onOpenChange={(open) => {
+          setGalleryOpen(open);
+          if (!open) setCategoryFilter('all');
+        }}>
           <DialogTrigger asChild>
             <Button
               type="button"
@@ -216,12 +287,42 @@ export function ImageUploadField({
               Choose from MLS Photos ({availablePhotos.length})
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Select Photo for {label}</DialogTitle>
+              <DialogDescription>
+                {expectedCategory && (
+                  <span className="text-amber-600 dark:text-amber-400">
+                    Looking for: {expectedCategory} photo
+                  </span>
+                )}
+              </DialogDescription>
             </DialogHeader>
-            <div className="grid grid-cols-3 gap-2 overflow-y-auto max-h-[60vh] p-1">
-              {availablePhotos.map((photo, index) => (
+            
+            {categories.length > 2 && (
+              <div className="flex gap-1.5 flex-wrap py-2 border-b">
+                {categories.map(cat => (
+                  <Button
+                    key={cat}
+                    type="button"
+                    variant={categoryFilter === cat ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setCategoryFilter(cat)}
+                    className="h-7 text-xs"
+                  >
+                    {cat === 'all' ? 'All Photos' : cat}
+                    {cat !== 'all' && (
+                      <span className="ml-1 opacity-60">
+                        ({availablePhotos.filter(p => (p.displayClassification || p.classification) === cat).length})
+                      </span>
+                    )}
+                  </Button>
+                ))}
+              </div>
+            )}
+
+            <div className="grid grid-cols-3 md:grid-cols-4 gap-2 overflow-y-auto flex-1 p-1">
+              {filteredPhotos.map((photo, index) => (
                 <button
                   key={index}
                   type="button"
@@ -245,11 +346,23 @@ export function ImageUploadField({
                       <Check className="w-3 h-3 text-primary-foreground" />
                     </div>
                   )}
-                  <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[10px] px-1.5 py-0.5 truncate">
-                    {photo.classification} · {photo.quality}%
+                  <div className="absolute bottom-0 inset-x-0 bg-black/70 text-white text-[10px] px-1.5 py-0.5">
+                    <div className="flex justify-between items-center">
+                      <span className="truncate">{photo.displayClassification || photo.classification}</span>
+                      {(photo.confidence !== undefined && photo.confidence > 0) ? (
+                        <span className="text-green-400 ml-1 whitespace-nowrap">{photo.confidence}%</span>
+                      ) : (
+                        <span className="text-muted-foreground ml-1 whitespace-nowrap">Q:{photo.quality}%</span>
+                      )}
+                    </div>
                   </div>
                 </button>
               ))}
+              {filteredPhotos.length === 0 && (
+                <div className="col-span-full text-center py-8 text-muted-foreground">
+                  No {categoryFilter !== 'all' ? categoryFilter : ''} photos found
+                </div>
+              )}
             </div>
           </DialogContent>
         </Dialog>

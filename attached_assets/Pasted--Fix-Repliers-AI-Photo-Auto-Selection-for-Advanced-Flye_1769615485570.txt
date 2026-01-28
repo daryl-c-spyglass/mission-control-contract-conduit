@@ -1,0 +1,720 @@
+# Fix: Repliers AI Photo Auto-Selection for Advanced Flyer Builder
+
+## Overview
+
+Use Repliers `imageInsights` AI classification to automatically select the best photos for each slot:
+
+| Photo Slot | AI Selection Logic |
+|------------|-------------------|
+| **Main Property Photo** | Highest confidence exterior/front photo, or highest quality score |
+| **Kitchen Photo** | Photo classified as "Kitchen" with highest confidence |
+| **Room Photo** | Photo classified as "Living Room", "Bedroom", "Dining Room" with highest confidence |
+
+If a category has no matching photo, prompt user to select an alternative or upload.
+
+---
+
+## Repliers imageInsights Structure
+
+Each photo in the MLS data has this structure:
+
+```typescript
+interface RepliersPhoto {
+  href: string;  // Photo URL path
+  // imageInsights data (when available)
+  imageInsights?: {
+    classification: {
+      imageOf: string;       // "Kitchen", "Living Room", "Front of Structure", etc.
+      prediction: number;    // Confidence 0.0 - 1.0 (e.g., 0.987 = 98.7%)
+    };
+    quality?: {
+      qualitative: string;   // "average", "above average", "excellent"
+      quantitative: number;  // Quality score 1.0 - 5.0
+    };
+  };
+}
+```
+
+### Common Classification Values from Repliers:
+
+**Exterior:**
+- "Front of Structure"
+- "Back of Structure"
+- "Aerial"
+- "Exterior"
+
+**Kitchen:**
+- "Kitchen"
+- "Breakfast Area"
+
+**Living Areas:**
+- "Living Room"
+- "Family Room"
+- "Great Room"
+- "Dining Room"
+
+**Bedrooms:**
+- "Bedroom"
+- "Primary Bedroom"
+- "Master Bedroom"
+
+**Other:**
+- "Bathroom"
+- "Garage"
+- "Pool"
+- "Patio"
+- "Laundry"
+
+---
+
+## Implementation
+
+### Step 1: Create Photo Selection Utility
+
+```typescript
+// utils/photoSelection.ts
+
+interface ProcessedPhoto {
+  url: string;
+  originalPath: string;
+  classification: string;
+  confidence: number;
+  qualityScore: number;
+  qualityLabel: string;
+  index: number;
+}
+
+interface PhotoSelectionResult {
+  mainPhoto: ProcessedPhoto | null;
+  kitchenPhoto: ProcessedPhoto | null;
+  roomPhoto: ProcessedPhoto | null;
+  hasAISelection: boolean;
+  missingCategories: string[];
+}
+
+const CDN_BASE = 'https://cdn.repliers.io/';
+
+/**
+ * Process raw Repliers photos into normalized format
+ */
+export function processRepliersPhotos(photos: any[]): ProcessedPhoto[] {
+  if (!photos || !Array.isArray(photos)) return [];
+  
+  return photos.map((photo, index) => {
+    const insights = photo.imageInsights || {};
+    const classification = insights.classification || {};
+    const quality = insights.quality || {};
+    
+    // Build full URL
+    let url = photo.href || photo.url || '';
+    if (url && !url.startsWith('http')) {
+      url = `${CDN_BASE}${url}`;
+    }
+    
+    return {
+      url,
+      originalPath: photo.href || photo.url || '',
+      classification: classification.imageOf || 'Unknown',
+      confidence: classification.prediction || 0,
+      qualityScore: quality.quantitative || 3.0,
+      qualityLabel: quality.qualitative || 'average',
+      index,
+    };
+  }).filter(p => p.url); // Filter out empty URLs
+}
+
+/**
+ * Auto-select best photos using Repliers AI classifications
+ */
+export function selectBestPhotos(photos: ProcessedPhoto[]): PhotoSelectionResult {
+  const missingCategories: string[] = [];
+  
+  // Sort all photos by quality score (highest first)
+  const sortedByQuality = [...photos].sort((a, b) => b.qualityScore - a.qualityScore);
+  
+  // ========== MAIN PHOTO ==========
+  // Priority: Front of Structure > Exterior > Aerial > Highest Quality
+  const exteriorTypes = ['Front of Structure', 'Back of Structure', 'Aerial', 'Exterior'];
+  
+  let mainPhoto = sortedByQuality.find(p => 
+    exteriorTypes.some(type => 
+      p.classification.toLowerCase().includes(type.toLowerCase())
+    ) && p.confidence >= 0.7
+  );
+  
+  // Fallback to highest quality photo
+  if (!mainPhoto) {
+    mainPhoto = sortedByQuality[0] || null;
+    console.log('Main Photo: No exterior found, using highest quality photo');
+  } else {
+    console.log(`Main Photo: Selected "${mainPhoto.classification}" (${(mainPhoto.confidence * 100).toFixed(0)}% confidence)`);
+  }
+  
+  // ========== KITCHEN PHOTO ==========
+  // Priority: Kitchen > Breakfast Area
+  const kitchenTypes = ['Kitchen', 'Breakfast Area', 'Breakfast'];
+  
+  const kitchenPhotos = photos
+    .filter(p => 
+      kitchenTypes.some(type => 
+        p.classification.toLowerCase().includes(type.toLowerCase())
+      ) && p.url !== mainPhoto?.url
+    )
+    .sort((a, b) => b.confidence - a.confidence);
+  
+  let kitchenPhoto = kitchenPhotos[0] || null;
+  
+  if (!kitchenPhoto) {
+    missingCategories.push('Kitchen');
+    console.log('Kitchen Photo: No kitchen photo found in MLS images');
+  } else {
+    console.log(`Kitchen Photo: Selected "${kitchenPhoto.classification}" (${(kitchenPhoto.confidence * 100).toFixed(0)}% confidence)`);
+  }
+  
+  // ========== ROOM PHOTO ==========
+  // Priority: Living Room > Family Room > Great Room > Dining Room > Bedroom
+  const roomTypes = ['Living Room', 'Family Room', 'Great Room', 'Dining Room', 'Bedroom', 'Primary Bedroom'];
+  const usedUrls = [mainPhoto?.url, kitchenPhoto?.url].filter(Boolean);
+  
+  const roomPhotos = photos
+    .filter(p => 
+      roomTypes.some(type => 
+        p.classification.toLowerCase().includes(type.toLowerCase())
+      ) && !usedUrls.includes(p.url)
+    )
+    .sort((a, b) => {
+      // Sort by room type priority first, then confidence
+      const aPriority = roomTypes.findIndex(t => a.classification.toLowerCase().includes(t.toLowerCase()));
+      const bPriority = roomTypes.findIndex(t => b.classification.toLowerCase().includes(t.toLowerCase()));
+      if (aPriority !== bPriority) return aPriority - bPriority;
+      return b.confidence - a.confidence;
+    });
+  
+  let roomPhoto = roomPhotos[0] || null;
+  
+  if (!roomPhoto) {
+    missingCategories.push('Room');
+    console.log('Room Photo: No living/family/dining room photo found in MLS images');
+  } else {
+    console.log(`Room Photo: Selected "${roomPhoto.classification}" (${(roomPhoto.confidence * 100).toFixed(0)}% confidence)`);
+  }
+  
+  return {
+    mainPhoto,
+    kitchenPhoto,
+    roomPhoto,
+    hasAISelection: true,
+    missingCategories,
+  };
+}
+```
+
+---
+
+### Step 2: Update Advanced Flyer Builder Component
+
+```tsx
+// In AdvancedFlyerGenerator/index.tsx
+
+import { processRepliersPhotos, selectBestPhotos } from '@/utils/photoSelection';
+
+// State for photos and AI info
+const [images, setImages] = useState({
+  mainImage: null as string | null,
+  kitchenImage: null as string | null,
+  roomImage: null as string | null,
+  agentPhoto: null as string | null,
+  companyLogo: null as string | null,
+  secondaryLogo: null as string | null,
+  qrCode: null as string | null,
+});
+
+const [photoAIInfo, setPhotoAIInfo] = useState({
+  mainImage: null as { classification: string; confidence: number } | null,
+  kitchenImage: null as { classification: string; confidence: number } | null,
+  roomImage: null as { classification: string; confidence: number } | null,
+});
+
+const [missingCategories, setMissingCategories] = useState<string[]>([]);
+const [allMLSPhotos, setAllMLSPhotos] = useState<ProcessedPhoto[]>([]);
+
+// Auto-select photos when MLS data loads
+useEffect(() => {
+  const mlsData = transaction?.mlsData;
+  if (!mlsData?.photos && !mlsData?.images) return;
+  
+  const rawPhotos = mlsData.photos || mlsData.images || [];
+  console.log(`Processing ${rawPhotos.length} MLS photos for AI selection...`);
+  
+  // Process photos
+  const processedPhotos = processRepliersPhotos(rawPhotos);
+  setAllMLSPhotos(processedPhotos);
+  
+  // Select best photos
+  const selection = selectBestPhotos(processedPhotos);
+  
+  // Update images state
+  setImages(prev => ({
+    ...prev,
+    mainImage: selection.mainPhoto?.url || null,
+    kitchenImage: selection.kitchenPhoto?.url || null,
+    roomImage: selection.roomPhoto?.url || null,
+  }));
+  
+  // Update AI info for badges
+  setPhotoAIInfo({
+    mainImage: selection.mainPhoto ? {
+      classification: selection.mainPhoto.classification,
+      confidence: selection.mainPhoto.confidence,
+    } : null,
+    kitchenImage: selection.kitchenPhoto ? {
+      classification: selection.kitchenPhoto.classification,
+      confidence: selection.kitchenPhoto.confidence,
+    } : null,
+    roomImage: selection.roomPhoto ? {
+      classification: selection.roomPhoto.classification,
+      confidence: selection.roomPhoto.confidence,
+    } : null,
+  });
+  
+  // Track missing categories
+  setMissingCategories(selection.missingCategories);
+  
+}, [transaction?.mlsData]);
+```
+
+---
+
+### Step 3: Update UI to Show AI Selection & Handle Missing Categories
+
+```tsx
+// Photo slot component with AI badge and fallback options
+
+interface PhotoSlotProps {
+  label: string;
+  photoUrl: string | null;
+  aiInfo: { classification: string; confidence: number } | null;
+  isMissing: boolean;
+  expectedCategory: string;
+  allPhotos: ProcessedPhoto[];
+  onPhotoSelect: (url: string) => void;
+  onUpload: (file: File) => void;
+}
+
+function PhotoSlot({
+  label,
+  photoUrl,
+  aiInfo,
+  isMissing,
+  expectedCategory,
+  allPhotos,
+  onPhotoSelect,
+  onUpload,
+}: PhotoSlotProps) {
+  const [showGallery, setShowGallery] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  return (
+    <div className="border rounded-lg p-3 space-y-2">
+      {/* Header with label and AI badge */}
+      <div className="flex items-center justify-between">
+        <Label className="text-xs font-medium uppercase tracking-wide">
+          {label}
+        </Label>
+        {aiInfo && (
+          <Badge 
+            variant="outline" 
+            className="text-[10px] gap-1 text-green-600 border-green-300 bg-green-50"
+            title={`AI classified as "${aiInfo.classification}" with ${(aiInfo.confidence * 100).toFixed(0)}% confidence`}
+          >
+            <Sparkles className="w-3 h-3" />
+            AI Selected
+          </Badge>
+        )}
+      </div>
+      
+      {/* Photo display or missing state */}
+      <div className="aspect-video bg-muted rounded-md overflow-hidden relative">
+        {photoUrl ? (
+          <img 
+            src={photoUrl} 
+            alt={label} 
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground p-4">
+            {isMissing ? (
+              <>
+                <AlertCircle className="w-8 h-8 mb-2 text-amber-500" />
+                <span className="text-sm font-medium text-amber-600">
+                  No {expectedCategory} photo found
+                </span>
+                <span className="text-xs text-center mt-1">
+                  Select an alternative or upload your own
+                </span>
+              </>
+            ) : (
+              <span className="text-sm">No photo selected</span>
+            )}
+          </div>
+        )}
+        
+        {/* AI Classification overlay (on hover) */}
+        {aiInfo && photoUrl && (
+          <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-2 opacity-0 hover:opacity-100 transition-opacity">
+            <div className="flex justify-between">
+              <span>{aiInfo.classification}</span>
+              <span>{(aiInfo.confidence * 100).toFixed(0)}% confidence</span>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Action buttons */}
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowGallery(true)}
+          className="flex-1 text-xs gap-1"
+        >
+          <Images className="w-3 h-3" />
+          Choose from MLS ({allPhotos.length})
+        </Button>
+        
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          className="text-xs gap-1"
+        >
+          <Upload className="w-3 h-3" />
+          Upload
+        </Button>
+        
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onUpload(file);
+          }}
+        />
+      </div>
+      
+      {/* Photo Gallery Modal */}
+      <PhotoGalleryModal
+        isOpen={showGallery}
+        onClose={() => setShowGallery(false)}
+        photos={allPhotos}
+        selectedUrl={photoUrl}
+        onSelect={(url) => {
+          onPhotoSelect(url);
+          setShowGallery(false);
+        }}
+        suggestedCategory={expectedCategory}
+      />
+    </div>
+  );
+}
+```
+
+---
+
+### Step 4: Photo Gallery Modal with Category Filtering
+
+```tsx
+// PhotoGalleryModal.tsx
+
+interface PhotoGalleryModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  photos: ProcessedPhoto[];
+  selectedUrl: string | null;
+  onSelect: (url: string) => void;
+  suggestedCategory?: string;
+}
+
+function PhotoGalleryModal({
+  isOpen,
+  onClose,
+  photos,
+  selectedUrl,
+  onSelect,
+  suggestedCategory,
+}: PhotoGalleryModalProps) {
+  const [filter, setFilter] = useState<string>('all');
+  
+  // Get unique categories
+  const categories = useMemo(() => {
+    const cats = new Set(photos.map(p => p.classification));
+    return ['all', ...Array.from(cats).sort()];
+  }, [photos]);
+  
+  // Filter photos
+  const filteredPhotos = useMemo(() => {
+    if (filter === 'all') return photos;
+    return photos.filter(p => p.classification === filter);
+  }, [photos, filter]);
+  
+  // Highlight suggested category
+  useEffect(() => {
+    if (suggestedCategory && isOpen) {
+      const matchingCat = categories.find(c => 
+        c.toLowerCase().includes(suggestedCategory.toLowerCase())
+      );
+      if (matchingCat && matchingCat !== 'all') {
+        setFilter(matchingCat);
+      }
+    }
+  }, [suggestedCategory, isOpen, categories]);
+  
+  if (!isOpen) return null;
+  
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Choose Photo from MLS</DialogTitle>
+          <DialogDescription>
+            {suggestedCategory && (
+              <span className="text-amber-600">
+                Looking for: {suggestedCategory} photo
+              </span>
+            )}
+          </DialogDescription>
+        </DialogHeader>
+        
+        {/* Category Filter */}
+        <div className="flex gap-2 flex-wrap py-2 border-b">
+          {categories.map(cat => (
+            <Button
+              key={cat}
+              variant={filter === cat ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFilter(cat)}
+              className="text-xs"
+            >
+              {cat === 'all' ? 'All Photos' : cat}
+              {cat !== 'all' && (
+                <span className="ml-1 text-muted-foreground">
+                  ({photos.filter(p => p.classification === cat).length})
+                </span>
+              )}
+            </Button>
+          ))}
+        </div>
+        
+        {/* Photo Grid */}
+        <div className="flex-1 overflow-y-auto py-4">
+          <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+            {filteredPhotos.map((photo, index) => (
+              <button
+                key={index}
+                onClick={() => onSelect(photo.url)}
+                className={cn(
+                  "relative aspect-video rounded-lg overflow-hidden border-2 transition-all hover:scale-105",
+                  selectedUrl === photo.url
+                    ? "border-primary ring-2 ring-primary/50"
+                    : "border-transparent hover:border-gray-300"
+                )}
+              >
+                <img
+                  src={photo.url}
+                  alt={photo.classification}
+                  className="w-full h-full object-cover"
+                />
+                
+                {/* Classification badge */}
+                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[10px] p-1">
+                  <div className="flex justify-between items-center">
+                    <span className="truncate">{photo.classification}</span>
+                    <span className="text-green-400 ml-1">
+                      {(photo.confidence * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Selected checkmark */}
+                {selectedUrl === photo.url && (
+                  <div className="absolute top-2 right-2 bg-primary text-white rounded-full p-1">
+                    <Check className="w-3 h-3" />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+          
+          {filteredPhotos.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              No {filter !== 'all' ? filter : ''} photos found
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+---
+
+### Step 5: Render the Photo Slots in Main Component
+
+```tsx
+// In the Property Images section of AdvancedFlyerGenerator
+
+<div className="space-y-4">
+  <div className="flex items-center gap-2">
+    <ImageIcon className="w-5 h-5 text-primary" />
+    <h2 className="text-lg font-medium">Property Images</h2>
+  </div>
+  
+  <div className="flex items-center gap-2 text-green-600 text-sm">
+    <Sparkles className="w-4 h-4" />
+    <span>Auto-selected using Repliers AI</span>
+  </div>
+  
+  <Separator />
+  
+  {/* Property Address */}
+  <div className="space-y-2">
+    <Label className="text-xs font-medium uppercase tracking-wide flex items-center gap-2">
+      <MapPin className="w-3 h-3" />
+      Property Address
+    </Label>
+    <Input
+      value={form.watch('address') || ''}
+      readOnly
+      className="bg-muted/50"
+    />
+  </div>
+  
+  {/* Main Property Photo */}
+  <PhotoSlot
+    label="Main Property Photo"
+    photoUrl={images.mainImage}
+    aiInfo={photoAIInfo.mainImage}
+    isMissing={false}
+    expectedCategory="Exterior"
+    allPhotos={allMLSPhotos}
+    onPhotoSelect={(url) => setImages(prev => ({ ...prev, mainImage: url }))}
+    onUpload={handleMainPhotoUpload}
+  />
+  
+  {/* Kitchen Photo */}
+  <PhotoSlot
+    label="Kitchen Photo"
+    photoUrl={images.kitchenImage}
+    aiInfo={photoAIInfo.kitchenImage}
+    isMissing={missingCategories.includes('Kitchen')}
+    expectedCategory="Kitchen"
+    allPhotos={allMLSPhotos}
+    onPhotoSelect={(url) => setImages(prev => ({ ...prev, kitchenImage: url }))}
+    onUpload={handleKitchenPhotoUpload}
+  />
+  
+  {/* Room Photo */}
+  <PhotoSlot
+    label="Room Photo"
+    photoUrl={images.roomImage}
+    aiInfo={photoAIInfo.roomImage}
+    isMissing={missingCategories.includes('Room')}
+    expectedCategory="Living Room"
+    allPhotos={allMLSPhotos}
+    onPhotoSelect={(url) => setImages(prev => ({ ...prev, roomImage: url }))}
+    onUpload={handleRoomPhotoUpload}
+  />
+</div>
+```
+
+---
+
+## Visual Summary
+
+### When AI Finds All Photos:
+```
+┌─────────────────────────────────────────────┐
+│ PROPERTY IMAGES                             │
+│ ✨ Auto-selected using Repliers AI          │
+├─────────────────────────────────────────────┤
+│ MAIN PROPERTY PHOTO           ✨ AI Selected │
+│ ┌─────────────────────────────────────────┐ │
+│ │      [Exterior Photo]                   │ │
+│ │      "Front of Structure" - 95%         │ │
+│ └─────────────────────────────────────────┘ │
+│ [Choose from MLS (37)]  [Upload]            │
+├─────────────────────────────────────────────┤
+│ KITCHEN PHOTO                 ✨ AI Selected │
+│ ┌─────────────────────────────────────────┐ │
+│ │      [Kitchen Photo]                    │ │
+│ │      "Kitchen" - 99%                    │ │
+│ └─────────────────────────────────────────┘ │
+│ [Choose from MLS (37)]  [Upload]            │
+├─────────────────────────────────────────────┤
+│ ROOM PHOTO                    ✨ AI Selected │
+│ ┌─────────────────────────────────────────┐ │
+│ │      [Living Room Photo]                │ │
+│ │      "Living Room" - 98%                │ │
+│ └─────────────────────────────────────────┘ │
+│ [Choose from MLS (37)]  [Upload]            │
+└─────────────────────────────────────────────┘
+```
+
+### When Kitchen Photo is Missing:
+```
+├─────────────────────────────────────────────┤
+│ KITCHEN PHOTO                               │
+│ ┌─────────────────────────────────────────┐ │
+│ │      ⚠️ No Kitchen photo found          │ │
+│ │      Select an alternative or upload    │ │
+│ └─────────────────────────────────────────┘ │
+│ [Choose from MLS (37)]  [Upload]            │
+├─────────────────────────────────────────────┤
+```
+
+---
+
+## Verification Checklist
+
+### AI Photo Selection
+- [ ] Main Photo auto-selects exterior/front with highest confidence
+- [ ] Kitchen Photo auto-selects "Kitchen" classified photo
+- [ ] Room Photo auto-selects "Living Room" or similar
+- [ ] AI badges show classification and confidence percentage
+- [ ] Console logs show selection reasoning
+
+### Missing Category Handling
+- [ ] Missing category shows amber warning icon
+- [ ] Message prompts user to select alternative or upload
+- [ ] Gallery modal pre-filters to suggested category
+- [ ] Upload button allows custom photo
+
+### Photo Gallery
+- [ ] Shows all MLS photos with classifications
+- [ ] Category filter buttons work
+- [ ] Selected photo shows checkmark
+- [ ] Clicking photo updates the slot
+
+---
+
+## Console Output Example
+
+```
+Processing 37 MLS photos for AI selection...
+Main Photo: Selected "Front of Structure" (95% confidence)
+Kitchen Photo: Selected "Kitchen" (99% confidence)
+Room Photo: Selected "Living Room" (98% confidence)
+```
+
+Or when missing:
+```
+Processing 37 MLS photos for AI selection...
+Main Photo: Selected "Front of Structure" (95% confidence)
+Kitchen Photo: No kitchen photo found in MLS images
+Room Photo: Selected "Living Room" (98% confidence)
+```
