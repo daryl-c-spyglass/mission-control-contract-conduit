@@ -28,9 +28,11 @@ export function PropertyDetailsSection({ property, index, company }: PropertyDet
   const base64Photos = (property as any).base64Photos || [];
   const urlPhotos = property.photos || [];
   const mainPhoto = base64Photos[0] || urlPhotos[0];
-  const additionalPhotos = base64Photos.length > 1 
-    ? base64Photos.slice(1, 5) 
-    : urlPhotos.slice(1, 5);
+  const base64Additional = base64Photos.slice(1, 5);
+  const urlAdditional = urlPhotos.slice(1, 5);
+  const additionalPhotos = base64Additional.length > 0 
+    ? [...base64Additional, ...urlAdditional.slice(base64Additional.length)].slice(0, 4)
+    : urlAdditional;
   const displayPrice = property.soldPrice || property.listPrice;
 
   return (
