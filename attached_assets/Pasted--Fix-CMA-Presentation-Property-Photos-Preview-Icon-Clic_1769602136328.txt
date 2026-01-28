@@ -1,0 +1,524 @@
+# Fix CMA Presentation: Property Photos, Preview Icon & Clickable Profile
+
+## 🎯 Three Issues to Fix
+
+### Issue 1: Property Photos Missing on Slides 35-43
+- Currently: Property photo only shows on Slide 34
+- Expected: Property photos should display on ALL slides from 34 to 43
+- Each slide (34-43) represents a different comparable property with its own photo
+
+### Issue 2: Add Preview/Download PDF Icon to ALL Slides
+- Add an "eye" icon button for Preview & Download PDF
+- Position: Upper right area, next to the agent profile
+- Should be visible and accessible on EVERY slide for better UX
+
+### Issue 3: Make Agent Profile Clickable on ALL Slides
+- The agent profile photo/name in upper right should be clickable
+- When clicked, shows a dropdown/popover with:
+  - Agent photo (larger)
+  - Agent name
+  - Company name (Spyglass Realty)
+  - Phone number with phone icon
+  - Email with email icon
+  - "Email Report" button
+
+---
+
+## 🔧 Fix 1: Property Photos on All Comparable Slides (34-43)
+
+### Root Cause
+The PDF export and/or preview is only rendering the first property's photo. Each comparable property slide needs its own photo.
+
+### Find the Slide Rendering Logic
+
+```typescript
+// Search for where comparable property slides are generated
+// Look for loops that create slides 34-43
+
+// CURRENT (BROKEN):
+const renderComparableSlide = (property, index) => {
+  // Only first property gets a photo
+  if (index === 0) {
+    return <PropertySlideWithPhoto property={property} />;
+  }
+  return <PropertySlideNoPhoto property={property} />;  // ❌ Wrong
+};
+
+// FIXED:
+const renderComparableSlide = (property, index) => {
+  // ALL comparable properties get their photos
+  return <PropertySlideWithPhoto property={property} slideNumber={34 + index} />;
+};
+```
+
+### Ensure Each Comparable Has Photo Data
+
+```typescript
+// When fetching comparables, ensure each has photo URL
+const comparablesWithPhotos = comparables.map((comp, index) => {
+  // Get primary photo for this comparable
+  const primaryPhoto = comp.photos?.[0]?.url || 
+                       comp.photos?.[0]?.href ||
+                       comp.images?.[0]?.url ||
+                       comp.primaryPhoto ||
+                       '/placeholder-property.jpg';
+  
+  return {
+    ...comp,
+    primaryPhotoUrl: primaryPhoto,
+    slideNumber: 34 + index
+  };
+});
+
+console.log('Comparables with photos:', comparablesWithPhotos.map(c => ({
+  address: c.address,
+  hasPhoto: !!c.primaryPhotoUrl,
+  photoUrl: c.primaryPhotoUrl?.substring(0, 50)
+})));
+```
+
+### Update Slide Generation Loop
+
+```typescript
+// Generate slides for ALL comparables (slides 34-43)
+const comparableSlides = comparablesWithPhotos.map((property, index) => ({
+  id: `comparable-${index}`,
+  type: 'property-details',
+  slideNumber: 34 + index,
+  data: {
+    address: property.address,
+    price: property.listPrice,
+    beds: property.bedroomsTotal,
+    baths: property.bathroomsTotalInteger,
+    sqft: property.livingArea,
+    dom: property.daysOnMarket,
+    status: property.standardStatus,
+    // CRITICAL: Include photo for EACH property
+    photoUrl: property.primaryPhotoUrl,
+    photos: property.photos  // All photos for this property
+  }
+}));
+
+// Verify all slides have photos
+comparableSlides.forEach(slide => {
+  console.log(`Slide ${slide.slideNumber}: ${slide.data.address} - Photo: ${slide.data.photoUrl ? 'YES' : 'MISSING'}`);
+});
+```
+
+### Update Slide Component to Always Show Photo
+
+```tsx
+// PropertyDetailsSlide.tsx or similar
+
+interface PropertyDetailsSlideProps {
+  property: {
+    address: string;
+    price: number;
+    beds: number;
+    baths: number;
+    sqft: number;
+    dom: number;
+    status: string;
+    photoUrl: string;
+  };
+  slideNumber: number;
+}
+
+export function PropertyDetailsSlide({ property, slideNumber }: PropertyDetailsSlideProps) {
+  return (
+    <div className="slide h-full flex flex-col">
+      {/* Header */}
+      <div className="bg-gray-800 text-white px-6 py-3">
+        <h2 className="text-lg font-semibold">
+          PROPERTY DETAILS - {property.address}
+        </h2>
+        <span className="text-sm">Slide {slideNumber} of 43</span>
+      </div>
+      
+      {/* Property Photo - ALWAYS RENDER */}
+      <div className="flex-1 p-6">
+        <div className="h-64 w-full overflow-hidden rounded-lg mb-4">
+          {property.photoUrl ? (
+            <img 
+              src={property.photoUrl} 
+              alt={property.address}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                console.error(`Failed to load photo for ${property.address}`);
+                e.currentTarget.src = '/placeholder-property.jpg';
+              }}
+            />
+          ) : (
+            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+              <span className="text-gray-500">No photo available</span>
+            </div>
+          )}
+        </div>
+        
+        {/* Property Details */}
+        <h3 className="text-xl font-bold mb-4">{property.address}</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <span className="text-gray-600">Price:</span>
+            <span className="font-semibold ml-2">
+              ${property.price?.toLocaleString()}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-600">Sq Ft:</span>
+            <span className="font-semibold ml-2">
+              {property.sqft?.toLocaleString()}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-600">Beds:</span>
+            <span className="font-semibold ml-2">{property.beds}</span>
+          </div>
+          <div>
+            <span className="text-gray-600">Baths:</span>
+            <span className="font-semibold ml-2">{property.baths}</span>
+          </div>
+          <div>
+            <span className="text-gray-600">DOM:</span>
+            <span className="font-semibold ml-2">{property.dom}</span>
+          </div>
+          <div>
+            <span className="text-gray-600">Status:</span>
+            <span className="font-semibold ml-2">{property.status}</span>
+          </div>
+        </div>
+      </div>
+      
+      {/* Footer with Spyglass logo */}
+      <div className="px-6 py-3 border-t flex justify-between items-center">
+        <img src="/logos/spyglass-logo.png" alt="Spyglass Realty" className="h-6" />
+        <span className="text-sm text-gray-500">Slide {slideNumber} of 43</span>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 Fix 2: Add Preview/Download PDF Icon to ALL Slides
+
+### Create Persistent Header Component
+
+```tsx
+// components/cma/PresentationHeader.tsx
+
+import { Eye, Download, User } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+interface PresentationHeaderProps {
+  agentInfo: {
+    name: string;
+    company: string;
+    phone: string;
+    email: string;
+    photo: string;
+  };
+  onPreview: () => void;
+  onDownloadPDF: () => void;
+  onEmailReport: () => void;
+}
+
+export function PresentationHeader({
+  agentInfo,
+  onPreview,
+  onDownloadPDF,
+  onEmailReport,
+}: PresentationHeaderProps) {
+  return (
+    <div className="fixed top-4 right-4 z-50 flex items-center gap-3">
+      {/* Preview & Download Button */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 bg-white shadow-md hover:bg-gray-50"
+          >
+            <Eye className="w-4 h-4" />
+            <span className="hidden sm:inline">Preview</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={onPreview}>
+            <Eye className="w-4 h-4 mr-2" />
+            Preview Presentation
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onDownloadPDF}>
+            <Download className="w-4 h-4 mr-2" />
+            Download PDF
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Agent Profile - Clickable */}
+      <AgentProfileDropdown 
+        agentInfo={agentInfo} 
+        onEmailReport={onEmailReport}
+      />
+    </div>
+  );
+}
+```
+
+### Add Header to ALL Slides
+
+```tsx
+// In the main presentation/preview component
+
+export function CMAPresentation({ slides, agentInfo }) {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  
+  return (
+    <div className="relative h-full">
+      {/* Persistent Header - Shows on ALL slides */}
+      <PresentationHeader
+        agentInfo={agentInfo}
+        onPreview={() => setShowPreviewModal(true)}
+        onDownloadPDF={handleExportPDF}
+        onEmailReport={handleEmailReport}
+      />
+      
+      {/* Slide Content */}
+      <div className="slide-container">
+        {slides.map((slide, index) => (
+          <SlideRenderer 
+            key={slide.id} 
+            slide={slide} 
+            isActive={index === currentSlide}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 🔧 Fix 3: Clickable Agent Profile with Dropdown
+
+### Create Agent Profile Dropdown Component
+
+```tsx
+// components/cma/AgentProfileDropdown.tsx
+
+import { Phone, Mail, Send } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+
+interface AgentProfileDropdownProps {
+  agentInfo: {
+    name: string;
+    company: string;
+    phone: string;
+    email: string;
+    photo: string;
+  };
+  onEmailReport: () => void;
+}
+
+export function AgentProfileDropdown({ agentInfo, onEmailReport }: AgentProfileDropdownProps) {
+  const initials = agentInfo.name
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase();
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className="flex items-center gap-2 bg-white rounded-full pl-3 pr-1 py-1 shadow-md hover:shadow-lg transition-shadow cursor-pointer border">
+          <div className="text-right hidden sm:block">
+            <div className="text-sm font-medium">{agentInfo.name}</div>
+            <div className="text-xs text-gray-500">{agentInfo.company}</div>
+          </div>
+          <Avatar className="w-10 h-10 border-2 border-white">
+            <AvatarImage src={agentInfo.photo} alt={agentInfo.name} />
+            <AvatarFallback className="bg-primary text-white text-sm">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+        </button>
+      </PopoverTrigger>
+      
+      <PopoverContent align="end" className="w-72 p-4">
+        {/* Agent Info Card */}
+        <div className="flex items-center gap-3 mb-4">
+          <Avatar className="w-14 h-14">
+            <AvatarImage src={agentInfo.photo} alt={agentInfo.name} />
+            <AvatarFallback className="bg-primary text-white text-lg">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <div className="font-semibold text-lg">{agentInfo.name}</div>
+            <div className="text-sm text-gray-500">{agentInfo.company}</div>
+          </div>
+        </div>
+        
+        {/* Contact Info */}
+        <div className="space-y-2 mb-4">
+          <a 
+            href={`tel:${agentInfo.phone}`}
+            className="flex items-center gap-3 text-sm hover:text-primary transition-colors"
+          >
+            <Phone className="w-4 h-4 text-gray-400" />
+            <span>{agentInfo.phone}</span>
+          </a>
+          <a 
+            href={`mailto:${agentInfo.email}`}
+            className="flex items-center gap-3 text-sm hover:text-primary transition-colors"
+          >
+            <Mail className="w-4 h-4 text-gray-400" />
+            <span>{agentInfo.email}</span>
+          </a>
+        </div>
+        
+        {/* Email Report Button */}
+        <Button 
+          onClick={onEmailReport}
+          variant="outline" 
+          className="w-full gap-2"
+        >
+          <Send className="w-4 h-4" />
+          Email Report
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
+}
+```
+
+### Style the Header Area (Upper Right)
+
+```css
+/* Ensure header is visible on all slides */
+.presentation-header {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+  .presentation-header {
+    top: 8px;
+    right: 8px;
+    gap: 8px;
+  }
+  
+  .agent-name-text {
+    display: none;
+  }
+}
+```
+
+---
+
+## 📊 Visual Layout
+
+### Upper Right Corner (All Slides)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│                              ┌──────────┐  ┌──────────────────┐│
+│                              │ 👁 Preview│  │ Daryl Camingao  ○││
+│                              │     ▼     │  │ Spyglass Realty  ││
+│                              └──────────┘  └──────────────────┘│
+│                                    │               │            │
+│                                    ▼               ▼            │
+│                           ┌─────────────┐  ┌─────────────────┐ │
+│                           │👁 Preview   │  │  ○ Daryl        │ │
+│                           │📥 Download  │  │    Camingao     │ │
+│                           └─────────────┘  │  Spyglass Realty│ │
+│                                            │                  │ │
+│                                            │ 📞 546-546-5123 │ │
+│                                            │ ✉ daryl@...     │ │
+│                                            │                  │ │
+│                                            │ [Email Report]   │ │
+│                                            └─────────────────┘ │
+│                                                                 │
+│  ┌────────────────────────────────────────────────────────────┐│
+│  │ SLIDE CONTENT                                              ││
+│  │                                                            ││
+│  │  [Property Photo]                                          ││
+│  │                                                            ││
+│  │  Address: 321 Delayne DR                                   ││
+│  │  Price: $2,099,900        Sq Ft: 3,578                     ││
+│  │  Beds: 4                  Baths: 4                         ││
+│  │                                                            ││
+│  └────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## ✅ Verification Checklist
+
+### Property Photos (Slides 34-43)
+- [ ] Slide 34 shows property photo (321 Delayne DR)
+- [ ] Slide 35 shows property photo (140 Hawthorne LOOP)
+- [ ] Slide 36 shows property photo (7716 Journeyville DR)
+- [ ] Slide 37 shows property photo (2209 Townes LN)
+- [ ] Slide 38 shows property photo (336 Mae PT)
+- [ ] Slide 39 shows property photo (1494 Bunker Ranch BLVD)
+- [ ] Slide 40 shows property photo (5025 Patagonia PASS)
+- [ ] Slide 41 shows property photo (908 Crestone Stream DR)
+- [ ] Slide 42 shows property photo (464 Paradise HLS)
+- [ ] Slide 43 shows property photo (2001 Montell RD)
+
+### Preview/Download Icon
+- [ ] Eye icon visible on Slide 1
+- [ ] Eye icon visible on Slide 20 (middle)
+- [ ] Eye icon visible on Slide 43 (last)
+- [ ] Clicking shows Preview & Download options
+- [ ] Download PDF works from any slide
+
+### Clickable Agent Profile
+- [ ] Agent photo/name visible in upper right on all slides
+- [ ] Clicking opens dropdown/popover
+- [ ] Dropdown shows larger photo
+- [ ] Dropdown shows name and company
+- [ ] Dropdown shows phone (clickable to call)
+- [ ] Dropdown shows email (clickable to email)
+- [ ] "Email Report" button works
+
+### PDF Export
+- [ ] All 10 comparable properties have photos in PDF (slides 34-43)
+- [ ] PDF matches preview exactly
+
+---
+
+## 📋 Summary
+
+| Feature | Implementation |
+|---------|----------------|
+| Property photos on slides 34-43 | Each comparable gets its own photo from MLS data |
+| Preview/Download icon | Fixed position upper right, visible on all slides |
+| Clickable agent profile | Popover with contact info and Email Report button |
+
+---
+
+**Note:** User will attach these screenshots to the Replit prompt for reference.

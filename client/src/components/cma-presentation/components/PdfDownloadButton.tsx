@@ -6,6 +6,8 @@ import { pdf } from '@react-pdf/renderer';
 import { CmaPdfDocument } from '../pdf/CmaPdfDocument';
 import { CmaPrintPreview } from './CmaPrintPreview';
 import type { AgentProfile, CmaProperty } from '../types';
+import { imageUrlToBase64 } from '@/lib/image-to-base64';
+import { getPrimaryPhoto } from '@/lib/cma-data-utils';
 
 interface PdfDownloadButtonProps {
   propertyAddress: string;
@@ -40,16 +42,40 @@ export function PdfDownloadButton({
     try {
       toast({
         title: 'Generating PDF',
-        description: 'This may take a moment...',
+        description: 'Converting images for PDF...',
       });
 
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+
+      console.log('[PdfDownloadButton] Converting comparable photos to base64...');
+      const processedComparables = await Promise.all(
+        comparables.map(async (comp, index) => {
+          const photoUrl = getPrimaryPhoto(comp);
+          if (!photoUrl) {
+            console.log(`[PdfDownloadButton] Comparable ${index + 1}: no photo found`);
+            return comp;
+          }
+          
+          try {
+            const base64Photo = await imageUrlToBase64(photoUrl);
+            if (base64Photo) {
+              console.log(`[PdfDownloadButton] Comparable ${index + 1}: photo converted`);
+              return { ...comp, base64PrimaryPhoto: base64Photo };
+            }
+          } catch (err) {
+            console.warn(`[PdfDownloadButton] Comparable ${index + 1}: conversion failed`, err);
+          }
+          return comp;
+        })
+      );
+      
+      console.log('[PdfDownloadButton] Image conversion complete, generating PDF...');
 
       const doc = (
         <CmaPdfDocument
           propertyAddress={propertyAddress}
           agent={agent}
-          comparables={comparables}
+          comparables={processedComparables}
           subjectProperty={subjectProperty}
           averageDaysOnMarket={averageDaysOnMarket}
           suggestedListPrice={suggestedListPrice}

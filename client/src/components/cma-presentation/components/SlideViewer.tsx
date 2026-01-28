@@ -1,8 +1,11 @@
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Phone, Mail, Send } from 'lucide-react';
 import type { AgentProfile, CmaProperty } from '../types';
 import { WIDGETS } from '../constants/widgets';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { PdfDownloadButton } from './PdfDownloadButton';
 
 import { StaticImageWidget } from '../widgets/StaticImageWidget';
 
@@ -156,21 +159,91 @@ export function SlideViewer({
             </h1>
           </div>
 
-          <div className="flex items-center gap-3 z-10">
-            <div className="text-right hidden md:block">
-              <p className="text-white text-sm font-medium" data-testid="text-agent-name">
-                {agent.name || 'Agent'}
-              </p>
-              <p className="text-white/70 text-xs" data-testid="text-agent-company">
-                {agent.company || 'Spyglass Realty'}
-              </p>
-            </div>
-            <img 
-              src={agent.photo || '/default-avatar.png'} 
-              alt={agent.name || 'Agent'}
-              className="w-10 h-10 rounded-full object-cover border-2 border-white/30"
-              data-testid="img-agent-photo"
+          <div className="flex items-center gap-2 z-10">
+            <PdfDownloadButton
+              propertyAddress={subjectProperty?.address || 'Property'}
+              agent={agent}
+              comparables={comparables}
+              subjectProperty={subjectProperty}
+              averageDaysOnMarket={averageDaysOnMarket}
+              suggestedListPrice={suggestedListPrice ?? undefined}
+              className="text-white"
             />
+            
+            <Popover>
+              <PopoverTrigger asChild>
+                <button 
+                  className="flex items-center gap-2 rounded-full pl-3 pr-1 py-1 hover-elevate transition-colors cursor-pointer"
+                  data-testid="button-agent-profile"
+                >
+                  <div className="text-right hidden md:block">
+                    <p className="text-white text-sm font-medium" data-testid="text-agent-name">
+                      {agent.name || 'Agent'}
+                    </p>
+                    <p className="text-white/70 text-xs" data-testid="text-agent-company">
+                      {agent.company || 'Spyglass Realty'}
+                    </p>
+                  </div>
+                  <Avatar className="w-10 h-10 border-2 border-white/30">
+                    <AvatarImage src={agent.photo || '/default-avatar.png'} alt={agent.name || 'Agent'} />
+                    <AvatarFallback className="bg-primary text-white text-sm">
+                      {(agent.name || 'A').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
+              </PopoverTrigger>
+              
+              <PopoverContent align="end" className="w-72 p-4" data-testid="popover-agent-profile">
+                <div className="flex items-center gap-3 mb-4">
+                  <Avatar className="w-14 h-14">
+                    <AvatarImage src={agent.photo || '/default-avatar.png'} alt={agent.name || 'Agent'} />
+                    <AvatarFallback className="bg-primary text-white text-lg">
+                      {(agent.name || 'A').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="font-semibold text-lg">{agent.name || 'Agent'}</div>
+                    <div className="text-sm text-muted-foreground">{agent.company || 'Spyglass Realty'}</div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2 mb-4">
+                  {agent.phone && (
+                    <a 
+                      href={`tel:${agent.phone}`}
+                      className="flex items-center gap-3 text-sm hover:text-primary transition-colors"
+                      data-testid="link-agent-phone"
+                    >
+                      <Phone className="w-4 h-4 text-muted-foreground" />
+                      <span>{agent.phone}</span>
+                    </a>
+                  )}
+                  {agent.email && (
+                    <a 
+                      href={`mailto:${agent.email}`}
+                      className="flex items-center gap-3 text-sm hover:text-primary transition-colors"
+                      data-testid="link-agent-email"
+                    >
+                      <Mail className="w-4 h-4 text-muted-foreground" />
+                      <span>{agent.email}</span>
+                    </a>
+                  )}
+                </div>
+                
+                {agent.email && (
+                  <Button 
+                    variant="outline" 
+                    className="w-full gap-2"
+                    onClick={() => window.open(`mailto:${agent.email}?subject=CMA Report Request`, '_blank')}
+                    data-testid="button-email-report"
+                  >
+                    <Send className="w-4 h-4" />
+                    Email Report
+                  </Button>
+                )}
+              </PopoverContent>
+            </Popover>
+
             <Button
               variant="ghost"
               size="icon"
