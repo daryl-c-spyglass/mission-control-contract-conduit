@@ -29,13 +29,17 @@ export function CropModal({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
       setPosition(initialPosition);
       setZoom(initialZoom);
+      wasOpenRef.current = true;
+    } else if (!isOpen) {
+      wasOpenRef.current = false;
     }
-  }, [isOpen, initialPosition, initialZoom]);
+  }, [isOpen, initialPosition.x, initialPosition.y, initialZoom]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
