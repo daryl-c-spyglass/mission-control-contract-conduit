@@ -227,6 +227,12 @@ function findChromiumPath(): string {
   return '';
 }
 
+interface ImageTransform {
+  scale: number;
+  positionX: number;
+  positionY: number;
+}
+
 export interface FlyerData {
   logoUrl?: string;
   secondaryLogoUrl?: string;
@@ -257,6 +263,13 @@ export interface FlyerData {
   logoScales?: { primary: number; secondary: number };
   dividerPosition?: number;
   secondaryLogoOffsetY?: number;
+  // Image transforms for cropping/positioning
+  imageTransforms?: {
+    mainImage: ImageTransform;
+    kitchenImage: ImageTransform;
+    roomImage: ImageTransform;
+    agentPhoto: ImageTransform;
+  };
 }
 
 // Template version for cache invalidation
@@ -366,6 +379,14 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
   const logoScales = data.logoScales || { primary: 1, secondary: 1 };
   const secondaryLogoOffsetY = Math.round((data.secondaryLogoOffsetY || 0) * PRINT_SCALE);
   
+  // Helper to generate CSS transform style from image transform data
+  const getTransformStyle = (transform?: ImageTransform) => {
+    if (!transform) return '';
+    return `transform: scale(${transform.scale}) translate(${transform.positionX}%, ${transform.positionY}%); transform-origin: center center;`;
+  };
+
+  const transforms = data.imageTransforms;
+
   const dataWithBase64 = {
     ...data,
     logoUrl: logoB64,
@@ -382,7 +403,12 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     primaryLogoWidth,
     primaryLogoScale: logoScales.primary,
     secondaryLogoScale: logoScales.secondary,
-    secondaryLogoOffsetY
+    secondaryLogoOffsetY,
+    // Image transform styles (CSS strings for template)
+    mainImageStyle: getTransformStyle(transforms?.mainImage),
+    kitchenImageStyle: getTransformStyle(transforms?.kitchenImage),
+    roomImageStyle: getTransformStyle(transforms?.roomImage),
+    agentPhotoStyle: getTransformStyle(transforms?.agentPhoto),
   };
   
   const templatePath = path.resolve(process.cwd(), 'server/templates/flyer-template.hbs');

@@ -4226,6 +4226,15 @@ Generate only the headline, nothing else.`;
         return res.status(404).json({ error: "Transaction not found" });
       }
 
+      // Default image transforms (no transform applied)
+      const defaultTransform = { scale: 1, positionX: 0, positionY: 0 };
+      const imageTransforms = data.imageTransforms || {
+        mainImage: defaultTransform,
+        kitchenImage: defaultTransform,
+        roomImage: defaultTransform,
+        agentPhoto: defaultTransform,
+      };
+
       // Build flyer data for the generator - map form fields to generator interface
       const flyerData: FlyerData = {
         priceLabel: 'Offered at',
@@ -4250,6 +4259,8 @@ Generate only the headline, nothing else.`;
         logoScales: data.logoScales || { primary: 1, secondary: 1 },
         dividerPosition: data.dividerPosition || 148,
         secondaryLogoOffsetY: data.secondaryLogoOffsetY || 0,
+        // Image transforms for cropping/positioning
+        imageTransforms,
       };
 
       console.log(`[FlyerGenerator] ${saveOnly ? 'Saving' : 'Exporting'} ${format} flyer for transaction ${id}`);
