@@ -60,6 +60,7 @@ interface FlyerFormProps {
   onUseDefaultCompanyLogoChange?: (checked: boolean) => void;
   useDefaultSecondaryLogo?: boolean;
   onUseDefaultSecondaryLogoChange?: (checked: boolean) => void;
+  onResetLogoControls?: () => void;
 }
 
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
@@ -127,6 +128,7 @@ export function FlyerForm({
   onUseDefaultCompanyLogoChange,
   useDefaultSecondaryLogo = true,
   onUseDefaultSecondaryLogoChange,
+  onResetLogoControls,
 }: FlyerFormProps) {
   const { register, setValue, watch } = form;
   const [isGeneratingQR, setIsGeneratingQR] = useState(false);
@@ -458,6 +460,18 @@ export function FlyerForm({
               data-testid="slider-secondary-logo-y"
             />
           </div>
+          
+          {/* Reset to Default Button */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onResetLogoControls}
+            className="w-full mt-2"
+            data-testid="button-reset-logo-controls"
+          >
+            Reset to Default
+          </Button>
         </div>
       </Section>
 

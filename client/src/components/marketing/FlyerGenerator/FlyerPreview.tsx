@@ -15,7 +15,7 @@ export function FlyerPreview({
   images, 
   imageTransforms,
   logoScales = { primary: 1, secondary: 1 },
-  dividerPosition = 200,
+  dividerPosition = 148,
   secondaryLogoOffsetY = 0,
 }: FlyerPreviewProps) {
   const accentColor = "#8b7d6b";
