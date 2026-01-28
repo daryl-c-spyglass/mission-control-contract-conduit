@@ -1,0 +1,134 @@
+# Fix: Advanced Flyer Back Button Navigation
+
+## Problem
+
+When clicking the back button (← beside the property address) in the Advanced Flyer Builder, the user is redirected to the **Transactions home page** instead of the **Marketing tab** where they came from.
+
+## Current Behavior
+```
+Marketing Tab → Click "Create Flyer" → Advanced Flyer Builder → Click Back → Transactions Home ❌
+```
+
+## Expected Behavior
+```
+Marketing Tab → Click "Create Flyer" → Advanced Flyer Builder → Click Back → Marketing Tab ✅
+```
+
+---
+
+## Fix
+
+### Find the Back Button in Advanced Flyer Builder
+
+```bash
+# Search for the back button component
+grep -r "Back to" client/src/components/
+grep -r "ArrowLeft" client/src/components/flyer/
+grep -r "useNavigate\|navigate(" client/src/components/flyer/
+```
+
+### Update Navigation
+
+The back button likely has code like this:
+
+```tsx
+// CURRENT (Wrong)
+<Button onClick={() => navigate('/transactions')}>
+  <ArrowLeft /> Back
+</Button>
+
+// OR
+<Link to="/transactions">
+  <ArrowLeft /> Back to Transactions
+</Link>
+```
+
+### Fix: Navigate to Marketing Tab
+
+```tsx
+// FIXED - Navigate back to Marketing tab of current transaction
+<Button onClick={() => navigate(`/transactions/${transactionId}/marketing`)}>
+  <ArrowLeft className="w-4 h-4 mr-2" />
+  Back to Marketing
+</Button>
+
+// OR using Link
+<Link to={`/transactions/${transactionId}/marketing`}>
+  <ArrowLeft className="w-4 h-4 mr-2" />
+  Back to Marketing
+</Link>
+```
+
+### If Using wouter (not react-router)
+
+```tsx
+import { useLocation } from 'wouter';
+
+const [, setLocation] = useLocation();
+
+// In the back button handler
+<Button onClick={() => setLocation(`/transactions/${transactionId}/marketing`)}>
+  <ArrowLeft className="w-4 h-4 mr-2" />
+  Back to Marketing
+</Button>
+```
+
+---
+
+## Full Component Example
+
+```tsx
+// In AdvancedFlyerGenerator header
+
+interface FlyerHeaderProps {
+  transactionId: string;
+  propertyAddress: string;
+}
+
+export function FlyerHeader({ transactionId, propertyAddress }: FlyerHeaderProps) {
+  const [, setLocation] = useLocation();  // wouter
+  // OR: const navigate = useNavigate();  // react-router
+
+  const handleBack = () => {
+    setLocation(`/transactions/${transactionId}/marketing`);
+    // OR: navigate(`/transactions/${transactionId}/marketing`);
+  };
+
+  return (
+    <div className="flex items-center gap-4 mb-6">
+      <Button 
+        variant="ghost" 
+        size="sm"
+        onClick={handleBack}
+        className="gap-2"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to Marketing
+      </Button>
+      
+      <div>
+        <h1 className="text-xl font-semibold">{propertyAddress}</h1>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## Verification
+
+1. Go to a Transaction
+2. Click on the **Marketing** tab
+3. Click **Create Flyer** to open Advanced Flyer Builder
+4. Click the **Back** button (← arrow beside address)
+5. Confirm you return to the **Marketing tab** of the same transaction
+
+---
+
+## Summary
+
+| Component | Change |
+|-----------|--------|
+| Back button `onClick` or `to` | Change from `/transactions` to `/transactions/${transactionId}/marketing` |
+| Button text (optional) | Change from "Back" to "Back to Marketing" for clarity |

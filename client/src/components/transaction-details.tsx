@@ -1146,6 +1146,8 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Hide main header when Flyer Generator is active - it has its own header */}
+      {!showFlyerGenerator && (
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div className="flex items-center gap-3 sm:gap-4">
           <Button
@@ -1388,6 +1390,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           </AlertDialog>
         </div>
       </div>
+      )}
 
       <CreateFlyerDialog
         open={flyerDialogOpen}
