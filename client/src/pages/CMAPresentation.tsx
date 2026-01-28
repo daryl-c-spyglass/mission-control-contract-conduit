@@ -109,12 +109,14 @@ export default function CMAPresentation() {
   }, [agentProfileData]);
 
   // Normalize status checking both status and lastStatus fields
-  // lastStatus="Sld" indicates a sold property even when status="Active"
+  // lastStatus="Sld" indicates a sold property, "Lsd" indicates leased (rental closed)
   const normalizeStatusWithLastStatus = useCallback((status: string | undefined | null, lastStatus: string | undefined | null): string => {
-    // First check lastStatus - "Sld" or "Sold" means the property is closed/sold
+    // First check lastStatus - "Sld" (Sold), "Lsd" (Leased), etc. indicate closed transactions
     if (lastStatus) {
       const ls = lastStatus.toLowerCase();
-      if (ls === 'sld' || ls === 'sold' || ls === 's' || ls.includes('sold') || ls.includes('closed')) {
+      // Sld = Sold, Lsd = Leased (rental closed), S = Sold
+      if (ls === 'sld' || ls === 'sold' || ls === 'lsd' || ls === 'leased' || ls === 's' || 
+          ls.includes('sold') || ls.includes('closed') || ls.includes('leased')) {
         return 'Closed';
       }
     }
@@ -124,7 +126,7 @@ export default function CMAPresentation() {
     const s = status.toLowerCase();
     if (s === 'u' || s === 'sc' || s.includes('pending') || s.includes('contract')) return 'Pending';
     if (s === 'a' || s.includes('active')) return 'Active';
-    if (s === 'c' || s === 's' || s.includes('sold') || s.includes('closed')) return 'Closed';
+    if (s === 'c' || s === 's' || s.includes('sold') || s.includes('closed') || s.includes('leased')) return 'Closed';
     if (s.includes('expired') || s.includes('withdrawn') || s.includes('cancel')) return 'Off Market';
     return status;
   }, []);
@@ -133,16 +135,27 @@ export default function CMAPresentation() {
     const cmaPropertiesData = (savedCma?.propertiesData || []) as any[];
     const transactionCmaData = (transaction?.cmaData || []) as any[];
     
-    // Create a lookup map from transaction.cmaData by mlsNumber for coordinate fallback
+    // Create lookup maps from transaction.cmaData by mlsNumber for coordinates and status
+    // This ensures we always use the LATEST status from MLS sync, even if savedCma has stale data
     const coordinateLookup = new Map<string, { lat: number; lng: number }>();
+    const statusLookup = new Map<string, { status: string; lastStatus: string }>();
+    
     transactionCmaData.forEach((comp: any) => {
+      if (!comp.mlsNumber) return;
+      
       const lat = comp.latitude || comp.lat || comp.map?.latitude || comp.map?.lat || 
         comp.coordinates?.latitude || comp.coordinates?.lat || comp.geo?.lat;
       const lng = comp.longitude || comp.lng || comp.map?.longitude || comp.map?.lng || 
         comp.coordinates?.longitude || comp.coordinates?.lng || comp.geo?.lng;
-      if (lat && lng && comp.mlsNumber) {
+      if (lat && lng) {
         coordinateLookup.set(comp.mlsNumber, { lat, lng });
       }
+      
+      // Always store the latest status from transaction.cmaData
+      statusLookup.set(comp.mlsNumber, {
+        status: comp.status || comp.standardStatus || '',
+        lastStatus: comp.lastStatus || ''
+      });
     });
     
     // Prefer CMA propertiesData if available, otherwise use transaction.cmaData
@@ -176,11 +189,14 @@ export default function CMAPresentation() {
         (comp.lotSizeSquareFeet ? comp.lotSizeSquareFeet / 43560 : null) ??
         (comp.lotSize && comp.lotSize > 100 ? comp.lotSize / 43560 : comp.lotSize) ?? null;
       
+      // Get status from the latest transaction.cmaData if available (via lookup), 
+      // otherwise fall back to the comp's own status fields
+      const freshStatus = comp.mlsNumber ? statusLookup.get(comp.mlsNumber) : null;
+      const statusToUse = freshStatus?.status || comp.status || comp.standardStatus || '';
+      const lastStatusToUse = freshStatus?.lastStatus || comp.lastStatus || '';
+      
       // Get normalized status using both status and lastStatus fields
-      const normalizedStatus = normalizeStatusWithLastStatus(
-        comp.status || comp.standardStatus,
-        comp.lastStatus
-      );
+      const normalizedStatus = normalizeStatusWithLastStatus(statusToUse, lastStatusToUse);
       
       return {
         id: comp.mlsNumber || `comp-${index}`,
