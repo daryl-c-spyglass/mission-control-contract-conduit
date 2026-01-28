@@ -119,7 +119,23 @@ export default function CMAPresentation() {
   }, []);
 
   const presentationComparables = useMemo(() => {
-    const rawComparables = savedCma?.propertiesData || transaction?.cmaData || [];
+    const cmaPropertiesData = (savedCma?.propertiesData || []) as any[];
+    const transactionCmaData = (transaction?.cmaData || []) as any[];
+    
+    // Create a lookup map from transaction.cmaData by mlsNumber for coordinate fallback
+    const coordinateLookup = new Map<string, { lat: number; lng: number }>();
+    transactionCmaData.forEach((comp: any) => {
+      const lat = comp.latitude || comp.lat || comp.map?.latitude || comp.map?.lat || 
+        comp.coordinates?.latitude || comp.coordinates?.lat || comp.geo?.lat;
+      const lng = comp.longitude || comp.lng || comp.map?.longitude || comp.map?.lng || 
+        comp.coordinates?.longitude || comp.coordinates?.lng || comp.geo?.lng;
+      if (lat && lng && comp.mlsNumber) {
+        coordinateLookup.set(comp.mlsNumber, { lat, lng });
+      }
+    });
+    
+    // Prefer CMA propertiesData if available, otherwise use transaction.cmaData
+    const rawComparables = cmaPropertiesData.length > 0 ? cmaPropertiesData : transactionCmaData;
     
     return (rawComparables as any[]).map((comp: any, index: number) => {
       const resolvedAddress = comp.unparsedAddress || comp.streetAddress || comp.address || 
@@ -130,10 +146,20 @@ export default function CMAPresentation() {
       const parsedBaths = typeof comp.bathrooms === 'string' ? parseFloat(comp.bathrooms) : (comp.bathrooms || comp.baths || comp.bathroomsTotal || 0);
       const parsedPrice = comp.listPrice || comp.price || comp.closePrice || 0;
       
-      const lat = comp.latitude || comp.lat || comp.map?.latitude || comp.map?.lat || 
+      // First try to get coordinates from the comp itself
+      let lat = comp.latitude || comp.lat || comp.map?.latitude || comp.map?.lat || 
         comp.coordinates?.latitude || comp.coordinates?.lat || comp.geo?.lat;
-      const lng = comp.longitude || comp.lng || comp.map?.longitude || comp.map?.lng || 
+      let lng = comp.longitude || comp.lng || comp.map?.longitude || comp.map?.lng || 
         comp.coordinates?.longitude || comp.coordinates?.lng || comp.geo?.lng;
+      
+      // If no coordinates and we have mlsNumber, try to get from transaction.cmaData
+      if ((!lat || !lng) && comp.mlsNumber) {
+        const fallbackCoords = coordinateLookup.get(comp.mlsNumber);
+        if (fallbackCoords) {
+          lat = fallbackCoords.lat;
+          lng = fallbackCoords.lng;
+        }
+      }
       
       const lotAcres = comp.lotSizeAcres ?? comp.lot?.acres ?? 
         (comp.lotSizeSquareFeet ? comp.lotSizeSquareFeet / 43560 : null) ??
