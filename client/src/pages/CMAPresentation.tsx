@@ -109,14 +109,18 @@ export default function CMAPresentation() {
   }, [agentProfileData]);
 
   // Normalize status checking both status and lastStatus fields
-  // lastStatus="Sld" indicates a sold property, "Lsd" indicates leased (rental closed)
+  // Per RESO Standard: Sale statuses (Active/Pending/Closed) vs Rental statuses (Leasing)
+  // lastStatus="Sld" indicates a sold property, "Lsd" indicates leased (rental)
   const normalizeStatusWithLastStatus = useCallback((status: string | undefined | null, lastStatus: string | undefined | null): string => {
-    // First check lastStatus - "Sld" (Sold), "Lsd" (Leased), etc. indicate closed transactions
+    // First check lastStatus for leasing vs sold distinction
     if (lastStatus) {
       const ls = lastStatus.toLowerCase();
-      // Sld = Sold, Lsd = Leased (rental closed), S = Sold
-      if (ls === 'sld' || ls === 'sold' || ls === 'lsd' || ls === 'leased' || ls === 's' || 
-          ls.includes('sold') || ls.includes('closed') || ls.includes('leased')) {
+      // Lsd = Leased (rental property completed) - distinct from sale "Closed"
+      if (ls === 'lsd' || ls === 'leased' || ls.includes('leased') || ls.includes('lease')) {
+        return 'Leasing';
+      }
+      // Sld = Sold (sale completed) - this is "Closed"
+      if (ls === 'sld' || ls === 'sold' || ls === 's' || ls.includes('sold') || ls.includes('closed')) {
         return 'Closed';
       }
     }
@@ -124,9 +128,14 @@ export default function CMAPresentation() {
     // Then check the primary status field
     if (!status) return 'Active';
     const s = status.toLowerCase();
+    
+    // Check for leasing/rental statuses first
+    if (s.includes('leasing') || s.includes('for rent') || s.includes('rental') || s === 'lease') {
+      return 'Leasing';
+    }
     if (s === 'u' || s === 'sc' || s.includes('pending') || s.includes('contract')) return 'Pending';
     if (s === 'a' || s.includes('active')) return 'Active';
-    if (s === 'c' || s === 's' || s.includes('sold') || s.includes('closed') || s.includes('leased')) return 'Closed';
+    if (s === 'c' || s === 's' || s.includes('sold') || s.includes('closed')) return 'Closed';
     if (s.includes('expired') || s.includes('withdrawn') || s.includes('cancel')) return 'Off Market';
     return status;
   }, []);

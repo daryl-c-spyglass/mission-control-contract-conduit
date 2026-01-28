@@ -9,13 +9,25 @@ export interface StatusConfig {
 export const getStatusConfig = (status: string): StatusConfig => {
   const normalized = status?.toLowerCase().replace(/\s+/g, '') || '';
   
-  // Check off market first
-  if (normalized.includes('offmarket') || normalized === 'off_market') {
+  // Check leasing/rental FIRST (before other checks) - Purple color
+  if (normalized.includes('leasing') || normalized.includes('forrent') || 
+      normalized.includes('rental') || normalized === 'lease' ||
+      normalized.includes('lsd')) {
     return {
-      label: 'Off Market',
+      label: 'Leasing',
       badge: 'bg-purple-500 text-white',
       dot: 'bg-purple-500',
       marker: '#a855f7',
+    };
+  }
+  
+  // Check off market
+  if (normalized.includes('offmarket') || normalized === 'off_market') {
+    return {
+      label: 'Off Market',
+      badge: 'bg-gray-400 text-white',
+      dot: 'bg-gray-400',
+      marker: '#9ca3af',
     };
   }
   
@@ -68,9 +80,9 @@ export const getStatusConfig = (status: string): StatusConfig => {
   if (normalized.includes('comingsoon')) {
     return {
       label: 'Coming Soon',
-      badge: 'bg-purple-500 text-white',
-      dot: 'bg-purple-500',
-      marker: '#a855f7',
+      badge: 'bg-violet-500 text-white',
+      dot: 'bg-violet-500',
+      marker: '#8b5cf6',
     };
   }
   
@@ -105,9 +117,15 @@ export const getStatusConfig = (status: string): StatusConfig => {
 export const getStatusBadgeStyle = (status: string): string => {
   const statusLower = status.toLowerCase();
   
-  // Check off market first
-  if (statusLower.includes('off market') || statusLower.includes('off_market') || statusLower === 'offmarket') {
+  // Check leasing/rental FIRST (before other checks) - Purple color
+  if (statusLower.includes('leasing') || statusLower.includes('for rent') || 
+      statusLower.includes('rental') || statusLower === 'lease' || statusLower === 'lsd') {
     return 'bg-purple-500 text-white';
+  }
+  
+  // Check off market
+  if (statusLower.includes('off market') || statusLower.includes('off_market') || statusLower === 'offmarket') {
+    return 'bg-gray-400 text-white';
   }
   
   // IMPORTANT: Check compound/contract statuses BEFORE simple "active"
@@ -131,7 +149,7 @@ export const getStatusBadgeStyle = (status: string): string => {
     return 'bg-muted text-muted-foreground';
   }
   if (statusLower.includes('coming soon')) {
-    return 'bg-[hsl(var(--chart-5))] text-white';
+    return 'bg-violet-500 text-white';
   }
   // Check "active" LAST since "Active Under Contract" should match contract above
   if (statusLower.includes('active') || statusLower === 'for sale') {
@@ -144,9 +162,15 @@ export const getStatusBadgeStyle = (status: string): string => {
 export const getStatusColor = (status: string): string => {
   const statusLower = status.toLowerCase();
   
-  // Check off market first
-  if (statusLower.includes('off market') || statusLower.includes('off_market') || statusLower === 'offmarket') {
+  // Check leasing/rental FIRST (before other checks) - Purple color
+  if (statusLower.includes('leasing') || statusLower.includes('for rent') || 
+      statusLower.includes('rental') || statusLower === 'lease' || statusLower === 'lsd') {
     return '#a855f7'; // Purple
+  }
+  
+  // Check off market
+  if (statusLower.includes('off market') || statusLower.includes('off_market') || statusLower === 'offmarket') {
+    return '#9ca3af'; // Gray
   }
   
   // IMPORTANT: Check compound/contract statuses BEFORE simple "active"
@@ -157,7 +181,7 @@ export const getStatusColor = (status: string): string => {
   if (statusLower.includes('pending')) return 'hsl(var(--chart-3))';
   if (statusLower.includes('closed') || statusLower.includes('sold')) return 'hsl(var(--destructive))';
   if (statusLower.includes('withdrawn') || statusLower.includes('cancel') || statusLower.includes('expired')) return 'hsl(var(--muted-foreground))';
-  if (statusLower.includes('coming soon')) return 'hsl(var(--chart-5))';
+  if (statusLower.includes('coming soon')) return '#8b5cf6'; // Violet
   // Check "active" LAST since "Active Under Contract" should match contract above
   if (statusLower.includes('active') || statusLower === 'for sale') return 'hsl(var(--chart-1))';
   
@@ -179,7 +203,13 @@ export const getStatusLabel = (status: string): string => {
   
   const statusLower = status.toLowerCase();
   
-  // Check off market first
+  // Check leasing/rental first - Purple badge status
+  if (statusLower.includes('leasing') || statusLower.includes('for rent') || 
+      statusLower.includes('rental') || statusLower === 'lease' || statusLower === 'lsd' || statusLower === 'leased') {
+    return 'Leasing';
+  }
+  
+  // Check off market
   if (statusLower.includes('off market') || statusLower === 'off_market' || statusLower === 'offmarket') {
     return 'Off Market';
   }

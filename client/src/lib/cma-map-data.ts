@@ -2,13 +2,14 @@ import * as turf from '@turf/turf';
 import type { Feature, FeatureCollection, Point, Polygon } from 'geojson';
 import type { Property } from '@shared/schema';
 
-export type NormalizedStatus = 'ACTIVE' | 'UNDER_CONTRACT' | 'PENDING' | 'SOLD' | 'UNKNOWN';
+export type NormalizedStatus = 'ACTIVE' | 'UNDER_CONTRACT' | 'PENDING' | 'SOLD' | 'LEASING' | 'UNKNOWN';
 
 export const STATUS_COLORS: Record<NormalizedStatus, string> = {
-  ACTIVE: '#22c55e',        // Green
-  UNDER_CONTRACT: '#f97316', // Orange
-  PENDING: '#6b7280',        // Gray
-  SOLD: '#ef4444',          // Red
+  ACTIVE: '#22c55e',        // Green - For Sale listings
+  UNDER_CONTRACT: '#f97316', // Orange - Has accepted offer
+  PENDING: '#6b7280',        // Gray - Sale pending
+  SOLD: '#ef4444',          // Red - Sale completed
+  LEASING: '#a855f7',       // Purple - Rental/For Rent property
   UNKNOWN: '#9ca3af',       // Light Gray
 };
 
@@ -19,6 +20,7 @@ export const STATUS_LABELS: Record<NormalizedStatus, string> = {
   UNDER_CONTRACT: 'Under Contract',
   PENDING: 'Pending',
   SOLD: 'Closed',
+  LEASING: 'Leasing',
   UNKNOWN: 'Unknown',
 };
 
@@ -61,8 +63,16 @@ export function normalizeStatus(rawStatus: string | null | undefined): Normalize
 
   const status = rawStatus.toLowerCase().trim();
 
-  // Sold/Closed statuses (Repliers codes: 's', 'sold', 'closed')
-  if (status === 's' || status === 'sold' || status === 'closed' ||
+  // Leasing/Rental statuses FIRST (Repliers codes: 'lsd' = leased, 'l' = lease)
+  // These are rental properties, distinct from sale transactions
+  if (status === 'lsd' || status === 'leased' || status === 'l' || status === 'lease' ||
+      status.includes('leasing') || status.includes('for rent') || status.includes('rental')) {
+    return 'LEASING';
+  }
+
+  // Sold/Closed statuses (Repliers codes: 's', 'sld', 'sold', 'closed')
+  // These are completed SALE transactions (not leases)
+  if (status === 's' || status === 'sld' || status === 'sold' || status === 'closed' ||
       status.includes('sold') || status.includes('closed')) {
     return 'SOLD';
   }

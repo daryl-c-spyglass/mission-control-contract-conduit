@@ -81,15 +81,20 @@ const STATUS_FILTERS = [
   { id: 'activeUnderContract', label: 'Active Under Contract' },
   { id: 'pending', label: 'Pending' },
   { id: 'active', label: 'Active' },
+  { id: 'leasing', label: 'Leasing' },
 ] as const;
 
 type StatusFilterType = typeof STATUS_FILTERS[number]['id'];
-type NormalizedStatusType = 'active' | 'closed' | 'activeUnderContract' | 'pending' | 'unknown';
+type NormalizedStatusType = 'active' | 'closed' | 'activeUnderContract' | 'pending' | 'leasing' | 'unknown';
 
 function normalizeStatus(status: string | null | undefined): NormalizedStatusType {
   const lower = (status || '').toLowerCase().trim();
   if (!lower) {
     return 'unknown';
+  }
+  // Check leasing/rental first (before other checks)
+  if (lower.includes('leasing') || lower.includes('for rent') || lower.includes('rental') || lower === 'lease' || lower === 'lsd' || lower === 'leased') {
+    return 'leasing';
   }
   if (lower.includes('active under contract') || lower.includes('under contract')) {
     return 'activeUnderContract';

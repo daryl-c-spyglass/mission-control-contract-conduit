@@ -33,6 +33,7 @@ const STATUS_FILTERS = [
   { id: 'activeUnderContract', label: 'Active Under Contract' },
   { id: 'pending', label: 'Pending' },
   { id: 'active', label: 'Active' },
+  { id: 'leasing', label: 'Leasing' },
 ] as const;
 
 // Safe helper to get display price using utility functions
@@ -113,9 +114,11 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-// Contract Conduit Standard: Closed=RED, Active=GREEN, Under Contract=ORANGE, Pending=GRAY
+// Contract Conduit Standard: Closed=RED, Active=GREEN, Under Contract=ORANGE, Pending=GRAY, Leasing=PURPLE
 const getStatusColor = (status: string) => {
   const s = status?.toLowerCase() || '';
+  // Check leasing first (before other checks) - includes Repliers API code "lsd" (Leased)
+  if (s === 'lsd' || s === 'leased' || s === 'lease' || s.includes('leasing') || s.includes('for rent') || s.includes('rental')) return 'bg-purple-500';  // PURPLE for Leasing
   if (s.includes('closed') || s.includes('sold')) return 'bg-red-500';  // RED for Closed/Sold
   if (s.includes('active under') || s.includes('under contract')) return 'bg-orange-500';  // ORANGE for Under Contract
   if (s.includes('active')) return 'bg-green-500';  // GREEN for Active
@@ -125,6 +128,8 @@ const getStatusColor = (status: string) => {
 
 const normalizeStatus = (status: string): string => {
   const s = status.toLowerCase();
+  // Check leasing first (before other checks) - includes Repliers API code "lsd" (Leased)
+  if (s === 'lsd' || s === 'leased' || s === 'lease' || s.includes('leasing') || s.includes('for rent') || s.includes('rental')) return 'leasing';
   if (s.includes('closed') || s.includes('sold')) return 'closed';
   if (s.includes('active under') || s.includes('under contract')) return 'activeUnderContract';
   if (s.includes('pending')) return 'pending';

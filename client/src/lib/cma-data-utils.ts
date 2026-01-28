@@ -363,19 +363,25 @@ export function extractFullAddress(comp: any): string {
 
 /**
  * Get status display color
+ * Contract Conduit Standard: Closed=RED, Active=GREEN, Under Contract=ORANGE, Pending=GRAY, Leasing=PURPLE
  */
 export function getStatusColor(status: string): string {
   const statusLower = (status || '').toLowerCase();
-  if (statusLower.includes('closed') || statusLower === 'sold' || statusLower === 's' || statusLower === 'c') {
-    return '#6b7280';
+  // Check leasing/rental first (before other checks) - Purple
+  if (statusLower.includes('leasing') || statusLower === 'lsd' || statusLower === 'leased' || 
+      statusLower.includes('for rent') || statusLower.includes('rental') || statusLower === 'lease') {
+    return '#a855f7';  // Purple for Leasing
+  }
+  if (statusLower.includes('closed') || statusLower === 'sold' || statusLower === 'sld' || statusLower === 's' || statusLower === 'c') {
+    return '#ef4444';  // Red for Closed/Sold
   }
   if (statusLower.includes('pending') || statusLower.includes('under contract') || statusLower === 'u' || statusLower === 'sc') {
-    return '#f59e0b';
+    return '#f59e0b';  // Orange for Pending/Under Contract
   }
   if (statusLower.includes('active') || statusLower === 'a') {
-    return '#22c55e';
+    return '#22c55e';  // Green for Active
   }
-  return '#6b7280';
+  return '#6b7280';    // Gray for Unknown
 }
 
 /**
@@ -400,6 +406,7 @@ export function extractStatus(comp: any): string {
 /**
  * Normalize status display text
  * Handles Repliers-specific status codes: Sld (Sold), Lsd (Leased), Sc (Sold Conditionally/Under Contract), etc.
+ * Per RESO Standard: Sale statuses (Active/Pending/Closed) vs Rental statuses (Leasing)
  */
 export function normalizeStatus(status: string): string {
   const statusLower = (status || '').toLowerCase().trim();
@@ -408,7 +415,13 @@ export function normalizeStatus(status: string): string {
   if (!statusLower) return 'Unknown';
   
   // Repliers-specific codes and common variations
-  // Closed/Sold statuses
+  // Check leasing/rental FIRST (before other checks) - distinct from sales
+  if (statusLower === 'lsd' || statusLower === 'leased' || statusLower === 'lease' ||
+      statusLower.includes('leasing') || statusLower.includes('for rent') || statusLower.includes('rental')) {
+    return 'Leasing';
+  }
+  
+  // Closed/Sold statuses (sale transactions)
   if (statusLower === 'sld' || statusLower === 'sold' || statusLower === 's' || 
       statusLower === 'c' || statusLower === 'closed' || statusLower.includes('closed')) {
     return 'Closed';
@@ -424,11 +437,6 @@ export function normalizeStatus(status: string): string {
   // Active statuses
   if (statusLower === 'a' || statusLower === 'active' || statusLower.includes('active')) {
     return 'Active';
-  }
-  
-  // Leased (for rentals)
-  if (statusLower === 'lsd' || statusLower === 'leased') {
-    return 'Leased';
   }
   
   // Back on market

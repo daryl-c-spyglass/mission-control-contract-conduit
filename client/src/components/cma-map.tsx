@@ -1016,6 +1016,13 @@ export function CMAMap({
           <div className="flex items-center gap-2">
             <div
               className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: STATUS_COLORS.LEASING }}
+            />
+            <span className="text-xs">{STATUS_LABELS.LEASING}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div
+              className="w-3 h-3 rounded-full"
               style={{ backgroundColor: STATUS_COLORS.UNKNOWN }}
             />
             <span className="text-xs">{STATUS_LABELS.UNKNOWN}</span>

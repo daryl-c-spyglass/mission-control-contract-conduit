@@ -41,7 +41,17 @@ Preferred communication style: Simple, everyday language.
 - **Agent Profile System**: Database-backed agent profiles with bio, default cover letter (with AI generation/enhancement), and social media links for CMA reports.
 - **Agent Marketing Profile System**: Separate database profile for flyers and marketing materials, including agent photo, title, QR code, company logos, with API endpoints for management and server-side validation.
 - **Automatic MLS Synchronization**: Background service for regular MLS data sync.
-- **CMA (Comparative Market Analysis) System**: Database-backed storage, public share links, property data visualization, and configurable filters. Includes robust data flow for subject property and comparables, extensive field aliasing, and status normalization for consistency across various MLS formats. Status normalization checks both `status` and `lastStatus` fields from Repliers API - `lastStatus="Sld"` indicates sold properties should display as "Closed" even when `status` shows "Active".
+- **CMA (Comparative Market Analysis) System**: Database-backed storage, public share links, property data visualization, and configurable filters. Includes robust data flow for subject property and comparables, extensive field aliasing, and status normalization for consistency across various MLS formats. Status normalization checks both `status` and `lastStatus` fields from Repliers API:
+  - `lastStatus="Sld"` (Sold) indicates a completed SALE transaction - displays as "Closed" with red badge
+  - `lastStatus="Lsd"` (Leased) indicates a completed RENTAL transaction - displays as "Leasing" with purple badge
+  - Per RESO Standard: Sale statuses (Active/Pending/Closed) are distinct from Rental statuses (Leasing)
+- **Status Color System**: Centralized status colors across all CMA views:
+  - Active = Green (#22c55e) - Property listed for sale
+  - Pending / Under Contract = Orange (#f97316) - Has accepted offer
+  - Closed = Red (#ef4444) - Sale completed
+  - Leasing = Purple (#a855f7) - Rental/For Rent property
+  - Subject = Blue (#3b82f6) - Subject property marker
+  - Unknown = Gray (#6b7280) - Status not determined
 - **Photo Upload System**: Photos uploaded via GCS client to private storage, served through a secure route. Server validates file type and size. Distinct handling for MLS photos and user uploads.
 - **CMA Data Extraction Utilities**: Comprehensive client-side utilities (`client/src/lib/cma-data-utils.ts`) for safe data extraction and normalization from various MLS/Repliers API field structures, including price, square footage, DOM, lot acres, beds/baths, address, coordinates, and status. Includes calculation of CMA statistics and robust formatting functions.
 - **CMA Resources System**: Agent-managed resources (documents, links) for CMA presentations, stored in a database with API endpoints for CRUD, reordering, and file uploads. Supports public access for shared CMAs.

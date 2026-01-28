@@ -45,7 +45,7 @@ export interface CmaProperty {
   pricePerAcre?: number | null;
   yearBuilt?: number;
   garageSpaces?: number;
-  status: 'Active' | 'Pending' | 'Closed' | 'Active Under Contract' | 'Expired' | 'Canceled' | 'Withdrawn';
+  status: 'Active' | 'Pending' | 'Closed' | 'Active Under Contract' | 'Leasing' | 'Expired' | 'Canceled' | 'Withdrawn';
   daysOnMarket: number;
   listDate?: string;
   soldDate?: string;
