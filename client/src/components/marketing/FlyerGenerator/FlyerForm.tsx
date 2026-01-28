@@ -494,7 +494,7 @@ export function FlyerForm({
               Shareable Flyer Link
             </Label>
             {images.qrCode && localQrUrl ? (
-              <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg border border-border/50">
+              <div className="flex items-start gap-3 h-32 p-3 border-2 border-solid border-primary/30 bg-muted/50 rounded-lg">
                 <div className="relative flex-shrink-0">
                   <img 
                     src={images.qrCode} 
@@ -521,8 +521,8 @@ export function FlyerForm({
                 </div>
               </div>
             ) : (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground leading-relaxed">
+              <div className="flex flex-col items-center justify-center h-32 p-4 border-2 border-dashed border-muted-foreground/25 bg-muted/50 rounded-lg">
+                <p className="text-xs text-muted-foreground text-center leading-relaxed mb-3">
                   Generate a shareable link for this flyer. The QR code will open a mobile-friendly property page.
                 </p>
                 <Button
@@ -530,7 +530,6 @@ export function FlyerForm({
                   variant="secondary"
                   onClick={onGenerateShareableLink}
                   disabled={isGeneratingShareableLink}
-                  className="w-full"
                   data-testid="button-generate-shareable-link"
                 >
                   {isGeneratingShareableLink ? (
