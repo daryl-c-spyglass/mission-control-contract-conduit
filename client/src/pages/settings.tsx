@@ -655,14 +655,17 @@ export default function Settings() {
                   </AvatarFallback>
                 </Avatar>
                 {marketingProfile.headshotUrl && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={handleRecropPhoto}
-                    className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    className="absolute inset-0 h-24 w-24 bg-black/50 rounded-full invisible group-hover:visible flex items-center justify-center"
+                    aria-label="Adjust photo position"
                     data-testid="button-recrop-overlay"
                   >
                     <Move className="w-6 h-6 text-white" />
-                  </button>
+                  </Button>
                 )}
               </div>
               <div className="flex-1 space-y-2">
@@ -719,6 +722,13 @@ export default function Settings() {
                 onClose={handleCloseCropper}
                 imageUrl={tempPhotoUrl}
                 onCropComplete={handlePhotoCropComplete}
+                onError={(error) => {
+                  toast({
+                    title: "Image Error",
+                    description: error,
+                    variant: "destructive",
+                  });
+                }}
               />
             )}
 

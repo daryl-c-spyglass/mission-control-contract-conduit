@@ -1,21 +1,26 @@
 /**
  * Format phone number to (XXX) XXX-XXXX format
  * Handles various input formats and strips non-numeric characters
+ * Always returns a properly formatted string or empty string
  */
 export function formatPhoneNumber(phone: string): string {
   if (!phone) return '';
   
   // Remove all non-numeric characters
-  const cleaned = phone.replace(/\D/g, '');
+  let cleaned = phone.replace(/\D/g, '');
   
   // Handle numbers with country code (1)
-  const digits = cleaned.startsWith('1') && cleaned.length === 11 
-    ? cleaned.slice(1) 
-    : cleaned;
+  if (cleaned.startsWith('1') && cleaned.length >= 11) {
+    cleaned = cleaned.slice(1);
+  }
   
-  // Must have exactly 10 digits for US format
+  // Take only the first 10 digits
+  const digits = cleaned.slice(0, 10);
+  
+  // Need exactly 10 digits for US format
   if (digits.length !== 10) {
-    return phone; // Return original if can't format
+    // If we have some digits but not 10, return empty to prompt user to fix
+    return digits.length > 0 ? formatPhoneAsYouType(digits) : '';
   }
   
   // Format as (XXX) XXX-XXXX
@@ -28,9 +33,11 @@ export function formatPhoneNumber(phone: string): string {
 
 /**
  * Format phone as user types (for input onChange)
+ * Clamps to 10 digits maximum
  */
 export function formatPhoneAsYouType(value: string): string {
-  const cleaned = value.replace(/\D/g, '');
+  // Remove all non-numeric characters and clamp to 10 digits
+  const cleaned = value.replace(/\D/g, '').slice(0, 10);
   
   if (cleaned.length === 0) return '';
   if (cleaned.length <= 3) return `(${cleaned}`;
