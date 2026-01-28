@@ -15,7 +15,7 @@ import { ImageUploadField } from './ImageUploadField';
 import { AIHeadlineButton } from './AIHeadlineButton';
 import { AISummarizeButton } from './AISummarizeButton';
 import { CharacterCounter } from './CharacterCounter';
-import type { FlyerData, FlyerImages } from '@/lib/flyer-types';
+import type { FlyerData, FlyerImages, ImageTransforms, ImageTransform } from '@/lib/flyer-types';
 import type { PhotoSelectionInfo } from '@/lib/flyer-utils';
 import QRCode from 'qrcode';
 
@@ -63,6 +63,8 @@ interface FlyerFormProps {
   useDefaultSecondaryLogo?: boolean;
   onUseDefaultSecondaryLogoChange?: (checked: boolean) => void;
   onResetLogoControls?: () => void;
+  imageTransforms?: ImageTransforms;
+  onImageTransformChange?: (field: keyof ImageTransforms, transform: ImageTransform) => void;
 }
 
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
@@ -133,6 +135,8 @@ export function FlyerForm({
   useDefaultSecondaryLogo = true,
   onUseDefaultSecondaryLogoChange,
   onResetLogoControls,
+  imageTransforms,
+  onImageTransformChange,
 }: FlyerFormProps) {
   const { register, setValue, watch } = form;
   const [isGeneratingQR, setIsGeneratingQR] = useState(false);
@@ -487,6 +491,8 @@ export function FlyerForm({
             id="agentPhoto"
             preview={images.agentPhoto}
             onChange={onImageUpload('agentPhoto')}
+            transform={imageTransforms?.agentPhoto}
+            onTransformChange={onImageTransformChange ? (t) => onImageTransformChange('agentPhoto', t) : undefined}
             circular
           />
           <div className="space-y-2">
@@ -574,6 +580,8 @@ export function FlyerForm({
               id="mainImage"
               preview={images.mainImage}
               onChange={onImageUpload('mainImage')}
+              transform={imageTransforms?.mainImage}
+              onTransformChange={onImageTransformChange ? (t) => onImageTransformChange('mainImage', t) : undefined}
               aiSelectionInfo={photoSelectionInfo?.mainImage}
               availablePhotos={allMlsPhotos}
               onSelectPhoto={(url) => onSelectPhoto?.('mainImage', url)}
@@ -586,6 +594,8 @@ export function FlyerForm({
               id="kitchenImage"
               preview={images.kitchenImage}
               onChange={onImageUpload('kitchenImage')}
+              transform={imageTransforms?.kitchenImage}
+              onTransformChange={onImageTransformChange ? (t) => onImageTransformChange('kitchenImage', t) : undefined}
               aiSelectionInfo={photoSelectionInfo?.kitchenImage}
               availablePhotos={allMlsPhotos}
               onSelectPhoto={(url) => onSelectPhoto?.('kitchenImage', url)}
@@ -598,6 +608,8 @@ export function FlyerForm({
               id="roomImage"
               preview={images.roomImage}
               onChange={onImageUpload('roomImage')}
+              transform={imageTransforms?.roomImage}
+              onTransformChange={onImageTransformChange ? (t) => onImageTransformChange('roomImage', t) : undefined}
               aiSelectionInfo={photoSelectionInfo?.roomImage}
               availablePhotos={allMlsPhotos}
               onSelectPhoto={(url) => onSelectPhoto?.('roomImage', url)}

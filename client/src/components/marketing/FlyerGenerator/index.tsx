@@ -785,6 +785,13 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
                 setDividerPosition(148);
                 setSecondaryLogoOffsetY(0);
               }}
+              imageTransforms={imageTransforms}
+              onImageTransformChange={(field, transform) => {
+                setImageTransforms(prev => ({
+                  ...prev,
+                  [field]: transform,
+                }));
+              }}
             />
           </ScrollArea>
         </div>
