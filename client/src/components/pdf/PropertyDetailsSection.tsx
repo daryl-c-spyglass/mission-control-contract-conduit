@@ -3,7 +3,7 @@ import { styles, SPYGLASS_ORANGE, SPYGLASS_NAVY, MEDIUM_GRAY } from './styles';
 import type { CMAComparable } from '@shared/cma-sections';
 
 interface PropertyDetailsSectionProps {
-  property: CMAComparable;
+  property: CMAComparable & { base64Photos?: string[] };
   index: number;
   company?: string;
 }
@@ -25,8 +25,12 @@ function getStatusColor(status: string): string {
 }
 
 export function PropertyDetailsSection({ property, index, company }: PropertyDetailsSectionProps) {
-  const mainPhoto = property.photos?.[0];
-  const additionalPhotos = property.photos?.slice(1, 5) || [];
+  const base64Photos = (property as any).base64Photos || [];
+  const urlPhotos = property.photos || [];
+  const mainPhoto = base64Photos[0] || urlPhotos[0];
+  const additionalPhotos = base64Photos.length > 1 
+    ? base64Photos.slice(1, 5) 
+    : urlPhotos.slice(1, 5);
   const displayPrice = property.soldPrice || property.listPrice;
 
   return (

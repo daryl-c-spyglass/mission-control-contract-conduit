@@ -47,6 +47,7 @@ import { cn } from "@/lib/utils";
 import { transformToCMAReportData } from "@/lib/cma-transformer";
 import { pdf } from '@react-pdf/renderer';
 import { CMAPdfDocument } from "@/components/pdf/CMAPdfDocument";
+import { imageUrlToBase64 } from "@/lib/image-to-base64";
 
 import {
   DndContext,
@@ -614,10 +615,49 @@ export default function CMAPresentationBuilder() {
       console.log('[PDF Export] Agent:', reportData.agent?.firstName, reportData.agent?.lastName);
       console.log('[PDF Export] Agent photo:', reportData.agent?.photo ? 'present' : 'missing');
       console.log('[PDF Export] Subject photos:', reportData.subjectProperty?.photos?.length || 0);
+      console.log('[PDF Export] Comparables:', reportData.comparables?.length || 0);
+      
+      console.log('[PDF Export] Converting external images to base64 for PDF...');
+      
+      const processedComparables = await Promise.all(
+        (reportData.comparables || []).map(async (comp, index) => {
+          const photos = comp.photos || [];
+          const photosToConvert = photos.slice(0, 5);
+          
+          console.log(`[PDF Export] Processing comparable ${index + 1}/${reportData.comparables?.length || 0} - ${photosToConvert.length} photos`);
+          
+          const base64Photos = await Promise.all(
+            photosToConvert.map(async (photoUrl) => {
+              try {
+                const base64 = await imageUrlToBase64(photoUrl);
+                return base64;
+              } catch (err) {
+                console.warn(`[PDF Export] Failed to convert photo: ${photoUrl}`);
+                return null;
+              }
+            })
+          );
+          
+          const validBase64Photos = base64Photos.filter((p): p is string => p !== null);
+          console.log(`[PDF Export] Comparable ${index + 1}: converted ${validBase64Photos.length}/${photosToConvert.length} photos`);
+          
+          return {
+            ...comp,
+            base64Photos: validBase64Photos,
+          };
+        })
+      );
+      
+      console.log('[PDF Export] Image conversion complete');
+      
+      const processedReportData = {
+        ...reportData,
+        comparables: processedComparables,
+      };
 
       const pdfDoc = (
         <CMAPdfDocument
-          data={reportData}
+          data={processedReportData}
           includedSections={config.includedSections}
           sectionOrder={config.sectionOrder}
           coverPageConfig={config.coverPageConfig}
