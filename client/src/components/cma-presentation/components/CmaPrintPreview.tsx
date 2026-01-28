@@ -242,17 +242,22 @@ export function CmaPrintPreview({
                     )}
                     data-testid={`thumbnail-slide-${index}`}
                   >
-                    <div className="w-full h-full bg-white p-2 flex flex-col">
-                      <div className="text-[6px] font-bold text-zinc-900 truncate text-left">
-                        {slide.title}
+                    <div className="w-full h-full bg-white overflow-hidden relative">
+                      <div 
+                        className="absolute inset-0 origin-top-left"
+                        style={{ 
+                          transform: 'scale(0.18)', 
+                          width: '555%', 
+                          height: '555%' 
+                        }}
+                      >
+                        <SlidePreview slide={slide} />
                       </div>
-                      <div className="flex-1 flex items-center justify-center">
-                        {slide.hasIssue ? (
-                          <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                        ) : (
-                          <div className="w-full h-full bg-zinc-100 rounded" />
-                        )}
-                      </div>
+                      {slide.hasIssue && (
+                        <div className="absolute top-1 right-1 z-10">
+                          <AlertTriangle className="w-3 h-3 text-yellow-500" />
+                        </div>
+                      )}
                     </div>
                   </button>
                 ))}
