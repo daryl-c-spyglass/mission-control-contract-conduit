@@ -69,9 +69,9 @@ export function FlyerPreview({
           }}
         />
         
-        {/* Secondary Logo Container */}
+        {/* Secondary Logo Container - positioned immediately after divider */}
         <div 
-          className="flex items-center justify-center h-full flex-1"
+          className="flex items-center justify-start h-full"
           style={{ 
             transform: `translateY(${secondaryLogoOffsetY}px)`,
           }}
@@ -83,11 +83,11 @@ export function FlyerPreview({
               className="max-h-[50px] object-contain"
               style={{ 
                 transform: `scale(${logoScales.secondary})`,
-                transformOrigin: 'center center',
+                transformOrigin: 'left center',
               }}
             />
           ) : (
-            <span className="text-gray-400 text-xs">SECONDARY</span>
+            <span className="text-gray-400 text-xs">SECONDARY LOGO</span>
           )}
         </div>
         
