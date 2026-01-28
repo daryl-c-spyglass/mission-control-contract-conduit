@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Trash2, Loader2, UserPlus, Save, Mail, CheckCircle2, ExternalLink, User, Camera, Bell, FileText, Sparkles, Link as LinkIcon, Upload, GripVertical, Pencil, FolderOpen, QrCode, Building2, Image as ImageIcon } from "lucide-react";
+import { Plus, Trash2, Loader2, UserPlus, Save, Mail, CheckCircle2, ExternalLink, User, Camera, Bell, FileText, Sparkles, Link as LinkIcon, Upload, GripVertical, Pencil, FolderOpen, QrCode, Building2, Image as ImageIcon, Crop, Move } from "lucide-react";
+import { formatPhoneNumber, formatPhoneAsYouType } from "@/lib/formatPhone";
+import { ProfilePhotoCropper } from "@/components/settings/ProfilePhotoCropper";
 import { SiFacebook, SiInstagram, SiLinkedin, SiX } from "react-icons/si";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -65,21 +67,18 @@ export default function Settings() {
     headshotUrl: "",
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Phone number formatting helper (XXX-XXX-XXXX format)
-  const formatPhoneNumber = (value: string): string => {
-    const cleaned = value.replace(/\D/g, '');
-    if (cleaned.length <= 3) {
-      return cleaned;
-    } else if (cleaned.length <= 6) {
-      return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
-    } else {
-      return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
-    }
-  };
+  
+  // Photo cropper state
+  const [showPhotoCropper, setShowPhotoCropper] = useState(false);
+  const [tempPhotoUrl, setTempPhotoUrl] = useState<string | null>(null);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatPhoneNumber(e.target.value);
+    const formatted = formatPhoneAsYouType(e.target.value);
+    setMarketingProfile(prev => ({ ...prev, phone: formatted }));
+  };
+  
+  const handlePhoneBlur = () => {
+    const formatted = formatPhoneNumber(marketingProfile.phone);
     setMarketingProfile(prev => ({ ...prev, phone: formatted }));
   };
 
@@ -505,13 +504,35 @@ export default function Settings() {
       return;
     }
     
-    // Convert to base64
+    // Create temporary URL for cropping
     const reader = new FileReader();
     reader.onload = () => {
       const base64 = reader.result as string;
-      setMarketingProfile(prev => ({ ...prev, headshotUrl: base64 }));
+      setTempPhotoUrl(base64);
+      setShowPhotoCropper(true);
     };
     reader.readAsDataURL(file);
+    
+    // Reset file input so same file can be selected again
+    e.target.value = '';
+  };
+  
+  const handlePhotoCropComplete = (croppedUrl: string) => {
+    setMarketingProfile(prev => ({ ...prev, headshotUrl: croppedUrl }));
+    setTempPhotoUrl(null);
+  };
+  
+  const handleRecropPhoto = () => {
+    const currentPhoto = marketingProfile.headshotUrl;
+    if (currentPhoto) {
+      setTempPhotoUrl(currentPhoto);
+      setShowPhotoCropper(true);
+    }
+  };
+  
+  const handleCloseCropper = () => {
+    setShowPhotoCropper(false);
+    setTempPhotoUrl(null);
   };
 
   const handleSaveMarketingProfile = async () => {
@@ -624,18 +645,30 @@ export default function Settings() {
           <div className="space-y-6">
             {/* Profile Photo Section */}
             <div className="flex items-start gap-4">
-              <Avatar className="h-20 w-20 border-2 border-muted">
-                {marketingProfile.headshotUrl ? (
-                  <AvatarImage src={marketingProfile.headshotUrl} alt="Agent headshot" />
-                ) : null}
-                <AvatarFallback className="text-xl">
-                  <User className="h-10 w-10 text-muted-foreground" />
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative group">
+                <Avatar className="h-24 w-24 border-2 border-muted">
+                  {marketingProfile.headshotUrl ? (
+                    <AvatarImage src={marketingProfile.headshotUrl} alt="Agent headshot" />
+                  ) : null}
+                  <AvatarFallback className="text-xl">
+                    <User className="h-10 w-10 text-muted-foreground" />
+                  </AvatarFallback>
+                </Avatar>
+                {marketingProfile.headshotUrl && (
+                  <button
+                    type="button"
+                    onClick={handleRecropPhoto}
+                    className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    data-testid="button-recrop-overlay"
+                  >
+                    <Move className="w-6 h-6 text-white" />
+                  </button>
+                )}
+              </div>
               <div className="flex-1 space-y-2">
                 <Label className="text-sm text-muted-foreground">Profile Photo</Label>
                 <p className="text-xs text-muted-foreground">
-                  Upload a professional headshot photo (max 5MB, JPG or PNG) or paste an image URL.
+                  Upload a photo, then drag to position and zoom to fit the circle frame.
                 </p>
                 <Input
                   value={marketingProfile.headshotUrl || ''}
@@ -652,18 +685,42 @@ export default function Settings() {
                   onChange={handleHeadshotUpload}
                   data-testid="input-headshot-upload"
                 />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="gap-2"
-                  data-testid="button-upload-headshot"
-                >
-                  <Camera className="h-4 w-4" />
-                  Change
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="gap-2"
+                    data-testid="button-upload-headshot"
+                  >
+                    <Camera className="h-4 w-4" />
+                    Upload Photo
+                  </Button>
+                  {marketingProfile.headshotUrl && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRecropPhoto}
+                      className="gap-2"
+                      data-testid="button-adjust-position"
+                    >
+                      <Crop className="h-4 w-4" />
+                      Adjust Position
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
+
+            {/* Profile Photo Cropper Modal */}
+            {tempPhotoUrl && (
+              <ProfilePhotoCropper
+                isOpen={showPhotoCropper}
+                onClose={handleCloseCropper}
+                imageUrl={tempPhotoUrl}
+                onCropComplete={handlePhotoCropComplete}
+              />
+            )}
 
             {/* Name Fields Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -704,14 +761,20 @@ export default function Settings() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
+                <Label htmlFor="phone">Phone Number</Label>
                 <Input
                   id="phone"
+                  type="tel"
                   value={marketingProfile.phone}
                   onChange={handlePhoneChange}
-                  placeholder="512-452-4125"
+                  onBlur={handlePhoneBlur}
+                  placeholder="(512) 555-1234"
+                  maxLength={14}
                   data-testid="input-phone"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Format: (512) 555-1234
+                </p>
               </div>
             </div>
 
