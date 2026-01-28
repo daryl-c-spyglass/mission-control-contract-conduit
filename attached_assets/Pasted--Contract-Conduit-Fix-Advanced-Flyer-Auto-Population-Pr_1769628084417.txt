@@ -1,0 +1,272 @@
+# Contract Conduit — Fix Advanced Flyer Auto-Population
+
+## 📌 Problem
+
+The Advanced Flyer Builder's **left pane form fields** are showing hardcoded default values instead of auto-populating from the transaction's MLS data via Repliers API.
+
+Since each transaction is tied to a **property address + MLS #**, the Flyer Generator should automatically pull all property data from Repliers API.
+
+---
+
+## 🔄 Data Flow Logic
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     TRANSACTION                                  │
+│                                                                  │
+│   Has MLS # ?                                                    │
+│       │                                                          │
+│       ├── YES (Active Listing) ──► AUTO-POPULATE from Repliers  │
+│       │                            - Price, Beds, Baths, SqFt   │
+│       │                            - Address, Description        │
+│       │                            - Photos with imageInsights   │
+│       │                                                          │
+│       └── NO (Off-Market) ──────► MANUAL ENTRY required         │
+│                                    - Show empty fields           │
+│                                    - User fills in manually      │
+│                                                                  │
+│   Agent Details ─────────────────► ALWAYS from Settings         │
+│                                    - Name, Title, Phone, Photo  │
+│                                    - Logos (with sizing control) │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔧 Implementation
+
+### Check for MLS Data and Auto-Populate
+
+```typescript
+useEffect(() => {
+  if (!transaction) return;
+  
+  const mlsData = transaction.mlsData;
+  const hasMLS = transaction.mlsNumber || mlsData;
+  
+  if (hasMLS && mlsData) {
+    // ✅ ACTIVE LISTING — Auto-populate from Repliers API
+    console.log('[Flyer] Transaction has MLS data, auto-populating...');
+    console.log('[Flyer] MLS Data:', mlsData);
+    
+    // Property Details
+    form.setValue('price', formatPrice(mlsData.listPrice || transaction.listPrice));
+    form.setValue('bedrooms', String(mlsData.beds || mlsData.bedroomsTotal || ''));
+    form.setValue('bathrooms', String(mlsData.baths || mlsData.bathroomsTotalInteger || ''));
+    form.setValue('sqft', formatNumber(mlsData.sqft || mlsData.livingArea || mlsData.buildingAreaTotal));
+    
+    // Address (construct from Repliers fields)
+    const streetParts = [
+      mlsData.streetNumber,
+      mlsData.streetName,
+      mlsData.streetSuffix
+    ].filter(Boolean).join(' ');
+    const cityStateZip = [mlsData.city, mlsData.state, mlsData.zip].filter(Boolean).join(', ');
+    const fullAddress = streetParts && cityStateZip 
+      ? `${streetParts}, ${cityStateZip}` 
+      : streetParts || cityStateZip || transaction.propertyAddress || '';
+    form.setValue('address', fullAddress.toUpperCase());
+    
+    // Description (from MLS public remarks)
+    form.setValue('introDescription', mlsData.publicRemarks || mlsData.remarks || '');
+    
+    // Headline (auto-generate from location)
+    const neighborhood = mlsData.neighborhood || mlsData.subdivision || '';
+    const city = mlsData.city || '';
+    const headline = neighborhood 
+      ? `Prime Opportunity in ${neighborhood}`
+      : city 
+        ? `Prime Opportunity in ${city}`
+        : 'Prime Opportunity';
+    form.setValue('introHeadline', headline);
+    
+    // Photos — Auto-select using Repliers imageInsights
+    if (mlsData.photos?.length > 0) {
+      console.log('[Flyer] Found', mlsData.photos.length, 'MLS photos');
+      const selected = autoSelectPhotos(mlsData.photos);
+      
+      setImages(prev => ({
+        ...prev,
+        mainImage: selected.mainPhoto?.url || null,
+        kitchenImage: selected.kitchenPhoto?.url || null,
+        roomImage: selected.roomPhoto?.url || null,
+      }));
+      
+      console.log('[Flyer] Auto-selected photos:', {
+        main: selected.mainPhoto?.imageInsights?.classification?.imageOf,
+        kitchen: selected.kitchenPhoto?.imageInsights?.classification?.imageOf,
+        room: selected.roomPhoto?.imageInsights?.classification?.imageOf,
+      });
+    }
+    
+  } else {
+    // ❌ OFF-MARKET — Manual entry required
+    console.log('[Flyer] No MLS data (Off-Market listing), manual entry required');
+    
+    // Still try to use basic transaction data if available
+    if (transaction.listPrice) {
+      form.setValue('price', formatPrice(transaction.listPrice));
+    }
+    if (transaction.propertyAddress) {
+      form.setValue('address', transaction.propertyAddress.toUpperCase());
+    }
+    // Leave other fields empty for manual entry
+  }
+}, [transaction]);
+```
+
+### Agent Details — Always from Settings
+
+```typescript
+useEffect(() => {
+  if (!settings) return;
+  
+  console.log('[Flyer] Loading agent details from Settings...');
+  
+  // Agent Details (always from Settings, regardless of MLS status)
+  const fullName = `${settings.firstName || ''} ${settings.lastName || ''}`.trim();
+  if (fullName) form.setValue('agentName', fullName);
+  if (settings.title) form.setValue('agentTitle', settings.title);
+  if (settings.phone) form.setValue('phone', settings.phone);
+  
+  // Agent Photo
+  if (settings.profilePhoto) {
+    setImages(prev => ({ ...prev, agentPhoto: settings.profilePhoto }));
+  }
+  
+  // Logos (from Settings, sizing adjustable in Flyer Generator)
+  setImages(prev => ({
+    ...prev,
+    companyLogo: settings.companyLogo || '/logos/SpyglassRealty_Logo_Black.png',
+    secondaryLogo: settings.secondaryLogo || '/logos/LeadingRE_Logo.png',
+  }));
+  
+  // QR Code URL (if saved in Settings)
+  if (settings.qrCodeUrl) {
+    form.setValue('qrCodeUrl', settings.qrCodeUrl);
+  }
+  
+  console.log('[Flyer] Agent details loaded:', { fullName, title: settings.title, phone: settings.phone });
+}, [settings]);
+```
+
+### Photo Auto-Selection with imageInsights
+
+```typescript
+function autoSelectPhotos(photos: any[]) {
+  if (!photos?.length) return { mainPhoto: null, kitchenPhoto: null, roomPhoto: null };
+  
+  // Sort by quality score (highest first)
+  const sorted = [...photos].sort((a, b) => {
+    const scoreA = a.imageInsights?.quality?.score || 0;
+    const scoreB = b.imageInsights?.quality?.score || 0;
+    return scoreB - scoreA;
+  });
+  
+  // Main Photo: Best EXTERIOR / FRONT OF STRUCTURE
+  const mainPhoto = sorted.find(p => {
+    const imageOf = (p.imageInsights?.classification?.imageOf || '').toLowerCase();
+    return ['front of structure', 'exterior', 'front', 'facade', 'aerial'].some(term => imageOf.includes(term));
+  }) || sorted[0]; // Fallback to highest quality
+  
+  // Kitchen Photo: Best KITCHEN
+  const kitchenPhoto = sorted.find(p => {
+    const imageOf = (p.imageInsights?.classification?.imageOf || '').toLowerCase();
+    return imageOf.includes('kitchen');
+  }) || null;
+  
+  // Room Photo: Best LIVING ROOM / INTERIOR (excluding already selected)
+  const usedUrls = new Set([mainPhoto?.url, kitchenPhoto?.url].filter(Boolean));
+  const roomPhoto = sorted.find(p => {
+    if (usedUrls.has(p.url)) return false;
+    const imageOf = (p.imageInsights?.classification?.imageOf || '').toLowerCase();
+    return ['living room', 'living', 'great room', 'family room', 'interior', 'bedroom', 'dining'].some(term => imageOf.includes(term));
+  }) || sorted.find(p => !usedUrls.has(p.url)) || null;
+  
+  return { mainPhoto, kitchenPhoto, roomPhoto };
+}
+```
+
+---
+
+## 📊 Expected Behavior
+
+### Active Listing (Has MLS #)
+
+| Field | Auto-Populates From | Example |
+|-------|---------------------|---------|
+| Listed Price | `mlsData.listPrice` | $434,990 |
+| Beds | `mlsData.beds` | 4 |
+| Baths | `mlsData.baths` | 2 |
+| Sq Ft | `mlsData.sqft` | 1,850 |
+| Address | `streetNumber + streetName + city, state zip` | 13106 NEW BOSTON, AUSTIN, TX 78701 |
+| Headline | Generated from `neighborhood` or `city` | "Prime Opportunity in Travis County" |
+| Description | `mlsData.publicRemarks` | (Full MLS description) |
+| Main Photo | AI-selected (best exterior) | From Repliers CDN |
+| Kitchen Photo | AI-selected (best kitchen) | From Repliers CDN |
+| Room Photo | AI-selected (best interior) | From Repliers CDN |
+| Agent Name | `settings.firstName + lastName` | Daryl C. |
+| Agent Title | `settings.title` | REALTOR® |
+| Phone | `settings.phone` | (512) xxx-xxxx |
+| Agent Photo | `settings.profilePhoto` | From Settings |
+| Logos | `settings.companyLogo / secondaryLogo` | Spyglass / Leading RE |
+
+### Off-Market Listing (No MLS #)
+
+| Field | Behavior |
+|-------|----------|
+| Listed Price | Empty (manual entry) |
+| Beds / Baths / Sq Ft | Empty (manual entry) |
+| Address | From `transaction.propertyAddress` if available |
+| Description | Empty (manual entry) |
+| Photos | Empty upload boxes (manual upload) |
+| Agent Details | Still auto-fills from Settings ✅ |
+| Logos | Still auto-fills from Settings ✅ |
+
+---
+
+## 🐛 Debug Logging
+
+Add these console.logs to verify data flow:
+
+```typescript
+// At component mount
+console.log('=== FLYER GENERATOR DEBUG ===');
+console.log('[Flyer] Transaction ID:', transactionId);
+console.log('[Flyer] Transaction:', transaction);
+console.log('[Flyer] Has MLS #:', transaction?.mlsNumber);
+console.log('[Flyer] MLS Data exists:', !!transaction?.mlsData);
+console.log('[Flyer] MLS Photos count:', transaction?.mlsData?.photos?.length || 0);
+console.log('[Flyer] Settings:', settings);
+console.log('=============================');
+```
+
+---
+
+## ✅ Testing Checklist
+
+### Active Listing Test (13106 New Boston, MLS# ACT2572987)
+- [ ] Open Flyer Builder from this transaction
+- [ ] Price shows actual MLS price (NOT $1,250,000)
+- [ ] Beds/Baths/Sq Ft show actual MLS values
+- [ ] Address shows "13106 NEW BOSTON, AUSTIN, TX..."
+- [ ] Description shows MLS publicRemarks
+- [ ] Main photo auto-selects best exterior
+- [ ] Kitchen photo auto-selects
+- [ ] Room photo auto-selects
+- [ ] Agent Name shows YOUR name (NOT "Jane Smith")
+- [ ] Agent Title shows YOUR title
+- [ ] Phone shows YOUR phone
+- [ ] Check browser console for debug logs
+
+### Off-Market Test (If you have one)
+- [ ] Open Flyer Builder from an Off-Market transaction
+- [ ] Property fields are empty for manual entry
+- [ ] Photo upload boxes are empty
+- [ ] Agent details STILL load from Settings
+
+### Verify Data Sources
+- [ ] Console shows `[Flyer] Transaction has MLS data, auto-populating...`
+- [ ] Console shows `[Flyer] MLS Data: {...}` with actual data
+- [ ] Console shows `[Flyer] Found X MLS photos`
+- [ ] Console shows `[Flyer] Agent details loaded: {...}`

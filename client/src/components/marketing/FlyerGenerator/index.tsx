@@ -114,6 +114,9 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   const [previousDescription, setPreviousDescription] = useState<string>('');
   const [hasUsedAISummarize, setHasUsedAISummarize] = useState(false);
 
+  // QR Code URL state
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+
   const form = useForm<FlyerData>({
     defaultValues: {
       price: '',
@@ -445,6 +448,11 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
     }
   };
 
+  // Handle direct image URL changes (for QR codes, etc.)
+  const handleImageChange = (field: keyof FlyerImages, url: string | null) => {
+    setImages(prev => ({ ...prev, [field]: url }));
+  };
+
   // Handle AI summarization
   const handleSummarized = (summary: string) => {
     const currentDescription = form.getValues('introDescription') || '';
@@ -588,6 +596,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
               form={form}
               images={images}
               onImageUpload={handleImageUpload}
+              onImageChange={handleImageChange}
               transactionId={transactionId}
               mlsData={transaction?.mlsData}
               photoSelectionInfo={photoSelectionInfo}
@@ -600,6 +609,8 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
               onRevertDescription={handleRevertDescription}
               missingCategories={missingCategories}
               selectionMethod={aiPhotoData?.selectionMethod}
+              qrCodeUrl={qrCodeUrl}
+              onQrCodeUrlChange={setQrCodeUrl}
             />
           </ScrollArea>
         </div>

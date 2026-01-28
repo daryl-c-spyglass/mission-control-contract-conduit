@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { Upload, ZoomIn, MoveHorizontal, MoveVertical, RotateCcw, Sparkles, Images, Check, AlertCircle } from 'lucide-react';
+import { Upload, ZoomIn, MoveHorizontal, MoveVertical, RotateCcw, Sparkles, Images, Check, AlertCircle, Crop } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ImageTransform } from '@/lib/flyer-types';
 import type { PhotoSelectionInfo } from '@/lib/flyer-utils';
+import { CropModal } from './CropModal';
 
 interface ImageUploadFieldProps {
   label: string;
@@ -50,6 +51,7 @@ export function ImageUploadField({
 }: ImageUploadFieldProps) {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [cropModalOpen, setCropModalOpen] = useState(false);
 
   const handleReset = () => {
     onTransformChange?.({ scale: 1, positionX: 0, positionY: 0 });
@@ -58,6 +60,17 @@ export function ImageUploadField({
   const handleSelectFromGallery = (url: string) => {
     onSelectPhoto?.(url);
     setGalleryOpen(false);
+  };
+
+  const handleCropApply = (position: { x: number; y: number }, zoom: number) => {
+    if (onTransformChange) {
+      onTransformChange({
+        scale: zoom,
+        positionX: (position.x - 50) * -1,
+        positionY: (position.y - 50) * -1,
+      });
+    }
+    setCropModalOpen(false);
   };
 
   // Get unique categories from available photos
@@ -168,6 +181,24 @@ export function ImageUploadField({
                 transform: `scale(${transform.scale}) translate(${transform.positionX}%, ${transform.positionY}%)`,
               }}
             />
+            {onTransformChange && (
+              <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="secondary"
+                  className="h-7 w-7 bg-white/90 hover:bg-white"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setCropModalOpen(true);
+                  }}
+                  data-testid={`button-crop-${id}`}
+                >
+                  <Crop className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
             {aiSelectionInfo?.isAISelected ? (
               <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                 <div className="flex justify-between items-center">
@@ -404,6 +435,22 @@ export function ImageUploadField({
             </div>
           </DialogContent>
         </Dialog>
+      )}
+
+      {preview && onTransformChange && (
+        <CropModal
+          isOpen={cropModalOpen}
+          onClose={() => setCropModalOpen(false)}
+          imageUrl={preview}
+          aspectRatio={circular ? 1 : 16 / 9}
+          onApply={handleCropApply}
+          initialPosition={{ 
+            x: 50 - transform.positionX, 
+            y: 50 - transform.positionY 
+          }}
+          initialZoom={transform.scale}
+          title={`Crop ${label}`}
+        />
       )}
     </div>
   );

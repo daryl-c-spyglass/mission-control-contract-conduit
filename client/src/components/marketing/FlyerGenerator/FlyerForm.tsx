@@ -1,11 +1,13 @@
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 import {
   FileText, DollarSign, BedDouble, Bath, Ruler, User, Phone, MapPin,
-  Image as ImageIcon, Check, Sparkles
+  Image as ImageIcon, Check, Sparkles, QrCode, X, Loader2
 } from 'lucide-react';
 import { ImageUploadField } from './ImageUploadField';
 import { AIHeadlineButton } from './AIHeadlineButton';
@@ -13,6 +15,7 @@ import { AISummarizeButton } from './AISummarizeButton';
 import { CharacterCounter } from './CharacterCounter';
 import type { FlyerData, FlyerImages } from '@/lib/flyer-types';
 import type { PhotoSelectionInfo } from '@/lib/flyer-utils';
+import QRCode from 'qrcode';
 
 const MAX_DESCRIPTION_LENGTH = 150;
 
@@ -20,6 +23,7 @@ interface FlyerFormProps {
   form: UseFormReturn<FlyerData>;
   images: FlyerImages;
   onImageUpload: (field: keyof FlyerImages) => (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onImageChange: (field: keyof FlyerImages, url: string | null) => void;
   transactionId: string;
   mlsData: any;
   photoSelectionInfo?: {
@@ -42,6 +46,8 @@ interface FlyerFormProps {
   onRevertDescription?: (type: 'previous' | 'original') => void;
   missingCategories?: string[];
   selectionMethod?: string;
+  qrCodeUrl?: string;
+  onQrCodeUrlChange?: (url: string) => void;
 }
 
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
@@ -84,6 +90,7 @@ export function FlyerForm({
   form,
   images,
   onImageUpload,
+  onImageChange,
   transactionId,
   mlsData,
   photoSelectionInfo,
@@ -96,8 +103,65 @@ export function FlyerForm({
   onRevertDescription,
   missingCategories = [],
   selectionMethod,
+  qrCodeUrl = '',
+  onQrCodeUrlChange,
 }: FlyerFormProps) {
   const { register, setValue, watch } = form;
+  const [isGeneratingQR, setIsGeneratingQR] = useState(false);
+  const [localQrUrl, setLocalQrUrl] = useState(qrCodeUrl);
+  const lastGeneratedQrUrlRef = useRef<string>('');
+
+  const generateQRCode = useCallback(async (url: string) => {
+    if (!url.trim()) {
+      onImageChange('qrCode', null);
+      lastGeneratedQrUrlRef.current = '';
+      return;
+    }
+    
+    if (lastGeneratedQrUrlRef.current === url) {
+      return;
+    }
+    
+    setIsGeneratingQR(true);
+    try {
+      const qrDataUrl = await QRCode.toDataURL(url, {
+        width: 200,
+        margin: 1,
+        color: {
+          dark: '#000000',
+          light: '#ffffff',
+        },
+      });
+      onImageChange('qrCode', qrDataUrl);
+      lastGeneratedQrUrlRef.current = url;
+    } catch (error) {
+      console.error('[Flyer] QR code generation failed:', error);
+    } finally {
+      setIsGeneratingQR(false);
+    }
+  }, [onImageChange]);
+
+  useEffect(() => {
+    setLocalQrUrl(qrCodeUrl);
+    if (qrCodeUrl.trim()) {
+      generateQRCode(qrCodeUrl);
+    } else {
+      onImageChange('qrCode', null);
+      lastGeneratedQrUrlRef.current = '';
+    }
+  }, [qrCodeUrl, generateQRCode, onImageChange]);
+
+  const handleQrUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value;
+    setLocalQrUrl(url);
+    onQrCodeUrlChange?.(url);
+  };
+
+  const handleClearQR = () => {
+    setLocalQrUrl('');
+    onQrCodeUrlChange?.('');
+    onImageChange('qrCode', null);
+  };
   
   // Watch all form values for controlled inputs
   const priceValue = watch('price') || '';
@@ -271,13 +335,50 @@ export function FlyerForm({
             onChange={onImageUpload('agentPhoto')}
             circular
           />
-          <ImageUploadField
-            label="QR Code"
-            id="qrCode"
-            preview={images.qrCode}
-            onChange={onImageUpload('qrCode')}
-            compact
-          />
+          <div className="space-y-2">
+            <Label className="text-xs font-medium uppercase tracking-wide">
+              QR Code
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter URL for QR code..."
+                value={localQrUrl}
+                onChange={handleQrUrlChange}
+                className="flex-1 h-9"
+                data-testid="input-qr-url"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                className="h-9 w-9 flex-shrink-0"
+                onClick={() => generateQRCode(localQrUrl)}
+                disabled={!localQrUrl.trim() || isGeneratingQR}
+                data-testid="button-generate-qr"
+              >
+                {isGeneratingQR ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <QrCode className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            {images.qrCode && (
+              <div className="relative w-20 h-20 border rounded-lg overflow-hidden bg-white">
+                <img src={images.qrCode} alt="QR Code" className="w-full h-full object-contain" />
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="secondary"
+                  className="absolute top-1 right-1 h-6 w-6"
+                  onClick={handleClearQR}
+                  data-testid="button-clear-qr"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       </Section>
 
