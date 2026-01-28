@@ -1,0 +1,297 @@
+# Contract Conduit — Development Audit Log
+
+## 📅 Date: January 29, 2026
+## 👤 Developer: Daryl Camingao
+## 🏢 Project: Contract Conduit (Mission Control) — Advanced Flyer Builder
+
+---
+
+## 📌 Purpose
+
+This document serves as an audit log of all updates, new features, and improvements discussed and planned for the Contract Conduit Advanced Flyer Builder on January 29, 2026. This is for documentation and tracking purposes.
+
+---
+
+## 🎯 Session Overview
+
+Today's session focused on completing the Advanced Flyer Builder feature with emphasis on:
+- QR Code system with public flyer viewer
+- Export consistency (PNG/CMYK matching Live Preview)
+- Image cropping synchronization
+- UI/UX improvements
+- Mobile optimization
+
+---
+
+## 📋 Features & Updates Planned
+
+### 1. QR Code to Flyer Viewer System
+
+**Status:** Planning Complete | Prompt Created
+
+**Description:** A comprehensive system where QR codes on printed flyers link to a mobile-optimized online version of the flyer.
+
+**Components:**
+| Component | Description |
+|-----------|-------------|
+| Database Table | New `flyers` table to store saved flyer data |
+| Flyer Service | Generate unique IDs, create QR codes, save flyers |
+| API Endpoints | POST `/api/flyers` (create), GET `/api/public/flyer/:id` (public view) |
+| Public Viewer Page | `/flyer/[id]` - mobile-optimized, no auth required |
+| Contact Buttons | Call Agent, Send Email, Schedule Showing |
+| Social Sharing | Facebook, X (Twitter), LinkedIn, WhatsApp, SMS, Email, Copy Link |
+
+**Contact Button Behavior:**
+- **Call Agent:** Opens phone dialer with agent phone from Settings
+- **Send Email:** Opens email client with pre-filled subject and body
+- **Schedule Showing:** Opens email with comprehensive showing request template including property details, preferred time slots, and contact info fields
+
+**Files Created:**
+- `QR-FLYER-SYSTEM-PLANNING.md` — Detailed planning document
+- `QR-FLYER-VISUAL-SUMMARY.md` — Visual diagrams and flow charts
+- `CONTRACT-CONDUIT-QR-FLYER-SYSTEM.md` — Complete Replit implementation prompt
+
+---
+
+### 2. Flyer Generator Header Fix
+
+**Status:** Prompt Created
+
+**Description:** Fix the Flyer Generator header behavior and styling.
+
+**Issues Addressed:**
+| Issue | Before | After |
+|-------|--------|-------|
+| Header scroll | Sticky/fixed at top | Scrolls with page content |
+| Title styling | Basic | Improved with divider, proper fonts |
+| Mobile layout | Not optimized | Responsive stacking |
+
+**File Created:**
+- `CONTRACT-CONDUIT-FIX-FLYER-HEADER.md`
+
+---
+
+### 3. Export Consistency (PNG/CMYK Match Preview)
+
+**Status:** Prompt Created → Implemented → Verified ✅
+
+**Description:** Ensure exported flyers (PNG and CMYK) match the Live Preview exactly.
+
+**Issues Identified & Resolved:**
+| Element | Before Export | After Export | Status |
+|---------|---------------|--------------|--------|
+| Spyglass Logo | ✅ Showing | ✅ Showing | OK |
+| Secondary Logo (Leading RE) | ❌ Missing | ✅ Showing | Fixed |
+| Logo Dividers | ❌ Missing | ✅ Showing | Fixed |
+| Agent Photo | ✅ Showing | ✅ Showing | OK |
+| Agent Name | ❌ Missing | ✅ Showing | Fixed |
+| Agent Title | ❌ Wrong | ⚠️ Shows Settings value | Data Issue* |
+| Agent Phone | ❌ Missing | ✅ Showing | Fixed |
+| QR Code | ❌ Missing | ✅ Showing | Fixed |
+| Property Details | ✅ Showing | ✅ Showing | OK |
+
+*Agent title shows "AI Web Developer" — this is a Settings data issue, not a code issue. User needs to update their title in Settings.
+
+**File Created:**
+- `CONTRACT-CONDUIT-FIX-EXPORT-MATCH-PREVIEW.md`
+
+**Verification:**
+- Tested with property: 12701 Trails End Rd ($3,200,000)
+- Export now matches Live Preview ✅
+
+---
+
+### 4. Image Crop Synchronization
+
+**Status:** Prompt Created
+
+**Description:** Ensure the image crop feature syncs properly across the application.
+
+**Data Flow:**
+```
+User crops image in modal
+        ↓
+Cropped image saved to state (as data URL)
+        ↓
+Live Preview updates immediately
+        ↓
+Export uses same cropped image
+```
+
+**Features:**
+- Crop modal with zoom slider
+- Apply/Cancel functionality
+- Aspect ratios: 16:9 (main), 4:3 (secondary), 1:1 (agent)
+- Consistent across Preview, PNG export, and CMYK export
+
+**File Created:**
+- `CONTRACT-CONDUIT-IMAGE-CROP-SYNC.md`
+
+---
+
+### 5. Left Pane Scroll Implementation
+
+**Status:** Prompt Created (from earlier session)
+
+**Description:** Implement proper scrolling for the left form pane using ScrollArea component.
+
+**Implementation:**
+- Uses shadcn/ui ScrollArea (Radix UI)
+- Height formula: `h-[calc(100vh-64px)]`
+- Left pane: Fixed 420px on desktop, full width on mobile
+- Right pane: `flex-1` with sticky preview
+
+**File Created:**
+- `CONTRACT-CONDUIT-SCROLL-IMPLEMENTATION.md`
+
+---
+
+### 6. Branding & Logos Section
+
+**Status:** Prompt Created (from earlier session)
+
+**Description:** Add comprehensive logo controls to the Flyer Generator.
+
+**Controls Added:**
+| Control | Range | Default |
+|---------|-------|---------|
+| Primary Logo Size | 50% - 200% | 100% |
+| Secondary Logo Size | 50% - 200% | 100% |
+| Divider Position | 100px - 200px | 148px |
+| Secondary Logo Y Position | -20px to +20px | 0px |
+
+**Features:**
+- Company logo upload with "Use Default" checkbox
+- Secondary logo upload with "Use Default" checkbox
+- Size sliders for both logos
+- Position controls for fine-tuning
+
+**File Created:**
+- `CONTRACT-CONDUIT-BRANDING-LOGOS.md`
+
+---
+
+## 📱 Mobile Optimization Requirements
+
+All features planned today adhere to the following mobile standards:
+
+| Requirement | Specification |
+|-------------|---------------|
+| Touch targets | Minimum 44x44px |
+| Hover interactions | Touch alternatives provided |
+| Layouts | Stack on mobile, side-by-side on tablet+ |
+| Safe areas | Insets for notched devices |
+| Scrolling | Smooth with momentum |
+| Font sizes | Minimum 16px body text |
+| Orientation | Portrait and landscape support |
+
+**Target Devices:**
+- iPad Pro (1024 x 1366)
+- iPad Air/Mini (768 x 1024)
+- iPhone 14/15 Pro (393 x 852)
+- iPhone SE (375 x 667)
+- Android Tablet (800 x 1280)
+- Android Phone (360 x 800)
+
+---
+
+## 📁 Prompts/Documents Created
+
+| # | File Name | Purpose |
+|---|-----------|---------|
+| 1 | `QR-FLYER-SYSTEM-PLANNING.md` | Detailed QR system planning |
+| 2 | `QR-FLYER-VISUAL-SUMMARY.md` | Visual diagrams for QR system |
+| 3 | `CONTRACT-CONDUIT-QR-FLYER-SYSTEM.md` | Replit implementation prompt |
+| 4 | `CONTRACT-CONDUIT-FIX-FLYER-HEADER.md` | Header scroll/styling fix |
+| 5 | `CONTRACT-CONDUIT-FIX-EXPORT-MATCH-PREVIEW.md` | Export consistency fix |
+| 6 | `CONTRACT-CONDUIT-IMAGE-CROP-SYNC.md` | Image crop synchronization |
+| 7 | `CONTRACT-CONDUIT-SCROLL-IMPLEMENTATION.md` | Left pane scroll behavior |
+| 8 | `CONTRACT-CONDUIT-BRANDING-LOGOS.md` | Logo controls implementation |
+
+---
+
+## ✅ Verified Working
+
+The following was tested and verified working on January 29, 2026:
+
+### Export PNG Test
+- **Property:** 12701 Trails End Rd
+- **Price:** $3,200,000
+- **Result:** Export matches Live Preview
+
+**Elements Verified in Export:**
+- ✅ Spyglass Realty logo
+- ✅ Secondary logo (Leading RE) with dividers
+- ✅ Price badge ($3,200,000)
+- ✅ Property address
+- ✅ Main property photo
+- ✅ Kitchen photo
+- ✅ Room photo
+- ✅ Beds (5), Baths (5), Sq Ft (5,590)
+- ✅ Headline (AI-generated)
+- ✅ Description (AI-summarized)
+- ✅ Agent photo
+- ✅ Agent name (Daryl Camingao)
+- ✅ Agent phone ((546) 546-5123)
+- ✅ QR code
+
+---
+
+## 🔮 Next Steps
+
+| Priority | Task | Status |
+|----------|------|--------|
+| High | Send QR Flyer System prompt to Replit | Pending |
+| High | Implement public flyer viewer page | Pending |
+| Medium | Update agent title in Settings | User Action |
+| Medium | Test image crop sync end-to-end | Pending |
+| Low | Add flyer analytics (view count) | Future |
+
+---
+
+## 📊 Project Progress
+
+### Advanced Flyer Builder Completion
+
+```
+Overall Progress: ~85%
+
+✅ MLS data auto-population
+✅ Form fields and validation
+✅ Live Preview rendering
+✅ Photo upload and management
+✅ Image cropping (UI complete)
+✅ AI headline generation
+✅ AI description summarization
+✅ Logo controls and branding
+✅ Export PNG (working)
+✅ Export CMYK (working)
+⏳ QR code system (planned)
+⏳ Public flyer viewer (planned)
+⏳ Save to My Assets integration (planned)
+```
+
+---
+
+## 📝 Notes
+
+1. **Left divider line in header:** Confirmed as intentional design choice by developer — no change needed.
+
+2. **Agent title "AI Web Developer":** This is test data in Settings, not a code issue. Production users will have their actual titles.
+
+3. **QR Code behavior:** Changed from manual URL input to auto-generated flyer URL. Custom URL option available as override.
+
+4. **Schedule Showing:** Opens email client (not external booking system) with pre-filled template to agent's email address.
+
+---
+
+## 🔗 Related Documents
+
+- Project Overview: `/mnt/project/Mission_Control__Contract_Conduit.pdf`
+- Previous Transcript: `/mnt/transcripts/2026-01-28-20-29-20-flyer-builder-scroll-qr-branding.txt`
+
+---
+
+**Audit Log Prepared By:** Claude AI Assistant
+**Date:** January 29, 2026
+**Session Duration:** Full day development session
