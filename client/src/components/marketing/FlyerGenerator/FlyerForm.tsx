@@ -5,9 +5,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   FileText, DollarSign, BedDouble, Bath, Ruler, User, Phone, MapPin,
-  Image as ImageIcon, Check, Sparkles, QrCode, X, Loader2
+  Image as ImageIcon, Check, Sparkles, QrCode, X, Loader2, Palette, Upload
 } from 'lucide-react';
 import { ImageUploadField } from './ImageUploadField';
 import { AIHeadlineButton } from './AIHeadlineButton';
@@ -48,6 +50,16 @@ interface FlyerFormProps {
   selectionMethod?: string;
   qrCodeUrl?: string;
   onQrCodeUrlChange?: (url: string) => void;
+  logoScales?: { primary: number; secondary: number };
+  onLogoScalesChange?: (scales: { primary: number; secondary: number }) => void;
+  dividerPosition?: number;
+  onDividerPositionChange?: (position: number) => void;
+  secondaryLogoOffsetY?: number;
+  onSecondaryLogoOffsetYChange?: (offset: number) => void;
+  useDefaultCompanyLogo?: boolean;
+  onUseDefaultCompanyLogoChange?: (checked: boolean) => void;
+  useDefaultSecondaryLogo?: boolean;
+  onUseDefaultSecondaryLogoChange?: (checked: boolean) => void;
 }
 
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
@@ -105,6 +117,16 @@ export function FlyerForm({
   selectionMethod,
   qrCodeUrl = '',
   onQrCodeUrlChange,
+  logoScales = { primary: 1, secondary: 1 },
+  onLogoScalesChange,
+  dividerPosition = 148,
+  onDividerPositionChange,
+  secondaryLogoOffsetY = 0,
+  onSecondaryLogoOffsetYChange,
+  useDefaultCompanyLogo = true,
+  onUseDefaultCompanyLogoChange,
+  useDefaultSecondaryLogo = true,
+  onUseDefaultSecondaryLogoChange,
 }: FlyerFormProps) {
   const { register, setValue, watch } = form;
   const [isGeneratingQR, setIsGeneratingQR] = useState(false);
@@ -304,30 +326,188 @@ export function FlyerForm({
         </div>
       </Section>
 
-      <Section icon={<ImageIcon className="w-5 h-5 text-primary" />} title="Branding & Logos">
+      <Section icon={<Palette className="w-5 h-5 text-primary" />} title="Branding & Logos">
         <div className="flex items-center gap-2 text-green-500 text-sm mb-4">
           <Check className="w-4 h-4" />
           Using saved marketing profile
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <ImageUploadField
-            label="Company Logo"
-            id="companyLogo"
-            preview={images.companyLogo}
-            onChange={onImageUpload('companyLogo')}
-            compact
-          />
-          <ImageUploadField
-            label="Secondary Logo"
-            id="secondaryLogo"
-            preview={images.secondaryLogo}
-            onChange={onImageUpload('secondaryLogo')}
-            compact
-          />
+        {/* Logo Upload Areas */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Company Logo */}
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Company Logo
+            </Label>
+            <div 
+              className={`relative h-20 border-2 border-dashed border-border rounded-lg flex items-center justify-center bg-muted/30 transition-colors overflow-hidden ${!useDefaultCompanyLogo ? 'cursor-pointer hover:bg-muted/50' : 'opacity-75'}`}
+              onClick={() => !useDefaultCompanyLogo && document.getElementById('company-logo-input')?.click()}
+            >
+              {images.companyLogo ? (
+                <img 
+                  src={images.companyLogo} 
+                  alt="Company Logo" 
+                  className="max-h-14 max-w-full object-contain"
+                  style={{ transform: `scale(${logoScales.primary})` }}
+                />
+              ) : (
+                <div className="text-center text-muted-foreground">
+                  <Upload className="h-6 w-6 mx-auto mb-1" />
+                  <span className="text-xs">Click to upload</span>
+                </div>
+              )}
+              <input
+                id="company-logo-input"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={onImageUpload('companyLogo')}
+                disabled={useDefaultCompanyLogo}
+                data-testid="input-company-logo"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="useDefaultCompany"
+                checked={useDefaultCompanyLogo}
+                onCheckedChange={(checked) => onUseDefaultCompanyLogoChange?.(!!checked)}
+                data-testid="checkbox-default-company-logo"
+              />
+              <Label htmlFor="useDefaultCompany" className="text-xs text-muted-foreground cursor-pointer">
+                Use Spyglass Default
+              </Label>
+            </div>
+          </div>
+          
+          {/* Secondary Logo */}
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Secondary Logo
+            </Label>
+            <div 
+              className={`relative h-20 border-2 border-dashed border-border rounded-lg flex items-center justify-center bg-muted/30 transition-colors overflow-hidden ${!useDefaultSecondaryLogo ? 'cursor-pointer hover:bg-muted/50' : 'opacity-75'}`}
+              onClick={() => !useDefaultSecondaryLogo && document.getElementById('secondary-logo-input')?.click()}
+            >
+              {images.secondaryLogo ? (
+                <img 
+                  src={images.secondaryLogo} 
+                  alt="Secondary Logo" 
+                  className="max-h-14 max-w-full object-contain"
+                  style={{ transform: `scale(${logoScales.secondary})` }}
+                />
+              ) : (
+                <div className="text-center text-muted-foreground">
+                  <Upload className="h-6 w-6 mx-auto mb-1" />
+                  <span className="text-xs">Click to upload</span>
+                </div>
+              )}
+              <input
+                id="secondary-logo-input"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={onImageUpload('secondaryLogo')}
+                disabled={useDefaultSecondaryLogo}
+                data-testid="input-secondary-logo"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="useDefaultSecondary"
+                checked={useDefaultSecondaryLogo}
+                onCheckedChange={(checked) => onUseDefaultSecondaryLogoChange?.(!!checked)}
+                data-testid="checkbox-default-secondary-logo"
+              />
+              <Label htmlFor="useDefaultSecondary" className="text-xs text-muted-foreground cursor-pointer">
+                Use Leading RE Default
+              </Label>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mt-4">
+        {/* Logo Size & Position Sliders */}
+        <div className="space-y-4 pt-4">
+          {/* Primary Logo Size */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Primary Logo Size</Label>
+              <span className="text-xs text-muted-foreground font-medium">
+                {Math.round(logoScales.primary * 100)}%
+              </span>
+            </div>
+            <Slider
+              value={[logoScales.primary]}
+              onValueChange={([value]) => onLogoScalesChange?.({ ...logoScales, primary: value })}
+              min={0.5}
+              max={2}
+              step={0.05}
+              className="py-2"
+              data-testid="slider-primary-logo-size"
+            />
+          </div>
+          
+          {/* Secondary Logo Size */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Secondary Logo Size</Label>
+              <span className="text-xs text-muted-foreground font-medium">
+                {Math.round(logoScales.secondary * 100)}%
+              </span>
+            </div>
+            <Slider
+              value={[logoScales.secondary]}
+              onValueChange={([value]) => onLogoScalesChange?.({ ...logoScales, secondary: value })}
+              min={0.5}
+              max={2}
+              step={0.05}
+              className="py-2"
+              data-testid="slider-secondary-logo-size"
+            />
+          </div>
+          
+          {/* Divider Position */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Divider Position</Label>
+              <span className="text-xs text-muted-foreground font-medium">
+                {dividerPosition}px
+              </span>
+            </div>
+            <Slider
+              value={[dividerPosition]}
+              onValueChange={([value]) => onDividerPositionChange?.(value)}
+              min={100}
+              max={200}
+              step={1}
+              className="py-2"
+              data-testid="slider-divider-position"
+            />
+          </div>
+          
+          {/* Secondary Logo Y Position */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Secondary Logo Y Position</Label>
+              <span className="text-xs text-muted-foreground font-medium">
+                {secondaryLogoOffsetY}px
+              </span>
+            </div>
+            <Slider
+              value={[secondaryLogoOffsetY]}
+              onValueChange={([value]) => onSecondaryLogoOffsetYChange?.(value)}
+              min={-20}
+              max={20}
+              step={1}
+              className="py-2"
+              data-testid="slider-secondary-logo-y"
+            />
+          </div>
+        </div>
+      </Section>
+
+      {/* Agent Photo & QR Code Section */}
+      <Section icon={<User className="w-5 h-5 text-primary" />} title="Agent Photo & QR Code">
+        <div className="grid grid-cols-2 gap-3">
           <ImageUploadField
             label="Agent Photo"
             id="agentPhoto"

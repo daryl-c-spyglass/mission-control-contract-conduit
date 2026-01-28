@@ -117,6 +117,13 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   // QR Code URL state
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
 
+  // Logo controls state
+  const [logoScales, setLogoScales] = useState({ primary: 1, secondary: 1 });
+  const [dividerPosition, setDividerPosition] = useState(148);
+  const [secondaryLogoOffsetY, setSecondaryLogoOffsetY] = useState(0);
+  const [useDefaultCompanyLogo, setUseDefaultCompanyLogo] = useState(true);
+  const [useDefaultSecondaryLogo, setUseDefaultSecondaryLogo] = useState(true);
+
   const form = useForm<FlyerData>({
     defaultValues: {
       price: '',
@@ -431,15 +438,21 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   useEffect(() => {
     if (marketingProfile || agentProfile) {
       const user = agentProfile?.user;
+      
+      // Set default toggles from marketing profile
+      const companyDefault = marketingProfile?.companyLogoUseDefault !== false;
+      const secondaryDefault = marketingProfile?.secondaryLogoUseDefault !== false;
+      setUseDefaultCompanyLogo(companyDefault);
+      setUseDefaultSecondaryLogo(secondaryDefault);
+      
       setImages(prev => ({
         ...prev,
         // Use marketing profile photo, fall back to user's marketing headshot or profile image
         agentPhoto: marketingProfile?.agentPhoto || user?.marketingHeadshotUrl || user?.profileImageUrl || null,
-        qrCode: marketingProfile?.qrCode || null,
-        companyLogo: marketingProfile?.companyLogoUseDefault !== false
+        companyLogo: companyDefault
           ? '/logos/SpyglassRealty_Logo_Black.png'
           : marketingProfile?.companyLogo || '/logos/SpyglassRealty_Logo_Black.png',
-        secondaryLogo: marketingProfile?.secondaryLogoUseDefault !== false
+        secondaryLogo: secondaryDefault
           ? '/logos/lre-sgr-black.png'
           : marketingProfile?.secondaryLogo || '/logos/lre-sgr-black.png',
       }));
@@ -635,6 +648,26 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
               selectionMethod={aiPhotoData?.selectionMethod}
               qrCodeUrl={qrCodeUrl}
               onQrCodeUrlChange={setQrCodeUrl}
+              logoScales={logoScales}
+              onLogoScalesChange={setLogoScales}
+              dividerPosition={dividerPosition}
+              onDividerPositionChange={setDividerPosition}
+              secondaryLogoOffsetY={secondaryLogoOffsetY}
+              onSecondaryLogoOffsetYChange={setSecondaryLogoOffsetY}
+              useDefaultCompanyLogo={useDefaultCompanyLogo}
+              onUseDefaultCompanyLogoChange={(checked) => {
+                setUseDefaultCompanyLogo(checked);
+                if (checked) {
+                  setImages(prev => ({ ...prev, companyLogo: '/logos/SpyglassRealty_Logo_Black.png' }));
+                }
+              }}
+              useDefaultSecondaryLogo={useDefaultSecondaryLogo}
+              onUseDefaultSecondaryLogoChange={(checked) => {
+                setUseDefaultSecondaryLogo(checked);
+                if (checked) {
+                  setImages(prev => ({ ...prev, secondaryLogo: '/logos/lre-sgr-black.png' }));
+                }
+              }}
             />
           </ScrollArea>
         </div>
@@ -691,6 +724,9 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
                   data={watchedValues}
                   images={images}
                   imageTransforms={imageTransforms}
+                  logoScales={logoScales}
+                  dividerPosition={dividerPosition}
+                  secondaryLogoOffsetY={secondaryLogoOffsetY}
                 />
                 {showGrid && <GridOverlay />}
               </div>

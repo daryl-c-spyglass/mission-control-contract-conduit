@@ -1,0 +1,513 @@
+# Contract Conduit — Branding & Logos Section Implementation
+
+## 📌 Purpose
+
+Add the **Branding & Logos** section to the Advanced Flyer Builder left pane with:
+1. Company Logo upload (with Spyglass default)
+2. Secondary Logo upload (with Leading RE default)
+3. Primary Logo Size slider (50%-200%)
+4. Secondary Logo Size slider (50%-200%)
+5. Divider Position slider (100-200px)
+6. Secondary Logo Y Position slider (±20px)
+
+---
+
+## 🎨 Visual Reference
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 🎨 Branding & Logos                                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  COMPANY LOGO              SECONDARY LOGO                   │
+│  ┌─────────────────┐      ┌─────────────────┐              │
+│  │                 │      │                 │              │
+│  │   [Spyglass]    │      │  [Leading RE]   │              │
+│  │      Logo       │      │     Logo        │              │
+│  │                 │      │                 │              │
+│  │  Click to upload│      │  Click to upload│              │
+│  └─────────────────┘      └─────────────────┘              │
+│  ☑ Use Default            ☑ Use Default                    │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Primary Logo Size                              100%        │
+│  ○───────────────────────●───────────────────○              │
+│  50%                                          200%          │
+│                                                             │
+│  Secondary Logo Size                            100%        │
+│  ○───────────────────────●───────────────────○              │
+│  50%                                          200%          │
+│                                                             │
+│  Divider Position                               148px       │
+│  ○───────────────────────●───────────────────○              │
+│  100px                                        200px         │
+│                                                             │
+│  Secondary Logo Y Position                       0px        │
+│  ○───────────────────────●───────────────────○              │
+│  -20px                                        +20px         │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔧 State Management
+
+Add these state variables to the main Flyer Generator component:
+
+```typescript
+// Logo images
+const [companyLogo, setCompanyLogo] = useState<string | null>('/logos/SpyglassRealty_Logo_Black.png');
+const [secondaryLogo, setSecondaryLogo] = useState<string | null>('/logos/LeadingRE_Logo.png');
+
+// Default toggles
+const [useDefaultCompanyLogo, setUseDefaultCompanyLogo] = useState(true);
+const [useDefaultSecondaryLogo, setUseDefaultSecondaryLogo] = useState(true);
+
+// Logo controls
+const [logoScales, setLogoScales] = useState({
+  primary: 1,    // 1 = 100%
+  secondary: 1,  // 1 = 100%
+});
+const [dividerPosition, setDividerPosition] = useState(148); // pixels
+const [secondaryLogoOffsetY, setSecondaryLogoOffsetY] = useState(0); // pixels
+```
+
+---
+
+## 🖼️ Default Logo Files
+
+Ensure these logo files exist in your public folder:
+
+```
+public/
+└── logos/
+    ├── SpyglassRealty_Logo_Black.png    (Primary - Spyglass)
+    ├── SpyglassRealty_Logo_White.png    (For dark backgrounds)
+    └── LeadingRE_Logo.png               (Secondary - Leading RE)
+```
+
+If not available, download from Spyglass brand assets or use placeholder paths.
+
+---
+
+## 📝 Branding & Logos Component
+
+Add this section to the left pane form (after Agent Details, before Property Images):
+
+```tsx
+{/* ============================================ */}
+{/* Section: Branding & Logos                   */}
+{/* ============================================ */}
+<div className="space-y-4">
+  <div className="flex items-center gap-2">
+    <Palette className="h-5 w-5 text-primary" />
+    <h2 className="text-lg font-medium">Branding & Logos</h2>
+  </div>
+  <Separator />
+  
+  {/* Logo Upload Areas */}
+  <div className="grid grid-cols-2 gap-4">
+    {/* Company Logo */}
+    <div className="space-y-2">
+      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        Company Logo
+      </Label>
+      <div 
+        className="relative h-20 border-2 border-dashed border-border rounded-lg flex items-center justify-center bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+        onClick={() => !useDefaultCompanyLogo && companyLogoInputRef.current?.click()}
+      >
+        {companyLogo ? (
+          <img 
+            src={companyLogo} 
+            alt="Company Logo" 
+            className="max-h-14 max-w-full object-contain"
+            style={{ transform: `scale(${logoScales.primary})` }}
+          />
+        ) : (
+          <div className="text-center text-muted-foreground">
+            <Upload className="h-6 w-6 mx-auto mb-1" />
+            <span className="text-xs">Click to upload</span>
+          </div>
+        )}
+        <input
+          ref={companyLogoInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => handleLogoUpload(e, 'company')}
+          disabled={useDefaultCompanyLogo}
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="useDefaultCompany"
+          checked={useDefaultCompanyLogo}
+          onCheckedChange={(checked) => {
+            setUseDefaultCompanyLogo(!!checked);
+            if (checked) {
+              setCompanyLogo('/logos/SpyglassRealty_Logo_Black.png');
+            }
+          }}
+        />
+        <Label htmlFor="useDefaultCompany" className="text-xs text-muted-foreground cursor-pointer">
+          Use Spyglass Default
+        </Label>
+      </div>
+    </div>
+    
+    {/* Secondary Logo */}
+    <div className="space-y-2">
+      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        Secondary Logo
+      </Label>
+      <div 
+        className="relative h-20 border-2 border-dashed border-border rounded-lg flex items-center justify-center bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+        onClick={() => !useDefaultSecondaryLogo && secondaryLogoInputRef.current?.click()}
+      >
+        {secondaryLogo ? (
+          <img 
+            src={secondaryLogo} 
+            alt="Secondary Logo" 
+            className="max-h-14 max-w-full object-contain"
+            style={{ transform: `scale(${logoScales.secondary})` }}
+          />
+        ) : (
+          <div className="text-center text-muted-foreground">
+            <Upload className="h-6 w-6 mx-auto mb-1" />
+            <span className="text-xs">Click to upload</span>
+          </div>
+        )}
+        <input
+          ref={secondaryLogoInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => handleLogoUpload(e, 'secondary')}
+          disabled={useDefaultSecondaryLogo}
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="useDefaultSecondary"
+          checked={useDefaultSecondaryLogo}
+          onCheckedChange={(checked) => {
+            setUseDefaultSecondaryLogo(!!checked);
+            if (checked) {
+              setSecondaryLogo('/logos/LeadingRE_Logo.png');
+            }
+          }}
+        />
+        <Label htmlFor="useDefaultSecondary" className="text-xs text-muted-foreground cursor-pointer">
+          Use Leading RE Default
+        </Label>
+      </div>
+    </div>
+  </div>
+  
+  {/* Logo Size & Position Sliders */}
+  <div className="space-y-4 pt-2">
+    {/* Primary Logo Size */}
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs text-muted-foreground">Primary Logo Size</Label>
+        <span className="text-xs text-muted-foreground font-medium">
+          {Math.round(logoScales.primary * 100)}%
+        </span>
+      </div>
+      <Slider
+        value={[logoScales.primary]}
+        onValueChange={([value]) => setLogoScales(prev => ({ ...prev, primary: value }))}
+        min={0.5}
+        max={2}
+        step={0.05}
+        className="py-2"
+      />
+    </div>
+    
+    {/* Secondary Logo Size */}
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs text-muted-foreground">Secondary Logo Size</Label>
+        <span className="text-xs text-muted-foreground font-medium">
+          {Math.round(logoScales.secondary * 100)}%
+        </span>
+      </div>
+      <Slider
+        value={[logoScales.secondary]}
+        onValueChange={([value]) => setLogoScales(prev => ({ ...prev, secondary: value }))}
+        min={0.5}
+        max={2}
+        step={0.05}
+        className="py-2"
+      />
+    </div>
+    
+    {/* Divider Position */}
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs text-muted-foreground">Divider Position</Label>
+        <span className="text-xs text-muted-foreground font-medium">
+          {dividerPosition}px
+        </span>
+      </div>
+      <Slider
+        value={[dividerPosition]}
+        onValueChange={([value]) => setDividerPosition(value)}
+        min={100}
+        max={200}
+        step={1}
+        className="py-2"
+      />
+    </div>
+    
+    {/* Secondary Logo Y Position */}
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs text-muted-foreground">Secondary Logo Y Position</Label>
+        <span className="text-xs text-muted-foreground font-medium">
+          {secondaryLogoOffsetY}px
+        </span>
+      </div>
+      <Slider
+        value={[secondaryLogoOffsetY]}
+        onValueChange={([value]) => setSecondaryLogoOffsetY(value)}
+        min={-20}
+        max={20}
+        step={1}
+        className="py-2"
+      />
+    </div>
+  </div>
+</div>
+```
+
+---
+
+## 📤 Logo Upload Handler
+
+```typescript
+const companyLogoInputRef = useRef<HTMLInputElement>(null);
+const secondaryLogoInputRef = useRef<HTMLInputElement>(null);
+
+const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'company' | 'secondary') => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = reader.result as string;
+    if (type === 'company') {
+      setCompanyLogo(dataUrl);
+      setUseDefaultCompanyLogo(false);
+    } else {
+      setSecondaryLogo(dataUrl);
+      setUseDefaultSecondaryLogo(false);
+    }
+  };
+  reader.readAsDataURL(file);
+};
+```
+
+---
+
+## 🖼️ Live Preview Header Update
+
+Update the FlyerPreview component header to use the logo controls:
+
+```tsx
+{/* ====== HEADER WITH LOGOS ====== */}
+<div className="flex items-center h-[80px] px-4 border-b relative">
+  
+  {/* Company Logo Container */}
+  <div 
+    className="flex items-center justify-center h-full"
+    style={{ width: `${dividerPosition}px` }}
+  >
+    {companyLogo && (
+      <img 
+        src={companyLogo} 
+        alt="Company Logo" 
+        className="max-h-[55px] object-contain"
+        style={{ 
+          transform: `scale(${logoScales.primary})`,
+          transformOrigin: 'center center',
+        }}
+      />
+    )}
+  </div>
+  
+  {/* Vertical Divider Line */}
+  <div 
+    className="h-[50px] bg-gray-300"
+    style={{ 
+      width: '1px',
+      marginLeft: '8px',
+      marginRight: '8px',
+    }}
+  />
+  
+  {/* Secondary Logo Container */}
+  <div 
+    className="flex items-center justify-center h-full flex-1"
+    style={{ 
+      transform: `translateY(${secondaryLogoOffsetY}px)`,
+    }}
+  >
+    {secondaryLogo && (
+      <img 
+        src={secondaryLogo} 
+        alt="Secondary Logo" 
+        className="max-h-[50px] object-contain"
+        style={{ 
+          transform: `scale(${logoScales.secondary})`,
+          transformOrigin: 'center center',
+        }}
+      />
+    )}
+  </div>
+  
+  {/* Price Badge - Positioned at right */}
+  <div className="absolute right-0 top-0 bg-[#8B7355] text-white px-6 py-3 text-right">
+    <div className="text-[10px] uppercase tracking-wider opacity-80">Offered At</div>
+    <div className="text-xl font-bold">{price || '$0'}</div>
+  </div>
+</div>
+```
+
+---
+
+## 📤 Include in Export
+
+Pass logo data to the export endpoint:
+
+```typescript
+const handleExportPNG = async () => {
+  const response = await fetch('/api/flyer/export-png', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      transactionId,
+      formData: watchedValues,
+      images: {
+        mainImage,
+        kitchenImage,
+        roomImage,
+        agentPhoto,
+        companyLogo,      // ← Include company logo
+        secondaryLogo,    // ← Include secondary logo
+        qrCode,
+      },
+      logoScales,           // ← Include logo scales
+      dividerPosition,      // ← Include divider position
+      secondaryLogoOffsetY, // ← Include Y offset
+      // ... other data
+    }),
+  });
+  // ...
+};
+```
+
+---
+
+## 🖨️ Server-Side Export Template
+
+Update the HTML template on the server to use these values:
+
+```html
+<!-- Header Section -->
+<div class="header" style="display: flex; align-items: center; height: 80px; padding: 0 16px; position: relative;">
+  
+  <!-- Company Logo -->
+  <div style="width: {{dividerPosition}}px; display: flex; align-items: center; justify-content: center;">
+    {{#if companyLogo}}
+      <img 
+        src="{{companyLogo}}" 
+        alt="Company Logo" 
+        style="max-height: 55px; object-fit: contain; transform: scale({{logoScales.primary}});"
+      />
+    {{/if}}
+  </div>
+  
+  <!-- Divider -->
+  <div style="width: 1px; height: 50px; background: #d1d5db; margin: 0 8px;"></div>
+  
+  <!-- Secondary Logo -->
+  <div style="flex: 1; display: flex; align-items: center; justify-content: center; transform: translateY({{secondaryLogoOffsetY}}px);">
+    {{#if secondaryLogo}}
+      <img 
+        src="{{secondaryLogo}}" 
+        alt="Secondary Logo" 
+        style="max-height: 50px; object-fit: contain; transform: scale({{logoScales.secondary}});"
+      />
+    {{/if}}
+  </div>
+  
+  <!-- Price Badge -->
+  <div style="position: absolute; right: 0; top: 0; background: #8B7355; color: white; padding: 12px 24px; text-align: right;">
+    <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8;">Offered At</div>
+    <div style="font-size: 24px; font-weight: bold;">{{price}}</div>
+  </div>
+</div>
+```
+
+---
+
+## 📦 Required Imports
+
+```typescript
+import { useState, useRef } from 'react';
+import { Slider } from '@/components/ui/slider';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
+import { Palette, Upload } from 'lucide-react';
+```
+
+---
+
+## 📱 Mobile Optimization
+
+Ensure sliders have proper touch targets:
+
+```tsx
+<Slider
+  className="py-2" // Adds vertical padding for easier touch
+  // ... other props
+/>
+```
+
+The slider component from shadcn/ui should already have good touch support, but verify:
+- Thumb is at least 44px touch target
+- Track is easy to tap
+
+---
+
+## ✅ Testing Checklist
+
+### Logo Upload
+- [ ] Click Company Logo area → file picker opens
+- [ ] Upload custom logo → displays in preview
+- [ ] "Use Spyglass Default" checkbox → loads default logo
+- [ ] Click Secondary Logo area → file picker opens
+- [ ] Upload custom logo → displays in preview
+- [ ] "Use Leading RE Default" checkbox → loads default logo
+
+### Logo Sliders
+- [ ] Primary Logo Size slider → logo scales in preview (50%-200%)
+- [ ] Secondary Logo Size slider → logo scales in preview (50%-200%)
+- [ ] Divider Position slider → divider line moves (100-200px)
+- [ ] Secondary Logo Y Position → secondary logo moves up/down (±20px)
+
+### Live Preview
+- [ ] Both logos display in header
+- [ ] Divider line visible between logos
+- [ ] Logo sizes reflect slider values
+- [ ] Secondary logo Y position reflects slider value
+
+### Export
+- [ ] PNG export includes both logos with correct sizing
+- [ ] PNG export includes divider at correct position
+- [ ] CMYK export includes both logos with correct sizing
+- [ ] Exported logos match Live Preview exactly

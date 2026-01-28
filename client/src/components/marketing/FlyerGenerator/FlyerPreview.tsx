@@ -5,9 +5,19 @@ interface FlyerPreviewProps {
   data: FlyerData;
   images: FlyerImages;
   imageTransforms: ImageTransforms;
+  logoScales?: { primary: number; secondary: number };
+  dividerPosition?: number;
+  secondaryLogoOffsetY?: number;
 }
 
-export function FlyerPreview({ data, images, imageTransforms }: FlyerPreviewProps) {
+export function FlyerPreview({ 
+  data, 
+  images, 
+  imageTransforms,
+  logoScales = { primary: 1, secondary: 1 },
+  dividerPosition = 148,
+  secondaryLogoOffsetY = 0,
+}: FlyerPreviewProps) {
   const accentColor = "#8b7d6b";
 
   const getTransformStyle = (transform: { scale: number; positionX: number; positionY: number }) => ({
@@ -21,26 +31,67 @@ export function FlyerPreview({ data, images, imageTransforms }: FlyerPreviewProp
       style={{ width: '816px', height: '1056px', fontFamily: 'Arial, sans-serif' }}
       data-testid="flyer-preview"
     >
-      <div className="absolute left-6 top-4 right-6 h-[60px]">
+      {/* Header with Logos */}
+      <div className="absolute left-6 top-4 right-6 h-[80px] flex items-center">
+        {/* Accent Bar */}
         <div
           className="absolute left-0 top-0 w-[6px] h-[83px]"
           style={{ backgroundColor: accentColor }}
         />
-        <div className="absolute left-4 top-0 w-[100px] h-[55px] flex items-center">
+        
+        {/* Company Logo Container */}
+        <div 
+          className="flex items-center justify-center h-full ml-4"
+          style={{ width: `${dividerPosition}px` }}
+        >
           {images.companyLogo ? (
-            <img src={images.companyLogo} alt="Company Logo" className="h-full object-contain" />
+            <img 
+              src={images.companyLogo} 
+              alt="Company Logo" 
+              className="max-h-[55px] object-contain"
+              style={{ 
+                transform: `scale(${logoScales.primary})`,
+                transformOrigin: 'center center',
+              }}
+            />
           ) : (
             <span className="text-gray-400 text-xs">LOGO</span>
           )}
         </div>
-        <div className="absolute left-[126px] top-[5px] w-[1px] h-[45px] bg-gray-500" />
-        <div className="absolute left-[140px] top-0 w-[180px] h-[55px] flex items-center">
+        
+        {/* Vertical Divider Line */}
+        <div 
+          className="h-[50px] bg-gray-400"
+          style={{ 
+            width: '1px',
+            marginLeft: '8px',
+            marginRight: '8px',
+          }}
+        />
+        
+        {/* Secondary Logo Container */}
+        <div 
+          className="flex items-center justify-center h-full flex-1"
+          style={{ 
+            transform: `translateY(${secondaryLogoOffsetY}px)`,
+          }}
+        >
           {images.secondaryLogo ? (
-            <img src={images.secondaryLogo} alt="Secondary Logo" className="h-full object-contain" />
+            <img 
+              src={images.secondaryLogo} 
+              alt="Secondary Logo" 
+              className="max-h-[50px] object-contain"
+              style={{ 
+                transform: `scale(${logoScales.secondary})`,
+                transformOrigin: 'center center',
+              }}
+            />
           ) : (
             <span className="text-gray-400 text-xs">SECONDARY</span>
           )}
         </div>
+        
+        {/* Price Badge */}
         <div className="absolute right-0 top-0 w-[144px] h-[58px] bg-[#6b7b6e] flex flex-col justify-center items-center text-white">
           <span className="text-[7pt] tracking-[2px]">LISTED AT</span>
           <span className="text-[14pt] font-bold">{data.price || '$0'}</span>
