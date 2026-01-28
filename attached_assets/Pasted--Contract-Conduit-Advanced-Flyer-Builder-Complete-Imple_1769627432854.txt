@@ -1,0 +1,784 @@
+# Contract Conduit — Advanced Flyer Builder Complete Implementation
+
+## 📌 Summary
+
+Fix the Advanced Flyer Builder to:
+1. **Auto-populate form fields** from MLS data and Settings (currently showing hardcoded defaults)
+2. **Implement modal-based image cropping** (click to open crop dialog, drag to pan, zoom slider)
+3. **Add QR Code generation** (URL input → auto-generate QR code)
+4. **Keep logo sizing controls** in Flyer Generator (data comes from Settings, sizing adjustable per flyer)
+
+---
+
+## 🔧 Part 1: Fix Auto-Population
+
+### Problem
+Form fields show hardcoded defaults instead of actual data:
+- "$1,250,000" instead of MLS `listPrice`
+- "Jane Smith" instead of Settings `firstName` + `lastName`
+- Empty photo boxes instead of AI-selected MLS photos
+
+### Fix: Auto-Fill from MLS Data
+
+```typescript
+// In the main component, add useEffect to populate from transaction.mlsData
+useEffect(() => {
+  if (transaction?.mlsData) {
+    const mls = transaction.mlsData;
+    
+    console.log('[Flyer] Auto-populating from MLS:', mls);
+    
+    // Property Details
+    form.setValue('price', formatPrice(mls.listPrice || transaction.listPrice));
+    form.setValue('bedrooms', String(mls.beds || mls.bedroomsTotal || ''));
+    form.setValue('bathrooms', String(mls.baths || mls.bathroomsTotalInteger || ''));
+    form.setValue('sqft', formatNumber(mls.sqft || mls.livingArea || mls.buildingAreaTotal));
+    
+    // Address
+    const streetParts = [mls.streetNumber, mls.streetName, mls.streetSuffix].filter(Boolean).join(' ');
+    const cityStateZip = [mls.city, mls.state, mls.zip].filter(Boolean).join(', ');
+    form.setValue('address', `${streetParts}, ${cityStateZip}`.toUpperCase());
+    
+    // Description
+    form.setValue('introDescription', mls.publicRemarks || mls.remarks || '');
+    
+    // Headline (auto-generate from location)
+    const headline = mls.neighborhood 
+      ? `Prime Opportunity in ${mls.neighborhood}`
+      : mls.city 
+        ? `Prime Opportunity in ${mls.city}`
+        : 'Prime Opportunity';
+    form.setValue('introHeadline', headline);
+    
+    // Auto-select photos using imageInsights
+    if (mls.photos?.length > 0) {
+      const selected = autoSelectPhotos(mls.photos);
+      setImages(prev => ({
+        ...prev,
+        mainImage: selected.mainPhoto?.url || null,
+        kitchenImage: selected.kitchenPhoto?.url || null,
+        roomImage: selected.roomPhoto?.url || null,
+      }));
+    }
+  }
+}, [transaction]);
+```
+
+### Fix: Auto-Fill from Settings
+
+```typescript
+useEffect(() => {
+  if (settings) {
+    console.log('[Flyer] Auto-populating from Settings:', settings);
+    
+    // Agent Details
+    const fullName = `${settings.firstName || ''} ${settings.lastName || ''}`.trim();
+    if (fullName) form.setValue('agentName', fullName);
+    if (settings.title) form.setValue('agentTitle', settings.title);
+    if (settings.phone) form.setValue('phone', settings.phone);
+    
+    // Agent Photo
+    if (settings.profilePhoto) {
+      setImages(prev => ({ ...prev, agentPhoto: settings.profilePhoto }));
+    }
+    
+    // Logos (from Settings, but sizing adjustable in Flyer Generator)
+    if (settings.companyLogo) {
+      setImages(prev => ({ ...prev, companyLogo: settings.companyLogo }));
+    } else {
+      // Use Spyglass default
+      setImages(prev => ({ ...prev, companyLogo: '/logos/SpyglassRealty_Logo_Black.png' }));
+    }
+    
+    if (settings.secondaryLogo) {
+      setImages(prev => ({ ...prev, secondaryLogo: settings.secondaryLogo }));
+    } else {
+      // Use Leading RE default
+      setImages(prev => ({ ...prev, secondaryLogo: '/logos/LeadingRE_Logo.png' }));
+    }
+    
+    // QR Code URL (if saved in settings)
+    if (settings.qrCodeUrl) {
+      form.setValue('qrCodeUrl', settings.qrCodeUrl);
+      // Auto-generate QR code
+      generateQRCode(settings.qrCodeUrl);
+    }
+  }
+}, [settings]);
+```
+
+### Photo Auto-Selection Utility
+
+```typescript
+function autoSelectPhotos(photos: any[]) {
+  // Sort by quality score (highest first)
+  const sorted = [...photos].sort((a, b) => {
+    const scoreA = a.imageInsights?.quality?.score || 0;
+    const scoreB = b.imageInsights?.quality?.score || 0;
+    return scoreB - scoreA;
+  });
+  
+  // Find best EXTERIOR/FRONT photo for main
+  const mainPhoto = sorted.find(p => {
+    const imageOf = p.imageInsights?.classification?.imageOf?.toLowerCase() || '';
+    return ['front of structure', 'exterior', 'front', 'facade'].some(term => imageOf.includes(term));
+  }) || sorted[0];
+  
+  // Find best KITCHEN photo
+  const kitchenPhoto = sorted.find(p => {
+    const imageOf = p.imageInsights?.classification?.imageOf?.toLowerCase() || '';
+    return imageOf.includes('kitchen');
+  });
+  
+  // Find best LIVING ROOM / INTERIOR photo
+  const usedUrls = new Set([mainPhoto?.url, kitchenPhoto?.url].filter(Boolean));
+  const roomPhoto = sorted.find(p => {
+    if (usedUrls.has(p.url)) return false;
+    const imageOf = p.imageInsights?.classification?.imageOf?.toLowerCase() || '';
+    return ['living room', 'living', 'interior', 'bedroom', 'great room'].some(term => imageOf.includes(term));
+  }) || sorted.find(p => !usedUrls.has(p.url));
+  
+  return { mainPhoto, kitchenPhoto, roomPhoto };
+}
+```
+
+---
+
+## 🔧 Part 2: Modal-Based Image Cropping
+
+Replace the current inline crop controls with a modal-based system like the Flyer Maker has.
+
+### CropModal Component
+
+```tsx
+// components/marketing/AdvancedFlyerGenerator/CropModal.tsx
+
+import { useState, useRef, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
+import { ZoomIn } from 'lucide-react';
+
+interface CropModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  imageUrl: string;
+  aspectRatio: number; // width/height ratio of the crop area
+  onApply: (position: { x: number; y: number }, zoom: number) => void;
+  initialPosition?: { x: number; y: number };
+  initialZoom?: number;
+}
+
+export function CropModal({
+  isOpen,
+  onClose,
+  imageUrl,
+  aspectRatio,
+  onApply,
+  initialPosition = { x: 50, y: 50 },
+  initialZoom = 1,
+}: CropModalProps) {
+  const [position, setPosition] = useState(initialPosition);
+  const [zoom, setZoom] = useState(initialZoom);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [imageAspect, setImageAspect] = useState(1);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Load image to get natural dimensions
+  useEffect(() => {
+    if (imageUrl) {
+      const img = new Image();
+      img.onload = () => {
+        setImageAspect(img.naturalWidth / img.naturalHeight);
+      };
+      img.src = imageUrl;
+    }
+  }, [imageUrl]);
+
+  // Reset when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setPosition(initialPosition);
+      setZoom(initialZoom);
+    }
+  }, [isOpen, initialPosition, initialZoom]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setDragStart({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+
+    const deltaX = e.clientX - dragStart.x;
+    const deltaY = e.clientY - dragStart.y;
+
+    // Calculate pan limits based on zoom and aspect ratios
+    const container = containerRef.current;
+    if (!container) return;
+
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+    const containerAspect = containerWidth / containerHeight;
+
+    // Determine how much the image overflows in each direction
+    let overflowX = 0;
+    let overflowY = 0;
+
+    if (imageAspect > containerAspect) {
+      // Image is wider - can pan horizontally
+      overflowX = ((imageAspect / containerAspect) * zoom - 1) * 50;
+    } else {
+      // Image is taller - can pan vertically
+      overflowY = ((containerAspect / imageAspect) * zoom - 1) * 50;
+    }
+
+    // Add zoom overflow
+    overflowX += (zoom - 1) * 50;
+    overflowY += (zoom - 1) * 50;
+
+    setPosition(prev => ({
+      x: Math.max(0, Math.min(100, prev.x - deltaX * 0.2)),
+      y: Math.max(0, Math.min(100, prev.y - deltaY * 0.2)),
+    }));
+
+    setDragStart({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleApply = () => {
+    onApply(position, zoom);
+    onClose();
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Crop Image</DialogTitle>
+        </DialogHeader>
+
+        {/* Crop Area */}
+        <div
+          ref={containerRef}
+          className="relative overflow-hidden rounded-lg bg-gray-100 cursor-move"
+          style={{
+            aspectRatio: aspectRatio,
+            maxHeight: '400px',
+          }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+          {/* Grid Overlay */}
+          <div className="absolute inset-0 pointer-events-none z-10">
+            <div className="w-full h-full grid grid-cols-3 grid-rows-3">
+              {Array.from({ length: 9 }).map((_, i) => (
+                <div key={i} className="border border-white/30" />
+              ))}
+            </div>
+          </div>
+
+          {/* Image */}
+          <img
+            src={imageUrl}
+            alt="Crop preview"
+            className="absolute w-full h-full object-cover select-none"
+            style={{
+              objectPosition: `${position.x}% ${position.y}%`,
+              transform: `scale(${zoom})`,
+              transformOrigin: `${position.x}% ${position.y}%`,
+            }}
+            draggable={false}
+          />
+        </div>
+
+        {/* Zoom Slider */}
+        <div className="flex items-center gap-3 mt-4">
+          <ZoomIn className="w-4 h-4 text-muted-foreground" />
+          <Slider
+            value={[zoom]}
+            onValueChange={([value]) => setZoom(value)}
+            min={1}
+            max={3}
+            step={0.1}
+            className="flex-1"
+          />
+          <span className="text-sm text-muted-foreground w-12">{zoom.toFixed(1)}x</span>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleApply}>
+            Apply Crop
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+### Updated ImageUploadField Component
+
+```tsx
+// components/marketing/AdvancedFlyerGenerator/ImageUploadField.tsx
+
+import { useState, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Crop, X, Upload } from 'lucide-react';
+import { CropModal } from './CropModal';
+
+interface ImageUploadFieldProps {
+  label: string;
+  value: string | null;
+  onChange: (url: string | null) => void;
+  onCropChange: (position: { x: number; y: number }, zoom: number) => void;
+  cropPosition?: { x: number; y: number };
+  cropZoom?: number;
+  aspectRatio?: number;
+  circular?: boolean;
+  className?: string;
+}
+
+export function ImageUploadField({
+  label,
+  value,
+  onChange,
+  onCropChange,
+  cropPosition = { x: 50, y: 50 },
+  cropZoom = 1,
+  aspectRatio = 16 / 9,
+  circular = false,
+  className = '',
+}: ImageUploadFieldProps) {
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        onChange(reader.result as string);
+        // Reset crop when new image uploaded
+        onCropChange({ x: 50, y: 50 }, 1);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemove = () => {
+    onChange(null);
+    onCropChange({ x: 50, y: 50 }, 1);
+    if (inputRef.current) {
+      inputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div className={className}>
+      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+        {label}
+      </label>
+
+      <div
+        className={`relative bg-muted border-2 border-dashed border-border rounded-lg overflow-hidden ${
+          circular ? 'aspect-square rounded-full' : 'aspect-video'
+        }`}
+      >
+        {value ? (
+          <>
+            {/* Image Preview */}
+            <img
+              src={value}
+              alt={label}
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{
+                objectPosition: `${cropPosition.x}% ${cropPosition.y}%`,
+                transform: `scale(${cropZoom})`,
+                transformOrigin: `${cropPosition.x}% ${cropPosition.y}%`,
+              }}
+            />
+
+            {/* Action Buttons */}
+            <div className="absolute top-2 right-2 flex gap-1">
+              <Button
+                type="button"
+                size="icon"
+                variant="secondary"
+                className="h-8 w-8 bg-white/90 hover:bg-white"
+                onClick={() => setIsCropModalOpen(true)}
+              >
+                <Crop className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="secondary"
+                className="h-8 w-8 bg-white/90 hover:bg-white"
+                onClick={handleRemove}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+            onClick={() => inputRef.current?.click()}
+          >
+            <Upload className="h-8 w-8 mb-2" />
+            <span className="text-sm">Click to upload</span>
+          </button>
+        )}
+
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+      </div>
+
+      {/* Crop Modal */}
+      {value && (
+        <CropModal
+          isOpen={isCropModalOpen}
+          onClose={() => setIsCropModalOpen(false)}
+          imageUrl={value}
+          aspectRatio={circular ? 1 : aspectRatio}
+          onApply={onCropChange}
+          initialPosition={cropPosition}
+          initialZoom={cropZoom}
+        />
+      )}
+    </div>
+  );
+}
+```
+
+### State Management for Crops
+
+```typescript
+// In the main component, update the imageTransforms state:
+
+interface ImageCrop {
+  position: { x: number; y: number };
+  zoom: number;
+}
+
+const [imageCrops, setImageCrops] = useState<Record<string, ImageCrop>>({
+  mainImage: { position: { x: 50, y: 50 }, zoom: 1 },
+  kitchenImage: { position: { x: 50, y: 50 }, zoom: 1 },
+  roomImage: { position: { x: 50, y: 50 }, zoom: 1 },
+  agentPhoto: { position: { x: 50, y: 50 }, zoom: 1 },
+});
+
+// Handler for crop changes
+const handleCropChange = (imageKey: string) => (position: { x: number; y: number }, zoom: number) => {
+  setImageCrops(prev => ({
+    ...prev,
+    [imageKey]: { position, zoom },
+  }));
+};
+```
+
+---
+
+## 🔧 Part 3: QR Code Generation
+
+Add QR code generation from URL input instead of file upload.
+
+### Install Package
+
+```bash
+npm install qrcode
+```
+
+### QR Code Input Component
+
+```tsx
+// In the Property Images section of FlyerForm:
+
+import QRCode from 'qrcode';
+
+// State for QR code
+const [qrCodeUrl, setQrCodeUrl] = useState('');
+const [generatedQR, setGeneratedQR] = useState<string | null>(null);
+
+// Generate QR code from URL
+const generateQRCode = async (url: string) => {
+  if (!url) {
+    setGeneratedQR(null);
+    return;
+  }
+  
+  try {
+    const qrDataUrl = await QRCode.toDataURL(url, {
+      width: 200,
+      margin: 1,
+      color: {
+        dark: '#000000',
+        light: '#ffffff',
+      },
+    });
+    setGeneratedQR(qrDataUrl);
+    setImages(prev => ({ ...prev, qrCode: qrDataUrl }));
+  } catch (error) {
+    console.error('[Flyer] QR code generation failed:', error);
+  }
+};
+
+// QR Code Input UI
+<div className="space-y-2">
+  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+    QR Code
+  </label>
+  <div className="flex gap-2">
+    <Input
+      placeholder="Enter URL..."
+      value={qrCodeUrl}
+      onChange={(e) => setQrCodeUrl(e.target.value)}
+      className="flex-1 min-h-11"
+    />
+    <Button
+      type="button"
+      variant="secondary"
+      size="icon"
+      className="min-h-11 min-w-11"
+      onClick={() => generateQRCode(qrCodeUrl)}
+      disabled={!qrCodeUrl}
+    >
+      <QrCode className="h-4 w-4" />
+    </Button>
+  </div>
+  
+  {/* QR Code Preview */}
+  {generatedQR && (
+    <div className="relative w-20 h-20 border rounded-lg overflow-hidden">
+      <img src={generatedQR} alt="QR Code" className="w-full h-full" />
+      <Button
+        type="button"
+        size="icon"
+        variant="secondary"
+        className="absolute top-1 right-1 h-6 w-6"
+        onClick={() => {
+          setGeneratedQR(null);
+          setQrCodeUrl('');
+          setImages(prev => ({ ...prev, qrCode: null }));
+        }}
+      >
+        <X className="h-3 w-3" />
+      </Button>
+    </div>
+  )}
+</div>
+```
+
+---
+
+## 🔧 Part 4: Logo Sizing Controls
+
+Keep logo sizing controls in the Flyer Generator (even though data comes from Settings).
+
+### Logo Controls Component
+
+```tsx
+// In the Branding & Logos section:
+
+<div className="space-y-4">
+  <h3 className="text-sm font-medium flex items-center gap-2">
+    <Palette className="h-4 w-4" />
+    Branding & Logos
+  </h3>
+  
+  {/* Logo Upload/Preview */}
+  <div className="grid grid-cols-2 gap-4">
+    {/* Company Logo */}
+    <div>
+      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+        Company Logo
+      </label>
+      <div className="h-16 bg-muted rounded-lg flex items-center justify-center p-2">
+        {images.companyLogo ? (
+          <img 
+            src={images.companyLogo} 
+            alt="Company Logo" 
+            className="max-h-full max-w-full object-contain"
+            style={{ transform: `scale(${logoScales.primary})` }}
+          />
+        ) : (
+          <span className="text-xs text-muted-foreground">No logo</span>
+        )}
+      </div>
+    </div>
+    
+    {/* Secondary Logo */}
+    <div>
+      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+        Secondary Logo
+      </label>
+      <div className="h-16 bg-muted rounded-lg flex items-center justify-center p-2">
+        {images.secondaryLogo ? (
+          <img 
+            src={images.secondaryLogo} 
+            alt="Secondary Logo" 
+            className="max-h-full max-w-full object-contain"
+            style={{ transform: `scale(${logoScales.secondary})` }}
+          />
+        ) : (
+          <span className="text-xs text-muted-foreground">No logo</span>
+        )}
+      </div>
+    </div>
+  </div>
+  
+  {/* Logo Size Sliders */}
+  <div className="space-y-3">
+    <div className="flex items-center justify-between">
+      <label className="text-xs text-muted-foreground">Primary Logo Size</label>
+      <span className="text-xs text-muted-foreground">{Math.round(logoScales.primary * 100)}%</span>
+    </div>
+    <Slider
+      value={[logoScales.primary]}
+      onValueChange={([value]) => setLogoScales(prev => ({ ...prev, primary: value }))}
+      min={0.5}
+      max={2}
+      step={0.05}
+      className="min-h-11" // 44px touch target
+    />
+    
+    <div className="flex items-center justify-between">
+      <label className="text-xs text-muted-foreground">Secondary Logo Size</label>
+      <span className="text-xs text-muted-foreground">{Math.round(logoScales.secondary * 100)}%</span>
+    </div>
+    <Slider
+      value={[logoScales.secondary]}
+      onValueChange={([value]) => setLogoScales(prev => ({ ...prev, secondary: value }))}
+      min={0.5}
+      max={2}
+      step={0.05}
+      className="min-h-11"
+    />
+    
+    <div className="flex items-center justify-between">
+      <label className="text-xs text-muted-foreground">Divider Position</label>
+      <span className="text-xs text-muted-foreground">{dividerPosition}px</span>
+    </div>
+    <Slider
+      value={[dividerPosition]}
+      onValueChange={([value]) => setDividerPosition(value)}
+      min={100}
+      max={200}
+      step={1}
+      className="min-h-11"
+    />
+    
+    <div className="flex items-center justify-between">
+      <label className="text-xs text-muted-foreground">Secondary Logo Y Position</label>
+      <span className="text-xs text-muted-foreground">{secondaryLogoOffsetY}px</span>
+    </div>
+    <Slider
+      value={[secondaryLogoOffsetY]}
+      onValueChange={([value]) => setSecondaryLogoOffsetY(value)}
+      min={-20}
+      max={20}
+      step={1}
+      className="min-h-11"
+    />
+  </div>
+</div>
+```
+
+---
+
+## 📱 Mobile Optimization
+
+Ensure all components have proper touch targets and responsive behavior:
+
+```tsx
+// Minimum touch targets
+className="min-h-11" // 44px
+
+// Smooth scrolling
+className="-webkit-overflow-scrolling-touch"
+
+// Responsive layout
+<div className="flex flex-col md:flex-row">
+  {/* Left pane: full width on mobile, fixed on desktop */}
+  <div className="w-full md:w-[420px] h-[50vh] md:h-full">
+    {/* Form */}
+  </div>
+  
+  {/* Right pane: full width on mobile */}
+  <div className="flex-1">
+    {/* Preview */}
+  </div>
+</div>
+```
+
+---
+
+## ✅ Testing Checklist
+
+### Auto-Population
+- [ ] Open Flyer from transaction with MLS data
+- [ ] Listed Price shows actual MLS price (not $1,250,000)
+- [ ] Beds/Baths/Sq Ft show actual MLS values
+- [ ] Address shows actual property address
+- [ ] Description shows MLS publicRemarks
+- [ ] Agent Name shows your name from Settings (not "Jane Smith")
+- [ ] Agent Title shows your title from Settings
+- [ ] Phone shows your phone from Settings
+- [ ] Agent Photo loads from Settings
+- [ ] Main/Kitchen/Room photos auto-select from MLS
+
+### Modal-Based Cropping
+- [ ] Click image → Crop button appears
+- [ ] Click Crop → Modal opens with image
+- [ ] Drag to pan works
+- [ ] Zoom slider works (1x-3x)
+- [ ] Apply Crop saves changes
+- [ ] Thumbnail shows cropped position
+- [ ] Live Preview shows cropped position
+- [ ] Export includes cropped position
+
+### QR Code
+- [ ] URL input field exists
+- [ ] Enter URL → click generate → QR appears
+- [ ] QR shows in preview
+- [ ] QR exports correctly
+- [ ] Can remove and regenerate
+
+### Logo Controls
+- [ ] Logos load from Settings
+- [ ] Primary Logo Size slider works (50%-200%)
+- [ ] Secondary Logo Size slider works
+- [ ] Divider Position slider works (100-200px)
+- [ ] Secondary Logo Y Position works (±20px)
+- [ ] Changes reflect in preview
+- [ ] Changes export correctly
+
+### Export
+- [ ] Export PNG works
+- [ ] Export CMYK works
+- [ ] All crops, logos, QR code included
+- [ ] Matches Live Preview exactly
+
+### Mobile
+- [ ] iPad Safari layout correct
+- [ ] iPhone Safari stacked layout
+- [ ] All buttons 44px touch targets
+- [ ] Smooth scrolling
+- [ ] Crop modal works on touch

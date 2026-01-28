@@ -133,8 +133,25 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
 
   // Effect for MLS/property data - runs when transaction changes
   useEffect(() => {
+    console.log('[Flyer Debug] Transaction effect triggered:', { 
+      hasTransaction: !!transaction,
+      mlsNumber: transaction?.mlsNumber,
+      listPrice: transaction?.listPrice
+    });
+    
     if (transaction) {
       const mlsData = transaction.mlsData || {};
+      console.log('[Flyer Debug] MLS Data keys:', Object.keys(mlsData));
+      console.log('[Flyer Debug] MLS Data sample fields:', {
+        bedrooms: mlsData.bedrooms,
+        beds: mlsData.beds,
+        bathrooms: mlsData.bathrooms,
+        baths: mlsData.baths,
+        sqft: mlsData.sqft,
+        listPrice: mlsData.listPrice,
+        rawData_exists: !!mlsData.rawData,
+        details_exists: !!mlsData.rawData?.details
+      });
 
       // Extract data using robust utility functions that handle Repliers API field variations
       const listPrice = transaction.listPrice || mlsData.listPrice || mlsData.price || mlsData.ListPrice;
@@ -143,6 +160,8 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
       const rawBeds = extractBeds(mlsData);
       const rawBaths = extractBaths(mlsData);
       const rawSqft = extractSqft(mlsData);
+      
+      console.log('[Flyer Debug] Extracted raw values:', { rawBeds, rawBaths, rawSqft, listPrice });
       
       // Comprehensive Repliers field fallbacks with all known field variations
       const bedsValue = rawBeds !== 'N/A' && rawBeds !== null && rawBeds !== undefined
@@ -163,6 +182,12 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
                         mlsData.buildingAreaTotal ?? mlsData.BuildingAreaTotal ?? mlsData.size ?? 
                         mlsData.squareFeet ?? mlsData.SquareFeet ?? null;
       const sqft = sqftValue !== null && sqftValue !== undefined ? sqftValue : '';
+      
+      console.log('[Flyer Debug] Final form values to set:', { 
+        beds, baths, sqft, listPrice,
+        formattedPrice: formatPrice(listPrice),
+        formattedSqft: sqft ? formatNumber(sqft) : ''
+      });
 
       // Store original description for AI summarize feature
       const fullDescription = mlsData.publicRemarks || mlsData.remarks || mlsData.description || '';
@@ -176,6 +201,11 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
       form.setValue('sqft', sqft !== null && sqft !== undefined && sqft !== '' ? formatNumber(sqft) : '');
       form.setValue('introHeading', generateDefaultHeadline(transaction, mlsData));
       form.setValue('introDescription', fullDescription);
+      
+      // Verify the form values were set
+      setTimeout(() => {
+        console.log('[Flyer Debug] Form values after setValue:', form.getValues());
+      }, 100);
 
       // Get photos from mlsData - handle various Repliers API formats
       const photoUrls = mlsData.photos || mlsData.images || mlsData.Media || [];
@@ -277,10 +307,17 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
 
   // Effect for AI-selected photos from coverImage API (takes priority over imageInsights)
   useEffect(() => {
+    console.log('[Flyer Debug] AI Photos effect triggered:', { 
+      aiPhotoData, 
+      aiPhotosLoading,
+      hasAiSelected: !!aiPhotoData?.aiSelected 
+    });
+    
     if (aiPhotoData?.aiSelected && !aiPhotosLoading) {
       const { mainPhoto, kitchenPhoto, roomPhoto } = aiPhotoData.aiSelected;
       
       console.log(`[Flyer AI] Using coverImage API selection (method: ${aiPhotoData.selectionMethod})`);
+      console.log('[Flyer Debug] Setting images from AI:', { mainPhoto, kitchenPhoto, roomPhoto });
       
       // Set images from coverImage API selection
       setImages(prev => ({
@@ -345,6 +382,12 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
 
   // Effect for agent data - runs when agent profile or marketing profile loads
   useEffect(() => {
+    console.log('[Flyer Debug] Agent effect triggered:', { 
+      agentProfile, 
+      marketingProfile,
+      user: agentProfile?.user 
+    });
+    
     const user = agentProfile?.user;
     
     // Build agent name - try user settings first, then transaction data
