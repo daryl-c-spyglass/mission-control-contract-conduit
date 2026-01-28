@@ -119,7 +119,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
 
   // Logo controls state
   const [logoScales, setLogoScales] = useState({ primary: 1, secondary: 1 });
-  const [dividerPosition, setDividerPosition] = useState(148);
+  const [dividerPosition, setDividerPosition] = useState(200);
   const [secondaryLogoOffsetY, setSecondaryLogoOffsetY] = useState(0);
   const [useDefaultCompanyLogo, setUseDefaultCompanyLogo] = useState(true);
   const [useDefaultSecondaryLogo, setUseDefaultSecondaryLogo] = useState(true);
