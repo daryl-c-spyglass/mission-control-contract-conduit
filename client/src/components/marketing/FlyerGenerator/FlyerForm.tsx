@@ -50,6 +50,8 @@ interface FlyerFormProps {
   selectionMethod?: string;
   qrCodeUrl?: string;
   onQrCodeUrlChange?: (url: string) => void;
+  onGenerateShareableLink?: () => Promise<{ flyerUrl: string; qrCode: string } | null>;
+  isGeneratingShareableLink?: boolean;
   logoScales?: { primary: number; secondary: number };
   onLogoScalesChange?: (scales: { primary: number; secondary: number }) => void;
   dividerPosition?: number;
@@ -118,6 +120,8 @@ export function FlyerForm({
   selectionMethod,
   qrCodeUrl = '',
   onQrCodeUrlChange,
+  onGenerateShareableLink,
+  isGeneratingShareableLink = false,
   logoScales = { primary: 1, secondary: 1 },
   onLogoScalesChange,
   dividerPosition = 148,
@@ -487,37 +491,12 @@ export function FlyerForm({
           />
           <div className="space-y-3">
             <Label className="text-xs font-medium uppercase tracking-wide">
-              QR Code
+              Shareable Flyer Link
             </Label>
             <p className="text-xs text-muted-foreground">
-              Enter a URL for the QR code. When scanned, it will direct users to this link.
+              Generate a shareable link for this flyer. When scanned, the QR code will open a mobile-friendly property page.
             </p>
-            <div className="flex gap-2">
-              <Input
-                placeholder="https://spyglassrealty.com/listing/..."
-                value={localQrUrl}
-                onChange={handleQrUrlChange}
-                className="flex-1 min-h-11 text-sm"
-                data-testid="input-qr-url"
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                size="icon"
-                className="min-h-11 min-w-11"
-                onClick={() => generateQRCode(localQrUrl)}
-                disabled={!localQrUrl.trim() || isGeneratingQR}
-                title="Generate QR Code"
-                data-testid="button-generate-qr"
-              >
-                {isGeneratingQR ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <QrCode className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-            {images.qrCode ? (
+            {images.qrCode && localQrUrl ? (
               <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
                 <div className="relative">
                   <img 
@@ -538,16 +517,33 @@ export function FlyerForm({
                   </Button>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-foreground">QR Code Generated</p>
+                  <p className="text-xs font-medium text-foreground">Shareable Link Ready</p>
                   <p className="text-xs text-muted-foreground truncate" title={localQrUrl}>
                     {localQrUrl}
                   </p>
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground italic">
-                Enter a URL and click the QR button to generate
-              </p>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onGenerateShareableLink}
+                disabled={isGeneratingShareableLink}
+                className="w-full"
+                data-testid="button-generate-shareable-link"
+              >
+                {isGeneratingShareableLink ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <QrCode className="h-4 w-4 mr-2" />
+                    Generate Shareable Link
+                  </>
+                )}
+              </Button>
             )}
           </div>
         </div>

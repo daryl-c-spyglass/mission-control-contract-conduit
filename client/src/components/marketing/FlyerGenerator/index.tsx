@@ -116,6 +116,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
 
   // QR Code URL state
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [isGeneratingShareableLink, setIsGeneratingShareableLink] = useState(false);
 
   // Logo controls state
   const [logoScales, setLogoScales] = useState({ primary: 1, secondary: 1 });
@@ -501,6 +502,72 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
     }
   };
 
+  // Handle generating shareable link - creates flyer in database and returns QR code
+  const handleGenerateShareableLink = async (): Promise<{ flyerUrl: string; qrCode: string } | null> => {
+    setIsGeneratingShareableLink(true);
+    try {
+      const values = form.getValues();
+      
+      // Build flyer payload from current form state
+      const flyerPayload = {
+        propertyAddress: values.address || '',
+        propertyCity: transaction?.mlsData?.city || '',
+        propertyState: transaction?.mlsData?.state || 'TX',
+        propertyZip: transaction?.mlsData?.zipCode || '',
+        listPrice: values.price?.replace(/[^0-9.]/g, '') || null,
+        bedrooms: values.bedrooms ? parseInt(values.bedrooms) : null,
+        bathrooms: values.bathrooms || null,
+        squareFeet: values.sqft ? parseInt(values.sqft.replace(/,/g, '')) : null,
+        headline: values.introHeading || '',
+        description: values.introDescription || '',
+        mainPhoto: images.mainImage || null,
+        kitchenPhoto: images.kitchenImage || null,
+        roomPhoto: images.roomImage || null,
+        additionalPhotos: transaction?.mlsData?.photos?.slice(0, 10) || [],
+        agentName: values.agentName || '',
+        agentTitle: values.agentTitle || '',
+        agentPhone: values.phone || '',
+        agentEmail: agentProfile?.user?.marketingEmail || agentProfile?.user?.email || '',
+        agentPhoto: images.agentPhoto || null,
+        companyLogo: images.companyLogo || null,
+        secondaryLogo: images.secondaryLogo || null,
+        logoScales: logoScales,
+        dividerPosition: dividerPosition,
+        secondaryLogoOffsetY: secondaryLogoOffsetY,
+        transactionId: transactionId,
+        mlsNumber: transaction?.mlsNumber || null,
+      };
+
+      const response = await apiRequest('POST', '/api/flyers', flyerPayload);
+      const data = await response.json() as { success: boolean; flyerUrl?: string; qrCode?: string };
+
+      if (data.success && data.flyerUrl && data.qrCode) {
+        // Update the QR code URL and image
+        setQrCodeUrl(data.flyerUrl);
+        setImages(prev => ({ ...prev, qrCode: data.qrCode }));
+        
+        toast({
+          title: 'Shareable Link Created',
+          description: 'Your flyer is now accessible via the QR code.',
+        });
+
+        return { flyerUrl: data.flyerUrl, qrCode: data.qrCode };
+      } else {
+        throw new Error('Failed to create shareable link');
+      }
+    } catch (error: any) {
+      console.error('[Flyer] Error generating shareable link:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate shareable link. Please try again.',
+        variant: 'destructive',
+      });
+      return null;
+    } finally {
+      setIsGeneratingShareableLink(false);
+    }
+  };
+
   const exportMutation = useMutation({
     mutationFn: async (format: 'png' | 'cmyk') => {
       const response = await apiRequest('POST', `/api/transactions/${transactionId}/export-flyer?format=${format}`, {
@@ -652,6 +719,8 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
               selectionMethod={aiPhotoData?.selectionMethod}
               qrCodeUrl={qrCodeUrl}
               onQrCodeUrlChange={setQrCodeUrl}
+              onGenerateShareableLink={handleGenerateShareableLink}
+              isGeneratingShareableLink={isGeneratingShareableLink}
               logoScales={logoScales}
               onLogoScalesChange={setLogoScales}
               dividerPosition={dividerPosition}
