@@ -123,6 +123,10 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   const [secondaryLogoOffsetY, setSecondaryLogoOffsetY] = useState(0);
   const [useDefaultCompanyLogo, setUseDefaultCompanyLogo] = useState(true);
   const [useDefaultSecondaryLogo, setUseDefaultSecondaryLogo] = useState(true);
+  
+  // Store previous custom logos when switching to defaults
+  const [previousCompanyLogo, setPreviousCompanyLogo] = useState<string | null>(null);
+  const [previousSecondaryLogo, setPreviousSecondaryLogo] = useState<string | null>(null);
 
   const form = useForm<FlyerData>({
     defaultValues: {
@@ -658,14 +662,28 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
               onUseDefaultCompanyLogoChange={(checked) => {
                 setUseDefaultCompanyLogo(checked);
                 if (checked) {
+                  // Store current custom logo before switching to default
+                  if (images.companyLogo && images.companyLogo !== '/logos/SpyglassRealty_Logo_Black.png') {
+                    setPreviousCompanyLogo(images.companyLogo);
+                  }
                   setImages(prev => ({ ...prev, companyLogo: '/logos/SpyglassRealty_Logo_Black.png' }));
+                } else {
+                  // Restore previous custom logo if available
+                  setImages(prev => ({ ...prev, companyLogo: previousCompanyLogo }));
                 }
               }}
               useDefaultSecondaryLogo={useDefaultSecondaryLogo}
               onUseDefaultSecondaryLogoChange={(checked) => {
                 setUseDefaultSecondaryLogo(checked);
                 if (checked) {
+                  // Store current custom logo before switching to default
+                  if (images.secondaryLogo && images.secondaryLogo !== '/logos/lre-sgr-black.png') {
+                    setPreviousSecondaryLogo(images.secondaryLogo);
+                  }
                   setImages(prev => ({ ...prev, secondaryLogo: '/logos/lre-sgr-black.png' }));
+                } else {
+                  // Restore previous custom logo if available
+                  setImages(prev => ({ ...prev, secondaryLogo: previousSecondaryLogo }));
                 }
               }}
             />

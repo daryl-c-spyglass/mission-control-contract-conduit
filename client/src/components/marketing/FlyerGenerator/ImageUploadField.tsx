@@ -20,6 +20,7 @@ interface ImageUploadFieldProps {
   showCropControls?: boolean;
   compact?: boolean;
   circular?: boolean;
+  disabled?: boolean;
   aiSelectionInfo?: PhotoSelectionInfo | null;
   availablePhotos?: Array<{ 
     url: string; 
@@ -43,6 +44,7 @@ export function ImageUploadField({
   showCropControls = false,
   compact = false,
   circular = false,
+  disabled = false,
   aiSelectionInfo,
   availablePhotos,
   onSelectPhoto,
@@ -156,15 +158,15 @@ export function ImageUploadField({
       </div>
 
       <label
-        htmlFor={id}
+        htmlFor={disabled ? undefined : id}
         className={cn(
-          "flex cursor-pointer items-center justify-center border-2 border-dashed",
+          "flex items-center justify-center border-2 border-dashed",
           "border-muted-foreground/25 bg-muted/50 transition-colors",
-          "hover:border-primary/50 hover:bg-muted",
           compact ? "h-24" : circular ? "h-32 w-32 mx-auto" : "h-32",
           circular ? "rounded-full" : "rounded-lg",
           preview ? "p-0 border-solid border-primary/30 overflow-hidden" : "p-4",
-          showMissingWarning && !preview && "border-amber-400/50"
+          showMissingWarning && !preview && "border-amber-400/50",
+          disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer hover-elevate"
         )}
         data-testid={`upload-${id}`}
       >
@@ -181,13 +183,13 @@ export function ImageUploadField({
                 transform: `scale(${transform.scale}) translate(${transform.positionX}%, ${transform.positionY}%)`,
               }}
             />
-            {onTransformChange && (
-              <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {onTransformChange && !disabled && (
+              <div className="absolute top-1 right-1 invisible group-hover:visible">
                 <Button
                   type="button"
                   size="icon"
                   variant="secondary"
-                  className="h-7 w-7 bg-white/90 hover:bg-white"
+                  className="h-7 w-7"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -199,15 +201,15 @@ export function ImageUploadField({
                 </Button>
               </div>
             )}
-            {aiSelectionInfo?.isAISelected ? (
-              <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            {!disabled && aiSelectionInfo?.isAISelected ? (
+              <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1.5 invisible group-hover:visible">
                 <div className="flex justify-between items-center">
                   <span className="truncate">{aiSelectionInfo.displayClassification || aiSelectionInfo.classification}</span>
                   <span className="text-green-400 ml-1 whitespace-nowrap">{aiSelectionInfo.confidence}%</span>
                 </div>
               </div>
-            ) : showMissingWarning && (
-              <div className="absolute bottom-0 left-0 right-0 bg-amber-900/80 text-amber-100 text-xs p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            ) : !disabled && showMissingWarning && (
+              <div className="absolute bottom-0 left-0 right-0 bg-amber-900/80 text-amber-100 text-xs p-1.5 invisible group-hover:visible">
                 <div className="flex items-center gap-1">
                   <AlertCircle className="w-3 h-3 flex-shrink-0" />
                   <span className="truncate">Fallback - no {expectedCategory} found</span>
@@ -240,6 +242,7 @@ export function ImageUploadField({
           accept="image/*"
           onChange={onChange}
           className="hidden"
+          disabled={disabled}
           data-testid={`input-${id}`}
         />
       </label>

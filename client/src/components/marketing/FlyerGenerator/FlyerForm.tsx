@@ -336,36 +336,14 @@ export function FlyerForm({
         <div className="grid grid-cols-2 gap-4">
           {/* Company Logo */}
           <div className="space-y-2">
-            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Company Logo
-            </Label>
-            <div 
-              className={`relative h-20 border-2 border-dashed border-border rounded-lg flex items-center justify-center bg-muted/30 transition-colors overflow-hidden ${!useDefaultCompanyLogo ? 'cursor-pointer hover:bg-muted/50' : 'opacity-75'}`}
-              onClick={() => !useDefaultCompanyLogo && document.getElementById('company-logo-input')?.click()}
-            >
-              {images.companyLogo ? (
-                <img 
-                  src={images.companyLogo} 
-                  alt="Company Logo" 
-                  className="max-h-14 max-w-full object-contain"
-                  style={{ transform: `scale(${logoScales.primary})` }}
-                />
-              ) : (
-                <div className="text-center text-muted-foreground">
-                  <Upload className="h-6 w-6 mx-auto mb-1" />
-                  <span className="text-xs">Click to upload</span>
-                </div>
-              )}
-              <input
-                id="company-logo-input"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={onImageUpload('companyLogo')}
-                disabled={useDefaultCompanyLogo}
-                data-testid="input-company-logo"
-              />
-            </div>
+            <ImageUploadField
+              label="Company Logo"
+              id="companyLogo"
+              preview={images.companyLogo}
+              onChange={onImageUpload('companyLogo')}
+              compact
+              disabled={useDefaultCompanyLogo}
+            />
             <div className="flex items-center gap-2">
               <Checkbox
                 id="useDefaultCompany"
@@ -381,36 +359,14 @@ export function FlyerForm({
           
           {/* Secondary Logo */}
           <div className="space-y-2">
-            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Secondary Logo
-            </Label>
-            <div 
-              className={`relative h-20 border-2 border-dashed border-border rounded-lg flex items-center justify-center bg-muted/30 transition-colors overflow-hidden ${!useDefaultSecondaryLogo ? 'cursor-pointer hover:bg-muted/50' : 'opacity-75'}`}
-              onClick={() => !useDefaultSecondaryLogo && document.getElementById('secondary-logo-input')?.click()}
-            >
-              {images.secondaryLogo ? (
-                <img 
-                  src={images.secondaryLogo} 
-                  alt="Secondary Logo" 
-                  className="max-h-14 max-w-full object-contain"
-                  style={{ transform: `scale(${logoScales.secondary})` }}
-                />
-              ) : (
-                <div className="text-center text-muted-foreground">
-                  <Upload className="h-6 w-6 mx-auto mb-1" />
-                  <span className="text-xs">Click to upload</span>
-                </div>
-              )}
-              <input
-                id="secondary-logo-input"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={onImageUpload('secondaryLogo')}
-                disabled={useDefaultSecondaryLogo}
-                data-testid="input-secondary-logo"
-              />
-            </div>
+            <ImageUploadField
+              label="Secondary Logo"
+              id="secondaryLogo"
+              preview={images.secondaryLogo}
+              onChange={onImageUpload('secondaryLogo')}
+              compact
+              disabled={useDefaultSecondaryLogo}
+            />
             <div className="flex items-center gap-2">
               <Checkbox
                 id="useDefaultSecondary"
