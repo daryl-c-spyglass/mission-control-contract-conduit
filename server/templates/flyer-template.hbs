@@ -40,28 +40,48 @@
         .logo-container {
             display: flex;
             align-items: center;
-            gap: 45px;
+            gap: 0;
+            height: 250px;
+            position: relative;
+        }
+        
+        .accent-bar {
+            width: 18px;
+            height: 260px;
+            background-color: #8b7d6b;
+            margin-right: 30px;
+        }
+        
+        .logo-primary-section {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+        
+        .logo-divider {
+            width: 3px;
+            height: 160px;
+            background-color: #9ca3af;
+            margin: 0 24px;
+        }
+        
+        .logo-secondary-section {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            height: 100%;
         }
         
         .logo-svg,
         .logo-image {
-            width: 180px;
-            height: 180px;
+            max-height: 172px;
             object-fit: contain;
         }
         
-        .logo-text {
-            font-size: 84px;
-            font-weight: 800;
-            letter-spacing: 6px;
-            color: #2c2c2c;
-        }
-        
-        .logo-subtext {
-            font-size: 48px;
-            font-weight: 600;
-            letter-spacing: 9px;
-            color: #2c2c2c;
+        .secondary-logo-image {
+            max-height: 156px;
+            object-fit: contain;
         }
         
         .price-tag {
@@ -336,20 +356,32 @@
         <!-- Top Bar -->
         <div class="top-bar">
             <div class="logo-container">
-                {{#if logoUrl}}
-                <img src="{{logoUrl}}" alt="Spyglass Realty" class="logo-image" />
-                {{else}}
-                <svg class="logo-svg" viewBox="0 0 180 180">
-                    <circle cx="90" cy="90" r="84" fill="none" stroke="#2c2c2c" stroke-width="6"/>
-                    <circle cx="90" cy="90" r="66" fill="none" stroke="#2c2c2c" stroke-width="6"/>
-                    <path d="M 45 105 Q 90 75, 135 105" fill="none" stroke="#2c2c2c" stroke-width="6"/>
-                    <path d="M 45 75 Q 90 105, 135 75" fill="none" stroke="#2c2c2c" stroke-width="6"/>
-                </svg>
-                {{/if}}
-                <div>
-                    <div class="logo-text">SPYGLASS</div>
-                    <div class="logo-subtext">REALTY</div>
+                <!-- Accent Bar -->
+                <div class="accent-bar"></div>
+                
+                <!-- Primary Logo -->
+                <div class="logo-primary-section" style="width: {{primaryLogoWidth}}px;">
+                    {{#if logoUrl}}
+                    <img src="{{logoUrl}}" alt="Company Logo" class="logo-image" style="transform: scale({{primaryLogoScale}});" />
+                    {{else}}
+                    <svg class="logo-svg" viewBox="0 0 180 180">
+                        <circle cx="90" cy="90" r="84" fill="none" stroke="#2c2c2c" stroke-width="6"/>
+                        <circle cx="90" cy="90" r="66" fill="none" stroke="#2c2c2c" stroke-width="6"/>
+                        <path d="M 45 105 Q 90 75, 135 105" fill="none" stroke="#2c2c2c" stroke-width="6"/>
+                        <path d="M 45 75 Q 90 105, 135 75" fill="none" stroke="#2c2c2c" stroke-width="6"/>
+                    </svg>
+                    {{/if}}
                 </div>
+                
+                <!-- Vertical Divider -->
+                <div class="logo-divider"></div>
+                
+                <!-- Secondary Logo -->
+                {{#if secondaryLogoUrl}}
+                <div class="logo-secondary-section">
+                    <img src="{{secondaryLogoUrl}}" alt="Partner Logo" class="secondary-logo-image" style="transform: scale({{secondaryLogoScale}}) translateY({{secondaryLogoOffsetY}}px);" />
+                </div>
+                {{/if}}
             </div>
             <div class="price-tag">
                 <div class="price-tag-label">{{priceLabel}}</div>

@@ -358,12 +358,13 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
   });
   
   // Create data with base64 images for template
-  // Calculate logo widths from dividerPosition (default 148 = ~50% split at 300px width)
+  // Scale factor: preview is 96 DPI (816px wide), print is 300 DPI (2550px wide)
+  // 2550/816 = 3.125 scale factor
+  const PRINT_SCALE = 3.125;
   const dividerPos = data.dividerPosition || 148;
-  const primaryLogoWidth = Math.round(dividerPos * 1.1); // Scale for print resolution
-  const secondaryLogoWidth = Math.round((300 - dividerPos) * 1.1);
+  const primaryLogoWidth = Math.round(dividerPos * PRINT_SCALE);
   const logoScales = data.logoScales || { primary: 1, secondary: 1 };
-  const secondaryLogoOffsetY = data.secondaryLogoOffsetY || 0;
+  const secondaryLogoOffsetY = Math.round((data.secondaryLogoOffsetY || 0) * PRINT_SCALE);
   
   const dataWithBase64 = {
     ...data,
@@ -379,7 +380,6 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     sqftIcon: sqftIconB64,
     // Branding controls for template
     primaryLogoWidth,
-    secondaryLogoWidth,
     primaryLogoScale: logoScales.primary,
     secondaryLogoScale: logoScales.secondary,
     secondaryLogoOffsetY
