@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line, ReferenceLine, ScatterChart, Scatter, ZAxis, Cell } from "recharts";
-import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar, Map as MapIcon, ExternalLink, DollarSign, TrendingUp, Target, Zap, Clock, BarChart3, Menu, LayoutGrid, MoreHorizontal, List, Table2 } from "lucide-react";
+import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar, Map as MapIcon, ExternalLink, DollarSign, TrendingUp, Target, Zap, Clock, BarChart3, Menu, LayoutGrid, MoreHorizontal, Table2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { CMAMap } from "@/components/cma-map";
@@ -60,7 +60,7 @@ export function CMAReport({
   const [activeTab, setActiveTab] = useState("compare");
   const [activeListingTab, setActiveListingTab] = useState("all");
   const [statsStatusFilter, setStatsStatusFilter] = useState("all");
-  const [statsViewType, setStatsViewType] = useState<'grid' | 'list' | 'table'>('grid');
+  const [statsViewType, setStatsViewType] = useState<'grid' | 'table'>('grid');
   
   // Property exclusion state for Include All/Exclude All functionality
   const [excludedPropertyIds, setExcludedPropertyIds] = useState<Set<string>>(new Set());
@@ -1332,16 +1332,6 @@ export function CMAReport({
                 <span className="hidden sm:inline">Grid</span>
               </Button>
               <Button
-                variant={statsViewType === 'list' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setStatsViewType('list')}
-                className="rounded-none px-3"
-                data-testid="stats-view-list"
-              >
-                <List className="w-4 h-4 mr-1" />
-                <span className="hidden sm:inline">List</span>
-              </Button>
-              <Button
                 variant={statsViewType === 'table' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setStatsViewType('table')}
@@ -2114,83 +2104,6 @@ export function CMAReport({
             );
           })()}
           </div>
-          )}
-
-          {/* List View - Vertical property cards with stats */}
-          {statsViewType === 'list' && (
-            <div className="divide-y bg-white dark:bg-zinc-950">
-              {(() => {
-                const pendingProperties = properties.filter(p => p.standardStatus === 'Pending');
-                const statsFilteredProps = (statsStatusFilter === 'all' ? allProperties :
-                  statsStatusFilter === 'sold' ? soldProperties :
-                  statsStatusFilter === 'under-contract' ? underContractProperties :
-                  statsStatusFilter === 'pending' ? pendingProperties : activeProperties)
-                  .filter(p => !excludedPropertyIds.has(p.id));
-                
-                if (statsFilteredProps.length === 0) {
-                  return (
-                    <div className="p-8 text-center text-muted-foreground">
-                      No properties in this category
-                    </div>
-                  );
-                }
-                
-                const statusColors: Record<string, string> = {
-                  'Active': 'bg-green-500',
-                  'Closed': 'bg-red-500',
-                  'Active Under Contract': 'bg-[#EF4923]',
-                  'Pending': 'bg-gray-500',
-                };
-                
-                return statsFilteredProps.map((property) => {
-                  const photos = getPropertyPhotos(property);
-                  const primaryPhoto = photos[0];
-                  const isSold = property.standardStatus === 'Closed';
-                  const price = isSold 
-                    ? (property.closePrice ? Number(property.closePrice) : Number(property.listPrice || 0))
-                    : Number(property.listPrice || 0);
-                  const pricePerSqFt = property.livingArea && Number(property.livingArea) > 0 
-                    ? Math.round(price / Number(property.livingArea))
-                    : null;
-                  
-                  return (
-                    <div 
-                      key={property.id}
-                      className="p-4 flex items-center gap-4 hover-elevate cursor-pointer"
-                      onClick={() => handlePropertyClick(property)}
-                      data-testid={`stats-list-${property.id}`}
-                    >
-                      <div className="w-20 h-16 rounded overflow-hidden flex-shrink-0">
-                        {primaryPhoto ? (
-                          <img src={primaryPhoto} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full bg-muted flex items-center justify-center">
-                            <Home className="w-6 h-6 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{property.unparsedAddress}</div>
-                        <div className="text-sm text-muted-foreground">{property.city}, {(property as any).stateOrProvince} {property.postalCode}</div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <div className={cn("w-2 h-2 rounded-full", statusColors[property.standardStatus || ''] || 'bg-gray-500')} />
-                          <span className="text-xs">{property.standardStatus}</span>
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <div className="text-lg font-bold text-primary">${price.toLocaleString()}</div>
-                        <div className="text-sm text-muted-foreground">{pricePerSqFt ? `$${pricePerSqFt}/sqft` : '-'}</div>
-                      </div>
-                      <div className="hidden sm:block text-right text-sm text-muted-foreground flex-shrink-0 w-24">
-                        <div>{(property as any).bedroomsTotal || '-'} beds</div>
-                        <div>{(property as any).bathroomsTotalInteger || '-'} baths</div>
-                        <div>{property.livingArea ? Number(property.livingArea).toLocaleString() : '-'} sqft</div>
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
           )}
 
           {/* Table View - Spreadsheet-style like Compare */}

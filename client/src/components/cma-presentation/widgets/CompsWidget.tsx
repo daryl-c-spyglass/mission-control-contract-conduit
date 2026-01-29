@@ -418,7 +418,7 @@ function CompsMapView({ comparables, subjectProperty }: { comparables: CmaProper
 }
 
 export function CompsWidget({ comparables, subjectProperty }: CompsWidgetProps) {
-  const [mainView, setMainView] = useState<'compare' | 'map' | 'stats' | 'list'>('compare');
+  const [mainView, setMainView] = useState<'compare' | 'map' | 'stats'>('compare');
   const [subView, setSubView] = useState<'grid' | 'list' | 'table'>('grid');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedProperty, setSelectedProperty] = useState<CmaProperty | null>(null);
@@ -456,9 +456,6 @@ export function CompsWidget({ comparables, subjectProperty }: CompsWidgetProps) 
               </TabsTrigger>
               <TabsTrigger value="stats" className="text-xs gap-1" data-testid="tab-stats">
                 <TrendingUp className="w-3 h-3" /> Stats
-              </TabsTrigger>
-              <TabsTrigger value="list" className="text-xs gap-1" data-testid="tab-list">
-                <List className="w-3 h-3" /> List
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -684,13 +681,6 @@ export function CompsWidget({ comparables, subjectProperty }: CompsWidgetProps) 
           </div>
         )}
 
-        {mainView === 'list' && (
-          <PropertyTable 
-            comparables={filteredComparables} 
-            subjectProperty={subjectProperty ? {...subjectProperty, isSubject: true} : undefined}
-            onPropertyClick={setSelectedProperty}
-          />
-        )}
       </div>
 
       {selectedProperty && (
