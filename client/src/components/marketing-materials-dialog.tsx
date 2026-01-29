@@ -7,12 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Download, Image as ImageIcon, Loader2, Copy, Check, Upload, MessageSquare, Sparkles, Wand2, ZoomIn, X } from "lucide-react";
+import { Download, Image as ImageIcon, Loader2, Copy, Check, Upload, Sparkles, Wand2, ZoomIn, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@shared/schema";
 import spyglassLogoWhite from "@assets/White-Orange_(1)_1767129299733.png";
@@ -104,7 +103,6 @@ export function MarketingMaterialsDialog({
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
   const [socialDescription, setSocialDescription] = useState("");
-  const [postToSlack, setPostToSlack] = useState(true);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [recommendedIndices, setRecommendedIndices] = useState<number[]>([]);
   const [showEnlargedPreview, setShowEnlargedPreview] = useState(false);
@@ -130,7 +128,7 @@ export function MarketingMaterialsDialog({
           type,
           imageData,
           fileName,
-          postToSlack,
+          postToSlack: true,
           metadata,
         });
         return await res.json();
@@ -142,7 +140,7 @@ export function MarketingMaterialsDialog({
         title: isEditMode ? "Asset Updated" : "Asset Saved",
         description: isEditMode 
           ? "Marketing asset updated successfully." 
-          : (postToSlack ? "Marketing asset saved and posted to Slack." : "Marketing asset saved."),
+          : "Marketing asset saved.",
       });
       onAssetSaved?.();
     },
@@ -1194,24 +1192,6 @@ export function MarketingMaterialsDialog({
               <p className="text-xs text-muted-foreground text-right">{socialDescription.length}/80 characters</p>
             </div>
 
-            {/* Post to Slack */}
-            <div className="flex items-center gap-3 p-3 rounded-md bg-muted/30 border">
-              <Checkbox
-                id="post-to-slack"
-                checked={postToSlack}
-                onCheckedChange={(checked) => setPostToSlack(checked === true)}
-                data-testid="checkbox-post-to-slack"
-              />
-              <div className="flex-1">
-                <label htmlFor="post-to-slack" className="text-sm font-medium cursor-pointer flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4" />
-                  Post to Slack
-                </label>
-                <p className="text-xs text-muted-foreground">
-                  {transaction.slackChannelId ? "Auto-post when saved" : "No channel connected"}
-                </p>
-              </div>
-            </div>
           </div>
 
           {/* RIGHT COLUMN - Live Preview */}
