@@ -48,7 +48,8 @@ export function FlyerPreview({
 
       {/* Header with Logos - centered vertically with accent bar center (66.5px) */}
       {/* Logo container height 50px, so top = 66.5 - 25 = 41.5px ≈ 42px */}
-      <div className="absolute left-[72px] top-[42px] right-6 h-[50px] flex items-center">
+      {/* Left aligned with address line at 70px */}
+      <div className="absolute left-[70px] top-[42px] right-6 h-[50px] flex items-center">
         {/* Company Logo Container */}
         <div 
           className="flex items-center justify-center h-full"
