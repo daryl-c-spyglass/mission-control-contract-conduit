@@ -41,9 +41,10 @@ export function FlyerPreview({
     >
       {/* Header with Logos */}
       <div className="absolute left-6 top-4 right-6 h-[80px] flex items-center">
-        {/* Accent Bar - aligned with left edge of photos (48px from page edge, 24px from header container) */}
+        {/* Accent Bar - aligned with left edge of photos, top at halfway through second division (~122px from page top) */}
+        {/* Second division: header ends ~96px, main photo starts 156px. Halfway = (96+156)/2 = 126px - 16px header offset = 110px */}
         <div
-          className="absolute left-[24px] top-0 w-[6px] h-[83px]"
+          className="absolute left-[24px] top-[110px] w-[6px] h-[83px]"
           style={{ backgroundColor: accentColor }}
         />
         
