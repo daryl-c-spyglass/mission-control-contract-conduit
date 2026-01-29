@@ -4788,7 +4788,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
   // Get marketing profile for the current user
   app.get("/api/settings/marketing-profile", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id || req.user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
@@ -4814,7 +4814,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
   // Save marketing profile for the current user
   app.post("/api/settings/marketing-profile", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id || req.user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
