@@ -1,0 +1,58 @@
+Exact Divider X Positions - Analysis
+Current Code Positions (OVERFLOWS - for reference only)
+Based on the current flexbox layout starting at X=48:
+
+Element	X Start	X End	Width
+Stats	48px	198.72px	150.72px
+Gap (margin)	198.72px	240.72px	42px
+Divider 1	240.72px	244.72px	4px
+Description	244.72px	676.72px	432px
+Gap (margin)	676.72px	697.72px	21px
+Divider 2	697.72px	701.72px	4px
+Agent Card	701.72px	1036.72px	335px
+Photo center	~838px	-	OFF CANVAS
+QR left edge	~907px	-	OFF CANVAS
+Problem: Total 988.72px, exceeds 720px by 268.72px.
+
+Corrected Positions to Fit 720px with Grid Alignment
+To achieve:
+
+Divider 1 at Grid 13/14 boundary (~204px)
+Divider 2 at Grid 14/15 boundary (~408px)
+Photo in Grid 15, QR in Grid 16
+Element	X Start	X End	Width
+Stats	48px	192px	144px
+Gap (margin)	192px	200px	8px
+Divider 1	200px	204px	4px
+Description	204px	400px	196px
+Gap (margin)	400px	404px	4px
+Divider 2	404px	408px	4px
+Agent Card	408px	768px	360px
+TOTAL	-	-	720px ✓
+Agent Card Internal Positions (Corrected Layout)
+With Agent Card from 408px to 768px (360px wide, 27px left padding = 333px content):
+
+Element	Calculation	X Position
+Agent Card left	-	408px
+Photo+QR row width	105.6 + 16 + 73.92	195.52px
+Centering offset	(333 - 195.52) / 2	68.74px
+Photo left edge	408 + 27 + 68.74	503.74px
+Photo center	503.74 + 52.8	556.54px (Grid 15 ✓)
+QR left edge	503.74 + 105.6 + 16	625.34px (Grid 16 ✓)
+QR center	625.34 + 36.96	662.3px (Grid 16 ✓)
+Summary - Corrected Values for 720px Fit
+Position	Value	Grid
+Divider 1 left edge	200px	Grid 13/14 boundary
+Divider 2 left edge	404px	Grid 14/15 boundary
+Agent Card start	408px	Grid 15 start
+Photo center	~557px	Grid 15 (center at 510px)
+QR left edge	~625px	Grid 16
+Required Width Changes
+Element	Current	Corrected	Change
+Stats	150.72px	144px	-6.72px
+Divider 1 margins	42px	8px	-34px
+Description	432px	196px	-236px
+Divider 2 margins	21px	4px	-17px
+Agent Card	335px	360px	+25px
+TOTAL	988.72px	720px	-268.72px
+The main change: Description column must shrink from 432px to ~196px to fit everything within 720px.
