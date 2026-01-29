@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line, ReferenceLine, ScatterChart, Scatter, ZAxis, Cell } from "recharts";
-import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar, Map as MapIcon, ExternalLink, DollarSign, TrendingUp, Target, Zap, Clock, BarChart3, Menu, LayoutGrid, MoreHorizontal, Table2 } from "lucide-react";
+import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar, Map as MapIcon, ExternalLink, DollarSign, TrendingUp, Target, Zap, Clock, BarChart3, Menu, LayoutGrid, MoreHorizontal, List, Table2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { CMAMap } from "@/components/cma-map";
@@ -60,7 +60,7 @@ export function CMAReport({
   const [activeTab, setActiveTab] = useState("compare");
   const [activeListingTab, setActiveListingTab] = useState("all");
   const [statsStatusFilter, setStatsStatusFilter] = useState("all");
-  const [statsViewType, setStatsViewType] = useState<'grid' | 'table'>('grid');
+  const [statsViewType, setStatsViewType] = useState<'grid' | 'list' | 'table'>('grid');
   
   // Property exclusion state for Include All/Exclude All functionality
   const [excludedPropertyIds, setExcludedPropertyIds] = useState<Set<string>>(new Set());
@@ -834,26 +834,6 @@ export function CMAReport({
                   <p>Statistics & Analytics</p>
                 </TooltipContent>
               </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "text-white hover:bg-white/10",
-                      activeTab === "list" && "bg-white/20 text-primary"
-                    )}
-                    onClick={() => setActiveTab("list")}
-                    data-testid="tab-list"
-                  >
-                    <Home className="w-4 h-4 mr-1.5" />
-                    List
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Property List</p>
-                </TooltipContent>
-              </Tooltip>
             </div>
           </TooltipProvider>
         </div>
@@ -865,7 +845,6 @@ export function CMAReport({
           <TabsTrigger value="compare" data-testid="tab-compare-hidden">Compare</TabsTrigger>
           <TabsTrigger value="map" data-testid="tab-map-hidden">Map</TabsTrigger>
           <TabsTrigger value="stats" data-testid="tab-stats-hidden">Stats</TabsTrigger>
-          <TabsTrigger value="list" data-testid="tab-list-hidden">List</TabsTrigger>
           <TabsTrigger value="home-averages" data-testid="tab-home-averages">Home Averages</TabsTrigger>
           <TabsTrigger value="listings" data-testid="tab-listings">Listings</TabsTrigger>
           <TabsTrigger value="timeline" data-testid="tab-timeline">Timeline</TabsTrigger>
@@ -1330,6 +1309,16 @@ export function CMAReport({
               >
                 <LayoutGrid className="w-4 h-4 mr-1" />
                 <span className="hidden sm:inline">Grid</span>
+              </Button>
+              <Button
+                variant={statsViewType === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setStatsViewType('list')}
+                className="rounded-none px-3"
+                data-testid="stats-view-list"
+              >
+                <List className="w-4 h-4 mr-1" />
+                <span className="hidden sm:inline">List</span>
               </Button>
               <Button
                 variant={statsViewType === 'table' ? 'default' : 'ghost'}
@@ -2106,6 +2095,83 @@ export function CMAReport({
           </div>
           )}
 
+          {/* List View - Vertical property cards with stats */}
+          {statsViewType === 'list' && (
+            <div className="divide-y bg-white dark:bg-zinc-950">
+              {(() => {
+                const pendingProperties = properties.filter(p => p.standardStatus === 'Pending');
+                const statsFilteredProps = (statsStatusFilter === 'all' ? allProperties :
+                  statsStatusFilter === 'sold' ? soldProperties :
+                  statsStatusFilter === 'under-contract' ? underContractProperties :
+                  statsStatusFilter === 'pending' ? pendingProperties : activeProperties)
+                  .filter(p => !excludedPropertyIds.has(p.id));
+                
+                if (statsFilteredProps.length === 0) {
+                  return (
+                    <div className="p-8 text-center text-muted-foreground">
+                      No properties in this category
+                    </div>
+                  );
+                }
+                
+                const statusColors: Record<string, string> = {
+                  'Active': 'bg-green-500',
+                  'Closed': 'bg-red-500',
+                  'Active Under Contract': 'bg-[#EF4923]',
+                  'Pending': 'bg-gray-500',
+                };
+                
+                return statsFilteredProps.map((property) => {
+                  const photos = getPropertyPhotos(property);
+                  const primaryPhoto = photos[0];
+                  const isSold = property.standardStatus === 'Closed';
+                  const price = isSold 
+                    ? (property.closePrice ? Number(property.closePrice) : Number(property.listPrice || 0))
+                    : Number(property.listPrice || 0);
+                  const pricePerSqFt = property.livingArea && Number(property.livingArea) > 0 
+                    ? Math.round(price / Number(property.livingArea))
+                    : null;
+                  
+                  return (
+                    <div 
+                      key={property.id}
+                      className="p-4 flex items-center gap-4 hover-elevate cursor-pointer"
+                      onClick={() => handlePropertyClick(property)}
+                      data-testid={`stats-list-${property.id}`}
+                    >
+                      <div className="w-20 h-16 rounded overflow-hidden flex-shrink-0">
+                        {primaryPhoto ? (
+                          <img src={primaryPhoto} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-muted flex items-center justify-center">
+                            <Home className="w-6 h-6 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{property.unparsedAddress}</div>
+                        <div className="text-sm text-muted-foreground">{property.city}, {(property as any).stateOrProvince} {property.postalCode}</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className={cn("w-2 h-2 rounded-full", statusColors[property.standardStatus || ''] || 'bg-gray-500')} />
+                          <span className="text-xs">{property.standardStatus}</span>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-lg font-bold text-primary">${price.toLocaleString()}</div>
+                        <div className="text-sm text-muted-foreground">{pricePerSqFt ? `$${pricePerSqFt}/sqft` : '-'}</div>
+                      </div>
+                      <div className="hidden sm:block text-right text-sm text-muted-foreground flex-shrink-0 w-24">
+                        <div>{(property as any).bedroomsTotal || '-'} beds</div>
+                        <div>{(property as any).bathroomsTotalInteger || '-'} baths</div>
+                        <div>{property.livingArea ? Number(property.livingArea).toLocaleString() : '-'} sqft</div>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          )}
+
           {/* Table View - Spreadsheet-style like Compare */}
           {statsViewType === 'table' && (
             <div className="bg-white dark:bg-zinc-950 overflow-x-auto">
@@ -2223,40 +2289,6 @@ export function CMAReport({
           )}
         </TabsContent>
 
-        {/* List Tab - Property Cards with Horizontal Scroll */}
-        <TabsContent value="list" className="space-y-0 mt-0">
-          <div className="bg-white dark:bg-zinc-950 rounded-b-lg p-4 relative">
-            {/* Left scroll arrow */}
-            {listCanScrollLeft && (
-              <Button
-                variant="outline"
-                size="icon"
-                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 dark:bg-zinc-900/90 shadow-lg rounded-full h-10 w-10"
-                onClick={scrollListLeft}
-                data-testid="button-list-scroll-left"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </Button>
-            )}
-            
-            {/* Right scroll arrow */}
-            {listCanScrollRight && (
-              <Button
-                variant="outline"
-                size="icon"
-                className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 dark:bg-zinc-900/90 shadow-lg rounded-full h-10 w-10"
-                onClick={scrollListRight}
-                data-testid="button-list-scroll-right"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </Button>
-            )}
-            
-            <div 
-              ref={listScrollRef}
-              className="flex gap-4 overflow-x-auto pb-4 scroll-smooth px-8"
-              onLoad={() => updateListScrollButtons()}
-            >
               {(() => {
                 // Find the actual subject property using subjectPropertyId prop
                 const subjectProp = subjectPropertyId 
