@@ -31,9 +31,24 @@ export function CropModal({
   const containerRef = useRef<HTMLDivElement>(null);
   const wasOpenRef = useRef(false);
 
+  // Constrain position to valid bounds for current zoom
+  // This prevents showing empty/grey areas when zoomed and panned
+  const constrainPosition = (pos: { x: number; y: number }, currentZoom: number) => {
+    // When zoomed, limit pan range so edges don't show
+    // At zoom z, the valid range is [50 - 50/z, 50 + 50/z] for each axis
+    const minPos = 50 - (50 / currentZoom);
+    const maxPos = 50 + (50 / currentZoom);
+    return {
+      x: Math.max(minPos, Math.min(maxPos, pos.x)),
+      y: Math.max(minPos, Math.min(maxPos, pos.y)),
+    };
+  };
+
   useEffect(() => {
     if (isOpen && !wasOpenRef.current) {
-      setPosition(initialPosition);
+      // Constrain initial position to valid bounds for initial zoom
+      const constrainedPos = constrainPosition(initialPosition, initialZoom);
+      setPosition(constrainedPos);
       setZoom(initialZoom);
       wasOpenRef.current = true;
     } else if (!isOpen) {
@@ -55,10 +70,13 @@ export function CropModal({
 
     const sensitivity = 0.15 / zoom;
 
-    setPosition(prev => ({
-      x: Math.max(0, Math.min(100, prev.x - deltaX * sensitivity)),
-      y: Math.max(0, Math.min(100, prev.y - deltaY * sensitivity)),
-    }));
+    setPosition(prev => {
+      const newPos = {
+        x: prev.x - deltaX * sensitivity,
+        y: prev.y - deltaY * sensitivity,
+      };
+      return constrainPosition(newPos, zoom);
+    });
 
     setDragStart({ x: e.clientX, y: e.clientY });
   };
@@ -82,10 +100,13 @@ export function CropModal({
 
     const sensitivity = 0.15 / zoom;
 
-    setPosition(prev => ({
-      x: Math.max(0, Math.min(100, prev.x - deltaX * sensitivity)),
-      y: Math.max(0, Math.min(100, prev.y - deltaY * sensitivity)),
-    }));
+    setPosition(prev => {
+      const newPos = {
+        x: prev.x - deltaX * sensitivity,
+        y: prev.y - deltaY * sensitivity,
+      };
+      return constrainPosition(newPos, zoom);
+    });
 
     setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
   };
@@ -157,8 +178,9 @@ export function CropModal({
             value={zoom}
             onChange={(e) => {
               const newValue = parseFloat(e.target.value);
-              console.log('[CropModal] Zoom changed:', newValue);
               setZoom(newValue);
+              // Constrain position when zoom changes to prevent empty areas
+              setPosition(prev => constrainPosition(prev, newValue));
             }}
             className="flex-1 h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
             data-testid="slider-crop-zoom"
