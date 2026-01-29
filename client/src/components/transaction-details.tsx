@@ -1396,7 +1396,14 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
         open={flyerDialogOpen}
         onOpenChange={setFlyerDialogOpen}
         transaction={transaction}
-        mlsPhotos={mlsData?.photos || mlsData?.images || []}
+        mlsPhotos={[
+          // Include user-uploaded photos first (for off-market transactions)
+          ...((transaction.propertyImages as string[]) || []).filter(url => 
+            url && !url.includes('cdn.repliers.io') && !url.includes('repliers.io')
+          ),
+          // Then MLS photos
+          ...(mlsData?.photos || mlsData?.images || [])
+        ]}
         onAssetSaved={() => queryClient.invalidateQueries({ queryKey: [`/api/transactions/${transaction.id}/marketing-assets`] })}
       />
 
@@ -1407,7 +1414,14 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
           if (!open) setEditFlyerAsset(null);
         }}
         transaction={transaction}
-        mlsPhotos={mlsData?.photos || mlsData?.images || []}
+        mlsPhotos={[
+          // Include user-uploaded photos first (for off-market transactions)
+          ...((transaction.propertyImages as string[]) || []).filter(url => 
+            url && !url.includes('cdn.repliers.io') && !url.includes('repliers.io')
+          ),
+          // Then MLS photos
+          ...(mlsData?.photos || mlsData?.images || [])
+        ]}
         onAssetSaved={() => {
           queryClient.invalidateQueries({ queryKey: [`/api/transactions/${transaction.id}/marketing-assets`] });
           setEditFlyerAsset(null);

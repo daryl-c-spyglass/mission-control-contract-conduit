@@ -236,13 +236,27 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
       }, 100);
 
       // Get photos from mlsData - handle various Repliers API formats
-      const photoUrls = mlsData.photos || mlsData.images || mlsData.Media || [];
+      const mlsPhotoUrls = mlsData.photos || mlsData.images || mlsData.Media || [];
+      
+      // Get user-uploaded photos from transaction.propertyImages (for off-market transactions)
+      const userUploadedPhotos = ((transaction.propertyImages || []) as string[]).filter(
+        (url: string) => url && !url.includes('cdn.repliers.io') && !url.includes('repliers.io')
+      );
+      
+      // Combine: user uploads first, then MLS photos
+      const photoUrls = [...userUploadedPhotos, ...mlsPhotoUrls];
+      
+      console.log('[Flyer Debug] Photo sources:', {
+        userUploads: userUploadedPhotos.length,
+        mlsPhotos: mlsPhotoUrls.length,
+        total: photoUrls.length
+      });
       
       // Get imageInsights from mlsData (added to server response), with fallback to rawData
       const imageInsights = mlsData.imageInsights || mlsData.rawData?.imageInsights;
       
       if (photoUrls.length > 0) {
-        console.log(`[Flyer AI] Processing ${photoUrls.length} MLS photos for AI selection...`);
+        console.log(`[Flyer AI] Processing ${photoUrls.length} photos for selection (${userUploadedPhotos.length} uploads, ${mlsPhotoUrls.length} MLS)...`);
         
         // Helper function to extract canonical image identifier from URL
         const extractImageId = (url: string): string => {
