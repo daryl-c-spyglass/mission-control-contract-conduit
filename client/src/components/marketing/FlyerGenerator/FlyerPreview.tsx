@@ -41,9 +41,9 @@ export function FlyerPreview({
     >
       {/* Header with Logos */}
       <div className="absolute left-6 top-4 right-6 h-[80px] flex items-center">
-        {/* Accent Bar */}
+        {/* Accent Bar - aligned with left edge of photos (48px from page edge, 24px from header container) */}
         <div
-          className="absolute left-0 top-0 w-[6px] h-[83px]"
+          className="absolute left-[24px] top-0 w-[6px] h-[83px]"
           style={{ backgroundColor: accentColor }}
         />
         
