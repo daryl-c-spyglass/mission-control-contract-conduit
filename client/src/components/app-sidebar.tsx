@@ -1,4 +1,4 @@
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { Home, Archive, Settings, Shield, Plus, Building2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -34,7 +34,7 @@ const adminNavItems = [
 ];
 
 export function AppSidebar({ transactions, onCreateTransaction }: AppSidebarProps) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { user } = useAuth();
   const activeCount = transactions.filter(t => t.status !== "closed" && t.status !== "cancelled" && t.isArchived !== true).length;
   
@@ -106,19 +106,17 @@ export function AppSidebar({ transactions, onCreateTransaction }: AppSidebarProp
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
-                      asChild
                       isActive={isActive}
+                      onClick={() => navigate(item.url)}
                       data-testid={`nav-${item.title.toLowerCase()}`}
                     >
-                      <Link href={item.url}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                        {item.title === "Transactions" && activeCount > 0 && (
-                          <Badge variant="secondary" className="ml-auto" data-testid="badge-active-count">
-                            {activeCount}
-                          </Badge>
-                        )}
-                      </Link>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                      {item.title === "Transactions" && activeCount > 0 && (
+                        <Badge variant="secondary" className="ml-auto" data-testid="badge-active-count">
+                          {activeCount}
+                        </Badge>
+                      )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
