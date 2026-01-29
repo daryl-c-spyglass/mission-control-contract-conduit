@@ -41,10 +41,10 @@ export function FlyerPreview({
     >
       {/* Header with Logos */}
       <div className="absolute left-6 top-4 right-6 h-[80px] flex items-center">
-        {/* Accent Bar - aligned with left edge of photos, top at halfway through Block 1 Row 2 */}
-        {/* Block 1 (main photo): top 156px, rows 90px each. Row 2 = 246-336px. Halfway = 291px. From header (top 16px): 291-16 = 275px */}
+        {/* Accent Bar - aligned with photos (left 48px), 1.5 blocks down from top */}
+        {/* Page: 1056px ÷ 4 blocks = 264px/block. 1.5 blocks = 396px. From header (16px): 396-16 = 380px */}
         <div
-          className="absolute left-[24px] top-[275px] w-[6px] h-[83px]"
+          className="absolute left-[24px] top-[380px] w-[6px] h-[83px]"
           style={{ backgroundColor: accentColor }}
         />
         
