@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, Download, Grid3X3, Loader2 } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { FlyerForm } from './FlyerForm';
 import { FlyerPreview } from './FlyerPreview';
@@ -137,8 +136,6 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [isGeneratingShareableLink, setIsGeneratingShareableLink] = useState(false);
   
-  // Post to Slack option (matches Create Graphics modal)
-  const [postToSlack, setPostToSlack] = useState(true);
 
   // Logo controls state
   const [logoScales, setLogoScales] = useState({ primary: 1, secondary: 1 });
@@ -697,11 +694,11 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
         logoScales,
         dividerPosition,
         secondaryLogoOffsetY,
-        postToSlack, // Include Slack notification preference
       };
       
       // Call export endpoint which saves to assets and returns the blob for download
-      const response = await apiRequest('POST', `/api/transactions/${transactionId}/export-flyer?format=png&postToSlack=${postToSlack}`, exportData);
+      // Always pass postToSlack=true to let server check user notification preferences
+      const response = await apiRequest('POST', `/api/transactions/${transactionId}/export-flyer?format=png&postToSlack=true`, exportData);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -728,9 +725,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
       
       toast({ 
         title: 'Flyer Saved & Downloaded', 
-        description: postToSlack 
-          ? 'Your flyer has been saved to My Assets, downloaded, and posted to Slack.' 
-          : 'Your flyer has been saved to My Assets and downloaded.'
+        description: 'Your flyer has been saved to My Assets and downloaded.'
       });
     },
     onError: (error: Error) => {
@@ -770,22 +765,6 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
             </div>
           </div>
           <div className="flex items-center gap-4">
-            {/* Post to Slack checkbox */}
-            <div className="flex items-center gap-2">
-              <Checkbox 
-                id="post-to-slack" 
-                checked={postToSlack} 
-                onCheckedChange={(checked) => setPostToSlack(checked === true)}
-                data-testid="checkbox-post-to-slack"
-              />
-              <div className="flex flex-col">
-                <Label htmlFor="post-to-slack" className="text-sm font-medium cursor-pointer">
-                  Post to Slack
-                </Label>
-                <span className="text-xs text-muted-foreground">Auto-post when saved</span>
-              </div>
-            </div>
-            
             <div className="flex items-center gap-2">
               <Button
                 onClick={onBack}

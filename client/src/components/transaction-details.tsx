@@ -3321,7 +3321,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                               )} />
                             </div>
                             <div>
-                              <h3 className="font-semibold">Create Flyer</h3>
+                              <h3 className="font-semibold">Basic Flyer Maker</h3>
                               <p className="text-sm text-muted-foreground">
                                 {hasPhotosForMarketing ? "PNG flyer (8.5\" × 11\")" : disabledMessage}
                               </p>
@@ -3360,7 +3360,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                               )} />
                             </div>
                             <div>
-                              <h3 className="font-semibold">Advanced Flyer</h3>
+                              <h3 className="font-semibold">Advanced Flyer Maker</h3>
                               <p className="text-sm text-muted-foreground">
                                 {hasPhotosForMarketing ? "AI headlines, image controls, grid overlay" : disabledMessage}
                               </p>
