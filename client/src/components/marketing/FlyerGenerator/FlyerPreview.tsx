@@ -162,53 +162,59 @@ export function FlyerPreview({
         </div>
       </div>
 
-      {/* Bottom Section - Grid row 5: Property details, description, agent info */}
-      {/* Starts after bottom photos (474 + 252 + 14 gap = 740px) */}
-      <div className="absolute left-6 top-[740px] right-6 h-[296px] flex">
-        <div className="pt-[35px] pl-2">
-          <div className="flex items-center gap-2.5 mb-5 text-[13.5pt] whitespace-nowrap">
-            <svg className="w-[31px] h-[31px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
+      {/* Bottom Section - Grid row 5: 4-column layout matching reference grid */}
+      {/* Column widths: 192px each (768px / 4 columns) */}
+      {/* Col 1: Property details | Col 2-3: Description | Col 4: Agent info */}
+      <div className="absolute left-6 top-[740px] w-[768px] h-[296px] flex">
+        {/* Column 1: Property Details (192px) */}
+        <div className="w-[192px] pt-[20px] pl-2 flex-shrink-0">
+          <div className="flex items-center gap-2 mb-4 text-[12pt] whitespace-nowrap">
+            <svg className="w-[28px] h-[28px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
               <path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/>
             </svg>
             <span>{data.bedrooms || '0'} bedrooms</span>
           </div>
-          <div className="flex items-center gap-2.5 mb-5 text-[13.5pt] whitespace-nowrap">
-            <svg className="w-[31px] h-[31px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
+          <div className="flex items-center gap-2 mb-4 text-[12pt] whitespace-nowrap">
+            <svg className="w-[28px] h-[28px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
               <path d="M9 6 6.5 3.5a1.5 1.5 0 0 0-1-.5C4.683 3 4 3.683 4 4.5V17a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/>
               <line x1="10" x2="8" y1="5" y2="7"/><line x1="2" x2="22" y1="12" y2="12"/>
             </svg>
             <span>{data.bathrooms || '0'} bathrooms</span>
           </div>
-          <div className="flex items-center gap-2.5 mb-5 text-[13.5pt] whitespace-nowrap">
-            <svg className="w-[31px] h-[31px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
+          <div className="flex items-center gap-2 mb-4 text-[12pt] whitespace-nowrap">
+            <svg className="w-[28px] h-[28px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
               <path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/>
             </svg>
             <span>{data.sqft || '0'} sq. ft</span>
           </div>
         </div>
 
+        {/* Accent divider at column 1/2 boundary */}
         <div
-          className="w-1 h-[148px] mt-[35px] ml-[42px] flex-shrink-0"
+          className="w-1 h-[148px] mt-[20px] flex-shrink-0"
           style={{ backgroundColor: accentColor }}
         />
 
-        <div className="w-[432px] pl-8 pr-2.5">
-          <h3 className="text-[11pt] font-medium uppercase tracking-[2px] leading-[1.3] mb-4 mt-2 text-gray-700">
+        {/* Columns 2-3: Description (384px - 2 columns) */}
+        <div className="w-[384px] pl-6 pr-4 flex-shrink-0">
+          <h3 className="text-[10pt] font-medium uppercase tracking-[2px] leading-[1.3] mb-3 mt-2 text-gray-700">
             {data.introHeading || 'Property Headline'}
           </h3>
-          <p className="text-[11pt] leading-[1.5] line-clamp-6">
+          <p className="text-[10pt] leading-[1.5] line-clamp-6">
             {data.introDescription || 'Property description will appear here...'}
           </p>
         </div>
 
+        {/* Accent divider at column 3/4 boundary */}
         <div
-          className="w-1 h-[148px] mt-[35px] ml-[22px] flex-shrink-0"
+          className="w-1 h-[148px] mt-[20px] flex-shrink-0"
           style={{ backgroundColor: accentColor }}
         />
 
-        <div className="w-[335px] pl-[27px] flex flex-col items-center pt-4">
-          <div className="flex gap-4 items-center mb-2">
-            <div className="w-[106px] h-[106px] rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+        {/* Column 4: Agent Info (192px) */}
+        <div className="w-[192px] pl-4 flex flex-col items-center pt-2 flex-shrink-0">
+          <div className="flex gap-3 items-center mb-2">
+            <div className="w-[80px] h-[80px] rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
               {images.agentPhoto ? (
                 <img
                   src={images.agentPhoto}
@@ -217,10 +223,10 @@ export function FlyerPreview({
                   style={getTransformStyle(imageTransforms.agentPhoto)}
                 />
               ) : (
-                <User className="w-10 h-10 text-gray-400" />
+                <User className="w-8 h-8 text-gray-400" />
               )}
             </div>
-            <div className="w-[74px] h-[74px] border-2 border-black p-[3px]">
+            <div className="w-[60px] h-[60px] border-2 border-black p-[2px]">
               {images.qrCode ? (
                 <img src={images.qrCode} alt="QR Code" className="w-full h-full object-contain" />
               ) : (
@@ -228,10 +234,10 @@ export function FlyerPreview({
               )}
             </div>
           </div>
-          <div className="text-[21pt] font-bold text-center mb-1">
+          <div className="text-[16pt] font-bold text-center mb-1">
             {data.agentName || ''}
           </div>
-          <div className="text-[10pt] text-center leading-[1.4]">
+          <div className="text-[8pt] text-center leading-[1.4]">
             <div>{data.agentTitle || ''}</div>
             <div>{data.phone || ''}</div>
           </div>

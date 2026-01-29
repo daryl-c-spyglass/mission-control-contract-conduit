@@ -193,26 +193,29 @@
             display: flex;
         }
         
-        /* Property Details Column - pt-[35px] -> 109px, pl-2 -> 6px */
+        /* Property Details Column - 4-column grid layout */
+        /* Column 1: 192px * 3.125 = 600px, pt-[20px] -> 63px, pl-2 -> 6px */
         .property-details {
-            padding-top: 109px;
+            width: 600px;
+            padding-top: 63px;
             padding-left: 6px;
+            flex-shrink: 0;
         }
         
-        /* gap-2.5 (10px) -> 31px, mb-5 (20px) -> 63px, text-[13.5pt] = 18px -> 56px */
+        /* gap-2 (8px) -> 25px, mb-4 (16px) -> 50px, text-[12pt] = 16px -> 50px */
         .detail-item {
             display: flex;
             align-items: center;
-            gap: 31px;
-            margin-bottom: 63px;
-            font-size: 56px;
+            gap: 25px;
+            margin-bottom: 50px;
+            font-size: 50px;
             white-space: nowrap;
         }
         
-        /* w-[31px] h-[31px] -> 97px */
+        /* w-[28px] h-[28px] -> 88px */
         .detail-icon {
-            width: 97px;
-            height: 97px;
+            width: 88px;
+            height: 88px;
             flex-shrink: 0;
         }
         
@@ -221,39 +224,40 @@
             height: 100%;
         }
         
-        /* Accent Divider Bar - w-1 (4px) -> 12.5px, h-[148px] -> 463px */
-        /* mt-[35px] -> 109px, ml-[42px] -> 131px */
+        /* Accent Divider Bar at column 1/2 boundary */
+        /* w-1 (4px) -> 12px, h-[148px] -> 463px, mt-[20px] -> 63px */
         .accent-divider {
             width: 12px;
             height: 463px;
             background-color: #8b7d6b;
-            margin-top: 109px;
-            margin-left: 131px;
+            margin-top: 63px;
             flex-shrink: 0;
         }
         
-        /* Description Section - w-[432px] -> 1350px, pl-8 (32px) -> 100px, pr-2.5 (10px) -> 31px */
+        /* Description Section - Columns 2-3: 384px * 3.125 = 1200px */
+        /* pl-6 (24px) -> 75px, pr-4 (16px) -> 50px */
         .description-section {
-            width: 1350px;
-            padding-left: 100px;
-            padding-right: 31px;
+            width: 1200px;
+            padding-left: 75px;
+            padding-right: 50px;
+            flex-shrink: 0;
         }
         
-        /* text-[11pt] -> 46px, tracking-[2px] -> 6px, mb-4 (16px) -> 50px, mt-2 (8px) -> 25px */
+        /* text-[10pt] -> 42px, tracking-[2px] -> 6px, mb-3 (12px) -> 38px, mt-2 (8px) -> 25px */
         .listing-headline {
-            font-size: 46px;
+            font-size: 42px;
             font-weight: 500;
             text-transform: uppercase;
             letter-spacing: 6px;
             line-height: 1.3;
-            margin-bottom: 50px;
+            margin-bottom: 38px;
             margin-top: 25px;
             color: #374151;
         }
         
-        /* text-[11pt] -> 46px, line-clamp-6 not directly applicable in HTML */
+        /* text-[10pt] -> 42px */
         .description-text {
-            font-size: 46px;
+            font-size: 42px;
             line-height: 1.5;
             color: #000;
             display: -webkit-box;
@@ -262,38 +266,39 @@
             overflow: hidden;
         }
         
-        /* Second Accent Divider - ml-[22px] -> 69px */
+        /* Second Accent Divider at column 3/4 boundary */
         .accent-divider-2 {
             width: 12px;
             height: 463px;
             background-color: #8b7d6b;
-            margin-top: 109px;
-            margin-left: 69px;
+            margin-top: 63px;
             flex-shrink: 0;
         }
         
-        /* Agent Section - w-[335px] -> 1047px, pl-[27px] -> 84px, pt-4 (16px) -> 50px */
+        /* Agent Section - Column 4: 192px * 3.125 = 600px */
+        /* pl-4 (16px) -> 50px, pt-2 (8px) -> 25px */
         .agent-section {
-            width: 1047px;
-            padding-left: 84px;
+            width: 600px;
+            padding-left: 50px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding-top: 50px;
+            padding-top: 25px;
+            flex-shrink: 0;
         }
         
-        /* gap-4 (16px) -> 50px, mb-2 (8px) -> 25px */
+        /* gap-3 (12px) -> 38px, mb-2 (8px) -> 25px */
         .agent-top-row {
             display: flex;
-            gap: 50px;
+            gap: 38px;
             align-items: center;
             margin-bottom: 25px;
         }
         
-        /* Agent Photo - 106px * 3.125 = 331px */
+        /* Agent Photo - 80px * 3.125 = 250px */
         .agent-photo {
-            width: 331px;
-            height: 331px;
+            width: 250px;
+            height: 250px;
             border-radius: 50%;
             overflow: hidden;
             background: #e5e7eb;
@@ -308,12 +313,12 @@
             object-fit: cover;
         }
         
-        /* QR Code - 74px * 3.125 = 231px, border-2 -> 6px, p-[3px] -> 9px */
+        /* QR Code - 60px * 3.125 = 188px, border-2 -> 6px, p-[2px] -> 6px */
         .qr-code {
-            width: 231px;
-            height: 231px;
+            width: 188px;
+            height: 188px;
             border: 6px solid black;
-            padding: 9px;
+            padding: 6px;
         }
         
         .qr-code img {
@@ -322,17 +327,17 @@
             object-fit: contain;
         }
         
-        /* Agent Name - text-[21pt] = 28px -> 88px, mb-1 (4px) -> 12px */
+        /* Agent Name - text-[16pt] = 21px -> 66px, mb-1 (4px) -> 12px */
         .agent-name {
-            font-size: 88px;
+            font-size: 66px;
             font-weight: bold;
             text-align: center;
             margin-bottom: 12px;
         }
         
-        /* Agent Title/Phone - text-[10pt] = 13.33px -> 42px */
+        /* Agent Title/Phone - text-[8pt] = 11px -> 34px */
         .agent-info {
-            font-size: 42px;
+            font-size: 34px;
             text-align: center;
             line-height: 1.4;
         }
