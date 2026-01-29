@@ -544,18 +544,33 @@ export class DatabaseStorage implements IStorage {
   async updateAgentProfile(userId: string, profile: UpdateAgentProfile): Promise<AgentProfile | undefined> {
     const existing = await this.getAgentProfile(userId);
     
+    // Filter out empty strings and undefined values - only update fields with actual content
+    // This prevents accidentally overwriting existing data with empty values
+    const filteredProfile: Partial<UpdateAgentProfile> = {};
+    for (const [key, value] of Object.entries(profile)) {
+      // Only include if value is not empty string, null, or undefined
+      if (value !== '' && value !== null && value !== undefined) {
+        (filteredProfile as any)[key] = value;
+      }
+    }
+    
     if (!existing) {
       // Create new profile if doesn't exist (upsert)
       const [created] = await db
         .insert(agentProfiles)
-        .values({ userId, ...profile })
+        .values({ userId, ...filteredProfile })
         .returning();
       return created;
     }
     
+    // Only update if there's something to update
+    if (Object.keys(filteredProfile).length === 0) {
+      return existing;
+    }
+    
     const [updated] = await db
       .update(agentProfiles)
-      .set({ ...profile, updatedAt: new Date() })
+      .set({ ...filteredProfile, updatedAt: new Date() })
       .where(eq(agentProfiles.userId, userId))
       .returning();
     return updated;
@@ -670,17 +685,32 @@ export class DatabaseStorage implements IStorage {
   ): Promise<AgentMarketingProfile> {
     const existing = await this.getAgentMarketingProfile(userId);
 
+    // Filter out empty strings and undefined values - only update fields with actual content
+    // This prevents accidentally overwriting existing data with empty values
+    const filteredProfile: Partial<InsertAgentMarketingProfile> = {};
+    for (const [key, value] of Object.entries(profile)) {
+      // Only include if value is not empty string or undefined
+      // Note: null and false are valid values (e.g., for boolean flags like companyLogoUseDefault)
+      if (value !== '' && value !== undefined) {
+        (filteredProfile as any)[key] = value;
+      }
+    }
+
     if (existing) {
+      // Only update if there's something to update
+      if (Object.keys(filteredProfile).length === 0) {
+        return existing;
+      }
       const [updated] = await db
         .update(agentMarketingProfiles)
-        .set({ ...profile, updatedAt: new Date() })
+        .set({ ...filteredProfile, updatedAt: new Date() })
         .where(eq(agentMarketingProfiles.userId, userId))
         .returning();
       return updated;
     } else {
       const [created] = await db
         .insert(agentMarketingProfiles)
-        .values({ userId, ...profile })
+        .values({ userId, ...filteredProfile })
         .returning();
       return created;
     }
