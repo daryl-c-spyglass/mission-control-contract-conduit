@@ -175,15 +175,15 @@ export function FlyerPreview({
         </div>
       </div>
 
-      {/* Bottom Section - starts after photos end (530 + 230 = 760px) */}
-      {/* Position: x: 48, y: 774 (with 14px gap after photos), width: 720 */}
-      {/* Col 1: Property details | Col 2-3: Description | Col 4: Agent info */}
+      {/* Bottom Section - Reference: top: 766 + 24 bleed = 790, height: 270 */}
+      {/* Position: x: 48, y: 790, width: 720, height: 270 */}
+      {/* Stats: 150.72px | Description: 432px | Agent: remaining */}
       <div 
-        className="absolute left-[48px] top-[774px] w-[720px] h-[268px] flex"
+        className="absolute left-[48px] top-[790px] w-[720px] h-[270px] flex"
         data-layout-id="bottom-section"
       >
-        {/* Column 1: Property Details (180px = 720/4) */}
-        <div className="w-[180px] pt-[20px] pl-2 flex-shrink-0" data-layout-id="stats">
+        {/* Column 1: Property Details (150.72px per reference) */}
+        <div className="w-[150.72px] pt-[20px] pl-2 flex-shrink-0" data-layout-id="stats">
           <div className="flex items-center gap-2 mb-4 text-[12pt] whitespace-nowrap">
             <svg className="w-[28px] h-[28px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
               <path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/>
@@ -211,8 +211,8 @@ export function FlyerPreview({
           style={{ backgroundColor: accentColor }}
         />
 
-        {/* Columns 2-3: Description (360px - 2 columns) */}
-        <div className="w-[360px] pl-5 pr-3 flex-shrink-0" data-layout-id="description-column">
+        {/* Description column: 432px per reference */}
+        <div className="w-[432px] pl-5 pr-3 flex-shrink-0" data-layout-id="description-column">
           <h3 className="text-[10pt] font-medium uppercase tracking-[2px] leading-[1.3] mb-3 mt-2 text-gray-700">
             {data.introHeading || 'Property Headline'}
           </h3>
@@ -227,8 +227,8 @@ export function FlyerPreview({
           style={{ backgroundColor: accentColor }}
         />
 
-        {/* Column 4: Agent Info (180px = 720/4) */}
-        <div className="w-[180px] pl-3 flex flex-col items-center pt-2 flex-shrink-0" data-layout-id="agent-card">
+        {/* Agent card: remaining width (720 - 150.72 - 432 - dividers ≈ 133px) */}
+        <div className="flex-1 pl-3 flex flex-col items-center pt-2" data-layout-id="agent-card">
           <div className="flex gap-3 items-center mb-2">
             <div className="w-[80px] h-[80px] rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
               {images.agentPhoto ? (

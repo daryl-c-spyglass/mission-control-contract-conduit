@@ -182,22 +182,22 @@
             object-fit: cover;
         }
         
-        /* Footer Section - starts after photos (530 + 230 + 14 gap = 774px) */
-        /* Preview: x: 48, y: 774, w: 720, h: 268 */
-        /* PDF: 150, 2419, 2250, 838 */
+        /* Footer Section - Reference: y: 790, h: 270 */
+        /* Preview: x: 48, y: 790, w: 720, h: 270 */
+        /* PDF: 790*3.125=2469, 270*3.125=844 */
         .footer-section {
             position: absolute;
             left: 150px;
-            top: 2419px;
+            top: 2469px;
             width: 2250px;
-            height: 838px;
+            height: 844px;
             display: flex;
         }
         
-        /* Property Details Column - 4-column grid layout (720/4 = 180px per col) */
-        /* Column 1: 180px * 3.125 = 563px, pt-[20px] -> 63px, pl-2 -> 6px */
+        /* Property Details Column - Reference: 150.72px */
+        /* 150.72px * 3.125 = 471px, pt-[20px] -> 63px, pl-2 -> 6px */
         .property-details {
-            width: 563px;
+            width: 471px;
             padding-top: 63px;
             padding-left: 6px;
             flex-shrink: 0;
@@ -235,10 +235,10 @@
             flex-shrink: 0;
         }
         
-        /* Description Section - Columns 2-3: 360px * 3.125 = 1125px */
+        /* Description Section - Reference: 432px * 3.125 = 1350px */
         /* pl-5 (20px) -> 63px, pr-3 (12px) -> 38px */
         .description-section {
-            width: 1125px;
+            width: 1350px;
             padding-left: 63px;
             padding-right: 38px;
             flex-shrink: 0;
@@ -276,16 +276,15 @@
             flex-shrink: 0;
         }
         
-        /* Agent Section - Column 4: 180px * 3.125 = 563px */
+        /* Agent Section - remaining width (flex: 1) */
         /* pl-3 (12px) -> 38px, pt-2 (8px) -> 25px */
         .agent-section {
-            width: 563px;
+            flex: 1;
             padding-left: 38px;
             display: flex;
             flex-direction: column;
             align-items: center;
             padding-top: 25px;
-            flex-shrink: 0;
         }
         
         /* gap-3 (12px) -> 38px, mb-2 (8px) -> 25px */
