@@ -205,24 +205,45 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
   );
 }
 
-interface SubjectDiamondProps {
+interface SubjectHouseProps {
   cx?: number;
   cy?: number;
   payload?: PropertyWithAcreage;
 }
 
-function SubjectDiamond({ cx, cy }: SubjectDiamondProps) {
+function SubjectHouse({ cx, cy }: SubjectHouseProps) {
   if (cx === undefined || cy === undefined) return null;
-  const size = 14; // Increased from 10 for better visibility
+  const size = 18; // Size of the house icon
+  
+  // House shape: roof triangle on top, square body below
   return (
     <g>
       {/* Invisible hit area for touch targets */}
       <circle cx={cx} cy={cy} r={22} fill="transparent" />
-      <polygon
-        points={`${cx},${cy - size} ${cx + size},${cy} ${cx},${cy + size} ${cx - size},${cy}`}
+      {/* House body (rectangle) */}
+      <rect
+        x={cx - size/2.5}
+        y={cy - size/6}
+        width={size * 0.8}
+        height={size * 0.6}
         fill={STATUS_COLORS.subject}
         stroke="white"
         strokeWidth={2}
+      />
+      {/* Roof (triangle) */}
+      <polygon
+        points={`${cx},${cy - size/1.5} ${cx - size/2},${cy - size/6} ${cx + size/2},${cy - size/6}`}
+        fill={STATUS_COLORS.subject}
+        stroke="white"
+        strokeWidth={2}
+      />
+      {/* Door (small rectangle) */}
+      <rect
+        x={cx - size/8}
+        y={cy + size/10}
+        width={size/4}
+        height={size/4}
+        fill="white"
       />
     </g>
   );
@@ -504,7 +525,7 @@ export function AveragePriceAcreWidget({
                       data={trendlineData}
                       line={{
                         stroke: '#9CA3AF',
-                        strokeWidth: 2,
+                        strokeWidth: 3,
                         strokeDasharray: '8 4',
                       }}
                       shape={() => <></>}
@@ -536,7 +557,7 @@ export function AveragePriceAcreWidget({
                     <Scatter
                       name="Subject"
                       data={subjectChartData}
-                      shape={<SubjectDiamond />}
+                      shape={<SubjectHouse />}
                     />
                   )}
                 </ScatterChart>
@@ -570,7 +591,7 @@ export function AveragePriceAcreWidget({
                 onCheckedChange={(checked) => setShowSubject(checked === true)}
                 data-testid="checkbox-show-subject"
               />
-              <span className="w-3 h-3 bg-blue-500 rotate-45" />
+              <Home className="w-4 h-4 text-blue-500" />
               <span className="text-muted-foreground">Subject Property</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
