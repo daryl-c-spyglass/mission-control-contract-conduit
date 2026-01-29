@@ -219,14 +219,16 @@ export function FlyerPreview({
         />
 
         {/* Description column: 432px width, padding left 32px, right 10px */}
+        {/* Added flex-shrink-0 and overflow-hidden to prevent content from pushing dividers */}
         <div 
-          className="w-[432px] flex-shrink-0" 
+          className="w-[432px] flex-shrink-0 overflow-hidden" 
           style={{ paddingLeft: '32px', paddingRight: '10px' }}
           data-layout-id="description-column"
         >
           {/* Headline: 11pt, weight 500, uppercase, letter-spacing 2px, line-height 1.3, mt 7.68px, mb 16.32px */}
+          {/* Added line-clamp-2 to limit headline to 2 lines max */}
           <h3 
-            className="text-gray-700 uppercase"
+            className="text-gray-700 uppercase line-clamp-2"
             style={{
               fontSize: '11pt',
               fontWeight: 500,
@@ -234,17 +236,21 @@ export function FlyerPreview({
               lineHeight: 1.3,
               marginTop: '7.68px',
               marginBottom: '16.32px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }}
             data-layout-id="headline"
           >
             {data.introHeading || 'Property Headline'}
           </h3>
           {/* Description: 11pt, line-height 1.5, immediately below headline */}
+          {/* Line clamp 6 for max 6 lines */}
           <p 
             className="line-clamp-6"
             style={{
               fontSize: '11pt',
               lineHeight: 1.5,
+              overflow: 'hidden',
             }}
             data-layout-id="description"
           >

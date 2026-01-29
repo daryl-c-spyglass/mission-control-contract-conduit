@@ -1,0 +1,154 @@
+Bottom Section Layout Specifications - Complete Answer
+1. Divider Positions - Are ALL dividers static?
+Yes, both bottom section dividers are STATIC with fixed dimensions.
+
+Divider	Width	Height	Margin Top	Margin Left	Behavior
+Divider 1	4px	147.84px	34.56px	42px	Static - fixed margins
+Divider 2	4px	147.84px	34.56px	21px	Static - fixed margins
+The dividers do NOT flex or move based on content. They are fixed-size flex items within the flexbox layout. Their position is determined by the fixed widths of preceding columns.
+
+2. Description Column - Text Overflow Behavior
+Current implementation has NO overflow constraints:
+
+/* Description Column */
+width: 432px;
+padding-left: 32px;
+padding-right: 10px;
+/* No overflow, max-width, or text-overflow properties */
+This is a potential issue: If text is very long, it will:
+
+Wrap within the 432px width (default behavior)
+But there's no overflow: hidden to clip content
+No flex-shrink: 0 to prevent column compression
+3. Headline Specific Behavior
+Current headline styles:
+
+font-size: 11pt;
+font-weight: 500;
+text-transform: uppercase;
+letter-spacing: 2px;
+line-height: 1.3;
+margin-bottom: 16.32px;
+margin-top: 7.68px;
+color: #333;
+No constraints exist:
+
+❌ No max-width
+❌ No line clamp (-webkit-line-clamp)
+❌ No overflow: hidden
+❌ No text-overflow: ellipsis
+If headline exceeds space, it simply wraps to multiple lines and can push content down.
+
+4. Bottom Section Flex Layout
+It uses Flexbox with fixed widths but NO shrink protection:
+
+/* Bottom Section Container */
+position: absolute;
+left: 24px;
+top: 766px;
+right: 24px;
+height: 270px;
+display: flex;
+gap: 0;
+Column widths (all fixed, no flex-grow/shrink specified):
+
+Column	Width	Notes
+Stats	150.72px	Fixed
+Divider 1	4px + 42px margin	Fixed
+Description	432px	Fixed
+Divider 2	4px + 21px margin	Fixed
+Agent Card	335px	Fixed
+Total width: 150.72 + 46 + 432 + 25 + 335 = 988.72px (exceeds 720px available!)
+
+5. Full Bottom Section CSS
+{/* Bottom Section Container */}
+<div style={{ 
+  position: "absolute",
+  left: "24px",
+  top: "766px",
+  right: "24px",      // Makes container 720px wide (816 - 48 - 48)
+  height: "270px",
+  display: "flex",
+  gap: "0"
+}}>
+  {/* Stats Column */}
+  <div style={{ 
+    width: "150.72px", 
+    paddingTop: "34.56px", 
+    paddingLeft: "7.68px" 
+  }}>
+  {/* Divider 1 */}
+  <div style={{ 
+    width: "4px",
+    height: "147.84px",
+    background: "#C9A227",  // accentColor
+    marginTop: "34.56px",
+    marginLeft: "42px"
+  }} />
+  {/* Description Column */}
+  <div style={{ 
+    width: "432px", 
+    paddingLeft: "32px", 
+    paddingRight: "10px" 
+  }}>
+    {/* Headline */}
+    <div style={{ 
+      fontSize: "11pt",
+      fontWeight: "500",
+      textTransform: "uppercase",
+      letterSpacing: "2px",
+      lineHeight: 1.3,
+      marginBottom: "16.32px",
+      marginTop: "7.68px",
+      color: "#333"
+    }} />
+    
+    {/* Description */}
+    <div style={{ 
+      fontSize: "11pt", 
+      lineHeight: 1.5 
+    }} />
+  </div>
+  {/* Divider 2 */}
+  <div style={{ 
+    width: "4px",
+    height: "147.84px",
+    background: "#C9A227",
+    marginTop: "34.56px",
+    marginLeft: "21px"
+  }} />
+  {/* Agent Column */}
+  <div style={{ 
+    width: "335px",
+    paddingLeft: "27px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    paddingTop: "16.32px"
+  }} />
+</div>
+Your Issue - Why Content Pushes Elements Right
+The current implementation lacks overflow protection. To fix in your project, you'd need:
+
+/* For Description Column */
+.description-column {
+  width: 432px;
+  flex-shrink: 0;        /* Prevent compression */
+  overflow: hidden;       /* Clip overflow */
+}
+/* For Headline */
+.headline {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;  /* Max 2 lines */
+  -webkit-box-orient: vertical;
+}
+/* For Description */
+.description {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 6;  /* Max 6 lines */
+  -webkit-box-orient: vertical;
+}
+Note: This project currently does NOT have these protections - it relies on users entering appropriately-sized text.
