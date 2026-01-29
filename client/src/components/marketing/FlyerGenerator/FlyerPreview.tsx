@@ -110,6 +110,8 @@ export function FlyerPreview({
         className="absolute left-[70px] top-[114px] text-[11pt] text-gray-700 tracking-[2px] uppercase font-medium"
       >
         {data.address || 'PROPERTY ADDRESS'}
+        {(data.city || data.state || data.zip) && ', '}
+        {[data.city, data.state, data.zip].filter(Boolean).join(', ')}
       </div>
 
       {/* Main Photo - Exact coordinates from reference project */}

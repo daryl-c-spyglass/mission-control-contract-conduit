@@ -24,6 +24,9 @@ export interface FlyerImages {
 export interface FlyerData {
   price: string;
   address: string;
+  city: string;
+  state: string;
+  zip: string;
   bedrooms: string;
   bathrooms: string;
   sqft: string;

@@ -4236,11 +4236,19 @@ Generate only the headline, nothing else.`;
         agentPhoto: defaultTransform,
       };
 
+      // Build full address with city, state, zip
+      const addressParts = [data.address];
+      const cityStateZip = [data.city, data.state, data.zip].filter(Boolean).join(', ');
+      if (cityStateZip) {
+        addressParts.push(cityStateZip);
+      }
+      const fullAddressStr = addressParts.filter(Boolean).join(', ');
+
       // Build flyer data for the generator - map form fields to generator interface
       const flyerData: FlyerData = {
         priceLabel: 'Offered at',
         price: data.price || '',
-        fullAddress: data.address || '',
+        fullAddress: fullAddressStr,
         bedrooms: data.bedrooms || '',
         bathrooms: data.bathrooms || '',
         sqft: data.sqft || '',

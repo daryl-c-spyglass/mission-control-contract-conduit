@@ -152,6 +152,9 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
     defaultValues: {
       price: '',
       address: '',
+      city: '',
+      state: '',
+      zip: '',
       bedrooms: '',
       bathrooms: '',
       sqft: '',
@@ -243,6 +246,9 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
       // Set property-related form values
       form.setValue('price', formatPrice(listPrice));
       form.setValue('address', formatAddress(transaction, mlsData));
+      form.setValue('city', mlsData.city || mlsData.City || '');
+      form.setValue('state', mlsData.state || mlsData.StateOrProvince || 'TX');
+      form.setValue('zip', mlsData.zipCode || mlsData.postalCode || mlsData.PostalCode || '');
       form.setValue('bedrooms', beds !== null && beds !== undefined && beds !== '' ? String(beds) : '');
       form.setValue('bathrooms', baths !== null && baths !== undefined && baths !== '' ? String(baths) : '');
       form.setValue('sqft', sqft !== null && sqft !== undefined && sqft !== '' ? formatNumber(sqft) : '');
