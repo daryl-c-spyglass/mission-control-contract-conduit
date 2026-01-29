@@ -58,6 +58,7 @@ interface FlyerFormProps {
   onDividerPositionChange?: (position: number) => void;
   secondaryLogoOffsetY?: number;
   onSecondaryLogoOffsetYChange?: (offset: number) => void;
+  isOffMarket?: boolean;
   useDefaultCompanyLogo?: boolean;
   onUseDefaultCompanyLogoChange?: (checked: boolean) => void;
   useDefaultSecondaryLogo?: boolean;
@@ -130,6 +131,7 @@ export function FlyerForm({
   onDividerPositionChange,
   secondaryLogoOffsetY = 0,
   onSecondaryLogoOffsetYChange,
+  isOffMarket = false,
   useDefaultCompanyLogo = true,
   onUseDefaultCompanyLogoChange,
   useDefaultSecondaryLogo = true,
@@ -587,6 +589,7 @@ export function FlyerForm({
               onSelectPhoto={(url) => onSelectPhoto?.('mainImage', url)}
               expectedCategory="Exterior"
               isMissing={missingCategories.includes('Exterior')}
+              isOffMarket={isOffMarket}
             />
 
             <ImageUploadField
@@ -601,6 +604,7 @@ export function FlyerForm({
               onSelectPhoto={(url) => onSelectPhoto?.('kitchenImage', url)}
               expectedCategory="Kitchen"
               isMissing={missingCategories.includes('Kitchen')}
+              isOffMarket={isOffMarket}
             />
 
             <ImageUploadField
@@ -615,6 +619,7 @@ export function FlyerForm({
               onSelectPhoto={(url) => onSelectPhoto?.('roomImage', url)}
               expectedCategory="Living Room"
               isMissing={missingCategories.includes('Living Room')}
+              isOffMarket={isOffMarket}
             />
           </div>
         </div>

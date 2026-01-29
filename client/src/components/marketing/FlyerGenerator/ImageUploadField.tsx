@@ -32,6 +32,7 @@ interface ImageUploadFieldProps {
   onSelectPhoto?: (url: string) => void;
   expectedCategory?: string;
   isMissing?: boolean;
+  isOffMarket?: boolean;
 }
 
 export function ImageUploadField({
@@ -50,6 +51,7 @@ export function ImageUploadField({
   onSelectPhoto,
   expectedCategory,
   isMissing = false,
+  isOffMarket = false,
 }: ImageUploadFieldProps) {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -356,7 +358,7 @@ export function ImageUploadField({
               data-testid={`button-gallery-${id}`}
             >
               <Images className="w-3 h-3" />
-              Choose from MLS Photos ({availablePhotos.length})
+              {isOffMarket ? `Choose from Saved Photos (${availablePhotos.length})` : `Choose from MLS Photos (${availablePhotos.length})`}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">

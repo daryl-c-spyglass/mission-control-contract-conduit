@@ -751,6 +751,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
               onImageChange={handleImageChange}
               transactionId={transactionId}
               mlsData={transaction?.mlsData}
+              isOffMarket={!transaction?.mlsNumber}
               photoSelectionInfo={photoSelectionInfo}
               allMlsPhotos={allMlsPhotos}
               onSelectPhoto={(field, url) => setImages(prev => ({ ...prev, [field]: url }))}
