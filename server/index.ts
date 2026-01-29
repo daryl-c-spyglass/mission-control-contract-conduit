@@ -18,14 +18,14 @@ declare module "http" {
 
 app.use(
   express.json({
-    limit: "10mb",
+    limit: "50mb",  // Increased to handle base64-encoded images (33% overhead)
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
   }),
 );
 
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false, limit: "50mb" }));
 
 // Allow iframe embedding from trusted domains
 // Only set frame-ancestors, preserve any other CSP directives
