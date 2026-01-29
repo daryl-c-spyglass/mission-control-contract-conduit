@@ -405,7 +405,7 @@ export function AveragePriceAcreWidget({
   };
 
   const handleScatterClick = (data: any) => {
-    if (data && !data.isSubject) {
+    if (data) {
       setSelectedProperty(data);
     }
   };
@@ -558,6 +558,8 @@ export function AveragePriceAcreWidget({
                       name="Subject"
                       data={subjectChartData}
                       shape={<SubjectHouse />}
+                      cursor="pointer"
+                      onClick={(data) => handleScatterClick(data)}
                     />
                   )}
                 </ScatterChart>
