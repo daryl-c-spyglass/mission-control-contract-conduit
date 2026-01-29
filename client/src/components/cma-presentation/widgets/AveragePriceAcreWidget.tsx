@@ -280,16 +280,16 @@ export function AveragePriceAcreWidget({
       .map(p => {
         const acres = getAcres(p);
         const price = getPrice(p);
-        // Calculate price per acre with existing value fallback
-        const pricePerAcre = p.pricePerAcre ?? (acres && acres > 0 && price > 0 ? Math.round(price / acres) : 0);
+        // Always calculate fresh price per acre from current data (don't use stale p.pricePerAcre)
+        const pricePerAcre = acres > 0 && price > 0 ? Math.round(price / acres) : 0;
         
         return {
           ...p,
           lotSizeAcres: acres as number,
-          pricePerAcre: pricePerAcre as number,
+          pricePerAcre: pricePerAcre,
         };
       })
-      // Filter out properties with zero price
+      // Filter out properties with zero price per acre
       .filter(p => p.pricePerAcre > 0);
     
     return withAcreage;
@@ -319,7 +319,8 @@ export function AveragePriceAcreWidget({
     const acres = getAcres(subjectProperty);
     if (!acres || acres <= 0) return null;
     const price = getPrice(subjectProperty) || (avgPricePerAcre * acres);
-    const pricePerAcre = subjectProperty.pricePerAcre ?? (price > 0 ? Math.round(price / acres) : 0);
+    // Always calculate fresh price per acre from current data
+    const pricePerAcre = price > 0 && acres > 0 ? Math.round(price / acres) : 0;
     return {
       ...subjectProperty,
       lotSizeAcres: acres,
