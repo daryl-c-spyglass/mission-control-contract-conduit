@@ -182,7 +182,10 @@ export function ImageUploadField({
                 circular && "rounded-full"
               )}
               style={{
-                transform: `scale(${transform.scale}) translate(${transform.positionX}%, ${transform.positionY}%)`,
+                // Use objectPosition + scale approach to match CropModal exactly
+                objectPosition: `${50 - transform.positionX}% ${50 - transform.positionY}%`,
+                transform: `scale(${transform.scale})`,
+                transformOrigin: `${50 - transform.positionX}% ${50 - transform.positionY}%`,
               }}
             />
             {onTransformChange && !disabled && (

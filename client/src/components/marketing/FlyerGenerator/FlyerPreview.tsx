@@ -20,10 +20,18 @@ export function FlyerPreview({
 }: FlyerPreviewProps) {
   const accentColor = "#8b7d6b";
 
-  const getTransformStyle = (transform: { scale: number; positionX: number; positionY: number }) => ({
-    transform: `scale(${transform.scale}) translate(${transform.positionX}%, ${transform.positionY}%)`,
-    transformOrigin: 'center center',
-  });
+  // Use objectPosition + scale approach to match CropModal exactly
+  // positionX/Y are in range -50 to 50, where 0 is center
+  // Convert back to objectPosition format (0-100, where 50 is center)
+  const getTransformStyle = (transform: { scale: number; positionX: number; positionY: number }) => {
+    const objPosX = 50 - transform.positionX;
+    const objPosY = 50 - transform.positionY;
+    return {
+      objectPosition: `${objPosX}% ${objPosY}%`,
+      transform: `scale(${transform.scale})`,
+      transformOrigin: `${objPosX}% ${objPosY}%`,
+    };
+  };
 
   return (
     <div

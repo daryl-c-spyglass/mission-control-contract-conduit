@@ -413,9 +413,14 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
   const secondaryLogoOffsetY = Math.round((data.secondaryLogoOffsetY || 0) * PRINT_SCALE);
   
   // Helper to generate CSS transform style from image transform data
+  // Use objectPosition + scale approach to match CropModal exactly
+  // positionX/Y are in range -50 to 50, where 0 is center
+  // Convert back to objectPosition format (0-100, where 50 is center)
   const getTransformStyle = (transform?: ImageTransform) => {
     if (!transform) return '';
-    return `transform: scale(${transform.scale}) translate(${transform.positionX}%, ${transform.positionY}%); transform-origin: center center;`;
+    const objPosX = 50 - transform.positionX;
+    const objPosY = 50 - transform.positionY;
+    return `object-position: ${objPosX}% ${objPosY}%; transform: scale(${transform.scale}); transform-origin: ${objPosX}% ${objPosY}%;`;
   };
 
   const transforms = data.imageTransforms;
