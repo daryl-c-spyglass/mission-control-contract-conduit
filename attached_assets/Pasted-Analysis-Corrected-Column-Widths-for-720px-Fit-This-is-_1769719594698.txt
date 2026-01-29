@@ -1,0 +1,55 @@
+Analysis: Corrected Column Widths for 720px Fit
+This is an inquiry response based on the current code and grid requirements.
+
+Current Code Reality
+The current widths in the code DO overflow. Here's the math:
+
+Element	Current Width	Notes
+Stats Column	150.72px	Fixed width
+Divider 1	4px + 42px margin = 46px	Fixed
+Description Column	432px	Fixed width
+Divider 2	4px + 21px margin = 25px	Fixed
+Agent Card	335px	Fixed width
+TOTAL	988.72px	Overflows by 268.72px
+Available space: 720px (816px canvas - 48px padding on each side)
+
+Required Widths to Center Photo in Grid 15
+For Photo center at 510px and QR center at ~680px:
+
+Working backwards:
+
+Photo is 105.6px wide → Photo left edge at 510 - 52.8 = 457.2px
+QR is 73.92px wide, gap 16px → QR left at 457.2 + 105.6 + 16 = 578.8px
+QR center at 578.8 + 36.96 = 615.76px (just into Grid 16 ✓)
+Agent Card positioning:
+
+Agent Card needs to start so photo lands at 457.2px
+With 27px padding + centering offset (~56px), Agent Card starts at ~374px from canvas
+From bottom section start (48px): 374 - 48 = 326px
+Corrected Widths That Would Fit
+Element	Corrected Width	Fits in 720px
+Stats Column	110px	✓
+Divider 1 (with margins)	30px (4px + 26px margin)	✓
+Description Column	186px	✓
+Divider 2 (with margins)	20px (4px + 16px margin)	✓
+Agent Card	374px	✓
+TOTAL	720px	✓
+Result Grid Alignment
+With corrected widths:
+
+Element	X Start	X End	Grid
+Stats	48px	158px	Grid 13
+Divider 1	184px	188px	Grid 13/14 border
+Description	188px	374px	Grid 14
+Divider 2	390px	394px	Grid 14/15 border
+Agent Card	394px	768px	Grid 15-16
+Photo center	~510px	-	Grid 15 center ✓
+QR center	~616px	-	Grid 16 start ✓
+Summary
+The current code has a bug - the column widths total 988.72px but only 720px is available. The overflow causes the Photo and QR to render outside the visible canvas area.
+
+To fix and achieve Photo in Grid 15 / QR in Grid 16:
+
+Description column needs to shrink from 432px to ~186px
+Agent Card can expand slightly to ~374px for proper centering
+Divider margins need reduction

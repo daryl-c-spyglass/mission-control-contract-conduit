@@ -194,10 +194,10 @@
             display: flex;
         }
         
-        /* Property Details Column - Reference: 150.72px */
-        /* 150.72px * 3.125 = 471px, pt-[20px] -> 63px, pl-2 -> 6px */
+        /* Property Details Column - CORRECTED: 110px * 3.125 = 344px */
+        /* pt-[20px] -> 63px, pl-2 -> 6px */
         .property-details {
-            width: 471px;
+            width: 344px;
             padding-top: 63px;
             padding-left: 6px;
             flex-shrink: 0;
@@ -225,24 +225,23 @@
             height: 100%;
         }
         
-        /* STATIC Divider 1 (after Stats): 4px width, 147.84px height, 34.56px margin-top, 42px margin-left */
-        /* Scaled 3.125x: 12.5px width, 462px height, 108px margin-top, 131px margin-left */
+        /* STATIC Divider 1 - CORRECTED: 4px width, 147.84px height, 34.56px margin-top, 26px margin-left */
+        /* Scaled 3.125x: 13px width, 462px height, 108px margin-top, 81px margin-left */
         .accent-divider {
             width: 13px;
             height: 462px;
             background-color: #8b7d6b;
             margin-top: 108px;
-            margin-left: 131px;
+            margin-left: 81px;
             flex-shrink: 0;
         }
         
-        /* Description Section - Reference: 432px * 3.125 = 1350px */
-        /* padding-left: 32px * 3.125 = 100px, padding-right: 10px * 3.125 = 31px */
-        /* Added overflow:hidden and flex-shrink:0 to prevent content from pushing dividers */
+        /* Description Section - CORRECTED: 186px * 3.125 = 581px */
+        /* padding-left: 12px * 3.125 = 38px, padding-right: 6px * 3.125 = 19px */
         .description-section {
-            width: 1350px;
-            padding-left: 100px;
-            padding-right: 31px;
+            width: 581px;
+            padding-left: 38px;
+            padding-right: 19px;
             flex-shrink: 0;
             overflow: hidden;
         }
@@ -278,22 +277,22 @@
             overflow: hidden;
         }
         
-        /* STATIC Divider 2 (after Description): 4px width, 147.84px height, 34.56px margin-top, 21px margin-left */
-        /* Scaled 3.125x: 13px width, 462px height, 108px margin-top, 66px margin-left */
+        /* STATIC Divider 2 - CORRECTED: 4px width, 147.84px height, 34.56px margin-top, 16px margin-left */
+        /* Scaled 3.125x: 13px width, 462px height, 108px margin-top, 50px margin-left */
         .accent-divider-2 {
             width: 13px;
             height: 462px;
             background-color: #8b7d6b;
             margin-top: 108px;
-            margin-left: 66px;
+            margin-left: 50px;
             flex-shrink: 0;
         }
         
-        /* Agent Card Container - Exact specs from Flyer Maker (scaled 3.125x) */
-        /* Width: 335px -> 1047px, paddingTop: 16.32px -> 51px, paddingLeft: 27px -> 84px */
+        /* Agent Card Container - CORRECTED: 374px * 3.125 = 1169px */
+        /* paddingTop: 16.32px -> 51px, paddingLeft: 10px -> 31px */
         .agent-section {
-            width: 1047px;
-            padding-left: 84px;
+            width: 1169px;
+            padding-left: 31px;
             padding-top: 51px;
             display: flex;
             flex-direction: column;
