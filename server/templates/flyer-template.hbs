@@ -289,35 +289,34 @@
             flex-shrink: 0;
         }
         
-        /* Agent Section - remaining width (flex: 1) */
-        /* pl-3 (12px) -> 38px, pt-2 (8px) -> 25px */
+        /* Agent Section - restructured to match preview layout */
+        /* pl-3 (12px) -> 38px, pt-4 (16px) -> 50px */
         .agent-section {
             flex: 1;
             padding-left: 38px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding-top: 25px;
+            padding-top: 50px;
+            position: relative;
+            overflow: hidden;
         }
         
-        /* gap-3 (12px) -> 38px, mb-2 (8px) -> 25px */
+        /* Agent top row with photo and info side by side */
         .agent-top-row {
             display: flex;
-            gap: 38px;
-            align-items: center;
-            margin-bottom: 25px;
+            align-items: flex-start;
+            gap: 25px;
         }
         
-        /* Agent Photo - 80px * 3.125 = 250px */
+        /* Agent Photo - 70px * 3.125 = 219px */
         .agent-photo {
-            width: 250px;
-            height: 250px;
+            width: 219px;
+            height: 219px;
             border-radius: 50%;
             overflow: hidden;
             background: #e5e7eb;
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
         }
         
         .agent-photo img {
@@ -326,33 +325,53 @@
             object-fit: cover;
         }
         
-        /* QR Code - 60px * 3.125 = 188px, border-2 -> 6px, p-[2px] -> 6px */
+        /* Agent info column */
+        .agent-info-column {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            flex: 1;
+        }
+        
+        /* Agent Name - text-[11pt] = 14.67px -> 46px */
+        .agent-name {
+            font-size: 46px;
+            font-weight: bold;
+            line-height: 1.2;
+            margin-bottom: 6px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        /* Agent Title/Phone - text-[7pt] = 9.33px -> 29px */
+        .agent-info {
+            font-size: 29px;
+            line-height: 1.3;
+            color: #4b5563;
+        }
+        
+        .agent-info div {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        /* QR Code - 55px * 3.125 = 172px, positioned at bottom right */
         .qr-code {
-            width: 188px;
-            height: 188px;
-            border: 6px solid black;
-            padding: 6px;
+            position: absolute;
+            bottom: 25px;
+            right: 25px;
+            width: 172px;
+            height: 172px;
+            border: 3px solid black;
+            padding: 3px;
         }
         
         .qr-code img {
             width: 100%;
             height: 100%;
             object-fit: contain;
-        }
-        
-        /* Agent Name - text-[16pt] = 21px -> 66px, mb-1 (4px) -> 12px */
-        .agent-name {
-            font-size: 66px;
-            font-weight: bold;
-            text-align: center;
-            margin-bottom: 12px;
-        }
-        
-        /* Agent Title/Phone - text-[8pt] = 11px -> 34px */
-        .agent-info {
-            font-size: 34px;
-            text-align: center;
-            line-height: 1.4;
         }
         
         .photo-placeholder {
@@ -484,7 +503,7 @@
             <!-- Second Accent Divider -->
             <div class="accent-divider-2"></div>
             
-            <!-- Agent Section -->
+            <!-- Agent Section - restructured: photo + info side by side, QR at bottom right -->
             <div class="agent-section">
                 <div class="agent-top-row">
                     <div class="agent-photo">
@@ -497,17 +516,19 @@
                         </svg>
                         {{/if}}
                     </div>
-                    {{#if qrCodeUrl}}
-                    <div class="qr-code">
-                        <img src="{{qrCodeUrl}}" alt="QR Code" />
+                    <div class="agent-info-column">
+                        <div class="agent-name">{{agentName}}</div>
+                        <div class="agent-info">
+                            <div>{{agentTitle}}</div>
+                            <div>{{agentPhone}}</div>
+                        </div>
                     </div>
-                    {{/if}}
                 </div>
-                <div class="agent-name">{{agentName}}</div>
-                <div class="agent-info">
-                    <div>{{agentTitle}}</div>
-                    <div>{{agentPhone}}</div>
+                {{#if qrCodeUrl}}
+                <div class="qr-code">
+                    <img src="{{qrCodeUrl}}" alt="QR Code" />
                 </div>
+                {{/if}}
             </div>
         </div>
     </div>
