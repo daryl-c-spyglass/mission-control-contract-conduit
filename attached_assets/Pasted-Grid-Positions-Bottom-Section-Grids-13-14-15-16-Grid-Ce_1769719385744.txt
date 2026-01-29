@@ -1,0 +1,51 @@
+Grid Positions - Bottom Section (Grids 13, 14, 15, 16)
+Grid Cell Boundaries (816px ÷ 4 = 204px per column)
+Grid	X Start	X End	Width
+13	0px	204px	204px
+14	204px	408px	204px
+15	408px	612px	204px
+16	612px	816px	204px
+Current Element Positions (traced through flexbox)
+Bottom section starts at X = 48px (24px bleed + 24px left position).
+
+Element	X Start	X End	Grid Location
+Stats Column	48px	198.72px	Grid 13 ✅
+Divider 1	240.72px	244.72px	Grid 14 ✅
+Description Column	244.72px	676.72px	Grids 14-15 (into 16)
+Divider 2	697.72px	701.72px	Grid 16
+Agent Card Container	701.72px	1036.72px	OVERFLOW!
+⚠️ Critical Issue Found
+Total width of bottom section elements: 988.72px
+Available width: 720px (816 - 48 - 48)
+
+The layout overflows by 268.72px! This explains why your Photo and QR are shifted too far right.
+
+Agent Card Current Positions (overflowing canvas)
+Element	Calculated X	Grid	Issue
+Agent Card left edge	701.72px	Grid 16	Too far right
+Photo left edge	~785px	Off canvas	Overflow
+Photo center	~838px	Off canvas	Overflow
+QR left edge	~907px	Off canvas	Overflow
+What Grid 15 & 16 Should Look Like
+For Photo centered in Grid 15 and QR in Grid 16:
+
+Element	Target X Center	Target Grid
+Agent Photo	~510px (Grid 15 center)	Grid 15 (408-612px)
+QR Code	~714px (Grid 16 center)	Grid 16 (612-816px)
+Photo center in Grid 15: 408 + 102 = 510px
+QR center in Grid 16: 612 + 102 = 714px
+
+Root Cause
+The column widths don't fit in 720px:
+
+Column	Current Width	Issue
+Stats	150.72px	OK
+Divider 1 margins + width	46px	OK
+Description	432px	Too wide
+Divider 2 margins + width	25px	OK
+Agent Card	335px	Too wide
+Total	988.72px	Exceeds 720px by 268.72px
+Summary
+Your observation is correct: The current code has the agent card positioned in overflow territory because the Description column (432px) and Agent Card (335px) are too wide for the available space.
+
+To get Photo in Grid 15 and QR in Grid 16, the column widths need to be reduced so the Agent Card container starts around X = 500-520px instead of 701.72px.
