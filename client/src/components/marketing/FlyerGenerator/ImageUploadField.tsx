@@ -141,7 +141,7 @@ export function ImageUploadField({
               <div className="space-y-1.5 text-xs">
                 <p className="font-medium">This doesn't appear to be a {expectedCategory?.toLowerCase()} photo</p>
                 <p className="text-muted-foreground">
-                  Please select a better photo from the MLS gallery below, or upload your own.
+                  Please select a better photo from {isOffMarket ? 'your saved photos' : 'the MLS gallery'} below, or upload your own.
                 </p>
               </div>
             </TooltipContent>
@@ -227,7 +227,7 @@ export function ImageUploadField({
                 <span className="text-xs text-center text-amber-600">
                   No {expectedCategory || 'matching'} photo found
                   <br />
-                  <span className="text-muted-foreground">Click to upload or choose from MLS</span>
+                  <span className="text-muted-foreground">Click to upload or choose from {isOffMarket ? 'saved photos' : 'MLS'}</span>
                 </span>
               </>
             ) : (
@@ -338,7 +338,7 @@ export function ImageUploadField({
           <div className="space-y-0.5">
             <p className="font-medium">This doesn't look like a {expectedCategory?.toLowerCase()} photo</p>
             <p className="text-amber-600 dark:text-amber-400">
-              Select a better photo from MLS gallery or upload your own below.
+              Select a better photo from {isOffMarket ? 'saved photos' : 'MLS gallery'} or upload your own below.
             </p>
           </div>
         </div>
