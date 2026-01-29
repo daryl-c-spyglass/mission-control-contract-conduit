@@ -44,6 +44,11 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   const { toast } = useToast();
   const previewRef = useRef<HTMLDivElement>(null);
 
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
   const [showGrid, setShowGrid] = useState(false);
   const [scale, setScale] = useState<string>('1'); // Default to 100%
   const [imageTransforms, setImageTransforms] = useState<ImageTransforms>({ ...DEFAULT_TRANSFORMS });
