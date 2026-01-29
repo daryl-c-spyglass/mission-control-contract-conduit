@@ -4298,6 +4298,7 @@ Generate only the headline, nothing else.`;
         console.log(`[FlyerGenerator] Saved flyer to marketing assets`);
         
         // Send Slack notification if postToSlack is true and transaction has Slack channel
+        console.log(`[FlyerGenerator] postToSlack=${postToSlack}, slackChannelId=${transaction.slackChannelId}`);
         if (postToSlack && transaction.slackChannelId) {
           try {
             const userId = req.user?.claims?.sub;
@@ -4306,23 +4307,31 @@ Generate only the headline, nothing else.`;
             if (userId) {
               const userPrefs = await storage.getUserNotificationPreferences(userId);
               shouldNotify = userPrefs?.notifyMarketingAssets ?? true;
+              console.log(`[FlyerGenerator] User ${userId} notifyMarketingAssets=${shouldNotify}`);
             }
             
             if (shouldNotify) {
               const address = transaction.propertyAddress || data.address || 'Unknown Property';
+              const createdBy = req.user?.claims?.email || 'Unknown User';
+              console.log(`[FlyerGenerator] Sending Slack notification for flyer: ${address}`);
               await sendMarketingNotification(
                 transaction.slackChannelId,
-                'Flyer',
-                address,
-                `data:image/png;base64,${buffer.toString('base64')}`,
-                `${addressSlug}_flyer.png`
+                address,           // propertyAddress
+                'flyer',           // assetType
+                createdBy,         // createdBy
+                `data:image/png;base64,${buffer.toString('base64')}`,  // imageData
+                `${addressSlug}_flyer.png`  // fileName
               );
               console.log(`[FlyerGenerator] Posted flyer to Slack channel ${transaction.slackChannelId}`);
+            } else {
+              console.log(`[FlyerGenerator] Slack notification skipped - user preference disabled`);
             }
           } catch (slackError: any) {
             console.error('[FlyerGenerator] Failed to post to Slack:', slackError.message);
             // Don't fail the export just because Slack failed
           }
+        } else {
+          console.log(`[FlyerGenerator] Slack notification skipped - postToSlack=${postToSlack}, hasChannel=${!!transaction.slackChannelId}`);
         }
       } catch (saveError: any) {
         console.error('[FlyerGenerator] Failed to save to marketing assets:', saveError.message);
