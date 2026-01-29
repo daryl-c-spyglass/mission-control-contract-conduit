@@ -370,8 +370,10 @@ export const agentResources = pgTable("agent_resources", {
   name: text("name").notNull(),
   type: text("type").notNull(), // 'link' or 'file'
   url: text("url"), // For external links
-  fileUrl: text("file_url"), // For uploaded files (object storage URL)
+  fileUrl: text("file_url"), // For uploaded files (object storage URL) - deprecated, use fileData
   fileName: text("file_name"), // Original file name
+  fileData: text("file_data"), // Base64 encoded file content (for database storage)
+  fileMimeType: text("file_mime_type"), // MIME type of uploaded file
   isActive: boolean("is_active").default(true),
   displayOrder: integer("display_order").default(0),
   createdAt: timestamp("created_at").defaultNow(),

@@ -4883,7 +4883,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
   // Get all resources for the current user
   app.get("/api/agent/resources", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id || req.user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
@@ -4899,12 +4899,12 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
   // Create a new resource
   app.post("/api/agent/resources", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id || req.user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      const { name, type, url, fileUrl, fileName } = req.body;
+      const { name, type, url, fileUrl, fileName, fileData, fileMimeType } = req.body;
 
       if (!name || !type) {
         return res.status(400).json({ error: "Name and type are required" });
@@ -4921,6 +4921,8 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
         url: url || null,
         fileUrl: fileUrl || null,
         fileName: fileName || null,
+        fileData: fileData || null,
+        fileMimeType: fileMimeType || null,
         isActive: true,
       });
 
@@ -4934,13 +4936,13 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
   // Update a resource
   app.patch("/api/agent/resources/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id || req.user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
       const { id } = req.params;
-      const { name, url, isActive } = req.body;
+      const { name, url, isActive, fileData, fileMimeType } = req.body;
 
       // Verify ownership
       const existing = await storage.getAgentResource(id);
@@ -4952,6 +4954,8 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       if (name !== undefined) updateData.name = name;
       if (url !== undefined) updateData.url = url;
       if (isActive !== undefined) updateData.isActive = isActive;
+      if (fileData !== undefined) updateData.fileData = fileData;
+      if (fileMimeType !== undefined) updateData.fileMimeType = fileMimeType;
 
       const updated = await storage.updateAgentResource(id, updateData);
       res.json(updated);
@@ -4964,7 +4968,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
   // Delete a resource
   app.delete("/api/agent/resources/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id || req.user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
@@ -4988,7 +4992,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
   // Reorder resources
   app.patch("/api/agent/resources/reorder", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id || req.user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
@@ -5007,10 +5011,40 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
     }
   });
 
+  // Serve file from database storage (public access for CMA viewers)
+  app.get("/api/agent/resources/:id/file", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const resource = await storage.getAgentResource(id);
+      
+      if (!resource || !resource.fileData) {
+        return res.status(404).json({ error: "File not found" });
+      }
+
+      // Parse base64 data URI
+      const matches = resource.fileData.match(/^data:([^;]+);base64,(.+)$/);
+      if (!matches) {
+        return res.status(500).json({ error: "Invalid file data format" });
+      }
+
+      const mimeType = matches[1];
+      const base64Data = matches[2];
+      const buffer = Buffer.from(base64Data, 'base64');
+
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `inline; filename="${resource.fileName || 'document'}"`);
+      res.setHeader('Content-Length', buffer.length);
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("[Agent Resources] Error serving file:", error.message);
+      res.status(500).json({ error: "Failed to serve file" });
+    }
+  });
+
   // Upload file for resource
   app.post("/api/agent/resources/upload", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id || req.user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
@@ -5036,53 +5070,25 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
           return res.status(400).json({ error: "Only PDF and Word documents are allowed" });
         }
 
-        // Validate file size (max 50MB)
-        if (req.file.size > 50 * 1024 * 1024) {
-          return res.status(400).json({ error: "File size must be less than 50MB" });
+        // Validate file size (max 10MB for database storage)
+        const maxSize = 10 * 1024 * 1024; // 10MB limit for database storage
+        if (req.file.size > maxSize) {
+          return res.status(400).json({ error: "File size must be less than 10MB" });
         }
 
         try {
-          // Use the existing object storage integration
-          const privateObjectDir = process.env.PRIVATE_OBJECT_DIR;
-          if (!privateObjectDir) {
-            console.error("[Agent Resources] PRIVATE_OBJECT_DIR not set");
-            return res.status(500).json({ error: "Object storage not configured" });
-          }
-
-          // Parse bucket name from PRIVATE_OBJECT_DIR (format: /<bucket_name>/.private)
-          const pathParts = privateObjectDir.startsWith('/') 
-            ? privateObjectDir.slice(1).split('/') 
-            : privateObjectDir.split('/');
-          const bucketName = pathParts[0];
+          // Convert file buffer to base64 for database storage
+          const base64Data = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
           
-          const timestamp = Date.now();
-          const safeFileName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-          const objectName = `resources/${userId}/${timestamp}-${safeFileName}`;
-          
-          // Full path for serving: .private/resources/...
-          const fullObjectPath = `.private/${objectName}`;
-
-          // Use existing objectStorageClient from object storage integration
-          const { objectStorageClient } = await import("./replit_integrations/object_storage/objectStorage");
-          const bucket = objectStorageClient.bucket(bucketName);
-          const file = bucket.file(fullObjectPath);
-
-          // Upload the file buffer
-          await file.save(req.file.buffer, {
-            contentType: req.file.mimetype,
-            metadata: {
-              originalName: req.file.originalname,
-              uploadedBy: userId,
-            },
-          });
-
+          // Return the file data to be stored with the resource
           res.json({
-            fileUrl: `/objects/${objectName}`,
+            fileData: base64Data,
             fileName: req.file.originalname,
+            fileMimeType: req.file.mimetype,
           });
         } catch (uploadErr: any) {
           console.error("[Agent Resources] Storage upload error:", uploadErr);
-          res.status(500).json({ error: "Failed to upload file to storage" });
+          res.status(500).json({ error: "Failed to process file" });
         }
       });
     } catch (error: any) {
