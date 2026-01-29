@@ -219,10 +219,10 @@ export function FlyerPreview({
           data-layout-id="divider-1"
         />
 
-        {/* Description column: 432px width, padding left 32px, right 10px (per reference) */}
+        {/* Description column: 156px width to fit divider at Grid 15 line (~408px) */}
         <div 
-          className="w-[432px] flex-shrink-0 overflow-hidden" 
-          style={{ paddingLeft: '32px', paddingRight: '10px' }}
+          className="w-[156px] flex-shrink-0 overflow-hidden" 
+          style={{ paddingLeft: '8px', paddingRight: '4px' }}
           data-layout-id="description-column"
         >
           {/* Headline: 11pt, weight 500, uppercase, letter-spacing 2px, line-height 1.3, mt 7.68px, mb 16.32px */}
@@ -258,14 +258,14 @@ export function FlyerPreview({
           </p>
         </div>
 
-        {/* Divider 2: 4px width, 29px margin-left (moved 8px right) */}
+        {/* Divider 2 at Grid 15 line (~408px): 4px width, 4px margin-left */}
         <div
           className="flex-shrink-0"
           style={{ 
             width: '4px', 
             height: '147.84px', 
             marginTop: '34.56px', 
-            marginLeft: '29px',
+            marginLeft: '4px',
             backgroundColor: accentColor 
           }}
           data-layout-id="divider-2"
