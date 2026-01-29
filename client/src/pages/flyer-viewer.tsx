@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useParams } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Phone, Mail, Calendar, Share2, MapPin,
-  Bed, Bath, Maximize, ChevronLeft, ChevronRight,
-  Facebook, Linkedin, MessageCircle, Link2, Check, Home, User
+  Mail, Calendar, Share2, MapPin,
+  Bed, Bath, Maximize,
+  Facebook, Link2, Check, Home, User
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -13,6 +13,19 @@ import type { Flyer } from '@shared/schema';
 const XIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
+
+// Custom arrow icons for photo navigation
+const ArrowLeftIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 18 9 12 15 6" />
+  </svg>
+);
+
+const ArrowRightIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 18 15 12 9 6" />
   </svg>
 );
 
@@ -61,12 +74,6 @@ export default function PublicFlyerPage() {
 
   const fullAddress = `${flyer.propertyAddress}, ${flyer.propertyCity || ''}, ${flyer.propertyState || ''} ${flyer.propertyZip || ''}`.trim();
   const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
-
-  const handleCall = () => {
-    if (flyer.agentPhone) {
-      window.location.href = `tel:${flyer.agentPhone.replace(/[^0-9+]/g, '')}`;
-    }
-  };
 
   const handleEmail = () => {
     if (flyer.agentEmail) {
@@ -130,24 +137,6 @@ Best regards`
     window.open(`https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedText}`, '_blank', 'width=600,height=400');
   };
 
-  const shareToLinkedIn = () => {
-    window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`, '_blank', 'width=600,height=400');
-  };
-
-  const shareToWhatsApp = () => {
-    window.open(`https://wa.me/?text=${encodedText}%20${encodedUrl}`, '_blank');
-  };
-
-  const shareViaSMS = () => {
-    window.location.href = `sms:?body=${encodedText}%20${encodedUrl}`;
-  };
-
-  const shareViaEmail = () => {
-    const subject = encodeURIComponent(`Property: ${flyer.propertyAddress}`);
-    const body = encodeURIComponent(`${shareText}\n\nView details: ${currentUrl}`);
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
-  };
-
   const copyLink = async () => {
     await navigator.clipboard.writeText(currentUrl);
     setLinkCopied(true);
@@ -192,24 +181,22 @@ Best regards`
           
           {photos.length > 1 && (
             <>
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <button 
                 onClick={prevPhoto} 
-                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full" 
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-white/90 hover:bg-white text-gray-800 rounded-full shadow-lg transition-all" 
                 data-testid="button-prev-photo"
+                aria-label="Previous photo"
               >
-                <ChevronLeft className="w-6 h-6" />
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
+                <ArrowLeftIcon />
+              </button>
+              <button 
                 onClick={nextPhoto} 
-                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full" 
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-white/90 hover:bg-white text-gray-800 rounded-full shadow-lg transition-all" 
                 data-testid="button-next-photo"
+                aria-label="Next photo"
               >
-                <ChevronRight className="w-6 h-6" />
-              </Button>
+                <ArrowRightIcon />
+              </button>
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5" aria-hidden="true">
                 {photos.map((_, i) => (
                   <span 
@@ -289,16 +276,6 @@ Best regards`
 
           <div className="space-y-3">
             <Button 
-              onClick={handleCall} 
-              disabled={!flyer.agentPhone}
-              className="w-full bg-[#8B7355] border-[#8B7355] text-white"
-              data-testid="button-call-agent"
-            >
-              <Phone className="w-5 h-5 mr-2" />
-              Call {flyer.agentName?.split(' ')[0] || 'Agent'}
-            </Button>
-            
-            <Button 
               variant="secondary"
               onClick={handleEmail} 
               disabled={!flyer.agentEmail}
@@ -347,7 +324,7 @@ Best regards`
             <h3 className="font-medium text-foreground">Share This Property</h3>
           </div>
 
-          <div className="grid grid-cols-4 gap-2">
+          <div className="flex justify-center gap-6">
             <div className="flex flex-col items-center gap-1.5">
               <Button 
                 variant="ghost" 
@@ -372,58 +349,6 @@ Best regards`
                 <span className="text-white"><XIcon /></span>
               </Button>
               <span className="text-xs text-muted-foreground">X</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-1.5">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={shareToLinkedIn}
-                className="rounded-full bg-[#0A66C2] border-[#0A66C2]"
-                data-testid="button-share-linkedin"
-              >
-                <Linkedin className="w-5 h-5 text-white" />
-              </Button>
-              <span className="text-xs text-muted-foreground">LinkedIn</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-1.5">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={shareToWhatsApp}
-                className="rounded-full bg-[#25D366] border-[#25D366]"
-                data-testid="button-share-whatsapp"
-              >
-                <MessageCircle className="w-5 h-5 text-white" />
-              </Button>
-              <span className="text-xs text-muted-foreground">WhatsApp</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-1.5">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={shareViaSMS}
-                className="rounded-full bg-green-500 border-green-500"
-                data-testid="button-share-sms"
-              >
-                <MessageCircle className="w-5 h-5 text-white" />
-              </Button>
-              <span className="text-xs text-muted-foreground">Text</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-1.5">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={shareViaEmail}
-                className="rounded-full bg-gray-600 border-gray-600"
-                data-testid="button-share-email"
-              >
-                <Mail className="w-5 h-5 text-white" />
-              </Button>
-              <span className="text-xs text-muted-foreground">Email</span>
             </div>
 
             <div className="flex flex-col items-center gap-1.5">
