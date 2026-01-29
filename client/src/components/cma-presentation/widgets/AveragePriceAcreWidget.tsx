@@ -11,11 +11,35 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  Cell
+  Cell,
+  ReferenceLine
 } from 'recharts';
 import type { CmaProperty } from '../types';
 import { PropertyDetailModal } from './PropertyDetailModal';
 import { extractLotAcres, extractPrice } from '@/lib/cma-data-utils';
+
+// Linear regression calculation for trendline
+function calculateLinearRegression(points: { x: number; y: number }[]): { slope: number; intercept: number } | null {
+  if (points.length < 2) return null;
+  
+  const n = points.length;
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+  
+  for (const p of points) {
+    sumX += p.x;
+    sumY += p.y;
+    sumXY += p.x * p.y;
+    sumX2 += p.x * p.x;
+  }
+  
+  const denominator = n * sumX2 - sumX * sumX;
+  if (denominator === 0) return null;
+  
+  const slope = (n * sumXY - sumX * sumY) / denominator;
+  const intercept = (sumY - slope * sumX) / n;
+  
+  return { slope, intercept };
+}
 
 interface AveragePriceAcreWidgetProps {
   comparables: CmaProperty[];
@@ -213,13 +237,6 @@ export function AveragePriceAcreWidget({
   const [showSubject, setShowSubject] = useState(true);
   const [showTrendline, setShowTrendline] = useState(true);
 
-  // Minimum lot size to exclude small residential lots where $/acre is not meaningful
-  // 0.25 acres = 10,890 sqft - ensures only properties where land value matters are included
-  const MIN_LOT_SIZE_ACRES = 0.25;
-  // Sanity checks for price per acre (Austin market)
-  const MAX_PRICE_PER_ACRE = 20_000_000; // $20M/acre max for Austin residential
-  const MIN_PRICE_PER_ACRE = 10_000; // $10K/acre minimum
-
   // Helper to calculate acres using the improved utility function
   const getAcres = (p: CmaProperty): number => {
     const acres = extractLotAcres(p);
@@ -231,42 +248,19 @@ export function AveragePriceAcreWidget({
     return extractPrice(p) ?? 0;
   };
 
-  // All properties with any acreage data (for tracking excluded count)
-  const allPropertiesWithAcreage = useMemo(() => {
-    return comparables
-      .filter(p => p.type !== 'Lease')
-      .map(p => {
-        const acres = getAcres(p);
-        return { ...p, calculatedAcres: acres };
-      })
-      .filter(p => p.calculatedAcres > 0);
-  }, [comparables]);
-
-  // Count excluded small-lot properties
-  const excludedSmallLotCount = useMemo(() => {
-    return allPropertiesWithAcreage.filter(p => p.calculatedAcres < MIN_LOT_SIZE_ACRES).length;
-  }, [allPropertiesWithAcreage]);
-
+  // Include all properties with acreage data (CloudCMA-style - no exclusions)
   const propertiesWithAcreage = useMemo<PropertyWithAcreage[]>(() => {
     const withAcreage = comparables
       .filter(p => {
         if (p.type === 'Lease') return false;
         const acres = getAcres(p);
-        // Exclude small residential lots where $/acre isn't meaningful
-        if (acres < MIN_LOT_SIZE_ACRES) return false;
         return acres > 0;
       })
       .map(p => {
         const acres = getAcres(p);
         const price = getPrice(p);
         // Calculate price per acre with existing value fallback
-        let pricePerAcre = p.pricePerAcre ?? (acres && acres > 0 && price > 0 ? Math.round(price / acres) : 0);
-        
-        // Sanity check: exclude impossible values
-        if (pricePerAcre > MAX_PRICE_PER_ACRE || pricePerAcre < MIN_PRICE_PER_ACRE) {
-          // If value is unreasonable, it's likely a data error - set to 0 to exclude from avg
-          pricePerAcre = 0;
-        }
+        const pricePerAcre = p.pricePerAcre ?? (acres && acres > 0 && price > 0 ? Math.round(price / acres) : 0);
         
         return {
           ...p,
@@ -274,11 +268,11 @@ export function AveragePriceAcreWidget({
           pricePerAcre: pricePerAcre as number,
         };
       })
-      // Filter out properties with invalid price per acre
+      // Filter out properties with zero price
       .filter(p => p.pricePerAcre > 0);
     
     return withAcreage;
-  }, [comparables, allPropertiesWithAcreage.length, excludedSmallLotCount]);
+  }, [comparables]);
 
   const groupedProperties = useMemo(() => {
     const closed = propertiesWithAcreage.filter(p => getStatusCategory(p.status) === 'closed');
@@ -330,6 +324,15 @@ export function AveragePriceAcreWidget({
     }];
   }, [subjectWithAcreage, showSubject, avgPricePerAcre]);
 
+  // Calculate linear regression from CLOSED/SOLD listings only (CloudCMA-style)
+  const regressionData = useMemo(() => {
+    const closedData = chartData.filter(d => getStatusCategory(d.status) === 'closed');
+    if (closedData.length < 2) return null;
+    
+    const points = closedData.map(d => ({ x: d.x, y: d.y }));
+    return calculateLinearRegression(points);
+  }, [chartData]);
+
   const { minAcres, maxAcres, minPrice, maxPrice, trendlineData } = useMemo(() => {
     const allAcres = chartData.map(d => d.x);
     const allPrices = chartData.map(d => d.y);
@@ -345,19 +348,26 @@ export function AveragePriceAcreWidget({
     const minA = Math.min(...allAcres) * 0.9;
     const maxA = Math.max(...allAcres) * 1.1;
     
-    // Calculate trendline endpoints: y = avgPricePerAcre * x
-    const trendMinY = avgPricePerAcre * minA;
-    const trendMaxY = avgPricePerAcre * maxA;
+    // Calculate trendline endpoints using linear regression: y = mx + b
+    let trendMinY = 0, trendMaxY = 0;
+    if (regressionData) {
+      trendMinY = regressionData.slope * minA + regressionData.intercept;
+      trendMaxY = regressionData.slope * maxA + regressionData.intercept;
+    }
     
-    // Include trendline endpoints in price range calculation
-    const pricesWithTrend = [...allPrices, trendMinY, trendMaxY].filter(p => p > 0);
-    const minP = pricesWithTrend.length > 0 ? Math.min(...pricesWithTrend) * 0.9 : 0;
-    const maxP = pricesWithTrend.length > 0 ? Math.max(...pricesWithTrend) * 1.1 : 1;
+    // Include trendline endpoints in price range calculation (if positive)
+    const pricesWithTrend = [...allPrices];
+    if (trendMinY > 0) pricesWithTrend.push(trendMinY);
+    if (trendMaxY > 0) pricesWithTrend.push(trendMaxY);
+    
+    const validPrices = pricesWithTrend.filter(p => p > 0);
+    const minP = validPrices.length > 0 ? Math.min(...validPrices) * 0.9 : 0;
+    const maxP = validPrices.length > 0 ? Math.max(...validPrices) * 1.1 : 1;
     
     // Create trendline data points (two points define the line)
-    const trendline = avgPricePerAcre > 0 ? [
-      { x: minA, y: trendMinY },
-      { x: maxA, y: trendMaxY },
+    const trendline = regressionData ? [
+      { x: minA, y: Math.max(0, trendMinY) },
+      { x: maxA, y: Math.max(0, trendMaxY) },
     ] : [];
     
     return {
@@ -367,7 +377,7 @@ export function AveragePriceAcreWidget({
       maxPrice: maxP,
       trendlineData: trendline,
     };
-  }, [chartData, subjectChartData, avgPricePerAcre]);
+  }, [chartData, subjectChartData, regressionData]);
 
   const handlePropertyClick = (property: CmaProperty) => {
     setSelectedProperty(property);
@@ -429,11 +439,6 @@ export function AveragePriceAcreWidget({
                 <p className="text-sm text-muted-foreground mt-1">
                   Comparable land sold for an average of <span className="text-[#EF4923] font-medium">{formatFullPrice(avgPricePerAcre)}</span> / acre.
                 </p>
-                {excludedSmallLotCount > 0 && (
-                  <p className="text-xs text-muted-foreground/70 mt-1">
-                    {excludedSmallLotCount} propert{excludedSmallLotCount === 1 ? 'y' : 'ies'} excluded (lots under 0.25 acres)
-                  </p>
-                )}
               </div>
               
               <div className="relative group">
@@ -447,17 +452,15 @@ export function AveragePriceAcreWidget({
                                 rounded-lg shadow-lg border border-border
                                 opacity-0 invisible group-hover:opacity-100 group-hover:visible 
                                 transition-all z-50 text-xs text-muted-foreground">
-                  <p className="font-medium text-foreground mb-1">How This Is Calculated</p>
+                  <p className="font-medium text-foreground mb-1">PRICE/ACRE SCATTER CHART</p>
                   <p>
-                    The average price per acre is calculated by dividing each property's sale price by its lot size in acres, 
-                    then averaging the results from <span className="font-medium text-foreground">closed/sold properties only</span>.
+                    The price/acre scatter chart is a way to visualize the trend between the price and acreage of the home.
                   </p>
                   <p className="mt-2">
-                    <span className="font-medium text-foreground">Note:</span> Properties with lots under 0.25 acres (10,890 sqft) are excluded 
-                    because price-per-acre is not a meaningful metric for small residential lots where home value dominates land value.
+                    A trendline will be drawn to show the <span className="font-medium text-foreground">correlation between price and acreage</span> across the sold listings.
                   </p>
                   <p className="mt-2 text-muted-foreground/70">
-                    The trendline shows the average $/acre rate. Properties below may be undervalued; those above may be premium-priced.
+                    The average $/acre is calculated by dividing each sold property's price by its lot size in acres, then averaging the results.
                   </p>
                 </div>
               </div>
@@ -577,7 +580,7 @@ export function AveragePriceAcreWidget({
                 data-testid="checkbox-show-trendline"
               />
               <span className="w-6 h-0.5 bg-muted-foreground border-t border-dashed" />
-              <span className="text-muted-foreground">Trendline (avg price/acre of SOLD)</span>
+              <span className="text-muted-foreground">Trendline represents average price per acre of SOLD listings.</span>
             </label>
             <div className="flex items-center gap-4 ml-auto">
               <div className="flex items-center gap-1.5">

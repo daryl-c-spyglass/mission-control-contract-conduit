@@ -1,0 +1,97 @@
+Here’s a clear overview of **how CloudCMA calculates its *Price per Acre* and related scatter chart data**, what it means, and where you can find more information and supporting resources.
+
+---
+
+## 🧠 What CloudCMA Does (General CMA Context)
+
+**CloudCMA** is a real estate CMA (Comparative Market Analysis) software that helps agents create CMA reports using live MLS data pulled from your MLS provider. It’s designed to help you analyze *comparable properties (comps)* to estimate *fair market value* for a subject property. ([Lwolf Community][1])
+
+* CMA = *Comparative Market Analysis*: an estimate of market value based on recent sales and active listings of similar properties. ([Real Estate Witch][2])
+* CloudCMA pulls accessible MLS data (sale prices, list prices, property metrics) and uses that as the foundation for all analytics in its reports. ([Lwolf Community][1])
+
+---
+
+## 📊 How *Price/Acre* Is Calculated in CMA Reports
+
+CloudCMA doesn’t publish public technical documentation on *exact internal formulas* for charts (e.g., Price/Acre scatter plots). However, based on what *CMA data outputs represent* and how CMAs are built, here’s how this metric is generally derived:
+
+### 💡 Components Used
+
+1. **Raw MLS data**
+
+   * Sale price and list price from recent comparable properties.
+   * Property attribute data including *lot size (in acres)*.
+     CloudCMA includes fields like *Average Price per Acre* in its CMA data pages. ([Cloud CMA][3])
+
+2. **Base calculation principle**
+   Price per Acre for each comparable property =
+   **Sale Price ÷ Lot Size (in acres)**
+   (Lot size is typically reported by the MLS.)
+   This formula is a common standard in land pricing and real estate analytics. ([omnicalculator.com][4])
+   — *Example:* If a property sold for $500,000 and has 2.5 acres, then Price/Acre = $200,000/acre.
+
+3. **Aggregation for charts**
+
+   * When CloudCMA plots a scatter chart (e.g., price/acre vs year or lot size), each point likely represents a *comparable sale’s Price/Acre* computed as above.
+   * Tools like CloudCMA allow formatting charts under “Average Price per Acre” or “Average pricing” pages. ([Cloud CMA][3])
+
+### 📈 Scatter Chart Purpose
+
+A typical *Price per Acre plot* in a CMA helps visualize:
+
+* How land value (price per acre) varies across recent sales.
+* Whether the subject property’s pricing is in line with local market trends.
+* Outliers or trends based on parcel size.
+
+Agents use it to justify pricing decisions when presenting to sellers or buyers.
+
+---
+
+## 📌 How It Fits Into a CMA Workflow
+
+CloudCMA’s process roughly follows these steps:
+
+1. **Select subject property & comps** – choose recently sold properties similar in location, lot size, and features. ([Support Hub][5])
+2. **Fetch MLS data** – automatically pulls in price, acreage, sale date, etc. ([Lwolf Community][1])
+3. **Compute price metrics** – standard fields like Price/SqFt or Price/Acre will be derived from MLS values.
+4. **Display as charts/tables** – reports include summary stats and visual analytics. ([Cloud CMA][3])
+
+> *Note:* CloudCMA itself doesn’t replace an appraisal — it is a comparative tool based on *comps selected and MLS data*, with agent judgment layered in. ([Real Estate Witch][2])
+
+---
+
+## 📚 Resources & References
+
+### Official & Support
+
+* **Cloud CMA Website (official product info)** – overview of software and what reports include. ([Cloud CMA][6])
+* **Cloud CMA About Reports** – conceptual overview of CMA report types and data integration. ([Lwolf Community][1])
+* **Support YouTube / Training** – Cloud CMA tutorials showing report creation and analytics. ([youtube.com][7])
+
+### Real Estate CMA Background
+
+* **What a CMA Is and How Agents Use It** – general principles of CMA and pricing metrics. ([Real Estate Witch][2])
+* **Price per Acre Explanation** – generic formula and use case for land pricing. ([omnicalculator.com][4])
+
+---
+
+## 🔍 Summary
+
+| **Metric / Concept**     | **Explanation**                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Price per Acre**       | Sale price of a property divided by its lot size in acres. ([omnicalculator.com][4])                                           |
+| **CloudCMA Source Data** | Pulled from MLS: sale price + lot size + additional attributes for comps. ([Lwolf Community][1])                               |
+| **Scatter Chart**        | Visual plot of Price/Acre points across comparable sales (likely sorted by lot size, date, etc.). Informing pricing decisions. |
+| **Report Inclusion**     | CMA includes “Average Price/Acre” and related summaries as part of analytics. ([Cloud CMA][3])                                 |
+
+---
+
+If you want, I can help you **locate specific examples of CloudCMA output (e.g., sample reports with Price/Acre charts)** or show how to derive scatter plots from MLS export data step-by-step. Just let me know!
+
+[1]: https://community.lwolf.com/s/article/CCMA-About-Reports?utm_source=chatgpt.com "About reports (Cloud CMA)"
+[2]: https://www.realestatewitch.com/what-is-a-cma-in-real-estate-comparative-market-analysis/?utm_source=chatgpt.com "What's a CMA in Real Estate? Step-by-Step Guide with Examples"
+[3]: https://cloudcma.com/live/8fedfbed4b561237b4518e1c3a0ffd22?utm_source=chatgpt.com "Real Estate CMA Software For Agents | Cloud CMA"
+[4]: https://www.omnicalculator.com/everyday-life/price-per-acre?utm_source=chatgpt.com "Price per Acre Calculator"
+[5]: https://supporthub.realtracs.com/cma-using-the-cloud-cma-tool?utm_source=chatgpt.com "CMA: Using the Cloud CMA Tool - Realtracs"
+[6]: https://cloudcma.com/?utm_source=chatgpt.com "Real Estate CMA Software For Agents | Cloud CMA"
+[7]: https://www.youtube.com/watch?v=2BDlj17ryqw&utm_source=chatgpt.com "Cloud CMA Training for Real Estate Agents: Creating Effective CMAs ..."
