@@ -134,7 +134,7 @@ export function CropModal({
 
         <div
           ref={containerRef}
-          className="relative overflow-hidden rounded-lg bg-gray-100 cursor-move select-none"
+          className="relative overflow-hidden rounded-lg bg-muted cursor-move select-none"
           style={{
             aspectRatio: aspectRatio,
             maxHeight: '400px',

@@ -63,7 +63,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   }, []);
 
   const [showGrid, setShowGrid] = useState(false);
-  const [scale, setScale] = useState<string>('1'); // Default to 100%
+  const [scale, setScale] = useState<string>('0.75'); // Default to 75%
   const [imageTransforms, setImageTransforms] = useState<ImageTransforms>({ ...DEFAULT_TRANSFORMS });
 
   const { data: marketingProfile } = useMarketingProfile();
