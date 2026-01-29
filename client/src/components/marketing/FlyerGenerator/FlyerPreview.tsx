@@ -258,14 +258,14 @@ export function FlyerPreview({
           </p>
         </div>
 
-        {/* Divider 2 @ 697.72px: 4px width, 21px margin-left (per reference) */}
+        {/* Divider 2: 4px width, 29px margin-left (moved 8px right) */}
         <div
           className="flex-shrink-0"
           style={{ 
             width: '4px', 
             height: '147.84px', 
             marginTop: '34.56px', 
-            marginLeft: '21px',
+            marginLeft: '29px',
             backgroundColor: accentColor 
           }}
           data-layout-id="divider-2"
