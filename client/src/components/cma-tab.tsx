@@ -73,7 +73,8 @@ import {
   Trash2,
   Loader2,
   AlertCircle,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw
 } from "lucide-react";
 
 const STATUS_FILTERS = [
@@ -440,6 +441,27 @@ export function CMATab({ transaction }: CMATabProps) {
     },
   });
 
+  const refreshMlsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', `/api/transactions/${transaction.id}/refresh-mls`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id] });
+      toast({
+        title: 'MLS Data Refreshed',
+        description: 'Property data and comparables have been updated from MLS',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Failed to Refresh MLS Data',
+        description: 'Could not sync data from MLS. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const clearCmaMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest('DELETE', `/api/transactions/${transaction.id}/cma`);
@@ -616,9 +638,31 @@ export function CMATab({ transaction }: CMATabProps) {
                 </Alert>
               )}
 
-              {!isClosedListing && (
+              {!isClosedListing && transaction.mlsNumber && (
+                <div className="flex flex-col items-center gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    Click the button below to refresh MLS data and fetch comparable properties.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => refreshMlsMutation.mutate()}
+                    disabled={refreshMlsMutation.isPending}
+                    data-testid="button-refresh-mls-cma"
+                  >
+                    {refreshMlsMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    Refresh MLS Data
+                  </Button>
+                </div>
+              )}
+
+              {!isClosedListing && !transaction.mlsNumber && (
                 <p className="text-sm text-muted-foreground">
-                  Try clicking "Refresh MLS Data" to fetch comparable properties.
+                  Add an MLS number to this transaction to fetch comparable properties.
                 </p>
               )}
             </div>
@@ -836,9 +880,25 @@ export function CMATab({ transaction }: CMATabProps) {
 
 
 
-      {/* Clear CMA Button - always show when CMA data exists */}
+      {/* Refresh MLS & Clear CMA Buttons - always show when CMA data exists */}
       {cmaData && cmaData.length > 0 && (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          {transaction.mlsNumber && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => refreshMlsMutation.mutate()}
+              disabled={refreshMlsMutation.isPending}
+              data-testid="button-refresh-mls-cma-header"
+            >
+              {refreshMlsMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-2" />
+              )}
+              Refresh MLS Data
+            </Button>
+          )}
           <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" size="sm" data-testid="button-clear-cma">
