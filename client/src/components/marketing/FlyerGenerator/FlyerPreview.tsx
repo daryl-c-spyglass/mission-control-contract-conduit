@@ -112,9 +112,12 @@ export function FlyerPreview({
         {data.address || 'PROPERTY ADDRESS'}
       </div>
 
-      {/* Main Photo - Grid rows 2-3, columns 1-4 (spans full width minus margins) */}
-      {/* Position: starts at row 2 top (~120px), height spans ~2.5 grid rows (~330px) */}
-      <div className="absolute left-6 top-[120px] w-[768px] h-[340px] rounded-lg overflow-hidden bg-gray-200">
+      {/* Main Photo - Exact coordinates from reference project */}
+      {/* Position: x: 48, y: 156, width: 720, height: 360 */}
+      <div 
+        className="absolute left-[48px] top-[156px] w-[720px] h-[360px] rounded-lg overflow-hidden bg-gray-200"
+        data-layout-id="main-photo"
+      >
         {images.mainImage ? (
           <img
             src={images.mainImage}
@@ -129,10 +132,17 @@ export function FlyerPreview({
         )}
       </div>
 
-      {/* Bottom Photos - Grid row 4, Kitchen spans columns 1-2, Room spans columns 3-4 */}
-      {/* Gap between main and bottom photos: 14px, each photo exactly half width minus gap */}
-      <div className="absolute left-6 top-[474px] w-[768px] flex gap-[12px]">
-        <div className="w-[378px] h-[252px] rounded-lg overflow-hidden bg-gray-200">
+      {/* Bottom Photos - Exact coordinates from reference project */}
+      {/* photo-2: x: 48, y: 530, width: 355, height: 230 */}
+      {/* photo-3: x: 413 (48 + 355 + 10 gap), y: 530, width: 355, height: 230 */}
+      <div 
+        className="absolute left-[48px] top-[530px] w-[720px] flex gap-[10px]"
+        data-layout-id="secondary-photos-row"
+      >
+        <div 
+          className="w-[355px] h-[230px] rounded-lg overflow-hidden bg-gray-200"
+          data-layout-id="photo-2"
+        >
           {images.kitchenImage ? (
             <img
               src={images.kitchenImage}
@@ -146,7 +156,10 @@ export function FlyerPreview({
             </div>
           )}
         </div>
-        <div className="w-[378px] h-[252px] rounded-lg overflow-hidden bg-gray-200">
+        <div 
+          className="w-[355px] h-[230px] rounded-lg overflow-hidden bg-gray-200"
+          data-layout-id="photo-3"
+        >
           {images.roomImage ? (
             <img
               src={images.roomImage}
@@ -162,12 +175,15 @@ export function FlyerPreview({
         </div>
       </div>
 
-      {/* Bottom Section - Grid row 5: 4-column layout matching reference grid */}
-      {/* Column widths: 192px each (768px / 4 columns) */}
+      {/* Bottom Section - starts after photos end (530 + 230 = 760px) */}
+      {/* Position: x: 48, y: 774 (with 14px gap after photos), width: 720 */}
       {/* Col 1: Property details | Col 2-3: Description | Col 4: Agent info */}
-      <div className="absolute left-6 top-[740px] w-[768px] h-[296px] flex">
-        {/* Column 1: Property Details (192px) */}
-        <div className="w-[192px] pt-[20px] pl-2 flex-shrink-0">
+      <div 
+        className="absolute left-[48px] top-[774px] w-[720px] h-[268px] flex"
+        data-layout-id="bottom-section"
+      >
+        {/* Column 1: Property Details (180px = 720/4) */}
+        <div className="w-[180px] pt-[20px] pl-2 flex-shrink-0" data-layout-id="stats">
           <div className="flex items-center gap-2 mb-4 text-[12pt] whitespace-nowrap">
             <svg className="w-[28px] h-[28px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
               <path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/>
@@ -195,8 +211,8 @@ export function FlyerPreview({
           style={{ backgroundColor: accentColor }}
         />
 
-        {/* Columns 2-3: Description (384px - 2 columns) */}
-        <div className="w-[384px] pl-6 pr-4 flex-shrink-0">
+        {/* Columns 2-3: Description (360px - 2 columns) */}
+        <div className="w-[360px] pl-5 pr-3 flex-shrink-0" data-layout-id="description-column">
           <h3 className="text-[10pt] font-medium uppercase tracking-[2px] leading-[1.3] mb-3 mt-2 text-gray-700">
             {data.introHeading || 'Property Headline'}
           </h3>
@@ -211,8 +227,8 @@ export function FlyerPreview({
           style={{ backgroundColor: accentColor }}
         />
 
-        {/* Column 4: Agent Info (192px) */}
-        <div className="w-[192px] pl-4 flex flex-col items-center pt-2 flex-shrink-0">
+        {/* Column 4: Agent Info (180px = 720/4) */}
+        <div className="w-[180px] pl-3 flex flex-col items-center pt-2 flex-shrink-0" data-layout-id="agent-card">
           <div className="flex gap-3 items-center mb-2">
             <div className="w-[80px] h-[80px] rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
               {images.agentPhoto ? (

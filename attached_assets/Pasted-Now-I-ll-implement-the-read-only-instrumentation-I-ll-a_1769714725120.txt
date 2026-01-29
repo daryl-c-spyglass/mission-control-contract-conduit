@@ -1,0 +1,68 @@
+Now I'll implement the read-only instrumentation. I'll add:
+
+data-layout-id attributes to all layout blocks
+A measurement function that captures coordinates
+Console logging of the layout map
+A dev-only export button
+The instrumentation is working. The console logs show FLYER_LAYOUT_COORDINATES_READ_ONLY being logged with all the layout blocks. Let me run a quick e2e test to verify the application still works correctly and the export button functions properly.
+
+The instrumentation is complete and verified. Let me have the architect review these changes.
+
+Good catch by the review. I need to fix two issues:
+
+Measurements are at 0.65 scale - need to normalize to 1.0
+Layout logging should happen before PNG/CMYK export
+The scale normalization is now working correctly. The console logs show:
+
+Canvas: 816 x 1056 px (correct 1.0 scale)
+All coordinates are now normalized to true flyer dimensions
+✅ Layout Instrumentation Complete
+What Was Added (Read-Only)
+1. Data Attributes on Layout Blocks:
+
+flyer-canvas - Main canvas container
+header-section - Header area
+accent-bar - Gold vertical bar
+logo-primary - Main company logo
+logo-secondary - Secondary logo
+price-box - Price badge
+address - Property address
+main-photo - Hero property image
+secondary-photos-row - Container for smaller photos
+photo-2 - Kitchen image
+photo-3 - Room image
+bottom-section - Bottom 3-column area
+stats - Beds/baths/sqft stats
+description-column - Description area
+headline - Intro heading
+description - Intro text
+agent-card - Agent info section
+agent-photo - Agent headshot
+qr-code - QR code block
+2. Console Logging:
+
+FLYER_LAYOUT_COORDINATES_READ_ONLY logged on initial render
+Also logged before PNG/CMYK export
+3. Export Layout JSON Button:
+
+Ghost icon button (FileJson icon) in header
+Downloads flyer-layout.json with all coordinates
+Shows toast notification on success
+4. Scale Normalization:
+
+Coordinates are normalized to 1.0 scale (816x1056)
+Regardless of preview scale (0.65)
+Sample Output
+{
+  "canvas": { "width": 816, "height": 1056 },
+  "blocks": [
+    { "id": "main-photo", "x": 48, "y": 156, "width": 720, "height": 360, "zIndex": 0 },
+    { "id": "photo-2", "x": 48, "y": 530, "width": 355, "height": 230, "zIndex": 0 },
+    ...
+  ],
+  "timestamp": "2026-01-29T..."
+}
+Unchanged
+All flyer visuals remain pixel-identical
+No layout, styling, or behavioral changes
+Export PNG/CMYK functionality unchanged

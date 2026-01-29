@@ -135,16 +135,15 @@
             font-weight: 500;
         }
         
-        /* Main Image - Grid rows 2-3, columns 1-4 (full width minus margins) */
-        /* left: 24px * 3.125 = 75px, top: 120px * 3.125 = 375px */
-        /* w: 768px * 3.125 = 2400px, h: 340px * 3.125 = 1063px */
-        /* rounded-lg -> 8px * 3.125 = 25px */
+        /* Main Image - Exact coordinates from reference project (scaled 3.125x) */
+        /* Preview: x: 48, y: 156, w: 720, h: 360 */
+        /* PDF: 48*3.125=150, 156*3.125=488, 720*3.125=2250, 360*3.125=1125 */
         .main-image-container {
             position: absolute;
-            left: 75px;
-            top: 375px;
-            width: 2400px;
-            height: 1063px;
+            left: 150px;
+            top: 488px;
+            width: 2250px;
+            height: 1125px;
             border-radius: 25px;
             overflow: hidden;
             background: #e5e7eb;
@@ -156,21 +155,22 @@
             object-fit: cover;
         }
         
-        /* Secondary Images Row - Grid row 4, each photo spans 2 columns */
-        /* top: 474px * 3.125 = 1481px, gap: 12px * 3.125 = 38px */
+        /* Secondary Images Row - Exact coordinates from reference (scaled 3.125x) */
+        /* Preview: x: 48, y: 530, w: 720, gap: 10 */
+        /* PDF: 48*3.125=150, 530*3.125=1656, 720*3.125=2250, 10*3.125=31 */
         .secondary-images {
             position: absolute;
-            left: 75px;
-            top: 1481px;
-            width: 2400px;
+            left: 150px;
+            top: 1656px;
+            width: 2250px;
             display: flex;
-            gap: 38px;
+            gap: 31px;
         }
         
-        /* Secondary Image - 378px * 3.125 = 1181px wide, 252px * 3.125 = 788px tall */
+        /* Secondary Image - Preview: 355x230, PDF: 355*3.125=1109, 230*3.125=719 */
         .secondary-image-container {
-            width: 1181px;
-            height: 788px;
+            width: 1109px;
+            height: 719px;
             border-radius: 25px;
             overflow: hidden;
             background: #e5e7eb;
@@ -182,21 +182,22 @@
             object-fit: cover;
         }
         
-        /* Footer Section - Grid row 5: starts after bottom photos */
-        /* top: 740px * 3.125 = 2313px, h: 296px * 3.125 = 925px */
+        /* Footer Section - starts after photos (530 + 230 + 14 gap = 774px) */
+        /* Preview: x: 48, y: 774, w: 720, h: 268 */
+        /* PDF: 150, 2419, 2250, 838 */
         .footer-section {
             position: absolute;
-            left: 75px;
-            top: 2313px;
-            right: 75px;
-            height: 925px;
+            left: 150px;
+            top: 2419px;
+            width: 2250px;
+            height: 838px;
             display: flex;
         }
         
-        /* Property Details Column - 4-column grid layout */
-        /* Column 1: 192px * 3.125 = 600px, pt-[20px] -> 63px, pl-2 -> 6px */
+        /* Property Details Column - 4-column grid layout (720/4 = 180px per col) */
+        /* Column 1: 180px * 3.125 = 563px, pt-[20px] -> 63px, pl-2 -> 6px */
         .property-details {
-            width: 600px;
+            width: 563px;
             padding-top: 63px;
             padding-left: 6px;
             flex-shrink: 0;
@@ -234,12 +235,12 @@
             flex-shrink: 0;
         }
         
-        /* Description Section - Columns 2-3: 384px * 3.125 = 1200px */
-        /* pl-6 (24px) -> 75px, pr-4 (16px) -> 50px */
+        /* Description Section - Columns 2-3: 360px * 3.125 = 1125px */
+        /* pl-5 (20px) -> 63px, pr-3 (12px) -> 38px */
         .description-section {
-            width: 1200px;
-            padding-left: 75px;
-            padding-right: 50px;
+            width: 1125px;
+            padding-left: 63px;
+            padding-right: 38px;
             flex-shrink: 0;
         }
         
@@ -275,11 +276,11 @@
             flex-shrink: 0;
         }
         
-        /* Agent Section - Column 4: 192px * 3.125 = 600px */
-        /* pl-4 (16px) -> 50px, pt-2 (8px) -> 25px */
+        /* Agent Section - Column 4: 180px * 3.125 = 563px */
+        /* pl-3 (12px) -> 38px, pt-2 (8px) -> 25px */
         .agent-section {
-            width: 600px;
-            padding-left: 50px;
+            width: 563px;
+            padding-left: 38px;
             display: flex;
             flex-direction: column;
             align-items: center;
