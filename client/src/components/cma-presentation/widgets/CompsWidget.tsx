@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, Map as MapIcon, TrendingUp, List, LayoutGrid, Table2, Bed, Bath, Square, Clock, MapPin, Home, AlertTriangle } from 'lucide-react';
+import { BarChart3, Map as MapIcon, TrendingUp, List, LayoutGrid, Table2, Bed, Bath, Square, Clock, MapPin, Home, AlertTriangle, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { CMAMap } from '@/components/cma-map';
 import { PropertyDetailModal } from './PropertyDetailModal';
 import { extractPrice, extractSqft, extractDOM, calculatePricePerSqft, getCityState } from '@/lib/cma-data-utils';
@@ -166,12 +166,16 @@ function StatItem({
   label, 
   value, 
   subtext, 
-  subtextColor = 'text-muted-foreground' 
+  subtextColor = 'text-muted-foreground',
+  vsMarketPercent,
+  yourValue
 }: { 
   label: string; 
   value: string; 
   subtext?: string;
   subtextColor?: string;
+  vsMarketPercent?: number | null;
+  yourValue?: string;
 }) {
   const testId = `stat-${label.toLowerCase().replace(/[\s/]+/g, '-')}`;
   return (
@@ -180,6 +184,17 @@ function StatItem({
         {label}
       </p>
       <p className="text-lg font-bold" data-testid={`${testId}-value`}>{value}</p>
+      {vsMarketPercent !== undefined && vsMarketPercent !== null && (
+        <p className={`text-xs flex items-center justify-center gap-0.5 ${vsMarketPercent > 0 ? 'text-red-500' : 'text-green-500'}`} data-testid={`${testId}-vs-market`}>
+          {vsMarketPercent > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+          {Math.abs(vsMarketPercent).toFixed(1)}% vs market
+        </p>
+      )}
+      {yourValue && (
+        <p className="text-xs text-muted-foreground" data-testid={`${testId}-your`}>
+          Your: {yourValue}
+        </p>
+      )}
       {subtext && (
         <p className={`text-xs ${subtextColor}`}>{subtext}</p>
       )}
@@ -464,34 +479,56 @@ export function CompsWidget({ comparables, subjectProperty }: CompsWidgetProps) 
           ))}
         </div>
         
-        {statistics && (
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 p-4 bg-muted/50 rounded-lg" data-testid="stats-summary">
-            <StatItem 
-              label="LOW PRICE" 
-              value={formatCurrency(statistics.price.range.min)} 
-            />
-            <StatItem 
-              label="HIGH PRICE" 
-              value={formatCurrency(statistics.price.range.max)} 
-            />
-            <StatItem 
-              label="AVG PRICE" 
-              value={formatCurrency(statistics.price.average)}
-            />
-            <StatItem 
-              label="MEDIAN" 
-              value={formatCurrency(statistics.price.median)} 
-            />
-            <StatItem 
-              label="AVG $/SQFT" 
-              value={`$${Math.round(statistics.pricePerSqFt.average)}`} 
-            />
-            <StatItem 
-              label="AVG DOM" 
-              value={`${Math.round(statistics.daysOnMarket.average)} days`} 
-            />
-          </div>
-        )}
+        {statistics && (() => {
+          // Calculate subject property values for "vs market" comparison
+          const subjectPrice = subjectProperty ? extractPrice(subjectProperty) : null;
+          const subjectSqft = subjectProperty ? extractSqft(subjectProperty) : null;
+          const subjectPricePerSqft = (subjectPrice && subjectSqft && subjectSqft > 0) 
+            ? subjectPrice / subjectSqft 
+            : null;
+          
+          // Calculate % difference vs market average
+          const priceVsMarket = (statistics.price.average > 0 && subjectPrice && subjectPrice > 0)
+            ? ((subjectPrice - statistics.price.average) / statistics.price.average) * 100
+            : null;
+          
+          const pricePerSqftVsMarket = (statistics.pricePerSqFt.average > 0 && subjectPricePerSqft && subjectPricePerSqft > 0)
+            ? ((subjectPricePerSqft - statistics.pricePerSqFt.average) / statistics.pricePerSqFt.average) * 100
+            : null;
+          
+          return (
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4 p-4 bg-muted/50 rounded-lg" data-testid="stats-summary">
+              <StatItem 
+                label="LOW PRICE" 
+                value={formatCurrency(statistics.price.range.min)} 
+              />
+              <StatItem 
+                label="HIGH PRICE" 
+                value={formatCurrency(statistics.price.range.max)} 
+              />
+              <StatItem 
+                label="AVG PRICE" 
+                value={formatCurrency(statistics.price.average)}
+                vsMarketPercent={priceVsMarket}
+                yourValue={subjectPrice ? formatCurrency(subjectPrice) : undefined}
+              />
+              <StatItem 
+                label="MEDIAN" 
+                value={formatCurrency(statistics.price.median)} 
+              />
+              <StatItem 
+                label="AVG $/SQFT" 
+                value={`$${Math.round(statistics.pricePerSqFt.average)}`}
+                vsMarketPercent={pricePerSqftVsMarket}
+                yourValue={subjectPricePerSqft ? `$${Math.round(subjectPricePerSqft)}` : undefined}
+              />
+              <StatItem 
+                label="AVG DOM" 
+                value={`${Math.round(statistics.daysOnMarket.average)} days`} 
+              />
+            </div>
+          );
+        })()}
         
         {mainView === 'compare' && (
           <div className="flex items-center gap-2 flex-wrap" data-testid="view-toggles">

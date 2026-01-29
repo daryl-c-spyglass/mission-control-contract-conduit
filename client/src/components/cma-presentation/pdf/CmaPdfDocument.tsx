@@ -131,13 +131,15 @@ const AgentResumePage = ({ agent, slideNumber, totalSlides, logoBase64 }: { agen
 };
 
 const ComparablesSummaryPage = ({ 
-  comparables, 
+  comparables,
+  subjectProperty,
   propertyAddress,
   slideNumber, 
   totalSlides,
   logoBase64
 }: { 
-  comparables: CmaProperty[]; 
+  comparables: CmaProperty[];
+  subjectProperty?: CmaProperty;
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
@@ -145,12 +147,29 @@ const ComparablesSummaryPage = ({
 }) => {
   const stats = calculateCMAStats(comparables);
   
+  // Calculate subject property values for "vs market" comparison
+  const subjectPrice = subjectProperty ? extractPrice(subjectProperty) : null;
+  const subjectSqft = subjectProperty ? extractSqft(subjectProperty) : null;
+  const subjectPricePerSqft = (subjectPrice && subjectSqft && subjectSqft > 0) 
+    ? subjectPrice / subjectSqft 
+    : null;
+  
+  // Calculate % difference vs market average
+  const priceVsMarket = (stats.avgPrice && stats.avgPrice > 0 && subjectPrice && subjectPrice > 0)
+    ? ((subjectPrice - stats.avgPrice) / stats.avgPrice) * 100
+    : null;
+  
+  const avgPricePerSqft = stats.avgPricePerSqft ?? null;
+  const pricePerSqftVsMarket = (avgPricePerSqft && avgPricePerSqft > 0 && subjectPricePerSqft && subjectPricePerSqft > 0)
+    ? ((subjectPricePerSqft - avgPricePerSqft) / avgPricePerSqft) * 100
+    : null;
+  
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>
       <PageHeader title="COMPS" slideNumber={slideNumber} totalSlides={totalSlides} />
       <View style={styles.content}>
-        {/* Stats boxes matching Preview */}
-        <View style={{ flexDirection: 'row', gap: 16, marginBottom: 16 }}>
+        {/* Stats boxes matching Preview with market comparison */}
+        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
           <View style={{ flex: 1, backgroundColor: '#fafafa', padding: 12, borderRadius: 4, alignItems: 'center' }}>
             <Text style={{ fontSize: 18, fontWeight: 700, color: '#EF4923' }}>{comparables.length}</Text>
             <Text style={{ fontSize: 12, color: '#71717a' }}>Properties</Text>
@@ -158,6 +177,26 @@ const ComparablesSummaryPage = ({
           <View style={{ flex: 1, backgroundColor: '#fafafa', padding: 12, borderRadius: 4, alignItems: 'center' }}>
             <Text style={{ fontSize: 18, fontWeight: 700, color: '#222222' }}>{stats.avgPrice ? formatPrice(stats.avgPrice) : 'N/A'}</Text>
             <Text style={{ fontSize: 12, color: '#71717a' }}>Avg Price</Text>
+            {priceVsMarket !== null && (
+              <Text style={{ fontSize: 10, color: priceVsMarket > 0 ? '#ef4444' : '#22c55e', marginTop: 2 }}>
+                {priceVsMarket > 0 ? '↗' : '↘'} {Math.abs(priceVsMarket).toFixed(1)}% vs market
+              </Text>
+            )}
+            {subjectPrice && (
+              <Text style={{ fontSize: 10, color: '#71717a', marginTop: 1 }}>Your: {formatPrice(subjectPrice)}</Text>
+            )}
+          </View>
+          <View style={{ flex: 1, backgroundColor: '#fafafa', padding: 12, borderRadius: 4, alignItems: 'center' }}>
+            <Text style={{ fontSize: 18, fontWeight: 700, color: '#222222' }}>{avgPricePerSqft ? `$${Math.round(avgPricePerSqft)}` : 'N/A'}</Text>
+            <Text style={{ fontSize: 12, color: '#71717a' }}>Avg $/SqFt</Text>
+            {pricePerSqftVsMarket !== null && (
+              <Text style={{ fontSize: 10, color: pricePerSqftVsMarket > 0 ? '#ef4444' : '#22c55e', marginTop: 2 }}>
+                {pricePerSqftVsMarket > 0 ? '↗' : '↘'} {Math.abs(pricePerSqftVsMarket).toFixed(1)}% vs market
+              </Text>
+            )}
+            {subjectPricePerSqft && (
+              <Text style={{ fontSize: 10, color: '#71717a', marginTop: 1 }}>Your: ${Math.round(subjectPricePerSqft)}</Text>
+            )}
           </View>
           <View style={{ flex: 1, backgroundColor: '#fafafa', padding: 12, borderRadius: 4, alignItems: 'center' }}>
             <Text style={{ fontSize: 18, fontWeight: 700, color: '#222222' }}>{stats.avgDOM !== null ? `${Math.round(stats.avgDOM)} days` : 'N/A'}</Text>
@@ -892,7 +931,7 @@ export function CmaPdfDocument({
             return <ClientTestimonialsPage key={widget.id} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} logoBase64={logoBase64} />;
           
           case 'comps':
-            return <ComparablesSummaryPage key={widget.id} comparables={comparables} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} logoBase64={logoBase64} />;
+            return <ComparablesSummaryPage key={widget.id} comparables={comparables} subjectProperty={subjectProperty} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} logoBase64={logoBase64} />;
           
           case 'time_to_sell':
             return <TimeToSellPage key={widget.id} averageDaysOnMarket={avgDom} comparables={comparables} propertyAddress={propertyAddress} slideNumber={slideNum} totalSlides={totalSlides} logoBase64={logoBase64} />;

@@ -12,7 +12,7 @@ import {
   getStatusColor,
   getPrimaryPhoto,
 } from '@/lib/cma-data-utils';
-import { Home, MapPin, Calendar, Ruler, DollarSign, Clock, User, Building, FileText, Play, MessageSquare, TrendingUp, Link } from 'lucide-react';
+import { Home, MapPin, Calendar, Ruler, DollarSign, Clock, User, Building, FileText, Play, MessageSquare, TrendingUp, Link, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import type { AgentProfile, CmaProperty } from '../types';
 import { WIDGETS, LISTING_ACTION_PLAN_TEXT, MARKETING_TEXT, GOOGLE_REVIEWS_URL, SAMPLE_REVIEWS } from '../constants/widgets';
 
@@ -95,7 +95,7 @@ export function generatePreviewSlides({
           : stats.avgPrice === null 
             ? 'Price data not available' 
             : undefined;
-        slideContent = <CompsContent comparables={comparables} stats={stats} />;
+        slideContent = <CompsContent comparables={comparables} stats={stats} subjectProperty={subjectProperty} />;
         break;
 
       case 'time_to_sell':
@@ -423,13 +423,31 @@ function MarketingContent() {
   );
 }
 
-function CompsContent({ comparables, stats }: { 
+function CompsContent({ comparables, stats, subjectProperty }: { 
   comparables: CmaProperty[]; 
   stats: ReturnType<typeof calculateCMAStats>;
+  subjectProperty?: CmaProperty;
 }) {
+  // Calculate subject property values for "vs market" comparison
+  const subjectPrice = subjectProperty ? extractPrice(subjectProperty) : null;
+  const subjectSqft = subjectProperty ? extractSqft(subjectProperty) : null;
+  const subjectPricePerSqft = (subjectPrice && subjectSqft && subjectSqft > 0) 
+    ? subjectPrice / subjectSqft 
+    : null;
+  
+  // Calculate % difference vs market average
+  const priceVsMarket = (stats.avgPrice && stats.avgPrice > 0 && subjectPrice && subjectPrice > 0)
+    ? ((subjectPrice - stats.avgPrice) / stats.avgPrice) * 100
+    : null;
+  
+  const avgPricePerSqft = stats.avgPricePerSqft ?? null;
+  const pricePerSqftVsMarket = (avgPricePerSqft && avgPricePerSqft > 0 && subjectPricePerSqft && subjectPricePerSqft > 0)
+    ? ((subjectPricePerSqft - avgPricePerSqft) / avgPricePerSqft) * 100
+    : null;
+  
   return (
     <div className="flex flex-col h-full">
-      <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-4 gap-3 mb-4">
         <div className="bg-zinc-50 p-3 rounded text-center">
           <p className="text-lg font-bold text-[#EF4923]">{comparables.length}</p>
           <p className="text-xs text-zinc-500">Properties</p>
@@ -437,6 +455,28 @@ function CompsContent({ comparables, stats }: {
         <div className="bg-zinc-50 p-3 rounded text-center">
           <p className="text-lg font-bold text-[#222222]">{stats.avgPrice ? formatPrice(stats.avgPrice) : 'N/A'}</p>
           <p className="text-xs text-zinc-500">Avg Price</p>
+          {priceVsMarket !== null && (
+            <p className={`text-[10px] flex items-center justify-center gap-0.5 ${priceVsMarket > 0 ? 'text-red-500' : 'text-green-500'}`}>
+              {priceVsMarket > 0 ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
+              {Math.abs(priceVsMarket).toFixed(1)}% vs market
+            </p>
+          )}
+          {subjectPrice && (
+            <p className="text-[10px] text-zinc-400">Your: {formatPrice(subjectPrice)}</p>
+          )}
+        </div>
+        <div className="bg-zinc-50 p-3 rounded text-center">
+          <p className="text-lg font-bold text-[#222222]">{avgPricePerSqft ? `$${Math.round(avgPricePerSqft)}` : 'N/A'}</p>
+          <p className="text-xs text-zinc-500">Avg $/SqFt</p>
+          {pricePerSqftVsMarket !== null && (
+            <p className={`text-[10px] flex items-center justify-center gap-0.5 ${pricePerSqftVsMarket > 0 ? 'text-red-500' : 'text-green-500'}`}>
+              {pricePerSqftVsMarket > 0 ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
+              {Math.abs(pricePerSqftVsMarket).toFixed(1)}% vs market
+            </p>
+          )}
+          {subjectPricePerSqft && (
+            <p className="text-[10px] text-zinc-400">Your: ${Math.round(subjectPricePerSqft)}</p>
+          )}
         </div>
         <div className="bg-zinc-50 p-3 rounded text-center">
           <p className="text-lg font-bold text-[#222222]">{stats.avgDOM !== null ? `${Math.round(stats.avgDOM)} days` : 'N/A'}</p>
