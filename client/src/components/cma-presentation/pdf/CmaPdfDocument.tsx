@@ -2,6 +2,7 @@ import { Document, Page, View, Text, Image } from '@react-pdf/renderer';
 import { styles, COLORS } from './styles';
 import type { AgentProfile, CmaProperty } from '../types';
 import { WIDGETS, MARKETING_TEXT, LISTING_ACTION_PLAN_TEXT, SAMPLE_REVIEWS, type Review } from '../constants/widgets';
+import lreSgrWhiteLogo from '@assets/LRE_SGR_White_1769702535327.png';
 import {
   extractPrice,
   extractSqft,
@@ -857,10 +858,10 @@ const ThankYouPage = ({ agent, slideNumber, totalSlides }: { agent: AgentProfile
     <Page size="LETTER" orientation="landscape" style={styles.darkPage}>
       <View style={styles.coverPagePro}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <View style={styles.coverLogoPro}>
-            <Text style={styles.coverLogoOrange}>SPYGLASS</Text>
-            <Text style={styles.coverLogoWhite}>REALTY</Text>
-          </View>
+          <Image 
+            src={lreSgrWhiteLogo} 
+            style={{ width: 280, height: 56, marginBottom: 16 }} 
+          />
           <Text style={{ fontSize: 36, color: COLORS.white, marginTop: 24, marginBottom: 8 }}>Thank You</Text>
           <Text style={{ fontSize: 12, color: COLORS.mediumGray, marginBottom: 32 }}>for considering Spyglass Realty</Text>
           {agentPhoto ? (
