@@ -15,6 +15,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  Customized,
 } from 'recharts';
 import type { CmaProperty } from '../types';
 
@@ -169,14 +170,37 @@ function TimeToSellInfoModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
             This chart shows that pricing the home correctly from the beginning will help reduce the 
             days on market.
           </p>
-          <div className="space-y-2">
+          <div className="space-y-3">
             <h4 className="font-semibold">How to read the chart:</h4>
-            <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-              <li><span className="text-red-500 font-medium">Red dots</span> represent closed/sold properties</li>
-              <li><span className="text-green-500 font-medium">Green dots</span> represent active listings</li>
-              <li><span className="text-orange-500 font-medium">Orange dots</span> represent properties under contract</li>
-              <li><span className="text-blue-500 font-medium">Blue dots</span> represent expired/canceled listings</li>
-            </ul>
+            <div className="grid gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-3">
+                <svg width="24" height="24" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="6" fill="none" stroke="#22c55e" strokeWidth="2" />
+                </svg>
+                <span>Hollow circle = Original list price</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <svg width="24" height="24" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="6" fill="#22c55e" />
+                </svg>
+                <span>Filled circle = Most recent price or sold price</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <svg width="24" height="24" viewBox="0 0 24 24">
+                  <line x1="12" y1="4" x2="12" y2="20" stroke="#6b7280" strokeWidth="2" />
+                </svg>
+                <span>Line connects original to current price</span>
+              </div>
+            </div>
+            <div className="border-t pt-3 mt-3">
+              <h4 className="font-semibold mb-2">Status Colors:</h4>
+              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                <li><span className="text-red-500 font-medium">Red</span> = Closed/Sold properties</li>
+                <li><span className="text-green-500 font-medium">Green</span> = Active listings</li>
+                <li><span className="text-orange-500 font-medium">Orange</span> = Under contract</li>
+                <li><span className="text-blue-500 font-medium">Blue</span> = Expired/Canceled</li>
+              </ul>
+            </div>
           </div>
           <button
             onClick={() => onClose()}
@@ -424,6 +448,85 @@ function PropertyCardPanel({ property, subjectProperty, onClose, onViewClick }: 
   );
 }
 
+// Custom shape for hollow circles (original price)
+function HollowCircle(props: any) {
+  const { cx, cy, payload } = props;
+  if (!cx || !cy) return null;
+  const color = getStatusColorHex(payload.statusColor);
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={7}
+      fill="none"
+      stroke={color}
+      strokeWidth={2}
+    />
+  );
+}
+
+// Custom shape for filled circles (current/sold price)
+function FilledCircle(props: any) {
+  const { cx, cy, payload } = props;
+  if (!cx || !cy) return null;
+  const color = getStatusColorHex(payload.statusColor);
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={7}
+      fill={color}
+      stroke={color}
+      strokeWidth={1}
+    />
+  );
+}
+
+// Custom component to draw connecting lines between original and current price
+interface ConnectingLinesProps {
+  chartData: any[];
+  xAxisMap?: any;
+  yAxisMap?: any;
+}
+
+function ConnectingLinesComponent({ chartData, xAxisMap, yAxisMap }: ConnectingLinesProps) {
+  if (!xAxisMap || !yAxisMap) return null;
+  
+  const xAxis = xAxisMap[0];
+  const yAxis = yAxisMap[0];
+  
+  if (!xAxis?.scale || !yAxis?.scale) return null;
+  
+  return (
+    <g className="connecting-lines">
+      {chartData.map((item, index) => {
+        if (!item.hasPriceChange) return null;
+        
+        const x = xAxis.scale(item.daysOnMarket);
+        const y1 = yAxis.scale(item.originalPrice);
+        const y2 = yAxis.scale(item.currentPrice);
+        
+        if (isNaN(x) || isNaN(y1) || isNaN(y2)) return null;
+        
+        const color = getStatusColorHex(item.statusColor);
+        
+        return (
+          <line
+            key={`line-${index}`}
+            x1={x}
+            y1={y1}
+            x2={x}
+            y2={y2}
+            stroke={color}
+            strokeWidth={2}
+            strokeOpacity={0.5}
+          />
+        );
+      })}
+    </g>
+  );
+}
+
 export function TimeToSellWidget({
   comparables,
   averageDaysOnMarket,
@@ -503,19 +606,40 @@ export function TimeToSellWidget({
     return total / validComps.length;
   }, [closedComps, averageListPricePercent]);
 
+  // Chart data for both original prices and current prices
   const chartData = useMemo(() => {
     return comparables.map(p => {
       const statusColor = getStatusColor(p.status);
+      const originalPrice = p.originalPrice || p.price || 0;
+      const currentPrice = p.soldPrice || p.listPrice || p.price || 0;
+      
       return {
         id: p.id,
         address: p.address,
         daysOnMarket: p.daysOnMarket || 0,
-        originalPrice: p.originalPrice || p.price || 0,
-        currentPrice: p.soldPrice || p.listPrice || p.price || 0,
+        originalPrice,
+        currentPrice,
         statusColor,
+        hasPriceChange: originalPrice !== currentPrice && originalPrice > 0 && currentPrice > 0,
       };
-    }).filter(d => d.daysOnMarket >= 0 && d.currentPrice > 0);
+    }).filter(d => d.daysOnMarket >= 0 && (d.currentPrice > 0 || d.originalPrice > 0));
   }, [comparables]);
+
+  // Separate data for original prices (hollow circles)
+  const originalPriceData = useMemo(() => {
+    return chartData.filter(d => d.originalPrice > 0).map(d => ({
+      ...d,
+      price: d.originalPrice,
+    }));
+  }, [chartData]);
+
+  // Separate data for current prices (filled circles)
+  const currentPriceData = useMemo(() => {
+    return chartData.filter(d => d.currentPrice > 0).map(d => ({
+      ...d,
+      price: d.currentPrice,
+    }));
+  }, [chartData]);
 
   const formatPrice = (value: number) => {
     if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
@@ -526,12 +650,19 @@ export function TimeToSellWidget({
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      const isOriginal = payload[0].dataKey === 'originalPrice';
       return (
         <div className="bg-white dark:bg-zinc-800 p-3 rounded-lg shadow-lg border">
           <p className="font-medium text-sm truncate max-w-[200px]">{data.address}</p>
           <p className="text-xs text-muted-foreground">{data.daysOnMarket} Days on Market</p>
+          {data.originalPrice > 0 && data.originalPrice !== data.currentPrice && (
+            <p className="text-xs text-muted-foreground">
+              Orig. Price: {formatPrice(data.originalPrice)}
+            </p>
+          )}
           <p className="text-xs text-muted-foreground">
-            Price: {formatPrice(data.currentPrice)}
+            {data.currentPrice !== data.originalPrice ? 'Current/Sold: ' : 'Price: '}
+            {formatPrice(data.currentPrice)}
           </p>
         </div>
       );
@@ -697,36 +828,74 @@ export function TimeToSellWidget({
                         }}
                       />
                       <YAxis
-                        dataKey="currentPrice"
+                        dataKey="price"
                         name="Price"
                         type="number"
                         tickFormatter={formatPrice}
                         tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
                         width={70}
+                        domain={['dataMin - 50000', 'dataMax + 50000']}
                       />
                       <Tooltip content={<CustomTooltip />} />
-                      <Scatter name="Properties" data={chartData} fill="#8884d8">
-                        {chartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={getStatusColorHex(entry.statusColor)} />
-                        ))}
-                      </Scatter>
+                      
+                      {/* Connecting lines between original and current prices */}
+                      <Customized 
+                        component={(props: any) => (
+                          <ConnectingLinesComponent 
+                            chartData={chartData} 
+                            xAxisMap={props.xAxisMap} 
+                            yAxisMap={props.yAxisMap} 
+                          />
+                        )} 
+                      />
+                      
+                      {/* Hollow circles for original list price */}
+                      <Scatter
+                        name="Original Price"
+                        data={originalPriceData}
+                        dataKey="originalPrice"
+                        shape={<HollowCircle />}
+                      />
+                      
+                      {/* Filled circles for current/sold price */}
+                      <Scatter
+                        name="Current Price"
+                        data={currentPriceData}
+                        dataKey="currentPrice"
+                        shape={<FilledCircle />}
+                      />
                     </ScatterChart>
                   </ResponsiveContainer>
                 </div>
 
                 <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t flex-wrap flex-shrink-0">
                   <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-red-500" />
-                    <span className="text-sm text-muted-foreground">Closed</span>
+                    <svg width="16" height="16" viewBox="0 0 16 16">
+                      <circle cx="8" cy="8" r="5" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted-foreground" />
+                    </svg>
+                    <span className="text-sm text-muted-foreground">Original list price</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-orange-500" />
-                    <span className="text-sm text-muted-foreground">Under Contract</span>
+                    <svg width="16" height="16" viewBox="0 0 16 16">
+                      <circle cx="8" cy="8" r="5" fill="currentColor" className="text-muted-foreground" />
+                    </svg>
+                    <span className="text-sm text-muted-foreground">Most recent price or sold price</span>
+                  </div>
+                  <div className="h-4 w-px bg-border mx-2" />
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-red-500" />
+                    <span className="text-sm text-muted-foreground">Closed</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-green-500" />
                     <span className="text-sm text-muted-foreground">Active</span>
                   </div>
+                  {underContractComps.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-orange-500" />
+                      <span className="text-sm text-muted-foreground">Under Contract</span>
+                    </div>
+                  )}
                   {expiredComps.length > 0 && (
                     <div className="flex items-center gap-2">
                       <span className="w-3 h-3 rounded-full bg-blue-500" />
