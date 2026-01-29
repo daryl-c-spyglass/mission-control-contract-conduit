@@ -2069,7 +2069,10 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                  {overviewPhotos.slice(0, 8).map((photo, index) => (
+                  {overviewPhotos.slice(0, 8).map((photo, index) => {
+                    const isLocalUrl = photo.startsWith('/objects/') || photo.startsWith('/api/');
+                    const imgSrc = isLocalUrl ? photo : `/api/proxy-image?url=${encodeURIComponent(photo)}`;
+                    return (
                     <div 
                       key={index} 
                       className="relative aspect-video bg-muted rounded-md overflow-hidden cursor-pointer group"
@@ -2080,7 +2083,7 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                       data-testid={`button-photo-${index}`}
                     >
                       <img
-                        src={`/api/proxy-image?url=${encodeURIComponent(photo)}`}
+                        src={imgSrc}
                         alt={`Property photo ${index + 1}`}
                         className="w-full h-full object-cover transition-transform group-hover:scale-105"
                         data-testid={`img-property-photo-${index}`}
@@ -2092,7 +2095,8 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                         <Maximize2 className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 {overviewPhotos.length > 8 && (
                   <Button
@@ -3554,14 +3558,19 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
             </div>
             
             {/* Main Image */}
-            {overviewPhotos[overviewPhotoIndex] && (
+            {overviewPhotos[overviewPhotoIndex] && (() => {
+              const photo = overviewPhotos[overviewPhotoIndex];
+              const isLocalUrl = photo.startsWith('/objects/') || photo.startsWith('/api/');
+              const imgSrc = isLocalUrl ? photo : `/api/proxy-image?url=${encodeURIComponent(photo)}`;
+              return (
               <img
-                src={`/api/proxy-image?url=${encodeURIComponent(overviewPhotos[overviewPhotoIndex])}`}
+                src={imgSrc}
                 alt={`Photo ${overviewPhotoIndex + 1}`}
                 className="max-w-full max-h-[65vh] sm:max-h-[80vh] object-contain touch-manipulation"
                 data-testid="img-overview-fullscreen-photo"
               />
-            )}
+              );
+            })()}
             
             {/* Navigation Arrows */}
             {overviewPhotos.length > 1 && (
@@ -3585,7 +3594,10 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
             
             {/* Thumbnail Strip at Bottom */}
             <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 sm:gap-2 p-1.5 sm:p-2 bg-black/50 rounded-lg max-w-[95vw] sm:max-w-[90vw] overflow-x-auto scrollbar-hide">
-              {overviewPhotos.map((photo, idx) => (
+              {overviewPhotos.map((photo, idx) => {
+                const isLocalUrl = photo.startsWith('/objects/') || photo.startsWith('/api/');
+                const thumbSrc = isLocalUrl ? photo : `/api/proxy-image?url=${encodeURIComponent(photo)}`;
+                return (
                 <button
                   key={idx}
                   onClick={() => setOverviewPhotoIndex(idx)}
@@ -3595,13 +3607,14 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                   data-testid={`button-overview-thumbnail-${idx}`}
                 >
                   <img
-                    src={`/api/proxy-image?url=${encodeURIComponent(photo)}`}
+                    src={thumbSrc}
                     alt={`Thumbnail ${idx + 1}`}
                     className="w-full h-full object-cover"
                     loading="lazy"
                   />
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
         </DialogContent>
