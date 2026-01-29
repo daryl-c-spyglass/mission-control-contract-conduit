@@ -112,7 +112,9 @@ export function FlyerPreview({
         {data.address || 'PROPERTY ADDRESS'}
       </div>
 
-      <div className="absolute left-6 top-[132px] w-[720px] h-[360px] rounded-lg overflow-hidden bg-gray-200">
+      {/* Main Photo - Grid rows 2-3, columns 1-4 (spans full width minus margins) */}
+      {/* Position: starts at row 2 top (~120px), height spans ~2.5 grid rows (~330px) */}
+      <div className="absolute left-6 top-[120px] w-[768px] h-[340px] rounded-lg overflow-hidden bg-gray-200">
         {images.mainImage ? (
           <img
             src={images.mainImage}
@@ -127,8 +129,10 @@ export function FlyerPreview({
         )}
       </div>
 
-      <div className="absolute left-6 top-[506px] w-[720px] flex gap-[10px]">
-        <div className="w-[355px] h-[230px] rounded-lg overflow-hidden bg-gray-200">
+      {/* Bottom Photos - Grid row 4, Kitchen spans columns 1-2, Room spans columns 3-4 */}
+      {/* Gap between main and bottom photos: 14px, each photo exactly half width minus gap */}
+      <div className="absolute left-6 top-[474px] w-[768px] flex gap-[12px]">
+        <div className="w-[378px] h-[252px] rounded-lg overflow-hidden bg-gray-200">
           {images.kitchenImage ? (
             <img
               src={images.kitchenImage}
@@ -142,7 +146,7 @@ export function FlyerPreview({
             </div>
           )}
         </div>
-        <div className="w-[355px] h-[230px] rounded-lg overflow-hidden bg-gray-200">
+        <div className="w-[378px] h-[252px] rounded-lg overflow-hidden bg-gray-200">
           {images.roomImage ? (
             <img
               src={images.roomImage}
@@ -158,7 +162,9 @@ export function FlyerPreview({
         </div>
       </div>
 
-      <div className="absolute left-6 top-[766px] right-6 h-[270px] flex">
+      {/* Bottom Section - Grid row 5: Property details, description, agent info */}
+      {/* Starts after bottom photos (474 + 252 + 14 gap = 740px) */}
+      <div className="absolute left-6 top-[740px] right-6 h-[296px] flex">
         <div className="pt-[35px] pl-2">
           <div className="flex items-center gap-2.5 mb-5 text-[13.5pt] whitespace-nowrap">
             <svg className="w-[31px] h-[31px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">

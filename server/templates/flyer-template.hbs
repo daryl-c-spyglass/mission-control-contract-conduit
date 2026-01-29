@@ -135,15 +135,16 @@
             font-weight: 500;
         }
         
-        /* Main Image - left: 24px * 3.125 = 75px, top: 132px * 3.125 = 413px */
-        /* w: 720px * 3.125 = 2250px, h: 360px * 3.125 = 1125px */
+        /* Main Image - Grid rows 2-3, columns 1-4 (full width minus margins) */
+        /* left: 24px * 3.125 = 75px, top: 120px * 3.125 = 375px */
+        /* w: 768px * 3.125 = 2400px, h: 340px * 3.125 = 1063px */
         /* rounded-lg -> 8px * 3.125 = 25px */
         .main-image-container {
             position: absolute;
             left: 75px;
-            top: 413px;
-            width: 2250px;
-            height: 1125px;
+            top: 375px;
+            width: 2400px;
+            height: 1063px;
             border-radius: 25px;
             overflow: hidden;
             background: #e5e7eb;
@@ -155,20 +156,21 @@
             object-fit: cover;
         }
         
-        /* Secondary Images Row - top: 506px * 3.125 = 1581px, gap: 10px * 3.125 = 31px */
+        /* Secondary Images Row - Grid row 4, each photo spans 2 columns */
+        /* top: 474px * 3.125 = 1481px, gap: 12px * 3.125 = 38px */
         .secondary-images {
             position: absolute;
             left: 75px;
-            top: 1581px;
-            width: 2250px;
+            top: 1481px;
+            width: 2400px;
             display: flex;
-            gap: 31px;
+            gap: 38px;
         }
         
-        /* Secondary Image - 355px * 3.125 = 1109px wide, 230px * 3.125 = 719px tall */
+        /* Secondary Image - 378px * 3.125 = 1181px wide, 252px * 3.125 = 788px tall */
         .secondary-image-container {
-            width: 1109px;
-            height: 719px;
+            width: 1181px;
+            height: 788px;
             border-radius: 25px;
             overflow: hidden;
             background: #e5e7eb;
@@ -180,13 +182,14 @@
             object-fit: cover;
         }
         
-        /* Footer Section - top: 766px * 3.125 = 2394px, h: 270px * 3.125 = 844px */
+        /* Footer Section - Grid row 5: starts after bottom photos */
+        /* top: 740px * 3.125 = 2313px, h: 296px * 3.125 = 925px */
         .footer-section {
             position: absolute;
             left: 75px;
-            top: 2394px;
+            top: 2313px;
             right: 75px;
-            height: 844px;
+            height: 925px;
             display: flex;
         }
         
