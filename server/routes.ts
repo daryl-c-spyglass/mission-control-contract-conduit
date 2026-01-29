@@ -1768,11 +1768,11 @@ export async function registerRoutes(
       if (transaction.slackChannelId) {
         let shouldNotify = postToSlack; // If explicitly requested, honor that
         
-        // If not explicitly requested, check user's notification settings
+        // If not explicitly requested, check user's global notification preferences
         if (postToSlack === undefined && userId) {
           try {
-            const settings = await storage.getNotificationSettings(userId, transaction.id);
-            shouldNotify = settings?.marketingAssets ?? true; // Default to true
+            const userPrefs = await storage.getUserNotificationPreferences(userId);
+            shouldNotify = userPrefs?.notifyMarketingAssets ?? true; // Default to true
           } catch (e) {
             shouldNotify = true; // Default to enabled if can't get settings
           }
@@ -2154,9 +2154,9 @@ export async function registerRoutes(
         
         if (userId) {
           try {
-            const settings = await storage.getNotificationSettings(userId, transaction.id);
-            shouldNotify = settings?.documentUploads ?? true;
-            process.stderr.write(`[DOC UPLOAD] Notification settings: ${JSON.stringify(settings)}\n`);
+            const userPrefs = await storage.getUserNotificationPreferences(userId);
+            shouldNotify = userPrefs?.notifyDocumentUploads ?? true;
+            process.stderr.write(`[DOC UPLOAD] User notification preferences: ${JSON.stringify(userPrefs)}\n`);
             process.stderr.write(`[DOC UPLOAD] shouldNotify: ${shouldNotify}\n`);
           } catch (e) {
             process.stderr.write(`[DOC UPLOAD] Error getting settings, defaulting to enabled: ${e}\n`);
@@ -2271,8 +2271,8 @@ export async function registerRoutes(
 
         if (userId) {
           try {
-            const settings = await storage.getNotificationSettings(userId, transaction.id);
-            shouldNotify = settings?.documentUploads ?? true;
+            const userPrefs = await storage.getUserNotificationPreferences(userId);
+            shouldNotify = userPrefs?.notifyDocumentUploads ?? true;
           } catch (e) {
             shouldNotify = true;
           }

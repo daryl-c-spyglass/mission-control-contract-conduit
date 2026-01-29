@@ -329,6 +329,12 @@ export const userNotificationPreferences = pgTable("user_notification_preference
   notifyClosingReminders: boolean("notify_closing_reminders").default(false),
   notifyMarketingAssets: boolean("notify_marketing_assets").default(false),
   
+  // Reminder Schedule Options (only active when notifyClosingReminders is true)
+  reminder14Days: boolean("reminder_14_days").default(false),
+  reminder7Days: boolean("reminder_7_days").default(false),
+  reminder3Days: boolean("reminder_3_days").default(false),
+  reminderDayOf: boolean("reminder_day_of").default(false),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -342,6 +348,10 @@ export const updateUserNotificationPreferencesSchema = z.object({
   notifyDocumentUploads: z.boolean().optional(),
   notifyClosingReminders: z.boolean().optional(),
   notifyMarketingAssets: z.boolean().optional(),
+  reminder14Days: z.boolean().optional(),
+  reminder7Days: z.boolean().optional(),
+  reminder3Days: z.boolean().optional(),
+  reminderDayOf: z.boolean().optional(),
 });
 
 // Agent profiles for CMA reports and marketing

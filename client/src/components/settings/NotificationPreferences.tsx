@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Bell, FileText, Calendar, Image, User, Check } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
@@ -9,6 +10,11 @@ interface NotificationPrefs {
   notifyDocumentUploads: boolean;
   notifyClosingReminders: boolean;
   notifyMarketingAssets: boolean;
+  // Reminder schedule
+  reminder14Days?: boolean;
+  reminder7Days?: boolean;
+  reminder3Days?: boolean;
+  reminderDayOf?: boolean;
 }
 
 export function NotificationPreferences() {
@@ -19,6 +25,10 @@ export function NotificationPreferences() {
     notifyDocumentUploads: false,
     notifyClosingReminders: false,
     notifyMarketingAssets: false,
+    reminder14Days: false,
+    reminder7Days: false,
+    reminder3Days: false,
+    reminderDayOf: false,
   });
 
   useEffect(() => {
@@ -34,6 +44,10 @@ export function NotificationPreferences() {
           notifyDocumentUploads: data.notifyDocumentUploads ?? false,
           notifyClosingReminders: data.notifyClosingReminders ?? false,
           notifyMarketingAssets: data.notifyMarketingAssets ?? false,
+          reminder14Days: data.reminder14Days ?? false,
+          reminder7Days: data.reminder7Days ?? false,
+          reminder3Days: data.reminder3Days ?? false,
+          reminderDayOf: data.reminderDayOf ?? false,
         });
       }
     } catch (error) {
@@ -143,26 +157,76 @@ export function NotificationPreferences() {
         </p>
         
         {notificationOptions.map((option) => (
-          <div
-            key={option.key}
-            className="flex items-center justify-between p-4 bg-muted/30 rounded-md"
-            data-testid={`notification-option-${option.key}`}
-          >
-            <div className="flex items-center gap-3">
-              <option.icon className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <Label className="font-medium cursor-pointer">
-                  {option.title}
-                </Label>
-                <p className="text-sm text-muted-foreground mt-0.5">{option.description}</p>
+          <div key={option.key}>
+            <div
+              className="flex items-center justify-between p-4 bg-muted/30 rounded-md"
+              data-testid={`notification-option-${option.key}`}
+            >
+              <div className="flex items-center gap-3">
+                <option.icon className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <Label className="font-medium cursor-pointer">
+                    {option.title}
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-0.5">{option.description}</p>
+                </div>
               </div>
+              <Switch
+                checked={prefs[option.key]}
+                onCheckedChange={(checked) => updatePreference(option.key, checked)}
+                disabled={saving}
+                data-testid={`switch-${option.key}`}
+              />
             </div>
-            <Switch
-              checked={prefs[option.key]}
-              onCheckedChange={(checked) => updatePreference(option.key, checked)}
-              disabled={saving}
-              data-testid={`switch-${option.key}`}
-            />
+            
+            {/* Show reminder schedule options when Closing Date Reminders is enabled */}
+            {option.key === "notifyClosingReminders" && prefs.notifyClosingReminders && (
+              <div className="ml-8 mt-2 p-4 bg-muted/20 rounded-md space-y-3 border-l-2 border-primary/30">
+                <p className="text-sm font-medium text-muted-foreground">Send reminders:</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="reminder14Days"
+                      checked={prefs.reminder14Days}
+                      onCheckedChange={(checked) => updatePreference("reminder14Days", checked === true)}
+                      disabled={saving}
+                      data-testid="checkbox-reminder14Days"
+                    />
+                    <Label htmlFor="reminder14Days" className="text-sm cursor-pointer">14 days before</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="reminder7Days"
+                      checked={prefs.reminder7Days}
+                      onCheckedChange={(checked) => updatePreference("reminder7Days", checked === true)}
+                      disabled={saving}
+                      data-testid="checkbox-reminder7Days"
+                    />
+                    <Label htmlFor="reminder7Days" className="text-sm cursor-pointer">7 days before</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="reminder3Days"
+                      checked={prefs.reminder3Days}
+                      onCheckedChange={(checked) => updatePreference("reminder3Days", checked === true)}
+                      disabled={saving}
+                      data-testid="checkbox-reminder3Days"
+                    />
+                    <Label htmlFor="reminder3Days" className="text-sm cursor-pointer">3 days before</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="reminderDayOf"
+                      checked={prefs.reminderDayOf}
+                      onCheckedChange={(checked) => updatePreference("reminderDayOf", checked === true)}
+                      disabled={saving}
+                      data-testid="checkbox-reminderDayOf"
+                    />
+                    <Label htmlFor="reminderDayOf" className="text-sm cursor-pointer">Day of closing</Label>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ))}
 
