@@ -9,6 +9,24 @@ import type { AgentProfile, CmaProperty } from '../types';
 import { imageUrlToBase64 } from '@/lib/image-to-base64';
 import { getPrimaryPhoto } from '@/lib/cma-data-utils';
 
+// Fetch AI-selected cover photo for a property using Repliers coverImage API
+async function fetchCoverPhoto(mlsNumber: string): Promise<string | null> {
+  if (!mlsNumber) return null;
+  
+  try {
+    const response = await fetch(`/api/listings/${mlsNumber}/ai-photos`, {
+      credentials: 'include',
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    // Return the main photo URL (AI-selected exterior front)
+    return data?.mainPhoto?.url || null;
+  } catch (error) {
+    console.warn(`[CoverPhoto] Failed to fetch cover photo for ${mlsNumber}:`, error);
+    return null;
+  }
+}
+
 interface PdfDownloadButtonProps {
   propertyAddress: string;
   agent: AgentProfile;
@@ -66,13 +84,33 @@ export function PdfDownloadButton({
         console.warn('[PdfDownloadButton] Failed to convert logo to base64:', err);
       }
 
-      console.log(`[PdfDownloadButton] Converting ${comparables.length} comparable photos to base64 via proxy...`);
+      console.log(`[PdfDownloadButton] Fetching AI-selected cover photos for ${comparables.length} comparables...`);
       let successCount = 0;
+      let coverPhotoCount = 0;
       let failCount = 0;
       
       const processedComparables = await Promise.all(
         comparables.map(async (comp, index) => {
-          const photoUrl = getPrimaryPhoto(comp);
+          // Try to get AI-selected cover photo first using Repliers coverImage API
+          let photoUrl: string | null = null;
+          let usedCoverPhoto = false;
+          
+          const mlsNumber = comp.mlsNumber || (comp as any).mls || (comp as any).listingId;
+          if (mlsNumber) {
+            const coverPhoto = await fetchCoverPhoto(mlsNumber);
+            if (coverPhoto) {
+              photoUrl = coverPhoto;
+              usedCoverPhoto = true;
+              coverPhotoCount++;
+              console.log(`[PdfDownloadButton] Comparable ${index + 1}: using AI cover photo`);
+            }
+          }
+          
+          // Fall back to first photo if no cover photo
+          if (!photoUrl) {
+            photoUrl = getPrimaryPhoto(comp);
+          }
+          
           if (!photoUrl) {
             console.log(`[PdfDownloadButton] Comparable ${index + 1}: no photo URL found`);
             failCount++;
@@ -85,7 +123,11 @@ export function PdfDownloadButton({
             if (base64Photo) {
               console.log(`[PdfDownloadButton] Comparable ${index + 1}: photo converted (${Math.round(base64Photo.length / 1024)}KB)`);
               successCount++;
-              return { ...comp, base64PrimaryPhoto: base64Photo };
+              return { 
+                ...comp, 
+                base64PrimaryPhoto: base64Photo,
+                coverPhoto: usedCoverPhoto ? photoUrl : undefined,
+              };
             } else {
               console.warn(`[PdfDownloadButton] Comparable ${index + 1}: conversion returned null`);
               failCount++;
@@ -98,7 +140,7 @@ export function PdfDownloadButton({
         })
       );
       
-      console.log(`[PdfDownloadButton] Image conversion complete: ${successCount} success, ${failCount} failed`);
+      console.log(`[PdfDownloadButton] Image processing complete: ${successCount} converted, ${coverPhotoCount} AI cover photos, ${failCount} failed`);
       
       console.log('[PdfDownloadButton] Image conversion complete, generating PDF...');
 

@@ -204,7 +204,7 @@ const PropertyDetailPage = ({
   totalSlides,
   logoBase64
 }: { 
-  property: CmaProperty & { base64PrimaryPhoto?: string }; 
+  property: CmaProperty & { base64PrimaryPhoto?: string; coverPhoto?: string }; 
   propertyAddress: string;
   slideNumber: number; 
   totalSlides: number;
@@ -217,57 +217,60 @@ const PropertyDetailPage = ({
   const baths = extractBaths(property);
   const status = normalizeStatus(property.status);
   const address = extractFullAddress(property);
+  // Priority: coverPhoto (AI-selected) > base64PrimaryPhoto > first photo from array
+  const coverPhoto = (property as any).coverPhoto;
   const base64Photo = (property as any).base64PrimaryPhoto;
   const urlPhoto = getPrimaryPhoto(property);
-  const primaryPhoto = base64Photo || urlPhoto;
+  const primaryPhoto = coverPhoto || base64Photo || urlPhoto;
   
   return (
     <Page size="LETTER" orientation="landscape" style={styles.page}>
       <PageHeader title={`PROPERTY DETAILS - ${address || 'Property'}`} slideNumber={slideNumber} totalSlides={totalSlides} />
       <View style={styles.content}>
-        {/* Property Photo - matching Preview compact height */}
-        <View style={{ height: 96, borderRadius: 4, marginBottom: 12, overflow: 'hidden' }}>
+        {/* Property Photo - Full uncropped display with contain mode */}
+        <View style={{ height: 280, borderRadius: 4, marginBottom: 16, overflow: 'hidden', backgroundColor: '#f8f8f8' }}>
           {primaryPhoto ? (
-            <Image src={primaryPhoto} style={{ width: '100%', height: 96, objectFit: 'cover' }} />
+            <Image src={primaryPhoto} style={{ width: '100%', height: 280, objectFit: 'contain' }} />
           ) : (
-            <View style={{ width: '100%', height: 96, backgroundColor: '#f4f4f5', alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: '100%', height: 280, backgroundColor: '#f4f4f5', alignItems: 'center', justifyContent: 'center' }}>
               {/* Building icon placeholder - no emoji */}
-              <View style={{ width: 32, height: 32, borderWidth: 2, borderColor: '#a1a1aa', borderRadius: 4 }}>
-                <View style={{ position: 'absolute', top: 2, left: 2, right: 2, height: 6, borderBottomWidth: 2, borderColor: '#a1a1aa' }} />
-                <View style={{ position: 'absolute', bottom: 4, left: 8, width: 6, height: 10, borderWidth: 1, borderColor: '#a1a1aa' }} />
-                <View style={{ position: 'absolute', bottom: 4, right: 8, width: 6, height: 10, borderWidth: 1, borderColor: '#a1a1aa' }} />
+              <View style={{ width: 48, height: 48, borderWidth: 3, borderColor: '#a1a1aa', borderRadius: 6 }}>
+                <View style={{ position: 'absolute', top: 4, left: 4, right: 4, height: 10, borderBottomWidth: 3, borderColor: '#a1a1aa' }} />
+                <View style={{ position: 'absolute', bottom: 6, left: 12, width: 8, height: 14, borderWidth: 2, borderColor: '#a1a1aa' }} />
+                <View style={{ position: 'absolute', bottom: 6, right: 12, width: 8, height: 14, borderWidth: 2, borderColor: '#a1a1aa' }} />
               </View>
+              <Text style={{ fontSize: 12, color: '#a1a1aa', marginTop: 8 }}>No Photo Available</Text>
             </View>
           )}
         </View>
         
-        <Text style={{ fontSize: 14, fontWeight: 500, marginBottom: 8 }}>{address || 'Property Address'}</Text>
+        <Text style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: '#222222' }}>{address || 'Property Address'}</Text>
         
-        {/* Grid of property details - matching Preview layout */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {/* Grid of property details - larger text for better readability */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
           <View style={{ width: '48%', flexDirection: 'row' }}>
-            <Text style={{ fontSize: 12, color: '#71717a' }}>Price: </Text>
-            <Text style={{ fontSize: 12, fontWeight: 500 }}>{formatPrice(price)}</Text>
+            <Text style={{ fontSize: 14, color: '#71717a' }}>Price: </Text>
+            <Text style={{ fontSize: 14, fontWeight: 600 }}>{formatPrice(price)}</Text>
           </View>
           <View style={{ width: '48%', flexDirection: 'row' }}>
-            <Text style={{ fontSize: 12, color: '#71717a' }}>Sq Ft: </Text>
-            <Text style={{ fontSize: 12, fontWeight: 500 }}>{formatNumber(sqft)}</Text>
+            <Text style={{ fontSize: 14, color: '#71717a' }}>Sq Ft: </Text>
+            <Text style={{ fontSize: 14, fontWeight: 600 }}>{formatNumber(sqft)}</Text>
           </View>
           <View style={{ width: '48%', flexDirection: 'row' }}>
-            <Text style={{ fontSize: 12, color: '#71717a' }}>Beds: </Text>
-            <Text style={{ fontSize: 12, fontWeight: 500 }}>{beds ?? 'N/A'}</Text>
+            <Text style={{ fontSize: 14, color: '#71717a' }}>Beds: </Text>
+            <Text style={{ fontSize: 14, fontWeight: 600 }}>{beds ?? 'N/A'}</Text>
           </View>
           <View style={{ width: '48%', flexDirection: 'row' }}>
-            <Text style={{ fontSize: 12, color: '#71717a' }}>Baths: </Text>
-            <Text style={{ fontSize: 12, fontWeight: 500 }}>{baths ?? 'N/A'}</Text>
+            <Text style={{ fontSize: 14, color: '#71717a' }}>Baths: </Text>
+            <Text style={{ fontSize: 14, fontWeight: 600 }}>{baths ?? 'N/A'}</Text>
           </View>
           <View style={{ width: '48%', flexDirection: 'row' }}>
-            <Text style={{ fontSize: 12, color: '#71717a' }}>DOM: </Text>
-            <Text style={{ fontSize: 12, fontWeight: 500 }}>{dom ?? 'N/A'}</Text>
+            <Text style={{ fontSize: 14, color: '#71717a' }}>DOM: </Text>
+            <Text style={{ fontSize: 14, fontWeight: 600 }}>{dom ?? 'N/A'}</Text>
           </View>
           <View style={{ width: '48%', flexDirection: 'row' }}>
-            <Text style={{ fontSize: 12, color: '#71717a' }}>Status: </Text>
-            <Text style={{ fontSize: 12, fontWeight: 500 }}>{status}</Text>
+            <Text style={{ fontSize: 14, color: '#71717a' }}>Status: </Text>
+            <Text style={{ fontSize: 14, fontWeight: 600 }}>{status}</Text>
           </View>
         </View>
       </View>
