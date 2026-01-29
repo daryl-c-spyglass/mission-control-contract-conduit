@@ -179,7 +179,7 @@ const ComparablesSummaryPage = ({
             <Text style={{ fontSize: 12, color: '#71717a' }}>Avg Price</Text>
             {priceVsMarket !== null && (
               <Text style={{ fontSize: 10, color: priceVsMarket > 0 ? '#ef4444' : '#22c55e', marginTop: 2 }}>
-                {priceVsMarket > 0 ? '↗' : '↘'} {Math.abs(priceVsMarket).toFixed(1)}% vs market
+                {priceVsMarket > 0 ? '+' : '-'}{Math.abs(priceVsMarket).toFixed(1)}% vs market
               </Text>
             )}
             {subjectPrice && (
@@ -191,7 +191,7 @@ const ComparablesSummaryPage = ({
             <Text style={{ fontSize: 12, color: '#71717a' }}>Avg $/SqFt</Text>
             {pricePerSqftVsMarket !== null && (
               <Text style={{ fontSize: 10, color: pricePerSqftVsMarket > 0 ? '#ef4444' : '#22c55e', marginTop: 2 }}>
-                {pricePerSqftVsMarket > 0 ? '↗' : '↘'} {Math.abs(pricePerSqftVsMarket).toFixed(1)}% vs market
+                {pricePerSqftVsMarket > 0 ? '+' : '-'}{Math.abs(pricePerSqftVsMarket).toFixed(1)}% vs market
               </Text>
             )}
             {subjectPricePerSqft && (
