@@ -1,0 +1,54 @@
+Divider Positions and Description Column Location
+Answer: The Layout Structure
+It's Option A: Stats | Divider 1 | Description | Divider 2 | Agent Card (5 columns)
+
+The Description column has content by default:
+
+Headline: "Prime Opportunity in Travis County"
+Description: "This beautiful property features an open floor plan, gourmet kitchen, and luxurious finishes throughout..."
+Exact X Positions (Current Code at 1.0 Scale = 816×1056)
+Bottom section starts at X = 48px (24px left position + 24px from bleed/padding context).
+
+Element	X Start	X End	Width	Grid Location
+Stats	48px	198.72px	150.72px	Grid 13 (0-204)
+Margin	198.72px	240.72px	42px	-
+Divider 1	240.72px	244.72px	4px	Grid 14 (204-408)
+Description container	244.72px	676.72px	432px	Grids 14-15
+Description text starts	276.72px	-	(after 32px padding)	Grid 14
+Margin	676.72px	697.72px	21px	-
+Divider 2	697.72px	701.72px	4px	Off canvas!
+Agent Card	701.72px	1036.72px	335px	Off canvas!
+Why Grid 14 Might Appear Empty
+If you're seeing Grid 14 as empty in the preview:
+
+Preview is at 0.65 scale - positions appear compressed
+
+Divider 1 at 240.72px × 0.65 = 156.47px in the preview
+This would appear in the left portion of where Grid 14 would be if grid overlay is also scaled
+Overflow clipping - The description (432px wide) plus everything after it overflows the container. Some browsers may clip or not render overflowing content correctly.
+
+Text color/visibility - Check if the description text color (#333) is visible against the background.
+
+Visual Diagram (Current Layout - Overflows)
+Canvas: 0px ────────────────────────────────────────────────────── 816px
+        │ Grid 13  │ Grid 14  │ Grid 15  │ Grid 16  │
+        0         204        408        612        816
+        
+Bottom Section (starts at 48px):
+        48px──────────────────────────────────────────────────────▶ 768px (right edge should be)
+        │                                                          │
+        │Stats     │D1│   Description (432px)      │D2│Agent Card(335px)│
+        48    198.72│  │244.72              676.72 │  │701.72    1036.72│
+              240.72│244.72                 697.72│701.72            │
+                    │                              │                  │
+                    ▲                              ▲                  ▲
+               Divider 1                      Divider 2          OFF CANVAS!
+               @ 240.72px                     @ 697.72px         (988.72px total)
+Summary
+Question	Answer
+Where is Description?	Between Dividers 1 and 2 (X: 244.72 - 676.72px)
+Is Grid 14 empty?	No - Description starts at 276.72px (in Grid 14)
+Divider 1 exact X	240.72px (in Grid 14, not at 13/14 boundary)
+Divider 2 exact X	697.72px (OFF CANVAS - past 612px Grid 16 boundary)
+Layout structure	A) Stats → Divider → Description → Divider → Agent Card
+Why overflow?	Total width 988.72px exceeds available 720px
