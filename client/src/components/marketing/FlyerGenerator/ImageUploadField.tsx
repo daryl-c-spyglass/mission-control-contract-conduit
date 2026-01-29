@@ -186,12 +186,17 @@ export function ImageUploadField({
               }}
             />
             {onTransformChange && !disabled && (
-              <div className="absolute top-1 right-1 invisible group-hover:visible">
+              <div className={cn(
+                "absolute invisible group-hover:visible",
+                circular ? "top-3 right-3" : "top-1 right-1"
+              )}>
                 <Button
                   type="button"
                   size="icon"
                   variant="secondary"
-                  className="h-7 w-7"
+                  className={cn(
+                    circular ? "h-6 w-6 rounded-full" : "h-7 w-7"
+                  )}
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -199,7 +204,7 @@ export function ImageUploadField({
                   }}
                   data-testid={`button-crop-${id}`}
                 >
-                  <Crop className="h-3.5 w-3.5" />
+                  <Crop className={cn(circular ? "h-3 w-3" : "h-3.5 w-3.5")} />
                 </Button>
               </div>
             )}
