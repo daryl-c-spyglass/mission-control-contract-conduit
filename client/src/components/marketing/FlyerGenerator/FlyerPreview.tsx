@@ -177,13 +177,14 @@ export function FlyerPreview({
 
       {/* Bottom Section - Reference: top: 766 + 24 bleed = 790, height: 270 */}
       {/* Position: x: 48, y: 790, width: 720, height: 270 */}
-      {/* CORRECTED widths to fit 720px: Stats: 110px | Divider1 (4px + 26px margin) | Description: 186px | Divider2 (4px + 16px margin) | Agent: 374px */}
+      {/* Original widths from reference (overflows intentionally): Stats: 150.72px | Divider1 (4px + 42px margin) | Description: 432px | Divider2 (4px + 21px margin) | Agent: 335px */}
       <div 
-        className="absolute left-[48px] top-[790px] w-[720px] h-[270px] flex"
+        className="absolute left-[48px] top-[790px] h-[270px] flex"
+        style={{ width: '988.72px' }}
         data-layout-id="bottom-section"
       >
-        {/* Column 1: Property Details - CORRECTED to 110px */}
-        <div className="w-[110px] pt-[20px] pl-2 flex-shrink-0" data-layout-id="stats">
+        {/* Column 1: Property Details - 150.72px per reference */}
+        <div className="w-[150.72px] pt-[20px] pl-2 flex-shrink-0" data-layout-id="stats">
           <div className="flex items-center gap-2 mb-4 text-[12pt] whitespace-nowrap">
             <svg className="w-[28px] h-[28px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
               <path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/>
@@ -205,23 +206,23 @@ export function FlyerPreview({
           </div>
         </div>
 
-        {/* STATIC Divider 1 - CORRECTED: 4px width, 147.84px height, 34.56px margin-top, 26px margin-left */}
+        {/* STATIC Divider 1: 4px width, 147.84px height, 34.56px margin-top, 42px margin-left */}
         <div
           className="flex-shrink-0"
           style={{ 
             width: '4px', 
             height: '147.84px', 
             marginTop: '34.56px', 
-            marginLeft: '26px',
+            marginLeft: '42px',
             backgroundColor: accentColor 
           }}
           data-layout-id="divider-1"
         />
 
-        {/* Description column - CORRECTED to 186px width */}
+        {/* Description column: 432px width, padding left 32px, right 10px */}
         <div 
-          className="w-[186px] flex-shrink-0 overflow-hidden" 
-          style={{ paddingLeft: '12px', paddingRight: '6px' }}
+          className="w-[432px] flex-shrink-0 overflow-hidden" 
+          style={{ paddingLeft: '32px', paddingRight: '10px' }}
           data-layout-id="description-column"
         >
           {/* Headline: 11pt, weight 500, uppercase, letter-spacing 2px, line-height 1.3, mt 7.68px, mb 16.32px */}
@@ -257,26 +258,25 @@ export function FlyerPreview({
           </p>
         </div>
 
-        {/* STATIC Divider 2 - CORRECTED: 4px width, 147.84px height, 34.56px margin-top, 16px margin-left */}
+        {/* STATIC Divider 2: 4px width, 147.84px height, 34.56px margin-top, 21px margin-left */}
         <div
           className="flex-shrink-0"
           style={{ 
             width: '4px', 
             height: '147.84px', 
             marginTop: '34.56px', 
-            marginLeft: '16px',
+            marginLeft: '21px',
             backgroundColor: accentColor 
           }}
           data-layout-id="divider-2"
         />
 
-        {/* Agent Card Container - CORRECTED to 374px width */}
-        {/* Photo centered in Grid 15 (~510px), QR in Grid 16 (~616px) */}
+        {/* Agent Card Container: 335px width, paddingTop: 16.32px, paddingLeft: 27px */}
         <div 
           className="flex flex-col items-center"
           style={{ 
-            width: '374px',
-            paddingLeft: '10px',
+            width: '335px',
+            paddingLeft: '27px',
             paddingTop: '16.32px',
           }}
           data-layout-id="agent-card"

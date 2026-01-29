@@ -1,0 +1,107 @@
+Answer to Your Questions:
+1. Is the Agent Card using absolute positioning to overlay the description?
+NO. The Agent Card is NOT using absolute positioning. It is a flex child within the bottom section's flexbox layout.
+
+{/* Bottom Section Container */}
+<div style={{ 
+  position: "absolute",  // Container is absolute
+  left: "24px",
+  top: "766px",
+  right: "24px",
+  height: "270px",
+  display: "flex",       // Flexbox layout
+  gap: "0"
+}}>
+  {/* Stats → Divider1 → Description → Divider2 → Agent Card */}
+  {/* All are flex children, NO absolute positioning */}
+</div>
+2. What is the ACTUAL description column width?
+432px (fixed width in flexbox, no truncation)
+
+<div style={{ width: "432px", paddingLeft: "32px", paddingRight: "10px" }}>
+3. What is the Agent Card's position relative to the bottom section?
+Flexbox child with fixed width - NOT absolute positioned:
+
+{/* Agent Card - Flex child, NOT absolute */}
+<div style={{ 
+  width: "335px",           // Fixed width
+  paddingLeft: "27px",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  paddingTop: "16.32px"
+  // NO position: absolute
+  // NO right/top values
+}}>
+4. Does the description text wrap UNDER the photo?
+NO. The description and agent card are separate flex columns. They don't overlap. The description is constrained to its 432px width, and the agent card is in its own 335px column.
+
+Current Layout Structure (Flex, NOT Overlay)
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Bottom Section (flex container)                                          │
+│ ┌──────────┬────┬─────────────────────────────┬────┬──────────────────┐ │
+│ │  Stats   │ D1 │      Description            │ D2 │   Agent Card     │ │
+│ │ 150.72px │4px │       432px                 │4px │     335px        │ │
+│ │          │    │                             │    │  ┌─────┐ ┌────┐  │ │
+│ │ 🛏 4 bed │    │ MODERN LUXURY LIVING        │    │  │Photo│ │ QR │  │ │
+│ │ 🛁 3 bath│    │ Lorem ipsum dolor sit...    │    │  └─────┘ └────┘  │ │
+│ │ 📐 2450  │    │                             │    │   Agent Name     │ │
+│ │          │    │                             │    │   Title/Phone    │ │
+│ └──────────┴────┴─────────────────────────────┴────┴──────────────────┘ │
+│   ↑ 42px margin      ↑ 21px margin                                      │
+└─────────────────────────────────────────────────────────────────────────┘
+TOTAL: 150.72 + 46 + 432 + 25 + 335 = 988.72px (OVERFLOWS 720px available!)
+The Overflow Problem
+The current code does NOT use overlay/absolute positioning for the agent card. All elements are in flex flow, but the total width exceeds the container:
+
+Element	Width
+Stats	150.72px
+Divider 1 + margins	46px
+Description	432px
+Divider 2 + margins	25px
+Agent Card	335px
+TOTAL	988.72px
+Available	720px
+Overflow	268.72px
+What You're Seeing in Grid Overlay
+If description appears to extend into Grid 15 and photo overlaps it, this is due to CSS overflow - elements are rendering outside their container bounds because the flex children exceed the available space. The browser renders them anyway, causing visual overlap.
+
+To Achieve Your Goal (Overlay Layout)
+If you want description to fill Grids 14-15 with agent card overlaying the right portion, you'd need to restructure like this:
+
+{/* Bottom Section Container */}
+<div style={{ 
+  position: "absolute",
+  left: "24px",
+  top: "766px",
+  right: "24px",
+  height: "270px",
+  /* Remove flex, use relative for positioning context */
+  position: "relative"  
+}}>
+  {/* Description - extends full width under agent */}
+  <div style={{
+    position: "absolute",
+    left: "196px",  /* After stats + divider */
+    right: "0",
+    top: "0"
+  }}>
+    {/* Description content */}
+  </div>
+  {/* Agent Card - overlays on top right */}
+  <div style={{
+    position: "absolute",
+    right: "0",
+    top: "16px",
+    width: "200px"
+  }}>
+    {/* Photo, QR, name, etc */}
+  </div>
+</div>
+Summary
+Question	Answer
+Agent Card positioning	Flexbox child (not absolute)
+Description width	432px fixed
+Agent Card position values	None - it's in flex flow
+Text wrap under photo	No - separate columns
+Why overlap appears	Flex overflow (988px in 720px container)
