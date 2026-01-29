@@ -87,13 +87,10 @@ export function CMAReport({
   // Horizontal scroll refs for carousel arrows
   const statsScrollRef = useRef<HTMLDivElement>(null);
   const compareScrollRef = useRef<HTMLDivElement>(null);
-  const listScrollRef = useRef<HTMLDivElement>(null);
   const [statsCanScrollLeft, setStatsCanScrollLeft] = useState(false);
   const [statsCanScrollRight, setStatsCanScrollRight] = useState(false);
   const [compareCanScrollLeft, setCompareCanScrollLeft] = useState(false);
   const [compareCanScrollRight, setCompareCanScrollRight] = useState(false);
-  const [listCanScrollLeft, setListCanScrollLeft] = useState(false);
-  const [listCanScrollRight, setListCanScrollRight] = useState(false);
   
   // Update scroll button visibility for Stats view
   const updateStatsScrollButtons = () => {
@@ -113,22 +110,11 @@ export function CMAReport({
     }
   };
   
-  // Update scroll button visibility for List view
-  const updateListScrollButtons = () => {
-    if (listScrollRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = listScrollRef.current;
-      setListCanScrollLeft(scrollLeft > 5);
-      setListCanScrollRight(scrollLeft < scrollWidth - clientWidth - 5);
-    }
-  };
-  
   useEffect(() => {
     updateStatsScrollButtons();
     updateCompareScrollButtons();
-    updateListScrollButtons();
     const statsEl = statsScrollRef.current;
     const compareEl = compareScrollRef.current;
-    const listEl = listScrollRef.current;
     
     if (statsEl) {
       statsEl.addEventListener('scroll', updateStatsScrollButtons);
@@ -136,13 +122,9 @@ export function CMAReport({
     if (compareEl) {
       compareEl.addEventListener('scroll', updateCompareScrollButtons);
     }
-    if (listEl) {
-      listEl.addEventListener('scroll', updateListScrollButtons);
-    }
     window.addEventListener('resize', () => {
       updateStatsScrollButtons();
       updateCompareScrollButtons();
-      updateListScrollButtons();
     });
     
     return () => {
@@ -151,9 +133,6 @@ export function CMAReport({
       }
       if (compareEl) {
         compareEl.removeEventListener('scroll', updateCompareScrollButtons);
-      }
-      if (listEl) {
-        listEl.removeEventListener('scroll', updateListScrollButtons);
       }
     };
   }, [activeTab, properties]);
@@ -179,18 +158,6 @@ export function CMAReport({
   const scrollCompareRight = () => {
     if (compareScrollRef.current) {
       compareScrollRef.current.scrollBy({ left: 300, behavior: 'smooth' });
-    }
-  };
-  
-  const scrollListLeft = () => {
-    if (listScrollRef.current) {
-      listScrollRef.current.scrollBy({ left: -280, behavior: 'smooth' });
-    }
-  };
-  
-  const scrollListRight = () => {
-    if (listScrollRef.current) {
-      listScrollRef.current.scrollBy({ left: 280, behavior: 'smooth' });
     }
   };
   
@@ -834,26 +801,6 @@ export function CMAReport({
                   <p>Statistics & Analytics</p>
                 </TooltipContent>
               </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "text-white hover:bg-white/10",
-                      activeTab === "list" && "bg-white/20 text-primary"
-                    )}
-                    onClick={() => setActiveTab("list")}
-                    data-testid="tab-list"
-                  >
-                    <Home className="w-4 h-4 mr-1.5" />
-                    List
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Property List</p>
-                </TooltipContent>
-              </Tooltip>
             </div>
           </TooltipProvider>
         </div>
@@ -865,7 +812,6 @@ export function CMAReport({
           <TabsTrigger value="compare" data-testid="tab-compare-hidden">Compare</TabsTrigger>
           <TabsTrigger value="map" data-testid="tab-map-hidden">Map</TabsTrigger>
           <TabsTrigger value="stats" data-testid="tab-stats-hidden">Stats</TabsTrigger>
-          <TabsTrigger value="list" data-testid="tab-list-hidden">List</TabsTrigger>
           <TabsTrigger value="home-averages" data-testid="tab-home-averages">Home Averages</TabsTrigger>
           <TabsTrigger value="listings" data-testid="tab-listings">Listings</TabsTrigger>
           <TabsTrigger value="timeline" data-testid="tab-timeline">Timeline</TabsTrigger>
@@ -2221,243 +2167,6 @@ export function CMAReport({
               </Table>
             </div>
           )}
-        </TabsContent>
-
-        {/* List Tab - Property Cards with Horizontal Scroll */}
-        <TabsContent value="list" className="space-y-0 mt-0">
-          <div className="bg-white dark:bg-zinc-950 rounded-b-lg p-4 relative">
-            {/* Left scroll arrow */}
-            {listCanScrollLeft && (
-              <Button
-                variant="outline"
-                size="icon"
-                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 dark:bg-zinc-900/90 shadow-lg rounded-full h-10 w-10"
-                onClick={scrollListLeft}
-                data-testid="button-list-scroll-left"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </Button>
-            )}
-            
-            {/* Right scroll arrow */}
-            {listCanScrollRight && (
-              <Button
-                variant="outline"
-                size="icon"
-                className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 dark:bg-zinc-900/90 shadow-lg rounded-full h-10 w-10"
-                onClick={scrollListRight}
-                data-testid="button-list-scroll-right"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </Button>
-            )}
-            
-            <div 
-              ref={listScrollRef}
-              className="flex gap-4 overflow-x-auto pb-4 scroll-smooth px-8"
-              onLoad={() => updateListScrollButtons()}
-            >
-              {(() => {
-                // Find the actual subject property using subjectPropertyId prop
-                const subjectProp = subjectPropertyId 
-                  ? properties.find(p => p.id === subjectPropertyId)
-                  : null;
-                
-                // Get non-subject properties (comps)
-                const compProps = properties
-                  .filter(p => !excludedPropertyIds.has(p.id) && p.id !== subjectPropertyId)
-                  .sort((a, b) => {
-                    const priceA = a.standardStatus === 'Closed' 
-                      ? (a.closePrice ? Number(a.closePrice) : Number(a.listPrice || 0))
-                      : Number(a.listPrice || 0);
-                    const priceB = b.standardStatus === 'Closed'
-                      ? (b.closePrice ? Number(b.closePrice) : Number(b.listPrice || 0))
-                      : Number(b.listPrice || 0);
-                    return priceA - priceB;
-                  });
-                
-                // Combine: subject first, then sorted comps
-                const displayProps = subjectProp 
-                  ? [subjectProp, ...compProps] 
-                  : compProps;
-                
-                if (displayProps.length === 0) {
-                  return (
-                    <div className="w-full text-center py-8 text-muted-foreground">
-                      No properties to compare
-                    </div>
-                  );
-                }
-                
-                // Use actual subject property for comparison (or first comp if no subject)
-                const referenceProperty = subjectProp || displayProps[0];
-                const subjectBeds = referenceProperty.bedroomsTotal || 0;
-                const subjectBaths = referenceProperty.bathroomsTotalInteger || 0;
-                const subjectSqFt = Number(referenceProperty.livingArea || 0);
-                const subjectLotSize = Number(referenceProperty.lotSizeSquareFeet || 0);
-                const subjectGarage = Number((referenceProperty as any).garageSpaces || 0);
-                
-                return displayProps.map((property) => {
-                  const photos = getPropertyPhotos(property);
-                  const primaryPhoto = photos[0];
-                  const isSold = property.standardStatus === 'Closed';
-                  const price = isSold 
-                    ? (property.closePrice ? Number(property.closePrice) : Number(property.listPrice || 0))
-                    : Number(property.listPrice || 0);
-                  
-                  const beds = property.bedroomsTotal || 0;
-                  const baths = property.bathroomsTotalInteger || 0;
-                  const sqft = Number(property.livingArea || 0);
-                  const lotSize = Number(property.lotSizeSquareFeet || 0);
-                  const garage = Number((property as any).garageSpaces || 0);
-                  
-                  // Calculate differences from subject
-                  const bedsDiff = beds - subjectBeds;
-                  const sqftDiff = subjectSqFt > 0 ? ((sqft - subjectSqFt) / subjectSqFt * 100) : 0;
-                  const lotDiff = subjectLotSize > 0 ? ((lotSize - subjectLotSize) / subjectLotSize * 100) : 0;
-                  const garageDiff = garage - subjectGarage;
-                  
-                  const isSubject = subjectPropertyId ? property.id === subjectPropertyId : false;
-                  
-                  const statusColors: Record<string, string> = {
-                    'Active': 'bg-green-500',
-                    'Closed': 'bg-red-500',
-                    'Active Under Contract': 'bg-yellow-500',
-                    'Pending': 'bg-[#EF4923]',
-                  };
-                  
-                  return (
-                    <div 
-                      key={property.id}
-                      className="flex-shrink-0 w-64 bg-card border rounded-lg overflow-hidden cursor-pointer hover-elevate"
-                      onClick={() => handlePropertyClick(property)}
-                      data-testid={`list-card-${property.id}`}
-                    >
-                      {/* Photo */}
-                      <div className="relative h-36">
-                        {primaryPhoto ? (
-                          <img src={primaryPhoto} alt={property.unparsedAddress || ''} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full bg-muted flex items-center justify-center">
-                            <Home className="w-8 h-8 text-muted-foreground/50" />
-                          </div>
-                        )}
-                        {isSubject && (
-                          <div className="absolute top-2 right-2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded">
-                            Subject
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Details */}
-                      <div className="p-3">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <h4 className="font-bold text-sm truncate">{property.unparsedAddress?.toUpperCase()}</h4>
-                          <span className="font-bold text-primary">${price.toLocaleString()}</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mb-2">
-                          {property.city}, {property.stateOrProvince} {property.postalCode}
-                        </p>
-                        <Badge className={cn("text-xs text-white", statusColors[property.standardStatus || ''] || 'bg-gray-500')}>
-                          {property.standardStatus}
-                        </Badge>
-                        
-                        <Separator className="my-3" />
-                        
-                        {/* Comparison Stats */}
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Beds</span>
-                            <span className="font-medium">
-                              {beds}
-                              {!isSubject && bedsDiff !== 0 && (
-                                <span className={cn("ml-1 text-xs", bedsDiff > 0 ? "text-green-600" : "text-red-600")}>
-                                  {bedsDiff > 0 ? `+${bedsDiff}` : bedsDiff}
-                                </span>
-                              )}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Baths</span>
-                            <span className="font-medium">{baths}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Sq. Ft. (Living Area)</span>
-                            <span className="font-medium">
-                              {sqft.toLocaleString()}
-                              {!isSubject && sqftDiff !== 0 && (
-                                <span className={cn("ml-1 text-xs", sqftDiff > 0 ? "text-green-600" : "text-red-600")}>
-                                  {sqftDiff > 0 ? "+" : ""}{sqftDiff.toFixed(1)}%
-                                </span>
-                              )}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Lot Size</span>
-                            <span className="font-medium">
-                              {lotSize.toLocaleString()}
-                              {!isSubject && lotDiff !== 0 && (
-                                <span className={cn("ml-1 text-xs", lotDiff > 0 ? "text-green-600" : "text-red-600")}>
-                                  {lotDiff > 0 ? "+" : ""}{lotDiff.toFixed(0)}%
-                                </span>
-                              )}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Garage Spaces</span>
-                            <span className="font-medium">
-                              {garage}
-                              {!isSubject && garageDiff !== 0 && (
-                                <span className={cn("ml-1 text-xs", garageDiff > 0 ? "text-green-600" : "text-red-600")}>
-                                  {garageDiff > 0 ? `+${garageDiff}` : garageDiff}
-                                </span>
-                              )}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <Separator className="my-3" />
-                        
-                        {/* Listing Details */}
-                        <div className="space-y-1 text-sm">
-                          <h5 className="font-semibold text-xs text-muted-foreground uppercase">Listing Details</h5>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Orig. Price</span>
-                            <span className="font-medium">
-                              ${((property as any).originalListPrice ? Number((property as any).originalListPrice) : price).toLocaleString()}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">List Price</span>
-                            <span className="font-medium">${Number(property.listPrice || 0).toLocaleString()}</span>
-                          </div>
-                          {isSold && property.closePrice && (
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Sold Price</span>
-                              <span className="font-medium">${Number(property.closePrice).toLocaleString()}</span>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Public Remarks */}
-                        {property.publicRemarks && (
-                          <>
-                            <Separator className="my-3" />
-                            <div className="space-y-1 text-sm">
-                              <h5 className="font-semibold text-xs text-muted-foreground uppercase">Public Remarks</h5>
-                              <p className="text-xs text-muted-foreground line-clamp-4">
-                                {property.publicRemarks}
-                              </p>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-          </div>
         </TabsContent>
 
         {/* Home Averages Tab */}
