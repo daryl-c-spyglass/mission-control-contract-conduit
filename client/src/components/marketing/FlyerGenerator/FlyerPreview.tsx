@@ -271,12 +271,24 @@ export function FlyerPreview({
           data-layout-id="divider-2"
         />
 
-        {/* Agent card: remaining width - restructured to match reference layout */}
-        {/* Reference shows: photo on left, name/title stacked, QR on right side */}
-        <div className="flex-1 pl-3 pt-4 relative overflow-hidden" data-layout-id="agent-card">
-          <div className="flex items-start gap-2">
-            {/* Agent Photo */}
-            <div className="w-[70px] h-[70px] rounded-full overflow-hidden bg-gray-200 flex items-center justify-center flex-shrink-0">
+        {/* Agent Card Container - Exact specs from Flyer Maker */}
+        {/* Width: 335px, paddingTop: 16.32px, paddingLeft: 27px, flex column, items-center */}
+        <div 
+          className="flex flex-col items-center"
+          style={{ 
+            width: '335px',
+            paddingLeft: '27px',
+            paddingTop: '16.32px',
+          }}
+          data-layout-id="agent-card"
+        >
+          {/* Top Row - Photo and QR side by side: gap: 16px, mb: 8px */}
+          <div className="flex items-center" style={{ gap: '16px', marginBottom: '8px' }}>
+            {/* Agent Photo - 105.6px × 105.6px circular */}
+            <div 
+              className="rounded-full overflow-hidden bg-gray-200 flex items-center justify-center"
+              style={{ width: '105.6px', height: '105.6px' }}
+            >
               {images.agentPhoto ? (
                 <img
                   src={images.agentPhoto}
@@ -285,27 +297,40 @@ export function FlyerPreview({
                   style={getTransformStyle(imageTransforms.agentPhoto)}
                 />
               ) : (
-                <User className="w-8 h-8 text-gray-400" />
+                <User className="w-10 h-10 text-gray-400" />
               )}
             </div>
-            {/* Agent Info + QR stacked vertically */}
-            <div className="flex flex-col min-w-0 flex-1">
-              <div className="text-[11pt] font-bold leading-tight mb-0.5 truncate">
-                {data.agentName || ''}
-              </div>
-              <div className="text-[7pt] leading-[1.3] text-gray-600">
-                <div className="truncate">{data.agentTitle || ''}</div>
-                <div className="truncate">{data.phone || ''}</div>
-              </div>
+            {/* QR Code - 73.92px × 73.92px, border 2px black, padding 2.88px */}
+            <div 
+              className="flex items-center justify-center"
+              style={{ 
+                width: '73.92px', 
+                height: '73.92px', 
+                border: '2px solid #000',
+                padding: '2.88px',
+              }}
+            >
+              {images.qrCode ? (
+                <img src={images.qrCode} alt="QR Code" className="w-full h-full object-contain" />
+              ) : (
+                <QrCode className="w-full h-full text-gray-400" />
+              )}
             </div>
           </div>
-          {/* QR Code positioned at bottom right */}
-          <div className="absolute bottom-2 right-2 w-[55px] h-[55px] border border-black p-[1px]">
-            {images.qrCode ? (
-              <img src={images.qrCode} alt="QR Code" className="w-full h-full object-contain" />
-            ) : (
-              <QrCode className="w-full h-full text-gray-400" />
-            )}
+          {/* Agent Name - 21pt bold, center, mb: 3.84px */}
+          <div 
+            className="font-bold text-center"
+            style={{ fontSize: '21pt', marginBottom: '3.84px' }}
+          >
+            {data.agentName || ''}
+          </div>
+          {/* Agent Title & Phone - 10pt, center, line-height 1.4 */}
+          <div 
+            className="text-center"
+            style={{ fontSize: '10pt', lineHeight: 1.4 }}
+          >
+            <div>{data.agentTitle || ''}</div>
+            <div>{data.phone || ''}</div>
           </div>
         </div>
       </div>

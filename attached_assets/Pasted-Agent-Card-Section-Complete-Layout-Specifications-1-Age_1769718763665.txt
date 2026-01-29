@@ -1,0 +1,163 @@
+Agent Card Section - Complete Layout Specifications
+1. Agent Card Container
+Property	Value
+Width	335px (fixed)
+Padding Top	16.32px
+Padding Left	27px
+Padding Right	0 (not specified)
+Padding Bottom	0 (not specified)
+Display	flex
+Flex Direction	column
+Align Items	center
+Position within Bottom Section:
+
+Comes after: Stats (150.72px) + Divider 1 (46px) + Description (432px) + Divider 2 (25px)
+Approximate X from canvas left: 48 + 150.72 + 46 + 432 + 25 = 701.72px
+Y: 790px (same as bottom section)
+2. Agent Photo
+Property	Value
+Width	105.6px
+Height	105.6px
+Border Radius	50% (fully circular via rounded-full)
+Background	#E5E7EB (gray-200)
+Overflow	hidden
+Position	Relative (within flex row)
+Position within Agent Card:
+
+Centered horizontally (parent has align-items: center)
+Top padding: 16.32px from container top
+Part of a horizontal flex row with QR code
+3. Agent Name
+Property	Value
+Font Size	21pt
+Font Weight	bold
+Text Align	center
+Margin Bottom	3.84px
+Max Width	None (not constrained)
+Line Clamp	None
+Position:
+
+Below the Photo + QR row
+Horizontally centered
+4. Agent Title & Phone
+Property	Value
+Font Size	10pt
+Text Align	center
+Line Height	1.4
+Spacing	<br /> between title and phone (single line break)
+Position:
+
+Below Agent Name (3.84px margin)
+Title and phone stacked vertically with line break
+5. QR Code
+Property	Value
+Width	73.92px
+Height	73.92px
+Border	2px solid #000 (black)
+Inner Padding	2.88px
+Position	Right side of Agent Photo
+Gap from Photo	16px (gap-4 = 1rem = 16px)
+6. Layout Arrangement
+Answer: B) Photo + QR side by side on top row, name/info below
+
+┌─────────────────────────────────┐
+│         Agent Card (335px)       │
+│  ┌─────────────┐  ┌──────────┐  │
+│  │   Photo     │  │    QR    │  │ ← Top Row (flex, gap-4, mb-2)
+│  │  105.6px    │  │  73.92px │  │
+│  │  (circle)   │  │          │  │
+│  └─────────────┘  └──────────┘  │
+│                                  │
+│        Agent Name (21pt bold)    │ ← margin-bottom: 3.84px
+│                                  │
+│      Agent Title (10pt)          │ ← line-height: 1.4
+│      Phone Number                │
+└─────────────────────────────────┘
+7. Full CSS/Styles - Complete Agent Card
+{/* Agent Card Container */}
+<div style={{ 
+  width: "335px",
+  paddingLeft: "27px",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  paddingTop: "16.32px"
+}}>
+  {/* Top Row - Photo and QR side by side */}
+  <div style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "16px",           /* gap-4 = 1rem = 16px */
+    marginBottom: "8px"    /* mb-2 = 0.5rem = 8px */
+  }}>
+  
+    {/* Agent Photo */}
+    <div style={{ 
+      width: "105.6px", 
+      height: "105.6px",
+      borderRadius: "50%",           /* rounded-full */
+      backgroundColor: "#E5E7EB",    /* bg-gray-200 */
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+      position: "relative"
+    }}>
+      <img 
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover"
+        }}
+      />
+    </div>
+    
+    {/* QR Code */}
+    <div style={{ 
+      width: "73.92px",
+      height: "73.92px",
+      border: "2px solid #000",
+      padding: "2.88px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }}>
+      <img style={{ 
+        width: "100%", 
+        height: "100%", 
+        objectFit: "contain" 
+      }} />
+    </div>
+  </div>
+  
+  {/* Agent Name */}
+  <div style={{ 
+    fontSize: "21pt", 
+    fontWeight: "bold", 
+    textAlign: "center", 
+    marginBottom: "3.84px" 
+  }}>
+    Jane Smith
+  </div>
+  
+  {/* Agent Details */}
+  <div style={{ 
+    fontSize: "10pt", 
+    textAlign: "center", 
+    lineHeight: 1.4 
+  }}>
+    Real Estate Agent
+    <br />
+    (512) 555-0123
+  </div>
+  
+</div>
+Summary - Pixel Positions (Absolute from Canvas 816×1056)
+Element	Approximate X	Approximate Y	Dimensions
+Agent Card Container	~702px	790px	335 × 270px
+Agent Photo	~744px (centered)	806px	105.6 × 105.6px
+QR Code	~866px	822px	73.92 × 73.92px
+Agent Name	Centered in card	~920px	Variable width
+Agent Title/Phone	Centered in card	~948px	Variable width

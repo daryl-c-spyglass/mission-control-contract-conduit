@@ -289,34 +289,35 @@
             flex-shrink: 0;
         }
         
-        /* Agent Section - restructured to match preview layout */
-        /* pl-3 (12px) -> 38px, pt-4 (16px) -> 50px */
+        /* Agent Card Container - Exact specs from Flyer Maker (scaled 3.125x) */
+        /* Width: 335px -> 1047px, paddingTop: 16.32px -> 51px, paddingLeft: 27px -> 84px */
         .agent-section {
-            flex: 1;
-            padding-left: 38px;
-            padding-top: 50px;
-            position: relative;
-            overflow: hidden;
+            width: 1047px;
+            padding-left: 84px;
+            padding-top: 51px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         
-        /* Agent top row with photo and info side by side */
+        /* Top Row - Photo and QR side by side: gap: 16px -> 50px, mb: 8px -> 25px */
         .agent-top-row {
             display: flex;
-            align-items: flex-start;
-            gap: 25px;
+            align-items: center;
+            gap: 50px;
+            margin-bottom: 25px;
         }
         
-        /* Agent Photo - 70px * 3.125 = 219px */
+        /* Agent Photo - 105.6px * 3.125 = 330px circular */
         .agent-photo {
-            width: 219px;
-            height: 219px;
+            width: 330px;
+            height: 330px;
             border-radius: 50%;
             overflow: hidden;
             background: #e5e7eb;
             display: flex;
             align-items: center;
             justify-content: center;
-            flex-shrink: 0;
         }
         
         .agent-photo img {
@@ -325,53 +326,36 @@
             object-fit: cover;
         }
         
-        /* Agent info column */
-        .agent-info-column {
-            display: flex;
-            flex-direction: column;
-            min-width: 0;
-            flex: 1;
-        }
-        
-        /* Agent Name - text-[11pt] = 14.67px -> 46px */
-        .agent-name {
-            font-size: 46px;
-            font-weight: bold;
-            line-height: 1.2;
-            margin-bottom: 6px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        
-        /* Agent Title/Phone - text-[7pt] = 9.33px -> 29px */
-        .agent-info {
-            font-size: 29px;
-            line-height: 1.3;
-            color: #4b5563;
-        }
-        
-        .agent-info div {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        
-        /* QR Code - 55px * 3.125 = 172px, positioned at bottom right */
+        /* QR Code - 73.92px * 3.125 = 231px, border 2px -> 6px, padding 2.88px -> 9px */
         .qr-code {
-            position: absolute;
-            bottom: 25px;
-            right: 25px;
-            width: 172px;
-            height: 172px;
-            border: 3px solid black;
-            padding: 3px;
+            width: 231px;
+            height: 231px;
+            border: 6px solid black;
+            padding: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .qr-code img {
             width: 100%;
             height: 100%;
             object-fit: contain;
+        }
+        
+        /* Agent Name - 21pt = 28px -> 88px, bold, center, mb: 3.84px -> 12px */
+        .agent-name {
+            font-size: 88px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        
+        /* Agent Title/Phone - 10pt = 13.33px -> 42px, center, line-height 1.4 */
+        .agent-info {
+            font-size: 42px;
+            text-align: center;
+            line-height: 1.4;
         }
         
         .photo-placeholder {
@@ -503,32 +487,33 @@
             <!-- Second Accent Divider -->
             <div class="accent-divider-2"></div>
             
-            <!-- Agent Section - restructured: photo + info side by side, QR at bottom right -->
+            <!-- Agent Section - Exact Flyer Maker layout: Photo + QR side by side, Name/Info below -->
             <div class="agent-section">
+                <!-- Top Row: Photo and QR side by side -->
                 <div class="agent-top-row">
                     <div class="agent-photo">
                         {{#if agentPhoto}}
                         <img src="{{agentPhoto}}" alt="{{agentName}}" style="{{{agentPhotoStyle}}}" />
                         {{else}}
-                        <svg viewBox="0 0 24 24" fill="#9ca3af" width="120" height="120">
+                        <svg viewBox="0 0 24 24" fill="#9ca3af" width="180" height="180">
                             <circle cx="12" cy="8" r="4"/>
                             <path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>
                         </svg>
                         {{/if}}
                     </div>
-                    <div class="agent-info-column">
-                        <div class="agent-name">{{agentName}}</div>
-                        <div class="agent-info">
-                            <div>{{agentTitle}}</div>
-                            <div>{{agentPhone}}</div>
-                        </div>
+                    {{#if qrCodeUrl}}
+                    <div class="qr-code">
+                        <img src="{{qrCodeUrl}}" alt="QR Code" />
                     </div>
+                    {{/if}}
                 </div>
-                {{#if qrCodeUrl}}
-                <div class="qr-code">
-                    <img src="{{qrCodeUrl}}" alt="QR Code" />
+                <!-- Agent Name -->
+                <div class="agent-name">{{agentName}}</div>
+                <!-- Agent Title & Phone -->
+                <div class="agent-info">
+                    <div>{{agentTitle}}</div>
+                    <div>{{agentPhone}}</div>
                 </div>
-                {{/if}}
             </div>
         </div>
     </div>
