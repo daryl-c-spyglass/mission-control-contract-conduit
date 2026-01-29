@@ -286,27 +286,18 @@
             flex-shrink: 0;
         }
         
-        /* Agent Card Container: 335px * 3.125 = 1047px (per reference) */
-        /* paddingTop: 16.32px -> 51px, paddingLeft: 27px -> 84px */
+        /* Agent Card Container: fills remaining space, uses relative positioning */
+        /* Photo centered in Grid 15, QR at right of Grid 16 */
         .agent-section {
-            width: 1047px;
-            padding-left: 84px;
+            flex: 1;
+            position: relative;
             padding-top: 51px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
         }
         
-        /* Top Row - Photo and QR side by side: gap: 16px -> 50px, mb: 8px -> 25px */
-        .agent-top-row {
-            display: flex;
-            align-items: center;
-            gap: 50px;
-            margin-bottom: 25px;
-        }
-        
-        /* Agent Photo - 105.6px * 3.125 = 330px circular */
+        /* Agent Photo - positioned in center of Grid 15 area */
+        /* 45px * 3.125 = 141px left offset, 16px * 3.125 = 50px top offset */
         .agent-photo {
+            position: absolute;
             width: 330px;
             height: 330px;
             border-radius: 50%;
@@ -315,6 +306,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            left: 141px;
+            top: 50px;
         }
         
         .agent-photo img {
@@ -323,8 +316,10 @@
             object-fit: cover;
         }
         
-        /* QR Code - 73.92px * 3.125 = 231px, border 2px -> 6px, padding 2.88px -> 9px */
+        /* QR Code - positioned at right side of Grid 16 */
+        /* 274px * 3.125 = 856px left offset, 32px * 3.125 = 100px top offset */
         .qr-code {
+            position: absolute;
             width: 231px;
             height: 231px;
             border: 6px solid black;
@@ -332,6 +327,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            left: 856px;
+            top: 100px;
         }
         
         .qr-code img {
@@ -340,19 +337,28 @@
             object-fit: contain;
         }
         
-        /* Agent Name - 21pt = 28px -> 88px, bold, center, mb: 3.84px -> 12px */
+        /* Agent Name - positioned below photo */
+        /* 20px * 3.125 = 63px left, 130px * 3.125 = 406px top */
         .agent-name {
-            font-size: 88px;
+            position: absolute;
+            font-size: 50px;
             font-weight: bold;
             text-align: center;
-            margin-bottom: 12px;
+            left: 63px;
+            right: 250px;
+            top: 406px;
         }
         
-        /* Agent Title/Phone - 10pt = 13.33px -> 42px, center, line-height 1.4 */
+        /* Agent Title/Phone - below name */
+        /* 155px * 3.125 = 484px top */
         .agent-info {
-            font-size: 42px;
+            position: absolute;
+            font-size: 28px;
             text-align: center;
             line-height: 1.4;
+            left: 63px;
+            right: 250px;
+            top: 484px;
         }
         
         .photo-placeholder {
@@ -484,29 +490,28 @@
             <!-- Second Accent Divider -->
             <div class="accent-divider-2"></div>
             
-            <!-- Agent Section - Exact Flyer Maker layout: Photo + QR side by side, Name/Info below -->
+            <!-- Agent Section - Absolute positioned elements: Photo in Grid 15, QR in Grid 16 -->
             <div class="agent-section">
-                <!-- Top Row: Photo and QR side by side -->
-                <div class="agent-top-row">
-                    <div class="agent-photo">
-                        {{#if agentPhoto}}
-                        <img src="{{agentPhoto}}" alt="{{agentName}}" style="{{{agentPhotoStyle}}}" />
-                        {{else}}
-                        <svg viewBox="0 0 24 24" fill="#9ca3af" width="180" height="180">
-                            <circle cx="12" cy="8" r="4"/>
-                            <path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>
-                        </svg>
-                        {{/if}}
-                    </div>
-                    {{#if qrCodeUrl}}
-                    <div class="qr-code">
-                        <img src="{{qrCodeUrl}}" alt="QR Code" />
-                    </div>
+                <!-- Agent Photo - absolute positioned in Grid 15 -->
+                <div class="agent-photo">
+                    {{#if agentPhoto}}
+                    <img src="{{agentPhoto}}" alt="{{agentName}}" style="{{{agentPhotoStyle}}}" />
+                    {{else}}
+                    <svg viewBox="0 0 24 24" fill="#9ca3af" width="180" height="180">
+                        <circle cx="12" cy="8" r="4"/>
+                        <path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>
+                    </svg>
                     {{/if}}
                 </div>
-                <!-- Agent Name -->
+                <!-- QR Code - absolute positioned in Grid 16 -->
+                {{#if qrCodeUrl}}
+                <div class="qr-code">
+                    <img src="{{qrCodeUrl}}" alt="QR Code" />
+                </div>
+                {{/if}}
+                <!-- Agent Name - absolute positioned below photo -->
                 <div class="agent-name">{{agentName}}</div>
-                <!-- Agent Title & Phone -->
+                <!-- Agent Title & Phone - absolute positioned below name -->
                 <div class="agent-info">
                     <div>{{agentTitle}}</div>
                     <div>{{agentPhone}}</div>

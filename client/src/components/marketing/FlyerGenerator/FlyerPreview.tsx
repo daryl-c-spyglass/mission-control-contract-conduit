@@ -271,63 +271,83 @@ export function FlyerPreview({
           data-layout-id="divider-2"
         />
 
-        {/* Agent Card Container: 335px width, starts @ 701.72px (per reference) */}
-        {/* Photo + QR side by side, then name/info below */}
+        {/* Agent Card Container: fills remaining space after divider 2 (~408px to 768px = 360px) */}
+        {/* Photo centered in Grid 15, QR at right of Grid 16 */}
         <div 
-          className="flex flex-col items-center"
+          className="relative flex-1"
           style={{ 
-            width: '335px',
-            paddingLeft: '27px',
             paddingTop: '16.32px',
           }}
           data-layout-id="agent-card"
         >
-          {/* Top Row - Photo and QR side by side: gap: 16px, mb: 8px */}
-          <div className="flex items-center" style={{ gap: '16px', marginBottom: '8px' }}>
-            {/* Agent Photo - 105.6px × 105.6px circular */}
-            <div 
-              className="rounded-full overflow-hidden bg-gray-200 flex items-center justify-center"
-              style={{ width: '105.6px', height: '105.6px' }}
-            >
-              {images.agentPhoto ? (
-                <img
-                  src={images.agentPhoto}
-                  alt="Agent"
-                  className="w-full h-full object-cover"
-                  style={getTransformStyle(imageTransforms.agentPhoto)}
-                />
-              ) : (
-                <User className="w-10 h-10 text-gray-400" />
-              )}
-            </div>
-            {/* QR Code - 73.92px × 73.92px, border 2px black, padding 2.88px */}
-            <div 
-              className="flex items-center justify-center"
-              style={{ 
-                width: '73.92px', 
-                height: '73.92px', 
-                border: '2px solid #000',
-                padding: '2.88px',
-              }}
-            >
-              {images.qrCode ? (
-                <img src={images.qrCode} alt="QR Code" className="w-full h-full object-contain" />
-              ) : (
-                <QrCode className="w-full h-full text-gray-400" />
-              )}
-            </div>
-          </div>
-          {/* Agent Name - 21pt bold, center, mb: 3.84px */}
+          {/* Agent Photo - positioned center of Grid 15 area */}
+          {/* Grid 15 = 408-612px, center = 510px, photo 105.6px, left edge = 510 - 52.8 = 457.2px */}
+          {/* From agent card start (~412px): 457.2 - 412 = 45.2px offset */}
           <div 
-            className="font-bold text-center"
-            style={{ fontSize: '21pt', marginBottom: '3.84px' }}
+            className="absolute rounded-full overflow-hidden bg-gray-200 flex items-center justify-center"
+            style={{ 
+              width: '105.6px', 
+              height: '105.6px',
+              left: '45px',
+              top: '16px',
+            }}
+          >
+            {images.agentPhoto ? (
+              <img
+                src={images.agentPhoto}
+                alt="Agent"
+                className="w-full h-full object-cover"
+                style={getTransformStyle(imageTransforms.agentPhoto)}
+              />
+            ) : (
+              <User className="w-10 h-10 text-gray-400" />
+            )}
+          </div>
+          
+          {/* QR Code - positioned at right side of Grid 16 */}
+          {/* Grid 16 right edge = 768px (from section start), QR 73.92px, left edge = 768 - 73.92 - 8px margin = ~686px */}
+          {/* From agent card start (~412px): 686 - 412 = 274px offset */}
+          <div 
+            className="absolute flex items-center justify-center"
+            style={{ 
+              width: '73.92px', 
+              height: '73.92px', 
+              border: '2px solid #000',
+              padding: '2.88px',
+              left: '274px',
+              top: '32px',
+            }}
+          >
+            {images.qrCode ? (
+              <img src={images.qrCode} alt="QR Code" className="w-full h-full object-contain" />
+            ) : (
+              <QrCode className="w-full h-full text-gray-400" />
+            )}
+          </div>
+          
+          {/* Agent Name - positioned below photo, centered between photo and QR */}
+          <div 
+            className="absolute font-bold text-center"
+            style={{ 
+              fontSize: '16pt', 
+              left: '20px',
+              right: '80px',
+              top: '130px',
+            }}
           >
             {data.agentName || ''}
           </div>
-          {/* Agent Title & Phone - 10pt, center, line-height 1.4 */}
+          
+          {/* Agent Title & Phone - below name */}
           <div 
-            className="text-center"
-            style={{ fontSize: '10pt', lineHeight: 1.4 }}
+            className="absolute text-center"
+            style={{ 
+              fontSize: '9pt', 
+              lineHeight: 1.4,
+              left: '20px',
+              right: '80px',
+              top: '155px',
+            }}
           >
             <div>{data.agentTitle || ''}</div>
             <div>{data.phone || ''}</div>
