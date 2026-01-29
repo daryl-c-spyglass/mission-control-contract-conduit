@@ -43,10 +43,23 @@ interface FlyerGeneratorProps {
 export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGeneratorProps) {
   const { toast } = useToast();
   const previewRef = useRef<HTMLDivElement>(null);
+  const leftPaneRef = useRef<HTMLDivElement>(null);
+  const rightPaneRef = useRef<HTMLDivElement>(null);
 
-  // Scroll to top when component mounts
+  // Scroll all panes to top when component mounts
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
+    // Reset left pane scroll (ScrollArea viewport)
+    if (leftPaneRef.current) {
+      const viewport = leftPaneRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (viewport) {
+        viewport.scrollTop = 0;
+      }
+    }
+    // Reset right pane scroll
+    if (rightPaneRef.current) {
+      rightPaneRef.current.scrollTop = 0;
+    }
   }, []);
 
   const [showGrid, setShowGrid] = useState(false);
@@ -742,7 +755,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
       {/* Main Content - Two Column Layout */}
       <div className="flex flex-col lg:flex-row">
         {/* Left Pane - Scrollable Form Panel */}
-        <div className="w-full lg:w-[420px] lg:min-w-[420px] border-r border-border bg-card">
+        <div ref={leftPaneRef} className="w-full lg:w-[420px] lg:min-w-[420px] border-r border-border bg-card">
           <ScrollArea className="h-[calc(100vh-64px)]">
             <FlyerForm
               form={form}
@@ -817,7 +830,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
         </div>
 
         {/* Right Pane - Live Preview (Sticky) */}
-        <div className="flex-1 bg-muted/30 p-6 lg:p-8 overflow-auto">
+        <div ref={rightPaneRef} className="flex-1 bg-muted/30 p-6 lg:p-8 overflow-auto">
           <div className="sticky top-24">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-medium text-muted-foreground">Live Preview</h2>
