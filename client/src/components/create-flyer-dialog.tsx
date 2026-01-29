@@ -999,10 +999,15 @@ export function CreateFlyerDialog({
   }, [mlsData?.mlsNumber, transaction.mlsNumber, maxPhotos, mlsPhotos, extractImageId, toast]);
 
   const getPhotosForFlyer = useCallback((): string[] => {
-    const mlsUrls = selectedPhotos.map(url => 
-      url.startsWith('data:') ? url : `/api/proxy-image?url=${encodeURIComponent(url)}`
-    );
-    const combined = [...mlsUrls, ...uploadedPhotos];
+    const photoUrls = selectedPhotos.map(url => {
+      // Keep data URLs and local URLs as-is
+      if (url.startsWith('data:') || url.startsWith('/objects/') || url.startsWith('/api/')) {
+        return url;
+      }
+      // Proxy external URLs (MLS photos)
+      return `/api/proxy-image?url=${encodeURIComponent(url)}`;
+    });
+    const combined = [...photoUrls, ...uploadedPhotos];
     return combined.slice(0, maxPhotos);
   }, [selectedPhotos, uploadedPhotos, maxPhotos]);
 
@@ -1726,11 +1731,16 @@ export function CreateFlyerDialog({
                       {mlsPhotos.map((photo, index) => {
                         const isSelected = selectedPhotos.includes(photo);
                         const selectionIndex = selectedPhotos.indexOf(photo);
-                        const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(photo)}`;
+                        // Use direct URL for local photos, proxy for external URLs
+                        const isLocalUrl = photo.startsWith('/objects/') || photo.startsWith('/api/');
+                        const displayUrl = isLocalUrl ? photo : `/api/proxy-image?url=${encodeURIComponent(photo)}`;
                         const insight = photoInsights[photo];
                         const roomType = insight?.classification && insight.classification !== "Unknown" 
                           ? insight.classification 
                           : null;
+                        // Determine label: user upload or MLS photo
+                        const isUserUpload = photo.startsWith('/objects/');
+                        const photoLabel = isUserUpload ? `Photo ${index + 1}` : `MLS Photo ${index + 1}`;
                         return (
                           <div key={index} className="relative aspect-square group">
                             <button
@@ -1744,8 +1754,8 @@ export function CreateFlyerDialog({
                               data-testid={`button-mls-photo-${index}`}
                             >
                               <img
-                                src={proxyUrl}
-                                alt={`MLS Photo ${index + 1}`}
+                                src={displayUrl}
+                                alt={photoLabel}
                                 className="w-full h-full object-cover"
                                 loading="lazy"
                               />
@@ -1773,7 +1783,7 @@ export function CreateFlyerDialog({
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setExpandedPhotoUrl(proxyUrl);
+                                setExpandedPhotoUrl(displayUrl);
                               }}
                               className="absolute top-0.5 right-0.5 p-0.5 bg-black/50 hover:bg-black/70 rounded text-white opacity-0 group-hover:opacity-100 transition-opacity z-10"
                               data-testid={`button-expand-photo-${index}`}

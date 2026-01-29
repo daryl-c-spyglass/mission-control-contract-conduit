@@ -183,14 +183,22 @@ export function autoSelectPhotosWithInfo(photos: (PhotoWithInsights | string)[])
 
   const getPhotoUrl = (photo: PhotoWithInsights | string): string => {
     if (typeof photo === 'string') {
-      // Handle relative paths from Repliers
+      // Keep local paths as-is (user uploads, object storage)
+      if (photo && (photo.startsWith('/objects/') || photo.startsWith('/api/') || photo.startsWith('data:'))) {
+        return photo;
+      }
+      // Handle relative paths from Repliers CDN
       if (photo && !photo.startsWith('http')) {
         return `${CDN_BASE}${photo}`;
       }
       return photo;
     }
     let url = photo.href || photo.highResUrl || photo.largeUrl || photo.url || photo.Uri || '';
-    // Handle relative paths
+    // Keep local paths as-is
+    if (url && (url.startsWith('/objects/') || url.startsWith('/api/') || url.startsWith('data:'))) {
+      return url;
+    }
+    // Handle relative paths from CDN
     if (url && !url.startsWith('http')) {
       url = `${CDN_BASE}${url}`;
     }
