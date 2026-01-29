@@ -5,6 +5,10 @@ import path from 'path';
 import Handlebars from 'handlebars';
 import { execSync } from 'child_process';
 import crypto from 'crypto';
+import { ObjectStorageService, ObjectNotFoundError } from '../replit_integrations/object_storage';
+
+// Create an instance of the object storage service for reading uploaded files
+const objectStorageService = new ObjectStorageService();
 
 // 8.5x11 at 300 DPI - moved to top for use in launchBrowser
 const FLYER_WIDTH = 2550;
@@ -126,6 +130,35 @@ async function imageToBase64(imageUrl: string): Promise<string> {
       if (urlMatch) {
         imageUrl = decodeURIComponent(urlMatch[1]);
         console.log('Extracted CDN URL from proxy:', imageUrl);
+      }
+    }
+    
+    // Handle /objects/ paths (user-uploaded files in object storage)
+    if (imageUrl.startsWith('/objects/')) {
+      console.log('Reading from object storage:', imageUrl);
+      try {
+        const objectFile = await objectStorageService.getObjectEntityFile(imageUrl);
+        const [downloadBuffer] = await objectFile.download();
+        const buffer = Buffer.from(downloadBuffer);
+        // Determine MIME type from file extension or metadata
+        const ext = path.extname(imageUrl).slice(1).toLowerCase() || 'png';
+        const mimeTypes: Record<string, string> = {
+          'png': 'image/png',
+          'jpg': 'image/jpeg',
+          'jpeg': 'image/jpeg',
+          'gif': 'image/gif',
+          'webp': 'image/webp',
+        };
+        const mimeType = mimeTypes[ext] || 'image/png';
+        console.log('Object storage file loaded, size:', buffer.length, 'type:', mimeType);
+        return `data:${mimeType};base64,${buffer.toString('base64')}`;
+      } catch (objError: any) {
+        if (objError instanceof ObjectNotFoundError) {
+          console.error('Object not found in storage:', imageUrl);
+        } else {
+          console.error('Error reading from object storage:', imageUrl, objError.message);
+        }
+        return '';
       }
     }
     
