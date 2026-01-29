@@ -4218,6 +4218,7 @@ Generate only the headline, nothing else.`;
       const { id } = req.params;
       const format = req.query.format as string || 'png';
       const saveOnly = req.query.saveOnly === 'true';
+      const postToSlack = req.query.postToSlack === 'true';
       const data = req.body;
 
       // Validate transaction exists
@@ -4295,6 +4296,34 @@ Generate only the headline, nothing else.`;
           metadata: { format, createdBy: userId, flyerData: data },
         });
         console.log(`[FlyerGenerator] Saved flyer to marketing assets`);
+        
+        // Send Slack notification if postToSlack is true and transaction has Slack channel
+        if (postToSlack && transaction.slackChannelId) {
+          try {
+            const userId = req.user?.claims?.sub;
+            let shouldNotify = true;
+            
+            if (userId) {
+              const userPrefs = await storage.getUserNotificationPreferences(userId);
+              shouldNotify = userPrefs?.notifyMarketingAssets ?? true;
+            }
+            
+            if (shouldNotify) {
+              const address = transaction.propertyAddress || data.address || 'Unknown Property';
+              await sendMarketingNotification(
+                transaction.slackChannelId,
+                'Flyer',
+                address,
+                `data:image/png;base64,${buffer.toString('base64')}`,
+                `${addressSlug}_flyer.png`
+              );
+              console.log(`[FlyerGenerator] Posted flyer to Slack channel ${transaction.slackChannelId}`);
+            }
+          } catch (slackError: any) {
+            console.error('[FlyerGenerator] Failed to post to Slack:', slackError.message);
+            // Don't fail the export just because Slack failed
+          }
+        }
       } catch (saveError: any) {
         console.error('[FlyerGenerator] Failed to save to marketing assets:', saveError.message);
       }

@@ -6,7 +6,8 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Download, Grid3X3, Loader2, Save } from 'lucide-react';
+import { ArrowLeft, Download, Grid3X3, Loader2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { FlyerForm } from './FlyerForm';
 import { FlyerPreview } from './FlyerPreview';
@@ -135,6 +136,9 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   // QR Code URL state
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [isGeneratingShareableLink, setIsGeneratingShareableLink] = useState(false);
+  
+  // Post to Slack option (matches Create Graphics modal)
+  const [postToSlack, setPostToSlack] = useState(true);
 
   // Logo controls state
   const [logoScales, setLogoScales] = useState({ primary: 1, secondary: 1 });
@@ -683,6 +687,61 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
     },
   });
 
+  // Combined Save & Download mutation (saves to My Assets AND downloads PNG)
+  const saveAndDownloadMutation = useMutation({
+    mutationFn: async () => {
+      const exportData = {
+        ...watchedValues,
+        ...images,
+        imageTransforms,
+        logoScales,
+        dividerPosition,
+        secondaryLogoOffsetY,
+        postToSlack, // Include Slack notification preference
+      };
+      
+      // Call export endpoint which saves to assets and returns the blob for download
+      const response = await apiRequest('POST', `/api/transactions/${transactionId}/export-flyer?format=png&postToSlack=${postToSlack}`, exportData);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Save & Download failed:', errorText);
+        throw new Error('Failed to save and download flyer');
+      }
+      
+      return response.blob();
+    },
+    onSuccess: (blob) => {
+      // Download the PNG file
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const safeAddress = watchedValues.address?.replace(/[^a-zA-Z0-9]/g, '-') || 'property';
+      a.download = `flyer-${safeAddress}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      // Invalidate the marketing assets query to refresh the list
+      queryClient.invalidateQueries({ queryKey: [`/api/transactions/${transactionId}/marketing-assets`] });
+      
+      toast({ 
+        title: 'Flyer Saved & Downloaded', 
+        description: postToSlack 
+          ? 'Your flyer has been saved to My Assets, downloaded, and posted to Slack.' 
+          : 'Your flyer has been saved to My Assets and downloaded.'
+      });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: 'Save & Download Failed', 
+        description: error.message || 'Please try again.', 
+        variant: 'destructive' 
+      });
+    },
+  });
+
   const getPreviewScale = () => {
     if (scale === 'fit') return 0.55;
     return parseFloat(scale);
@@ -710,44 +769,57 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
               <p className="text-sm text-muted-foreground">Create stunning property flyers</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => saveAssetMutation.mutate()}
-              disabled={saveAssetMutation.isPending || exportMutation.isPending}
-              variant="outline"
-              className="gap-2"
-              data-testid="button-save-to-assets"
-            >
-              {saveAssetMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              Save to My Assets
-            </Button>
-            <Button
-              onClick={() => exportMutation.mutate('png')}
-              disabled={exportMutation.isPending || saveAssetMutation.isPending}
-              className="gap-2 bg-[#F37216] hover:bg-[#E06510] text-white"
-              data-testid="button-export-png"
-            >
-              {exportMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
+          <div className="flex items-center gap-4">
+            {/* Post to Slack checkbox */}
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="post-to-slack" 
+                checked={postToSlack} 
+                onCheckedChange={(checked) => setPostToSlack(checked === true)}
+                data-testid="checkbox-post-to-slack"
+              />
+              <div className="flex flex-col">
+                <Label htmlFor="post-to-slack" className="text-sm font-medium cursor-pointer">
+                  Post to Slack
+                </Label>
+                <span className="text-xs text-muted-foreground">Auto-post when saved</span>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={onBack}
+                variant="outline"
+                className="gap-2"
+                disabled={saveAndDownloadMutation.isPending || exportMutation.isPending}
+                data-testid="button-cancel-flyer"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => saveAndDownloadMutation.mutate()}
+                disabled={saveAndDownloadMutation.isPending || exportMutation.isPending}
+                className="gap-2 bg-[#F37216] hover:bg-[#E06510] text-white"
+                data-testid="button-save-download"
+              >
+                {saveAndDownloadMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                Save & Download
+              </Button>
+              <Button
+                onClick={() => exportMutation.mutate('cmyk')}
+                disabled={exportMutation.isPending || saveAndDownloadMutation.isPending}
+                variant="outline"
+                className="gap-2"
+                data-testid="button-export-cmyk"
+              >
                 <Download className="w-4 h-4" />
-              )}
-              Export PNG
-            </Button>
-            <Button
-              onClick={() => exportMutation.mutate('cmyk')}
-              disabled={exportMutation.isPending || saveAssetMutation.isPending}
-              variant="outline"
-              className="gap-2"
-              data-testid="button-export-cmyk"
-            >
-              <Download className="w-4 h-4" />
-              Export CMYK (Print)
-            </Button>
+                Export CMYK (Print)
+              </Button>
+            </div>
           </div>
         </div>
       </header>
