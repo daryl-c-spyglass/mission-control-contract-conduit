@@ -177,65 +177,71 @@ export function FlyerPreview({
 
       {/* Bottom Section - Reference: top: 766 + 24 bleed = 790, height: 270 */}
       {/* Position: x: 48, y: 790, width: 720, height: 270 */}
-      {/* Reference layout (overflows by design): Stats: 150.72px | Divider1 @ 240.72px | Description: 432px | Divider2 @ 697.72px | Agent: 335px */}
-      {/* Total: 988.72px - overflow is intentional to match reference positioning */}
+      {/* Bottom Section - Fixed 720px width layout with proper grid alignment */}
+      {/* Grid: Stats (Grid 13) | Divider1 | Description (Grid 14) | Divider2 | Agent Card (Grids 15-16) */}
+      {/* Total: 720px = 816px canvas - 48px padding each side */}
       <div 
-        className="absolute left-[48px] top-[790px] h-[270px] flex overflow-visible"
+        className="absolute left-[48px] top-[790px] h-[270px] flex overflow-hidden"
+        style={{ width: '720px' }}
         data-layout-id="bottom-section"
       >
-        {/* Column 1: Property Details - 150.72px */}
-        <div className="w-[150.72px] pt-[20px] pl-2 flex-shrink-0" data-layout-id="stats">
-          <div className="flex items-center gap-2 mb-4 text-[12pt] whitespace-nowrap">
-            <svg className="w-[28px] h-[28px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
+        {/* Column 1: Property Details - Grid 13 area (132px + 8px margin = 140px) */}
+        <div 
+          className="flex-shrink-0 pt-[20px] pl-2"
+          style={{ width: '132px', marginRight: '8px' }}
+          data-layout-id="stats"
+        >
+          <div className="flex items-center gap-2 mb-4 text-[11pt] whitespace-nowrap">
+            <svg className="w-[24px] h-[24px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
               <path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/>
             </svg>
-            <span>{data.bedrooms || '0'} bedrooms</span>
+            <span>{data.bedrooms || '0'} beds</span>
           </div>
-          <div className="flex items-center gap-2 mb-4 text-[12pt] whitespace-nowrap">
-            <svg className="w-[28px] h-[28px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
+          <div className="flex items-center gap-2 mb-4 text-[11pt] whitespace-nowrap">
+            <svg className="w-[24px] h-[24px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
               <path d="M9 6 6.5 3.5a1.5 1.5 0 0 0-1-.5C4.683 3 4 3.683 4 4.5V17a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/>
               <line x1="10" x2="8" y1="5" y2="7"/><line x1="2" x2="22" y1="12" y2="12"/>
             </svg>
-            <span>{data.bathrooms || '0'} bathrooms</span>
+            <span>{data.bathrooms || '0'} baths</span>
           </div>
-          <div className="flex items-center gap-2 mb-4 text-[12pt] whitespace-nowrap">
-            <svg className="w-[28px] h-[28px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
+          <div className="flex items-center gap-2 mb-4 text-[11pt] whitespace-nowrap">
+            <svg className="w-[24px] h-[24px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="1.5">
               <path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/>
             </svg>
-            <span>{data.sqft || '0'} sq. ft</span>
+            <span>{data.sqft || '0'} sqft</span>
           </div>
         </div>
 
-        {/* Divider 1 @ 240.72px: 4px width, 42px margin-left (per reference) */}
+        {/* Divider 1 @ ~140px (Grid 13/14 boundary) */}
         <div
           className="flex-shrink-0"
           style={{ 
             width: '4px', 
             height: '147.84px', 
             marginTop: '34.56px', 
-            marginLeft: '42px',
+            marginLeft: '8px',
+            marginRight: '8px',
             backgroundColor: accentColor 
           }}
           data-layout-id="divider-1"
         />
 
-        {/* Description column: 156px width to fit divider at Grid 15 line (~408px) */}
+        {/* Description column: Grid 14 area (196px width) */}
         <div 
-          className="w-[156px] flex-shrink-0 overflow-hidden" 
-          style={{ paddingLeft: '8px', paddingRight: '4px' }}
+          className="flex-shrink-0 overflow-hidden" 
+          style={{ width: '196px', paddingLeft: '8px', paddingRight: '8px' }}
           data-layout-id="description-column"
         >
-          {/* Headline: 11pt, weight 500, uppercase, letter-spacing 2px, line-height 1.3, mt 7.68px, mb 16.32px */}
-          {/* Added line-clamp-2 to limit headline to 2 lines max */}
+          {/* Headline: 10pt to fit narrower column */}
           <h3 
             className="text-gray-700 uppercase line-clamp-2"
             style={{
-              fontSize: '11pt',
-              fontWeight: 500,
-              letterSpacing: '2px',
+              fontSize: '10pt',
+              fontWeight: 600,
+              letterSpacing: '1px',
               lineHeight: 1.3,
               marginTop: '7.68px',
-              marginBottom: '16.32px',
+              marginBottom: '8px',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
             }}
@@ -243,13 +249,13 @@ export function FlyerPreview({
           >
             {data.introHeading || 'Property Headline'}
           </h3>
-          {/* Description: 11pt, line-height 1.5, immediately below headline */}
-          {/* Line clamp 6 for max 6 lines */}
+          {/* Description: 9pt for narrower column */}
           <p 
-            className="line-clamp-6"
+            className="line-clamp-8"
             style={{
-              fontSize: '11pt',
-              lineHeight: 1.5,
+              fontSize: '9pt',
+              lineHeight: 1.4,
+              color: '#555',
               overflow: 'hidden',
             }}
             data-layout-id="description"
@@ -258,81 +264,77 @@ export function FlyerPreview({
           </p>
         </div>
 
-        {/* Divider 2 at Grid 15 line (~408px): 4px width, 4px margin-left */}
+        {/* Divider 2 @ ~360px (Grid 14/15 boundary, ~408px from canvas left) */}
         <div
           className="flex-shrink-0"
           style={{ 
             width: '4px', 
             height: '147.84px', 
             marginTop: '34.56px', 
-            marginLeft: '4px',
+            marginLeft: '8px',
+            marginRight: '8px',
             backgroundColor: accentColor 
           }}
           data-layout-id="divider-2"
         />
 
-        {/* Agent Card Container: fills remaining space after divider 2 (~408px to 768px = 360px) */}
-        {/* Photo centered in Grid 15, QR at right of Grid 16 */}
+        {/* Agent Card Container: Grids 15-16 (remaining ~308px) */}
         <div 
-          className="relative flex-1"
+          className="relative flex-1 overflow-hidden"
           style={{ 
-            paddingTop: '16.32px',
+            paddingTop: '16px',
+            paddingLeft: '12px',
+            minWidth: '280px',
+            maxWidth: '308px',
           }}
           data-layout-id="agent-card"
         >
-          {/* Agent Photo - positioned center of Grid 15 area */}
-          {/* Grid 15 = 408-612px, center = 510px, photo 105.6px, left edge = 510 - 52.8 = 457.2px */}
-          {/* From agent card start (~412px): 457.2 - 412 = 45.2px offset */}
+          {/* Photo + QR Row - side by side layout */}
           <div 
-            className="absolute rounded-full overflow-hidden bg-gray-200 flex items-center justify-center"
-            style={{ 
-              width: '105.6px', 
-              height: '105.6px',
-              left: '45px',
-              top: '16px',
-            }}
+            className="flex items-center justify-center gap-4 mb-2"
+            data-layout-id="agent-media-row"
           >
-            {images.agentPhoto ? (
-              <img
-                src={images.agentPhoto}
-                alt="Agent"
-                className="w-full h-full object-cover"
-                style={getTransformStyle(imageTransforms.agentPhoto)}
-              />
-            ) : (
-              <User className="w-10 h-10 text-gray-400" />
-            )}
+            {/* Agent Photo - 100px circular */}
+            <div 
+              className="rounded-full overflow-hidden bg-gray-200 flex items-center justify-center flex-shrink-0"
+              style={{ width: '100px', height: '100px' }}
+            >
+              {images.agentPhoto ? (
+                <img
+                  src={images.agentPhoto}
+                  alt="Agent"
+                  className="w-full h-full object-cover"
+                  style={getTransformStyle(imageTransforms.agentPhoto)}
+                />
+              ) : (
+                <User className="w-10 h-10 text-gray-400" />
+              )}
+            </div>
+            
+            {/* QR Code - 70px square */}
+            <div 
+              className="flex items-center justify-center flex-shrink-0"
+              style={{ 
+                width: '70px', 
+                height: '70px', 
+                border: '2px solid #000',
+                padding: '2px',
+              }}
+            >
+              {images.qrCode ? (
+                <img src={images.qrCode} alt="QR Code" className="w-full h-full object-contain" />
+              ) : (
+                <QrCode className="w-full h-full text-gray-400" />
+              )}
+            </div>
           </div>
           
-          {/* QR Code - positioned at right side of Grid 16 */}
-          {/* Grid 16 right edge = 768px (from section start), QR 73.92px, left edge = 768 - 73.92 - 8px margin = ~686px */}
-          {/* From agent card start (~412px): 686 - 412 = 274px offset */}
+          {/* Agent Name - centered below media row */}
           <div 
-            className="absolute flex items-center justify-center"
-            style={{ 
-              width: '73.92px', 
-              height: '73.92px', 
-              border: '2px solid #000',
-              padding: '2.88px',
-              left: '274px',
-              top: '32px',
-            }}
-          >
-            {images.qrCode ? (
-              <img src={images.qrCode} alt="QR Code" className="w-full h-full object-contain" />
-            ) : (
-              <QrCode className="w-full h-full text-gray-400" />
-            )}
-          </div>
-          
-          {/* Agent Name - positioned below photo, centered between photo and QR */}
-          <div 
-            className="absolute font-bold text-center"
+            className="font-bold text-center truncate"
             style={{ 
               fontSize: '16pt', 
-              left: '20px',
-              right: '80px',
-              top: '130px',
+              maxWidth: '100%',
             }}
           >
             {data.agentName || ''}
@@ -340,16 +342,14 @@ export function FlyerPreview({
           
           {/* Agent Title & Phone - below name */}
           <div 
-            className="absolute text-center"
+            className="text-center"
             style={{ 
               fontSize: '9pt', 
               lineHeight: 1.4,
-              left: '20px',
-              right: '80px',
-              top: '155px',
+              color: '#555',
             }}
           >
-            <div>{data.agentTitle || ''}</div>
+            <div className="truncate">{data.agentTitle || ''}</div>
             <div>{data.phone || ''}</div>
           </div>
         </div>

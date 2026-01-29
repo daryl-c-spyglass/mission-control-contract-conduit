@@ -1,0 +1,410 @@
+# Replit Prompt: Fix Bottom Section Grid Alignment - Advanced Flyer Builder
+
+## 🎯 Objective
+Fix the bottom section (footer) layout in the Advanced Flyer Builder to match the Flyer Maker reference grid alignment. Currently, elements overflow the canvas by 268.72px, causing the Agent Photo and QR Code to render off-canvas.
+
+---
+
+## 📐 Problem Statement
+
+### Current Issue
+The bottom section uses a flexbox layout where column widths total **988.72px**, but only **720px** is available (816px canvas - 48px padding each side).
+
+### Current Layout (BROKEN - Overflows)
+| Element | Current Width | X Start | X End | Issue |
+|---------|--------------|---------|-------|-------|
+| Stats Column | 150.72px | 48px | 198.72px | OK |
+| Divider 1 margin | 42px | 198.72px | 240.72px | Too wide |
+| Divider 1 | 4px | 240.72px | 244.72px | OK |
+| Description | 432px | 244.72px | 676.72px | Too wide |
+| Divider 2 margin | 21px | 676.72px | 697.72px | - |
+| Divider 2 | 4px | 697.72px | 701.72px | Off canvas |
+| Agent Card | 335px | 701.72px | 1036.72px | **OFF CANVAS** |
+| **TOTAL** | **988.72px** | - | - | **Exceeds 720px by 268.72px** |
+
+### Target Layout (Reference from Flyer Maker)
+Based on the 4-column grid (816px ÷ 4 = 204px per grid):
+
+| Grid | X Start | X End | Content |
+|------|---------|-------|---------|
+| 13 | 0px | 204px | Stats (bed/bath/sqft) |
+| 14 | 204px | 408px | Headline + Description |
+| 15 | 408px | 612px | Agent Photo (centered) |
+| 16 | 612px | 816px | QR Code |
+
+---
+
+## ✅ Target Coordinates (at 1.0 scale = 816×1056)
+
+### Grid-Aligned Positions
+| Element | Target X Position | Target Width | Grid |
+|---------|------------------|--------------|------|
+| Bottom Section container | left: 24px, right: 24px | 720px total | - |
+| Stats Column | 48px - 180px | 132px | Grid 13 |
+| Divider 1 | ~196px | 4px | Grid 13/14 boundary |
+| Description Column | 204px - 400px | ~196px | Grid 14 |
+| Divider 2 | ~404px | 4px | Grid 14/15 boundary |
+| Agent Card Container | 412px - 768px | ~308px | Grids 15-16 |
+| Agent Photo center | ~510px | 105.6px diameter | Grid 15 center |
+| QR Code left edge | ~620px | 73.92px | Grid 16 |
+
+### Calculated Widths to Fit 720px
+| Element | Width | Margins/Padding | Total Space |
+|---------|-------|-----------------|-------------|
+| Stats | 132px | 8px right margin | 140px |
+| Divider 1 | 4px | 8px margins | 20px |
+| Description | 196px | 16px padding | 212px |
+| Divider 2 | 4px | 8px margins | 20px |
+| Agent Card | 308px | 20px left padding | 328px |
+| **TOTAL** | - | - | **720px ✓** |
+
+---
+
+## 🔧 Implementation Changes
+
+### 1. Update Bottom Section Container
+**File:** `client/src/components/flyer/AdvancedFlyerPreview.tsx` (or similar)
+
+```tsx
+{/* Bottom Section Container - FIXED to fit 720px */}
+<div 
+  data-layout-id="bottom-section"
+  style={{ 
+    position: "absolute",
+    left: "24px",
+    top: "766px",
+    width: "720px",  // Fixed width instead of right: 24px
+    height: "270px",
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: "0",
+    overflow: "hidden"  // Prevent overflow
+  }}
+>
+```
+
+### 2. Update Stats Column
+```tsx
+{/* Stats Column - Grid 13 */}
+<div 
+  data-layout-id="stats-column"
+  style={{ 
+    width: "132px",
+    flexShrink: 0,
+    paddingTop: "34.56px", 
+    paddingLeft: "7.68px",
+    paddingRight: "8px"
+  }}
+>
+  {/* Stats content unchanged */}
+</div>
+```
+
+### 3. Update Divider 1
+```tsx
+{/* Divider 1 - Grid 13/14 boundary */}
+<div 
+  data-layout-id="divider-1"
+  style={{ 
+    width: "4px",
+    height: "147.84px",
+    backgroundColor: accentColor || "#C9A227",
+    marginTop: "34.56px",
+    marginLeft: "8px",
+    marginRight: "8px",
+    flexShrink: 0
+  }} 
+/>
+```
+
+### 4. Update Description Column
+```tsx
+{/* Description Column - Grid 14 */}
+<div 
+  data-layout-id="description-column"
+  style={{ 
+    width: "196px",
+    flexShrink: 0,
+    paddingLeft: "8px",
+    paddingRight: "8px",
+    paddingTop: "7.68px",
+    overflow: "hidden"
+  }}
+>
+  {/* Headline */}
+  <div 
+    data-layout-id="headline"
+    style={{ 
+      fontSize: "10pt",  // Slightly smaller to fit
+      fontWeight: "600",
+      textTransform: "uppercase",
+      letterSpacing: "1px",
+      lineHeight: 1.3,
+      marginBottom: "8px",
+      color: "#333",
+      overflow: "hidden",
+      display: "-webkit-box",
+      WebkitLineClamp: 2,
+      WebkitBoxOrient: "vertical"
+    }}
+  >
+    {headline}
+  </div>
+  
+  {/* Description */}
+  <div 
+    data-layout-id="description"
+    style={{ 
+      fontSize: "9pt",  // Smaller to fit constrained width
+      lineHeight: 1.4,
+      color: "#555",
+      overflow: "hidden",
+      display: "-webkit-box",
+      WebkitLineClamp: 8,
+      WebkitBoxOrient: "vertical"
+    }}
+  >
+    {description}
+  </div>
+</div>
+```
+
+### 5. Update Divider 2
+```tsx
+{/* Divider 2 - Grid 14/15 boundary */}
+<div 
+  data-layout-id="divider-2"
+  style={{ 
+    width: "4px",
+    height: "147.84px",
+    backgroundColor: accentColor || "#C9A227",
+    marginTop: "34.56px",
+    marginLeft: "8px",
+    marginRight: "8px",
+    flexShrink: 0
+  }} 
+/>
+```
+
+### 6. Update Agent Card Container
+```tsx
+{/* Agent Card - Grids 15-16 */}
+<div 
+  data-layout-id="agent-card"
+  style={{ 
+    flex: 1,  // Take remaining space
+    minWidth: "280px",
+    maxWidth: "328px",
+    paddingLeft: "20px",
+    paddingTop: "16px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    overflow: "hidden"
+  }}
+>
+  {/* Photo + QR Row */}
+  <div 
+    data-layout-id="agent-media-row"
+    style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "16px",
+      marginBottom: "8px",
+      width: "100%"
+    }}
+  >
+    {/* Agent Photo - Centered in Grid 15 */}
+    <div 
+      data-layout-id="agent-photo"
+      style={{ 
+        width: "100px",
+        height: "100px",
+        borderRadius: "50%",
+        backgroundColor: "#E5E7EB",
+        overflow: "hidden",
+        flexShrink: 0
+      }}
+    >
+      {agentPhoto && (
+        <img 
+          src={agentPhoto}
+          alt="Agent"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover"
+          }}
+        />
+      )}
+    </div>
+    
+    {/* QR Code - Grid 16 */}
+    <div 
+      data-layout-id="qr-code"
+      style={{ 
+        width: "70px",
+        height: "70px",
+        border: "2px solid #000",
+        padding: "2px",
+        flexShrink: 0
+      }}
+    >
+      {qrCodeUrl && (
+        <img 
+          src={qrCodeUrl}
+          alt="QR Code"
+          style={{ 
+            width: "100%", 
+            height: "100%", 
+            objectFit: "contain" 
+          }}
+        />
+      )}
+    </div>
+  </div>
+  
+  {/* Agent Name */}
+  <div 
+    data-layout-id="agent-name"
+    style={{ 
+      fontSize: "18pt",
+      fontWeight: "bold",
+      textAlign: "center",
+      marginBottom: "4px",
+      maxWidth: "100%",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }}
+  >
+    {agentName}
+  </div>
+  
+  {/* Agent Title & Phone */}
+  <div 
+    data-layout-id="agent-details"
+    style={{ 
+      fontSize: "9pt",
+      textAlign: "center",
+      lineHeight: 1.4,
+      color: "#555"
+    }}
+  >
+    {agentTitle}
+    <br />
+    {agentPhone}
+  </div>
+</div>
+```
+
+---
+
+## 🖨️ PDF Template Updates
+
+Apply the same coordinate changes to the PDF template file:
+**File:** `server/templates/flyer-pdf-template.ts` (or similar)
+
+Ensure the PDF generation uses identical:
+- Column widths (132px, 196px, 308px)
+- Divider positions and margins (8px each side)
+- Font sizes (10pt headline, 9pt description, 18pt agent name, 9pt details)
+- Line clamp values for text overflow
+
+---
+
+## 📱 Mobile Optimization Requirements
+
+### Touch Targets
+- All interactive elements minimum 44x44px
+- Photo and QR code containers should be tappable if interactive
+
+### Responsive Scaling
+The flyer preview scales at 0.65x on smaller screens. Ensure:
+- Text remains readable at scaled sizes
+- Touch targets scale appropriately
+- No horizontal overflow at any viewport width
+
+### Device Testing Matrix
+| Device | Browser | Screen Size | Status |
+|--------|---------|-------------|--------|
+| iPad Pro | Safari | 1024 x 1366 | ☐ Test |
+| iPad Air/Mini | Safari | 768 x 1024 | ☐ Test |
+| iPhone 14/15 Pro | Safari | 393 x 852 | ☐ Test |
+| iPhone SE | Safari | 375 x 667 | ☐ Test |
+| Android Tablet | Chrome | 800 x 1280 | ☐ Test |
+| Android Phone | Chrome | 360 x 800 | ☐ Test |
+
+---
+
+## ✅ Verification Checklist
+
+### Grid Alignment Verification
+- [ ] Stats column fits within Grid 13 (0-204px)
+- [ ] Divider 1 at Grid 13/14 boundary (~200px)
+- [ ] Description column fits within Grid 14 (204-408px)
+- [ ] Divider 2 at Grid 14/15 boundary (~408px)
+- [ ] Agent Photo centered in Grid 15 (center at ~510px)
+- [ ] QR Code positioned in Grid 16 (left edge at ~620px)
+- [ ] Total bottom section width = 720px (no overflow)
+
+### Visual Verification
+- [ ] Enable grid overlay and verify alignment matches Flyer Maker reference
+- [ ] All elements visible within canvas bounds
+- [ ] No horizontal scrolling or clipping
+- [ ] Proper spacing between all columns
+- [ ] Dividers vertically aligned and same height
+
+### Export Verification
+- [ ] PNG export matches Live Preview exactly
+- [ ] CMYK PDF export matches Live Preview exactly
+- [ ] All text readable in exports
+- [ ] QR code scannable in exports
+- [ ] Agent photo renders correctly in exports
+
+### Content Overflow Testing
+- [ ] Long headline (50+ characters) - truncates with ellipsis
+- [ ] Long description (500+ characters) - truncates with line clamp
+- [ ] Long agent name (30+ characters) - truncates with ellipsis
+- [ ] All overflow handled gracefully without breaking layout
+
+---
+
+## 🚫 Do NOT Change
+
+- Header section layout (logos, property info, status badge)
+- Photo grid section (main photo, secondary photos)
+- Overall canvas dimensions (816×1056 at 1.0 scale)
+- Bleed/padding values (24px)
+- Accent color logic
+- Data flow from parent components
+
+---
+
+## 📋 Files to Update
+
+1. `client/src/components/flyer/AdvancedFlyerPreview.tsx` - Live preview component
+2. `server/templates/flyer-pdf-template.ts` - PDF generation template
+3. Any shared constants file for flyer dimensions
+
+---
+
+## 🧪 Testing Steps
+
+1. **Before Changes:** Screenshot current bottom section with grid overlay enabled
+2. **After Changes:** Compare side-by-side with Flyer Maker reference
+3. **Grid Overlay Test:** Verify Photo in Grid 15, QR in Grid 16
+4. **Export Test:** Generate PNG and PDF, compare to Live Preview
+5. **Overflow Test:** Enter maximum length content in all fields
+6. **Mobile Test:** Check preview on iPad and iPhone Safari
+
+---
+
+## 📎 Reference Images
+
+- **Target Layout:** Flyer Maker with grid overlay showing Photo in Grid 15, QR in Grid 16
+- **Current Issue:** Contract Conduit with Photo/QR pushed to far right (overflow)
+
+The goal is to match the Flyer Maker grid alignment exactly while maintaining all existing functionality.
