@@ -200,7 +200,9 @@ export interface CMAComparable {
   photos?: string[];
   mlsNumber?: string;
   status?: string;
+  lastStatus?: string;
   listDate?: string;
+  soldDate?: string | null;
   map?: {
     latitude: number;
     longitude: number;
@@ -213,6 +215,7 @@ export interface CMAComparable {
   lotSizeAcres?: number | null;
   lotSizeSquareFeet?: number | null;
   pricePerAcre?: number | null;
+  originalPrice?: number | null;
   soldPrice?: number | null;
   listPrice?: number;
   type?: string;
@@ -563,10 +566,13 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
         const soldPrice = comp.soldPrice ? parseFloat(comp.soldPrice) : null;
         const effectivePrice = soldPrice || listPrice;
         
+        const originalPrice = comp.originalPrice ? parseFloat(comp.originalPrice) : null;
+        
         return {
           address: comp.address?.full || compStreetAddress || "",
           price: effectivePrice,
           listPrice: listPrice,
+          originalPrice: originalPrice,
           soldPrice: soldPrice,
           bedrooms: comp.bedroomsTotal || comp.details?.numBedrooms || comp.beds || 0,
           bathrooms: comp.bathroomsFull || comp.details?.numBathrooms || comp.baths || 0,
@@ -1649,6 +1655,7 @@ export async function searchNearbyComparables(
       const lotData = buildLotSizeData(listing);
       const price = parseFloat(listing.listPrice) || 0;
       const soldPrice = listing.soldPrice ? parseFloat(listing.soldPrice) : null;
+      const originalPrice = listing.originalPrice ? parseFloat(listing.originalPrice) : null;
       const effectivePrice = soldPrice || price;
       
       return {
@@ -1656,7 +1663,9 @@ export async function searchNearbyComparables(
         address: displayAddress,
         price: price,
         listPrice: price,
+        originalPrice: originalPrice,
         soldPrice: soldPrice,
+        soldDate: listing.soldDate || listing.closeDate || null,
         bedrooms: parseInt(listing.details?.numBedrooms || listing.numBedrooms || '0'),
         bathrooms: parseInt(listing.details?.numBathrooms || listing.numBathrooms || '0'),
         sqft: typeof sqft === 'string' ? parseInt(sqft) || 0 : sqft,
