@@ -2611,7 +2611,7 @@ export function CreateFlyerDialog({
                 ) : (
                   <Download className="h-4 w-4 mr-2" />
                 )}
-                Download Flyer
+                Save & Download
               </Button>
             </div>
           </form>
