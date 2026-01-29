@@ -107,7 +107,7 @@ export function FlyerPreview({
       </div>
 
       <div
-        className="absolute left-[90px] top-[89px] text-[11pt] text-gray-700 tracking-[2px] uppercase font-medium"
+        className="absolute left-[90px] top-[114px] text-[11pt] text-gray-700 tracking-[2px] uppercase font-medium"
       >
         {data.address || 'PROPERTY ADDRESS'}
       </div>
