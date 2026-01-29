@@ -177,7 +177,7 @@ export function FlyerPreview({
 
       {/* Bottom Section - Reference: top: 766 + 24 bleed = 790, height: 270 */}
       {/* Position: x: 48, y: 790, width: 720, height: 270 */}
-      {/* Stats: 150.72px | Description: 432px | Agent: remaining */}
+      {/* Stats: 150.72px | Divider1 (4px + 42px margin) | Description: 432px (pl-32px, pr-10px) | Divider2 (4px + 21px margin) | Agent: remaining */}
       <div 
         className="absolute left-[48px] top-[790px] w-[720px] h-[270px] flex"
         data-layout-id="bottom-section"
@@ -205,29 +205,67 @@ export function FlyerPreview({
           </div>
         </div>
 
-        {/* Accent divider at column 1/2 boundary */}
+        {/* STATIC Divider 1 (after Stats): 4px width, 147.84px height, 34.56px margin-top, 42px margin-left */}
         <div
-          className="w-1 h-[148px] mt-[20px] flex-shrink-0"
-          style={{ backgroundColor: accentColor }}
+          className="flex-shrink-0"
+          style={{ 
+            width: '4px', 
+            height: '147.84px', 
+            marginTop: '34.56px', 
+            marginLeft: '42px',
+            backgroundColor: accentColor 
+          }}
+          data-layout-id="divider-1"
         />
 
-        {/* Description column: 432px per reference */}
-        <div className="w-[432px] pl-5 pr-3 flex-shrink-0" data-layout-id="description-column">
-          <h3 className="text-[10pt] font-medium uppercase tracking-[2px] leading-[1.3] mb-3 mt-2 text-gray-700">
+        {/* Description column: 432px width, padding left 32px, right 10px */}
+        <div 
+          className="w-[432px] flex-shrink-0" 
+          style={{ paddingLeft: '32px', paddingRight: '10px' }}
+          data-layout-id="description-column"
+        >
+          {/* Headline: 11pt, weight 500, uppercase, letter-spacing 2px, line-height 1.3, mt 7.68px, mb 16.32px */}
+          <h3 
+            className="text-gray-700 uppercase"
+            style={{
+              fontSize: '11pt',
+              fontWeight: 500,
+              letterSpacing: '2px',
+              lineHeight: 1.3,
+              marginTop: '7.68px',
+              marginBottom: '16.32px',
+            }}
+            data-layout-id="headline"
+          >
             {data.introHeading || 'Property Headline'}
           </h3>
-          <p className="text-[10pt] leading-[1.5] line-clamp-6">
+          {/* Description: 11pt, line-height 1.5, immediately below headline */}
+          <p 
+            className="line-clamp-6"
+            style={{
+              fontSize: '11pt',
+              lineHeight: 1.5,
+            }}
+            data-layout-id="description"
+          >
             {data.introDescription || 'Property description will appear here...'}
           </p>
         </div>
 
-        {/* Accent divider at column 3/4 boundary */}
+        {/* STATIC Divider 2 (after Description): 4px width, 147.84px height, 34.56px margin-top, 21px margin-left */}
         <div
-          className="w-1 h-[148px] mt-[20px] flex-shrink-0"
-          style={{ backgroundColor: accentColor }}
+          className="flex-shrink-0"
+          style={{ 
+            width: '4px', 
+            height: '147.84px', 
+            marginTop: '34.56px', 
+            marginLeft: '21px',
+            backgroundColor: accentColor 
+          }}
+          data-layout-id="divider-2"
         />
 
-        {/* Agent card: remaining width (720 - 150.72 - 432 - dividers ≈ 133px) */}
+        {/* Agent card: remaining width (720 - 150.72 - 42 - 4 - 432 - 21 - 4 ≈ 66.28px + flex growth) */}
         <div className="flex-1 pl-3 flex flex-col items-center pt-2" data-layout-id="agent-card">
           <div className="flex gap-3 items-center mb-2">
             <div className="w-[80px] h-[80px] rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
