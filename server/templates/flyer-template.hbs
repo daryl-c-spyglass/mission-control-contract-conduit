@@ -27,35 +27,36 @@
         }
         
         /* Header - matches FlyerPreview: left-6 (24px), top-4 (16px), right-6 (24px), h-[80px] (80px) */
-        /* Scaled: 24*3.125=75, 16*3.125=50, 80*3.125=250 */
-        .header {
-            position: absolute;
-            left: 75px;
-            top: 50px;
-            right: 75px;
-            height: 250px;
-            display: flex;
-            align-items: center;
-        }
-        
-        /* Accent Bar - aligned with photos, moved down 25px from logo */
-        /* top: 25px * 3.125 = 78px */
+        /* Accent Bar - positioned from canvas at left 48px, top 25px */
+        /* left: 48px * 3.125 = 150px, top: 25px * 3.125 = 78px */
         /* 6px * 3.125 = 19px wide, 83px * 3.125 = 259px tall */
         .accent-bar {
             position: absolute;
-            left: 75px;
+            left: 150px;
             top: 78px;
             width: 19px;
             height: 259px;
             background-color: #8b7d6b;
         }
         
-        /* Logo Container - ml-4 (16px) -> 50px */
+        /* Header with logos - centered with accent bar center */
+        /* left: 72px * 3.125 = 225px, top: 42px * 3.125 = 131px */
+        /* height: 50px * 3.125 = 156px */
+        .header {
+            position: absolute;
+            left: 225px;
+            top: 131px;
+            right: 75px;
+            height: 156px;
+            display: flex;
+            align-items: center;
+        }
+        
+        /* Logo Container - no margin needed now */
         .logo-container {
             display: flex;
             align-items: center;
             height: 100%;
-            margin-left: 50px;
         }
         
         /* Primary Logo Section */
@@ -66,9 +67,9 @@
             height: 100%;
         }
         
-        /* max-h-[55px] -> 55*3.125 = 172px */
+        /* max-h-[50px] -> 50*3.125 = 156px */
         .logo-image {
-            max-height: 172px;
+            max-height: 156px;
             object-fit: contain;
         }
         
@@ -97,10 +98,11 @@
         }
         
         /* Price Badge - 144px * 3.125 = 450px wide, 58px * 3.125 = 181px tall */
+        /* Positioned relative to canvas top, not header */
         .price-badge {
             position: absolute;
             right: 0;
-            top: 0;
+            top: -50px;
             width: 450px;
             height: 181px;
             background-color: #6b7b6e;
@@ -391,11 +393,11 @@
 </head>
 <body>
     <div class="page">
-        <!-- Header -->
+        <!-- Accent Bar - positioned from canvas -->
+        <div class="accent-bar"></div>
+        
+        <!-- Header with Logos -->
         <div class="header">
-            <!-- Accent Bar -->
-            <div class="accent-bar"></div>
-            
             <!-- Logo Container -->
             <div class="logo-container">
                 <!-- Primary Logo -->

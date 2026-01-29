@@ -39,24 +39,26 @@ export function FlyerPreview({
       style={{ width: '816px', height: '1056px', fontFamily: 'Arial, sans-serif' }}
       data-testid="flyer-preview"
     >
-      {/* Header with Logos */}
-      <div className="absolute left-6 top-4 right-6 h-[80px] flex items-center">
-        {/* Accent Bar - aligned with photos (left 48px), moved down 25px from logo */}
-        <div
-          className="absolute left-[24px] top-[25px] w-[6px] h-[83px]"
-          style={{ backgroundColor: accentColor }}
-        />
-        
+      {/* Accent Bar - positioned absolutely from canvas, left 48px aligned with photos */}
+      {/* top: 25px, height: 83px, center at 66.5px */}
+      <div
+        className="absolute left-[48px] top-[25px] w-[6px] h-[83px]"
+        style={{ backgroundColor: accentColor }}
+      />
+
+      {/* Header with Logos - centered vertically with accent bar center (66.5px) */}
+      {/* Logo container height 50px, so top = 66.5 - 25 = 41.5px ≈ 42px */}
+      <div className="absolute left-[72px] top-[42px] right-6 h-[50px] flex items-center">
         {/* Company Logo Container */}
         <div 
-          className="flex items-center justify-center h-full ml-4"
+          className="flex items-center justify-center h-full"
           style={{ width: `${dividerPosition}px` }}
         >
           {images.companyLogo ? (
             <img 
               src={images.companyLogo} 
               alt="Company Logo" 
-              className="max-h-[55px] object-contain"
+              className="max-h-[50px] object-contain"
               style={{ 
                 transform: `scale(${logoScales.primary})`,
                 transformOrigin: 'center center',
@@ -100,7 +102,7 @@ export function FlyerPreview({
         </div>
         
         {/* Price Badge */}
-        <div className="absolute right-0 top-0 w-[144px] h-[58px] bg-[#6b7b6e] flex flex-col justify-center items-center text-white">
+        <div className="absolute right-0 top-[-26px] w-[144px] h-[58px] bg-[#6b7b6e] flex flex-col justify-center items-center text-white">
           <span className="text-[7pt] tracking-[2px]">LISTED AT</span>
           <span className="text-[14pt] font-bold">{data.price || '$0'}</span>
         </div>
