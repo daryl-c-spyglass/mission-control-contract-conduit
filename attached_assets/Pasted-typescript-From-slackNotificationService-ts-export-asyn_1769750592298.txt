@@ -1,0 +1,124 @@
+typescript// From slackNotificationService.ts
+export async function processClosingDateNotifications() {
+  // Get transactions with closing dates AND Slack channels
+  const transactionsToCheck = await db
+    .select()
+    .from(transactions)
+    .where(
+      and(
+        isNotNull(transactions.closingDate),
+        isNotNull(transactions.slackChannelId)
+      )
+    );
+
+  for (const transaction of transactionsToCheck) {
+    // Get the TRANSACTION OWNER's notification settings
+    const userPrefs = await getUserNotificationSettings(transaction.userId);
+    
+    // Check if user has this reminder enabled
+    if (!userPrefs.reminder3Days) {
+      console.log(`[Slack] SKIPPED (user disabled): for "${transaction.address}"`);
+      continue;
+    }
+    
+    // Send only to this transaction's channel
+    await sendNotificationIfNotSent(transaction, 'closing_3_days', transaction.slackChannelId, message);
+  }
+}
+```
+
+---
+
+### Why Other Users Are Receiving Spam
+
+The issue is **NOT** that notifications are going to the wrong users. The issue is:
+
+1. **Two schedulers running** = 2x notifications per interval
+2. **Legacy scheduler restarts on server restart** = triggers immediate check
+3. **No deduplication in legacy scheduler** = same notification sent multiple times
+
+So when **any user** has notifications enabled, their channels get spammed because the schedulers fire multiple times.
+
+---
+
+## 🔧 Updated Fix Prompt with User-Specific Context
+```
+## 🎯 OBJECTIVE
+Fix Slack notification spam while preserving user-specific notification behavior.
+
+## 📋 CURRENT ARCHITECTURE (CORRECT - DO NOT CHANGE)
+- Notifications are USER-SPECIFIC
+- Each user's Settings controls ONLY their transactions' notifications
+- If Daryl enables "3 days before", only Daryl's transaction channels get those reminders
+- Other agents' channels are NOT affected by Daryl's settings
+
+## 🔴 ROOT CAUSE OF SPAM
+Two schedulers running simultaneously in server/index.ts:
+1. Legacy `startClosingRemindersScheduler()` - NO database deduplication
+2. New `initializeNotificationCron()` - HAS proper deduplication
+
+The legacy scheduler sends duplicates because it resets on every server restart.
+
+## ✅ REQUIRED FIXES
+
+### FIX 1: Disable Legacy Scheduler (CRITICAL)
+In `server/index.ts`, comment out the legacy scheduler:
+```typescript
+// REMOVE THIS LINE:
+// startClosingRemindersScheduler();
+
+// KEEP THIS ONE (has proper deduplication):
+initializeNotificationCron();
+```
+
+### FIX 2: Ensure Kill Switch Works at ALL Entry Points
+Add DISABLE_SLACK_NOTIFICATIONS check at the top of:
+
+1. `server/cron/notificationCron.ts` - initializeNotificationCron()
+2. `server/services/slackNotificationService.ts` - processClosingDateNotifications()
+3. `server/slack.ts` - sendClosingReminder()
+4. `server/services/closing-reminders.ts` - (legacy, but add for safety)
+```typescript
+if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+  console.log('[SLACK] Notifications disabled via env var - BLOCKED');
+  return;
+}
+```
+
+### FIX 3: Reduce Reminder Options (UI Change)
+In `client/src/components/settings/NotificationPreferences.tsx`:
+
+Change from 4 options (14, 7, 3, 0 days) to 2 options:
+- 3 days before
+- Day of closing
+```typescript
+const reminderOptions = [
+  { key: 'reminder3Days', label: '3 days before' },
+  { key: 'reminderDayOf', label: 'Day of closing' }
+];
+```
+
+Hide or remove the 14 days and 7 days checkboxes.
+
+### FIX 4: Verify User-Specific Logic is Working
+Add logging to confirm correct behavior:
+```typescript
+console.log(`[SLACK] Processing transaction: ${transaction.address}`);
+console.log(`[SLACK] Transaction owner userId: ${transaction.userId}`);
+console.log(`[SLACK] User prefs: ${JSON.stringify(userPrefs)}`);
+```
+
+## ✅ VERIFICATION
+After fix:
+1. Set DISABLE_SLACK_NOTIFICATIONS=true
+2. Restart server
+3. Check logs for "[SLACK] Notifications disabled" messages
+4. Confirm NO spam in any channels
+5. Later: Set DISABLE_SLACK_NOTIFICATIONS=false
+6. Verify only ONE notification per interval per transaction
+
+## 📱 MOBILE OPTIMIZATION
+For NotificationPreferences.tsx changes:
+- Touch targets minimum 44x44px
+- Stack checkboxes vertically on mobile
+- Min 16px font size

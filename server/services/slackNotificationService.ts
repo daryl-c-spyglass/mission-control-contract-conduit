@@ -299,7 +299,13 @@ export async function processClosingDateNotifications(): Promise<{
         continue;
       }
 
+      // User-specific notification lookup - each transaction owner controls their own settings
       const userPrefs = await getUserNotificationSettings(transaction.userId || '');
+      
+      console.log(`[Slack] Processing: "${transaction.propertyAddress}"`);
+      console.log(`[Slack]   Owner userId: ${transaction.userId || '(none)'}`);
+      console.log(`[Slack]   Channel: ${transaction.slackChannelId}`);
+      console.log(`[Slack]   User prefs: closingReminders=${userPrefs.closingReminders}, 3days=${userPrefs.reminder3Days}, dayOf=${userPrefs.reminderDayOf}`);
 
       if (!userPrefs.closingReminders) {
         console.log(`[Slack] SKIPPED (closing reminders disabled): "${transaction.propertyAddress}"`);
