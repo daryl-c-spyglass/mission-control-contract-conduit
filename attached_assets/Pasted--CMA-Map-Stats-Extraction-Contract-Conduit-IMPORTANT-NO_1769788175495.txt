@@ -1,0 +1,248 @@
+# CMA Map & Stats Extraction - Contract Conduit
+
+## ⚠️ IMPORTANT NOTE
+
+**This is an INQUIRY ONLY - NO CHANGES will be made to Contract Conduit.**
+
+The purpose of this prompt is to extract and document the exact implementation of the CMA Map and Stats views so they can be replicated in the Client Data Portal project.
+
+---
+
+## OBJECTIVE
+
+Extract the complete implementation details for:
+1. **CMA Map View** - Property markers on Mapbox
+2. **CMA Stats View** - Analytics and charts
+
+---
+
+## EXTRACTION REQUEST
+
+### PART 1: MAP VIEW
+
+Please provide the complete implementation for the CMA Map view:
+
+#### 1.1 Map Component Structure
+- Main map component file path and full code
+- How Mapbox is initialized (token, style, center, zoom)
+- Map container setup and responsive handling
+
+#### 1.2 Property Markers
+- How markers are created and styled
+- Price label formatting on markers
+- Color coding logic by status:
+  - Subject Property (Blue)
+  - Active (Green)
+  - Under Contract (Orange)
+  - Pending (Gray)
+  - Closed (Red)
+  - Leasing (Purple)
+- Marker clustering (if implemented)
+
+#### 1.3 Marker Interactions
+- Popup content and styling
+- Click handlers
+- Hover effects (if any)
+
+#### 1.4 Map Features
+- Legend component (position, styling, items)
+- Navigation controls
+- Zoom to fit all markers logic
+- Search area polygon/circle (if shown)
+
+#### 1.5 Data Flow
+- How properties are passed to the map
+- How subject property is identified
+- Coordinate extraction from property data
+- Handling missing coordinates
+
+#### 1.6 Map Styling
+- Day/Night mode support
+- Dark mode compatibility
+- Map style URL
+
+---
+
+### PART 2: STATS VIEW
+
+Please provide the complete implementation for the CMA Stats view:
+
+#### 2.1 Stats View Structure
+- Main stats component file path and full code
+- Section order and hierarchy
+- How data flows from parent to child components
+
+#### 2.2 Summary Cards Section
+- Card layout (grid columns)
+- Fields displayed:
+  - Average Price
+  - Price Per Sqft
+  - Avg Living Area
+- Range display format
+- Styling (colors, typography)
+
+#### 2.3 Statistics Summary Table
+- Table structure and columns
+- Metrics included:
+  - Price (Range, Average, Median)
+  - Price/SqFt
+  - Living Area
+  - Days on Market
+- Number formatting
+
+#### 2.4 Price Comparison Bar Chart
+- Chart library used (Recharts?)
+- Bar color (#EF4923 Spyglass orange?)
+- X-axis label formatting (address truncation, rotation)
+- Y-axis formatting ($K, $M)
+- Tooltip content
+- Responsive container setup
+
+#### 2.5 CMA Market Review Section
+- Layout (grid columns)
+- Text content generation
+- Dynamic values insertion
+- Status breakdown display
+
+#### 2.6 Days on Market Section
+- Header stats display (avg DOM, % of list price)
+- Left panel:
+  - Property list structure
+  - Thumbnail display
+  - Scrollable container (max-height)
+  - Property item layout (image, address, DOM, %)
+- Right panel:
+  - Scatter chart setup
+  - X-axis: Days on Market
+  - Y-axis: Price
+  - Point coloring logic:
+    - Green: ≥100% of list
+    - Yellow/Amber: 95-99%
+    - Red: <95%
+- Legend component
+- Click handlers for property items
+
+#### 2.7 Average Price/Sq. Ft. Section
+- Header display (count: "1 Subject, X Closed")
+- Left panel:
+  - Subject property highlight (top, blue text)
+  - Closed properties list
+  - Scrollable container
+  - $/sqft display per property
+- Right panel:
+  - Big average display ($XXX / Sq. Ft.)
+  - Explanatory text
+  - Scatter chart:
+    - X-axis: Square feet
+    - Y-axis: Price
+    - Blue dot: Subject
+    - Red dots: Closed comparables
+  - Checkbox legend (toggle subject/closed)
+
+#### 2.8 Statistics Calculation Functions
+- `calculateDetailedStats()` function
+- How averages are calculated
+- How medians are calculated
+- How ranges are determined
+- List price ratio calculation
+- Handling of missing/null values
+
+#### 2.9 Styling & Theme
+- Card styling
+- Dark mode support
+- Responsive breakpoints
+- Spyglass brand colors used
+
+---
+
+### PART 3: SHARED UTILITIES
+
+#### 3.1 Formatting Functions
+- `formatCurrency()` implementation
+- Price abbreviation ($K, $M)
+- Number formatting with commas
+- Percentage formatting
+
+#### 3.2 Status Utilities
+- Status color mapping
+- Status normalization
+- Filtering by status
+
+#### 3.3 Property Data Utilities
+- Coordinate extraction
+- Price extraction (soldPrice vs price vs listPrice)
+- $/sqft calculation
+
+---
+
+### PART 4: DEPENDENCIES
+
+List all dependencies used:
+- Mapbox GL JS version
+- Recharts (if used)
+- Any other charting libraries
+- UI component libraries
+
+---
+
+## OUTPUT FORMAT
+
+For each section, please provide:
+
+1. **File Path** - Where the code lives
+2. **Complete Code** - Full component/function code
+3. **Props Interface** - TypeScript interfaces
+4. **Usage Example** - How it's called from parent
+
+Example format:
+```
+### [Section Name]
+
+**File:** `client/src/components/cma/CMAMapView.tsx`
+
+**Interface:**
+```typescript
+interface CMAMapViewProps {
+  properties: CMAComparable[];
+  subjectProperty: PropertySnapshot;
+}
+```
+
+**Component:**
+```tsx
+// Full component code here
+```
+
+**Usage:**
+```tsx
+<CMAMapView 
+  properties={filteredProperties}
+  subjectProperty={cma.subjectPropertyData}
+/>
+```
+```
+
+---
+
+## QUESTIONS TO ANSWER
+
+1. What Mapbox style is used? (streets-v12, light-v11, etc.)
+2. How is the Mapbox token configured?
+3. What chart library is used for Stats charts?
+4. How are property thumbnails handled when missing?
+5. What is the max-height for scrollable property lists?
+6. Are there any animations or transitions?
+7. How is the "% of list price" calculated?
+8. What happens when there are no closed properties?
+
+---
+
+## REMINDER
+
+**NO CHANGES TO CONTRACT CONDUIT** - This is documentation/extraction only.
+
+The extracted code will be adapted for Client Data Portal in a separate prompt.
+
+---
+
+Please provide the complete implementation details for Map and Stats views.
