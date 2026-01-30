@@ -4,7 +4,8 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { startRepliersSync } from "./repliers-sync";
-import { startClosingRemindersScheduler } from "./services/closing-reminders";
+// LEGACY SCHEDULER DISABLED - was causing duplicate notifications without deduplication
+// import { startClosingRemindersScheduler } from "./services/closing-reminders";
 import { initializeNotificationCron } from "./cron/notificationCron";
 
 const app = express();
@@ -143,10 +144,13 @@ app.use((req, res, next) => {
       // Start automatic MLS data synchronization
       startRepliersSync();
       
-      // Start closing date reminders scheduler (legacy)
-      startClosingRemindersScheduler();
+      // LEGACY SCHEDULER DISABLED - was causing duplicate notifications
+      // The legacy scheduler had no database deduplication and would re-send 
+      // notifications every time the server restarted
+      // startClosingRemindersScheduler();
       
-      // Initialize new notification cron with deduplication (9 AM CT daily)
+      // Initialize new notification cron with proper deduplication (9 AM CT daily)
+      // This uses the sentNotifications table to prevent duplicates
       initializeNotificationCron();
     },
   );

@@ -5,8 +5,10 @@ let cronIntervalId: NodeJS.Timeout | null = null;
 let lastRunDate: string | null = null;
 
 export function initializeNotificationCron(): void {
+  // KILL SWITCH - check FIRST before any initialization
   if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
-    console.log(`[NotificationCron] ⚠️ Slack notifications DISABLED via environment variable`);
+    console.log(`[NotificationCron] 🔴 DISABLED - DISABLE_SLACK_NOTIFICATIONS=true`);
+    console.log(`[NotificationCron] ⚠️ No closing date reminders will be sent`);
     return;
   }
 

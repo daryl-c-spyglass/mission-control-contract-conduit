@@ -181,45 +181,27 @@ export function NotificationPreferences() {
             
             {/* Show reminder schedule options when Closing Date Reminders is enabled */}
             {option.key === "notifyClosingReminders" && prefs.notifyClosingReminders && (
-              <div className="ml-8 mt-2 p-4 bg-muted/20 rounded-md space-y-3 border-l-2 border-primary/30">
+              <div className="ml-4 sm:ml-8 mt-2 p-4 bg-muted/20 rounded-md space-y-3 border-l-2 border-primary/30">
                 <p className="text-sm font-medium text-muted-foreground">Send reminders:</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="reminder14Days"
-                      checked={prefs.reminder14Days}
-                      onCheckedChange={(checked) => updatePreference("reminder14Days", checked === true)}
-                      disabled={saving}
-                      data-testid="checkbox-reminder14Days"
-                    />
-                    <Label htmlFor="reminder14Days" className="text-sm cursor-pointer">14 days before</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="reminder7Days"
-                      checked={prefs.reminder7Days}
-                      onCheckedChange={(checked) => updatePreference("reminder7Days", checked === true)}
-                      disabled={saving}
-                      data-testid="checkbox-reminder7Days"
-                    />
-                    <Label htmlFor="reminder7Days" className="text-sm cursor-pointer">7 days before</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex items-center space-x-3 min-h-[44px]">
                     <Checkbox
                       id="reminder3Days"
                       checked={prefs.reminder3Days}
                       onCheckedChange={(checked) => updatePreference("reminder3Days", checked === true)}
                       disabled={saving}
+                      className="h-5 w-5"
                       data-testid="checkbox-reminder3Days"
                     />
                     <Label htmlFor="reminder3Days" className="text-sm cursor-pointer">3 days before</Label>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-3 min-h-[44px]">
                     <Checkbox
                       id="reminderDayOf"
                       checked={prefs.reminderDayOf}
                       onCheckedChange={(checked) => updatePreference("reminderDayOf", checked === true)}
                       disabled={saving}
+                      className="h-5 w-5"
                       data-testid="checkbox-reminderDayOf"
                     />
                     <Label htmlFor="reminderDayOf" className="text-sm cursor-pointer">Day of closing</Label>

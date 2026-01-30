@@ -589,8 +589,10 @@ export async function sendClosingReminder(
   closingDate: string,
   daysRemaining: number
 ): Promise<void> {
+  // KILL SWITCH - check FIRST before any Slack API calls
   if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
-    console.log(`[NOTIFICATIONS DISABLED] Would have sent closing reminder for: ${propertyAddress} (${daysRemaining} days remaining)`);
+    console.log(`[Slack] 🔴 BLOCKED sendClosingReminder - DISABLE_SLACK_NOTIFICATIONS=true`);
+    console.log(`[Slack] Would have sent: ${propertyAddress} (${daysRemaining} days remaining)`);
     return;
   }
   

@@ -1,0 +1,108 @@
+This diagnostic is excellent - the root cause is clear. Two schedulers are running and the legacy one has no deduplication. Let me create the fix prompt:
+
+🔧 Replit Fix Prompt: Stop Slack Notification Spam
+## 🎯 OBJECTIVE
+Fix the Slack notification spam by removing the duplicate legacy scheduler and reducing reminder options to 3 days before + day of closing only.
+
+## 🔴 ROOT CAUSE CONFIRMED
+Two separate schedulers are running simultaneously in server/index.ts:
+1. Legacy `startClosingRemindersScheduler()` - NO database deduplication, resets on restart
+2. New `initializeNotificationCron()` - HAS proper deduplication
+
+The legacy scheduler sends notifications every time the server restarts.
+
+## ✅ REQUIRED FIXES
+
+### FIX 1: Disable Legacy Scheduler (CRITICAL)
+In `server/index.ts`, comment out or remove the legacy scheduler:
+```typescript
+// REMOVE OR COMMENT OUT THIS LINE:
+// startClosingRemindersScheduler();
+
+// KEEP ONLY THIS ONE (with proper deduplication):
+initializeNotificationCron();
+```
+
+Also remove or comment out the import for the legacy scheduler if present.
+
+### FIX 2: Add Kill Switch to New Scheduler
+In `server/cron/notificationCron.ts`, ensure DISABLE_SLACK_NOTIFICATIONS check is at the TOP:
+```typescript
+export function initializeNotificationCron() {
+  // KILL SWITCH - check FIRST
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    console.log('[CRON] Slack notifications disabled - skipping cron initialization');
+    return;
+  }
+  
+  // ... rest of initialization
+}
+```
+
+### FIX 3: Add Kill Switch to Notification Service  
+In `server/services/slackNotificationService.ts`, add check at the top of main function:
+```typescript
+export async function processClosingDateNotifications() {
+  // KILL SWITCH - check FIRST
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    console.log('[NOTIFICATIONS] Disabled via environment variable - skipping');
+    return;
+  }
+  
+  // ... rest of function
+}
+```
+
+### FIX 4: Add Kill Switch to Core Slack Function
+In `server/slack.ts`, add check at the top of `sendClosingReminder()`:
+```typescript
+export async function sendClosingReminder(...) {
+  // KILL SWITCH - check FIRST
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    console.log('[SLACK] Notifications disabled - blocking sendClosingReminder');
+    return { success: false, reason: 'disabled' };
+  }
+  
+  // ... rest of function
+}
+```
+
+### FIX 5: Reduce Reminder Options to 2 Only
+Update `client/src/components/settings/NotificationPreferences.tsx` to show only:
+- 3 days before
+- Day of closing
+
+Remove or hide the 14 days and 7 days options from the UI.
+
+Update the checkbox options array to only include:
+```typescript
+const reminderOptions = [
+  { key: 'reminder3Days', label: '3 days before' },
+  { key: 'reminderDayOf', label: 'Day of closing' }
+];
+```
+
+### FIX 6: Verify Environment Variable
+Confirm in Replit Secrets that:
+DISABLE_SLACK_NOTIFICATIONS = true
+
+Then restart the server to pick up the change.
+
+## ✅ VERIFICATION STEPS
+After implementing:
+1. Check Replit console for "[NOTIFICATIONS] Disabled" or "[SLACK] Notifications disabled" logs
+2. Confirm NO new Slack messages in any transaction channels
+3. Verify Settings UI shows only 2 reminder options (3 days, day of)
+
+## 📱 MOBILE OPTIMIZATION
+For the NotificationPreferences.tsx UI changes:
+- Touch targets minimum 44x44px for checkboxes
+- Stack options vertically on mobile (<640px)
+- Readable font size (min 16px)
+
+## 🚨 PRIORITY ORDER
+1. FIX 1 (disable legacy scheduler) - stops duplicates
+2. FIX 4 (kill switch in slack.ts) - emergency stop
+3. FIX 6 (verify env var) - ensure disabled
+4. FIX 2 & 3 (kill switches in cron/service) - belt and suspenders
+5. FIX 5 (reduce UI options) - cleaner UX

@@ -232,21 +232,9 @@ interface ReminderConfig {
   messageTemplate: (address: string, closingDate: string) => string;
 }
 
+// Only 2 reminder options: 3 days before and day of closing
+// Reduced from 4 options (14, 7, 3, 0) to simplify and prevent notification fatigue
 const REMINDER_CONFIGS: ReminderConfig[] = [
-  {
-    daysBeforeClosing: 14,
-    notificationType: 'closing_14_days',
-    settingKey: 'reminder14Days',
-    messageTemplate: (addr, date) => 
-      `📅 *Closing Reminder*\n\n*${addr}* is closing in *14 days* on ${date}.\n\nPlease review all documents and requirements.`,
-  },
-  {
-    daysBeforeClosing: 7,
-    notificationType: 'closing_7_days',
-    settingKey: 'reminder7Days',
-    messageTemplate: (addr, date) => 
-      `📅 *Closing Reminder*\n\n*${addr}* is closing in *7 days* on ${date}.\n\nOne week until closing - please ensure everything is in order.`,
-  },
   {
     daysBeforeClosing: 3,
     notificationType: 'closing_3_days',
@@ -272,8 +260,10 @@ export async function processClosingDateNotifications(): Promise<{
 }> {
   const stats = { processed: 0, sent: 0, skipped: 0, disabled: 0, errors: 0 };
   
+  // KILL SWITCH - check FIRST before any processing
   if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
-    console.log(`[Slack] ⚠️ Notifications DISABLED via environment variable`);
+    console.log(`[Slack] 🔴 DISABLED - DISABLE_SLACK_NOTIFICATIONS=true`);
+    console.log(`[Slack] ⚠️ Skipping all closing date notifications`);
     return stats;
   }
 
@@ -392,6 +382,6 @@ export function getNotificationStatus(): {
     botConfigured: !!process.env.SLACK_BOT_TOKEN,
     notificationsEnabled: process.env.DISABLE_SLACK_NOTIFICATIONS !== 'true',
     environment: process.env.NODE_ENV || 'development',
-    availableReminders: ['14 days', '7 days', '3 days', 'Day of closing'],
+    availableReminders: ['3 days', 'Day of closing'],
   };
 }
