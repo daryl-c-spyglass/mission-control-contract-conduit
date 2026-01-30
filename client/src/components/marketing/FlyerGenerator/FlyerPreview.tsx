@@ -337,7 +337,7 @@ export function FlyerPreview({
           
           {/* Agent Name - centered below media row */}
           <div 
-            className="font-bold text-center truncate"
+            className="font-bold text-center truncate text-gray-800"
             style={{ 
               fontSize: '16pt', 
               maxWidth: '100%',
