@@ -1,0 +1,68 @@
+## 📋 OBJECTIVE
+Investigate and fix Slack notification spam where closing date reminders are being sent multiple times for the same transaction. Also reduce the closing reminder options from 4 to 2 (3 days before + day of closing only).
+
+## 🐛 PROBLEM DESCRIPTION
+Agents are receiving duplicate Slack notifications from "Transaction Management Replit" bot:
+- Same "Closing Reminder" messages sent 2+ times within minutes for the same property
+- Example: 1106 Saucedo received identical closing reminders at 4:21 PM AND 4:28 PM
+- Example: 1700 Taron DR received identical reminders at 5:07 PM AND 5:45 PM
+- Environment variable DISABLE_SLACK_NOTIFICATIONS=true doesn't appear to be working
+
+## 🔎 DIAGNOSTIC TASKS (READ-ONLY FIRST)
+
+### 1. Check Environment Variable Usage
+Search the codebase for how DISABLE_SLACK_NOTIFICATIONS is used:
+- Is it being checked BEFORE sending notifications?
+- Is the check case-sensitive or comparing correctly?
+- Are there multiple code paths that send notifications?
+
+### 2. Identify Notification Trigger Points
+Find ALL locations where Slack notifications are sent:
+- Scheduled jobs/cron tasks
+- API endpoints
+- Event handlers
+- Background workers
+
+Look for files like:
+- *slack*.ts, *notification*.ts, *reminder*.ts
+- Scheduled task configurations
+- Any setInterval or cron-like patterns
+
+### 3. Check for Duplicate Execution
+Investigate why notifications fire multiple times:
+- Is there a cron job running on multiple instances?
+- Are there race conditions in the scheduler?
+- Is there missing deduplication logic?
+- Are reminders being sent on every server restart?
+
+### 4. Database Investigation
+Check if there's tracking to prevent duplicate sends:
+- Is there a `notifications_sent` or `reminder_log` table?
+- Are sent notifications being recorded?
+- Is there a check before sending to see if already sent today?
+
+### 5. Closing Reminder Configuration
+Find where the reminder intervals are defined (14, 7, 3, 0 days):
+- Database schema for user preferences
+- Default configuration values
+- UI component that renders the checkboxes
+
+## 📊 PROVIDE A REPORT WITH:
+
+1. **File paths** of all Slack notification code
+2. **How DISABLE_SLACK_NOTIFICATIONS is currently used** (exact code snippets)
+3. **The trigger mechanism** for closing date reminders
+4. **Why duplicates occur** (root cause analysis)
+5. **Current deduplication logic** (if any exists)
+6. **Schema for notification preferences** (14/7/3/0 day options)
+
+## ⚠️ DO NOT MAKE CHANGES YET
+This is a diagnostic prompt. Provide findings first so we can plan the fix properly.
+
+## 📱 MOBILE OPTIMIZATION REQUIREMENTS
+Any future UI changes must support:
+- iPad Pro/Air/Mini Safari (768-1024px width)
+- iPhone 14/15 Pro, iPhone SE Safari (375-393px width)
+- Android tablet/phone Chrome (360-800px width)
+- Touch targets minimum 44x44px
+- No hover-only interactions
