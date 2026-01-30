@@ -216,6 +216,9 @@ export default function CMAPresentationBuilder() {
       if (!response.ok) return { profile: null, user: null };
       return response.json();
     },
+    staleTime: 0,               // Always consider stale - refetch on mount
+    refetchOnMount: true,       // Refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
   });
 
   // Fetch the linked transaction to get subject property from mlsData and cmaData fallback

@@ -21,13 +21,15 @@ export function GraphicGeneratorDialog({
   const [isLoading, setIsLoading] = useState(true);
   const [iframeError, setIframeError] = useState(false);
   
-  // Fetch agent profile for agent info
+  // Fetch agent profile for agent info (auto-refresh on mount/focus for Settings sync)
   const { data: agentProfileData } = useQuery<{
     profile: AgentProfile | null;
     user: any;
   }>({
     queryKey: ["/api/agent/profile"],
-    staleTime: 30000,
+    staleTime: 0,               // Always consider stale - refetch on mount
+    refetchOnMount: true,       // Refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
   });
   
   const mlsData = transaction.mlsData as any;

@@ -68,11 +68,12 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
 
   const { data: marketingProfile } = useMarketingProfile();
   
-  // Fetch agent profile for name, phone, etc.
+  // Fetch agent profile for name, phone, etc. (auto-refresh on mount/focus for Settings sync)
   const { data: agentProfile } = useQuery<AgentProfileResponse>({
     queryKey: ['/api/agent/profile'],
-    staleTime: 60000,
-    refetchOnWindowFocus: false,
+    staleTime: 0,               // Always consider stale - refetch on mount
+    refetchOnMount: true,       // Refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
   });
 
   // Fetch AI-selected photos using Repliers coverImage parameter

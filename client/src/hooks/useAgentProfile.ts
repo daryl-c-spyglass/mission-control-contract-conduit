@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 export interface AgentProfileData {
   firstName: string;
@@ -72,6 +72,18 @@ export function useAgentProfile() {
         bio: profile?.bio || "",
       };
     },
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 0,               // Always consider stale - refetch on mount
+    refetchOnMount: true,       // Refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
   });
+}
+
+// Helper to invalidate agent data caches (call after saving in Settings)
+export function useInvalidateAgentData() {
+  const queryClient = useQueryClient();
+  
+  return () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/agent/profile"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/settings/marketing-profile"] });
+  };
 }

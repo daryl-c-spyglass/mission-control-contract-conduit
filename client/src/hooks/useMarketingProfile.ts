@@ -13,7 +13,8 @@ export interface MarketingProfile {
 export function useMarketingProfile() {
   return useQuery<MarketingProfile>({
     queryKey: ["/api/settings/marketing-profile"],
-    staleTime: 60000,
-    refetchOnWindowFocus: false,
+    staleTime: 0,               // Always consider stale - refetch on mount
+    refetchOnMount: true,       // Refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
   });
 }

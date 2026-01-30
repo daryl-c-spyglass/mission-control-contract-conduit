@@ -1,0 +1,112 @@
+🔧 Replit Fix Prompt: Agent Profile Auto-Sync
+## 🎯 OBJECTIVE
+Fix agent profile data to auto-refresh across Marketing Tools and CMA Presentation when saved in Settings. Users should not need to manually refresh or navigate back and forth.
+
+## 🔴 ROOT CAUSE
+- staleTime: 60000 (60 seconds) - data considered "fresh" too long
+- refetchOnWindowFocus: false - no refresh when navigating back
+- Components show stale cached data after Settings save
+
+## ✅ RECOMMENDED FIX: Create Shared Hook
+
+### Step 1: Create useAgentProfile.ts Hook
+Create `client/src/hooks/useAgentProfile.ts`:
+```typescript
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+export function useAgentProfile() {
+  return useQuery({
+    queryKey: ["/api/agent/profile"],
+    staleTime: 0,              // Always refetch when stale
+    refetchOnMount: true,      // Refetch when component mounts
+    refetchOnWindowFocus: true // Refetch when window gains focus
+  });
+}
+
+export function useMarketingProfile() {
+  return useQuery({
+    queryKey: ["/api/settings/marketing-profile"],
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true
+  });
+}
+
+// Helper to invalidate both caches (call after saving in Settings)
+export function useInvalidateAgentData() {
+  const queryClient = useQueryClient();
+  
+  return () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/agent/profile"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/settings/marketing-profile"] });
+  };
+}
+```
+
+### Step 2: Update FlyerGenerator
+Replace existing useQuery calls with the shared hooks:
+```typescript
+import { useAgentProfile, useMarketingProfile } from "@/hooks/useAgentProfile";
+
+// Replace:
+// const { data: agentProfile } = useQuery({ queryKey: ['/api/agent/profile'], staleTime: 60000, ... });
+
+// With:
+const { data: agentProfile } = useAgentProfile();
+const { data: marketingProfile } = useMarketingProfile();
+```
+
+### Step 3: Update CMAPresentationBuilder
+```typescript
+import { useAgentProfile } from "@/hooks/useAgentProfile";
+
+const { data: agentProfile } = useAgentProfile();
+```
+
+### Step 4: Update CMAPresentation
+```typescript
+import { useAgentProfile } from "@/hooks/useAgentProfile";
+
+const { data: agentProfile } = useAgentProfile();
+```
+
+### Step 5: Update GraphicGeneratorDialog
+```typescript
+import { useAgentProfile } from "@/hooks/useAgentProfile";
+
+const { data: agentProfile } = useAgentProfile();
+```
+
+### Step 6: Update Settings Save Functions
+Ensure Settings invalidates both caches after saving:
+```typescript
+import { useInvalidateAgentData } from "@/hooks/useAgentProfile";
+
+const invalidateAgentData = useInvalidateAgentData();
+
+// After successful save:
+const handleSaveProfile = async () => {
+  await saveProfile(data);
+  invalidateAgentData(); // Invalidates both query keys
+};
+```
+
+## ✅ VERIFICATION CHECKLIST
+After implementing:
+- [ ] Go to Settings → Save Marketing Profile with new photo
+- [ ] Navigate to Marketing → Create Flyer
+- [ ] Verify new photo appears WITHOUT manual refresh
+- [ ] Go to Settings → Save Bio & Cover Letter
+- [ ] Navigate to CMA → Presentation tab
+- [ ] Verify new bio appears WITHOUT manual refresh
+
+## 📱 MOBILE OPTIMIZATION
+No UI changes required - this is a data layer fix only.
+
+## 📋 FILES TO MODIFY
+1. CREATE: `client/src/hooks/useAgentProfile.ts`
+2. UPDATE: `client/src/components/flyer/FlyerGenerator.tsx`
+3. UPDATE: `client/src/components/cma/CMAPresentationBuilder.tsx`
+4. UPDATE: `client/src/components/cma/CMAPresentation.tsx`
+5. UPDATE: `client/src/components/graphics/GraphicGeneratorDialog.tsx`
+6. UPDATE: `client/src/pages/Settings.tsx` (if not already using shared invalidation)

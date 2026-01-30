@@ -87,6 +87,9 @@ export default function CMAPresentation() {
     } | null;
   }>({
     queryKey: ['/api/agent/profile'],
+    staleTime: 0,               // Always consider stale - refetch on mount
+    refetchOnMount: true,       // Refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
   });
 
   const agentProfile = useMemo(() => {
