@@ -1,0 +1,424 @@
+# CMA Implementation Extraction Prompt - Contract Conduit
+
+## PURPOSE
+
+I need to extract the complete CMA (Comparative Market Analysis) implementation from Contract Conduit to replicate it in Client Data Portal. This is a **documentation-only request** - no code changes needed.
+
+**Key Difference:**
+- Contract Conduit: CMA is wired to a Transaction (Address + MLS already exist)
+- Client Data Portal: Standalone "Create CMA" flow (user starts fresh, no transaction context)
+
+I need to understand how Contract Conduit handles CMA so I can adapt it for standalone use.
+
+---
+
+## SECTION 1: CMA Creation Flow
+
+### 1.1 Entry Point
+
+Please describe:
+1. How does a user initiate CMA creation in Contract Conduit?
+2. What screen/page do they start from?
+3. Is there a wizard/stepper or single-page form?
+4. What data is pre-populated from the Transaction?
+
+### 1.2 Subject Property
+
+1. How is the subject property defined?
+   - Auto-populated from Transaction?
+   - Manual entry option?
+   - Search from MLS?
+2. What fields are captured for subject property?
+   ```
+   - Address
+   - MLS Number
+   - List Price
+   - Beds/Baths
+   - Square Footage
+   - Lot Size
+   - Year Built
+   - Property Type
+   - Status
+   - Photos
+   - Coordinates (lat/lng)
+   - Other?
+   ```
+3. Can users edit the subject property after initial selection?
+4. Is subject property required or optional?
+
+### 1.3 Search Criteria / Filters
+
+What search filters are available for finding comparables?
+
+```
+Filter Name          | Required? | Default Value | Notes
+---------------------|-----------|---------------|-------
+Subdivision          |           |               |
+ZIP Code             |           |               |
+City                 |           |               |
+Radius (miles)       |           |               |
+Property Type        |           |               |
+Status (Active/UC/Closed) |      |               |
+Price Range (Min/Max)|           |               |
+Sq Ft Range (Min/Max)|           |               |
+Lot Size Range       |           |               |
+Beds Range           |           |               |
+Baths Range          |           |               |
+Year Built Range     |           |               |
+Close Date (days)    |           |               |
+Pool (Yes/No/Any)    |           |               |
+Map/Polygon Search   |           |               |
+```
+
+### 1.4 Search Results Display
+
+1. What views are available? (Grid, List, Table)
+2. What sorting options exist?
+3. What information is shown on each property card?
+4. How many results per page (pagination)?
+5. Is there a "Select All" option?
+
+---
+
+## SECTION 2: Comparable Selection
+
+### 2.1 Adding Comparables
+
+1. How does user add a property as comparable?
+   - Click button on card?
+   - Checkbox + bulk add?
+   - Drag and drop?
+2. Is there a maximum number of comparables allowed?
+3. Can user add properties that don't match search criteria?
+4. Can user manually enter a comparable (not from MLS)?
+
+### 2.2 Comparable Management
+
+1. How are selected comparables displayed?
+2. Can comparables be:
+   - Reordered?
+   - Removed?
+   - Edited?
+3. Is there a "Comparable Cart" or similar UI?
+4. How does user know a property is already added?
+
+### 2.3 Subject Property as Comparable
+
+1. Is subject property included in comparable list?
+2. How is it visually distinguished?
+3. Is it included in statistics calculations?
+
+---
+
+## SECTION 3: UI/UX Patterns
+
+### 3.1 Layout
+
+Please describe or provide screenshots of:
+1. Overall page layout (sidebar? tabs? steps?)
+2. Search form layout
+3. Results grid/list layout
+4. Selected comparables panel
+5. Mobile responsiveness
+
+### 3.2 Visual Design
+
+1. How are property statuses color-coded?
+   ```
+   Active:         Color?
+   Under Contract: Color?
+   Closed/Sold:    Color?
+   Subject:        Color?
+   ```
+2. What icons are used for actions?
+3. Loading states?
+4. Empty states?
+5. Error states?
+
+### 3.3 User Feedback
+
+1. Toast notifications for actions?
+2. Confirmation dialogs?
+3. Progress indicators?
+4. Validation messages?
+
+---
+
+## SECTION 4: Data Architecture
+
+### 4.1 Database Schema
+
+Please provide the schema for CMA-related tables:
+
+```sql
+-- CMAs table
+CREATE TABLE cmas (
+  id              -- Type?
+  name            -- Type?
+  user_id         -- Type?
+  transaction_id  -- Type? (Contract Conduit specific)
+  subject_property_id -- Type?
+  comparable_property_ids -- Type? (Array? JSON? Relation?)
+  properties_data -- Type? (Denormalized JSON?)
+  statistics      -- Type? (Stored or calculated?)
+  search_criteria -- Type? (Store the filters used?)
+  brochure        -- Type?
+  adjustments     -- Type?
+  created_at
+  updated_at
+  -- Other columns?
+);
+
+-- Related tables?
+-- cma_comparables?
+-- cma_report_configs?
+-- cma_templates?
+```
+
+### 4.2 Data Storage Strategy
+
+1. Are comparables stored as:
+   - Array of MLS numbers (references)?
+   - Full property data snapshots (denormalized)?
+   - Separate junction table?
+2. Are search criteria saved with the CMA?
+3. How is subject property data stored?
+4. Is property data refreshed or static snapshot?
+
+### 4.3 Statistics Calculation
+
+1. What statistics are calculated?
+   ```
+   - Average Price
+   - Median Price
+   - Price Range (Low/High)
+   - Average $/Sq Ft
+   - Average DOM
+   - Bed/Bath Averages
+   - Other?
+   ```
+2. Are statistics calculated:
+   - On-the-fly (derived)?
+   - Stored in database?
+   - Cached?
+3. When are statistics recalculated?
+
+---
+
+## SECTION 5: API Endpoints
+
+### 5.1 CMA CRUD
+
+List all CMA-related endpoints with request/response formats:
+
+```
+GET    /api/cmas
+POST   /api/cmas
+GET    /api/cmas/:id
+PUT    /api/cmas/:id
+DELETE /api/cmas/:id
+```
+
+### 5.2 Search & Comparables
+
+```
+POST   /api/cmas/:id/search          -- Search for properties
+POST   /api/cmas/:id/comparables     -- Add comparable
+DELETE /api/cmas/:id/comparables/:id -- Remove comparable
+PUT    /api/cmas/:id/comparables/order -- Reorder
+```
+
+### 5.3 Statistics & Analysis
+
+```
+GET    /api/cmas/:id/statistics      -- Get calculated stats
+POST   /api/cmas/:id/adjustments     -- Save adjustments
+```
+
+### 5.4 Request/Response Examples
+
+Please provide sample payloads for key endpoints.
+
+---
+
+## SECTION 6: Repliers API Integration
+
+### 6.1 Search Query Building
+
+How are search filters mapped to Repliers API parameters?
+
+```typescript
+// Example mapping
+{
+  subdivision: "Steiner Ranch"  →  ?search=Steiner%20Ranch&searchFields=address.neighborhood
+  zipCode: "78732"              →  ?postalCode=78732
+  status: ["Active", "Closed"]  →  ?status=["A","S"]
+  priceMin: 500000              →  ?minPrice=500000
+  // ... etc
+}
+```
+
+### 6.2 Multi-Status Search
+
+How do you handle searching multiple statuses?
+- Single query with array?
+- Multiple queries merged?
+- Different parameters per status?
+
+### 6.3 Polygon/Map Search
+
+How is the map search implemented?
+- What parameter format for polygon?
+- How are coordinates passed?
+
+### 6.4 Field Mapping
+
+What Repliers fields are used for CMA data?
+
+```typescript
+interface PropertyMapping {
+  mlsNumber:     string;  // Repliers field name?
+  address:       string;  // Repliers path?
+  price:         number;  // listPrice? closePrice?
+  beds:          number;  // bedroomsTotal?
+  baths:         number;  // bathroomsTotalInteger?
+  sqft:          number;  // livingArea?
+  lotSize:       number;  // lotSizeArea? lotSizeSquareFeet?
+  yearBuilt:     number;  // yearBuilt?
+  dom:           number;  // daysOnMarket? simpleDaysOnMarket?
+  photos:        array;   // photos[]?
+  coordinates:   object;  // map.latitude/longitude?
+  status:        string;  // status? lastStatus?
+  soldPrice:     number;  // closePrice? soldPrice?
+  soldDate:      string;  // soldDate? closeDate?
+}
+```
+
+---
+
+## SECTION 7: Best Practices & Lessons Learned
+
+### 7.1 What Works Well
+
+What CMA features/patterns have been successful?
+1. UI/UX patterns users love?
+2. Data architecture decisions that scaled?
+3. Performance optimizations?
+
+### 7.2 What Would You Change
+
+If rebuilding CMA from scratch, what would you do differently?
+1. Schema changes?
+2. UI flow changes?
+3. API design changes?
+
+### 7.3 Known Issues / Edge Cases
+
+What edge cases or bugs have you encountered?
+1. Empty search results handling?
+2. Properties with missing data?
+3. Photos not loading?
+4. Subdivision vs neighborhood confusion?
+5. Status mapping issues?
+
+### 7.4 Performance Considerations
+
+1. How do you handle large result sets?
+2. Any caching strategies?
+3. Pagination approach?
+4. Image optimization?
+
+---
+
+## SECTION 8: Adaptation Notes for Client Data Portal
+
+Since Client Data Portal won't have Transaction context, I need to understand:
+
+### 8.1 Subject Property Without Transaction
+
+1. How should users find/select subject property?
+   - MLS search?
+   - Address autocomplete?
+   - Manual entry form?
+2. Should there be a "Recent Properties" quick select?
+3. Should users be able to save subject property searches?
+
+### 8.2 Standalone CMA List
+
+1. How should CMAs be organized without transactions?
+   - By date?
+   - By client name?
+   - By address?
+   - Folders/tags?
+2. Should CMAs be shareable between users?
+3. Archive vs delete behavior?
+
+### 8.3 Naming Convention
+
+Without transaction context:
+1. How should CMA be auto-named?
+2. Can users rename CMAs?
+
+---
+
+## SECTION 9: Code Extraction Request
+
+Please provide the complete code for these key components:
+
+### 9.1 Pages
+- [ ] CMA List page
+- [ ] CMA Create/Edit page
+- [ ] CMA Detail page
+
+### 9.2 Components
+- [ ] Subject Property Selector
+- [ ] Search Criteria Form
+- [ ] Property Search Results (Grid/List/Table)
+- [ ] Comparable Selection Panel
+- [ ] Statistics Summary Card
+- [ ] Property Card Component
+
+### 9.3 API Routes
+- [ ] CMA CRUD routes
+- [ ] Search routes
+- [ ] Statistics calculation
+
+### 9.4 Utilities
+- [ ] Repliers query builder
+- [ ] Statistics calculator
+- [ ] Data normalizers/transformers
+
+### 9.5 Types
+- [ ] CMA TypeScript interfaces
+- [ ] Property types
+- [ ] API request/response types
+
+---
+
+## OUTPUT FORMAT
+
+Please organize your response as:
+
+1. **Architecture Overview** - High-level summary
+2. **Database Schema** - Complete table definitions
+3. **API Documentation** - All endpoints with examples
+4. **Component Code** - Full implementations
+5. **Repliers Integration** - Query building patterns
+6. **UI/UX Guidelines** - Screenshots or descriptions
+7. **Recommendations** - Suggestions for Client Data Portal adaptation
+
+---
+
+## PRIORITY ITEMS
+
+If time is limited, prioritize these:
+
+1. ⭐ Subject Property selection flow
+2. ⭐ Search criteria form and Repliers mapping
+3. ⭐ Comparable selection UI pattern
+4. ⭐ Database schema for CMAs
+5. ⭐ Statistics calculation logic
+
+---
+
+**Note:** This extraction will be used to implement standalone CMA functionality in Client Data Portal where users start from "Create CMA" without any transaction context.
