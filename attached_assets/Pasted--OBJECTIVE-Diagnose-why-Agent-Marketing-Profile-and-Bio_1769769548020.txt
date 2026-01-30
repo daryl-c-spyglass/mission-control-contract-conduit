@@ -1,0 +1,108 @@
+## 🎯 OBJECTIVE
+Diagnose why Agent Marketing Profile and Bio & Default Cover Letter require manual save in Settings before syncing to Marketing Tools and CMA Presentation Tab. Users should not need to go back and forth to Settings.
+
+## 🐛 REPORTED ISSUE
+- Marketing tools and CMA Tab - CMA Presentation don't automatically pick up agent profile data
+- Users must go to Settings → Save Marketing Profile → then return to Marketing/CMA
+- Same issue with Bio & Default Cover Letter - must save in Settings before it appears elsewhere
+
+## 🔎 DIAGNOSTIC TASKS (READ-ONLY)
+
+### 1. Identify All Components Using Agent Profile Data
+Search for all files that consume agent marketing profile:
+```bash
+grep -r "agentProfile" --include="*.ts" --include="*.tsx" -l
+grep -r "marketingProfile" --include="*.ts" --include="*.tsx" -l
+grep -r "agentPhoto" --include="*.ts" --include="*.tsx" -l
+grep -r "agentBio" --include="*.ts" --include="*.tsx" -l
+grep -r "coverLetter" --include="*.ts" --include="*.tsx" -l
+```
+
+List each file and its purpose.
+
+### 2. Check Data Flow for Marketing Profile
+Show me:
+- Where is agent marketing profile SAVED? (Settings component)
+- Where is it FETCHED? (Marketing tools, CMA Presentation)
+- What API endpoints are used?
+- Is there a shared query key for cache invalidation?
+
+### 3. Check Data Flow for Bio & Cover Letter
+Show me:
+- Where is bio/cover letter SAVED?
+- Where is it FETCHED?
+- Are these separate API calls or part of the same profile object?
+
+### 4. Examine Cache/Query Strategy
+If using React Query or similar:
+- What query keys are used for agent profile data?
+- Is `invalidateQueries` called after saving in Settings?
+- Are Marketing tools and CMA using the SAME query key?
+
+Example issue pattern:
+```typescript
+// Settings saves with:
+queryClient.invalidateQueries(['agentProfile'])
+
+// But Marketing fetches with:
+useQuery(['marketingProfile']) // Different key = stale data!
+```
+
+### 5. Check API Endpoints
+Show me all API routes related to agent profile:
+```bash
+grep -r "agent" server/routes.ts | grep -i "profile\|marketing\|bio\|cover"
+```
+
+Are there separate endpoints for:
+- GET /api/agent-profile
+- PUT /api/agent-profile
+- GET /api/marketing-profile
+- PUT /api/marketing-profile
+
+If separate, are they returning the same data source?
+
+### 6. Check Settings Component Save Function
+In the Settings component, after saving:
+- Does it invalidate ALL related queries?
+- Does it update any global state?
+- Is there a success callback that should trigger refetch elsewhere?
+
+### 7. Check CMA Presentation Data Fetching
+In the CMA Presentation component:
+- How does it fetch agent profile data?
+- Is it using cached data or fresh fetch?
+- Does it have a dependency on Settings data?
+
+### 8. Check Marketing Tools Data Fetching
+In Marketing tools (flyer generator, social graphics):
+- How do they get agent photo, name, phone, email?
+- Are they reading from the same source as Settings?
+
+## 📊 PROVIDE A REPORT WITH:
+
+1. **Data flow diagram** showing:
+   - Settings → API → Database → Marketing Tools
+   - Settings → API → Database → CMA Presentation
+
+2. **All query keys** used for agent profile data across components
+
+3. **Cache invalidation calls** after Settings save
+
+4. **Identified issues** - why data isn't syncing automatically
+
+5. **Component list** with their data sources:
+   | Component | Data Source | Query Key | Auto-refreshes? |
+   |-----------|-------------|-----------|-----------------|
+   | Settings | ? | ? | N/A |
+   | Flyer Generator | ? | ? | ? |
+   | CMA Presentation | ? | ? | ? |
+
+## ⚠️ DO NOT MAKE CHANGES YET
+This is diagnostic only. Provide findings first so we can plan the fix.
+
+## 📱 MOBILE OPTIMIZATION NOTE
+Any future fixes must maintain:
+- Touch targets minimum 44x44px
+- Responsive layouts for iPad/iPhone/Android
+- No horizontal overflow
