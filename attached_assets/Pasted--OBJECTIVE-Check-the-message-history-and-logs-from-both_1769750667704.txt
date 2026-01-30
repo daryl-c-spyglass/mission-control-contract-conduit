@@ -1,0 +1,67 @@
+## 🎯 OBJECTIVE
+Check the message history and logs from both schedulers to identify which one is causing the Slack notification spam.
+
+## 📋 DIAGNOSTIC TASKS
+
+### 1. Check Current Console Logs
+Look at the Replit console output for any recent log entries containing:
+- "[ClosingReminders]" (legacy scheduler)
+- "[Cron]" (new scheduler)
+- "[Slack]" (notification service)
+- "SENT" or "SKIPPED" messages
+
+### 2. Show Me the Legacy Scheduler Code
+Display the full contents of `server/services/closing-reminders.ts`:
+- Is the DISABLE_SLACK_NOTIFICATIONS check at the TOP?
+- Is it checking the string correctly: `=== 'true'`?
+- What intervals does it use (30, 14, 7, 3, 1, 0 days)?
+- Does it have any database deduplication?
+
+### 3. Show Me the New Scheduler Code
+Display the full contents of:
+- `server/cron/notificationCron.ts`
+- `server/services/slackNotificationService.ts`
+
+Check:
+- Is the DISABLE_SLACK_NOTIFICATIONS check present?
+- Does it use the sentNotifications table for deduplication?
+
+### 4. Check server/index.ts
+Show me lines 140-160 (or wherever schedulers are started):
+- Is `startClosingRemindersScheduler()` being called?
+- Is `initializeNotificationCron()` being called?
+- Are BOTH being called? (This would cause duplicates)
+
+### 5. Check Environment Variable
+Run: `echo $DISABLE_SLACK_NOTIFICATIONS`
+And show me the Secrets panel value.
+
+### 6. Check sentNotifications Table
+Query the database:
+```sql
+SELECT * FROM sent_notifications 
+ORDER BY sent_at DESC 
+LIMIT 20;
+```
+
+This shows which notifications were recorded (new system uses this for dedup).
+
+### 7. Search for Recent Slack API Calls
+Search the codebase for all places that call:
+- `slack.chat.postMessage`
+- `sendClosingReminder`
+- `sendNotificationIfNotSent`
+
+List each file and function name.
+
+## 📊 PROVIDE A REPORT WITH:
+
+1. **Console log excerpts** showing scheduler activity
+2. **Both scheduler files** with kill switch locations highlighted
+3. **server/index.ts** scheduler startup lines
+4. **Current env var value** for DISABLE_SLACK_NOTIFICATIONS
+5. **sentNotifications table** contents (last 20 rows)
+6. **All Slack send functions** and their locations
+
+## ⚠️ DO NOT MAKE CHANGES YET
+This is diagnostic only. We need to confirm the root cause first.
