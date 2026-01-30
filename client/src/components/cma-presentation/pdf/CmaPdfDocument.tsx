@@ -3,6 +3,7 @@ import { styles, COLORS } from './styles';
 import type { AgentProfile, CmaProperty } from '../types';
 import { WIDGETS, MARKETING_TEXT, LISTING_ACTION_PLAN_TEXT, SAMPLE_REVIEWS, type Review } from '../constants/widgets';
 import lreSgrWhiteLogo from '@assets/LRE_SGR_White_1769702535327.png';
+import lreSgrBlackLogo from '@assets/LRE_SGR_Black.png';
 import {
   extractPrice,
   extractSqft,
@@ -632,16 +633,20 @@ const ListingWithSpyglassPage = ({
           <View style={{ 
             backgroundColor: '#000000', 
             borderRadius: 8, 
-            padding: 30, 
+            padding: 20, 
             marginBottom: 24,
             width: '60%',
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-              <Text style={{ fontSize: 28, fontWeight: 700, color: '#EF4923' }}>SPYGLASS</Text>
-              <Text style={{ fontSize: 28, fontWeight: 400, color: '#ffffff', marginLeft: 8 }}>REALTY</Text>
-            </View>
+            <Image 
+              src={lreSgrWhiteLogo} 
+              style={{ 
+                width: '100%', 
+                height: 'auto',
+                objectFit: 'contain'
+              }} 
+            />
           </View>
           
           {/* Video Presentation Label */}

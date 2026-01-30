@@ -1,0 +1,54 @@
+## 🎯 OBJECTIVE
+Fix the "LISTING WITH SPYGLASS REALTY" slide so the PDF output matches the Preview. Currently the logo displays differently between Preview and PDF export.
+
+## 🐛 ISSUE
+| View | Logo Display |
+|------|--------------|
+| Preview (Slide 3) | ✅ Correct - Shows full logo image (Spyglass + Leading Real Estate Companies of the World) |
+| PDF Export (Slide 2) | ❌ Wrong - Shows only "SPYGLASS REALTY" text, missing the full logo |
+
+## 📎 CORRECT LOGO
+The attached logo file `LRE_SGR_Black.png` should be used for BOTH Preview and PDF export.
+
+This logo contains:
+- Spyglass Realty logo on the left
+- Divider line
+- "Leading Real Estate Companies of the World" on the right
+- Black background
+
+## 🔍 DIAGNOSTIC
+1. Find the CMA Presentation slide component that renders "LISTING WITH SPYGLASS REALTY"
+2. Check how the logo is rendered in Preview vs PDF generation
+3. Identify why PDF uses text fallback instead of the image
+
+Search for:
+```bash
+grep -r "LISTING WITH SPYGLASS" --include="*.tsx" --include="*.ts"
+grep -r "LRE_SGR" --include="*.tsx" --include="*.ts"
+grep -r "Leading Real Estate" --include="*.tsx" --include="*.ts"
+```
+
+## ✅ FIX REQUIRED
+Ensure the PDF generation uses the same logo image as the Preview:
+
+1. The logo image path should be consistent between Preview and PDF
+2. If PDF generation can't access the image URL, embed the image as base64
+3. Both should display the full `LRE_SGR_Black.png` logo
+
+## 📁 LOGO FILE LOCATION
+Upload the attached `LRE_SGR_Black.png` to the appropriate assets folder if not already present:
+- `public/logos/LRE_SGR_Black.png` or
+- `client/src/assets/LRE_SGR_Black.png`
+
+## ✅ VERIFICATION
+After fix:
+- [ ] Preview Slide 3 shows full logo image
+- [ ] PDF export Slide 2/3 shows SAME full logo image
+- [ ] Logo displays correctly on black background
+- [ ] Both views are visually identical
+
+## 📱 MOBILE OPTIMIZATION
+Ensure logo scales properly on:
+- Desktop PDF view
+- Mobile PDF view
+- Preview on tablet/mobile
