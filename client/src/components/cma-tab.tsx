@@ -218,14 +218,13 @@ function StatCard({
   );
 }
 
-type MainView = 'compare' | 'map' | 'stats' | 'list';
+type MainView = 'compare' | 'map' | 'stats';
 type SubView = 'grid' | 'list' | 'table';
 
 const MAIN_VIEW_TABS = [
   { id: 'compare' as MainView, label: 'Compare', icon: BarChart3 },
   { id: 'map' as MainView, label: 'Map', icon: MapIcon },
   { id: 'stats' as MainView, label: 'Stats', icon: TrendingUp },
-  { id: 'list' as MainView, label: 'List', icon: Home },
 ] as const;
 
 export function CMATab({ transaction }: CMATabProps) {
@@ -968,7 +967,7 @@ export function CMATab({ transaction }: CMATabProps) {
         </div>
 
         {/* 3b. STATUS FILTER TABS - Pill style */}
-        {(mainView === 'compare' || mainView === 'list') && (
+        {mainView === 'compare' && (
           <div className="flex items-center gap-2 p-4 border-b border-gray-100 dark:border-gray-800">
             {STATUS_FILTERS.map(filter => (
               <button
@@ -991,7 +990,7 @@ export function CMATab({ transaction }: CMATabProps) {
         <div className="p-4 space-y-4">
 
           {/* STATS SUMMARY ROW - Dashboard matching style */}
-          {(mainView === 'compare' || mainView === 'list') && statistics && (() => {
+          {mainView === 'compare' && statistics && (() => {
             const mlsData = transaction.mlsData as any;
             const subjectPrice = mlsData?.listPrice || 0;
             const subjectSqft = mlsData?.livingArea || mlsData?.sqft || mlsData?.details?.sqft || 0;
@@ -1102,8 +1101,8 @@ export function CMATab({ transaction }: CMATabProps) {
           />
         )}
         
-        {/* COMPARE and LIST VIEWS - With sub-views */}
-        {(mainView === 'compare' || mainView === 'list') && (
+        {/* COMPARE VIEW - With sub-views */}
+        {mainView === 'compare' && (
           <>
             {/* Table Sub-View - Clean Dashboard style */}
             {subView === 'table' && (
