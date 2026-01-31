@@ -242,7 +242,7 @@ function PropertyCardPanel({ property, subjectProperty, onClose, onViewClick }: 
     : null;
 
   return (
-    <div className="w-72 lg:w-80 h-full bg-background border-r flex flex-col overflow-hidden relative animate-in slide-in-from-left duration-200">
+    <div className="w-full max-w-[280px] sm:max-w-[288px] lg:max-w-[320px] h-full bg-background border-r flex flex-col overflow-hidden relative animate-in slide-in-from-left duration-200">
       <button
         onClick={onClose}
         className="absolute top-3 right-3 z-10 min-w-[36px] min-h-[36px] 
@@ -301,22 +301,22 @@ function PropertyCardPanel({ property, subjectProperty, onClose, onViewClick }: 
       </div>
       
       <div className="flex-1 overflow-y-auto">
-        <div className="px-4 py-3 border-b">
+        <div className="px-3 sm:px-4 py-2 sm:py-3 border-b">
           <div className="flex justify-between items-start gap-2">
             <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-bold text-foreground uppercase truncate">
+              <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase truncate">
                 {property.address}
               </h3>
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <MapPin className="w-3 h-3" />
-                {property.city}, {property.state} {property.zipCode}
+              <p className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1">
+                <MapPin className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{property.city}, {property.state} {property.zipCode}</span>
               </p>
             </div>
             <div className="text-right flex-shrink-0">
-              <p className="text-base font-bold text-foreground">
+              <p className="text-sm sm:text-base font-bold text-foreground">
                 {formatCurrency(displayPrice)}
               </p>
-              <p className={`text-xs font-medium ${statusColorClass}`}>
+              <p className={`text-[10px] sm:text-xs font-medium ${statusColorClass}`}>
                 {property.status}
               </p>
             </div>
@@ -324,119 +324,119 @@ function PropertyCardPanel({ property, subjectProperty, onClose, onViewClick }: 
         </div>
         
         <div className="divide-y divide-muted">
-          <div className="flex justify-between px-4 py-2.5">
-            <span className="text-sm text-muted-foreground">Beds</span>
-            <span className="text-sm font-medium text-foreground">
+          <div className="flex justify-between px-3 sm:px-4 py-2">
+            <span className="text-xs sm:text-sm text-muted-foreground">Beds</span>
+            <span className="text-xs sm:text-sm font-medium text-foreground">
               {property.beds ?? 'N/A'}
             </span>
           </div>
-          <div className="flex justify-between px-4 py-2.5">
-            <span className="text-sm text-muted-foreground">Baths</span>
-            <span className="text-sm font-medium text-foreground">
+          <div className="flex justify-between px-3 sm:px-4 py-2">
+            <span className="text-xs sm:text-sm text-muted-foreground">Baths</span>
+            <span className="text-xs sm:text-sm font-medium text-foreground">
               {property.baths ?? 'N/A'}
             </span>
           </div>
-          <div className="flex justify-between px-4 py-2.5">
-            <span className="text-sm text-muted-foreground">
+          <div className="flex justify-between px-3 sm:px-4 py-2">
+            <span className="text-xs sm:text-sm text-muted-foreground">
               Sq. Ft.
               {sqftDiff && (
-                <span className={`ml-1 ${sqftDiff.isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                <span className={`ml-1 text-[10px] sm:text-xs ${sqftDiff.isPositive ? 'text-green-500' : 'text-red-500'}`}>
                   {sqftDiff.text}
                 </span>
               )}
             </span>
-            <span className="text-sm font-medium text-foreground">
+            <span className="text-xs sm:text-sm font-medium text-foreground">
               {property.sqft?.toLocaleString() ?? 'N/A'}
             </span>
           </div>
-          <div className="flex justify-between px-4 py-2.5">
-            <span className="text-sm text-muted-foreground">
+          <div className="flex justify-between px-3 sm:px-4 py-2">
+            <span className="text-xs sm:text-sm text-muted-foreground">
               Lot Size
               {lotSizeDiff && (
-                <span className={`ml-1 ${lotSizeDiff.isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                <span className={`ml-1 text-[10px] sm:text-xs ${lotSizeDiff.isPositive ? 'text-green-500' : 'text-red-500'}`}>
                   {lotSizeDiff.text}
                 </span>
               )}
             </span>
-            <span className="text-sm font-medium text-foreground">
+            <span className="text-xs sm:text-sm font-medium text-foreground">
               {property.lotSize?.toLocaleString() ?? 'N/A'}
             </span>
           </div>
-          <div className="flex justify-between px-4 py-2.5">
-            <span className="text-sm text-muted-foreground">
+          <div className="flex justify-between px-3 sm:px-4 py-2">
+            <span className="text-xs sm:text-sm text-muted-foreground">
               Garage
               {garageDiff && (
-                <span className={`ml-1 ${garageDiff.isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                <span className={`ml-1 text-[10px] sm:text-xs ${garageDiff.isPositive ? 'text-green-500' : 'text-red-500'}`}>
                   {garageDiff.text}
                 </span>
               )}
             </span>
-            <span className="text-sm font-medium text-foreground">
+            <span className="text-xs sm:text-sm font-medium text-foreground">
               {property.garageSpaces ?? 'N/A'}
             </span>
           </div>
         </div>
         
-        <div className="px-4 py-2.5 bg-muted/50 border-y">
-          <h4 className="text-sm font-semibold text-foreground">Listing Details</h4>
+        <div className="px-3 sm:px-4 py-2 bg-muted/50 border-y">
+          <h4 className="text-xs sm:text-sm font-semibold text-foreground">Listing Details</h4>
         </div>
         
         <div className="divide-y divide-muted">
           {property.originalPrice && property.originalPrice !== currentListPrice && (
-            <div className="flex justify-between px-4 py-2.5">
-              <span className="text-sm text-muted-foreground">Orig. Price</span>
-              <span className="text-sm font-medium text-foreground">
+            <div className="flex justify-between px-3 sm:px-4 py-2">
+              <span className="text-xs sm:text-sm text-muted-foreground">Orig. Price</span>
+              <span className="text-xs sm:text-sm font-medium text-foreground">
                 {formatCurrency(property.originalPrice)}
               </span>
             </div>
           )}
-          <div className="flex justify-between px-4 py-2.5">
-            <span className="text-sm text-muted-foreground">List Price</span>
-            <span className="text-sm font-medium text-foreground">
+          <div className="flex justify-between px-3 sm:px-4 py-2">
+            <span className="text-xs sm:text-sm text-muted-foreground">List Price</span>
+            <span className="text-xs sm:text-sm font-medium text-foreground">
               {formatCurrency(currentListPrice)}
             </span>
           </div>
           {property.soldPrice && (
-            <div className="flex justify-between px-4 py-2.5">
-              <span className="text-sm text-muted-foreground">
+            <div className="flex justify-between px-3 sm:px-4 py-2">
+              <span className="text-xs sm:text-sm text-muted-foreground">
                 Sold Price {soldPercent && (
                   <span className="text-muted-foreground/60">{soldPercent}%</span>
                 )}
               </span>
-              <span className="text-sm font-medium text-foreground">
+              <span className="text-xs sm:text-sm font-medium text-foreground">
                 {formatCurrency(property.soldPrice)}
               </span>
             </div>
           )}
           {property.pricePerSqft > 0 && (
-            <div className="flex justify-between px-4 py-2.5">
-              <span className="text-sm text-muted-foreground">$/Sq. Ft.</span>
-              <span className="text-sm font-medium text-foreground">
+            <div className="flex justify-between px-3 sm:px-4 py-2">
+              <span className="text-xs sm:text-sm text-muted-foreground">$/Sq. Ft.</span>
+              <span className="text-xs sm:text-sm font-medium text-foreground">
                 ${property.pricePerSqft.toLocaleString()}
               </span>
             </div>
           )}
           {property.soldDate && (
-            <div className="flex justify-between px-4 py-2.5">
-              <span className="text-sm text-muted-foreground">Sold Date</span>
-              <span className="text-sm font-medium text-foreground">
+            <div className="flex justify-between px-3 sm:px-4 py-2">
+              <span className="text-xs sm:text-sm text-muted-foreground">Sold Date</span>
+              <span className="text-xs sm:text-sm font-medium text-foreground">
                 {new Date(property.soldDate).toLocaleDateString()}
               </span>
             </div>
           )}
-          <div className="flex justify-between px-4 py-2.5">
-            <span className="text-sm text-muted-foreground">DOM</span>
-            <span className="text-sm font-medium text-foreground">
+          <div className="flex justify-between px-3 sm:px-4 py-2">
+            <span className="text-xs sm:text-sm text-muted-foreground">DOM</span>
+            <span className="text-xs sm:text-sm font-medium text-foreground">
               {property.daysOnMarket}
             </span>
           </div>
         </div>
         
-        <div className="p-4">
+        <div className="p-3 sm:p-4">
           <button
             onClick={onViewClick}
-            className="w-full py-3 bg-[#EF4923] hover:bg-[#d94420] text-white rounded-lg 
-                       font-medium transition-colors min-h-[44px] flex items-center justify-center gap-2"
+            className="w-full py-2.5 sm:py-3 bg-[#EF4923] hover:bg-[#d94420] text-white rounded-lg 
+                       text-sm font-medium transition-colors min-h-[44px] flex items-center justify-center gap-2"
             data-testid="button-view-full-details"
           >
             View Full Details

@@ -150,9 +150,9 @@ export function SlideViewer({
             />
           </div>
 
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-24 sm:px-32">
             <h1 
-              className="text-white text-lg md:text-xl font-bold uppercase tracking-wide"
+              className="text-white text-xs sm:text-base md:text-xl font-bold uppercase tracking-wide text-center truncate max-w-full"
               data-testid="text-slide-title"
             >
               {widget.title}

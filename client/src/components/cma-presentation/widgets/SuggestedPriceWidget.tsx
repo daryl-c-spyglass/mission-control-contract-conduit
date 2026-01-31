@@ -344,7 +344,7 @@ export function SuggestedPriceWidget({
     <div className="h-full w-full flex flex-col bg-background overflow-hidden" data-testid="suggested-price-widget">
       <div className="flex-1 min-h-0 flex flex-col p-2 sm:p-3 lg:p-4">
         
-        <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
+        <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
           
           <div className="relative rounded-xl overflow-hidden shadow-lg bg-muted min-h-[120px] md:min-h-0">
             {photosToShow.length > 0 && currentPhoto ? (

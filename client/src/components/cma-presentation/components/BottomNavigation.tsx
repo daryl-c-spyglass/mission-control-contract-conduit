@@ -91,12 +91,13 @@ export function BottomNavigation({
             onClick={isFirst ? onHome : onPrevious}
             className="flex items-center gap-1 text-gray-700 dark:text-gray-300 
                        hover:text-[#EF4923] dark:hover:text-[#EF4923] transition-colors
-                       min-h-[44px] px-2 md:px-3"
+                       min-h-[44px] min-w-[44px] px-1 sm:px-2 md:px-3"
             data-testid="button-nav-prev"
+            aria-label={isFirst ? 'Go to Home' : `Previous: ${prevSlideTitle || 'Previous'}`}
           >
             <ChevronLeft className="w-5 h-5 flex-shrink-0" />
-            <span className="text-xs font-medium hidden sm:inline sm:truncate sm:max-w-[80px] md:max-w-[140px] lg:max-w-[220px] xl:max-w-none xl:whitespace-normal">
-              {isFirst ? 'Home' : prevSlideTitle || 'Previous'}
+            <span className="text-[10px] sm:text-xs font-medium truncate max-w-[50px] sm:max-w-[80px] md:max-w-[140px] lg:max-w-[220px]">
+              {isFirst ? 'Home' : prevSlideTitle || 'Prev'}
             </span>
           </button>
           
@@ -134,10 +135,11 @@ export function BottomNavigation({
               onClick={onNext}
               className="flex items-center gap-1 text-gray-700 dark:text-gray-300 
                          hover:text-[#EF4923] dark:hover:text-[#EF4923] transition-colors
-                         min-h-[44px] px-2 md:px-3"
+                         min-h-[44px] min-w-[44px] px-1 sm:px-2 md:px-3"
               data-testid="button-nav-next"
+              aria-label={`Next: ${nextSlideTitle || 'Next'}`}
             >
-              <span className="text-xs font-medium hidden sm:inline sm:truncate sm:max-w-[80px] md:max-w-[140px] lg:max-w-[220px] xl:max-w-none xl:whitespace-normal text-right">
+              <span className="text-[10px] sm:text-xs font-medium truncate max-w-[50px] sm:max-w-[80px] md:max-w-[140px] lg:max-w-[220px] text-right">
                 {nextSlideTitle || 'Next'}
               </span>
               <ChevronRight className="w-5 h-5 flex-shrink-0" />
@@ -148,10 +150,11 @@ export function BottomNavigation({
               onClick={onHome}
               className="flex items-center gap-1 text-gray-700 dark:text-gray-300 
                          hover:text-[#EF4923] dark:hover:text-[#EF4923] transition-colors
-                         min-h-[44px] px-2 md:px-3"
+                         min-h-[44px] min-w-[44px] px-1 sm:px-2 md:px-3"
               data-testid="button-nav-home"
+              aria-label="Go to Home"
             >
-              <span className="text-xs font-medium">Home</span>
+              <span className="text-[10px] sm:text-xs font-medium">Home</span>
               <ChevronRight className="w-5 h-5 flex-shrink-0" />
             </button>
           )}

@@ -180,23 +180,23 @@ function StatItem({
   const testId = `stat-${label.toLowerCase().replace(/[\s/]+/g, '-')}`;
   return (
     <div className="text-center" data-testid={testId}>
-      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider" data-testid={`${testId}-label`}>
+      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wider" data-testid={`${testId}-label`}>
         {label}
       </p>
-      <p className="text-lg font-bold" data-testid={`${testId}-value`}>{value}</p>
+      <p className="text-sm sm:text-lg font-bold" data-testid={`${testId}-value`}>{value}</p>
       {vsMarketPercent !== undefined && vsMarketPercent !== null && (
-        <p className={`text-xs flex items-center justify-center gap-0.5 ${vsMarketPercent > 0 ? 'text-red-500' : 'text-green-500'}`} data-testid={`${testId}-vs-market`}>
+        <p className={`text-[10px] sm:text-xs flex items-center justify-center gap-0.5 ${vsMarketPercent > 0 ? 'text-red-500' : 'text-green-500'}`} data-testid={`${testId}-vs-market`}>
           {vsMarketPercent > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-          {Math.abs(vsMarketPercent).toFixed(1)}% vs market
+          {Math.abs(vsMarketPercent).toFixed(1)}%
         </p>
       )}
       {yourValue && (
-        <p className="text-xs text-muted-foreground" data-testid={`${testId}-your`}>
+        <p className="text-[10px] sm:text-xs text-muted-foreground truncate" data-testid={`${testId}-your`}>
           Your: {yourValue}
         </p>
       )}
       {subtext && (
-        <p className={`text-xs ${subtextColor}`}>{subtext}</p>
+        <p className={`text-[10px] sm:text-xs ${subtextColor}`}>{subtext}</p>
       )}
     </div>
   );
@@ -461,14 +461,14 @@ export function CompsWidget({ comparables, subjectProperty }: CompsWidgetProps) 
           </Tabs>
         </div>
         
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-wrap" data-testid="status-filters">
+        <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4" data-testid="status-filters">
           {STATUS_FILTERS.map(filter => (
             <Button
               key={filter.id}
               variant={statusFilter === filter.id ? 'default' : 'outline'}
               size="sm"
               onClick={() => setStatusFilter(filter.id)}
-              className="flex-shrink-0"
+              className="flex-shrink-0 text-[10px] sm:text-xs px-2 sm:px-3"
               data-testid={`filter-${filter.id}`}
             >
               {filter.label}
@@ -494,7 +494,7 @@ export function CompsWidget({ comparables, subjectProperty }: CompsWidgetProps) 
             : null;
           
           return (
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4 p-4 bg-muted/50 rounded-lg" data-testid="stats-summary">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-4 p-2 sm:p-4 bg-muted/50 rounded-lg" data-testid="stats-summary">
               <StatItem 
                 label="LOW PRICE" 
                 value={formatCurrency(statistics.price.range.min)} 

@@ -91,20 +91,20 @@ export function SectionCard({ widget, onClick, badge, agentPhoto, agentName }: S
   return (
     <Card
       onClick={onClick}
-      className="p-4 flex flex-col items-center justify-center gap-2 cursor-pointer hover-elevate min-h-[120px] touch-manipulation"
+      className="p-2 sm:p-4 flex flex-col items-center justify-center gap-1 sm:gap-2 cursor-pointer hover-elevate min-h-[100px] sm:min-h-[120px] touch-manipulation active:scale-[0.98] transition-transform"
       data-testid={`section-card-${widget.id}`}
     >
       {renderIcon()}
-      <span className="text-xs font-bold text-center uppercase tracking-wide line-clamp-2">
+      <span className="text-[10px] sm:text-xs font-bold text-center uppercase tracking-wide line-clamp-2 px-1">
         {widget.title}
       </span>
       {(widget.subtitle || (widget.id === 'agent_resume' && agentName)) && (
-        <span className="text-xs text-muted-foreground text-center">
+        <span className="text-[10px] sm:text-xs text-muted-foreground text-center truncate max-w-full px-1">
           {widget.id === 'agent_resume' ? agentName || 'Agent' : widget.subtitle}
         </span>
       )}
       {(badge || widget.badge) && (
-        <Badge variant="secondary" className="text-[#EF4923]">
+        <Badge variant="secondary" className="text-[#EF4923] text-[10px] sm:text-xs">
           {badge || widget.badge}
         </Badge>
       )}
