@@ -1,0 +1,68 @@
+## 🎯 OBJECTIVE
+Check the database configuration to understand what needs to be migrated for Ryan's request to move Contract Conduit to Render without disturbing Randi's workflow.
+
+## 📋 QUESTIONS TO ANSWER
+
+### 1. How Many Databases Exist?
+In Replit, I see "Development Database" and "Production Database" tabs.
+- Are these TWO separate databases with different data?
+- Or is this the same database with different connection methods?
+
+### 2. Check DATABASE_URL Configuration
+Show me:
+- What is the current DATABASE_URL in Replit Secrets?
+- Is there a separate DEV_DATABASE_URL or PROD_DATABASE_URL?
+- Which database is the app actually connecting to?
+
+### 3. Compare Transaction Counts
+Run on BOTH databases (if separate):
+```sql
+SELECT COUNT(*) as total FROM transactions;
+SELECT property_address, created_at FROM transactions ORDER BY created_at DESC LIMIT 5;
+```
+
+### 4. Check Render Database
+The Render-hosted Contract Conduit at:
+https://mission-control-contract-conduit.onrender.com
+
+- What DATABASE_URL is configured there?
+- Is it the same database as Replit Production?
+
+### 5. List All Users
+```sql
+SELECT id, email, name, created_at FROM users ORDER BY created_at DESC;
+```
+
+Are Randi's user account and preferences in the database?
+
+### 6. Check User-Specific Data
+For Randi (or other coordinators):
+```sql
+SELECT * FROM notification_settings WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%randi%' OR email LIKE '%spyglass%');
+```
+```sql
+SELECT * FROM user_settings WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%randi%' OR email LIKE '%spyglass%');
+```
+
+## 📊 PROVIDE A REPORT WITH:
+
+| Question | Answer |
+|----------|--------|
+| Number of databases | ? |
+| Replit connects to | ? |
+| Render connects to | ? |
+| Same database? | Yes/No |
+| Randi's transactions exist? | Yes/No |
+| User settings exist? | Yes/No |
+| Migration needed? | Yes/No/Partial |
+
+## 🎯 WHAT RYAN WANTS
+"Migrate Contract Conduit to Render without disturbing Randi's workflow"
+
+This means:
+- Randi's transactions must be accessible on Render
+- Her user settings/preferences must persist
+- No data loss during transition
+
+Based on our earlier finding today (Replit connected to Production DB with 16 transactions), my hypothesis is:
+ScenarioLikely?Migration Needed?Both Replit & Render use SAME databaseHighNo - just deploy codeSeparate databases with different dataLowYes - need data migration
