@@ -45,11 +45,11 @@ import {
   flyers,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, isNull, and } from "drizzle-orm";
+import { eq, desc, isNull, and, sql, or } from "drizzle-orm";
 
 export interface IStorage {
   // Transactions
-  getTransactions(userId?: string): Promise<Transaction[]>;
+  getTransactions(userId?: string, userEmail?: string): Promise<Transaction[]>;
   getTransaction(id: string): Promise<Transaction | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransaction(id: string, transaction: Partial<InsertTransaction>): Promise<Transaction | undefined>;
@@ -147,15 +147,49 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   // Transactions
-  async getTransactions(userId?: string): Promise<Transaction[]> {
-    if (userId) {
-      return await db
-        .select()
-        .from(transactions)
-        .where(eq(transactions.userId, userId))
-        .orderBy(desc(transactions.createdAt));
+  async getTransactions(userId?: string, userEmail?: string): Promise<Transaction[]> {
+    // If no user context, return all (admin view)
+    if (!userId && !userEmail) {
+      return await db.select().from(transactions).orderBy(desc(transactions.createdAt));
     }
-    return await db.select().from(transactions).orderBy(desc(transactions.createdAt));
+
+    // Get transactions user created
+    const ownedTransactions = userId ? await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.userId, userId))
+      .orderBy(desc(transactions.createdAt)) : [];
+
+    // If user has email, check if they're a coordinator
+    if (userEmail) {
+      // Find coordinator by email
+      const [coordinator] = await db
+        .select()
+        .from(coordinators)
+        .where(eq(coordinators.email, userEmail))
+        .limit(1);
+
+      if (coordinator) {
+        // Get transactions where this coordinator is assigned
+        const assignedTransactions = await db
+          .select()
+          .from(transactions)
+          .where(
+            sql`${coordinator.id} = ANY(${transactions.coordinatorIds})`
+          )
+          .orderBy(desc(transactions.createdAt));
+
+        // Merge and deduplicate
+        const allTransactions = [...ownedTransactions, ...assignedTransactions];
+        const uniqueTransactions = allTransactions.filter(
+          (t, index, self) => index === self.findIndex(x => x.id === t.id)
+        );
+        
+        return uniqueTransactions;
+      }
+    }
+
+    return ownedTransactions;
   }
 
   async getTransaction(id: string): Promise<Transaction | undefined> {

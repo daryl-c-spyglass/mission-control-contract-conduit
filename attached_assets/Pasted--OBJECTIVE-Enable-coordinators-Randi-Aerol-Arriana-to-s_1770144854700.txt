@@ -1,0 +1,95 @@
+## 🎯 OBJECTIVE
+Enable coordinators (Randi, Aerol, Arriana) to see transactions assigned to them when they log in.
+
+## 🐛 CURRENT PROBLEM
+- Coordinators can log in with their @spyglassrealty.com email
+- But they see NO transactions (only their own created ones, which is none)
+- The coordinator_ids on transactions aren't linked to user accounts
+
+## ✅ FIX: Match Coordinator by Email
+
+### Coordinator Emails to Match:
+| Name | Email |
+|------|-------|
+| Randi White | randi@spyglassrealty.com |
+| Aerol Fausto | aerol@spyglassrealty.com |
+| Arriana Alvarez | arriana@spyglassrealty.com |
+
+### Update getTransactions() in storage.ts
+```typescript
+async getTransactions(userId?: string, userEmail?: string): Promise<Transaction[]> {
+  // If no user context, return all (admin view)
+  if (!userId && !userEmail) {
+    return await db.select().from(transactions).orderBy(desc(transactions.createdAt));
+  }
+
+  // Get transactions user created
+  const ownedTransactions = await db
+    .select()
+    .from(transactions)
+    .where(eq(transactions.userId, userId))
+    .orderBy(desc(transactions.createdAt));
+
+  // If user has email, check if they're a coordinator
+  if (userEmail) {
+    // Find coordinator by email
+    const coordinator = await db
+      .select()
+      .from(coordinators)
+      .where(eq(coordinators.email, userEmail))
+      .limit(1);
+
+    if (coordinator.length > 0) {
+      // Get transactions where this coordinator is assigned
+      const assignedTransactions = await db
+        .select()
+        .from(transactions)
+        .where(
+          sql`${coordinator[0].id} = ANY(${transactions.coordinatorIds})`
+        )
+        .orderBy(desc(transactions.createdAt));
+
+      // Merge and deduplicate
+      const allTransactions = [...ownedTransactions, ...assignedTransactions];
+      const uniqueTransactions = allTransactions.filter(
+        (t, index, self) => index === self.findIndex(x => x.id === t.id)
+      );
+      
+      return uniqueTransactions;
+    }
+  }
+
+  return ownedTransactions;
+}
+```
+
+### Update API Route
+In routes.ts, pass the user's email to getTransactions:
+```typescript
+app.get('/api/transactions', async (req, res) => {
+  const userId = req.user?.id;
+  const userEmail = req.user?.email;
+  
+  const transactions = await storage.getTransactions(userId, userEmail);
+  res.json(transactions);
+});
+```
+
+## ✅ EXPECTED RESULT
+
+| User | Logs in with | Will See |
+|------|--------------|----------|
+| Ryan | ryan@spyglassrealty.com | Only transactions he created |
+| Daryl | daryl@spyglassrealty.com | Only transactions he created |
+| Randi | randi@spyglassrealty.com | All transactions assigned to her as coordinator |
+| Aerol | aerol@spyglassrealty.com | All transactions assigned to her as coordinator |
+| Arriana | arriana@spyglassrealty.com | All transactions assigned to her as coordinator |
+
+## ✅ VERIFICATION
+1. Log in as Randi (randi@spyglassrealty.com)
+2. Should see 20+ transactions assigned to her
+3. Log in as Ryan (ryan@spyglassrealty.com)
+4. Should see only transactions Ryan created
+
+## 📱 MOBILE OPTIMIZATION
+No UI changes needed - this is backend logic only.

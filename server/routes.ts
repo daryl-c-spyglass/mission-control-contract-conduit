@@ -18,6 +18,25 @@ import { generateGraphic, type GraphicsFormat, type GraphicsData } from "./servi
 import { nanoid } from "nanoid";
 import QRCode from "qrcode";
 
+// Helper to check if a user can access a transaction (owner OR assigned coordinator)
+async function canAccessTransaction(transaction: any, userId: string, userEmail?: string): Promise<boolean> {
+  // Owner always has access
+  if (!transaction.userId || transaction.userId === userId) {
+    return true;
+  }
+  
+  // Check if user is an assigned coordinator by email
+  if (userEmail && transaction.coordinatorIds && Array.isArray(transaction.coordinatorIds) && transaction.coordinatorIds.length > 0) {
+    const coordinatorsList = await storage.getCoordinators();
+    const userCoordinator = coordinatorsList.find(c => c.email === userEmail);
+    if (userCoordinator && transaction.coordinatorIds.includes(userCoordinator.id)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
 // Helper to generate a Slack channel name in format: buy-123main-joeywilkes or sell-123main-joeywilkes
 function generateSlackChannelName(address: string, transactionType: string = "buy", agentName: string = ""): string {
   // Extract just the street address (e.g., "123 Main Street" from "123 Main Street, Austin, TX 78701")
@@ -61,7 +80,8 @@ export async function registerRoutes(
   app.get("/api/transactions", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      const transactions = await storage.getTransactions(userId);
+      const userEmail = req.user?.claims?.email;
+      const transactions = await storage.getTransactions(userId, userEmail);
       res.json(transactions);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch transactions" });
@@ -71,13 +91,14 @@ export async function registerRoutes(
   app.get("/api/transactions/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
+      const userEmail = req.user?.claims?.email;
       const transaction = await storage.getTransaction(req.params.id);
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      // Verify user owns this transaction
-      if (transaction.userId && transaction.userId !== userId) {
+      // Verify user can access this transaction (owner OR assigned coordinator)
+      if (!(await canAccessTransaction(transaction, userId, userEmail))) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -527,6 +548,7 @@ export async function registerRoutes(
   app.patch("/api/transactions/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
+      const userEmail = req.user?.claims?.email;
       
       // Get current transaction to check for date changes
       const currentTransaction = await storage.getTransaction(req.params.id);
@@ -534,8 +556,8 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      // Verify user owns this transaction
-      if (currentTransaction.userId && currentTransaction.userId !== userId) {
+      // Verify user can access this transaction (owner OR assigned coordinator)
+      if (!(await canAccessTransaction(currentTransaction, userId, userEmail))) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -577,13 +599,14 @@ export async function registerRoutes(
   app.delete("/api/transactions/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
+      const userEmail = req.user?.claims?.email;
       
-      // Verify user owns this transaction
+      // Verify user can access this transaction (owner OR assigned coordinator)
       const transaction = await storage.getTransaction(req.params.id);
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
       }
-      if (transaction.userId && transaction.userId !== userId) {
+      if (!(await canAccessTransaction(transaction, userId, userEmail))) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -601,6 +624,7 @@ export async function registerRoutes(
   app.patch("/api/transactions/:id/add-mls", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
+      const userEmail = req.user?.claims?.email;
       const { mlsNumber } = req.body;
       
       if (!mlsNumber) {
@@ -612,8 +636,8 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      // Verify user owns this transaction
-      if (transaction.userId && transaction.userId !== userId) {
+      // Verify user can access this transaction (owner OR assigned coordinator)
+      if (!(await canAccessTransaction(transaction, userId, userEmail))) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -672,14 +696,15 @@ export async function registerRoutes(
   app.patch("/api/transactions/:id/archive", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.id || req.user?.claims?.sub;
+      const userEmail = req.user?.claims?.email;
       
       const transaction = await storage.getTransaction(req.params.id);
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      // Verify user owns this transaction
-      if (transaction.userId && transaction.userId !== userId) {
+      // Verify user can access this transaction (owner OR assigned coordinator)
+      if (!(await canAccessTransaction(transaction, userId, userEmail))) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -741,6 +766,7 @@ export async function registerRoutes(
   app.patch("/api/transactions/:id/unarchive", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.id || req.user?.claims?.sub;
+      const userEmail = req.user?.claims?.email;
       const { restoreNotifications = false } = req.body;
       
       const transaction = await storage.getTransaction(req.params.id);
@@ -748,8 +774,8 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      // Verify user owns this transaction
-      if (transaction.userId && transaction.userId !== userId) {
+      // Verify user can access this transaction (owner OR assigned coordinator)
+      if (!(await canAccessTransaction(transaction, userId, userEmail))) {
         return res.status(403).json({ message: "Access denied" });
       }
       let notificationsRestored = false;
