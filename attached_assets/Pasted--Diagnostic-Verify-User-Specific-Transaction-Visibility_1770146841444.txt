@@ -1,0 +1,83 @@
+## Diagnostic: Verify User-Specific Transaction Visibility + Add Coordinator
+
+### PART 1: Transaction Visibility Check
+
+#### 1. List All Users with Transaction Counts
+```sql
+SELECT 
+  u.id,
+  u.email,
+  u.name,
+  COUNT(t.id) as transaction_count
+FROM users u
+LEFT JOIN transactions t ON t.user_id = u.id
+GROUP BY u.id, u.email, u.name
+ORDER BY transaction_count DESC;
+```
+
+#### 2. Show Transaction Ownership
+```sql
+SELECT 
+  t.property_address,
+  t.user_id,
+  u.email as owner_email
+FROM transactions t
+LEFT JOIN users u ON t.user_id = u.id
+ORDER BY u.email, t.created_at DESC
+LIMIT 20;
+```
+
+#### 3. Check for Transactions Without Owners
+```sql
+SELECT id, property_address, user_id 
+FROM transactions 
+WHERE user_id IS NULL;
+```
+
+#### 4. Verify API Filtering Logic
+Show the getTransactions() function - does it filter by userId?
+
+#### 5. Provide Report
+
+| Check | Status |
+|-------|--------|
+| Transactions have user_id | ? |
+| API filters by logged-in user | ? |
+| Ryan only sees Ryan's transactions | ? |
+| Daryl only sees Daryl's transactions | ? |
+| Any orphan transactions | ? |
+
+---
+
+### PART 2: Add Daryl as Coordinator
+
+Add Daryl to the coordinators table in PRODUCTION database so he can monitor coordinator behavior:
+```sql
+INSERT INTO coordinators (id, name, email, slack_user_id, is_active)
+VALUES (
+  gen_random_uuid(),
+  'Daryl Camingao',
+  'daryl@spyglassrealty.com',
+  'U09GCRKDUFK',
+  true
+)
+ON CONFLICT (email) DO NOTHING;
+```
+
+#### Verify Daryl was added:
+```sql
+SELECT * FROM coordinators WHERE email = 'daryl@spyglassrealty.com';
+```
+
+#### Current Coordinators List:
+```sql
+SELECT name, email, slack_user_id, is_active FROM coordinators ORDER BY name;
+```
+
+Expected result - 4 coordinators:
+| Name | Email |
+|------|-------|
+| Aerol Fausto | aerol@spyglassrealty.com |
+| Arriana Alvarez | arriana@spyglassrealty.com |
+| Daryl Camingao | daryl@spyglassrealty.com |
+| Randi White | randi@spyglassrealty.com |
