@@ -68,11 +68,17 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/transactions/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/transactions/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       const transaction = await storage.getTransaction(req.params.id);
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      // Verify user owns this transaction
+      if (transaction.userId && transaction.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
       }
       
       // Enrich CMA comparables with coordinates if they're missing
@@ -518,12 +524,19 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/transactions/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/transactions/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
+      
       // Get current transaction to check for date changes
       const currentTransaction = await storage.getTransaction(req.params.id);
       if (!currentTransaction) {
         return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      // Verify user owns this transaction
+      if (currentTransaction.userId && currentTransaction.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
       }
       
       const transaction = await storage.updateTransaction(req.params.id, req.body);
@@ -561,8 +574,19 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/transactions/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/transactions/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
+      
+      // Verify user owns this transaction
+      const transaction = await storage.getTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      if (transaction.userId && transaction.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
       const deleted = await storage.deleteTransaction(req.params.id);
       if (!deleted) {
         return res.status(404).json({ message: "Transaction not found" });
@@ -574,8 +598,9 @@ export async function registerRoutes(
   });
 
   // Add MLS number to off-market listing (convert to active listing)
-  app.patch("/api/transactions/:id/add-mls", isAuthenticated, async (req, res) => {
+  app.patch("/api/transactions/:id/add-mls", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       const { mlsNumber } = req.body;
       
       if (!mlsNumber) {
@@ -585,6 +610,11 @@ export async function registerRoutes(
       const transaction = await storage.getTransaction(req.params.id);
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      // Verify user owns this transaction
+      if (transaction.userId && transaction.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
       }
       
       // Normalize MLS number with ACT prefix
@@ -641,13 +671,19 @@ export async function registerRoutes(
   // Archive a transaction - saves notification settings and disables all reminders
   app.patch("/api/transactions/:id/archive", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user?.id || req.user?.claims?.sub;
+      
       const transaction = await storage.getTransaction(req.params.id);
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
       }
       
+      // Verify user owns this transaction
+      if (transaction.userId && transaction.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
       // Get current notification settings to save before archiving
-      const userId = req.user?.id || req.user?.claims?.sub;
       let previousReminderSettings = null;
       
       if (userId) {
@@ -704,6 +740,7 @@ export async function registerRoutes(
   // Unarchive/restore a transaction with optional notification restoration
   app.patch("/api/transactions/:id/unarchive", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user?.id || req.user?.claims?.sub;
       const { restoreNotifications = false } = req.body;
       
       const transaction = await storage.getTransaction(req.params.id);
@@ -711,7 +748,10 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      const userId = req.user?.id || req.user?.claims?.sub;
+      // Verify user owns this transaction
+      if (transaction.userId && transaction.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       let notificationsRestored = false;
       
       // Optionally restore notification settings
