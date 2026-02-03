@@ -49,7 +49,7 @@ import { eq, desc, isNull, and } from "drizzle-orm";
 
 export interface IStorage {
   // Transactions
-  getTransactions(): Promise<Transaction[]>;
+  getTransactions(userId?: string): Promise<Transaction[]>;
   getTransaction(id: string): Promise<Transaction | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransaction(id: string, transaction: Partial<InsertTransaction>): Promise<Transaction | undefined>;
@@ -147,7 +147,14 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   // Transactions
-  async getTransactions(): Promise<Transaction[]> {
+  async getTransactions(userId?: string): Promise<Transaction[]> {
+    if (userId) {
+      return await db
+        .select()
+        .from(transactions)
+        .where(eq(transactions.userId, userId))
+        .orderBy(desc(transactions.createdAt));
+    }
     return await db.select().from(transactions).orderBy(desc(transactions.createdAt));
   }
 

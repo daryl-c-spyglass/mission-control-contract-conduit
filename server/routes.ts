@@ -58,9 +58,10 @@ export async function registerRoutes(
 
   // ============ Transactions ============
 
-  app.get("/api/transactions", isAuthenticated, async (req, res) => {
+  app.get("/api/transactions", isAuthenticated, async (req: any, res) => {
     try {
-      const transactions = await storage.getTransactions();
+      const userId = req.user?.claims?.sub;
+      const transactions = await storage.getTransactions(userId);
       res.json(transactions);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch transactions" });
@@ -765,7 +766,7 @@ export async function registerRoutes(
   app.delete("/api/transactions/archived/delete-all", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      const allTransactions = await storage.getTransactions();
+      const allTransactions = await storage.getTransactions(userId);
       const archivedTransactions = allTransactions.filter(t => t.isArchived === true);
       
       if (archivedTransactions.length === 0) {
