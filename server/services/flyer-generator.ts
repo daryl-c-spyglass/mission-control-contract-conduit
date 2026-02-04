@@ -52,6 +52,11 @@ async function launchBrowser(): Promise<any> {
     
     const launchOptions: any = {
       headless: true,
+      defaultViewport: { 
+        width: FLYER_WIDTH, 
+        height: FLYER_HEIGHT,
+        deviceScaleFactor: 1  // Force 1:1 pixel ratio for print quality
+      },
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -71,7 +76,8 @@ async function launchBrowser(): Promise<any> {
         '--hide-scrollbars',
         '--metrics-recording-only',
         '--mute-audio',
-        '--safebrowsing-disable-auto-update'
+        '--safebrowsing-disable-auto-update',
+        '--force-device-scale-factor=1'
       ]
     };
     
