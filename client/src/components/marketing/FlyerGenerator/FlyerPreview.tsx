@@ -232,10 +232,10 @@ export function FlyerPreview({
           data-layout-id="divider-1"
         />
 
-        {/* Description column: expanded 3 subsquares to push divider-2 right */}
+        {/* Description column: Grid 14 area (196px width) */}
         <div 
           className="flex-shrink-0 overflow-hidden" 
-          style={{ width: '220px', paddingLeft: '8px', paddingRight: '8px' }}
+          style={{ width: '196px', paddingLeft: '8px', paddingRight: '8px' }}
           data-layout-id="description-column"
         >
           {/* Headline: 10pt to fit narrower column */}
@@ -270,14 +270,14 @@ export function FlyerPreview({
           </p>
         </div>
 
-        {/* Divider 2 - between description and agent card */}
+        {/* Divider 2 - moved 3 subsquares (24px) to the right */}
         <div
           className="flex-shrink-0"
           style={{ 
             width: '4px', 
             height: '147.84px', 
             marginTop: '34.56px', 
-            marginLeft: '8px',
+            marginLeft: '32px',
             marginRight: '8px',
             backgroundColor: accentColor 
           }}
