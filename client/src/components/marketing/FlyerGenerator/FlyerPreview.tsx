@@ -270,14 +270,14 @@ export function FlyerPreview({
           </p>
         </div>
 
-        {/* Divider 2 @ ~360px (Grid 14/15 boundary, ~408px from canvas left) */}
+        {/* Divider 2 - moved 3 subsquares right */}
         <div
           className="flex-shrink-0"
           style={{ 
             width: '4px', 
             height: '147.84px', 
             marginTop: '34.56px', 
-            marginLeft: '8px',
+            marginLeft: '32px',
             marginRight: '8px',
             backgroundColor: accentColor 
           }}
