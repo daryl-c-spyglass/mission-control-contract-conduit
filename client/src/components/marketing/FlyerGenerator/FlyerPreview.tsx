@@ -270,15 +270,15 @@ export function FlyerPreview({
           </p>
         </div>
 
-        {/* Divider 2 - moved 3 subsquares (24px) to the right */}
+        {/* Divider 2 - absolutely positioned, 3 subsquares right of original position */}
+        {/* Original position was ~360px from left of bottom section, moved to ~384px */}
         <div
-          className="flex-shrink-0"
+          className="absolute"
           style={{ 
             width: '4px', 
             height: '147.84px', 
-            marginTop: '34.56px', 
-            marginLeft: '32px',
-            marginRight: '8px',
+            top: '34.56px', 
+            left: '384px',
             backgroundColor: accentColor 
           }}
           data-layout-id="divider-2"
