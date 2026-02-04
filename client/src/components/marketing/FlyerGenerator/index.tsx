@@ -63,19 +63,22 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
     }
   }, []);
 
+  const [containerWidth, setContainerWidth] = useState(500);
+  
   // Track preview container size for dynamic scaling
   useEffect(() => {
     const container = rightPaneRef.current;
     if (!container) return;
     
-    const updateHeight = () => {
-      // Subtract space for header, controls, padding (~150px)
+    const updateSize = () => {
+      // Subtract space for header, controls, padding
       setContainerHeight(container.clientHeight - 150);
+      setContainerWidth(container.clientWidth - 64); // 32px padding each side
     };
     
-    updateHeight();
+    updateSize();
     
-    const observer = new ResizeObserver(() => updateHeight());
+    const observer = new ResizeObserver(() => updateSize());
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
@@ -763,12 +766,15 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   });
 
   // Dynamically calculate base scale to fit flyer (816x1056) in container
+  const FLYER_WIDTH = 816;
   const FLYER_HEIGHT = 1056;
-  const baseScale = Math.min((containerHeight - 20) / FLYER_HEIGHT, 1); // -20 for padding, max 1
+  const scaleForHeight = containerHeight / FLYER_HEIGHT;
+  const scaleForWidth = containerWidth / FLYER_WIDTH;
+  const baseScale = Math.min(scaleForHeight, scaleForWidth, 1); // Fit both dimensions, max 1
   
   const getPreviewScale = () => {
     // All scales are relative to the base fit scale
-    // 100% = fits perfectly in container
+    // 100% = fits perfectly in container (no scrollbars)
     const multiplier = parseFloat(scale) || 1;
     return baseScale * multiplier;
   };
@@ -947,7 +953,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
               </div>
             </div>
 
-            <div className="overflow-auto rounded-lg shadow-2xl bg-white">
+            <div className="overflow-hidden rounded-lg shadow-2xl bg-white">
               <div
                 ref={previewRef}
                 className="origin-top-left relative"
