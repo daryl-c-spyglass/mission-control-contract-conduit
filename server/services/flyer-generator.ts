@@ -524,11 +524,11 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     let result: Buffer;
     
     if (outputType === 'pdf') {
-      // Generate PDF with exact pixel dimensions
+      // Generate PDF with exact 8.5 x 11 inch dimensions for print
       const pdf = await page.pdf({
         printBackground: true,
-        width: `${RENDER_CONFIG.width}px`,
-        height: `${RENDER_CONFIG.height}px`,
+        width: '8.5in',
+        height: '11in',
         pageRanges: '1',
         preferCSSPageSize: false,
         margin: { top: 0, right: 0, bottom: 0, left: 0 }
