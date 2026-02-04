@@ -63,7 +63,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   }, []);
 
   const [showGrid, setShowGrid] = useState(false);
-  const [scale, setScale] = useState<string>('0.75'); // Default to 75%
+  const [scale, setScale] = useState<string>('fit'); // Default to fit view
   const [imageTransforms, setImageTransforms] = useState<ImageTransforms>({ ...DEFAULT_TRANSFORMS });
 
   const { data: marketingProfile } = useMarketingProfile();
@@ -913,10 +913,9 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="fit">Fit to screen</SelectItem>
-                      <SelectItem value="0.5">50%</SelectItem>
+                      <SelectItem value="fit">Fit to View</SelectItem>
                       <SelectItem value="0.75">75%</SelectItem>
-                      <SelectItem value="1">100%</SelectItem>
+                      <SelectItem value="1">Actual Size</SelectItem>
                       <SelectItem value="1.25">125%</SelectItem>
                       <SelectItem value="1.5">150%</SelectItem>
                     </SelectContent>
