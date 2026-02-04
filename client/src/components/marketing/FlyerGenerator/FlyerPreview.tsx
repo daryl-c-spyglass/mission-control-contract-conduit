@@ -270,15 +270,14 @@ export function FlyerPreview({
           </p>
         </div>
 
-        {/* Divider 2 - absolutely positioned, 3 subsquares right of original position */}
-        {/* Original position was ~360px from left of bottom section, moved to ~384px */}
+        {/* Divider 2 - absolutely positioned */}
         <div
           className="absolute"
           style={{ 
             width: '4px', 
             height: '147.84px', 
             top: '34.56px', 
-            left: '384px',
+            left: '408px',
             backgroundColor: accentColor 
           }}
           data-layout-id="divider-2"
