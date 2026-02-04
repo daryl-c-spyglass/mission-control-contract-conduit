@@ -1,0 +1,189 @@
+Got it! The channel ID is C09J6327HQS.
+
+🔧 Replit Prompt: Coming Soon Checkbox Feature
+## 🎯 OBJECTIVE
+Add a "Coming Soon" checkbox to the Create Transaction form that posts to #coming-soon-listings Slack channel when checked.
+
+## 📍 SLACK CHANNEL
+- Channel: #coming-soon-listings
+- Channel ID: C09J6327HQS
+
+## ✅ REQUIREMENTS
+
+### 1. Database Changes
+Add column to transactions table:
+```sql
+ALTER TABLE transactions ADD COLUMN is_coming_soon BOOLEAN DEFAULT false;
+```
+
+### 2. UI Changes - Create Transaction Form
+Add checkbox below "Off Market":
+```tsx
+<div className="space-y-4">
+  {/* Existing Off Market checkbox */}
+  <div className="flex items-center gap-3">
+    <Checkbox id="offMarket" checked={isOffMarket} onCheckedChange={setIsOffMarket} />
+    <div>
+      <Label htmlFor="offMarket">Off Market</Label>
+      <p className="text-sm text-muted-foreground">Property is not listed in MLS</p>
+    </div>
+  </div>
+
+  {/* NEW: Coming Soon checkbox */}
+  <div className="flex items-center gap-3">
+    <Checkbox id="comingSoon" checked={isComingSoon} onCheckedChange={setIsComingSoon} />
+    <div>
+      <Label htmlFor="comingSoon">Coming Soon (Not Yet Listed)</Label>
+      <p className="text-sm text-muted-foreground">
+        Notify team in #coming-soon-listings
+      </p>
+    </div>
+  </div>
+</div>
+```
+
+### 3. Slack Notification - Post to Channel
+When transaction is created with isComingSoon = true:
+```typescript
+const COMING_SOON_CHANNEL_ID = 'C09J6327HQS';
+
+async function postComingSoonNotification(transaction: Transaction, agent: User) {
+  // Get property photo (first photo from MLS or uploaded)
+  const heroPhoto = transaction.mlsData?.photos?.[0] || transaction.uploadedPhotos?.[0];
+  
+  const blocks = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: "🏠 Coming Soon Listing",
+        emoji: true
+      }
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*📍 Address:*\n${transaction.propertyAddress}`
+        },
+        {
+          type: "mrkdwn", 
+          text: `*💰 List Price:*\n${formatPrice(transaction.listPrice || 'TBD')}`
+        }
+      ]
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*🛏️ Details:*\n${transaction.beds || '-'} bed | ${transaction.baths || '-'} bath | ${transaction.sqft || '-'} sqft`
+        },
+        {
+          type: "mrkdwn",
+          text: `*🗓️ Expected Live Date:*\n${transaction.dateGoingLive ? formatDate(transaction.dateGoingLive) : 'TBD'}`
+        }
+      ]
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*👤 Agent:*\n${agent.name}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*📞 Contact:*\n${agent.phone || agent.email}`
+        }
+      ]
+    }
+  ];
+
+  // Add description if available
+  if (transaction.description) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*📝 Description:*\n${transaction.description.substring(0, 500)}${transaction.description.length > 500 ? '...' : ''}`
+      }
+    });
+  }
+
+  // Add property photo if available
+  if (heroPhoto) {
+    blocks.push({
+      type: "image",
+      image_url: heroPhoto,
+      alt_text: "Property Photo"
+    });
+  }
+
+  // Add action button
+  blocks.push({
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: {
+          type: "plain_text",
+          text: "View in Contract Conduit",
+          emoji: true
+        },
+        url: `${process.env.APP_URL || 'https://mission-control-contract-conduit.onrender.com'}/transactions/${transaction.id}`,
+        style: "primary"
+      }
+    ]
+  });
+
+  await slackClient.chat.postMessage({
+    channel: COMING_SOON_CHANNEL_ID,
+    text: `🏠 Coming Soon: ${transaction.propertyAddress}`, // Fallback text
+    blocks: blocks
+  });
+}
+```
+
+### 4. Integration Point
+In the transaction creation API (routes.ts or similar):
+```typescript
+// After transaction is created successfully
+if (transaction.isComingSoon) {
+  try {
+    const agent = await storage.getUser(transaction.userId);
+    await postComingSoonNotification(transaction, agent);
+    
+    // Log to activity timeline
+    await storage.createActivity({
+      transactionId: transaction.id,
+      type: 'notification',
+      description: 'Coming Soon notification posted to #coming-soon-listings'
+    });
+  } catch (error) {
+    console.error('Failed to post Coming Soon notification:', error);
+    // Don't fail transaction creation if Slack post fails
+  }
+}
+```
+
+### 5. Schema Update (shared/schema.ts)
+Add to transactions table definition:
+```typescript
+isComingSoon: boolean("is_coming_soon").default(false),
+```
+
+## ✅ VERIFICATION
+- [ ] Checkbox appears in Create Transaction form
+- [ ] Checking box saves isComingSoon = true to database
+- [ ] On save, posts formatted message to #coming-soon-listings (C09J6327HQS)
+- [ ] Message includes: address, price, beds/baths/sqft, live date, agent info
+- [ ] Property photo displays if available
+- [ ] "View in Contract Conduit" button links to transaction
+- [ ] Activity logged in transaction timeline
+
+## 📱 MOBILE OPTIMIZATION
+- Checkbox touch target minimum 44x44px
+- Slack message readable on mobile app
+- Form fields stack properly on small screens
