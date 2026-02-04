@@ -525,16 +525,19 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     
     if (outputType === 'pdf') {
       // Generate PDF with exact 8.5 x 11 inch dimensions for print
+      // Scale factor: 816 CSS pixels (8.5in at 96dpi) / 2550px template = 0.32
+      const scaleFactor = (8.5 * 96) / FLYER_WIDTH;
       const pdf = await page.pdf({
         printBackground: true,
         width: '8.5in',
         height: '11in',
         pageRanges: '1',
         preferCSSPageSize: false,
+        scale: scaleFactor,
         margin: { top: 0, right: 0, bottom: 0, left: 0 }
       });
       result = Buffer.from(pdf);
-      console.log(`[FlyerGenerator] PDF generated, size: ${result.length} bytes`);
+      console.log(`[FlyerGenerator] PDF generated with scale ${scaleFactor.toFixed(3)}, size: ${result.length} bytes`);
     } else {
       // Generate PNG with exact clip (same dimensions as PDF)
       const screenshot = await page.screenshot({
