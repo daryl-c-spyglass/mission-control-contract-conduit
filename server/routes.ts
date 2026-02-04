@@ -5,7 +5,7 @@ import fs from "fs";
 import { storage } from "./storage";
 import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema, insertCmaSchema, insertNotificationSettingsSchema, insertFlyerSchema } from "@shared/schema";
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages, watchUserMailbox } from "./gmail";
-import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel, postDocumentUploadNotification, postMLSListingNotification, sendMarketingNotification } from "./slack";
+import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel, postDocumentUploadNotification, postMLSListingNotification, sendMarketingNotification, postComingSoonNotification } from "./slack";
 import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess, getBestPhotosForFlyer, getAISelectedPhotosForFlyer, searchNearbyComparables, type CMASearchFilters } from "./repliers";
 import { isRentalOrLease } from "../shared/lib/listings";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
@@ -147,6 +147,7 @@ export async function registerRoutes(
         isUnderContract,
         isOffMarket,
         isCompanyLead,
+        isComingSoon,
         // Off-market property details
         propertyDescription,
         listPrice,
@@ -186,6 +187,9 @@ export async function registerRoutes(
       
       // Set company lead flag
       transactionData.isCompanyLead = isCompanyLead === true || isCompanyLead === 'true';
+      
+      // Set coming soon flag
+      transactionData.isComingSoon = isComingSoon === true || isComingSoon === 'true';
       
       // Set the status based on whether property is under contract (for non-off-market)
       if (!isOffMarket) {
@@ -533,6 +537,63 @@ export async function registerRoutes(
         } catch (mlsError) {
           console.error("MLS data fetch error:", mlsError);
           // Continue without MLS - don't fail the transaction
+        }
+      }
+
+      // Post Coming Soon notification if checkbox was checked
+      if (transactionData.isComingSoon) {
+        try {
+          // Get agent info for notification
+          let agentName = "";
+          let agentEmail = "";
+          let agentPhone = "";
+          
+          if (onBehalfOfName && onBehalfOfName.trim()) {
+            agentName = onBehalfOfName.trim();
+            agentEmail = onBehalfOfEmail || "";
+          } else if (userId) {
+            const creator = await authStorage.getUser(userId);
+            if (creator) {
+              agentName = `${creator.firstName || ""} ${creator.lastName || ""}`.trim();
+              agentEmail = creator.email || "";
+              // Try to get phone from marketing profile
+              agentPhone = creator.marketingPhone || "";
+            }
+          }
+          
+          // Get the latest persisted transaction with MLS-enriched data
+          const currentTx = await storage.getTransaction(transaction.id);
+          const mlsData = currentTx?.mlsData as any;
+          const mlsPhotos = mlsData?.photos || [];
+          const uploadedPhotos = currentTx?.propertyImages || [];
+          const heroPhotoUrl = mlsPhotos[0] || uploadedPhotos[0] || null;
+          
+          // Use persisted/MLS-enriched data, falling back to raw request data
+          await postComingSoonNotification({
+            propertyAddress: currentTx?.propertyAddress || transaction.propertyAddress,
+            listPrice: currentTx?.listPrice || mlsData?.listPrice || null,
+            bedrooms: currentTx?.bedrooms || mlsData?.bedrooms || null,
+            bathrooms: currentTx?.bathrooms || mlsData?.bathrooms || null,
+            sqft: currentTx?.sqft || mlsData?.sqft || null,
+            goLiveDate: currentTx?.goLiveDate || null,
+            description: currentTx?.propertyDescription || mlsData?.description || null,
+            transactionId: transaction.id,
+            agentName,
+            agentEmail,
+            agentPhone,
+            heroPhotoUrl,
+          });
+          
+          // Log activity
+          await storage.createActivity({
+            transactionId: transaction.id,
+            type: "notification",
+            description: "Coming Soon notification posted to #coming-soon-listings",
+            category: "communication",
+          });
+        } catch (comingSoonError) {
+          console.error("Failed to post Coming Soon notification:", comingSoonError);
+          // Don't fail transaction creation if notification fails
         }
       }
 
