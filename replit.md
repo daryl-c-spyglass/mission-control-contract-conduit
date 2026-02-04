@@ -66,6 +66,15 @@ Preferred communication style: Simple, everyday language.
   - Subject = Blue (#3b82f6) - Subject property marker
   - Unknown = Gray (#6b7280) - Status not determined
 - **Photo Upload System**: Photos uploaded via GCS client to private storage, served through a secure route. Server validates file type and size. Distinct handling for MLS photos and user uploads.
+- **Transaction Photos Table**: Database-backed photo tracking with source attribution:
+  - **Schema**: transactionPhotos table tracks id, transactionId, url, filename, source, label, sortOrder, createdAt
+  - **Source Types**: 'mls' (synced from MLS, locked), 'off_market' (uploaded during transaction creation), 'coming_soon' (uploaded during transaction creation with Slack notification), 'uploaded' (added via Marketing tab)
+  - **API Endpoints**:
+    - GET /api/transactions/:id/transaction-photos - Fetch photos sorted by source (MLS first)
+    - DELETE /api/transactions/:id/transaction-photos/:photoId - Delete user photos (blocks MLS deletion)
+    - POST /api/transactions/:id/photos - Upload new photos (saves to both propertyImages and transactionPhotos)
+  - **PropertyPhotos Component** (client/src/components/marketing/PropertyPhotos.tsx): Unified photo gallery with color-coded source badges, upload functionality, and delete capability for non-MLS photos. Displays in Marketing tab.
+  - **Lot Size Conversion**: Bidirectional auto-conversion between Square Feet and Acres (1 acre = 43,560 sq ft) in Create Transaction form
 - **CMA Data Extraction Utilities**: Comprehensive client-side utilities (`client/src/lib/cma-data-utils.ts`) for safe data extraction and normalization from various MLS/Repliers API field structures, including price, square footage, DOM, lot acres, beds/baths, address, coordinates, and status. Includes calculation of CMA statistics and robust formatting functions.
 - **CMA Resources System**: Agent-managed resources (documents, links) for CMA presentations, stored in a database with API endpoints for CRUD, reordering, and file uploads. Supports public access for shared CMAs.
 - **User Notification Preferences System**: Per-user Slack notification settings stored in a database, with API endpoints and a reusable component for managing preferences.

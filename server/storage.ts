@@ -28,6 +28,8 @@ import {
   type InsertAgentMarketingProfile,
   type Flyer,
   type InsertFlyer,
+  type TransactionPhoto,
+  type InsertTransactionPhoto,
   transactions,
   coordinators,
   integrationSettings,
@@ -43,6 +45,7 @@ import {
   userNotificationPreferences,
   agentMarketingProfiles,
   flyers,
+  transactionPhotos,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, isNull, and, sql, or } from "drizzle-orm";
@@ -79,6 +82,12 @@ export interface IStorage {
   createMarketingAsset(asset: InsertMarketingAsset): Promise<MarketingAsset>;
   updateMarketingAsset(id: string, asset: Partial<InsertMarketingAsset>): Promise<MarketingAsset | undefined>;
   deleteMarketingAsset(id: string): Promise<boolean>;
+
+  // Transaction Photos
+  getTransactionPhotos(transactionId: string): Promise<TransactionPhoto[]>;
+  getTransactionPhoto(id: string): Promise<TransactionPhoto | undefined>;
+  addTransactionPhoto(photo: InsertTransactionPhoto): Promise<TransactionPhoto>;
+  deleteTransactionPhoto(id: string): Promise<boolean>;
 
   // Contract Documents
   getContractDocumentsByTransaction(transactionId: string): Promise<ContractDocument[]>;
@@ -362,6 +371,34 @@ export class DatabaseStorage implements IStorage {
   async deleteMarketingAsset(id: string): Promise<boolean> {
     await db.delete(marketingAssets).where(eq(marketingAssets.id, id));
     return true;
+  }
+
+  // Transaction Photos
+  async getTransactionPhotos(transactionId: string): Promise<TransactionPhoto[]> {
+    return await db
+      .select()
+      .from(transactionPhotos)
+      .where(eq(transactionPhotos.transactionId, transactionId))
+      .orderBy(transactionPhotos.sortOrder);
+  }
+
+  async getTransactionPhoto(id: string): Promise<TransactionPhoto | undefined> {
+    const result = await db
+      .select()
+      .from(transactionPhotos)
+      .where(eq(transactionPhotos.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async addTransactionPhoto(photo: InsertTransactionPhoto): Promise<TransactionPhoto> {
+    const [created] = await db.insert(transactionPhotos).values(photo).returning();
+    return created;
+  }
+
+  async deleteTransactionPhoto(id: string): Promise<boolean> {
+    const deleted = await db.delete(transactionPhotos).where(eq(transactionPhotos.id, id)).returning();
+    return deleted.length > 0;
   }
 
   // Contract Documents

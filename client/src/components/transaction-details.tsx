@@ -104,6 +104,7 @@ import { CreateFlyerDialog, FlyerAssetConfig } from "./create-flyer-dialog";
 import { MarketingMaterialsDialog, SocialGraphicConfig } from "./marketing-materials-dialog";
 import { GraphicGeneratorDialog } from "./graphic-generator-dialog";
 import { FlyerGenerator } from "./marketing/FlyerGenerator";
+import { PropertyPhotos } from "./marketing/PropertyPhotos";
 import { PhotoGalleryModal } from "./photo-gallery-modal";
 import { CMATab } from "./cma-tab";
 import { TimelineTab } from "./timeline-tab";
@@ -3239,6 +3240,13 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
               </div>
             );
           })()}
+
+          {/* Unified Photo Gallery with Source Tracking */}
+          <Card data-testid="card-property-photos-unified">
+            <CardContent className="pt-6">
+              <PropertyPhotos transactionId={transaction.id} />
+            </CardContent>
+          </Card>
 
           {/* Quick Actions */}
           {(() => {

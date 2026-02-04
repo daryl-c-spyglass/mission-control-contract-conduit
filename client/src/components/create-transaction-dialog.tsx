@@ -61,6 +61,7 @@ const formSchema = z.object({
   listPrice: z.string().optional(),
   propertyType: z.string().optional(),
   sqft: z.string().optional(),
+  lotSizeSqft: z.string().optional(),
   lotSizeAcres: z.string().optional(),
   bedrooms: z.string().optional(),
   bathrooms: z.string().optional(),
@@ -230,6 +231,7 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
       listPrice: "",
       propertyType: "Residential",
       sqft: "",
+      lotSizeSqft: "",
       lotSizeAcres: "",
       bedrooms: "",
       bathrooms: "",
@@ -712,23 +714,57 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                   />
                 </div>
 
-                {/* Sqft and Lot Size */}
+                {/* Building Square Feet */}
+                <FormField
+                  control={form.control}
+                  name="sqft"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm">Building Square Feet</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Square className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            {...field}
+                            type="number"
+                            placeholder="2500"
+                            className="pl-9"
+                            data-testid="input-sqft"
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Lot Size with Auto-conversion */}
                 <div className="grid grid-cols-2 gap-3">
                   <FormField
                     control={form.control}
-                    name="sqft"
+                    name="lotSizeSqft"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm">Square Feet</FormLabel>
+                        <FormLabel className="text-sm">Lot Size (Sq Ft)</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <Square className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Ruler className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <Input
                               {...field}
                               type="number"
-                              placeholder="2500"
+                              placeholder="10890"
                               className="pl-9"
-                              data-testid="input-sqft"
+                              data-testid="input-lot-size-sqft"
+                              onChange={(e) => {
+                                field.onChange(e);
+                                const sqftValue = parseFloat(e.target.value);
+                                if (!isNaN(sqftValue) && sqftValue > 0) {
+                                  const acres = (sqftValue / 43560).toFixed(2);
+                                  form.setValue('lotSizeAcres', acres);
+                                } else {
+                                  form.setValue('lotSizeAcres', '');
+                                }
+                              }}
                             />
                           </div>
                         </FormControl>
@@ -751,7 +787,17 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                               step="0.01"
                               placeholder="0.25"
                               className="pl-9"
-                              data-testid="input-lot-size"
+                              data-testid="input-lot-size-acres"
+                              onChange={(e) => {
+                                field.onChange(e);
+                                const acresValue = parseFloat(e.target.value);
+                                if (!isNaN(acresValue) && acresValue > 0) {
+                                  const sqft = Math.round(acresValue * 43560);
+                                  form.setValue('lotSizeSqft', sqft.toString());
+                                } else {
+                                  form.setValue('lotSizeSqft', '');
+                                }
+                              }}
                             />
                           </div>
                         </FormControl>
@@ -760,6 +806,9 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                     )}
                   />
                 </div>
+                <p className="text-xs text-muted-foreground -mt-2">
+                  Auto-converts between sq ft ↔ acres (1 acre = 43,560 sq ft)
+                </p>
 
                 {/* Bedrooms, Full Baths, Half Baths */}
                 <div className="grid grid-cols-3 gap-3">

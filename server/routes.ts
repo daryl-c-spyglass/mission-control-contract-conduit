@@ -598,7 +598,18 @@ export async function registerRoutes(
                 const updatedImages = [...currentImages, uploadedPhotoUrl];
                 await storage.updateTransaction(transaction.id, { propertyImages: updatedImages });
                 
-                console.log(`[Transaction Creation] Photo uploaded successfully: ${uploadedPhotoUrl}`);
+                // Also save to transactionPhotos table with proper source
+                const photoSource = isComingSoon ? 'coming_soon' : 'off_market';
+                await storage.addTransactionPhoto({
+                  transactionId: transaction.id,
+                  url: uploadedPhotoUrl,
+                  filename: safeFileName,
+                  source: photoSource,
+                  label: isComingSoon ? 'Coming Soon Upload' : 'Off Market Upload',
+                  sortOrder: 0,
+                });
+                
+                console.log(`[Transaction Creation] Photo uploaded successfully: ${uploadedPhotoUrl} (source: ${photoSource})`);
               }
             }
           }
@@ -2097,12 +2108,100 @@ export async function registerRoutes(
 
   // ============ Property Photos (Off Market) ============
 
+  // Get all transaction photos (from transactionPhotos table)
+  app.get("/api/transactions/:id/transaction-photos", isAuthenticated, async (req: any, res) => {
+    try {
+      const transaction = await storage.getTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      // Authorization check
+      const userId = req.user?.claims?.sub;
+      const userEmail = req.user?.claims?.email;
+      if (!(await canAccessTransaction(transaction, userId, userEmail))) {
+        return res.status(403).json({ message: "Not authorized to access this transaction" });
+      }
+
+      // Get photos from transactionPhotos table
+      const photos = await storage.getTransactionPhotos(transaction.id);
+      
+      // Sort: MLS first, then Coming Soon, then Off Market, then Uploaded (by sortOrder)
+      const sourceOrder: Record<string, number> = { mls: 0, coming_soon: 1, off_market: 2, uploaded: 3 };
+      const sortedPhotos = photos.sort((a, b) => {
+        const orderA = sourceOrder[a.source] ?? 99;
+        const orderB = sourceOrder[b.source] ?? 99;
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
+        return (a.sortOrder || 0) - (b.sortOrder || 0);
+      });
+
+      res.json(sortedPhotos);
+    } catch (error) {
+      console.error("Error fetching transaction photos:", error);
+      res.status(500).json({ message: "Failed to fetch photos" });
+    }
+  });
+
+  // Delete a transaction photo (only non-MLS photos)
+  app.delete("/api/transactions/:id/transaction-photos/:photoId", isAuthenticated, async (req: any, res) => {
+    try {
+      const transaction = await storage.getTransaction(req.params.id);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      // Authorization check
+      const userId = req.user?.claims?.sub;
+      const userEmail = req.user?.claims?.email;
+      if (!(await canAccessTransaction(transaction, userId, userEmail))) {
+        return res.status(403).json({ message: "Not authorized to access this transaction" });
+      }
+
+      const photo = await storage.getTransactionPhoto(req.params.photoId);
+      
+      if (!photo) {
+        return res.status(404).json({ message: "Photo not found" });
+      }
+      
+      // Verify photo belongs to this transaction
+      if (photo.transactionId !== req.params.id) {
+        return res.status(403).json({ message: "Photo does not belong to this transaction" });
+      }
+
+      if (photo.source === 'mls') {
+        return res.status(403).json({ message: "Cannot delete MLS photos" });
+      }
+
+      await storage.deleteTransactionPhoto(req.params.photoId);
+      
+      // Also remove from propertyImages array if present
+      if (transaction.propertyImages) {
+        const updatedImages = transaction.propertyImages.filter((url: string) => url !== photo.url);
+        await storage.updateTransaction(transaction.id, { propertyImages: updatedImages });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting photo:", error);
+      res.status(500).json({ message: "Failed to delete photo" });
+    }
+  });
+
   // Upload property photos for off-market listings
   app.post("/api/transactions/:id/photos", isAuthenticated, async (req: any, res) => {
     try {
       const transaction = await storage.getTransaction(req.params.id);
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      // Authorization check
+      const userId = req.user?.claims?.sub;
+      const userEmail = req.user?.claims?.email;
+      if (!(await canAccessTransaction(transaction, userId, userEmail))) {
+        return res.status(403).json({ message: "Not authorized to upload photos to this transaction" });
       }
 
       // Get the private object directory from env
@@ -2185,6 +2284,16 @@ export async function registerRoutes(
         propertyImages: updatedImages,
       });
 
+      // Also save to transactionPhotos table
+      const savedPhoto = await storage.addTransactionPhoto({
+        transactionId: transaction.id,
+        url: photoUrl,
+        filename: safeFileName,
+        source: 'uploaded',
+        label: 'User Upload',
+        sortOrder: 0,
+      });
+
       await storage.createActivity({
         transactionId: transaction.id,
         type: "photo_uploaded",
@@ -2196,6 +2305,7 @@ export async function registerRoutes(
         success: true, 
         photoUrl: photoUrl,
         propertyImages: updatedImages,
+        photo: savedPhoto,
       });
     } catch (error: any) {
       console.error("[Photo Upload] Error:", error);

@@ -105,6 +105,22 @@ export const marketingAssets = pgTable("marketing_assets", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Transaction photos table - for Off Market, Coming Soon, and User uploaded photos
+export const transactionPhotos = pgTable("transaction_photos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  transactionId: varchar("transaction_id").notNull(),
+  url: text("url").notNull(),
+  filename: text("filename"),
+  source: text("source").notNull(), // 'mls' | 'off_market' | 'coming_soon' | 'uploaded'
+  label: text("label"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTransactionPhotoSchema = createInsertSchema(transactionPhotos);
+export type TransactionPhoto = typeof transactionPhotos.$inferSelect;
+export type InsertTransactionPhoto = z.infer<typeof insertTransactionPhotoSchema>;
+
 // Flyers table - shareable property flyers with QR codes
 export const flyers = pgTable("flyers", {
   id: varchar("id", { length: 12 }).primaryKey(), // Short unique ID for URL (e.g., "abc123xyz")
