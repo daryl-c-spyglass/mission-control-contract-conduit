@@ -228,11 +228,14 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
     },
   });
   
-  // Watch isOffMarket to auto-uncheck isUnderContract and clear MLS number
+  // Watch isOffMarket and isComingSoon for mutual exclusivity and effects
   const isOffMarket = form.watch("isOffMarket");
+  const isComingSoon = form.watch("isComingSoon");
   
+  // When Off Market is checked, uncheck Coming Soon and clear MLS fields
   useEffect(() => {
     if (isOffMarket) {
+      form.setValue("isComingSoon", false);
       form.setValue("isUnderContract", false);
       form.setValue("mlsNumber", "");
       setMlsInput("");
@@ -240,6 +243,18 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
       clearResults();
     }
   }, [isOffMarket, form, clearResults]);
+  
+  // When Coming Soon is checked, uncheck Off Market and clear MLS fields
+  useEffect(() => {
+    if (isComingSoon) {
+      form.setValue("isOffMarket", false);
+      form.setValue("isUnderContract", false);
+      form.setValue("mlsNumber", "");
+      setMlsInput("");
+      setSelectedProperty(null);
+      clearResults();
+    }
+  }, [isComingSoon, form, clearResults]);
 
   const pullFubMutation = useMutation({
     mutationFn: async (url: string) => {
@@ -562,12 +577,14 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
               )}
             />
 
-            {/* Off Market Property Details Section */}
-            {isOffMarket && (
+            {/* Property Details Section - shown for Off Market OR Coming Soon */}
+            {(isOffMarket || isComingSoon) && (
               <Card className="p-4 space-y-4 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800">
                 <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
                   <Home className="w-4 h-4" />
-                  <span className="font-medium text-sm">Off Market Property Details</span>
+                  <span className="font-medium text-sm">
+                    {isOffMarket ? 'Off Market Property Details' : 'Coming Soon Property Details'}
+                  </span>
                 </div>
 
                 {/* Listing Description */}

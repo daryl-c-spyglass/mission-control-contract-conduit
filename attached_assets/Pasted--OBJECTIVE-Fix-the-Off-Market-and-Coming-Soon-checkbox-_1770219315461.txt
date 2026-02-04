@@ -1,0 +1,166 @@
+## 🎯 OBJECTIVE
+Fix the "Off Market" and "Coming Soon" checkbox behavior:
+1. Make them mutually exclusive (can only check one)
+2. Show property details when "Coming Soon" is checked (same as Off Market)
+
+## 🐛 CURRENT ISSUES
+- Both checkboxes can be checked simultaneously
+- "Coming Soon" doesn't show any fields when checked
+
+## ✅ FIX REQUIRED
+
+### 1. Mutual Exclusivity
+When one is checked, uncheck the other:
+```tsx
+const [isOffMarket, setIsOffMarket] = useState(false);
+const [isComingSoon, setIsComingSoon] = useState(false);
+
+const handleOffMarketChange = (checked: boolean) => {
+  setIsOffMarket(checked);
+  if (checked) {
+    setIsComingSoon(false); // Uncheck Coming Soon
+  }
+};
+
+const handleComingSoonChange = (checked: boolean) => {
+  setIsComingSoon(checked);
+  if (checked) {
+    setIsOffMarket(false); // Uncheck Off Market
+  }
+};
+```
+
+### 2. Show Property Details for Coming Soon
+The "Off Market Property Details" section should show when EITHER checkbox is checked:
+```tsx
+{/* Show property details if Off Market OR Coming Soon */}
+{(isOffMarket || isComingSoon) && (
+  <div className="space-y-4 p-4 bg-orange-50 rounded-lg border border-orange-200">
+    <h3 className="font-medium flex items-center gap-2">
+      <Home className="h-4 w-4 text-orange-600" />
+      {isOffMarket ? 'Off Market Property Details' : 'Coming Soon Property Details'}
+    </h3>
+    
+    {/* Listing Description */}
+    <div>
+      <Label>Listing Description</Label>
+      <Textarea 
+        placeholder="Describe the property..."
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+      />
+    </div>
+    
+    {/* Listing Price & Property Type */}
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <Label>Listing Price</Label>
+        <Input 
+          type="number" 
+          placeholder="450000"
+          value={listPrice}
+          onChange={(e) => setListPrice(e.target.value)}
+        />
+      </div>
+      <div>
+        <Label>Property Type</Label>
+        <Select value={propertyType} onValueChange={setPropertyType}>
+          <SelectTrigger>
+            <SelectValue placeholder="Residential" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="residential">Residential</SelectItem>
+            <SelectItem value="commercial">Commercial</SelectItem>
+            <SelectItem value="land">Land</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+    
+    {/* Square Feet & Lot Size */}
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <Label>Square Feet</Label>
+        <Input type="number" value={sqft} onChange={(e) => setSqft(e.target.value)} />
+      </div>
+      <div>
+        <Label>Lot Size (Acres)</Label>
+        <Input type="number" step="0.01" value={lotSize} onChange={(e) => setLotSize(e.target.value)} />
+      </div>
+    </div>
+    
+    {/* Bedrooms, Full Baths, Half Baths */}
+    <div className="grid grid-cols-3 gap-4">
+      <div>
+        <Label>Bedrooms</Label>
+        <Input type="number" value={beds} onChange={(e) => setBeds(e.target.value)} />
+      </div>
+      <div>
+        <Label>Full Baths</Label>
+        <Input type="number" value={fullBaths} onChange={(e) => setFullBaths(e.target.value)} />
+      </div>
+      <div>
+        <Label>Half Baths</Label>
+        <Input type="number" value={halfBaths} onChange={(e) => setHalfBaths(e.target.value)} />
+      </div>
+    </div>
+    
+    {/* Date Going Live */}
+    <div>
+      <Label>Date Going Live (optional)</Label>
+      <p className="text-sm text-muted-foreground mb-1">When will this listing be published to MLS?</p>
+      <Input 
+        type="date" 
+        value={dateGoingLive}
+        onChange={(e) => setDateGoingLive(e.target.value)}
+      />
+    </div>
+  </div>
+)}
+```
+
+### 3. Updated Checkbox UI
+```tsx
+<div className="space-y-3">
+  {/* Off Market */}
+  <div className="flex items-start gap-3">
+    <Checkbox 
+      id="offMarket" 
+      checked={isOffMarket} 
+      onCheckedChange={handleOffMarketChange}
+      className="mt-1"
+    />
+    <div>
+      <Label htmlFor="offMarket" className="font-medium">Off Market</Label>
+      <p className="text-sm text-muted-foreground">Check if this property is not listed in MLS</p>
+    </div>
+  </div>
+
+  {/* Coming Soon */}
+  <div className="flex items-start gap-3">
+    <Checkbox 
+      id="comingSoon" 
+      checked={isComingSoon} 
+      onCheckedChange={handleComingSoonChange}
+      className="mt-1"
+    />
+    <div>
+      <Label htmlFor="comingSoon" className="font-medium">Coming Soon (Not Yet Listed)</Label>
+      <p className="text-sm text-muted-foreground">Notify team in #coming-soon-listings</p>
+    </div>
+  </div>
+</div>
+```
+
+## ✅ EXPECTED BEHAVIOR
+
+| Action | Result |
+|--------|--------|
+| Check "Off Market" | Unchecks "Coming Soon", shows property details |
+| Check "Coming Soon" | Unchecks "Off Market", shows property details, will post to Slack |
+| Uncheck both | Hides property details section |
+
+## 📱 MOBILE OPTIMIZATION
+- Touch targets minimum 44x44px for checkboxes
+- Form fields stack on small screens
+- Property details section has proper padding on mobile
