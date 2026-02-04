@@ -158,6 +158,9 @@ export async function registerRoutes(
         bathrooms,
         halfBaths,
         goLiveDate,
+        // Photo upload for off-market/coming soon
+        propertyPhotoBase64,
+        propertyPhotoFileName,
         ...transactionData 
       } = req.body;
       
@@ -540,6 +543,61 @@ export async function registerRoutes(
         }
       }
 
+      // Upload property photo if provided (for off-market or coming soon)
+      let uploadedPhotoUrl: string | null = null;
+      if (propertyPhotoBase64 && (isOffMarket || isComingSoon)) {
+        try {
+          const privateDir = process.env.PRIVATE_OBJECT_DIR;
+          if (privateDir) {
+            // Validate image type
+            const validImagePrefixes = ['data:image/jpeg', 'data:image/png', 'data:image/gif', 'data:image/webp', 'data:image/jpg'];
+            if (validImagePrefixes.some(prefix => propertyPhotoBase64.startsWith(prefix))) {
+              const base64Data = propertyPhotoBase64.replace(/^data:image\/\w+;base64,/, '');
+              const fileSizeBytes = Buffer.byteLength(base64Data, 'base64');
+              const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+              
+              if (fileSizeBytes <= maxSizeBytes) {
+                const pathParts = privateDir.startsWith('/') ? privateDir.slice(1).split('/') : privateDir.split('/');
+                const bucketName = pathParts[0];
+                
+                const { randomUUID } = await import('crypto');
+                const objectId = randomUUID();
+                const timestamp = Date.now();
+                const safeFileName = (propertyPhotoFileName || 'photo.jpg').replace(/[^a-zA-Z0-9.-]/g, '_');
+                const objectName = `.private/uploads/property-${transaction.id}-${timestamp}-${objectId}-${safeFileName}`;
+                
+                const { objectStorageClient } = await import("./replit_integrations/object_storage/objectStorage");
+                const bucket = objectStorageClient.bucket(bucketName);
+                const file = bucket.file(objectName);
+                
+                const buffer = Buffer.from(base64Data, 'base64');
+                const contentType = propertyPhotoBase64.startsWith('data:image/png') ? 'image/png' : 
+                                   propertyPhotoBase64.startsWith('data:image/gif') ? 'image/gif' : 
+                                   propertyPhotoBase64.startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg';
+                
+                await file.save(buffer, {
+                  contentType,
+                  metadata: { cacheControl: 'public, max-age=31536000' },
+                });
+                
+                const entityId = objectName.replace('.private/', '');
+                uploadedPhotoUrl = `/objects/${entityId}`;
+                
+                // Update transaction with the photo
+                const currentImages = transaction.propertyImages || [];
+                const updatedImages = [...currentImages, uploadedPhotoUrl];
+                await storage.updateTransaction(transaction.id, { propertyImages: updatedImages });
+                
+                console.log(`[Transaction Creation] Photo uploaded: ${uploadedPhotoUrl}`);
+              }
+            }
+          }
+        } catch (photoError) {
+          console.error("[Transaction Creation] Photo upload error:", photoError);
+          // Continue without photo - don't fail transaction creation
+        }
+      }
+
       // Post Coming Soon notification if checkbox was checked
       if (transactionData.isComingSoon) {
         try {
@@ -566,7 +624,8 @@ export async function registerRoutes(
           const mlsData = currentTx?.mlsData as any;
           const mlsPhotos = mlsData?.photos || [];
           const uploadedPhotos = currentTx?.propertyImages || [];
-          const heroPhotoUrl = mlsPhotos[0] || uploadedPhotos[0] || null;
+          // Use freshly uploaded photo first, then fall back to MLS or existing uploads
+          const heroPhotoUrl = uploadedPhotoUrl || mlsPhotos[0] || uploadedPhotos[0] || null;
           
           // Use persisted/MLS-enriched data, falling back to raw request data
           await postComingSoonNotification({

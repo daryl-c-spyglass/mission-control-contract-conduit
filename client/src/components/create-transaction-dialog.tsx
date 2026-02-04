@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Loader2, ChevronDown, ChevronUp, User, Check, X, Bed, Bath, Square, DollarSign, Home, Ruler, Calendar } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, User, Check, X, Bed, Bath, Square, DollarSign, Home, Ruler, Calendar, Camera, ImageIcon, Info, CheckCircle } from "lucide-react";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePropertySearch, type PropertySearchResult, type PlacePrediction } from "@/hooks/usePropertySearch";
 import { PropertyAutocomplete } from "@/components/ui/property-autocomplete";
@@ -123,6 +123,10 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
   
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   
+  // Photo upload state for Off Market / Coming Soon
+  const [propertyPhoto, setPropertyPhoto] = useState<File | null>(null);
+  const [propertyPhotoPreview, setPropertyPhotoPreview] = useState<string | null>(null);
+  
   // Search by address when input changes
   useEffect(() => {
     if (debouncedAddress && debouncedAddress.length >= 3 && !selectedProperty) {
@@ -169,6 +173,24 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
       currency: 'USD',
       maximumFractionDigits: 0,
     }).format(price);
+  };
+
+  // Photo upload handlers
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPropertyPhoto(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPropertyPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setPropertyPhoto(null);
+    setPropertyPhotoPreview(null);
   };
 
   const { data: coordinators = [], isLoading: coordinatorsLoading, error: coordinatorsError, status } = useQuery<Coordinator[]>({
@@ -288,7 +310,22 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
 
   const createMutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      const res = await apiRequest("POST", "/api/transactions", data);
+      // Include photo as base64 if selected (for Off Market or Coming Soon)
+      const requestData: any = { ...data };
+      
+      if (propertyPhoto && (data.isOffMarket || data.isComingSoon)) {
+        // Convert file to base64
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(propertyPhoto);
+        });
+        requestData.propertyPhotoBase64 = base64;
+        requestData.propertyPhotoFileName = propertyPhoto.name;
+      }
+      
+      const res = await apiRequest("POST", "/api/transactions", requestData);
       return res.json();
     },
     onSuccess: () => {
@@ -304,6 +341,8 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
       setAddressInput("");
       setMlsInput("");
       setSelectedProperty(null);
+      setPropertyPhoto(null);
+      setPropertyPhotoPreview(null);
       clearResults();
       onOpenChange(false);
     },
@@ -810,6 +849,83 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                       </FormItem>
                     )}
                   />
+                </div>
+
+                {/* Photo Upload Section */}
+                <div className="pt-3 border-t border-purple-200 dark:border-purple-700">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Camera className="h-4 w-4 text-purple-600" />
+                      <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                        Property Photo {isComingSoon && 'for Slack'}
+                      </span>
+                    </div>
+                    <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded">
+                      Optional
+                    </span>
+                  </div>
+                  
+                  {!propertyPhotoPreview ? (
+                    <label className="block cursor-pointer">
+                      <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/10 transition-colors">
+                        <ImageIcon className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
+                          Click to upload or drag and drop
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          PNG, JPG up to 10MB
+                        </p>
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                        data-testid="input-property-photo"
+                      />
+                    </label>
+                  ) : (
+                    <div className="border-2 border-purple-400 rounded-lg p-3 bg-white dark:bg-gray-900">
+                      <div className="relative">
+                        <img 
+                          src={propertyPhotoPreview} 
+                          alt="Property preview" 
+                          className="w-full h-40 object-cover rounded-md"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleRemovePhoto}
+                          className="absolute top-2 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white transition-colors"
+                          data-testid="button-remove-photo"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        {propertyPhoto?.name}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Different hint text based on which checkbox is selected */}
+                  {isComingSoon ? (
+                    <p className="text-xs text-gray-500 mt-2 italic">
+                      This photo will be included in the #coming-soon-listings Slack notification and saved to Marketing
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-500 mt-2 italic">
+                      This photo will be saved to the Marketing section for flyers and marketing materials
+                    </p>
+                  )}
+                  
+                  {/* Hint for additional photos */}
+                  <div className="flex items-start gap-2 mt-3 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <Info className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      Need more photos? Add additional photos in the <strong>Marketing</strong> tab after creating this transaction.
+                    </p>
+                  </div>
                 </div>
               </Card>
             )}

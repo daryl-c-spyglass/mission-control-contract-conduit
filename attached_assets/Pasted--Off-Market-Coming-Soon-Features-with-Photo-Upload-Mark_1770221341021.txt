@@ -1,0 +1,1119 @@
+# 🏠 Off Market & Coming Soon Features with Photo Upload & Marketing Section Updates
+
+## 🎯 OBJECTIVE
+Update the "Off Market" and "Coming Soon" checkboxes in Create Transaction form:
+1. Make them mutually exclusive (can only check one)
+2. Show property details form when either is checked
+3. Allow optional photo upload for BOTH options
+4. Auto-save uploaded photo to Marketing section for BOTH
+5. **Coming Soon ONLY:** Post notification with photo to #coming-soon-listings Slack channel
+6. **Off Market:** Save photo to Marketing section only (no Slack notification)
+7. Update Marketing section to distinguish MLS photos (locked) vs User photos (removable)
+
+---
+
+## 📍 SLACK CHANNEL
+- **Channel:** #coming-soon-listings
+- **Channel ID:** C09J6327HQS
+
+---
+
+## ✅ REQUIREMENTS
+
+### 1. Database Schema Changes
+
+Add to `shared/schema.ts`:
+
+```typescript
+// Add to transactions table
+isComingSoon: boolean("is_coming_soon").default(false),
+
+// Create new table for transaction photos
+export const transactionPhotos = pgTable("transaction_photos", {
+  id: serial("id").primaryKey(),
+  transactionId: integer("transaction_id").references(() => transactions.id).notNull(),
+  url: text("url").notNull(),
+  filename: text("filename"),
+  source: text("source").notNull(), // 'mls' | 'off_market' | 'coming_soon' | 'uploaded'
+  label: text("label"), // e.g., "Front Exterior", "Kitchen"
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTransactionPhotoSchema = createInsertSchema(transactionPhotos);
+export type TransactionPhoto = typeof transactionPhotos.$inferSelect;
+export type InsertTransactionPhoto = typeof transactionPhotos.$inferInsert;
+```
+
+Run migration:
+```sql
+ALTER TABLE transactions ADD COLUMN is_coming_soon BOOLEAN DEFAULT false;
+
+CREATE TABLE transaction_photos (
+  id SERIAL PRIMARY KEY,
+  transaction_id INTEGER REFERENCES transactions(id) NOT NULL,
+  url TEXT NOT NULL,
+  filename TEXT,
+  source TEXT NOT NULL CHECK (source IN ('mls', 'off_market', 'coming_soon', 'uploaded')),
+  label TEXT,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_transaction_photos_transaction_id ON transaction_photos(transaction_id);
+```
+
+---
+
+### 2. UI Changes - Create Transaction Form
+
+#### 2.1 Mutual Exclusivity for Checkboxes
+
+```tsx
+// State
+const [isOffMarket, setIsOffMarket] = useState(false);
+const [isComingSoon, setIsComingSoon] = useState(false);
+const [propertyPhoto, setPropertyPhoto] = useState<File | null>(null);
+const [propertyPhotoPreview, setPropertyPhotoPreview] = useState<string | null>(null);
+
+// Handlers - Mutually Exclusive
+const handleOffMarketChange = (checked: boolean) => {
+  setIsOffMarket(checked);
+  if (checked) {
+    setIsComingSoon(false);
+  }
+};
+
+const handleComingSoonChange = (checked: boolean) => {
+  setIsComingSoon(checked);
+  if (checked) {
+    setIsOffMarket(false);
+  }
+};
+
+// Photo Upload Handler (shared for both Off Market and Coming Soon)
+const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (file) {
+    setPropertyPhoto(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPropertyPhotoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  }
+};
+
+const handleRemovePhoto = () => {
+  setPropertyPhoto(null);
+  setPropertyPhotoPreview(null);
+};
+```
+
+#### 2.2 Checkbox UI
+
+```tsx
+<div className="space-y-3">
+  {/* Off Market Checkbox */}
+  <div className="flex items-start gap-3">
+    <Checkbox 
+      id="offMarket" 
+      checked={isOffMarket} 
+      onCheckedChange={handleOffMarketChange}
+      className="mt-1"
+    />
+    <div>
+      <Label htmlFor="offMarket" className="font-medium cursor-pointer">
+        Off Market
+      </Label>
+      <p className="text-sm text-muted-foreground">
+        Check if this property is not listed in MLS
+      </p>
+    </div>
+  </div>
+
+  {/* Coming Soon Checkbox */}
+  <div className="flex items-start gap-3">
+    <Checkbox 
+      id="comingSoon" 
+      checked={isComingSoon} 
+      onCheckedChange={handleComingSoonChange}
+      className="mt-1"
+    />
+    <div>
+      <Label htmlFor="comingSoon" className="font-medium cursor-pointer">
+        Coming Soon (Not Yet Listed)
+      </Label>
+      <p className="text-sm text-muted-foreground">
+        Notify team in #coming-soon-listings
+      </p>
+    </div>
+  </div>
+</div>
+```
+
+#### 2.3 Property Details Section (Shows for Both)
+
+```tsx
+{(isOffMarket || isComingSoon) && (
+  <div className="space-y-4 p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800 mt-4">
+    <h3 className="font-medium flex items-center gap-2 text-orange-800 dark:text-orange-200">
+      <Home className="h-4 w-4" />
+      {isOffMarket ? 'Off Market Property Details' : 'Coming Soon Property Details'}
+    </h3>
+    
+    {/* Listing Description */}
+    <div>
+      <Label>Listing Description</Label>
+      <Textarea 
+        placeholder="Describe the property..."
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        className="mt-1"
+      />
+    </div>
+    
+    {/* Listing Price & Property Type */}
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <Label>Listing Price</Label>
+        <div className="relative mt-1">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+          <Input 
+            type="number" 
+            placeholder="450000"
+            value={listPrice}
+            onChange={(e) => setListPrice(e.target.value)}
+            className="pl-7"
+          />
+        </div>
+      </div>
+      <div>
+        <Label>Property Type</Label>
+        <Select value={propertyType} onValueChange={setPropertyType}>
+          <SelectTrigger className="mt-1">
+            <SelectValue placeholder="Select type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="residential">Residential</SelectItem>
+            <SelectItem value="condo">Condo/Townhouse</SelectItem>
+            <SelectItem value="land">Land</SelectItem>
+            <SelectItem value="commercial">Commercial</SelectItem>
+            <SelectItem value="multi-family">Multi-Family</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+    
+    {/* Square Feet & Lot Size */}
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <Label>Square Feet</Label>
+        <Input 
+          type="number" 
+          placeholder="2500"
+          value={sqft} 
+          onChange={(e) => setSqft(e.target.value)}
+          className="mt-1"
+        />
+      </div>
+      <div>
+        <Label>Lot Size (Acres)</Label>
+        <Input 
+          type="number" 
+          step="0.01"
+          placeholder="0.25"
+          value={lotSize} 
+          onChange={(e) => setLotSize(e.target.value)}
+          className="mt-1"
+        />
+      </div>
+    </div>
+    
+    {/* Bedrooms, Full Baths, Half Baths */}
+    <div className="grid grid-cols-3 gap-4">
+      <div>
+        <Label>Bedrooms</Label>
+        <Input 
+          type="number" 
+          placeholder="4"
+          value={beds} 
+          onChange={(e) => setBeds(e.target.value)}
+          className="mt-1"
+        />
+      </div>
+      <div>
+        <Label>Full Baths</Label>
+        <Input 
+          type="number"
+          placeholder="2"
+          value={fullBaths} 
+          onChange={(e) => setFullBaths(e.target.value)}
+          className="mt-1"
+        />
+      </div>
+      <div>
+        <Label>Half Baths</Label>
+        <Input 
+          type="number"
+          placeholder="1"
+          value={halfBaths} 
+          onChange={(e) => setHalfBaths(e.target.value)}
+          className="mt-1"
+        />
+      </div>
+    </div>
+    
+    {/* Date Going Live */}
+    <div>
+      <Label>Date Going Live (optional)</Label>
+      <p className="text-sm text-muted-foreground mb-1">
+        When will this listing be published to MLS?
+      </p>
+      <Input 
+        type="date" 
+        value={dateGoingLive}
+        onChange={(e) => setDateGoingLive(e.target.value)}
+        className="mt-1"
+      />
+    </div>
+
+    {/* Photo Upload - Shows for BOTH Off Market and Coming Soon */}
+    {(isOffMarket || isComingSoon) && (
+      <div className="pt-4 border-t border-orange-200 dark:border-orange-800">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Camera className="h-4 w-4 text-orange-600" />
+            <Label className="text-orange-800 dark:text-orange-200 font-medium">
+              Property Photo {isComingSoon && 'for Slack'}
+            </Label>
+          </div>
+          <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded">
+            Optional
+          </span>
+        </div>
+        
+        {!propertyPhotoPreview ? (
+          <label className="block">
+            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center cursor-pointer hover:border-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/10 transition-colors">
+              <ImageIcon className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Click to upload or drag and drop
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                PNG, JPG up to 10MB
+              </p>
+            </div>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoUpload}
+              className="hidden"
+            />
+          </label>
+        ) : (
+          <div className="border-2 border-orange-400 rounded-lg p-3 bg-white dark:bg-gray-900">
+            <div className="relative">
+              <img 
+                src={propertyPhotoPreview} 
+                alt="Property preview" 
+                className="w-full h-40 object-cover rounded-md"
+              />
+              <button
+                type="button"
+                onClick={handleRemovePhoto}
+                className="absolute top-2 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              {propertyPhoto?.name}
+            </p>
+          </div>
+        )}
+        
+        {/* Different hint text based on which checkbox is selected */}
+        {isComingSoon ? (
+          <p className="text-xs text-gray-500 mt-2 italic">
+            This photo will be included in the #coming-soon-listings Slack notification and saved to Marketing
+          </p>
+        ) : (
+          <p className="text-xs text-gray-500 mt-2 italic">
+            This photo will be saved to the Marketing section for flyers and marketing materials
+          </p>
+        )}
+        
+        {/* Hint for additional photos */}
+        <div className="flex items-start gap-2 mt-3 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <Info className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-blue-700 dark:text-blue-300">
+            Need more photos? Add additional photos in the <strong>Marketing</strong> tab after creating this transaction.
+          </p>
+        </div>
+      </div>
+    )}
+  </div>
+)}
+```
+
+---
+
+### 3. API Endpoints
+
+#### 3.1 Upload Photo Endpoint
+
+Add to `server/routes.ts`:
+
+```typescript
+import multer from 'multer';
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: './uploads/photos',
+  filename: (req, file, cb) => {
+    const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.'));
+    }
+  }
+});
+
+// Upload photo endpoint
+app.post('/api/photos/upload', requireAuth, upload.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    const photoUrl = `/uploads/photos/${req.file.filename}`;
+    
+    res.json({ 
+      url: photoUrl,
+      filename: req.file.originalname 
+    });
+  } catch (error) {
+    console.error('Photo upload error:', error);
+    res.status(500).json({ error: 'Failed to upload photo' });
+  }
+});
+```
+
+#### 3.2 Transaction Photos Endpoints
+
+```typescript
+// Get photos for a transaction
+app.get('/api/transactions/:id/photos', requireAuth, async (req, res) => {
+  try {
+    const transactionId = parseInt(req.params.id);
+    const photos = await storage.getTransactionPhotos(transactionId);
+    
+    // Sort: MLS first, then Coming Soon, then Uploaded (by date)
+    const sortedPhotos = photos.sort((a, b) => {
+      const sourceOrder = { mls: 0, coming_soon: 1, uploaded: 2 };
+      if (sourceOrder[a.source] !== sourceOrder[b.source]) {
+        return sourceOrder[a.source] - sourceOrder[b.source];
+      }
+      return a.sortOrder - b.sortOrder;
+    });
+    
+    res.json(sortedPhotos);
+  } catch (error) {
+    console.error('Error fetching transaction photos:', error);
+    res.status(500).json({ error: 'Failed to fetch photos' });
+  }
+});
+
+// Add photo to transaction
+app.post('/api/transactions/:id/photos', requireAuth, async (req, res) => {
+  try {
+    const transactionId = parseInt(req.params.id);
+    const { url, filename, source, label } = req.body;
+    
+    const photo = await storage.addTransactionPhoto({
+      transactionId,
+      url,
+      filename,
+      source, // 'mls' | 'coming_soon' | 'uploaded'
+      label,
+      sortOrder: 0
+    });
+    
+    res.json(photo);
+  } catch (error) {
+    console.error('Error adding transaction photo:', error);
+    res.status(500).json({ error: 'Failed to add photo' });
+  }
+});
+
+// Delete photo (only non-MLS photos)
+app.delete('/api/transactions/:id/photos/:photoId', requireAuth, async (req, res) => {
+  try {
+    const photoId = parseInt(req.params.photoId);
+    const photo = await storage.getTransactionPhoto(photoId);
+    
+    if (!photo) {
+      return res.status(404).json({ error: 'Photo not found' });
+    }
+    
+    if (photo.source === 'mls') {
+      return res.status(403).json({ error: 'Cannot delete MLS photos' });
+    }
+    
+    await storage.deleteTransactionPhoto(photoId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting photo:', error);
+    res.status(500).json({ error: 'Failed to delete photo' });
+  }
+});
+```
+
+#### 3.3 Storage Functions
+
+Add to `server/storage.ts`:
+
+```typescript
+async getTransactionPhotos(transactionId: number): Promise<TransactionPhoto[]> {
+  return await db
+    .select()
+    .from(transactionPhotos)
+    .where(eq(transactionPhotos.transactionId, transactionId))
+    .orderBy(transactionPhotos.sortOrder);
+}
+
+async getTransactionPhoto(photoId: number): Promise<TransactionPhoto | null> {
+  const result = await db
+    .select()
+    .from(transactionPhotos)
+    .where(eq(transactionPhotos.id, photoId))
+    .limit(1);
+  return result[0] || null;
+}
+
+async addTransactionPhoto(photo: InsertTransactionPhoto): Promise<TransactionPhoto> {
+  const result = await db
+    .insert(transactionPhotos)
+    .values(photo)
+    .returning();
+  return result[0];
+}
+
+async deleteTransactionPhoto(photoId: number): Promise<void> {
+  await db
+    .delete(transactionPhotos)
+    .where(eq(transactionPhotos.id, photoId));
+}
+```
+
+---
+
+### 4. Transaction Creation with Photo Upload (Both Off Market & Coming Soon)
+
+Update transaction creation to handle photo for both options:
+
+```typescript
+// In form submission handler
+const handleSubmit = async () => {
+  try {
+    setIsSubmitting(true);
+    
+    let photoUrl = null;
+    
+    // Upload photo first if provided (for either Off Market or Coming Soon)
+    if ((isOffMarket || isComingSoon) && propertyPhoto) {
+      const formData = new FormData();
+      formData.append('photo', propertyPhoto);
+      
+      const uploadResponse = await fetch('/api/photos/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (uploadResponse.ok) {
+        const uploadResult = await uploadResponse.json();
+        photoUrl = uploadResult.url;
+      }
+    }
+    
+    // Create transaction
+    const transactionData = {
+      propertyAddress,
+      mlsNumber,
+      isOffMarket,
+      isComingSoon,
+      description,
+      listPrice: listPrice ? parseFloat(listPrice) : null,
+      propertyType,
+      sqft: sqft ? parseInt(sqft) : null,
+      lotSize: lotSize ? parseFloat(lotSize) : null,
+      beds: beds ? parseInt(beds) : null,
+      fullBaths: fullBaths ? parseInt(fullBaths) : null,
+      halfBaths: halfBaths ? parseInt(halfBaths) : null,
+      dateGoingLive,
+      propertyPhotoUrl: photoUrl, // Pass to server
+      // ... other fields
+    };
+    
+    const response = await apiRequest('POST', '/api/transactions', transactionData);
+    const transaction = await response.json();
+    
+    // Photo is auto-saved to Marketing by server
+    // Slack notification only sent if Coming Soon (handled server-side)
+    
+    toast.success('Transaction created successfully!');
+    onClose();
+    
+  } catch (error) {
+    console.error('Error creating transaction:', error);
+    toast.error('Failed to create transaction');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+```
+
+---
+
+### 5. Slack Notification
+
+Add to server-side transaction creation:
+
+```typescript
+const COMING_SOON_CHANNEL_ID = 'C09J6327HQS';
+
+async function postComingSoonNotification(
+  transaction: Transaction, 
+  agent: User, 
+  photoUrl?: string
+) {
+  const blocks: any[] = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: "🏠 Coming Soon Listing",
+        emoji: true
+      }
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*📍 Address:*\n${transaction.propertyAddress}`
+        },
+        {
+          type: "mrkdwn", 
+          text: `*💰 List Price:*\n${transaction.listPrice ? formatPrice(transaction.listPrice) : 'TBD'}`
+        }
+      ]
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*🛏️ Details:*\n${transaction.beds || '-'} bed | ${transaction.baths || '-'} bath | ${transaction.sqft ? formatNumber(transaction.sqft) + ' sqft' : '-'}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*🗓️ Expected Live Date:*\n${transaction.dateGoingLive ? formatDate(transaction.dateGoingLive) : 'TBD'}`
+        }
+      ]
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*👤 Agent:*\n${agent.name || agent.email}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*📞 Contact:*\n${agent.phone || agent.email}`
+        }
+      ]
+    }
+  ];
+
+  // Add description if available
+  if (transaction.description) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*📝 Description:*\n${transaction.description.substring(0, 500)}${transaction.description.length > 500 ? '...' : ''}`
+      }
+    });
+  }
+
+  // Add photo if available
+  if (photoUrl) {
+    // Convert relative URL to absolute URL
+    const absolutePhotoUrl = photoUrl.startsWith('http') 
+      ? photoUrl 
+      : `${process.env.APP_URL || 'https://mission-control-contract-conduit.onrender.com'}${photoUrl}`;
+    
+    blocks.push({
+      type: "image",
+      image_url: absolutePhotoUrl,
+      alt_text: "Property Photo"
+    });
+  }
+
+  // Add action button
+  blocks.push({
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: {
+          type: "plain_text",
+          text: "View in Contract Conduit",
+          emoji: true
+        },
+        url: `${process.env.APP_URL || 'https://mission-control-contract-conduit.onrender.com'}/transactions/${transaction.id}`,
+        style: "primary"
+      }
+    ]
+  });
+
+  await slackClient.chat.postMessage({
+    channel: COMING_SOON_CHANNEL_ID,
+    text: `🏠 Coming Soon: ${transaction.propertyAddress}`,
+    blocks: blocks
+  });
+}
+```
+
+#### Integration in Transaction Creation:
+
+```typescript
+// In POST /api/transactions handler
+app.post('/api/transactions', requireAuth, async (req, res) => {
+  try {
+    const { propertyPhotoUrl, ...transactionData } = req.body;
+    
+    // Create transaction
+    const transaction = await storage.createTransaction({
+      ...transactionData,
+      userId: req.user.id
+    });
+    
+    // If photo was uploaded (for either Off Market or Coming Soon), save to transaction_photos
+    if (propertyPhotoUrl && (transaction.isOffMarket || transaction.isComingSoon)) {
+      const photoSource = transaction.isComingSoon ? 'coming_soon' : 'off_market';
+      
+      await storage.addTransactionPhoto({
+        transactionId: transaction.id,
+        url: propertyPhotoUrl,
+        filename: 'Property Photo',
+        source: photoSource,
+        label: transaction.isComingSoon ? 'Coming Soon Upload' : 'Off Market Upload',
+        sortOrder: 0
+      });
+    }
+    
+    // Post to Slack ONLY if Coming Soon (not for Off Market)
+    if (transaction.isComingSoon) {
+      try {
+        const agent = await storage.getUser(transaction.userId);
+        await postComingSoonNotification(transaction, agent, propertyPhotoUrl);
+        
+        // Log activity
+        await storage.createActivity({
+          transactionId: transaction.id,
+          type: 'notification',
+          description: 'Coming Soon notification posted to #coming-soon-listings'
+        });
+      } catch (slackError) {
+        console.error('Failed to post Coming Soon notification:', slackError);
+        // Don't fail transaction creation if Slack fails
+      }
+    }
+    
+    // Log photo upload activity (for both)
+    if (propertyPhotoUrl) {
+      await storage.createActivity({
+        transactionId: transaction.id,
+        type: 'photo_upload',
+        description: `Property photo uploaded and saved to Marketing`
+      });
+    }
+    
+    res.json(transaction);
+  } catch (error) {
+    console.error('Error creating transaction:', error);
+    res.status(500).json({ error: 'Failed to create transaction' });
+  }
+});
+```
+
+---
+
+### 6. Marketing Section - Photo Management UI
+
+Create/update `client/src/components/marketing/PropertyPhotos.tsx`:
+
+```tsx
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Camera, Upload, Lock, Trash2, X, ImageIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+
+interface TransactionPhoto {
+  id: number;
+  transactionId: number;
+  url: string;
+  filename: string;
+  source: 'mls' | 'off_market' | 'coming_soon' | 'uploaded';
+  label?: string;
+}
+
+export function PropertyPhotos({ transactionId }: { transactionId: number }) {
+  const queryClient = useQueryClient();
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Fetch photos
+  const { data: photos = [], isLoading } = useQuery<TransactionPhoto[]>({
+    queryKey: ['transaction-photos', transactionId],
+    queryFn: async () => {
+      const res = await fetch(`/api/transactions/${transactionId}/photos`);
+      if (!res.ok) throw new Error('Failed to fetch photos');
+      return res.json();
+    }
+  });
+
+  // Delete photo mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (photoId: number) => {
+      const res = await fetch(`/api/transactions/${transactionId}/photos/${photoId}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) throw new Error('Failed to delete photo');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transaction-photos', transactionId] });
+      toast.success('Photo deleted');
+    },
+    onError: () => {
+      toast.error('Failed to delete photo');
+    }
+  });
+
+  // Upload handler
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+
+    setIsUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append('photo', file);
+
+        const uploadRes = await fetch('/api/photos/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!uploadRes.ok) throw new Error('Upload failed');
+        const { url, filename } = await uploadRes.json();
+
+        // Add to transaction
+        await fetch(`/api/transactions/${transactionId}/photos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url,
+            filename,
+            source: 'uploaded',
+            label: filename
+          })
+        });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['transaction-photos', transactionId] });
+      toast.success('Photos uploaded successfully');
+    } catch (error) {
+      toast.error('Failed to upload photos');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Separate photos by source
+  const mlsPhotos = photos.filter(p => p.source === 'mls');
+  const userPhotos = photos.filter(p => p.source !== 'mls');
+
+  return (
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold flex items-center gap-2">
+          <Camera className="h-5 w-5 text-orange-500" />
+          Property Photos
+        </h2>
+        <label>
+          <Button disabled={isUploading} className="cursor-pointer">
+            <Upload className="h-4 w-4 mr-2" />
+            {isUploading ? 'Uploading...' : 'Upload Photos'}
+          </Button>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleUpload}
+            className="hidden"
+          />
+        </label>
+      </div>
+
+      {/* MLS Photos Section */}
+      {mlsPhotos.length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 mb-3">
+            <h3 className="text-sm font-medium text-gray-400">MLS Photos</h3>
+            <span className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">
+              {mlsPhotos.length} photos
+            </span>
+            <span className="text-xs bg-blue-900 text-blue-300 px-2 py-0.5 rounded flex items-center gap-1">
+              <Lock className="h-3 w-3" />
+              Synced from Repliers
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            These photos are pulled from MLS and cannot be removed
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {mlsPhotos.map(photo => (
+              <div key={photo.id} className="relative group rounded-lg overflow-hidden aspect-[4/3] bg-gray-800">
+                <img 
+                  src={photo.url} 
+                  alt={photo.label || 'MLS Photo'} 
+                  className="w-full h-full object-cover"
+                />
+                <span className="absolute top-2 left-2 text-xs bg-blue-600 text-white px-2 py-0.5 rounded">
+                  MLS
+                </span>
+                <div className="absolute top-2 right-2 w-6 h-6 bg-black/50 rounded-full flex items-center justify-center">
+                  <Lock className="h-3 w-3 text-gray-400" />
+                </div>
+                {photo.label && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                    <p className="text-xs text-white truncate">{photo.label}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* User Uploaded Photos Section */}
+      <div>
+        <div className="flex items-center gap-3 mb-3">
+          <h3 className="text-sm font-medium text-gray-400">Your Uploaded Photos</h3>
+          <span className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">
+            {userPhotos.length} photos
+          </span>
+          {userPhotos.length > 0 && (
+            <span className="text-xs bg-green-900 text-green-300 px-2 py-0.5 rounded flex items-center gap-1">
+              <Upload className="h-3 w-3" />
+              Manually Uploaded
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-gray-500 mb-3">
+          Hover over a photo and click the trash icon to remove it
+        </p>
+        
+        {userPhotos.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {userPhotos.map(photo => (
+              <div 
+                key={photo.id} 
+                className="relative group rounded-lg overflow-hidden aspect-[4/3] bg-gray-800 border-2 border-green-600"
+              >
+                <img 
+                  src={photo.url} 
+                  alt={photo.label || 'Uploaded Photo'} 
+                  className="w-full h-full object-cover"
+                />
+                <span className={`absolute top-2 left-2 text-xs px-2 py-0.5 rounded ${
+                  photo.source === 'coming_soon' 
+                    ? 'bg-orange-600 text-white' 
+                    : photo.source === 'off_market'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-green-600 text-white'
+                }`}>
+                  {photo.source === 'coming_soon' ? 'Coming Soon' : photo.source === 'off_market' ? 'Off Market' : 'Uploaded'}
+                </span>
+                
+                {/* Delete button - shows on hover */}
+                <button
+                  onClick={() => deleteMutation.mutate(photo.id)}
+                  disabled={deleteMutation.isPending}
+                  className="absolute top-2 right-2 w-7 h-7 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Trash2 className="h-4 w-4 text-white" />
+                </button>
+                
+                {photo.label && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                    <p className="text-xs text-white truncate">{photo.label}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="border-2 border-dashed border-gray-700 rounded-lg p-8 text-center">
+            <ImageIcon className="h-10 w-10 text-gray-600 mx-auto mb-3" />
+            <p className="text-gray-500 text-sm">No uploaded photos yet</p>
+            <p className="text-gray-600 text-xs mt-1">
+              Click "Upload Photos" to add your own photos
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Legend */}
+      <div className="bg-gray-800/50 rounded-lg p-4">
+        <h4 className="text-xs font-medium text-gray-400 mb-3 uppercase tracking-wide">
+          Photo Types
+        </h4>
+        <div className="flex flex-wrap gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-blue-600 rounded" />
+            <span className="text-sm text-gray-300">MLS Photos</span>
+            <span className="text-xs text-gray-500">- Synced from Repliers, cannot be removed</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-purple-600 rounded" />
+            <span className="text-sm text-gray-300">Off Market</span>
+            <span className="text-xs text-gray-500">- Added during creation, can be removed</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-orange-600 rounded" />
+            <span className="text-sm text-gray-300">Coming Soon</span>
+            <span className="text-xs text-gray-500">- Added during creation, can be removed</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-green-600 rounded" />
+            <span className="text-sm text-gray-300">Uploaded</span>
+            <span className="text-xs text-gray-500">- Added in Marketing tab, can be removed</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## ✅ VERIFICATION CHECKLIST
+
+### Create Transaction Form
+- [ ] "Off Market" and "Coming Soon" checkboxes are mutually exclusive
+- [ ] Checking one unchecks the other
+- [ ] Property details form appears when either is checked
+- [ ] Header changes based on which is checked ("Off Market Property Details" vs "Coming Soon Property Details")
+- [ ] Photo upload section appears for BOTH Off Market and Coming Soon
+- [ ] Photo can be uploaded, previewed, and removed
+- [ ] Hint text is different for each:
+  - Off Market: "saved to Marketing section"
+  - Coming Soon: "included in Slack notification and saved to Marketing"
+- [ ] "Add more photos in Marketing tab" hint appears for both
+
+### Transaction Creation - Off Market
+- [ ] Photo uploads to server successfully
+- [ ] Transaction saves with isOffMarket = true
+- [ ] Photo auto-saves to transaction_photos table with source = 'off_market'
+- [ ] NO Slack notification is sent
+- [ ] Activity logged: "Property photo uploaded and saved to Marketing"
+
+### Transaction Creation - Coming Soon
+- [ ] Photo uploads to server successfully
+- [ ] Transaction saves with isComingSoon = true
+- [ ] Photo auto-saves to transaction_photos table with source = 'coming_soon'
+- [ ] Slack notification posts to #coming-soon-listings
+- [ ] Slack message includes photo if uploaded
+- [ ] Activity logged: "Coming Soon notification posted to #coming-soon-listings"
+
+### Marketing Section
+- [ ] MLS photos show with blue "MLS" badge and lock icon
+- [ ] MLS photos do NOT have delete button
+- [ ] User photos show with green border
+- [ ] Off Market photos show "Off Market" badge (can be same color as uploaded)
+- [ ] Coming Soon photos show orange "Coming Soon" badge
+- [ ] All user-uploaded photos (off_market, coming_soon, uploaded) have delete button on hover
+- [ ] Delete button works and removes photo
+- [ ] Upload button adds new photos with source = 'uploaded'
+- [ ] Legend explains photo types
+
+---
+
+## 📱 MOBILE OPTIMIZATION
+
+- [ ] Checkbox touch targets minimum 44x44px
+- [ ] Photo upload area works with touch
+- [ ] Photo preview fits mobile screens
+- [ ] Delete button is touch-friendly (min 44x44px)
+- [ ] Photo grid is 2 columns on mobile, 4 on desktop
+- [ ] Form fields stack properly on small screens
+- [ ] Slack notification is readable on mobile Slack app
+
+---
+
+## 🔧 IMPORTS NEEDED
+
+```tsx
+import { useState } from 'react';
+import { 
+  Home, 
+  Camera, 
+  ImageIcon, 
+  X, 
+  CheckCircle, 
+  Info, 
+  Upload, 
+  Lock, 
+  Trash2 
+} from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+```
+
+---
+
+## 📁 FILES TO CREATE/MODIFY
+
+1. `shared/schema.ts` - Add isComingSoon column and transactionPhotos table
+2. `server/routes.ts` - Add photo upload and transaction photo endpoints
+3. `server/storage.ts` - Add transaction photo CRUD functions
+4. `server/slack.ts` - Add postComingSoonNotification function
+5. `client/src/components/transactions/CreateTransactionForm.tsx` - Update form
+6. `client/src/components/marketing/PropertyPhotos.tsx` - Create new component
+7. `client/src/pages/TransactionDetail.tsx` - Import PropertyPhotos in Marketing tab
