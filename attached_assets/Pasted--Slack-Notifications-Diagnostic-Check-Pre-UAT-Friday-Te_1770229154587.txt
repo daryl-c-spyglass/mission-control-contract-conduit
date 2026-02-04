@@ -1,0 +1,641 @@
+# 🔍 Slack Notifications Diagnostic Check (Pre-UAT Friday Testing)
+
+## 🎯 OBJECTIVE
+Run diagnostics on the Slack notification system to prepare for Friday UAT testing. **NO CHANGES** - this is purely a read-only diagnostic to verify everything is ready to turn on.
+
+---
+
+## ⚠️ IMPORTANT: READ-ONLY MODE
+- Do NOT enable notifications
+- Do NOT send any test messages
+- Do NOT modify any environment variables
+- Only READ and REPORT current status
+
+---
+
+## 📋 DIAGNOSTIC CHECKLIST
+
+### 1. Environment Variables Status
+
+Create a diagnostic endpoint or script that checks and reports:
+
+```typescript
+// GET /api/admin/slack-diagnostics (or run as script)
+
+async function runSlackDiagnostics() {
+  const diagnostics = {
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    checks: []
+  };
+
+  // Check 1: Notification Flags
+  diagnostics.checks.push({
+    name: 'Notification Flags',
+    status: 'info',
+    details: {
+      DISABLE_SLACK_NOTIFICATIONS: process.env.DISABLE_SLACK_NOTIFICATIONS || 'not set',
+      SLACK_BOT_TOKEN_DISABLE: process.env.SLACK_BOT_TOKEN_DISABLE || 'not set',
+      SLACK_API_TOKEN_DISABLE: process.env.SLACK_API_TOKEN_DISABLE || 'not set',
+    },
+    notificationsEnabled: !(
+      process.env.DISABLE_SLACK_NOTIFICATIONS === 'true' ||
+      process.env.SLACK_BOT_TOKEN_DISABLE === 'true' ||
+      process.env.SLACK_API_TOKEN_DISABLE === 'true'
+    )
+  });
+
+  // Check 2: Slack Token Exists
+  const hasSlackBotToken = !!process.env.SLACK_BOT_TOKEN;
+  const hasSlackApiToken = !!process.env.SLACK_API_TOKEN;
+  diagnostics.checks.push({
+    name: 'Slack Tokens',
+    status: hasSlackBotToken || hasSlackApiToken ? 'pass' : 'fail',
+    details: {
+      SLACK_BOT_TOKEN: hasSlackBotToken ? '✅ Set (hidden)' : '❌ Missing',
+      SLACK_API_TOKEN: hasSlackApiToken ? '✅ Set (hidden)' : '❌ Missing',
+    }
+  });
+
+  return diagnostics;
+}
+```
+
+### 2. Slack API Connection Test (Read-Only)
+
+```typescript
+// Test Slack connection WITHOUT sending messages
+async function testSlackConnection() {
+  const results = {
+    authTest: null,
+    channelAccess: [],
+    errors: []
+  };
+
+  try {
+    // Test 1: Verify token is valid (auth.test)
+    const authResult = await slackClient.auth.test();
+    results.authTest = {
+      status: 'pass',
+      team: authResult.team,
+      user: authResult.user,
+      bot_id: authResult.bot_id
+    };
+  } catch (error) {
+    results.authTest = {
+      status: 'fail',
+      error: error.message
+    };
+    results.errors.push(`Auth test failed: ${error.message}`);
+  }
+
+  // Test 2: Check channel access (conversations.info - read only)
+  const channelsToCheck = [
+    { name: '#coming-soon-listings', id: 'C09J6327HQS' },
+    { name: '#spyglass-photography', id: 'C0A9019MYT1' },
+    // Add other notification channels here
+  ];
+
+  for (const channel of channelsToCheck) {
+    try {
+      const info = await slackClient.conversations.info({ channel: channel.id });
+      results.channelAccess.push({
+        name: channel.name,
+        id: channel.id,
+        status: 'pass',
+        isMember: info.channel.is_member,
+        isPrivate: info.channel.is_private
+      });
+    } catch (error) {
+      results.channelAccess.push({
+        name: channel.name,
+        id: channel.id,
+        status: 'fail',
+        error: error.message
+      });
+      results.errors.push(`Channel ${channel.name} access failed: ${error.message}`);
+    }
+  }
+
+  return results;
+}
+```
+
+### 3. Scheduler Status Check
+
+```typescript
+// Check if any schedulers are running
+async function checkSchedulerStatus() {
+  const status = {
+    legacyScheduler: null,
+    newScheduler: null,
+    cronJobs: []
+  };
+
+  // Check for any active cron jobs or intervals
+  // This depends on how schedulers are implemented in the codebase
+
+  // Look for:
+  // - node-cron jobs
+  // - setInterval timers
+  // - Any scheduled notification functions
+
+  // Report what's found
+  console.log('=== SCHEDULER STATUS ===');
+  console.log('Check server/scheduler.ts or similar files');
+  console.log('Look for: cron.schedule(), setInterval(), or similar');
+  
+  return status;
+}
+```
+
+### 4. Database Check - Pending Notifications
+
+```typescript
+// Check transactions that might trigger notifications
+async function checkPendingNotifications() {
+  const report = {
+    transactionsWithClosingDates: 0,
+    upcomingClosings7Days: [],
+    upcomingClosings14Days: [],
+    comingSoonTransactions: [],
+    recentActivity: []
+  };
+
+  // Count transactions with closing dates
+  const transactionsWithClosing = await db
+    .select()
+    .from(transactions)
+    .where(isNotNull(transactions.closingDate));
+  
+  report.transactionsWithClosingDates = transactionsWithClosing.length;
+
+  // Find closings in next 7 days
+  const now = new Date();
+  const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const in14Days = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+
+  for (const txn of transactionsWithClosing) {
+    const closingDate = new Date(txn.closingDate);
+    const daysUntil = Math.ceil((closingDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+    
+    if (closingDate >= now && closingDate <= in7Days) {
+      report.upcomingClosings7Days.push({
+        id: txn.id,
+        address: txn.propertyAddress,
+        closingDate: txn.closingDate,
+        daysUntil: daysUntil,
+        agentId: txn.userId
+      });
+    } else if (closingDate > in7Days && closingDate <= in14Days) {
+      report.upcomingClosings14Days.push({
+        id: txn.id,
+        address: txn.propertyAddress,
+        closingDate: txn.closingDate,
+        daysUntil: daysUntil,
+        agentId: txn.userId
+      });
+    }
+  }
+
+  // Check for Coming Soon transactions (if field exists)
+  try {
+    const comingSoon = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.isComingSoon, true));
+    
+    report.comingSoonTransactions = comingSoon.map(t => ({
+      id: t.id,
+      address: t.propertyAddress
+    }));
+  } catch (e) {
+    report.comingSoonTransactions = 'Field not yet implemented';
+  }
+
+  return report;
+}
+```
+
+### 5. Notification History Check
+
+```typescript
+// Check recent notification activity (if logged)
+async function checkNotificationHistory() {
+  // If you have an activity or notifications log table
+  try {
+    const recentNotifications = await db
+      .select()
+      .from(activities)
+      .where(eq(activities.type, 'notification'))
+      .orderBy(desc(activities.createdAt))
+      .limit(20);
+
+    return {
+      found: recentNotifications.length,
+      recent: recentNotifications.map(n => ({
+        id: n.id,
+        description: n.description,
+        createdAt: n.createdAt,
+        transactionId: n.transactionId
+      }))
+    };
+  } catch (e) {
+    return {
+      found: 0,
+      error: 'Activity table not found or no notification type'
+    };
+  }
+}
+```
+
+---
+
+## 📊 DIAGNOSTIC REPORT OUTPUT
+
+Generate a report like this:
+
+```
+╔════════════════════════════════════════════════════════════════╗
+║           SLACK NOTIFICATIONS DIAGNOSTIC REPORT                ║
+║                   Pre-UAT Friday Testing                       ║
+╠════════════════════════════════════════════════════════════════╣
+║ Run Time: 2026-02-05 10:30:00 CST                              ║
+║ Environment: Development (Replit)                              ║
+╚════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. NOTIFICATION FLAGS                                           │
+├─────────────────────────────────────────────────────────────────┤
+│ DISABLE_SLACK_NOTIFICATIONS:  true  ← Notifications OFF        │
+│ SLACK_BOT_TOKEN_DISABLE:      true  ← Bot disabled             │
+│ SLACK_API_TOKEN_DISABLE:      true  ← API disabled             │
+│                                                                 │
+│ Status: 🔴 NOTIFICATIONS DISABLED (as expected for pre-UAT)    │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 2. SLACK API CONNECTION                                         │
+├─────────────────────────────────────────────────────────────────┤
+│ Auth Test:        ✅ PASS                                       │
+│ Team:             Spyglass Realty                               │
+│ Bot User:         Contract Conduit Bot                          │
+│                                                                 │
+│ Channel Access:                                                 │
+│   #coming-soon-listings (C09J6327HQS)  ✅ Member                │
+│   #spyglass-photography (C0A9019MYT1)  ✅ Member                │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 3. SCHEDULER STATUS                                             │
+├─────────────────────────────────────────────────────────────────┤
+│ Legacy Scheduler:  ❌ Disabled (confirmed)                      │
+│ New Scheduler:     ⏸️  Paused (waiting for UAT)                 │
+│ Active Cron Jobs:  0                                            │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 4. PENDING NOTIFICATIONS (what would send when enabled)         │
+├─────────────────────────────────────────────────────────────────┤
+│ Transactions with closing dates: 82                             │
+│                                                                 │
+│ Upcoming Closings (next 7 days): 3                              │
+│   • 7500 Northwest - Jan 27, 2026 (2 days) - Randi White       │
+│   • 2504 Main St - Jan 29, 2026 (4 days) - John Smith          │
+│   • 2008 Maple Ave - Jan 30, 2026 (5 days) - Arriana Alvarez   │
+│                                                                 │
+│ Upcoming Closings (8-14 days): 2                                │
+│   • 2107 Matterhorn Lane - Feb 3, 2026 (9 days)                │
+│   • 123 Test - Feb 5, 2026 (11 days)                           │
+│                                                                 │
+│ Coming Soon Transactions: 0 (feature not yet implemented)       │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 5. RECENT NOTIFICATION HISTORY                                  │
+├─────────────────────────────────────────────────────────────────┤
+│ Last notification sent: 2026-01-20 (spam incident - fixed)     │
+│ Total logged: 47 notifications                                  │
+│                                                                 │
+│ Note: Duplicate notifications issue was fixed by disabling     │
+│ legacy scheduler. Ready for clean UAT test.                    │
+└─────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════╗
+║                     READINESS SUMMARY                          ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  ✅ Slack tokens configured                                    ║
+║  ✅ Channel access verified                                    ║
+║  ✅ Legacy scheduler disabled                                  ║
+║  ✅ Notifications currently OFF (safe)                         ║
+║  ✅ No duplicate scheduler risk                                ║
+║                                                                ║
+║  📋 TO ENABLE FOR FRIDAY UAT:                                  ║
+║     1. Set DISABLE_SLACK_NOTIFICATIONS = false                 ║
+║     2. Set SLACK_BOT_TOKEN_DISABLE = false                     ║
+║     3. Set SLACK_API_TOKEN_DISABLE = false                     ║
+║     4. Test with ONE transaction first                         ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+## 🛠️ IMPLEMENTATION
+
+Create a new file: `server/diagnostics/slack-diagnostics.ts`
+
+```typescript
+import { db } from '../db';
+import { transactions, activities } from '../../shared/schema';
+import { eq, isNotNull, desc, gte, lte, and } from 'drizzle-orm';
+
+export async function runSlackDiagnostics() {
+  console.log('\n');
+  console.log('╔════════════════════════════════════════════════════════════════╗');
+  console.log('║           SLACK NOTIFICATIONS DIAGNOSTIC REPORT                ║');
+  console.log('║                   Pre-UAT Friday Testing                       ║');
+  console.log('╠════════════════════════════════════════════════════════════════╣');
+  console.log(`║ Run Time: ${new Date().toISOString()}                          ║`);
+  console.log(`║ Environment: ${process.env.NODE_ENV || 'development'}          ║`);
+  console.log('╚════════════════════════════════════════════════════════════════╝');
+  console.log('\n');
+
+  // 1. Check Environment Flags
+  console.log('┌─────────────────────────────────────────────────────────────────┐');
+  console.log('│ 1. NOTIFICATION FLAGS                                           │');
+  console.log('├─────────────────────────────────────────────────────────────────┤');
+  
+  const disableNotifications = process.env.DISABLE_SLACK_NOTIFICATIONS;
+  const disableBotToken = process.env.SLACK_BOT_TOKEN_DISABLE;
+  const disableApiToken = process.env.SLACK_API_TOKEN_DISABLE;
+  
+  console.log(`│ DISABLE_SLACK_NOTIFICATIONS:  ${disableNotifications || 'not set'}`.padEnd(66) + '│');
+  console.log(`│ SLACK_BOT_TOKEN_DISABLE:      ${disableBotToken || 'not set'}`.padEnd(66) + '│');
+  console.log(`│ SLACK_API_TOKEN_DISABLE:      ${disableApiToken || 'not set'}`.padEnd(66) + '│');
+  
+  const notificationsEnabled = !(
+    disableNotifications === 'true' ||
+    disableBotToken === 'true' ||
+    disableApiToken === 'true'
+  );
+  
+  console.log('│'.padEnd(66) + '│');
+  if (notificationsEnabled) {
+    console.log('│ Status: 🟢 NOTIFICATIONS ENABLED                                 │');
+  } else {
+    console.log('│ Status: 🔴 NOTIFICATIONS DISABLED (safe for pre-UAT)            │');
+  }
+  console.log('└─────────────────────────────────────────────────────────────────┘');
+  console.log('\n');
+
+  // 2. Check Slack Tokens Exist
+  console.log('┌─────────────────────────────────────────────────────────────────┐');
+  console.log('│ 2. SLACK TOKENS                                                  │');
+  console.log('├─────────────────────────────────────────────────────────────────┤');
+  
+  const hasBotToken = !!process.env.SLACK_BOT_TOKEN;
+  const hasApiToken = !!process.env.SLACK_API_TOKEN;
+  
+  console.log(`│ SLACK_BOT_TOKEN:  ${hasBotToken ? '✅ Set (hidden)' : '❌ Missing'}`.padEnd(66) + '│');
+  console.log(`│ SLACK_API_TOKEN:  ${hasApiToken ? '✅ Set (hidden)' : '❌ Missing'}`.padEnd(66) + '│');
+  console.log('└─────────────────────────────────────────────────────────────────┘');
+  console.log('\n');
+
+  // 3. Check Pending Notifications
+  console.log('┌─────────────────────────────────────────────────────────────────┐');
+  console.log('│ 3. PENDING NOTIFICATIONS (would send when enabled)              │');
+  console.log('├─────────────────────────────────────────────────────────────────┤');
+  
+  try {
+    const allTransactions = await db.select().from(transactions);
+    const withClosingDate = allTransactions.filter(t => t.closingDate);
+    
+    console.log(`│ Total Transactions: ${allTransactions.length}`.padEnd(66) + '│');
+    console.log(`│ With Closing Dates: ${withClosingDate.length}`.padEnd(66) + '│');
+    console.log('│'.padEnd(66) + '│');
+    
+    const now = new Date();
+    const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const in14Days = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+    
+    const upcoming7 = withClosingDate.filter(t => {
+      const closing = new Date(t.closingDate!);
+      return closing >= now && closing <= in7Days;
+    });
+    
+    const upcoming14 = withClosingDate.filter(t => {
+      const closing = new Date(t.closingDate!);
+      return closing > in7Days && closing <= in14Days;
+    });
+    
+    console.log(`│ Closings in next 7 days: ${upcoming7.length}`.padEnd(66) + '│');
+    upcoming7.slice(0, 5).forEach(t => {
+      const days = Math.ceil((new Date(t.closingDate!).getTime() - now.getTime()) / (24*60*60*1000));
+      console.log(`│   • ${t.propertyAddress?.substring(0, 30)} (${days} days)`.padEnd(66) + '│');
+    });
+    
+    console.log('│'.padEnd(66) + '│');
+    console.log(`│ Closings in 8-14 days: ${upcoming14.length}`.padEnd(66) + '│');
+    upcoming14.slice(0, 3).forEach(t => {
+      const days = Math.ceil((new Date(t.closingDate!).getTime() - now.getTime()) / (24*60*60*1000));
+      console.log(`│   • ${t.propertyAddress?.substring(0, 30)} (${days} days)`.padEnd(66) + '│');
+    });
+    
+  } catch (error) {
+    console.log(`│ Error checking transactions: ${error}`.padEnd(66) + '│');
+  }
+  
+  console.log('└─────────────────────────────────────────────────────────────────┘');
+  console.log('\n');
+
+  // 4. Summary
+  console.log('╔════════════════════════════════════════════════════════════════╗');
+  console.log('║                     READINESS SUMMARY                          ║');
+  console.log('╠════════════════════════════════════════════════════════════════╣');
+  console.log('║                                                                ║');
+  console.log(`║  ${hasBotToken || hasApiToken ? '✅' : '❌'} Slack tokens configured                                    ║`);
+  console.log(`║  ${!notificationsEnabled ? '✅' : '⚠️ '} Notifications currently OFF (safe)                         ║`);
+  console.log('║                                                                ║');
+  console.log('║  📋 TO ENABLE FOR FRIDAY UAT:                                  ║');
+  console.log('║     1. Set DISABLE_SLACK_NOTIFICATIONS = false                 ║');
+  console.log('║     2. Set SLACK_BOT_TOKEN_DISABLE = false                     ║');
+  console.log('║     3. Set SLACK_API_TOKEN_DISABLE = false                     ║');
+  console.log('║     4. Test with ONE transaction first                         ║');
+  console.log('║                                                                ║');
+  console.log('╚════════════════════════════════════════════════════════════════╝');
+  console.log('\n');
+}
+
+// Run if called directly
+runSlackDiagnostics().then(() => {
+  console.log('Diagnostics complete.');
+}).catch(console.error);
+```
+
+---
+
+## 🚀 HOW TO RUN
+
+Option A: **Add to server startup** (temporary)
+```typescript
+// In server/index.ts - add at bottom temporarily
+import { runSlackDiagnostics } from './diagnostics/slack-diagnostics';
+runSlackDiagnostics();
+```
+
+Option B: **Create API endpoint**
+```typescript
+// GET /api/admin/slack-diagnostics
+app.get('/api/admin/slack-diagnostics', requireAuth, async (req, res) => {
+  // Only allow admins
+  const diagnostics = await runSlackDiagnostics();
+  res.json(diagnostics);
+});
+```
+
+Option C: **Run as script**
+```bash
+npx tsx server/diagnostics/slack-diagnostics.ts
+```
+
+---
+
+## ✅ VERIFICATION
+
+After running diagnostics, confirm:
+- [ ] All 3 disable flags are set to `true` (notifications OFF)
+- [ ] Slack tokens exist and are valid
+- [ ] Bot has access to required channels
+- [ ] No active schedulers running
+- [ ] Know how many transactions would trigger notifications
+
+---
+
+## 📋 FRIDAY UAT CHECKLIST
+
+When ready to enable:
+1. [ ] Run diagnostics one more time
+2. [ ] Set all 3 flags to `false` in Replit Secrets
+3. [ ] Restart the server
+4. [ ] Create ONE test transaction with a closing date
+5. [ ] Verify notification appears in correct channel
+6. [ ] Check no duplicate notifications
+7. [ ] If issues, immediately set flags back to `true`
+
+---
+
+## 🔒 UAT EMAIL FILTER (IMPORTANT)
+
+**Only send notifications for these users during testing:**
+```typescript
+const UAT_TEST_EMAILS = [
+  'daryl@spyglassrealty.com',
+  'ryan@spyglassrealty.com'
+];
+```
+
+### Add this check to notification functions:
+
+```typescript
+// In your notification sending function
+async function shouldSendNotification(userId: number): Promise<boolean> {
+  // Check if notifications are enabled
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    return false;
+  }
+
+  // UAT Mode: Only send to test users
+  const UAT_MODE = process.env.UAT_MODE === 'true';
+  const UAT_TEST_EMAILS = [
+    'daryl@spyglassrealty.com',
+    'ryan@spyglassrealty.com'
+  ];
+
+  if (UAT_MODE) {
+    const user = await storage.getUser(userId);
+    if (!user || !UAT_TEST_EMAILS.includes(user.email?.toLowerCase())) {
+      console.log(`[UAT MODE] Skipping notification for non-test user: ${user?.email}`);
+      return false;
+    }
+    console.log(`[UAT MODE] Sending notification for test user: ${user.email}`);
+  }
+
+  return true;
+}
+
+// Usage in notification sender
+async function sendClosingReminder(transaction: Transaction) {
+  if (!await shouldSendNotification(transaction.userId)) {
+    return; // Skip - not a test user or notifications disabled
+  }
+  
+  // ... proceed with sending notification
+}
+```
+
+### Environment Variable to Add:
+
+```
+UAT_MODE=true   # Set to true during testing, false for production
+```
+
+### How It Works:
+
+| UAT_MODE | User Email | Notification Sent? |
+|----------|------------|-------------------|
+| true | daryl@spyglassrealty.com | ✅ Yes |
+| true | ryan@spyglassrealty.com | ✅ Yes |
+| true | randi@spyglassrealty.com | ❌ No (skipped) |
+| true | arriana@spyglassrealty.com | ❌ No (skipped) |
+| false | anyone | ✅ Yes (production mode) |
+
+### Add to Diagnostic Report:
+
+```typescript
+// In diagnostics, show UAT mode status
+console.log('┌─────────────────────────────────────────────────────────────────┐');
+console.log('│ UAT TEST MODE                                                   │');
+console.log('├─────────────────────────────────────────────────────────────────┤');
+console.log(`│ UAT_MODE: ${process.env.UAT_MODE || 'not set'}`.padEnd(66) + '│');
+console.log('│ Test Users:'.padEnd(66) + '│');
+console.log('│   • daryl@spyglassrealty.com'.padEnd(66) + '│');
+console.log('│   • ryan@spyglassrealty.com'.padEnd(66) + '│');
+console.log('│'.padEnd(66) + '│');
+if (process.env.UAT_MODE === 'true') {
+  console.log('│ Status: 🧪 UAT MODE - Only test users will receive notifications │');
+} else {
+  console.log('│ Status: 🚀 PRODUCTION MODE - All users receive notifications    │');
+}
+console.log('└─────────────────────────────────────────────────────────────────┘');
+```
+
+---
+
+## 🚀 FRIDAY UAT STEPS (UPDATED)
+
+1. **Add new environment variable:**
+   ```
+   UAT_MODE=true
+   ```
+
+2. **Enable notifications (set to false):**
+   ```
+   DISABLE_SLACK_NOTIFICATIONS=false
+   SLACK_BOT_TOKEN_DISABLE=false
+   SLACK_API_TOKEN_DISABLE=false
+   ```
+
+3. **Test with Daryl or Ryan's account:**
+   - Create transaction under daryl@spyglassrealty.com
+   - Set closing date to trigger notification
+   - Verify notification appears in Slack
+
+4. **Confirm no other agents affected:**
+   - Randi, Arriana, etc. should NOT receive any notifications during UAT
+
+5. **When ready for production:**
+   ```
+   UAT_MODE=false  # Remove filter, all users get notifications
+   ```

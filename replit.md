@@ -78,6 +78,12 @@ Preferred communication style: Simple, everyday language.
 - **CMA Data Extraction Utilities**: Comprehensive client-side utilities (`client/src/lib/cma-data-utils.ts`) for safe data extraction and normalization from various MLS/Repliers API field structures, including price, square footage, DOM, lot acres, beds/baths, address, coordinates, and status. Includes calculation of CMA statistics and robust formatting functions.
 - **CMA Resources System**: Agent-managed resources (documents, links) for CMA presentations, stored in a database with API endpoints for CRUD, reordering, and file uploads. Supports public access for shared CMAs.
 - **User Notification Preferences System**: Per-user Slack notification settings stored in a database, with API endpoints and a reusable component for managing preferences.
+- **Slack Diagnostics System**: Read-only diagnostic endpoint for pre-UAT testing:
+  - **Endpoint**: GET /api/admin/slack-diagnostics (authenticated)
+  - **Format**: JSON (default) or text (?format=text for formatted report)
+  - **Checks**: Notification flags, Slack tokens, API connection, scheduler status, database pending notifications, user preferences, recent notification history
+  - **UAT Mode**: Supports UAT_MODE env var to limit notifications to test users only
+  - **Kill Switches**: DISABLE_SLACK_NOTIFICATIONS, SLACK_BOT_TOKEN_DISABLE, SLACK_API_TOKEN_DISABLE
 - **Shareable Flyer System**: Database-backed storage for property flyers with public viewing pages accessible via QR codes.
   - **Flyer Storage**: Flyers table stores snapshot of property data, images, agent info, branding settings, and metadata
   - **Short URLs**: Uses nanoid(9) for URL-friendly 9-character IDs (e.g., /flyer/abc123xyz)

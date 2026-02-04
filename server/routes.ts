@@ -4962,6 +4962,26 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
     }
   });
 
+  // Slack diagnostics endpoint - READ ONLY
+  app.get("/api/admin/slack-diagnostics", isAuthenticated, async (req: any, res) => {
+    try {
+      const { runSlackDiagnostics, formatDiagnosticsReport } = await import("./diagnostics/slack-diagnostics");
+      const diagnostics = await runSlackDiagnostics();
+      
+      // Check if client wants formatted text output
+      const format = req.query.format;
+      if (format === 'text') {
+        const report = formatDiagnosticsReport(diagnostics);
+        res.type('text/plain').send(report);
+      } else {
+        res.json(diagnostics);
+      }
+    } catch (error) {
+      console.error("Error running Slack diagnostics:", error);
+      res.status(500).json({ message: "Failed to run diagnostics", error: String(error) });
+    }
+  });
+
   // Test Slack notification
   app.post("/api/slack/test", isAuthenticated, async (req: any, res) => {
     try {
