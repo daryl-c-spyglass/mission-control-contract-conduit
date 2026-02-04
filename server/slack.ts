@@ -796,3 +796,175 @@ export async function sendMarketingNotification(
     }
   }
 }
+
+// Coming Soon channel ID
+const COMING_SOON_CHANNEL_ID = 'C09J6327HQS';
+
+interface ComingSoonNotification {
+  propertyAddress: string;
+  listPrice?: number | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  sqft?: number | null;
+  goLiveDate?: string | null;
+  description?: string | null;
+  transactionId: string;
+  agentName: string;
+  agentEmail?: string | null;
+  agentPhone?: string | null;
+  heroPhotoUrl?: string | null;
+}
+
+function formatPrice(price: number | null | undefined): string {
+  if (!price) return 'TBD';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(price);
+}
+
+function formatGoLiveDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return 'TBD';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
+/**
+ * Post a Coming Soon listing notification to #coming-soon-listings channel
+ */
+export async function postComingSoonNotification(data: ComingSoonNotification): Promise<void> {
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    console.log(`[NOTIFICATIONS DISABLED] Would have posted Coming Soon notification for: ${data.propertyAddress}`);
+    return;
+  }
+
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!token) {
+    console.error("[Slack] SLACK_BOT_TOKEN not configured - skipping Coming Soon notification");
+    return;
+  }
+
+  const appUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
+    ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+    : 'https://mission-control-contract-conduit.onrender.com';
+
+  const blocks: any[] = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: "Coming Soon Listing",
+        emoji: true
+      }
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*Address:*\n${data.propertyAddress}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*List Price:*\n${formatPrice(data.listPrice)}`
+        }
+      ]
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*Details:*\n${data.bedrooms || '-'} bed | ${data.bathrooms || '-'} bath | ${data.sqft?.toLocaleString() || '-'} sqft`
+        },
+        {
+          type: "mrkdwn",
+          text: `*Expected Live Date:*\n${formatGoLiveDate(data.goLiveDate)}`
+        }
+      ]
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*Agent:*\n${data.agentName}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*Contact:*\n${data.agentPhone || data.agentEmail || 'N/A'}`
+        }
+      ]
+    }
+  ];
+
+  // Add description if available (summarize if too long)
+  if (data.description) {
+    const shortDesc = data.description.length > 500 
+      ? data.description.substring(0, 497) + '...'
+      : data.description;
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Description:*\n${shortDesc}`
+      }
+    });
+  }
+
+  // Add property photo if available
+  if (data.heroPhotoUrl) {
+    blocks.push({
+      type: "image",
+      image_url: data.heroPhotoUrl,
+      alt_text: "Property Photo"
+    });
+  }
+
+  // Add action button
+  blocks.push({
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: {
+          type: "plain_text",
+          text: "View in Contract Conduit",
+          emoji: true
+        },
+        url: `${appUrl}/transactions/${data.transactionId}`,
+        style: "primary"
+      }
+    ]
+  });
+
+  try {
+    const response = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        channel: COMING_SOON_CHANNEL_ID,
+        blocks,
+        text: `Coming Soon: ${data.propertyAddress}`,
+      }),
+    });
+
+    const result = await response.json();
+    if (!result.ok) {
+      console.error("[Slack] Failed to send Coming Soon notification:", result.error);
+    } else {
+      console.log(`[Slack] Coming Soon notification sent for: ${data.propertyAddress}`);
+    }
+  } catch (error) {
+    console.error("[Slack] Failed to send Coming Soon notification:", error);
+  }
+}
