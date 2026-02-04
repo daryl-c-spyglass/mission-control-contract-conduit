@@ -314,15 +314,26 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
       const requestData: any = { ...data };
       
       if (propertyPhoto && (data.isOffMarket || data.isComingSoon)) {
+        // Validate file size client-side (10MB limit)
+        const maxSize = 10 * 1024 * 1024;
+        if (propertyPhoto.size > maxSize) {
+          throw new Error(`Photo is too large (${(propertyPhoto.size / (1024 * 1024)).toFixed(1)}MB). Maximum size is 10MB.`);
+        }
+        
         // Convert file to base64
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(propertyPhoto);
-        });
-        requestData.propertyPhotoBase64 = base64;
-        requestData.propertyPhotoFileName = propertyPhoto.name;
+        try {
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error("Failed to read photo file"));
+            reader.readAsDataURL(propertyPhoto);
+          });
+          requestData.propertyPhotoBase64 = base64;
+          requestData.propertyPhotoFileName = propertyPhoto.name;
+        } catch {
+          console.error("[Photo Upload] Failed to convert photo to base64");
+          // Continue without photo - user can add later
+        }
       }
       
       const res = await apiRequest("POST", "/api/transactions", requestData);

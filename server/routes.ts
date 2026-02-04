@@ -545,18 +545,28 @@ export async function registerRoutes(
 
       // Upload property photo if provided (for off-market or coming soon)
       let uploadedPhotoUrl: string | null = null;
+      let photoUploadError: string | null = null;
       if (propertyPhotoBase64 && (isOffMarket || isComingSoon)) {
         try {
           const privateDir = process.env.PRIVATE_OBJECT_DIR;
-          if (privateDir) {
+          if (!privateDir) {
+            console.warn("[Transaction Creation] PRIVATE_OBJECT_DIR not configured, skipping photo upload");
+            photoUploadError = "Object storage not configured";
+          } else {
             // Validate image type
             const validImagePrefixes = ['data:image/jpeg', 'data:image/png', 'data:image/gif', 'data:image/webp', 'data:image/jpg'];
-            if (validImagePrefixes.some(prefix => propertyPhotoBase64.startsWith(prefix))) {
+            if (!validImagePrefixes.some(prefix => propertyPhotoBase64.startsWith(prefix))) {
+              console.warn("[Transaction Creation] Invalid image type provided");
+              photoUploadError = "Invalid image type";
+            } else {
               const base64Data = propertyPhotoBase64.replace(/^data:image\/\w+;base64,/, '');
               const fileSizeBytes = Buffer.byteLength(base64Data, 'base64');
               const maxSizeBytes = 10 * 1024 * 1024; // 10MB
               
-              if (fileSizeBytes <= maxSizeBytes) {
+              if (fileSizeBytes > maxSizeBytes) {
+                console.warn(`[Transaction Creation] Photo too large: ${(fileSizeBytes / (1024 * 1024)).toFixed(2)}MB`);
+                photoUploadError = "Photo exceeds 10MB limit";
+              } else {
                 const pathParts = privateDir.startsWith('/') ? privateDir.slice(1).split('/') : privateDir.split('/');
                 const bucketName = pathParts[0];
                 
@@ -588,13 +598,25 @@ export async function registerRoutes(
                 const updatedImages = [...currentImages, uploadedPhotoUrl];
                 await storage.updateTransaction(transaction.id, { propertyImages: updatedImages });
                 
-                console.log(`[Transaction Creation] Photo uploaded: ${uploadedPhotoUrl}`);
+                console.log(`[Transaction Creation] Photo uploaded successfully: ${uploadedPhotoUrl}`);
               }
             }
           }
         } catch (photoError) {
           console.error("[Transaction Creation] Photo upload error:", photoError);
+          photoUploadError = "Upload failed";
           // Continue without photo - don't fail transaction creation
+        }
+      }
+      
+      // Log photo status for Coming Soon notifications
+      if (isComingSoon) {
+        if (uploadedPhotoUrl) {
+          console.log(`[Coming Soon] Photo available for notification: ${uploadedPhotoUrl}`);
+        } else if (photoUploadError) {
+          console.log(`[Coming Soon] No photo for notification (${photoUploadError}), notification will proceed without image`);
+        } else if (!propertyPhotoBase64) {
+          console.log("[Coming Soon] No photo provided by user, notification will proceed without image");
         }
       }
 
