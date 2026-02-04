@@ -285,8 +285,9 @@ export function FlyerPreview({
         />
 
         {/* Agent Card Container: Grids 15-16 (remaining ~308px) */}
+        {/* Layout: Agent info on left, QR code aligned to right edge of photos */}
         <div 
-          className="relative flex-1 overflow-hidden"
+          className="relative flex-1 flex items-start justify-between overflow-hidden"
           style={{ 
             paddingTop: '16px',
             paddingLeft: '12px',
@@ -295,14 +296,15 @@ export function FlyerPreview({
           }}
           data-layout-id="agent-card"
         >
-          {/* Photo + QR Row - side by side layout */}
+          {/* Left side: Agent Photo + Details */}
           <div 
-            className="flex items-center justify-center gap-4 mb-2"
-            data-layout-id="agent-media-row"
+            className="flex flex-col items-center"
+            style={{ width: '160px' }}
+            data-layout-id="agent-info"
           >
             {/* Agent Photo - 100px circular */}
             <div 
-              className="rounded-full overflow-hidden bg-gray-200 flex items-center justify-center flex-shrink-0"
+              className="rounded-full overflow-hidden bg-gray-200 flex items-center justify-center flex-shrink-0 mb-2"
               style={{ width: '100px', height: '100px' }}
             >
               {images.agentPhoto ? (
@@ -317,12 +319,42 @@ export function FlyerPreview({
               )}
             </div>
             
-            {/* QR Code - 70px square */}
+            {/* Agent Name */}
             <div 
-              className="flex items-center justify-center flex-shrink-0"
+              className="font-bold text-center truncate text-gray-800"
               style={{ 
-                width: '70px', 
-                height: '70px', 
+                fontSize: '14pt', 
+                maxWidth: '100%',
+              }}
+            >
+              {data.agentName || ''}
+            </div>
+            
+            {/* Agent Title & Phone */}
+            <div 
+              className="text-center"
+              style={{ 
+                fontSize: '9pt', 
+                lineHeight: 1.4,
+                color: '#555',
+              }}
+            >
+              <div className="truncate">{data.agentTitle || ''}</div>
+              <div>{data.phone || ''}</div>
+            </div>
+          </div>
+          
+          {/* Right side: QR Code - aligned to right edge */}
+          <div 
+            className="flex flex-col items-center flex-shrink-0"
+            style={{ marginTop: '15px' }}
+            data-layout-id="qr-section"
+          >
+            <div 
+              className="flex items-center justify-center"
+              style={{ 
+                width: '80px', 
+                height: '80px', 
                 border: '2px solid #000',
                 padding: '2px',
               }}
@@ -333,30 +365,12 @@ export function FlyerPreview({
                 <QrCode className="w-full h-full text-gray-400" />
               )}
             </div>
-          </div>
-          
-          {/* Agent Name - centered below media row */}
-          <div 
-            className="font-bold text-center truncate text-gray-800"
-            style={{ 
-              fontSize: '16pt', 
-              maxWidth: '100%',
-            }}
-          >
-            {data.agentName || ''}
-          </div>
-          
-          {/* Agent Title & Phone - below name */}
-          <div 
-            className="text-center"
-            style={{ 
-              fontSize: '9pt', 
-              lineHeight: 1.4,
-              color: '#555',
-            }}
-          >
-            <div className="truncate">{data.agentTitle || ''}</div>
-            <div>{data.phone || ''}</div>
+            <span 
+              className="text-center mt-1"
+              style={{ fontSize: '7pt', color: '#666', letterSpacing: '0.5px' }}
+            >
+              SCAN FOR INFO
+            </span>
           </div>
         </div>
       </div>
