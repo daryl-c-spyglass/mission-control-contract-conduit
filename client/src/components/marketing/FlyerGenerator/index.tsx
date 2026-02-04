@@ -45,6 +45,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   const previewRef = useRef<HTMLDivElement>(null);
   const leftPaneRef = useRef<HTMLDivElement>(null);
   const rightPaneRef = useRef<HTMLDivElement>(null);
+  const [containerHeight, setContainerHeight] = useState(600);
 
   // Scroll all panes to top when component mounts
   useEffect(() => {
@@ -60,6 +61,23 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
     if (rightPaneRef.current) {
       rightPaneRef.current.scrollTop = 0;
     }
+  }, []);
+
+  // Track preview container size for dynamic scaling
+  useEffect(() => {
+    const container = rightPaneRef.current;
+    if (!container) return;
+    
+    const updateHeight = () => {
+      // Subtract space for header, controls, padding (~150px)
+      setContainerHeight(container.clientHeight - 150);
+    };
+    
+    updateHeight();
+    
+    const observer = new ResizeObserver(() => updateHeight());
+    observer.observe(container);
+    return () => observer.disconnect();
   }, []);
 
   const [showGrid, setShowGrid] = useState(false);
@@ -744,12 +762,13 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
     },
   });
 
-  // Base scale that fits the container - the flyer is 816x1056
-  const baseScale = 0.55;
+  // Dynamically calculate base scale to fit flyer (816x1056) in container
+  const FLYER_HEIGHT = 1056;
+  const baseScale = Math.min((containerHeight - 20) / FLYER_HEIGHT, 1); // -20 for padding, max 1
   
   const getPreviewScale = () => {
     // All scales are relative to the base fit scale
-    // 100% = fits perfectly, 75% = smaller, 125%/150% = larger
+    // 100% = fits perfectly in container
     const multiplier = parseFloat(scale) || 1;
     return baseScale * multiplier;
   };
