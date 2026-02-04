@@ -54,6 +54,7 @@ const formSchema = z.object({
   propertyAddress: z.string().min(5, "Please enter a valid property address"),
   mlsNumber: z.string().optional(),
   isOffMarket: z.boolean().default(false),
+  isComingSoon: z.boolean().default(false),
   isUnderContract: z.boolean().default(true),
   // Off Market property details
   propertyDescription: z.string().optional(),
@@ -201,6 +202,7 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
       propertyAddress: "",
       mlsNumber: "",
       isOffMarket: false,
+      isComingSoon: false,
       isUnderContract: true,
       propertyDescription: "",
       listPrice: "",
@@ -529,6 +531,31 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                     </FormLabel>
                     <FormDescription className="text-xs">
                       Check if this property is not listed in MLS
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            {/* Coming Soon Checkbox */}
+            <FormField
+              control={form.control}
+              name="isComingSoon"
+              render={({ field }) => (
+                <FormItem className="flex items-start gap-2 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      data-testid="checkbox-coming-soon"
+                    />
+                  </FormControl>
+                  <div className="space-y-1">
+                    <FormLabel className="text-sm font-normal cursor-pointer">
+                      Coming Soon (Not Yet Listed)
+                    </FormLabel>
+                    <FormDescription className="text-xs">
+                      Notify team in #coming-soon-listings
                     </FormDescription>
                   </div>
                 </FormItem>
