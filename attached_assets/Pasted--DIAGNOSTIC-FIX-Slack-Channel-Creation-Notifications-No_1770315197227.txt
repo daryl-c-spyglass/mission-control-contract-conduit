@@ -1,0 +1,259 @@
+# 🔍 DIAGNOSTIC & FIX: Slack Channel Creation + Notifications Not Working
+
+## 🎯 OBJECTIVE
+Diagnose and fix why Slack channel creation and notifications are NOT firing when a new transaction is created in Contract Conduit. The `DISABLE_SLACK_NOTIFICATIONS` env var is set to `false` in Render (production), but no channels are being created and no messages are being sent.
+
+## 📋 KNOWN CONTEXT
+- Bot name: "Transaction Management Replit" (Slack User ID: U0A5RLSRAP2)
+- Bot last sent messages: January 30, 2026
+- Channels WERE being created successfully before (e.g., #buy-*, #sell-* pattern)
+- `DISABLE_SLACK_NOTIFICATIONS=false` confirmed in Render
+- Previously identified: `chat:write` scope was MISSING from Slack bot
+- Three disable flags existed: `DISABLE_SLACK_NOTIFICATIONS`, `SLACK_BOT_TOKEN_DISABLE`, `SLACK_API_TOKEN_DISABLE`
+- Coming Soon channel: #coming-soon-listings (C09J6327HQS)
+
+---
+
+## PHASE 1: READ-ONLY DIAGNOSTIC (NO CHANGES)
+
+Run these checks and output a diagnostic report. Do NOT modify any code.
+
+### Check 1: Environment Variables
+```typescript
+// Log ALL Slack-related env vars (values masked)
+const slackEnvVars = [
+  'DISABLE_SLACK_NOTIFICATIONS',
+  'SLACK_BOT_TOKEN',
+  'SLACK_API_TOKEN',
+  'SLACK_BOT_TOKEN_DISABLE',
+  'SLACK_API_TOKEN_DISABLE',
+  'SLACK_SIGNING_SECRET',
+  'UAT_MODE',
+  'COMING_SOON_CHANNEL_ID'
+];
+
+slackEnvVars.forEach(key => {
+  const val = process.env[key];
+  if (!val) console.log(`${key}: ❌ NOT SET`);
+  else if (key.includes('TOKEN') || key.includes('SECRET')) 
+    console.log(`${key}: ✅ Set (${val.substring(0, 8)}...)`);
+  else 
+    console.log(`${key}: ${val}`);
+});
+```
+
+### Check 2: Slack Bot Token Validity
+```typescript
+// Test if the bot token can authenticate
+const { WebClient } = require('@slack/web-api');
+const client = new WebClient(process.env.SLACK_BOT_TOKEN);
+
+try {
+  const authResult = await client.auth.test();
+  console.log('Bot Auth: ✅ Valid');
+  console.log('Bot User:', authResult.user);
+  console.log('Bot User ID:', authResult.user_id);
+  console.log('Team:', authResult.team);
+} catch (error) {
+  console.log('Bot Auth: ❌ FAILED -', error.message);
+}
+```
+
+### Check 3: Bot Scopes (CRITICAL)
+```typescript
+// Check what scopes the bot token has
+// Try posting a test message to verify chat:write
+try {
+  // Don't actually post - just check if conversations.list works
+  const channels = await client.conversations.list({ limit: 1 });
+  console.log('channels:read scope: ✅');
+} catch (e) {
+  console.log('channels:read scope: ❌', e.data?.needed);
+}
+
+try {
+  // Try to create a channel (dry run concept - create then immediately archive)
+  // Actually, just test by checking conversations.create permissions
+  // We'll test with a conversations.info call instead
+  const info = await client.conversations.info({ channel: 'C09J6327HQS' }); // coming-soon-listings
+  console.log('Channel access: ✅ Can read #coming-soon-listings');
+} catch (e) {
+  console.log('Channel access: ❌', e.data?.error);
+}
+```
+
+### Check 4: Find ALL Notification Disable Checks in Code
+```bash
+# Search for ALL places that check disable flags
+grep -rn "DISABLE_SLACK" server/ --include="*.ts" --include="*.tsx" --include="*.js"
+grep -rn "SLACK_BOT_TOKEN_DISABLE\|SLACK_API_TOKEN_DISABLE" server/ --include="*.ts" --include="*.tsx" --include="*.js"
+grep -rn "notifications.*disabled\|disabled.*notifications\|skip.*slack\|slack.*skip" server/ --include="*.ts" --include="*.tsx" --include="*.js" -i
+```
+
+### Check 5: Find Channel Creation Logic
+```bash
+# Find where channels are created
+grep -rn "conversations.create\|channels.create\|createChannel\|createSlackChannel" server/ --include="*.ts" --include="*.tsx" --include="*.js"
+# Find where transaction creation triggers Slack
+grep -rn "slackChannelId\|slack_channel_id\|channelId.*slack\|slack.*channel" server/ --include="*.ts" --include="*.tsx" --include="*.js"
+```
+
+### Check 6: Find Transaction Creation Flow
+```bash
+# Find the transaction creation endpoint/function
+grep -rn "createTransaction\|create.*transaction\|POST.*transaction\|insert.*transaction" server/ --include="*.ts" --include="*.tsx" --include="*.js"
+```
+
+### Check 7: Check for Duplicate Schedulers
+```bash
+# Find all cron/scheduler/interval setups
+grep -rn "setInterval\|cron\|schedule\|scheduler\|node-cron" server/ --include="*.ts" --include="*.tsx" --include="*.js"
+```
+
+### Check 8: Check Recent Server Logs for Slack Errors
+```bash
+# Look for any Slack-related error logs
+grep -rn "SLACK\|slack\|channel.*create\|notification.*send\|notification.*skip" server/logs/ 2>/dev/null || echo "No log files found"
+```
+
+---
+
+## 📊 DIAGNOSTIC REPORT FORMAT
+
+Output the results as:
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║        SLACK NOTIFICATIONS DIAGNOSTIC REPORT                 ║
+║        Date: [current date/time]                             ║
+╚══════════════════════════════════════════════════════════════╝
+
+1. ENVIRONMENT VARIABLES
+   DISABLE_SLACK_NOTIFICATIONS:     [value]
+   SLACK_BOT_TOKEN:                 [set/not set]
+   SLACK_API_TOKEN:                 [set/not set]
+   SLACK_BOT_TOKEN_DISABLE:         [value or not set]
+   SLACK_API_TOKEN_DISABLE:         [value or not set]
+   UAT_MODE:                        [value or not set]
+
+2. BOT AUTHENTICATION
+   Status:                          [valid/failed]
+   Bot User:                        [name]
+   Bot User ID:                     [id]
+
+3. BOT PERMISSIONS
+   channels:read:                   [yes/no]
+   chat:write:                      [yes/no - TEST THIS]
+   conversations.create:            [yes/no - TEST THIS]
+
+4. DISABLE CHECKS IN CODE
+   Files with disable checks:       [list files and line numbers]
+   Total disable check locations:   [count]
+
+5. CHANNEL CREATION LOGIC
+   Files with channel creation:     [list files and line numbers]
+   Trigger point:                   [where in transaction creation flow]
+
+6. SCHEDULERS
+   Active schedulers found:         [count and locations]
+   Potential duplicates:            [yes/no]
+
+7. ROOT CAUSE ANALYSIS
+   [Based on findings, explain WHY channels are not being created]
+
+8. RECOMMENDED FIX
+   [Specific steps to fix the issue]
+```
+
+---
+
+## PHASE 2: FIX (Only after diagnostic confirms the issue)
+
+Based on diagnostic findings, apply the appropriate fix:
+
+### If Issue is: Additional disable flags still set to "true"
+```typescript
+// Remove or set to false ALL additional disable flags
+// Only DISABLE_SLACK_NOTIFICATIONS should control the behavior
+```
+
+### If Issue is: chat:write scope missing
+```
+STOP - This cannot be fixed in code.
+Tell the user:
+1. Go to api.slack.com → Select "Transaction Management Replit" app
+2. OAuth & Permissions → Bot Token Scopes
+3. Add: chat:write, channels:manage (if missing)
+4. Reinstall app to workspace
+5. Copy new xoxb- token
+6. Update SLACK_BOT_TOKEN in both Replit Secrets AND Render env vars
+```
+
+### If Issue is: Channel creation code wrapped in disable check
+```typescript
+// Ensure channel creation follows this logic:
+// 1. Check DISABLE_SLACK_NOTIFICATIONS env var
+// 2. If false (enabled), proceed with channel creation
+// 3. Create channel with pattern: #[buy/sell]-[address-sanitized]-[agentname]
+// 4. Store slackChannelId in transaction record
+// 5. Post initial message to the new channel
+```
+
+### If Issue is: Transaction creation not calling Slack functions
+```typescript
+// In the transaction creation endpoint/function, ensure:
+// After successful transaction insert, call:
+async function onTransactionCreated(transaction, user) {
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
+    console.log(`[SLACK] Notifications disabled - skipping channel creation for ${transaction.address}`);
+    return;
+  }
+  
+  // Create the Slack channel
+  const channelName = generateChannelName(transaction, user);
+  const channel = await createSlackChannel(channelName);
+  
+  if (channel) {
+    // Update transaction with channel ID
+    await db.update(transactions)
+      .set({ slackChannelId: channel.id })
+      .where(eq(transactions.id, transaction.id));
+    
+    // Post initial message
+    await postTransactionCreatedMessage(channel.id, transaction, user);
+    
+    // If Coming Soon, also post to #coming-soon-listings
+    if (transaction.isComingSoon) {
+      await postComingSoonNotification(transaction, user);
+    }
+  }
+}
+```
+
+---
+
+## ⚠️ IMPORTANT CONSTRAINTS
+- Do NOT send any test messages to production Slack channels
+- Do NOT create test channels
+- Do NOT modify environment variables
+- ONLY read code and environment to diagnose
+- Present findings BEFORE making any code changes
+- If the fix requires Slack API dashboard changes, STOP and report that to the user
+
+---
+
+## 📱 MOBILE OPTIMIZATION
+All UI changes related to notification settings or transaction creation must include:
+- Touch targets minimum 44x44px for checkboxes and buttons
+- Responsive layouts that stack on mobile (<640px), side-by-side on tablet+
+- Safe area insets for notched iOS devices (env(safe-area-inset-*))
+- Smooth scrolling with `-webkit-overflow-scrolling: touch`
+- No horizontal overflow on any screen size
+- Minimum 16px font size for body text
+- Works in both portrait and landscape orientations
+
+### Mobile Testing Checklist:
+- [ ] iPad Safari (1024x1366, 768x1024)
+- [ ] iPhone Safari (393x852, 375x667)
+- [ ] Android Chrome phone (360x800)
+- [ ] Android Chrome tablet (800x1280)
