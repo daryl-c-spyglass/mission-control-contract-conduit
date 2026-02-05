@@ -26,6 +26,21 @@
             background: white;
         }
         
+        /* Print-specific scaling for 8.5x11 inch output */
+        @media print {
+            body {
+                width: 8.5in;
+                height: 11in;
+                margin: 0;
+                padding: 0;
+            }
+            .page {
+                /* Scale 2550px to 8.5in (816px at 96dpi) = 816/2550 = 0.32 */
+                transform: scale(0.32);
+                transform-origin: top left;
+            }
+        }
+        
         /* Header - matches FlyerPreview: left-6 (24px), top-4 (16px), right-6 (24px), h-[80px] (80px) */
         /* Accent Bar - positioned from canvas at left 48px, top 25px */
         /* left: 48px * 3.125 = 150px, top: 25px * 3.125 = 78px */
