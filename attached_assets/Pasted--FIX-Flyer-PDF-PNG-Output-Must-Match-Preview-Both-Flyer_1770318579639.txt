@@ -1,0 +1,469 @@
+# 🔧 FIX: Flyer PDF/PNG Output Must Match Preview — Both Flyer Tools
+
+## 🚨 CRITICAL PROBLEM
+
+Both flyer tools have output rendering issues where the **downloaded file does NOT match the preview**:
+
+### Tool 1: Advanced Flyer Maker (Marketing Tab)
+- **Preview**: Looks correct — full-width layout, photos fill the page, text is readable, agent info positioned properly
+- **Downloaded PDF/PNG**: All content is **crammed into the top-left ~30% of the page** with massive white space filling the rest. Photos are tiny, text is microscopic, layout is broken
+
+### Tool 2: Create Property Flyer (Upper-right button)
+- **Preview panel**: Shows a tiny squished rendering — content is offset to top-left corner instead of filling the preview area properly
+- **Downloaded output**: Needs testing after fix — may have same viewport mismatch
+
+---
+
+## 🔍 ROOT CAUSE ANALYSIS
+
+The issue is a **Puppeteer viewport/template mismatch**. The HTML template is designed for a web viewport (e.g., ~800px wide) but Puppeteer renders on a much larger canvas (2550x3300 for 300 DPI), causing the content to appear tiny in the top-left corner.
+
+### What's Happening:
+```
+┌─────────────────────────────────┐
+│ ┌──────────┐                    │
+│ │ Content  │    EMPTY           │
+│ │ (tiny)   │    WHITE           │
+│ │          │    SPACE           │
+│ └──────────┘                    │
+│                                 │
+│         EMPTY WHITE SPACE       │
+│                                 │
+│                                 │
+└─────────────────────────────────┘
+Viewport: 2550x3300 but HTML designed for ~800px
+```
+
+### What It Should Be:
+```
+┌─────────────────────────────────┐
+│ [Logo]              [$955,000]  │
+│ 4507 UNITY CIR, AUSTIN, TX     │
+│ ┌───────────────────────────┐   │
+│ │     MAIN PHOTO            │   │
+│ │     (fills width)         │   │
+│ └───────────────────────────┘   │
+│ ┌────────┐ ┌────────────────┐   │
+│ │Photo 2 │ │   Photo 3      │   │
+│ └────────┘ └────────────────┘   │
+│ 4 beds  │ HEADLINE        │Agent│
+│ 4 baths │ Description...  │Photo│
+│ 2218sqft│                  │ QR  │
+└─────────────────────────────────┘
+Content fills the ENTIRE page
+```
+
+---
+
+## 🛠️ FIX STRATEGY
+
+There are TWO approaches. Use whichever matches the current codebase:
+
+### Approach A: Scale Viewport Down (PREFERRED if using `page.screenshot()`)
+Instead of setting viewport to 2550x3300, set it to the web design size and use `deviceScaleFactor` to get high resolution:
+
+```typescript
+// ❌ WRONG — Content designed for ~800px renders tiny in 2550px viewport
+await page.setViewport({
+  width: 2550,
+  height: 3300,
+  deviceScaleFactor: 1
+});
+
+// ✅ CORRECT — Match the web design viewport, scale up for print quality
+await page.setViewport({
+  width: 816,     // 8.5 inches at 96 DPI (web standard)
+  height: 1056,   // 11 inches at 96 DPI
+  deviceScaleFactor: 3.125  // 816 * 3.125 = 2550px (300 DPI equivalent)
+});
+```
+
+### Approach B: Make HTML Fill Any Viewport (if using `page.pdf()`)
+If generating PDF via `page.pdf()`, ensure the HTML template scales to fill the viewport:
+
+```css
+/* Add to the flyer HTML template */
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.flyer-container {
+  width: 100%;
+  height: 100%;
+  max-width: none; /* Remove any max-width constraints */
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+```
+
+And for `page.pdf()`:
+```typescript
+const pdfBuffer = await page.pdf({
+  width: '8.5in',
+  height: '11in',
+  printBackground: true,
+  preferCSSPageSize: false,
+  margin: { top: 0, right: 0, bottom: 0, left: 0 }
+});
+```
+
+---
+
+## 📋 IMPLEMENTATION — TOOL 1: Advanced Flyer Maker
+
+### Step 1: Find the Export/Download Endpoint
+
+Search for the endpoint that handles the Advanced Flyer Maker's "Save & Download" action. It's likely:
+- `POST /api/flyer/render` or
+- `POST /api/flyer/export` or 
+- `POST /api/advanced-flyer/render` or
+- Similar endpoint in `server/routes.ts` or `server/index.ts`
+
+Look for Puppeteer usage with `page.setViewport()` and either `page.screenshot()` or `page.pdf()`.
+
+### Step 2: Fix the Viewport Settings
+
+**Find the current viewport settings and fix them:**
+
+```typescript
+// FIND this pattern (the bug):
+await page.setViewport({
+  width: 2550,    // ← TOO LARGE for the HTML design
+  height: 3300,
+  deviceScaleFactor: 1
+});
+
+// REPLACE with:
+await page.setViewport({
+  width: 816,     // 8.5" at 96 DPI — matches web preview
+  height: 1056,   // 11" at 96 DPI — matches web preview
+  deviceScaleFactor: 3.125  // Produces 2550x3300 output (300 DPI)
+});
+```
+
+### Step 3: Fix Screenshot Clip (if using `page.screenshot()`)
+
+```typescript
+// FIND this pattern (if present):
+const screenshot = await page.screenshot({
+  type: 'png',
+  clip: { x: 0, y: 0, width: 816, height: 1056 },
+});
+
+// The clip should match the viewport dimensions, NOT the output dimensions
+// With deviceScaleFactor: 3.125, the clip uses CSS pixels (816x1056)
+// The actual output will be 2550x3300 due to the scale factor
+```
+
+### Step 4: Fix PDF Generation (if using `page.pdf()`)
+
+```typescript
+// If using page.pdf() instead of screenshot:
+const pdfBuffer = await page.pdf({
+  width: '8.5in',
+  height: '11in',
+  printBackground: true,
+  preferCSSPageSize: false,
+  margin: { top: '0', right: '0', bottom: '0', left: '0' },
+  scale: 1,
+});
+```
+
+### Step 5: Ensure HTML Template Has Full-Width Styles
+
+In the Handlebars/HTML template used for rendering, ensure:
+
+```html
+<html>
+<head>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  
+  .flyer-page {
+    width: 100%;      /* Fill entire viewport width */
+    height: 100%;     /* Fill entire viewport height */
+    position: relative;
+    overflow: hidden;
+    /* Do NOT set a fixed pixel width like width: 2550px */
+    /* Do NOT set max-width */
+  }
+  
+  /* All child elements should use percentage or relative units */
+  .header { width: 100%; }
+  .photo-grid { width: 100%; }
+  .bottom-section { width: 100%; }
+</style>
+</head>
+<body>
+  <div class="flyer-page">
+    <!-- content -->
+  </div>
+</body>
+</html>
+```
+
+### Step 6: Verify Data Passing
+
+Ensure ALL preview data is sent to the export endpoint. The preview may use React state but the export needs the same data:
+
+```typescript
+// In the Advanced Flyer Maker component's Save & Download handler:
+const handleSaveAndDownload = async () => {
+  const response = await fetch('/api/flyer/render', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      // ALL the data the preview uses:
+      address: formData.address,
+      price: formData.price,
+      status: formData.status,
+      bedrooms: formData.bedrooms,
+      bathrooms: formData.bathrooms,
+      sqft: formData.sqft,
+      headline: formData.headline,
+      description: formData.description,
+      
+      // Photos — send as base64 or URLs
+      mainPhoto: selectedPhotos.main,
+      secondaryPhoto1: selectedPhotos.secondary1,
+      secondaryPhoto2: selectedPhotos.secondary2,
+      
+      // Agent info
+      agentName: agentProfile.name,
+      agentTitle: agentProfile.title,
+      agentPhone: agentProfile.phone,
+      agentPhoto: agentProfile.photo,
+      
+      // Branding
+      companyLogo: logos.primary,
+      secondaryLogo: logos.secondary,
+      logoScale: logoSettings.scale,
+      dividerPosition: logoSettings.dividerPosition,
+      
+      // QR Code
+      qrCode: generatedQRCode,
+      
+      // Output format
+      outputFormat: 'pdf', // or 'png'
+    }),
+  });
+  
+  // Download the result
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `flyer-${formData.address.replace(/[^a-z0-9]/gi, '-')}.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+```
+
+---
+
+## 📋 IMPLEMENTATION — TOOL 2: Create Property Flyer
+
+### Step 1: Find the Create Property Flyer's Render Endpoint
+
+This is the separate "Create Property Flyer" dialog triggered from the upper-right "Create Flyer" button. Find its:
+- Dialog component (likely `create-flyer-dialog.tsx` or `create-property-flyer.tsx`)
+- Preview rendering logic
+- Export/download endpoint
+
+### Step 2: Fix Preview Panel Rendering
+
+The preview panel in the dialog is showing a tiny squished version. This is likely because:
+- The preview uses a server-side render at the wrong viewport size
+- Or the preview container CSS doesn't properly scale the rendered image
+
+```tsx
+// The preview panel should either:
+
+// Option A: Use CSS transform to scale down the full-size render
+<div className="preview-container" style={{
+  width: '250px',
+  height: '323px', // 8.5:11 aspect ratio
+  overflow: 'hidden',
+  position: 'relative',
+}}>
+  <img 
+    src={previewImageUrl} 
+    alt="Flyer preview"
+    style={{
+      width: '100%',
+      height: '100%',
+      objectFit: 'contain',
+    }}
+  />
+</div>
+
+// Option B: If rendering HTML directly in preview
+<div className="preview-container" style={{
+  width: '250px',
+  height: '323px',
+  overflow: 'hidden',
+}}>
+  <div style={{
+    width: '816px',
+    height: '1056px',
+    transform: 'scale(0.306)', // 250/816 ≈ 0.306
+    transformOrigin: 'top left',
+  }}>
+    {/* Full-size flyer HTML here */}
+  </div>
+</div>
+```
+
+### Step 3: Apply Same Viewport Fix as Tool 1
+
+The Create Property Flyer's Puppeteer endpoint needs the identical viewport fix:
+
+```typescript
+await page.setViewport({
+  width: 816,
+  height: 1056,
+  deviceScaleFactor: 3.125
+});
+```
+
+### Step 4: Verify the "Re-render" Button Works
+
+The dialog has a "Re-render" button — make sure it triggers a fresh server-side render with the correct viewport.
+
+---
+
+## 🧪 TESTING CHECKLIST
+
+### Advanced Flyer Maker Tests:
+- [ ] Open a transaction with MLS data
+- [ ] Go to Marketing tab → Advanced Flyer Maker
+- [ ] Verify preview shows correctly (full layout, readable text, photos fill space)
+- [ ] Click "Save & Download"
+- [ ] Open the downloaded file
+- [ ] **CRITICAL**: Downloaded PDF/PNG layout matches the preview EXACTLY
+- [ ] All photos are full-size (not tiny)
+- [ ] Text is readable at normal zoom
+- [ ] Agent photo, name, phone visible
+- [ ] QR code visible
+- [ ] Logos (Spyglass + Leading RE) visible
+- [ ] No excessive white space
+- [ ] Price badge positioned correctly
+- [ ] Address displayed correctly
+
+### Create Property Flyer Tests:
+- [ ] Click "Create Flyer" button (upper-right)
+- [ ] Select 3 photos
+- [ ] Verify preview panel shows the flyer correctly (not squished)
+- [ ] Click "Re-render" — preview updates properly
+- [ ] Click "Save & Download"
+- [ ] Open downloaded file — layout matches preview
+- [ ] Test with different properties to ensure consistency
+
+### Cross-Tool Consistency:
+- [ ] Both tools produce flyers at correct 8.5"×11" dimensions
+- [ ] Both tools output at 300 DPI quality (2550×3300 pixels for PNG)
+- [ ] PDF output has printBackground: true (no white boxes where colors should be)
+- [ ] Both tools handle missing data gracefully (no broken layout if agent photo missing)
+
+---
+
+## 📱 Mobile Optimization
+
+### All changes must be optimized for:
+
+| Device | Browser | Screen Size |
+|--------|---------|-------------|
+| iPad Pro | Safari | 1024 x 1366 |
+| iPad Air/Mini | Safari | 768 x 1024 |
+| iPhone 14/15 Pro | Safari | 393 x 852 |
+| iPhone SE | Safari | 375 x 667 |
+| Android Tablet | Chrome | 800 x 1280 |
+| Android Phone | Chrome | 360 x 800 |
+
+### Mobile UX for Flyer Dialogs:
+- [ ] Touch targets minimum 44x44px on all buttons
+- [ ] Flyer creation dialogs are scrollable on mobile (not cut off)
+- [ ] Photo selection grid is touch-friendly with adequate spacing
+- [ ] Preview panel is visible on mobile (may stack below form on small screens)
+- [ ] "Save & Download" button is always accessible (sticky footer or visible without scrolling)
+- [ ] Form fields have proper input types (number for beds/baths/sqft, text for address)
+- [ ] No horizontal overflow on any screen size
+- [ ] Readable font sizes (min 16px for body text to prevent iOS zoom)
+- [ ] Safe area insets for notched devices (iPhone X+)
+- [ ] Smooth scrolling with momentum (-webkit-overflow-scrolling: touch)
+- [ ] Works in both portrait and landscape orientations
+
+### Mobile Dialog Layout:
+```
+Phone (< 640px):
+┌──────────────────┐
+│ Create Flyer   X │
+│──────────────────│
+│ [Photo 1][2][3]  │  ← Horizontal scroll
+│──────────────────│
+│ Preview          │  ← Stacked above form
+│ ┌──────────────┐ │
+│ │  Mini flyer  │ │
+│ └──────────────┘ │
+│──────────────────│
+│ Price: $955,000  │
+│ Status: [Just..]│
+│ Beds: 4          │
+│ Baths: 4         │
+│ SqFt: 2218       │
+│──────────────────│
+│ Description      │
+│ [...............]│
+│──────────────────│
+│ [Cancel] [Save↓] │  ← Sticky footer
+└──────────────────┘
+
+Tablet+ (≥ 768px):
+┌──────────────────────────────┐
+│ Create Flyer               X │
+│ [Photo selection row]    Preview │
+│ Price  Status            ┌────┐ │
+│ Beds Baths SqFt         │Mini│ │
+│ Description              │    │ │
+│                          └────┘ │
+│        [Cancel] [Save & Download]│
+└──────────────────────────────────┘
+```
+
+### Testing Required:
+- [ ] iPad Safari — both dialogs render properly
+- [ ] iPhone Safari — dialogs are scrollable, preview visible
+- [ ] Android Chrome (phone) — no overflow, buttons reachable
+- [ ] Android Chrome (tablet) — side-by-side layout works
+
+---
+
+## ⚠️ DO NOT CHANGE
+
+- The Advanced Flyer Maker's preview HTML/CSS layout (it already looks correct)
+- The standalone Flyer Maker Replit's output format
+- Any MLS data fetching logic
+- Agent profile syncing logic
+- Repliers imageInsights classification logic
+
+---
+
+## 🎯 SUCCESS CRITERIA
+
+1. **Advanced Flyer Maker**: Downloaded PDF/PNG is IDENTICAL to the in-browser preview
+2. **Create Property Flyer**: Preview panel shows correct rendering, download matches
+3. **Both tools**: Output at print quality (300 DPI / 2550×3300)
+4. **Both tools**: No white space, content fills the full 8.5"×11" page
+5. **Mobile**: Dialogs work on all devices listed above

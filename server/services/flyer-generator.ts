@@ -324,11 +324,12 @@ const ICON_PATHS = {
 export type OutputType = 'pngPreview' | 'pdf';
 
 // Unified render config - MUST be identical for PNG and PDF for pixel parity
+// Template is designed for 2550x3300 (300 DPI) - viewport matches template
 const RENDER_CONFIG = {
   width: FLYER_WIDTH,
   height: FLYER_HEIGHT,
   deviceScaleFactor: 1,
-  mediaType: 'print' as const  // Use 'print' for both to match PDF output exactly
+  mediaType: 'screen' as const  // Use 'screen' to avoid @media print CSS affecting layout
 };
 
 // Generate deterministic hash for render verification (preview/download parity check)
@@ -524,15 +525,19 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     let result: Buffer;
     
     if (outputType === 'pdf') {
+      // For PDF, switch to print media type (page.pdf uses print mode internally)
+      await page.emulateMediaType('print');
+      
       // Generate PDF with exact 8.5 x 11 inch dimensions for print
-      // CSS @media print handles scaling the 2550x3300 content to fit
+      // Puppeteer page.pdf() scales viewport content to fit the specified page size
       const pdf = await page.pdf({
         printBackground: true,
         width: '8.5in',
         height: '11in',
         pageRanges: '1',
         preferCSSPageSize: false,
-        margin: { top: 0, right: 0, bottom: 0, left: 0 }
+        margin: { top: 0, right: 0, bottom: 0, left: 0 },
+        scale: 1  // Let Puppeteer handle scaling to fit page
       });
       result = Buffer.from(pdf);
       console.log(`[FlyerGenerator] PDF generated (8.5x11in), size: ${result.length} bytes`);
