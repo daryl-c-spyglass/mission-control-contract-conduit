@@ -235,6 +235,14 @@ export async function registerRoutes(
       });
 
       // Create real Slack channel if requested
+      console.log('[TRANSACTION] Slack channel creation check:', {
+        shouldCreateSlack,
+        SLACK_BOT_TOKEN_exists: !!process.env.SLACK_BOT_TOKEN,
+        DISABLE_SLACK_NOTIFICATIONS: process.env.DISABLE_SLACK_NOTIFICATIONS,
+        transactionId: transaction.id,
+        address: transaction.propertyAddress
+      });
+
       if (shouldCreateSlack && process.env.SLACK_BOT_TOKEN) {
         try {
           // Determine the agent name for the channel
@@ -258,19 +266,28 @@ export async function registerRoutes(
             transaction.transactionType,
             agentName
           );
+          console.log('[TRANSACTION] Attempting to create Slack channel:', { channelName, agentName });
+          
           const slackResult = await createSlackChannel(channelName);
           
-          await storage.updateTransaction(transaction.id, {
-            slackChannelId: slackResult.channelId,
-            slackChannelName: slackResult.channelName,
-          });
-          
-          await storage.createActivity({
-            transactionId: transaction.id,
-            type: "channel_created",
-            description: `Slack channel #${slackResult.channelName} created`,
-            category: "team",
-          });
+          // Handle null result (notifications disabled or creation failed)
+          if (!slackResult) {
+            console.log('[TRANSACTION] ⚠️ Slack channel NOT created (returned null)');
+            // Continue without Slack channel - don't store fake ID
+          } else {
+            console.log('[TRANSACTION] ✅ Slack channel created:', slackResult);
+            
+            await storage.updateTransaction(transaction.id, {
+              slackChannelId: slackResult.channelId,
+              slackChannelName: slackResult.channelName,
+            });
+            
+            await storage.createActivity({
+              transactionId: transaction.id,
+              type: "channel_created",
+              description: `Slack channel #${slackResult.channelName} created`,
+              category: "team",
+            });
 
           // Collect all Slack user IDs to invite (agent + creator + coordinators)
           const slackUserIdsToInvite: string[] = [];
@@ -371,6 +388,7 @@ export async function registerRoutes(
           }
           
           await postToChannel(slackResult.channelId, welcomeMessage);
+          } // end of else (slackResult exists)
         } catch (slackError) {
           console.error("Slack channel creation error:", slackError);
           // Continue without Slack - don't fail the transaction

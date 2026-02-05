@@ -135,11 +135,18 @@ app.use((req, res, next) => {
       
       // Log notification status prominently on startup
       const notificationsDisabled = process.env.DISABLE_SLACK_NOTIFICATIONS === 'true';
-      console.log('═══════════════════════════════════════════════════════════════');
-      console.log(`[SLACK NOTIFICATIONS] Status: ${notificationsDisabled ? '🔴 DISABLED' : '🟢 ENABLED'}`);
-      console.log(`[SLACK NOTIFICATIONS] DISABLE_SLACK_NOTIFICATIONS = ${process.env.DISABLE_SLACK_NOTIFICATIONS || 'not set'}`);
-      console.log(`[SLACK NOTIFICATIONS] NODE_ENV = ${process.env.NODE_ENV || 'not set'}`);
-      console.log('═══════════════════════════════════════════════════════════════');
+      const slackBotToken = process.env.SLACK_BOT_TOKEN;
+      const uatMode = process.env.UAT_MODE;
+      
+      console.log('╔═══════════════════════════════════════════════════════════════╗');
+      console.log('║                    SLACK CONFIGURATION                        ║');
+      console.log('╠═══════════════════════════════════════════════════════════════╣');
+      console.log(`║ Status: ${notificationsDisabled ? '🔴 DISABLED' : '🟢 ENABLED'}`.padEnd(66) + '║');
+      console.log(`║ DISABLE_SLACK_NOTIFICATIONS = ${JSON.stringify(process.env.DISABLE_SLACK_NOTIFICATIONS)}`.padEnd(66) + '║');
+      console.log(`║ SLACK_BOT_TOKEN = ${slackBotToken ? slackBotToken.substring(0, 15) + '...' : '❌ NOT SET'}`.padEnd(66) + '║');
+      console.log(`║ UAT_MODE = ${JSON.stringify(uatMode)}`.padEnd(66) + '║');
+      console.log(`║ NODE_ENV = ${process.env.NODE_ENV || 'not set'}`.padEnd(66) + '║');
+      console.log('╚═══════════════════════════════════════════════════════════════╝');
       
       // Start automatic MLS data synchronization
       startRepliersSync();

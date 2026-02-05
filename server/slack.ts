@@ -43,42 +43,81 @@ export async function summarizeDescription(description: string, maxLength: numbe
 
 // Global notification kill switch - blocks ALL Slack API calls that send messages
 function isSlackNotificationsDisabled(): boolean {
-  return process.env.DISABLE_SLACK_NOTIFICATIONS === 'true';
+  const disabled = process.env.DISABLE_SLACK_NOTIFICATIONS === 'true';
+  return disabled;
+}
+
+// Verbose logging helper for Slack operations
+function logSlackOp(emoji: string, message: string, data?: Record<string, any>): void {
+  const dataStr = data ? ` ${JSON.stringify(data)}` : '';
+  console.log(`[SLACK] ${emoji} ${message}${dataStr}`);
 }
 
 async function slackRequest(method: string, body: Record<string, any>): Promise<any> {
   // KILL SWITCH: Block all message-sending API calls when notifications are disabled
   const messageMethods = ['chat.postMessage', 'chat.update', 'files.upload', 'files.uploadV2'];
   if (isSlackNotificationsDisabled() && messageMethods.includes(method)) {
-    console.log(`[SLACK BLOCKED] Notifications disabled - would have called ${method} to channel: ${body.channel || 'unknown'}`);
+    logSlackOp('⛔', `BLOCKED ${method} - notifications disabled`, { channel: body.channel || 'unknown' });
     return { ok: true, blocked: true, message: 'Notifications disabled via DISABLE_SLACK_NOTIFICATIONS' };
   }
 
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {
+    logSlackOp('❌', 'SLACK_BOT_TOKEN not configured');
     throw new Error("SLACK_BOT_TOKEN not configured");
   }
 
-  const response = await fetch(`${SLACK_API_BASE}/${method}`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
+  logSlackOp('📡', `API call: ${method}`, { 
+    channel: body.channel || body.name || 'N/A',
+    tokenPrefix: token.substring(0, 15) + '...'
   });
 
-  const data = await response.json();
-  if (!data.ok) {
-    throw new Error(`Slack API error: ${data.error}`);
+  try {
+    const response = await fetch(`${SLACK_API_BASE}/${method}`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await response.json();
+    if (!data.ok) {
+      logSlackOp('❌', `API error: ${method}`, { 
+        error: data.error, 
+        needed: data.needed,
+        provided: data.provided 
+      });
+      throw new Error(`Slack API error: ${data.error}`);
+    }
+    
+    logSlackOp('✅', `API success: ${method}`, { 
+      channelId: data.channel?.id,
+      channelName: data.channel?.name,
+      ts: data.ts
+    });
+    return data;
+  } catch (error: any) {
+    logSlackOp('💥', `API exception: ${method}`, { 
+      message: error.message,
+      stack: error.stack?.split('\n')[0]
+    });
+    throw error;
   }
-  return data;
 }
 
-export async function createSlackChannel(name: string): Promise<{ channelId: string; channelName: string }> {
-  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
-    console.log(`[NOTIFICATIONS DISABLED] Would have created Slack channel: ${name}`);
-    return { channelId: 'disabled', channelName: name };
+export async function createSlackChannel(name: string): Promise<{ channelId: string; channelName: string } | null> {
+  logSlackOp('🔨', 'createSlackChannel called', {
+    channelName: name,
+    DISABLE_SLACK_NOTIFICATIONS: process.env.DISABLE_SLACK_NOTIFICATIONS,
+    SLACK_BOT_TOKEN_exists: !!process.env.SLACK_BOT_TOKEN,
+    tokenPrefix: process.env.SLACK_BOT_TOKEN?.substring(0, 15) + '...'
+  });
+
+  if (isSlackNotificationsDisabled()) {
+    logSlackOp('⛔', `Channel creation SKIPPED - notifications disabled`, { channelName: name });
+    return null; // Return null so caller knows channel wasn't created
   }
   
   const cleanName = name
@@ -87,15 +126,30 @@ export async function createSlackChannel(name: string): Promise<{ channelId: str
     .replace(/\s+/g, "-")
     .substring(0, 80);
 
-  const data = await slackRequest("conversations.create", {
-    name: cleanName,
-    is_private: false,
-  });
+  logSlackOp('🏗️', `Creating channel with sanitized name`, { original: name, sanitized: cleanName });
 
-  return {
-    channelId: data.channel.id,
-    channelName: data.channel.name,
-  };
+  try {
+    const data = await slackRequest("conversations.create", {
+      name: cleanName,
+      is_private: false,
+    });
+
+    logSlackOp('✅', 'Channel created successfully', {
+      channelId: data.channel.id,
+      channelName: data.channel.name
+    });
+
+    return {
+      channelId: data.channel.id,
+      channelName: data.channel.name,
+    };
+  } catch (error: any) {
+    logSlackOp('❌', 'Channel creation FAILED', {
+      error: error.message,
+      channelName: cleanName
+    });
+    throw error;
+  }
 }
 
 export async function inviteUsersToChannel(channelId: string, userIds: string[]): Promise<void> {
