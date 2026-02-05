@@ -1,0 +1,442 @@
+# Fix: Coming Soon Slack Notification — Photo Not Sending & Details Showing TBD
+
+## Problem
+
+When creating a transaction with "Coming Soon" checked:
+1. The uploaded "Property Photo for Slack" does NOT appear in the Slack message
+2. All property details show "TBD" or dashes despite being filled in the form
+3. The photo also doesn't appear in the auto-created transaction channel
+
+### What the user entered in the form:
+- Listing Price: $450,000
+- Property Type: Residential
+- Building Square Feet: 2500
+- Lot Size: 10890 sq ft / 0.25 acres
+- Bedrooms: 4
+- Full Baths: 2
+- Half Baths: 1
+
+### What Slack shows:
+- List Price: **TBD** (should be $450,000)
+- Details: **- bed | - bath | - sqft** (should be 4 bed | 2.5 bath | 2,500 sqft)
+- Expected Live Date: **TBD**
+- **No property photo** (should show the uploaded image)
+
+---
+
+## Root Cause Analysis
+
+### Issue 1: Property details showing TBD
+
+The Coming Soon notification is likely being sent BEFORE the transaction is fully saved to the database, OR the notification function is reading from MLS fields (which are empty for off-market/coming-soon properties) instead of the manually entered form fields.
+
+**Find and check the notification function. It's probably doing this:**
+
+```typescript
+// ❌ WRONG — Reading from MLS data fields (empty for Coming Soon)
+const price = transaction.listPrice || transaction.mlsData?.listPrice || 'TBD';
+const beds = transaction.mlsData?.bedrooms || '-';
+const baths = transaction.mlsData?.bathrooms || '-';
+const sqft = transaction.mlsData?.sqft || '-';
+```
+
+**It should be:**
+
+```typescript
+// ✅ CORRECT — Read from the Coming Soon form fields first
+const price = transaction.listingPrice || transaction.listPrice || 'TBD';
+const beds = transaction.bedrooms || '-';
+const baths = transaction.fullBaths 
+  ? `${transaction.fullBaths}${transaction.halfBaths ? `.${transaction.halfBaths}` : ''}`
+  : '-';
+const sqft = transaction.buildingSqft || transaction.sqft || '-';
+const liveDate = transaction.dateGoingLive 
+  ? new Date(transaction.dateGoingLive).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  : 'TBD';
+```
+
+### Step 1: Find the field name mapping
+
+Run this to see what field names the Coming Soon form actually saves:
+
+```bash
+grep -rn "isComingSoon\|is_coming_soon\|coming_soon\|listingPrice\|listing_price\|buildingSqft\|building_sqft\|dateGoingLive\|date_going_live\|fullBaths\|full_baths\|halfBaths\|half_baths" shared/ server/ client/ --include="*.ts" --include="*.tsx" | head -40
+```
+
+### Step 2: Check the database schema for Coming Soon fields
+
+```bash
+grep -rn "listingPrice\|buildingSqft\|lotSizeSqft\|lotSizeAcres\|fullBaths\|halfBaths\|dateGoingLive\|bedrooms\|propertyType" shared/schema.ts | head -20
+```
+
+### Step 3: Verify what's actually saved in the database
+
+After creating a test Coming Soon transaction, check what was stored:
+
+```sql
+SELECT id, property_address, listing_price, bedrooms, full_baths, half_baths, 
+       building_sqft, lot_size_sqft, lot_size_acres, date_going_live, 
+       is_coming_soon, property_type, listing_description
+FROM transactions 
+WHERE is_coming_soon = true 
+ORDER BY created_at DESC 
+LIMIT 1;
+```
+
+### Step 4: Fix the notification function
+
+Find the Coming Soon notification function:
+
+```bash
+grep -rn "postComingSoon\|coming.*soon.*notification\|COMING_SOON_CHANNEL\|coming-soon-listings" server/ --include="*.ts" | head -20
+```
+
+Then update it to read the correct fields:
+
+```typescript
+async function postComingSoonNotification(transaction: any, agent: any, photoUrl?: string) {
+  const COMING_SOON_CHANNEL_ID = process.env.COMING_SOON_CHANNEL_ID || 'C09J6327HQS';
+  
+  // Format price from the Coming Soon form fields
+  const price = transaction.listingPrice 
+    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(transaction.listingPrice)
+    : 'TBD';
+  
+  // Format beds/baths from Coming Soon form fields  
+  const beds = transaction.bedrooms || '-';
+  const fullBaths = transaction.fullBaths || 0;
+  const halfBaths = transaction.halfBaths || 0;
+  const totalBaths = halfBaths > 0 ? `${fullBaths}.${halfBaths}` : `${fullBaths}`;
+  const baths = (fullBaths || halfBaths) ? totalBaths : '-';
+  const sqft = transaction.buildingSqft 
+    ? new Intl.NumberFormat('en-US').format(transaction.buildingSqft)
+    : '-';
+  
+  // Format expected live date
+  const liveDate = transaction.dateGoingLive
+    ? new Date(transaction.dateGoingLive).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : 'TBD';
+  
+  const blocks: any[] = [
+    {
+      type: "header",
+      text: { type: "plain_text", text: "Coming Soon Listing", emoji: true }
+    },
+    {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*Address:*\n${transaction.propertyAddress || 'N/A'}` },
+        { type: "mrkdwn", text: `*List Price:*\n${price}` },
+        { type: "mrkdwn", text: `*Details:*\n${beds} bed | ${baths} bath | ${sqft} sqft` },
+        { type: "mrkdwn", text: `*Expected Live Date:*\n${liveDate}` },
+      ]
+    },
+    {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*Agent:*\n${agent?.name || agent?.fullName || 'N/A'}` },
+        { type: "mrkdwn", text: `*Contact:*\n${agent?.phone || agent?.email || 'N/A'}` },
+      ]
+    },
+  ];
+
+  // Add description if provided
+  if (transaction.listingDescription) {
+    blocks.push({
+      type: "section",
+      text: { type: "mrkdwn", text: `*Description:*\n${transaction.listingDescription.substring(0, 500)}` }
+    });
+  }
+
+  // *** CRITICAL: Add photo if available ***
+  if (photoUrl) {
+    // Ensure absolute URL
+    const absoluteUrl = photoUrl.startsWith('http') 
+      ? photoUrl 
+      : `${process.env.APP_URL || 'https://mission-control-contract-conduit.onrender.com'}${photoUrl}`;
+    
+    blocks.push({
+      type: "image",
+      image_url: absoluteUrl,
+      alt_text: `Property photo: ${transaction.propertyAddress || 'Coming Soon'}`
+    });
+  }
+
+  // Add action button
+  blocks.push({
+    type: "actions",
+    elements: [{
+      type: "button",
+      text: { type: "plain_text", text: "View in Contract Conduit", emoji: true },
+      url: `${process.env.APP_URL || 'https://mission-control-contract-conduit.onrender.com'}/transactions/${transaction.id}`,
+      style: "primary"
+    }]
+  });
+
+  await slackClient.chat.postMessage({
+    channel: COMING_SOON_CHANNEL_ID,
+    text: `Coming Soon: ${transaction.propertyAddress}`,
+    blocks: blocks
+  });
+}
+```
+
+---
+
+## Issue 2: Photo Not Sending to Slack
+
+The "Property Photo for Slack" upload likely has one of these problems:
+
+### Problem A: Photo URL not passed to notification function
+
+Check how the photo is handled after upload:
+
+```bash
+grep -rn "comingSoonPhoto\|coming_soon_photo\|propertyPhotoForSlack\|photoUrl\|photo_url" server/ client/ --include="*.ts" --include="*.tsx" | head -30
+```
+
+The form likely uploads the photo and gets a URL back, but that URL may not be passed to the `postComingSoonNotification` function.
+
+**Fix in the transaction creation handler:**
+
+```typescript
+// In POST /api/transactions handler
+app.post('/api/transactions', requireAuth, async (req, res) => {
+  try {
+    const { comingSoonPhotoUrl, ...transactionData } = req.body;
+    
+    // Create transaction
+    const transaction = await createTransaction(transactionData);
+    
+    // Post to Slack if Coming Soon — PASS THE PHOTO URL
+    if (transaction.isComingSoon) {
+      try {
+        const agent = await getUser(transaction.userId);
+        await postComingSoonNotification(
+          transaction, 
+          agent, 
+          comingSoonPhotoUrl  // ← THIS MUST BE PASSED
+        );
+      } catch (slackError) {
+        console.error('Failed to post Coming Soon notification:', slackError);
+      }
+    }
+    
+    res.json(transaction);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create transaction' });
+  }
+});
+```
+
+### Problem B: Photo uploaded as file but Slack needs a public URL
+
+Slack's `image` block type requires a **publicly accessible URL**. If the photo is uploaded to the server's local filesystem (e.g., `/uploads/photo.jpg`), Slack can't access it.
+
+**Options to fix:**
+1. Upload to a publicly accessible path that Render serves (e.g., `https://mission-control-contract-conduit.onrender.com/uploads/photo.jpg`)
+2. Use Slack's `files.upload` API instead of `image` block
+3. Convert to base64 and use `files.upload`
+
+**Option 2 — Use files.upload for the photo (most reliable):**
+
+```typescript
+// After posting the text message, upload the photo separately
+if (photoUrl || photoBuffer) {
+  try {
+    // If we have a file buffer from the upload
+    await slackClient.files.uploadV2({
+      channel_id: COMING_SOON_CHANNEL_ID,
+      file: photoBuffer,  // or fs.readFileSync(photoPath)
+      filename: `coming-soon-${transaction.propertyAddress?.replace(/[^a-z0-9]/gi, '-')}.jpg`,
+      title: `Property Photo: ${transaction.propertyAddress}`,
+      initial_comment: '', // Already posted the details above
+    });
+  } catch (fileError) {
+    console.error('Failed to upload photo to Slack:', fileError);
+  }
+}
+```
+
+### Problem C: Client not sending photo in the request body
+
+Check the frontend form submission:
+
+```bash
+grep -rn "handleSubmit\|onSubmit\|createTransaction\|formData\|FormData" client/src/ --include="*.ts" --include="*.tsx" | grep -i "transaction" | head -20
+```
+
+The form may need to use `FormData` instead of JSON if uploading a file:
+
+```typescript
+// Frontend: Submit with FormData for file upload
+const handleSubmit = async () => {
+  const formData = new FormData();
+  
+  // Append all transaction fields
+  formData.append('propertyAddress', address);
+  formData.append('isComingSoon', 'true');
+  formData.append('listingPrice', price.toString());
+  formData.append('bedrooms', bedrooms.toString());
+  formData.append('fullBaths', fullBaths.toString());
+  formData.append('halfBaths', halfBaths.toString());
+  formData.append('buildingSqft', sqft.toString());
+  // ... other fields
+  
+  // Append the photo file
+  if (comingSoonPhoto) {
+    formData.append('comingSoonPhoto', comingSoonPhoto); // ← The actual File object
+  }
+  
+  const response = await fetch('/api/transactions', {
+    method: 'POST',
+    body: formData, // NOT JSON.stringify
+    // Do NOT set Content-Type header — browser sets it with boundary
+  });
+};
+```
+
+And the server needs multer or similar to handle the file:
+
+```typescript
+import multer from 'multer';
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.post('/api/transactions', requireAuth, upload.single('comingSoonPhoto'), async (req, res) => {
+  const photoFile = req.file; // The uploaded photo buffer
+  const transactionData = req.body;
+  
+  // ... create transaction ...
+  
+  if (transaction.isComingSoon && photoFile) {
+    // Upload photo to Slack
+    await slackClient.files.uploadV2({
+      channel_id: COMING_SOON_CHANNEL_ID,
+      file: photoFile.buffer,
+      filename: photoFile.originalname,
+      title: `Property Photo: ${transaction.propertyAddress}`,
+    });
+  }
+});
+```
+
+---
+
+## Issue 3: Photo not going to the transaction's auto-created channel
+
+If a transaction channel is also created (e.g., `#buy-123mainst-agent`), the photo should be posted there too:
+
+```typescript
+// After channel creation, also post the photo there
+if (transaction.slackChannelId && photoFile) {
+  try {
+    await slackClient.files.uploadV2({
+      channel_id: transaction.slackChannelId,
+      file: photoFile.buffer,
+      filename: photoFile.originalname,
+      title: `Property Photo: ${transaction.propertyAddress}`,
+    });
+  } catch (err) {
+    console.error('Failed to upload photo to transaction channel:', err);
+  }
+}
+```
+
+---
+
+## Debugging Steps
+
+### Step 1: Add logging to trace the photo flow
+
+```typescript
+// In the transaction creation handler
+console.log('[COMING SOON] Form data received:', {
+  isComingSoon: transactionData.isComingSoon,
+  hasPhotoFile: !!req.file,
+  photoFileName: req.file?.originalname,
+  photoSize: req.file?.size,
+  listingPrice: transactionData.listingPrice,
+  bedrooms: transactionData.bedrooms,
+  fullBaths: transactionData.fullBaths,
+  halfBaths: transactionData.halfBaths,
+  buildingSqft: transactionData.buildingSqft,
+  dateGoingLive: transactionData.dateGoingLive,
+});
+```
+
+### Step 2: Check what the frontend actually sends
+
+In the browser console, add a temporary log before the fetch call:
+
+```typescript
+console.log('[FORM SUBMIT] Sending data:', {
+  comingSoonPhotoUrl,
+  comingSoonPhotoFile: comingSoonPhoto,
+  price,
+  bedrooms,
+  fullBaths,
+  halfBaths,
+  sqft,
+});
+```
+
+### Step 3: Verify the Slack API response
+
+```typescript
+const slackResponse = await slackClient.chat.postMessage({ ... });
+console.log('[SLACK] Message posted:', {
+  ok: slackResponse.ok,
+  ts: slackResponse.ts,
+  channel: slackResponse.channel,
+});
+```
+
+---
+
+## Testing Checklist
+
+- [ ] Create a Coming Soon transaction with ALL fields filled in
+- [ ] Upload a property photo in the "Property Photo for Slack" section
+- [ ] Verify Slack message in #coming-soon-listings shows:
+  - [ ] Correct address
+  - [ ] Correct price (formatted as $450,000)
+  - [ ] Correct beds/baths/sqft (4 bed | 2.5 bath | 2,500 sqft)
+  - [ ] Correct expected live date
+  - [ ] Agent name and contact
+  - [ ] Property photo visible in the message
+  - [ ] "View in Contract Conduit" button works
+- [ ] Verify the auto-created transaction channel also receives the photo
+- [ ] Test with NO photo uploaded — message should still post without photo, no errors
+- [ ] Test with NO price entered — should show "TBD" gracefully
+- [ ] Test with partial fields — should handle missing data without crashing
+
+---
+
+## 📱 Mobile Optimization
+
+All changes must be optimized for:
+
+| Device | Browser | Screen Size |
+|--------|---------|-------------|
+| iPad Pro | Safari | 1024 x 1366 |
+| iPad Air/Mini | Safari | 768 x 1024 |
+| iPhone 14/15 Pro | Safari | 393 x 852 |
+| iPhone SE | Safari | 375 x 667 |
+| Android Tablet | Chrome | 800 x 1280 |
+| Android Phone | Chrome | 360 x 800 |
+
+### Mobile UX Checklist:
+- [ ] Touch targets minimum 44x44px
+- [ ] Photo upload drag-and-drop area has tap alternative on mobile
+- [ ] Form fields don't cause horizontal overflow on small screens
+- [ ] "Property Photo for Slack" upload area is full-width on mobile
+- [ ] Camera option available for photo upload on mobile devices
+- [ ] File size validation (10MB) happens before upload attempt
+- [ ] Safe area insets for notched devices
+- [ ] Min 16px font size for body text
+
+### Testing Required:
+- [ ] iPad Safari — form layout and photo upload
+- [ ] iPhone Safari — form scrolling and photo capture
+- [ ] Android Chrome (phone) — form and Slack integration
+- [ ] Android Chrome (tablet) — layout consistency

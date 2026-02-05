@@ -164,10 +164,12 @@ export async function registerRoutes(
         ...transactionData 
       } = req.body;
       
-      // Handle off-market transactions
-      if (isOffMarket) {
-        transactionData.isOffMarket = true;
-        transactionData.offMarketListingDate = new Date();
+      // Handle off-market and Coming Soon transactions
+      // Both types need manual property data since there's no MLS to fetch from
+      const needsManualData = isOffMarket || (isComingSoon === true || isComingSoon === 'true');
+      
+      if (needsManualData) {
+        // Save all manually entered property data
         transactionData.propertyDescription = propertyDescription || null;
         transactionData.listPrice = listPrice ? parseInt(listPrice) : null;
         transactionData.propertyType = propertyType || null;
@@ -177,6 +179,22 @@ export async function registerRoutes(
         transactionData.bathrooms = bathrooms ? parseInt(bathrooms) : null;
         transactionData.halfBaths = halfBaths ? parseInt(halfBaths) : null;
         transactionData.goLiveDate = goLiveDate || null; // When listing will go live on MLS
+        
+        console.log('[TRANSACTION] Manual data fields saved:', {
+          listPrice: transactionData.listPrice,
+          bedrooms: transactionData.bedrooms,
+          bathrooms: transactionData.bathrooms,
+          halfBaths: transactionData.halfBaths,
+          sqft: transactionData.sqft,
+          goLiveDate: transactionData.goLiveDate,
+          propertyType: transactionData.propertyType,
+        });
+      }
+      
+      // Off-market specific settings
+      if (isOffMarket) {
+        transactionData.isOffMarket = true;
+        transactionData.offMarketListingDate = new Date();
         transactionData.status = "active"; // Off-market listings are active, not in contract
         // Clear MLS number for off-market listings
         transactionData.mlsNumber = null;
@@ -185,7 +203,9 @@ export async function registerRoutes(
         transactionData.closingDate = null;
       } else {
         transactionData.isOffMarket = false;
-        transactionData.goLiveDate = null; // Clear goLiveDate for non-off-market transactions
+        if (!needsManualData) {
+          transactionData.goLiveDate = null; // Only clear goLiveDate if not Coming Soon either
+        }
       }
       
       // Set company lead flag
@@ -686,20 +706,46 @@ export async function registerRoutes(
             }
           }
           
-          // Get the latest persisted transaction with MLS-enriched data
+          // Get the latest persisted transaction with all manual data
           const currentTx = await storage.getTransaction(transaction.id);
           const mlsData = currentTx?.mlsData as any;
           const mlsPhotos = mlsData?.photos || [];
           const uploadedPhotos = currentTx?.propertyImages || [];
           // Use freshly uploaded photo first, then fall back to MLS or existing uploads
-          const heroPhotoUrl = uploadedPhotoUrl || mlsPhotos[0] || uploadedPhotos[0] || null;
+          let heroPhotoUrl = uploadedPhotoUrl || mlsPhotos[0] || uploadedPhotos[0] || null;
           
-          // Use persisted/MLS-enriched data, falling back to raw request data
+          // Ensure hero photo URL is absolute (Slack requires public URLs)
+          if (heroPhotoUrl && !heroPhotoUrl.startsWith('http')) {
+            const appUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
+              ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+              : 'https://mission-control-contract-conduit.onrender.com';
+            heroPhotoUrl = `${appUrl}${heroPhotoUrl.startsWith('/') ? '' : '/'}${heroPhotoUrl}`;
+          }
+          
+          // Calculate total bathrooms: fullBaths + halfBaths as decimal (e.g., 2 full + 1 half = 2.5)
+          const fullBaths = currentTx?.bathrooms || 0;
+          const halfBathsCount = currentTx?.halfBaths || 0;
+          const totalBaths = fullBaths + (halfBathsCount * 0.5);
+          const formattedBaths = totalBaths > 0 ? totalBaths : null;
+          
+          console.log('[TRANSACTION] Coming Soon notification data:', {
+            listPrice: currentTx?.listPrice,
+            bedrooms: currentTx?.bedrooms,
+            fullBaths,
+            halfBathsCount,
+            totalBaths: formattedBaths,
+            sqft: currentTx?.sqft,
+            goLiveDate: currentTx?.goLiveDate,
+            heroPhotoUrl,
+            uploadedPhotoUrl,
+          });
+          
+          // Use persisted data from manual entry, falling back to MLS data
           const notificationSuccess = await postComingSoonNotification({
             propertyAddress: currentTx?.propertyAddress || transaction.propertyAddress,
             listPrice: currentTx?.listPrice || mlsData?.listPrice || null,
             bedrooms: currentTx?.bedrooms || mlsData?.bedrooms || null,
-            bathrooms: currentTx?.bathrooms || mlsData?.bathrooms || null,
+            bathrooms: formattedBaths || mlsData?.bathrooms || null,
             sqft: currentTx?.sqft || mlsData?.sqft || null,
             goLiveDate: currentTx?.goLiveDate || null,
             description: currentTx?.propertyDescription || mlsData?.description || null,
