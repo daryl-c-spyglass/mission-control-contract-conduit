@@ -893,14 +893,21 @@ function formatGoLiveDate(dateStr: string | null | undefined): string {
  * Post a Coming Soon listing notification to #coming-soon-listings channel
  */
 export async function postComingSoonNotification(data: ComingSoonNotification): Promise<void> {
-  if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
-    console.log(`[NOTIFICATIONS DISABLED] Would have posted Coming Soon notification for: ${data.propertyAddress}`);
+  logSlackOp('📢', 'postComingSoonNotification called', {
+    propertyAddress: data.propertyAddress,
+    transactionId: data.transactionId,
+    DISABLE_SLACK_NOTIFICATIONS: process.env.DISABLE_SLACK_NOTIFICATIONS,
+    targetChannel: COMING_SOON_CHANNEL_ID
+  });
+
+  if (isSlackNotificationsDisabled()) {
+    logSlackOp('⛔', 'Coming Soon notification SKIPPED - notifications disabled', { propertyAddress: data.propertyAddress });
     return;
   }
 
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {
-    console.error("[Slack] SLACK_BOT_TOKEN not configured - skipping Coming Soon notification");
+    logSlackOp('❌', 'SLACK_BOT_TOKEN not configured - skipping Coming Soon notification');
     return;
   }
 
@@ -999,6 +1006,12 @@ export async function postComingSoonNotification(data: ComingSoonNotification): 
   });
 
   try {
+    logSlackOp('📡', 'Posting to #coming-soon-listings', {
+      channel: COMING_SOON_CHANNEL_ID,
+      propertyAddress: data.propertyAddress,
+      tokenPrefix: token.substring(0, 15) + '...'
+    });
+
     const response = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
@@ -1014,11 +1027,22 @@ export async function postComingSoonNotification(data: ComingSoonNotification): 
 
     const result = await response.json();
     if (!result.ok) {
-      console.error("[Slack] Failed to send Coming Soon notification:", result.error);
+      logSlackOp('❌', 'Coming Soon notification FAILED', {
+        error: result.error,
+        channel: COMING_SOON_CHANNEL_ID,
+        propertyAddress: data.propertyAddress
+      });
     } else {
-      console.log(`[Slack] Coming Soon notification sent for: ${data.propertyAddress}`);
+      logSlackOp('✅', 'Coming Soon notification POSTED', {
+        channel: COMING_SOON_CHANNEL_ID,
+        propertyAddress: data.propertyAddress,
+        ts: result.ts
+      });
     }
-  } catch (error) {
-    console.error("[Slack] Failed to send Coming Soon notification:", error);
+  } catch (error: any) {
+    logSlackOp('💥', 'Coming Soon notification EXCEPTION', {
+      error: error.message,
+      propertyAddress: data.propertyAddress
+    });
   }
 }

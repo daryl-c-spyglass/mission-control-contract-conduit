@@ -1083,6 +1083,13 @@ export async function registerRoutes(
       console.log(`[Slack] Creating channel for existing transaction: ${channelName}`);
       const slackResult = await createSlackChannel(channelName);
       
+      // Handle null result (notifications disabled or creation failed)
+      if (!slackResult) {
+        console.log('[Slack] ⚠️ Channel NOT created for existing transaction (returned null)');
+        res.status(400).json({ message: "Slack channel creation failed or notifications are disabled" });
+        return;
+      }
+      
       // Update transaction with Slack channel info
       await storage.updateTransaction(transaction.id, {
         slackChannelId: slackResult.channelId,

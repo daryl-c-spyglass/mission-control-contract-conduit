@@ -1,0 +1,221 @@
+# 🔧 FIX: Coming Soon Checkbox Should Post to #coming-soon-listings Channel
+
+## 🎯 OBJECTIVE
+Fix the "Coming Soon (Not Yet Listed)" checkbox behavior. Currently when checked, it only creates a transaction-specific channel (e.g., #buy-thisisatest-darylcamingao). It should ALSO post a notification to the shared **#coming-soon-listings** channel (ID: C09J6327HQS).
+
+## ✅ CORRECT BEHAVIOR (what should happen)
+When a user creates a transaction with "Coming Soon" checked:
+
+1. ✅ Create the transaction-specific channel (e.g., #buy-[address]-[agent]) — THIS ALREADY WORKS
+2. ✅ Post welcome message to transaction channel — THIS ALREADY WORKS
+3. ❌ **ALSO post a Coming Soon announcement to #coming-soon-listings (C09J6327HQS)** — THIS IS MISSING
+
+## 📍 SLACK CHANNEL
+- Channel Name: #coming-soon-listings
+- Channel ID: C09J6327HQS
+- This is a SHARED channel where all agents can see upcoming listings
+
+---
+
+## STEP 1: Find the Coming Soon logic
+
+Search the codebase for:
+```bash
+grep -rn "isComingSoon\|is_coming_soon\|comingSoon\|coming.soon\|coming_soon" server/ --include="*.ts" --include="*.tsx" --include="*.js"
+grep -rn "C09J6327HQS\|coming-soon-listings\|COMING_SOON" server/ --include="*.ts" --include="*.tsx" --include="*.js"
+```
+
+Show me the FULL transaction creation code path where `isComingSoon` is checked and what happens after.
+
+---
+
+## STEP 2: Add the Coming Soon notification
+
+After the transaction is created AND the transaction channel is created, add this logic:
+
+```typescript
+// After transaction creation and transaction channel creation...
+if (transaction.isComingSoon) {
+  console.log('[SLACK] 📢 Coming Soon checked - posting to #coming-soon-listings');
+  
+  const COMING_SOON_CHANNEL_ID = 'C09J6327HQS';
+  
+  try {
+    // Build the Coming Soon announcement message
+    const comingSoonMessage = buildComingSoonMessage(transaction, user);
+    
+    await slackClient.chat.postMessage({
+      channel: COMING_SOON_CHANNEL_ID,
+      text: `🏡 Coming Soon: ${transaction.address}`,
+      blocks: comingSoonMessage
+    });
+    
+    console.log('[SLACK] ✅ Coming Soon notification posted to #coming-soon-listings');
+  } catch (error) {
+    console.error('[SLACK] ❌ Failed to post Coming Soon notification:', error.message);
+  }
+}
+```
+
+---
+
+## STEP 3: Build the Coming Soon message format
+
+The message posted to #coming-soon-listings should be professional and match how agents currently post manually in that channel. Look at the existing messages in the channel for reference.
+
+Format the message as:
+
+```typescript
+function buildComingSoonMessage(transaction: any, user: any) {
+  // Get property details from the Coming Soon form fields
+  const address = transaction.address || 'Address TBD';
+  const price = transaction.listingPrice 
+    ? `$${Number(transaction.listingPrice).toLocaleString()}` 
+    : 'Price TBD';
+  const beds = transaction.bedrooms || '--';
+  const baths = transaction.fullBaths || '--';
+  const halfBaths = transaction.halfBaths || 0;
+  const sqft = transaction.buildingSquareFeet 
+    ? `${Number(transaction.buildingSquareFeet).toLocaleString()} sq ft` 
+    : '--';
+  const lotSize = transaction.lotSizeAcres 
+    ? `${transaction.lotSizeAcres} acres` 
+    : transaction.lotSizeSqFt 
+      ? `${Number(transaction.lotSizeSqFt).toLocaleString()} sq ft lot`
+      : '';
+  const propertyType = transaction.propertyType || 'Residential';
+  const description = transaction.listingDescription || '';
+  const dateLive = transaction.dateGoingLive || 'TBD';
+  
+  // Agent info
+  const agentName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+  
+  // Format bath display
+  const bathDisplay = halfBaths > 0 
+    ? `${baths} full / ${halfBaths} half` 
+    : `${baths}`;
+  
+  const blocks = [
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `🏡 *Coming Soon: ${address}*\n*${price}*`
+      }
+    },
+    {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*🛏️ Beds:* ${beds}` },
+        { type: "mrkdwn", text: `*🛁 Baths:* ${bathDisplay}` },
+        { type: "mrkdwn", text: `*📐 Sq Ft:* ${sqft}` },
+        { type: "mrkdwn", text: `*🏠 Type:* ${propertyType}` }
+      ]
+    }
+  ];
+  
+  // Add lot size if available
+  if (lotSize) {
+    blocks.push({
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*🌳 Lot:* ${lotSize}` },
+        { type: "mrkdwn", text: `*📅 Target Live Date:* ${dateLive}` }
+      ]
+    });
+  }
+  
+  // Add description if provided
+  if (description) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `>${description.substring(0, 500)}${description.length > 500 ? '...' : ''}`
+      }
+    });
+  }
+  
+  // Add agent info and divider
+  blocks.push(
+    { type: "divider" },
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: `👤 *Agent:* ${agentName} | Posted via Contract Conduit`
+        }
+      ]
+    }
+  );
+  
+  return blocks;
+}
+```
+
+---
+
+## STEP 4: Ensure the bot can post to #coming-soon-listings
+
+The bot needs to be a member of the channel. Add a join attempt before posting:
+
+```typescript
+// Before posting, ensure bot is in the channel
+try {
+  await slackClient.conversations.join({ channel: COMING_SOON_CHANNEL_ID });
+  console.log('[SLACK] ✅ Bot joined #coming-soon-listings');
+} catch (joinError) {
+  // "already_in_channel" error is fine, ignore it
+  if (joinError.data?.error !== 'already_in_channel') {
+    console.error('[SLACK] ⚠️ Could not join #coming-soon-listings:', joinError.message);
+  }
+}
+```
+
+---
+
+## STEP 5: Add verbose logging
+
+Add logging at each step so we can verify the flow:
+
+```
+[TRANSACTION] ✅ Transaction created: { id, address, isComingSoon: true }
+[SLACK] 🔨 Creating transaction channel: #buy-[address]-[agent]
+[SLACK] ✅ Transaction channel created: C0XXXXXXX
+[SLACK] 📨 Welcome message posted to transaction channel
+[SLACK] 📢 Coming Soon checked - posting to #coming-soon-listings (C09J6327HQS)
+[SLACK] ✅ Bot joined #coming-soon-listings
+[SLACK] ✅ Coming Soon notification posted to #coming-soon-listings
+```
+
+---
+
+## STEP 6: Verify
+
+After implementing, show me:
+1. The FULL updated transaction creation code that handles isComingSoon
+2. The buildComingSoonMessage function
+3. Confirm the flow: transaction created → transaction channel created → coming soon posted to #coming-soon-listings
+
+Do NOT create a test transaction. Just show me the code changes.
+
+---
+
+## ⚠️ CONSTRAINTS
+- Do NOT change the existing transaction channel creation logic — it's working correctly
+- The Coming Soon post to #coming-soon-listings is IN ADDITION TO the transaction channel, not instead of it
+- Use channel ID C09J6327HQS — do not create a new channel
+- Handle errors gracefully — if the Coming Soon post fails, the transaction should still be created successfully
+- Match the field names from the Coming Soon Property Details form (listingDescription, listingPrice, propertyType, buildingSquareFeet, lotSizeSqFt, lotSizeAcres, bedrooms, fullBaths, halfBaths, dateGoingLive)
+
+---
+
+## 📱 MOBILE OPTIMIZATION
+If any UI changes are needed to the Coming Soon form:
+- Touch targets minimum 44x44px for checkboxes and buttons
+- Responsive layouts: stack on mobile (<640px), side-by-side on tablet+
+- Safe area insets for notched devices: env(safe-area-inset-*)
+- No horizontal overflow
+- Minimum 16px font size for body text
+- Test on iPad Safari, iPhone Safari, Android Chrome (phone + tablet)
