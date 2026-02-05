@@ -194,6 +194,14 @@ export async function registerRoutes(
       // Set coming soon flag
       transactionData.isComingSoon = isComingSoon === true || isComingSoon === 'true';
       
+      // DEBUG: Log Coming Soon status
+      console.log('[TRANSACTION] Coming Soon debug:', {
+        isComingSoon_raw: isComingSoon,
+        isComingSoon_type: typeof isComingSoon,
+        isComingSoon_computed: transactionData.isComingSoon,
+        propertyAddress: transactionData.propertyAddress
+      });
+      
       // Set the status based on whether property is under contract (for non-off-market)
       if (!isOffMarket) {
         if (isUnderContract === false) {
@@ -650,7 +658,15 @@ export async function registerRoutes(
       }
 
       // Post Coming Soon notification if checkbox was checked
+      console.log('[TRANSACTION] 📋 Coming Soon check:', {
+        isComingSoon: transactionData.isComingSoon,
+        transactionId: transaction.id,
+        propertyAddress: transaction.propertyAddress,
+        willPostNotification: !!transactionData.isComingSoon
+      });
+      
       if (transactionData.isComingSoon) {
+        console.log('[TRANSACTION] ✅ Coming Soon is TRUE - calling postComingSoonNotification');
         try {
           // Get agent info for notification
           let agentName = "";
@@ -679,7 +695,7 @@ export async function registerRoutes(
           const heroPhotoUrl = uploadedPhotoUrl || mlsPhotos[0] || uploadedPhotos[0] || null;
           
           // Use persisted/MLS-enriched data, falling back to raw request data
-          await postComingSoonNotification({
+          const notificationSuccess = await postComingSoonNotification({
             propertyAddress: currentTx?.propertyAddress || transaction.propertyAddress,
             listPrice: currentTx?.listPrice || mlsData?.listPrice || null,
             bedrooms: currentTx?.bedrooms || mlsData?.bedrooms || null,
@@ -694,13 +710,17 @@ export async function registerRoutes(
             heroPhotoUrl,
           });
           
-          // Log activity
-          await storage.createActivity({
-            transactionId: transaction.id,
-            type: "notification",
-            description: "Coming Soon notification posted to #coming-soon-listings",
-            category: "communication",
-          });
+          // Only log activity if notification was actually posted successfully
+          if (notificationSuccess) {
+            await storage.createActivity({
+              transactionId: transaction.id,
+              type: "notification",
+              description: "Coming Soon notification posted to #coming-soon-listings",
+              category: "communication",
+            });
+          } else {
+            console.log('[TRANSACTION] ⚠️ Coming Soon notification was NOT posted (check Slack logs above)');
+          }
         } catch (comingSoonError) {
           console.error("Failed to post Coming Soon notification:", comingSoonError);
           // Don't fail transaction creation if notification fails

@@ -891,8 +891,9 @@ function formatGoLiveDate(dateStr: string | null | undefined): string {
 
 /**
  * Post a Coming Soon listing notification to #coming-soon-listings channel
+ * @returns true if notification was successfully posted, false otherwise
  */
-export async function postComingSoonNotification(data: ComingSoonNotification): Promise<void> {
+export async function postComingSoonNotification(data: ComingSoonNotification): Promise<boolean> {
   logSlackOp('📢', 'postComingSoonNotification called', {
     propertyAddress: data.propertyAddress,
     transactionId: data.transactionId,
@@ -902,13 +903,13 @@ export async function postComingSoonNotification(data: ComingSoonNotification): 
 
   if (isSlackNotificationsDisabled()) {
     logSlackOp('⛔', 'Coming Soon notification SKIPPED - notifications disabled', { propertyAddress: data.propertyAddress });
-    return;
+    return false;
   }
 
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {
     logSlackOp('❌', 'SLACK_BOT_TOKEN not configured - skipping Coming Soon notification');
-    return;
+    return false;
   }
 
   const appUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
@@ -1006,6 +1007,24 @@ export async function postComingSoonNotification(data: ComingSoonNotification): 
   });
 
   try {
+    // Ensure bot is in the #coming-soon-listings channel
+    try {
+      const joinResponse = await fetch("https://slack.com/api/conversations.join", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ channel: COMING_SOON_CHANNEL_ID }),
+      });
+      const joinResult = await joinResponse.json();
+      if (!joinResult.ok && joinResult.error !== 'already_in_channel') {
+        logSlackOp('⚠️', 'Could not join #coming-soon-listings (non-fatal)', { error: joinResult.error });
+      }
+    } catch (joinErr: any) {
+      logSlackOp('⚠️', 'Join channel error (non-fatal)', { error: joinErr.message });
+    }
+    
     logSlackOp('📡', 'Posting to #coming-soon-listings', {
       channel: COMING_SOON_CHANNEL_ID,
       propertyAddress: data.propertyAddress,
@@ -1032,17 +1051,20 @@ export async function postComingSoonNotification(data: ComingSoonNotification): 
         channel: COMING_SOON_CHANNEL_ID,
         propertyAddress: data.propertyAddress
       });
+      return false;
     } else {
       logSlackOp('✅', 'Coming Soon notification POSTED', {
         channel: COMING_SOON_CHANNEL_ID,
         propertyAddress: data.propertyAddress,
         ts: result.ts
       });
+      return true;
     }
   } catch (error: any) {
     logSlackOp('💥', 'Coming Soon notification EXCEPTION', {
       error: error.message,
       propertyAddress: data.propertyAddress
     });
+    return false;
   }
 }

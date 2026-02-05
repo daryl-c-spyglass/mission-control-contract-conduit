@@ -1,0 +1,171 @@
+# 🔧 FIX: Coming Soon Must Post to EXISTING #coming-soon-listings Channel
+
+## 🚨 PROBLEM
+When "Coming Soon (Not Yet Listed)" checkbox is checked during transaction creation, the system ONLY creates a new transaction-specific channel (e.g., #buy-thisisatest-darylcamingao). It does NOT post any notification to the existing shared channel #coming-soon-listings.
+
+## 🎯 REQUIRED BEHAVIOR
+When "Coming Soon" is checked, TWO things must happen:
+1. Create the transaction channel (#buy/sell-[address]-[agent]) ← already works
+2. **ALSO post a message to the EXISTING channel #coming-soon-listings (Channel ID: C09J6327HQS)** ← THIS IS BROKEN/MISSING
+
+The channel #coming-soon-listings ALREADY EXISTS. Do NOT create a new channel. Post a MESSAGE to this existing channel using `chat.postMessage` with channel ID `C09J6327HQS`.
+
+---
+
+## STEP 1: Find exactly where Coming Soon is handled
+
+Run these searches and show me the FULL functions/code blocks:
+
+```bash
+grep -rn "isComingSoon\|is_coming_soon\|comingSoon\|coming.soon\|coming_soon" server/ --include="*.ts" --include="*.tsx" --include="*.js" -B 2 -A 10
+grep -rn "C09J6327HQS\|coming-soon-listings\|COMING_SOON_CHANNEL" server/ --include="*.ts" --include="*.tsx" --include="*.js" -B 2 -A 10
+```
+
+Show me EVERY result. I need to see if there is ANY code that attempts to post to C09J6327HQS.
+
+---
+
+## STEP 2: Find the transaction creation endpoint
+
+```bash
+grep -rn "shouldCreateSlack\|createSlackChannel\|slackChannelId" server/routes.ts --include="*.ts" -B 5 -A 20
+```
+
+Show me the FULL section of server/routes.ts where the transaction is created and Slack is triggered. I need to see the exact line where I can add the Coming Soon post.
+
+---
+
+## STEP 3: Add the Coming Soon post
+
+Find the exact location in server/routes.ts (or wherever transactions are created) where the transaction channel is successfully created. AFTER that success, add this code:
+
+```typescript
+// === COMING SOON NOTIFICATION ===
+// Post to the shared #coming-soon-listings channel (C09J6327HQS)
+// This is IN ADDITION TO the transaction-specific channel
+if (newTransaction.isComingSoon || newTransaction.is_coming_soon) {
+  const COMING_SOON_CHANNEL_ID = 'C09J6327HQS';
+  
+  console.log('[SLACK] 📢 Coming Soon is checked — posting to #coming-soon-listings (C09J6327HQS)');
+  
+  try {
+    // Ensure bot is in the channel first
+    const slackClient = new WebClient(process.env.SLACK_BOT_TOKEN);
+    
+    try {
+      await slackClient.conversations.join({ channel: COMING_SOON_CHANNEL_ID });
+    } catch (joinErr: any) {
+      // "already_in_channel" is fine
+      if (joinErr?.data?.error !== 'already_in_channel') {
+        console.log('[SLACK] ⚠️ Join error (non-fatal):', joinErr?.data?.error);
+      }
+    }
+    
+    // Build property details from the transaction
+    const address = newTransaction.address || 'Address TBD';
+    const price = newTransaction.listingPrice 
+      ? `$${Number(newTransaction.listingPrice).toLocaleString()}` 
+      : 'Price TBD';
+    const beds = newTransaction.bedrooms || '--';
+    const fullBaths = newTransaction.fullBaths || '--';
+    const halfBaths = newTransaction.halfBaths ? ` / ${newTransaction.halfBaths} half` : '';
+    const sqft = newTransaction.buildingSquareFeet 
+      ? `${Number(newTransaction.buildingSquareFeet).toLocaleString()} sq ft` 
+      : '';
+    const lotAcres = newTransaction.lotSizeAcres 
+      ? `${newTransaction.lotSizeAcres} acres` 
+      : '';
+    const propertyType = newTransaction.propertyType || 'Residential';
+    const description = newTransaction.listingDescription || '';
+    const agentName = user?.firstName && user?.lastName 
+      ? `${user.firstName} ${user.lastName}` 
+      : user?.marketingDisplayName || 'Agent';
+
+    // Post the message using chat.postMessage to the EXISTING channel
+    const result = await slackClient.chat.postMessage({
+      channel: COMING_SOON_CHANNEL_ID,  // THIS IS THE KEY — post to existing channel, NOT create new
+      text: `🏡 Coming Soon: ${address} — ${price}`,
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `🏡 *Coming Soon: ${address}*\n💰 *${price}*`
+          }
+        },
+        {
+          type: "section",
+          fields: [
+            ...(beds !== '--' ? [{ type: "mrkdwn", text: `*Beds:* ${beds}` }] : []),
+            ...(fullBaths !== '--' ? [{ type: "mrkdwn", text: `*Baths:* ${fullBaths}${halfBaths}` }] : []),
+            ...(sqft ? [{ type: "mrkdwn", text: `*Sq Ft:* ${sqft}` }] : []),
+            ...(lotAcres ? [{ type: "mrkdwn", text: `*Lot:* ${lotAcres}` }] : []),
+            { type: "mrkdwn", text: `*Type:* ${propertyType}` }
+          ].slice(0, 10) // Slack max 10 fields
+        },
+        ...(description ? [{
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: description.length > 500 ? description.substring(0, 500) + '...' : description
+          }
+        }] : []),
+        { type: "divider" },
+        {
+          type: "context",
+          elements: [
+            { type: "mrkdwn", text: `👤 *Agent:* ${agentName} | via Contract Conduit` }
+          ]
+        }
+      ]
+    });
+    
+    console.log('[SLACK] ✅ Coming Soon posted to #coming-soon-listings, ts:', result.ts);
+    
+  } catch (error: any) {
+    // Log but don't fail the transaction creation
+    console.error('[SLACK] ❌ Failed to post Coming Soon to #coming-soon-listings:', error.message);
+    if (error.data) {
+      console.error('[SLACK] Error details:', JSON.stringify(error.data));
+    }
+  }
+}
+```
+
+## ⚠️ CRITICAL RULES
+
+1. **Do NOT create a new channel** — use `chat.postMessage` with channel `C09J6327HQS`
+2. **Do NOT modify** the existing transaction channel creation logic — it works
+3. **Do NOT wrap this in the DISABLE_SLACK_NOTIFICATIONS check** separately — it should follow the same check as the transaction channel creation. If Slack is enabled, Coming Soon posts too.
+4. The Coming Soon post is **fire-and-forget** — if it fails, the transaction should still be created successfully
+5. Use `process.env.SLACK_BOT_TOKEN` (NOT SLACK_API_TOKEN) for the WebClient
+6. Make sure the `isComingSoon` field name matches EXACTLY what the database/form uses — check the schema
+
+---
+
+## STEP 4: Verify the field name
+
+```bash
+grep -rn "isComingSoon\|is_coming_soon" shared/ server/ --include="*.ts" --include="*.tsx" | head -20
+```
+
+Make sure you use the correct field name that matches the database column and form state.
+
+---
+
+## STEP 5: Show me the changes
+
+Before testing, show me:
+1. The exact file and line number where you added the Coming Soon post
+2. The full code block including 10 lines BEFORE and AFTER the new code
+3. Confirm: is `isComingSoon` the correct field name in the transaction object?
+
+---
+
+## 📱 MOBILE OPTIMIZATION
+No UI changes expected for this fix (backend only). If any UI changes are made:
+- Touch targets minimum 44x44px
+- Responsive layouts: stack on mobile (<640px), side-by-side on tablet+
+- Safe area insets for notched devices
+- No horizontal overflow
+- Minimum 16px font size for body text
