@@ -776,6 +776,7 @@ export async function sendMarketingNotification(
     story: 'Instagram Story (9:16)',
     alt_style: 'Alternative Style',
     flyer: 'Property Flyer',
+    print_flyer: 'Property Flyer (Print)',
   };
   const typeLabel = typeLabels[assetType] || assetType;
 
@@ -1079,6 +1080,7 @@ interface PhotographyRequestData {
   agentEmail?: string | null;
   agentPhone?: string | null;
   mlsNumber?: string | null;
+  heroPhotoUrl?: string | null;
   photographyNotes?: string | null;
   photographyAppointmentDate?: string | null;
   appUrl?: string;
@@ -1144,6 +1146,14 @@ export async function postPhotographyRequest(data: PhotographyRequestData): Prom
     blocks.push({
       type: "section",
       text: { type: "mrkdwn", text: `*Notes for James:*\n${data.photographyNotes}` }
+    });
+  }
+
+  if (data.heroPhotoUrl) {
+    blocks.push({
+      type: "image",
+      image_url: data.heroPhotoUrl,
+      alt_text: "Property Photo"
     });
   }
 

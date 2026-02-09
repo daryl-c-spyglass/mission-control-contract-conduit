@@ -1,0 +1,194 @@
+# Notification Audit — Transaction Management Bot
+## Period: Thursday Feb 5, 2026 through Sunday Feb 9, 2026
+
+---
+
+## Summary
+
+All bot activity since activation has been from **Daryl's test transactions only**. No agent-created transactions have triggered bot notifications. No closing reminder spam has occurred. The bot is functioning as expected within the testing scope.
+
+| Metric | Count |
+|--------|-------|
+| Channels auto-created | 8 |
+| Coming Soon notifications | 2 |
+| Photography Request notifications | 1 |
+| Marketing Materials notifications | 4 |
+| Closing Reminders from bot | 0 |
+| Agent-triggered notifications | 0 |
+| Affected real agents | None |
+
+---
+
+## Channels Auto-Created by Bot (8 total)
+
+All created by Daryl (test transactions). No agent channels were created.
+
+### Thursday Feb 5 / Friday Feb 6 — Initial Testing (7 channels)
+
+| # | Channel Name | Channel ID | Created | Type | Has MLS Data |
+|---|-------------|-----------|---------|------|-------------|
+| 1 | #buy-7616becasseaudr-darylcamingao | C0AD7DPP12A | Feb 6, 2:23 AM | Real address test | Check needed |
+| 2 | #sell-11112chatamberryln-darylcamingao | C0AD9G8QD0A | Feb 6, 2:27 AM | Real address test | Yes — ACT8135526, $499,000, 4/3, 2,901 sqft |
+| 3 | #buy-notethisisatest-darylcamingao | C0AE3R6NUUQ | Feb 6, 2:29 AM | Named test | No |
+| 4 | #buy-thisisatest-darylcamingao | C0AD7F7JTQE | Feb 6, 2:30 AM | Named test | No |
+| 5 | #sell-notetest-darylcamingao | C0AD66BT6J1 | Feb 6, 2:38 AM | Named test | No |
+| 6 | #sell-thisisatest-darylcamingao | C0ACU916MJT | Feb 6, 2:53 AM | Named test | No |
+| 7 | #sell-4507unitycir-darylcamingao | C0ADNLW1HGR | Feb 6, 2:58 AM | Real address test | Yes — ACT5898597, $955,000, 4/4, 2,218 sqft |
+| 8 | #sell-testtransactionmanagement-darylcamingao | C0ADA62QZJ6 | Feb 6, 3:55 AM | Named test | No |
+
+### Sunday Feb 9 — Photography Feature Testing (1 channel)
+
+| # | Channel Name | Channel ID | Created | Type | Has MLS Data |
+|---|-------------|-----------|---------|------|-------------|
+| 9 | #sell-20335rosenway-darylcamingao | C0ADP9CB13M | Feb 9, 9:28 PM | Real address test | Yes — ACT3782498, $339,990, 4/3, 1,831 sqft |
+
+---
+
+## Channel Message Content Breakdown
+
+### What gets posted to each new channel:
+
+Each auto-created channel receives these messages in order:
+1. Bot joins channel
+2. Daryl joins channel
+3. Welcome message with agent name and transaction coordinators
+4. MLS Listing Data (if MLS number was provided) — address, MLS#, status, price, beds/baths/sqft, year built, description
+5. Property photo (pulled from Repliers CDN)
+
+Example from #sell-20335rosenway-darylcamingao:
+- Welcome message with agent and TC info
+- MLS Data: ACT3782498, Active, $339,990, 4 bed, 3 bath, 1,831 sqft, 2026 build
+- Property photo: property-ACT3782498.jpg
+
+---
+
+## Coming Soon Notifications — #coming-soon-listings (2 messages)
+
+| # | Timestamp | Address | Price | Details | Live Date | Source |
+|---|-----------|---------|-------|---------|-----------|--------|
+| 1 | Feb 6, 2:53 AM | This is a test | TBD | - bed, - bath, - sqft | TBD | Replit test |
+| 2 | Feb 6, 3:55 AM | Test - Transaction Management Bot | TBD | - bed, - bath, - sqft | TBD | Replit test |
+
+### Issues Found:
+- Both messages show TBD for price despite form data being entered
+- Both messages show dashes for beds/baths/sqft despite form data being entered
+- No property photo attached to either message
+- Root cause: Notification function reading from MLS fields instead of Coming Soon form fields
+- Fix prompt created: REPLIT-FIX-COMING-SOON-PHOTO-AND-DETAILS.md
+
+### Context:
+These two bot messages appeared between real agent messages from Joey Wilkes (1712 West End Place, Round Rock) and Kristopher McWhorter. The bot messages are visually distinguishable from agent posts because they use the "Transaction Management Bot" name with APP badge.
+
+---
+
+## Photography Request Notifications — #spyglass-photography (1 message)
+
+| # | Timestamp | Address | Agent | Appointment Date | Notes | Source |
+|---|-----------|---------|-------|-----------------|-------|--------|
+| 1 | Feb 9, 9:28 PM | 20335 ROSEN WAY, Manor, TX | Daryl Camingao | Tue, Feb 10, 2026 | test message | Replit test |
+
+### Issues Found:
+- No MLS # included (enhancement requested — prompt created)
+- Photo uploaded in "Property Photo for Slack" field did NOT appear in Slack message
+- Agent contact shows email instead of phone (minor)
+- Fix prompt created: REPLIT-FIX-COMING-SOON-PHOTO-AND-DETAILS.md covers photo issue
+
+### Working Correctly:
+- Full address populated
+- Agent name populated
+- Appointment date formatted correctly
+- Notes for James populated
+- Photo Order Status: "Photos Requested"
+- Listing Status: "Pre-Listing"
+- "View in Contract Conduit" button present
+
+---
+
+## Marketing Materials Notifications — #sell-4507unitycir (4 messages)
+
+| # | Timestamp | Property | Type | Created By |
+|---|-----------|----------|------|-----------|
+| 1 | Feb 6, 3:01 AM | 4507 Unity CIR, Austin, TX | Property Flyer | daryl@spyglassrealty.com |
+| 2 | Feb 6, 3:50 AM | 4507 Unity CIR, Austin, TX | print_flyer | daryl@spyglassrealty.com |
+| 3 | Feb 6, 3:51 AM | 4507 Unity CIR, Austin, TX | Property Flyer | daryl@spyglassrealty.com |
+| 4 | Feb 6, 3:54 AM | 4507 Unity CIR, Austin, TX | Property Flyer | daryl@spyglassrealty.com |
+
+### Notes:
+- All 4 were from flyer generation testing on the 4507 Unity CIR transaction
+- Flyer PNG files were attached to each message
+- These posted to the transaction's own channel (not a shared channel)
+- Type inconsistency: one shows "print_flyer" while others show "Property Flyer" — minor cleanup needed
+
+---
+
+## Closing Reminders — Transaction Management Bot
+
+**None found.** Zero closing reminder notifications were sent by the Transaction Management Bot since activation.
+
+Two closing-related messages were found but they are from **Slackbot** (user-set reminders), NOT from the Transaction Management Bot:
+- Feb 8, 2:00 AM — Slackbot in #buy-569mendocino: "Check in on Jeremy's reply for final walk through"
+- Feb 7, 10:00 PM — Slackbot in #buy-1700tarondr: "Closing is in 3 days"
+
+These are manual Slack reminders unrelated to Contract Conduit.
+
+---
+
+## Environment Analysis
+
+### Replit (Development)
+- Source of ALL notifications during this period
+- DISABLE_SLACK_NOTIFICATIONS: set to false (enabled for testing)
+- All 8 channels and all notifications came from Replit testing sessions
+
+### Render (Production)
+- No new notifications detected from Render during this period
+- DISABLE_SLACK_NOTIFICATIONS: status needs verification
+- No agent-created transactions triggered notifications
+- Pre-existing channels from before Feb 5 (e.g., #sell-242sevenseas, #sell-1005jewell) show no new bot activity
+
+### Verification Needed:
+- Confirm DISABLE_SLACK_NOTIFICATIONS value on Render dashboard
+- Check Render server logs for any notification attempts that may have silently failed
+- Verify if any agents created transactions on Render during this period without channels being created
+
+---
+
+## Cleanup Recommended
+
+### Test Channels to Archive (7 channels):
+These are test-only channels cluttering the workspace. Recommend archiving:
+
+1. #buy-notethisisatest-darylcamingao (C0AE3R6NUUQ)
+2. #buy-thisisatest-darylcamingao (C0AD7F7JTQE)
+3. #sell-notetest-darylcamingao (C0AD66BT6J1)
+4. #sell-thisisatest-darylcamingao (C0ACU916MJT)
+5. #sell-testtransactionmanagement-darylcamingao (C0ADA62QZJ6)
+6. #buy-7616becasseaudr-darylcamingao (C0AD7DPP12A) — if test only
+7. #sell-11112chatamberryln-darylcamingao (C0AD9G8QD0A) — if test only
+
+### Keep for Continued Testing:
+- #sell-4507unitycir-darylcamingao — has flyer notification history, useful reference
+- #sell-20335rosenway-darylcamingao — latest test with photography feature
+
+### Test Messages in Shared Channels:
+- 2 Coming Soon test messages in #coming-soon-listings visible to all agents
+- 1 Photography Request test message in #spyglass-photography visible to Randi
+- Consider deleting these test messages to keep channels clean
+
+---
+
+## Known Bugs to Fix
+
+| Bug | Severity | Fix Status |
+|-----|----------|-----------|
+| Coming Soon: price/beds/baths show TBD despite form entry | High | Prompt created |
+| Coming Soon: uploaded photo not sent to Slack | High | Prompt created |
+| Photography: uploaded photo not sent to Slack | High | Same root cause |
+| Photography: no MLS # in message | Low | Prompt created |
+| Marketing Materials: inconsistent type label (print_flyer vs Property Flyer) | Low | Not yet addressed |
+
+---
+
+## Conclusion
+
+The notification system is operational and creating channels/posting messages correctly. The core issues are data passthrough problems (form fields not reaching the notification function) rather than system failures. No agent workflows have been affected. All activity is contained to Daryl's test transactions. The system is safe for continued testing and can be prepared for agent UAT once the Coming Soon data and photo bugs are resolved.

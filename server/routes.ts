@@ -804,6 +804,15 @@ export async function registerRoutes(
             ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
             : 'https://mission-control-contract-conduit.onrender.com';
 
+          const photoTx = await storage.getTransaction(transaction.id);
+          const photoMlsData = photoTx?.mlsData as any;
+          const photoMlsPhotos = photoMlsData?.photos || [];
+          const photoUploaded = photoTx?.propertyImages || [];
+          let photographyHeroPhoto = uploadedPhotoUrl || photoMlsPhotos[0] || photoUploaded[0] || null;
+          if (photographyHeroPhoto && !photographyHeroPhoto.startsWith('http')) {
+            photographyHeroPhoto = `${appUrl}${photographyHeroPhoto.startsWith('/') ? '' : '/'}${photographyHeroPhoto}`;
+          }
+
           const photographySuccess = await postPhotographyRequest({
             propertyAddress: transaction.propertyAddress,
             transactionId: transaction.id,
@@ -811,6 +820,7 @@ export async function registerRoutes(
             agentEmail: photographyAgentEmail,
             agentPhone: photographyAgentPhone,
             mlsNumber: transaction.mlsNumber,
+            heroPhotoUrl: photographyHeroPhoto,
             photographyNotes: transactionData.photographyNotes,
             photographyAppointmentDate: transactionData.photographyAppointmentDate,
             appUrl,
