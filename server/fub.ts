@@ -1,5 +1,9 @@
 // Real Follow Up Boss API integration using FUB_API_KEY
 
+import { createModuleLogger } from './lib/logger';
+
+const log = createModuleLogger('fub');
+
 const FUB_API_BASE = "https://api.followupboss.com/v1";
 
 async function fubRequest(endpoint: string, params?: Record<string, string>): Promise<any> {
@@ -63,7 +67,7 @@ export async function searchFUBContacts(query: string): Promise<FUBContact[]> {
       created: person.created || "",
     }));
   } catch (error) {
-    console.error("Error searching FUB contacts:", error);
+    log.error({ err: error }, 'Error searching FUB contacts');
     return [];
   }
 }
@@ -85,7 +89,7 @@ export async function getFUBContact(id: number): Promise<FUBContact | null> {
       created: data.created || "",
     };
   } catch (error) {
-    console.error("Error fetching FUB contact:", error);
+    log.error({ err: error }, 'Error fetching FUB contact');
     return null;
   }
 }
@@ -116,7 +120,7 @@ export async function getFUBUserByEmail(email: string): Promise<FUBUser | null> 
       name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
     };
   } catch (error) {
-    console.error("Error fetching FUB user by email:", error);
+    log.error({ err: error }, 'Error fetching FUB user by email');
     return null;
   }
 }
@@ -149,7 +153,7 @@ export async function searchFUBContactsByAssignedUser(query: string, fubUserId?:
       created: person.created || "",
     }));
   } catch (error) {
-    console.error("Error searching FUB contacts by assigned user:", error);
+    log.error({ err: error }, 'Error searching FUB contacts by assigned user');
     return [];
   }
 }
@@ -176,7 +180,7 @@ export async function searchFUBContactsByEmail(email: string): Promise<FUBContac
       created: person.created || "",
     }));
   } catch (error) {
-    console.error("Error searching FUB contacts by email:", error);
+    log.error({ err: error }, 'Error searching FUB contacts by email');
     return [];
   }
 }

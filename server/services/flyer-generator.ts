@@ -6,6 +6,9 @@ import Handlebars from 'handlebars';
 import { execSync } from 'child_process';
 import crypto from 'crypto';
 import { ObjectStorageService, ObjectNotFoundError } from '../replit_integrations/object_storage';
+import { createModuleLogger } from '../lib/logger';
+
+const log = createModuleLogger('marketing');
 
 // Create an instance of the object storage service for reading uploaded files
 const objectStorageService = new ObjectStorageService();
@@ -21,13 +24,12 @@ const isProduction = process.env.NODE_ENV === 'production' || !!process.env.REND
 async function launchBrowser(): Promise<any> {
   if (isProduction) {
     // Use @sparticuz/chromium on Render (bundles its own Chromium)
-    console.log('[FlyerGenerator] Using @sparticuz/chromium for production');
-    console.log('[FlyerGenerator] NODE_ENV:', process.env.NODE_ENV);
-    console.log('[FlyerGenerator] RENDER:', process.env.RENDER);
+    log.info('Using @sparticuz/chromium for production');
+    log.debug({ nodeEnv: process.env.NODE_ENV, render: process.env.RENDER }, 'Production environment details');
     
     try {
       const execPath = await chromium.executablePath();
-      console.log('[FlyerGenerator] Chromium executable path:', execPath);
+      log.debug({ execPath }, 'Chromium executable path');
       
       const browser = await puppeteerCore.launch({
         args: chromium.args,
@@ -36,19 +38,18 @@ async function launchBrowser(): Promise<any> {
         headless: true,
       });
       
-      console.log('[FlyerGenerator] @sparticuz/chromium browser launched successfully');
+      log.info('@sparticuz/chromium browser launched successfully');
       return browser;
     } catch (err: any) {
-      console.error('[FlyerGenerator] @sparticuz/chromium launch failed:', err.message);
-      console.error('[FlyerGenerator] Stack:', err.stack);
+      log.error({ err }, '@sparticuz/chromium launch failed');
       throw err;
     }
   } else {
     // Development mode - use local Puppeteer with system Chromium
-    console.log('[FlyerGenerator] Using local Puppeteer for development');
+    log.info('Using local Puppeteer for development');
     
     const chromiumPath = findChromiumPath();
-    console.log('[FlyerGenerator] Using Chromium at:', chromiumPath || 'Puppeteer bundled');
+    log.debug({ chromiumPath: chromiumPath || 'Puppeteer bundled' }, 'Using Chromium at');
     
     const launchOptions: any = {
       headless: true,
@@ -89,17 +90,17 @@ async function launchBrowser(): Promise<any> {
     try {
       if (chromiumPath) {
         const browser = await puppeteerCore.launch(launchOptions);
-        console.log('[FlyerGenerator] Browser launched with puppeteer-core');
+        log.info('Browser launched with puppeteer-core');
         return browser;
       }
     } catch (err) {
-      console.log('[FlyerGenerator] puppeteer-core failed, trying full puppeteer...');
+      log.info('puppeteer-core failed, trying full puppeteer...');
     }
     
     // Fallback to full puppeteer package (has bundled Chromium)
     const puppeteerFull = await import('puppeteer');
     const browser = await puppeteerFull.default.launch(launchOptions);
-    console.log('[FlyerGenerator] Browser launched with full puppeteer');
+    log.info('Browser launched with full puppeteer');
     return browser;
   }
 }
@@ -116,7 +117,7 @@ async function imageToBase64(imageUrl: string): Promise<string> {
     
     // Check if it's an absolute file path that exists
     if (fs.existsSync(imageUrl)) {
-      console.log('Reading local file:', imageUrl);
+      log.debug({ path: imageUrl }, 'Reading local file');
       const buffer = fs.readFileSync(imageUrl);
       const ext = path.extname(imageUrl).slice(1).toLowerCase();
       const mimeTypes: Record<string, string> = {
@@ -135,13 +136,13 @@ async function imageToBase64(imageUrl: string): Promise<string> {
       const urlMatch = imageUrl.match(/url=([^&]+)/);
       if (urlMatch) {
         imageUrl = decodeURIComponent(urlMatch[1]);
-        console.log('Extracted CDN URL from proxy:', imageUrl);
+        log.debug({ cdnUrl: imageUrl }, 'Extracted CDN URL from proxy');
       }
     }
     
     // Handle /objects/ paths (user-uploaded files in object storage)
     if (imageUrl.startsWith('/objects/')) {
-      console.log('Reading from object storage:', imageUrl);
+      log.debug({ path: imageUrl }, 'Reading from object storage');
       try {
         const objectFile = await objectStorageService.getObjectEntityFile(imageUrl);
         const [downloadBuffer] = await objectFile.download();
@@ -156,13 +157,13 @@ async function imageToBase64(imageUrl: string): Promise<string> {
           'webp': 'image/webp',
         };
         const mimeType = mimeTypes[ext] || 'image/png';
-        console.log('Object storage file loaded, size:', buffer.length, 'type:', mimeType);
+        log.debug({ size: buffer.length, mimeType }, 'Object storage file loaded');
         return `data:${mimeType};base64,${buffer.toString('base64')}`;
       } catch (objError: any) {
         if (objError instanceof ObjectNotFoundError) {
-          console.error('Object not found in storage:', imageUrl);
+          log.error({ path: imageUrl }, 'Object not found in storage');
         } else {
-          console.error('Error reading from object storage:', imageUrl, objError.message);
+          log.error({ err: objError, path: imageUrl }, 'Error reading from object storage');
         }
         return '';
       }
@@ -172,7 +173,7 @@ async function imageToBase64(imageUrl: string): Promise<string> {
     if (imageUrl.startsWith('/') && !imageUrl.startsWith('//') && !imageUrl.startsWith('http')) {
       // Check in public directory
       const localPath = path.join(process.cwd(), 'public', imageUrl);
-      console.log('Checking local path:', localPath);
+      log.debug({ localPath }, 'Checking local path');
       if (fs.existsSync(localPath)) {
         const buffer = fs.readFileSync(localPath);
         const ext = path.extname(localPath).slice(1).toLowerCase();
@@ -189,41 +190,41 @@ async function imageToBase64(imageUrl: string): Promise<string> {
     
     // Must be an http URL to fetch
     if (!fetchUrl.startsWith('http')) {
-      console.error('Cannot fetch non-http URL:', fetchUrl);
+      log.error({ url: fetchUrl }, 'Cannot fetch non-http URL');
       return '';
     }
     
     // Fetch remote URL and convert to base64
-    console.log('Fetching image:', fetchUrl);
+    log.debug({ url: fetchUrl }, 'Fetching image');
     const response = await fetch(fetchUrl);
     if (!response.ok) {
-      console.error('Failed to fetch image:', fetchUrl, response.status);
+      log.error({ url: fetchUrl, status: response.status }, 'Failed to fetch image');
       return '';
     }
     
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const contentType = response.headers.get('content-type') || 'image/jpeg';
-    console.log('Image fetched successfully, size:', buffer.length, 'type:', contentType);
+    log.debug({ size: buffer.length, contentType }, 'Image fetched successfully');
     return `data:${contentType};base64,${buffer.toString('base64')}`;
     
   } catch (error) {
-    console.error('Error converting image to base64:', imageUrl, error);
+    log.error({ err: error, imageUrl }, 'Error converting image to base64');
     return '';
   }
 }
 
 function findChromiumPath(): string {
-  console.log('[FlyerGenerator] Searching for Chromium...');
+  log.debug('Searching for Chromium...');
   
   // Try environment variable first (set on Render: CHROMIUM_PATH=/usr/bin/chromium)
   if (process.env.CHROMIUM_PATH) {
-    console.log('[FlyerGenerator] CHROMIUM_PATH env var:', process.env.CHROMIUM_PATH);
+    log.debug({ chromiumPath: process.env.CHROMIUM_PATH }, 'CHROMIUM_PATH env var');
     if (fs.existsSync(process.env.CHROMIUM_PATH)) {
-      console.log('[FlyerGenerator] Found Chromium at CHROMIUM_PATH');
+      log.debug('Found Chromium at CHROMIUM_PATH');
       return process.env.CHROMIUM_PATH;
     } else {
-      console.log('[FlyerGenerator] CHROMIUM_PATH does not exist on filesystem');
+      log.debug('CHROMIUM_PATH does not exist on filesystem');
     }
   }
   
@@ -238,7 +239,7 @@ function findChromiumPath(): string {
   
   for (const p of commonPaths) {
     if (fs.existsSync(p)) {
-      console.log('[FlyerGenerator] Found Chromium at:', p);
+      log.debug({ path: p }, 'Found Chromium at');
       return p;
     }
   }
@@ -247,22 +248,22 @@ function findChromiumPath(): string {
   try {
     const chromiumPath = execSync('which chromium 2>/dev/null || which chromium-browser 2>/dev/null || which google-chrome 2>/dev/null', { encoding: 'utf-8' }).trim();
     if (chromiumPath && fs.existsSync(chromiumPath)) {
-      console.log('[FlyerGenerator] Found Chromium via which:', chromiumPath);
+      log.debug({ path: chromiumPath }, 'Found Chromium via which');
       return chromiumPath;
     }
   } catch (e) {
-    console.log('[FlyerGenerator] which command failed');
+    log.debug('which command failed');
   }
   
   // Fallback to common Nix store path (Replit)
   const nixPath = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
   if (fs.existsSync(nixPath)) {
-    console.log('[FlyerGenerator] Found Chromium at Nix path');
+    log.debug('Found Chromium at Nix path');
     return nixPath;
   }
   
   // Let Puppeteer try to find its own bundled browser
-  console.log('[FlyerGenerator] No Chromium found, will use Puppeteer default');
+  log.debug('No Chromium found, will use Puppeteer default');
   return '';
 }
 
@@ -370,14 +371,15 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
   // Generate render hash for parity verification
   const renderHash = generateRenderHash(data, RENDER_CONFIG);
   
-  console.log(`[FlyerGenerator] ===== RENDER START =====`);
-  console.log(`[FlyerGenerator] Output type: ${outputType}`);
-  console.log(`[FlyerGenerator] Render hash: ${renderHash}`);
-  console.log(`[FlyerGenerator] Template version: ${TEMPLATE_VERSION}`);
-  console.log(`[FlyerGenerator] Viewport: ${RENDER_CONFIG.width}x${RENDER_CONFIG.height}`);
-  console.log(`[FlyerGenerator] Device scale: ${RENDER_CONFIG.deviceScaleFactor}`);
-  console.log(`[FlyerGenerator] Media type: ${RENDER_CONFIG.mediaType}`);
-  console.log(`[FlyerGenerator] Converting images to base64...`);
+  log.info({
+    outputType,
+    renderHash,
+    templateVersion: TEMPLATE_VERSION,
+    viewport: `${RENDER_CONFIG.width}x${RENDER_CONFIG.height}`,
+    deviceScale: RENDER_CONFIG.deviceScaleFactor,
+    mediaType: RENDER_CONFIG.mediaType
+  }, 'RENDER START');
+  log.info('Converting images to base64...');
   
   // Default logo paths
   const logoPath = data.logoUrl || path.join(process.cwd(), 'public', 'assets', 'SpyglassRealty_Logo_Black.png');
@@ -397,7 +399,7 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     imageToBase64(ICON_PATHS.sqft)
   ]);
   
-  console.log('[FlyerGenerator] Images converted:', {
+  log.info({
     logo: logoB64 ? 'OK' : 'FAILED',
     secondaryLogo: secondaryLogoB64 ? 'OK' : 'FAILED',
     mainImage: mainImageB64 ? 'OK' : 'EMPTY',
@@ -408,7 +410,7 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     bedroomIcon: bedroomIconB64 ? 'OK' : 'FAILED',
     bathroomIcon: bathroomIconB64 ? 'OK' : 'FAILED',
     sqftIcon: sqftIconB64 ? 'OK' : 'FAILED'
-  });
+  }, 'Images converted');
   
   // Create data with base64 images for template
   // Scale factor: preview is 96 DPI (816px wide), print is 300 DPI (2550px wide)
@@ -463,16 +465,13 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
   const html = template(dataWithBase64);
   
   // Launch browser using environment-aware function
-  console.log('[FlyerGenerator] Launching browser...');
+  log.info('Launching browser...');
   let browser;
   try {
     browser = await launchBrowser();
-    console.log('[FlyerGenerator] Browser launched successfully');
+    log.info('Browser launched successfully');
   } catch (launchError: any) {
-    console.error('[FlyerGenerator] ===== BROWSER LAUNCH ERROR =====');
-    console.error('[FlyerGenerator] Error:', launchError.message);
-    console.error('[FlyerGenerator] Stack:', launchError.stack);
-    console.error('[FlyerGenerator] isProduction:', isProduction);
+    log.error({ err: launchError, isProduction }, 'BROWSER LAUNCH ERROR');
     throw new Error(`Failed to launch browser: ${launchError.message}`);
   }
   
@@ -492,12 +491,12 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     await page.emulateMediaType(RENDER_CONFIG.mediaType);
     
     // 3. Load HTML content with generous timeout for slower environments
-    console.log('[FlyerGenerator] Loading HTML content...');
+    log.info('Loading HTML content...');
     await page.setContent(html, { 
       waitUntil: 'networkidle0',
       timeout: 60000  // 60 seconds for Render's slower cold starts
     });
-    console.log('[FlyerGenerator] HTML content loaded');
+    log.info('HTML content loaded');
     
     // 4. Wait for fonts to be fully loaded
     await page.evaluate(() => document.fonts && document.fonts.ready);
@@ -520,7 +519,7 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     // 6. Small delay to ensure layout is fully settled
     await new Promise(resolve => setTimeout(resolve, 150));
     
-    console.log(`[FlyerGenerator] Page ready, capturing ${outputType}...`);
+    log.info({ outputType }, 'Page ready, capturing output');
     
     let result: Buffer;
     
@@ -540,7 +539,7 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
         scale: 1  // Let Puppeteer handle scaling to fit page
       });
       result = Buffer.from(pdf);
-      console.log(`[FlyerGenerator] PDF generated (8.5x11in), size: ${result.length} bytes`);
+      log.info({ size: result.length }, 'PDF generated (8.5x11in)');
     } else {
       // Generate PNG with exact clip (same dimensions as PDF)
       const screenshot = await page.screenshot({
@@ -549,11 +548,10 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
         clip: { x: 0, y: 0, width: RENDER_CONFIG.width, height: RENDER_CONFIG.height }
       });
       result = Buffer.from(screenshot);
-      console.log(`[FlyerGenerator] PNG generated, size: ${result.length} bytes`);
+      log.info({ size: result.length }, 'PNG generated');
     }
     
-    console.log(`[FlyerGenerator] ===== RENDER COMPLETE =====`);
-    console.log(`[FlyerGenerator] Output: ${outputType}, Hash: ${renderHash}`);
+    log.info({ outputType, renderHash }, 'RENDER COMPLETE');
     
     return result;
   } finally {

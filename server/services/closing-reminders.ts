@@ -1,5 +1,8 @@
+import { createModuleLogger } from '../lib/logger';
 import { storage } from "../storage";
 import { sendClosingReminder } from "../slack";
+
+const log = createModuleLogger('notifications');
 
 const REMINDER_INTERVALS = [30, 14, 7, 3, 1, 0];
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // Check every hour (will only send once per day at configured time)
@@ -38,12 +41,12 @@ async function checkAndSendReminders(): Promise<void> {
     return;
   }
   
-  console.log(`[ClosingReminders] Running daily reminder check for ${today}`);
+  log.info({ date: today }, 'Running daily reminder check');
   lastCheckDate = today;
   
   try {
     const transactions = await storage.getTransactionsWithClosingReminders();
-    console.log(`[ClosingReminders] Found ${transactions.length} transactions with closing dates and Slack channels`);
+    log.info({ count: transactions.length }, 'Found transactions with closing dates and Slack channels');
     
     let sentCount = 0;
     
@@ -66,20 +69,20 @@ async function checkAndSendReminders(): Promise<void> {
           // If settings exist, check if closing reminders are enabled
           if (settings) {
             if (!settings.closingReminders) {
-              console.log(`[ClosingReminders] Skipping ${transaction.propertyAddress}: closing reminders disabled`);
+              log.info({ address: transaction.propertyAddress }, 'Skipping: closing reminders disabled');
               continue;
             }
             
             // Check specific interval setting
             const reminderKey = getReminderKey(daysRemaining);
             if (reminderKey && !(settings as any)[reminderKey]) {
-              console.log(`[ClosingReminders] Skipping ${transaction.propertyAddress}: ${reminderKey} disabled`);
+              log.info({ address: transaction.propertyAddress, reminderKey }, 'Skipping: reminder interval disabled');
               continue;
             }
           }
         } catch (settingsError) {
           // If we can't get settings, proceed with sending (defaults to enabled)
-          console.log(`[ClosingReminders] Could not get settings for ${transaction.propertyAddress}, proceeding with reminder`);
+          log.info({ address: transaction.propertyAddress }, 'Could not get settings, proceeding with reminder');
         }
       }
       
@@ -101,35 +104,35 @@ async function checkAndSendReminders(): Promise<void> {
           category: 'communication',
         });
       } catch (sendError) {
-        console.error(`[ClosingReminders] Failed to send reminder for ${transaction.propertyAddress}:`, sendError);
+        log.error({ err: sendError, address: transaction.propertyAddress }, 'Failed to send reminder');
       }
     }
     
-    console.log(`[ClosingReminders] Sent ${sentCount} closing reminders`);
+    log.info({ sentCount }, 'Closing reminders sent');
   } catch (error) {
-    console.error("[ClosingReminders] Error checking reminders:", error);
+    log.error({ err: error }, 'Error checking reminders');
   }
 }
 
 export function startClosingRemindersScheduler(): void {
   // STOP ALL NOTIFICATIONS - Environment variable kill switch
   if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
-    console.log('[ClosingReminders] DISABLED via DISABLE_SLACK_NOTIFICATIONS environment variable');
+    log.warn('DISABLED via DISABLE_SLACK_NOTIFICATIONS environment variable');
     return;
   }
   
   // Only run in production (Render) - prevents duplicate notifications from dev instances
   if (process.env.NODE_ENV !== 'production') {
-    console.log('[ClosingReminders] Skipping - not in production environment (NODE_ENV:', process.env.NODE_ENV, ')');
+    log.info({ nodeEnv: process.env.NODE_ENV }, 'Skipping - not in production environment');
     return;
   }
   
   if (reminderIntervalId) {
-    console.log("[ClosingReminders] Scheduler already running");
+    log.info('Scheduler already running');
     return;
   }
   
-  console.log("[ClosingReminders] Starting closing reminders scheduler (hourly check)");
+  log.info('Starting closing reminders scheduler (hourly check)');
   
   // Run immediately on startup
   checkAndSendReminders();
@@ -137,14 +140,14 @@ export function startClosingRemindersScheduler(): void {
   // Then check every hour (will only send once per day)
   reminderIntervalId = setInterval(checkAndSendReminders, CHECK_INTERVAL_MS);
   
-  console.log("[ClosingReminders] Scheduler initialized");
+  log.info('Scheduler initialized');
 }
 
 export function stopClosingRemindersScheduler(): void {
   if (reminderIntervalId) {
     clearInterval(reminderIntervalId);
     reminderIntervalId = null;
-    console.log("[ClosingReminders] Scheduler stopped");
+    log.info('Scheduler stopped');
   }
 }
 

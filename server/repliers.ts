@@ -1,6 +1,10 @@
 // Real Repliers MLS API integration using REPLIERS_API_KEY
 import { isRentalOrLease, excludeRentals } from "../shared/lib/listings";
 import { normalizedAcres, normalizedLotSquareFeet, calculatePricePerAcre, buildLotSizeData } from "./utils/lotSize";
+import { createModuleLogger } from './lib/logger';
+import { withTimeout, withRetry, repliersCircuit } from './lib/resilience';
+
+const log = createModuleLogger('repliers');
 
 const REPLIERS_API_BASE = "https://api.repliers.io";
 const REPLIERS_CDN_BASE = "https://cdn.repliers.io/";
@@ -28,20 +32,26 @@ async function repliersRequest(
     });
   }
 
-  const response = await fetch(url.toString(), {
-    method: "GET",
-    headers: {
-      "REPLIERS-API-KEY": apiKey,
-      "Accept": "application/json",
-    },
-  });
+  const response = await repliersCircuit.execute(() =>
+    withTimeout(
+      () => fetch(url.toString(), {
+        method: "GET",
+        headers: {
+          "REPLIERS-API-KEY": apiKey,
+          "Accept": "application/json",
+        },
+      }),
+      15000,
+      `repliers-${endpoint}`
+    )
+  );
 
   const responseText = await response.text();
 
   if (!response.ok) {
     if (response.status === 404 && options?.allow404) {
       const context = options.context || 'unknown';
-      console.warn(`[Repliers] No data found for ${context} (404 response)`);
+      log.warn({ context, statusCode: 404 }, 'No data found (404 response)');
       return null;
     }
     throw new Error(`Repliers API error: ${response.status} ${response.statusText} - ${responseText}`);
@@ -50,7 +60,7 @@ async function repliersRequest(
   try {
     return JSON.parse(responseText);
   } catch (e) {
-    console.error("Failed to parse Repliers response:", e);
+    log.error({ err: e }, 'Failed to parse Repliers response');
     throw new Error(`Invalid JSON response from Repliers API`);
   }
 }
@@ -293,20 +303,26 @@ export async function testRepliersAccess(): Promise<any> {
     throw new Error("REPLIERS_API_KEY not configured");
   }
 
-  const response = await fetch("https://api.repliers.io/listings", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "REPLIERS-API-KEY": apiKey,
-    },
-    body: JSON.stringify({
-      streetName: "Spring Creek",
-      streetNumber: "2204",
-      city: "Austin",
-      class: "residential",
-      pageSize: 5,
-    }),
-  });
+  const response = await repliersCircuit.execute(() =>
+    withTimeout(
+      () => fetch("https://api.repliers.io/listings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "REPLIERS-API-KEY": apiKey,
+        },
+        body: JSON.stringify({
+          streetName: "Spring Creek",
+          streetNumber: "2204",
+          city: "Austin",
+          class: "residential",
+          pageSize: 5,
+        }),
+      }),
+      15000,
+      'repliers-test-access'
+    )
+  );
 
   const responseText = await response.text();
 
@@ -339,18 +355,24 @@ async function searchByMLSNumber(mlsNumber: string): Promise<any> {
   const apiKey = process.env.REPLIERS_API_KEY;
   if (!apiKey) return null;
   
-  const response = await fetch("https://api.repliers.io/listings", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "REPLIERS-API-KEY": apiKey,
-    },
-    body: JSON.stringify({
-      mlsNumber: mlsNumber,
-      boardId: 53, // Unlock MLS (Austin)
-      pageSize: 1,
-    }),
-  });
+  const response = await repliersCircuit.execute(() =>
+    withTimeout(
+      () => fetch("https://api.repliers.io/listings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "REPLIERS-API-KEY": apiKey,
+        },
+        body: JSON.stringify({
+          mlsNumber: mlsNumber,
+          boardId: 53,
+          pageSize: 1,
+        }),
+      }),
+      15000,
+      'repliers-search-mls'
+    )
+  );
   
   if (!response.ok) {
     return null;
@@ -601,7 +623,7 @@ export async function fetchMLSListing(mlsNumber: string, boardId?: string): Prom
 
     return { mlsData: result, comparables };
   } catch (error) {
-    console.error("Error fetching MLS listing:", error);
+    log.error({ err: error }, 'Error fetching MLS listing');
     return null;
   }
 }
@@ -685,7 +707,7 @@ export async function fetchSimilarListings(mlsNumber: string, radius: number = 5
       };
     });
   } catch (error: any) {
-    console.warn("[Repliers] Failed to fetch similar listings:", error.message || error);
+    log.warn({ err: error }, 'Failed to fetch similar listings');
     return [];
   }
 }
@@ -712,7 +734,7 @@ export async function fetchListingCoordinates(mlsNumber: string): Promise<Listin
     } catch (firstError: any) {
       // If 404, retry without boardId (listing might be on a different board)
       if (firstError?.message?.includes("404")) {
-        console.log(`[CMA] Retrying ${mlsNumber} without boardId...`);
+        log.debug({ mlsNumber }, 'Retrying without boardId');
         data = await repliersRequest(`/listings/${formattedMLS}`, {});
       } else {
         throw firstError;
@@ -736,10 +758,10 @@ export async function fetchListingCoordinates(mlsNumber: string): Promise<Listin
         soldDate: soldDate || undefined,
       };
     }
-    console.log(`[CMA] No coordinates found for ${mlsNumber}`);
+    log.debug({ mlsNumber }, 'No coordinates found');
     return null;
   } catch (error) {
-    console.error(`[CMA] Error fetching coordinates for ${mlsNumber}:`, error);
+    log.error({ err: error, mlsNumber }, 'Error fetching coordinates');
     return null;
   }
 }
@@ -756,12 +778,12 @@ export async function enrichCMAWithCoordinates(comparables: CMAComparable[]): Pr
   
   if (needsEnrichment.length === 0) {
     if (noMls > 0) {
-      console.log(`[CMA] ${noMls} comparables lack MLS numbers and cannot be enriched`);
+      log.debug({ count: noMls }, 'Comparables lack MLS numbers and cannot be enriched');
     }
     return comparables;
   }
   
-  console.log(`[CMA] Enriching ${needsEnrichment.length} comparables with coordinates/status (${noMls} lack MLS numbers)`);
+  log.info({ enrichCount: needsEnrichment.length, noMlsCount: noMls }, 'Enriching comparables with coordinates/status');
   
   // Fetch listing data for all entries needing enrichment in parallel (with limit)
   const pLimit = (await import('p-limit')).default;
@@ -787,7 +809,7 @@ export async function enrichCMAWithCoordinates(comparables: CMAComparable[]): Pr
     }
   }
   
-  console.log(`[CMA] Enriched ${successCount}/${needsEnrichment.length} comparables with coordinates/status`);
+  log.info({ successCount, totalCount: needsEnrichment.length }, 'Enriched comparables with coordinates/status');
   
   // Merge enrichment data back into comparables
   return comparables.map(comp => {
@@ -844,7 +866,7 @@ export async function searchByAddress(address: string): Promise<MLSListingData |
     const result = await fetchMLSListing(listing.mlsNumber);
     return result?.mlsData || null;
   } catch (error) {
-    console.error("Error searching by address:", error);
+    log.error({ err: error }, 'Error searching by address');
     return null;
   }
 }
@@ -1050,7 +1072,7 @@ export async function getBestPhotosForFlyer(mlsNumber: string, count: number = 3
 
     return selectBestPhotosForFlyer(imageInsights, photos, count);
   } catch (error) {
-    console.error("[BestPhotos] Error fetching best photos:", error);
+    log.error({ err: error }, 'Error fetching best photos');
     return {
       selectedPhotos: [],
       allPhotosWithInsights: [],
@@ -1218,13 +1240,13 @@ export async function getAISelectedPhotosForFlyer(mlsNumber: string): Promise<AI
       
       return { url: firstImage, classification, confidence, quality };
     } catch (error) {
-      console.error(`[AI Photos] Error fetching with coverImage=${coverImageType}:`, error);
+      log.error({ err: error, coverImageType }, 'Error fetching with coverImage parameter');
       return null;
     }
   };
   
   try {
-    console.log(`[AI Photos] Fetching AI-selected photos for ${formattedMLS} using coverImage parameter...`);
+    log.info({ mlsNumber: formattedMLS }, 'Fetching AI-selected photos using coverImage parameter');
     
     // Fetch all three photo types in parallel using coverImage parameter
     const [mainPhoto, kitchenPhoto, roomPhoto] = await Promise.all([
@@ -1270,10 +1292,10 @@ export async function getAISelectedPhotosForFlyer(mlsNumber: string): Promise<AI
         return { url, classification, confidence, quality, index };
       });
     } catch (e) {
-      console.error("[AI Photos] Error fetching all photos:", e);
+      log.error({ err: e }, 'Error fetching all photos');
     }
     
-    console.log(`[AI Photos] Results - Main: ${mainPhoto ? 'Found' : 'Not found'}, Kitchen: ${kitchenPhoto ? 'Found' : 'Not found'}, Room: ${roomPhoto ? 'Found' : 'Not found'}`);
+    log.info({ mainFound: !!mainPhoto, kitchenFound: !!kitchenPhoto, roomFound: !!roomPhoto }, 'AI photo selection results');
     
     // Check if coverImage API returned identical photos for all slots
     // This happens when imageInsights is not available for the listing
@@ -1281,7 +1303,7 @@ export async function getAISelectedPhotosForFlyer(mlsNumber: string): Promise<AI
       mainPhoto.url === kitchenPhoto.url && kitchenPhoto.url === roomPhoto.url;
     
     if (allSamePhoto) {
-      console.log(`[AI Photos] All photos identical (imageInsights unavailable) - falling back to diversified selection`);
+      log.info('All photos identical (imageInsights unavailable) - falling back to diversified selection');
       
       // Use imageInsights-based selection if available, or diversify photos manually
       const diversifiedPhotos = selectDiversifiedPhotos(allPhotos, mainPhoto.url);
@@ -1305,7 +1327,7 @@ export async function getAISelectedPhotosForFlyer(mlsNumber: string): Promise<AI
       selectionMethod: "coverImage",
     };
   } catch (error) {
-    console.error("[AI Photos] Error in getAISelectedPhotosForFlyer:", error);
+    log.error({ err: error }, 'Error in getAISelectedPhotosForFlyer');
     return {
       mainPhoto: null,
       kitchenPhoto: null,
@@ -1359,8 +1381,7 @@ export async function checkImageInsights(mlsNumber: string): Promise<{
     const imageInsights = listing.imageInsights;
     
     if (imageInsights) {
-      console.log("[ImageInsights] Found imageInsights field in response!");
-      console.log("[ImageInsights] Raw preview (first 500 chars):", JSON.stringify(imageInsights).substring(0, 500));
+      log.debug({ preview: JSON.stringify(imageInsights).substring(0, 500) }, 'Found imageInsights field in response');
       
       const images = imageInsights.images || [];
       const sampleClassifications = images.slice(0, 5).map((img: any) => ({
@@ -1380,8 +1401,7 @@ export async function checkImageInsights(mlsNumber: string): Promise<{
     }
 
     // Image Insights not found - test coverImage parameter
-    console.log("[ImageInsights] imageInsights field NOT present in response");
-    console.log("[ImageInsights] Testing coverImage parameter...");
+    log.debug('imageInsights field NOT present in response, testing coverImage parameter');
     
     let coverImageFirstPhoto = defaultFirstImage;
     try {
@@ -1395,11 +1415,9 @@ export async function checkImageInsights(mlsNumber: string): Promise<{
       const coverPhotos = normalizeImageUrls(coverImages);
       coverImageFirstPhoto = coverPhotos[0] || "";
       
-      console.log("[ImageInsights] Default first image:", defaultFirstImage);
-      console.log("[ImageInsights] With coverImage param:", coverImageFirstPhoto);
-      console.log("[ImageInsights] Cover image changed:", coverImageFirstPhoto !== defaultFirstImage);
+      log.debug({ defaultFirstImage, coverImageFirstPhoto, coverImageChanged: coverImageFirstPhoto !== defaultFirstImage }, 'coverImage parameter test results');
     } catch (e) {
-      console.log("[ImageInsights] Error testing coverImage param:", e);
+      log.debug({ err: e }, 'Error testing coverImage parameter');
     }
 
     return {
@@ -1414,7 +1432,7 @@ export async function checkImageInsights(mlsNumber: string): Promise<{
       },
     };
   } catch (error) {
-    console.error("[ImageInsights] Error checking image insights:", error);
+    log.error({ err: error }, 'Error checking image insights');
     return {
       mlsNumber,
       imageInsightsEnabled: false,
@@ -1523,7 +1541,7 @@ export async function searchNearbyComparables(
     if (wantActive || wantUnderContract) {
       const activeParams = buildBaseParams();
       
-      console.log("[CMA Refresh] Searching active listings with POST and polygon, params:", activeParams);
+      log.debug({ params: activeParams }, 'Searching active listings with POST and polygon');
 
       const activeUrl = new URL(`${REPLIERS_API_BASE}/listings`);
       Object.entries(activeParams).forEach(([key, value]) => {
@@ -1548,15 +1566,15 @@ export async function searchNearbyComparables(
         if (activeResponse.ok) {
           const activeData = await activeResponse.json();
           if (activeData.listings && Array.isArray(activeData.listings)) {
-            console.log(`[CMA Refresh] Found ${activeData.listings.length} active listings`);
+            log.info({ count: activeData.listings.length }, 'Found active listings');
             allListings.push(...activeData.listings);
           }
         } else {
           const errorText = await activeResponse.text();
-          console.warn("[CMA Refresh] Active listings query failed:", activeResponse.status, errorText);
+          log.warn({ statusCode: activeResponse.status, errorText }, 'Active listings query failed');
         }
       } catch (err) {
-        console.warn("[CMA Refresh] Active listings query error:", err);
+        log.warn({ err }, 'Active listings query error');
       }
     }
 
@@ -1571,7 +1589,7 @@ export async function searchNearbyComparables(
         closedParams.soldDateFrom = closeDateMin.toISOString().split('T')[0];
       }
 
-      console.log("[CMA Refresh] Searching closed listings with POST and polygon, params:", closedParams);
+      log.debug({ params: closedParams }, 'Searching closed listings with POST and polygon');
 
       const closedUrl = new URL(`${REPLIERS_API_BASE}/listings`);
       Object.entries(closedParams).forEach(([key, value]) => {
@@ -1596,22 +1614,22 @@ export async function searchNearbyComparables(
         if (closedResponse.ok) {
           const closedData = await closedResponse.json();
           if (closedData.listings && Array.isArray(closedData.listings)) {
-            console.log(`[CMA Refresh] Found ${closedData.listings.length} closed listings`);
+            log.info({ count: closedData.listings.length }, 'Found closed listings');
             allListings.push(...closedData.listings);
           }
         } else {
           const errorText = await closedResponse.text();
-          console.warn("[CMA Refresh] Closed listings query failed:", closedResponse.status, errorText);
+          log.warn({ statusCode: closedResponse.status, errorText }, 'Closed listings query failed');
         }
       } catch (err) {
-        console.warn("[CMA Refresh] Closed listings query error:", err);
+        log.warn({ err }, 'Closed listings query error');
       }
     }
 
     const data = { listings: allListings };
 
     if (!data.listings || !Array.isArray(data.listings)) {
-      console.log("[CMA Refresh] No listings found");
+      log.info('No listings found');
       return [];
     }
 
@@ -1622,7 +1640,7 @@ export async function searchNearbyComparables(
       return true;
     });
 
-    console.log(`[CMA Refresh] Found ${filteredListings.length} comparables (excluded subject & rentals)`);
+    log.info({ count: filteredListings.length }, 'Found comparables (excluded subject & rentals)');
 
     // Map to CMAComparable format (matching existing interface)
     const comparables: CMAComparable[] = filteredListings.map((listing: any) => {
@@ -1694,7 +1712,7 @@ export async function searchNearbyComparables(
 
     return comparables.slice(0, filters.maxResults);
   } catch (error) {
-    console.error("[CMA Refresh] Error searching nearby comparables:", error);
+    log.error({ err: error }, 'Error searching nearby comparables');
     throw error;
   }
 }
@@ -1737,7 +1755,7 @@ export async function searchListings(params: {
     }
     return results;
   } catch (error) {
-    console.error("Error searching listings:", error);
+    log.error({ err: error }, 'Error searching listings');
     return [];
   }
 }

@@ -3,6 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import Handlebars from 'handlebars';
 import { execSync } from 'child_process';
+import { createModuleLogger } from '../lib/logger';
+
+const log = createModuleLogger('marketing');
 
 export type GraphicsFormat = 'square' | 'story' | 'landscape';
 
@@ -79,14 +82,14 @@ async function imageToBase64(imageUrl: string): Promise<string> {
     }
     
     if (!fetchUrl.startsWith('http')) {
-      console.error('[GraphicsGenerator] Cannot fetch non-http URL:', fetchUrl);
+      log.error({ url: fetchUrl }, 'Cannot fetch non-http URL');
       return '';
     }
     
-    console.log('[GraphicsGenerator] Fetching image:', fetchUrl);
+    log.debug({ url: fetchUrl }, 'Fetching image');
     const response = await fetch(fetchUrl);
     if (!response.ok) {
-      console.error('[GraphicsGenerator] Failed to fetch image:', fetchUrl, response.status);
+      log.error({ url: fetchUrl, status: response.status }, 'Failed to fetch image');
       return '';
     }
     
@@ -96,7 +99,7 @@ async function imageToBase64(imageUrl: string): Promise<string> {
     return `data:${contentType};base64,${buffer.toString('base64')}`;
     
   } catch (error) {
-    console.error('[GraphicsGenerator] Error converting image to base64:', imageUrl, error);
+    log.error({ err: error, imageUrl }, 'Error converting image to base64');
     return '';
   }
 }
@@ -123,10 +126,7 @@ function findChromiumPath(): string {
 }
 
 export async function generateGraphic(data: GraphicsData, format: GraphicsFormat): Promise<Buffer> {
-  console.log(`[GraphicsGenerator] ===== RENDER START =====`);
-  console.log(`[GraphicsGenerator] Format: ${format}`);
-  console.log(`[GraphicsGenerator] Status: ${data.status}`);
-  console.log(`[GraphicsGenerator] Address: ${data.address}`);
+  log.info({ format, status: data.status, address: data.address }, 'RENDER START');
   
   const dimensions = FORMAT_DIMENSIONS[format];
   if (!dimensions) {
@@ -167,7 +167,7 @@ export async function generateGraphic(data: GraphicsData, format: GraphicsFormat
   });
   
   const chromiumPath = findChromiumPath();
-  console.log('[GraphicsGenerator] Using Chromium at:', chromiumPath || 'Puppeteer default');
+  log.debug({ chromiumPath: chromiumPath || 'Puppeteer default' }, 'Using Chromium');
   
   const launchOptions: any = {
     headless: true,
@@ -231,8 +231,7 @@ export async function generateGraphic(data: GraphicsData, format: GraphicsFormat
       }
     });
     
-    console.log(`[GraphicsGenerator] ===== RENDER COMPLETE =====`);
-    console.log(`[GraphicsGenerator] Output size: ${screenshot.length} bytes`);
+    log.info({ size: screenshot.length }, 'RENDER COMPLETE');
     
     return Buffer.from(screenshot);
     

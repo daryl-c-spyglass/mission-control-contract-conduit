@@ -1,0 +1,1169 @@
+# Enterprise Architecture Compliance — Contract Conduit
+
+## Objective
+
+Align Contract Conduit with the **Spyglass Realty Enterprise Architecture Guidelines v1.0**. This prompt covers backend infrastructure improvements only — no UI changes, no hosting migration. The app stays on Render.
+
+**Reference:** Spyglass_Enterprise_Architecture_Guidelines.pdf (Sections 2, 5, 6, 8, 10, 11, 12)
+
+---
+
+## ⚠️ CRITICAL RULES
+
+1. **Do NOT change any UI components or frontend behavior**
+2. **Do NOT migrate hosting** — we stay on Render
+3. **Do NOT break existing functionality** — all current features must continue working
+4. **Do NOT modify existing API response shapes** — only add internal infrastructure
+5. **Run the app after each major section and verify no regressions**
+6. **Preserve all existing environment variables** — only ADD new ones
+
+---
+
+## PHASE 1: Structured Logging (Guideline Section 5.5)
+
+Replace all `console.log`, `console.error`, `console.warn` with structured JSON logging.
+
+### Step 1.1: Install logging library
+
+```bash
+npm install pino pino-pretty
+```
+
+### Step 1.2: Create logging module
+
+Create `server/lib/logger.ts`:
+
+```typescript
+import pino from 'pino';
+
+const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  transport: process.env.NODE_ENV === 'development' 
+    ? { target: 'pino-pretty', options: { colorize: true } }
+    : undefined,
+  // Redact PII from logs (Guideline Section 5.4)
+  redact: {
+    paths: [
+      'email',
+      'phone', 
+      'req.headers.authorization',
+      'req.headers.cookie',
+      '*.email',
+      '*.phone',
+      '*.phoneNumber',
+      '*.agentEmail',
+      '*.agentPhone',
+      '*.contactEmail',
+      '*.contactPhone',
+    ],
+    censor: '[REDACTED]'
+  },
+  serializers: {
+    err: pino.stdSerializers.err,
+    req: pino.stdSerializers.req,
+    res: pino.stdSerializers.res,
+  },
+  base: {
+    service: 'contract-conduit',
+    env: process.env.NODE_ENV || 'development',
+  }
+});
+
+export default logger;
+
+// Child logger factory for specific modules
+export function createModuleLogger(module: string) {
+  return logger.child({ module });
+}
+```
+
+### Step 1.3: Create request ID middleware
+
+Create `server/middleware/requestId.ts`:
+
+```typescript
+import { Request, Response, NextFunction } from 'express';
+import { randomUUID } from 'crypto';
+
+declare global {
+  namespace Express {
+    interface Request {
+      requestId: string;
+    }
+  }
+}
+
+export function requestIdMiddleware(req: Request, res: Response, next: NextFunction) {
+  const requestId = (req.headers['x-request-id'] as string) || randomUUID();
+  req.requestId = requestId;
+  res.setHeader('x-request-id', requestId);
+  next();
+}
+```
+
+### Step 1.4: Create request logging middleware
+
+Create `server/middleware/requestLogger.ts`:
+
+```typescript
+import { Request, Response, NextFunction } from 'express';
+import logger from '../lib/logger';
+
+export function requestLoggerMiddleware(req: Request, res: Response, next: NextFunction) {
+  const start = Date.now();
+  
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const logData = {
+      requestId: req.requestId,
+      method: req.method,
+      url: req.originalUrl,
+      statusCode: res.statusCode,
+      duration,
+      userAgent: req.headers['user-agent'],
+      ip: req.ip,
+    };
+    
+    if (res.statusCode >= 500) {
+      logger.error(logData, 'Request failed');
+    } else if (res.statusCode >= 400) {
+      logger.warn(logData, 'Request client error');
+    } else {
+      logger.info(logData, 'Request completed');
+    }
+  });
+  
+  next();
+}
+```
+
+### Step 1.5: Register middleware in server/index.ts
+
+Add these middleware EARLY in the Express setup, before routes:
+
+```typescript
+import { requestIdMiddleware } from './middleware/requestId';
+import { requestLoggerMiddleware } from './middleware/requestLogger';
+
+// Add BEFORE existing routes
+app.use(requestIdMiddleware);
+app.use(requestLoggerMiddleware);
+```
+
+### Step 1.6: Replace console.log across the codebase
+
+Search and replace all server-side logging. Use these patterns:
+
+```bash
+# Find all console.log/error/warn in server code
+grep -rn "console\.\(log\|error\|warn\)" server/ --include="*.ts" | head -50
+```
+
+Replace patterns:
+
+```typescript
+// BEFORE
+console.log('Transaction created:', transaction.id);
+console.error('Failed to post notification:', error);
+
+// AFTER
+import logger from './lib/logger';
+// or
+import { createModuleLogger } from './lib/logger';
+const log = createModuleLogger('transactions');
+
+log.info({ transactionId: transaction.id }, 'Transaction created');
+log.error({ err: error, transactionId: transaction.id }, 'Failed to post notification');
+```
+
+**Module logger naming convention:**
+
+| File/Area | Module Name |
+|-----------|-------------|
+| Transaction routes | `transactions` |
+| Slack notifications | `slack` |
+| Repliers API calls | `repliers` |
+| Marketing/Flyers | `marketing` |
+| CMA features | `cma` |
+| Auth/OAuth | `auth` |
+| Database operations | `database` |
+
+### Verification:
+- [ ] App starts without errors
+- [ ] All server-side console.log/error/warn replaced with pino logger
+- [ ] Request ID appears in response headers (`x-request-id`)
+- [ ] Logs output as structured JSON in production mode
+- [ ] Logs output as pretty-printed in development mode
+- [ ] PII fields (email, phone) show as `[REDACTED]` in logs
+- [ ] No existing functionality broken
+
+---
+
+## PHASE 2: Audit Logging for Bot Actions (Guideline Section 8.2)
+
+The Transaction Management Bot creates channels, posts messages, and sends photos autonomously. These are classified as **high-risk actions** requiring audit trails.
+
+### Step 2.1: Create audit log table
+
+Add to Drizzle schema:
+
+```typescript
+// In shared/schema.ts (or wherever your Drizzle schema lives)
+export const auditLogs = pgTable('audit_logs', {
+  id: serial('id').primaryKey(),
+  timestamp: timestamp('timestamp').defaultNow().notNull(),
+  requestId: text('request_id'),
+  action: text('action').notNull(), // e.g., 'slack.channel.create', 'slack.message.post', 'slack.photo.upload'
+  actor: text('actor').notNull(), // 'system' or user email
+  target: text('target'), // channel ID, message TS, etc.
+  metadata: jsonb('metadata'), // full context object
+  status: text('status').notNull(), // 'success', 'failure', 'skipped'
+  errorMessage: text('error_message'),
+  transactionId: integer('transaction_id').references(() => transactions.id),
+});
+```
+
+### Step 2.2: Run the migration
+
+```bash
+npx drizzle-kit generate
+npx drizzle-kit push
+```
+
+Verify the table exists:
+
+```sql
+SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'audit_logs';
+```
+
+### Step 2.3: Create audit service
+
+Create `server/lib/audit.ts`:
+
+```typescript
+import { db } from '../db';
+import { auditLogs } from '../../shared/schema';
+import { createModuleLogger } from './logger';
+
+const log = createModuleLogger('audit');
+
+interface AuditEntry {
+  requestId?: string;
+  action: string;
+  actor: string;
+  target?: string;
+  metadata?: Record<string, any>;
+  status: 'success' | 'failure' | 'skipped';
+  errorMessage?: string;
+  transactionId?: number;
+}
+
+export async function logAudit(entry: AuditEntry): Promise<void> {
+  try {
+    await db.insert(auditLogs).values({
+      requestId: entry.requestId,
+      action: entry.action,
+      actor: entry.actor,
+      target: entry.target,
+      metadata: entry.metadata,
+      status: entry.status,
+      errorMessage: entry.errorMessage,
+      transactionId: entry.transactionId,
+    });
+    
+    log.info({ 
+      action: entry.action, 
+      status: entry.status, 
+      target: entry.target 
+    }, 'Audit entry recorded');
+  } catch (err) {
+    // Audit logging should never crash the app
+    log.error({ err, entry }, 'Failed to write audit log');
+  }
+}
+```
+
+### Step 2.4: Wrap all Slack bot actions with audit logging
+
+Find every place the bot does one of these and wrap with audit:
+
+**Channel creation:**
+```typescript
+// BEFORE
+const channel = await slackClient.conversations.create({ name: channelName });
+
+// AFTER
+import { logAudit } from './lib/audit';
+
+let channel;
+try {
+  channel = await slackClient.conversations.create({ name: channelName });
+  await logAudit({
+    requestId: req?.requestId,
+    action: 'slack.channel.create',
+    actor: userEmail || 'system',
+    target: channel.channel?.id,
+    metadata: { channelName, transactionAddress: transaction.propertyAddress },
+    status: 'success',
+    transactionId: transaction.id,
+  });
+} catch (err) {
+  await logAudit({
+    requestId: req?.requestId,
+    action: 'slack.channel.create',
+    actor: userEmail || 'system',
+    metadata: { channelName, error: err.message },
+    status: 'failure',
+    errorMessage: err.message,
+    transactionId: transaction.id,
+  });
+  throw err;
+}
+```
+
+**Message posting (Coming Soon, Photography, Marketing Materials, Welcome messages):**
+```typescript
+await logAudit({
+  action: 'slack.message.post',
+  actor: userEmail || 'system',
+  target: channelId,
+  metadata: { messageType: 'coming_soon', address: transaction.propertyAddress },
+  status: 'success',
+  transactionId: transaction.id,
+});
+```
+
+**Photo uploads:**
+```typescript
+await logAudit({
+  action: 'slack.photo.upload',
+  actor: 'system',
+  target: channelId,
+  metadata: { photoSource: 'repliers_cdn', mlsNumber },
+  status: 'success',
+  transactionId: transaction.id,
+});
+```
+
+**Action types to cover (search for these in the codebase):**
+
+```bash
+grep -rn "conversations\.create\|chat\.postMessage\|files\.upload\|files\.uploadV2" server/ --include="*.ts" | head -30
+```
+
+| Action | Audit Action String |
+|--------|-------------------|
+| Create Slack channel | `slack.channel.create` |
+| Post welcome message | `slack.message.welcome` |
+| Post MLS data to channel | `slack.message.mls_data` |
+| Upload property photo | `slack.photo.upload` |
+| Post Coming Soon notification | `slack.message.coming_soon` |
+| Post Photography Request | `slack.message.photography_request` |
+| Post Marketing Materials notification | `slack.message.marketing_materials` |
+| Invite user to channel | `slack.channel.invite` |
+
+### Verification:
+- [ ] audit_logs table created in database
+- [ ] Creating a transaction logs channel creation audit entry
+- [ ] Coming Soon notification logs audit entry
+- [ ] Photography request logs audit entry
+- [ ] Failed Slack calls log with status='failure' and error message
+- [ ] Audit entries include requestId for correlation
+- [ ] App continues working if audit logging itself fails
+
+---
+
+## PHASE 3: Rate Limiting and Input Validation (Guideline Sections 5.1, 5.2, 5.3)
+
+### Step 3.1: Install dependencies
+
+```bash
+npm install express-rate-limit
+```
+
+### Step 3.2: Create rate limiting middleware
+
+Create `server/middleware/rateLimit.ts`:
+
+```typescript
+import rateLimit from 'express-rate-limit';
+import { createModuleLogger } from '../lib/logger';
+
+const log = createModuleLogger('security');
+
+// General API rate limit
+export const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    log.warn({ 
+      ip: req.ip, 
+      requestId: req.requestId,
+      path: req.originalUrl 
+    }, 'Rate limit exceeded');
+    res.status(429).json({ 
+      error: 'Too many requests, please try again later.',
+      retryAfter: res.getHeader('Retry-After') 
+    });
+  }
+});
+
+// Stricter limit for transaction creation (creates Slack channels)
+export const transactionCreateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5, // 5 transactions per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    log.warn({ 
+      ip: req.ip, 
+      requestId: req.requestId 
+    }, 'Transaction creation rate limit exceeded');
+    res.status(429).json({ error: 'Too many transaction creation attempts.' });
+  }
+});
+
+// Stricter limit for marketing/flyer generation (uses OpenAI + Puppeteer)
+export const generationLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 3, // 3 generations per minute
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    log.warn({ 
+      ip: req.ip, 
+      requestId: req.requestId 
+    }, 'Generation rate limit exceeded');
+    res.status(429).json({ error: 'Too many generation requests. Please wait.' });
+  }
+});
+
+// Auth endpoint limiter (prevent brute force)
+export const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+```
+
+### Step 3.3: Apply rate limiters to routes
+
+In your route registration (server/routes.ts or wherever routes are defined):
+
+```typescript
+import { apiLimiter, transactionCreateLimiter, generationLimiter, authLimiter } from './middleware/rateLimit';
+
+// Apply general limiter to all API routes
+app.use('/api/', apiLimiter);
+
+// Apply stricter limiters to specific endpoints
+app.post('/api/transactions', transactionCreateLimiter, /* existing handler */);
+app.post('/api/flyers/*', generationLimiter, /* existing handler */);
+app.post('/api/marketing/*', generationLimiter, /* existing handler */);
+app.use('/api/auth/*', authLimiter);
+```
+
+**IMPORTANT:** Find the actual route paths by running:
+```bash
+grep -rn "app\.\(get\|post\|put\|patch\|delete\|use\)(" server/ --include="*.ts" | grep -v node_modules | head -30
+```
+
+Match the rate limiters to the actual route paths found.
+
+### Step 3.4: Add input validation to transaction creation
+
+Find the POST /api/transactions handler and add server-side validation:
+
+```typescript
+// Add at the top of the transaction creation handler
+function validateTransactionInput(body: any): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  if (!body.propertyAddress || typeof body.propertyAddress !== 'string' || body.propertyAddress.trim().length === 0) {
+    errors.push('Property address is required');
+  }
+  if (body.propertyAddress && body.propertyAddress.length > 500) {
+    errors.push('Property address exceeds maximum length');
+  }
+  if (body.listPrice && (isNaN(Number(body.listPrice)) || Number(body.listPrice) < 0)) {
+    errors.push('List price must be a positive number');
+  }
+  if (body.beds && (isNaN(Number(body.beds)) || Number(body.beds) < 0 || Number(body.beds) > 99)) {
+    errors.push('Beds must be between 0 and 99');
+  }
+  if (body.baths && (isNaN(Number(body.baths)) || Number(body.baths) < 0 || Number(body.baths) > 99)) {
+    errors.push('Baths must be between 0 and 99');
+  }
+  if (body.mlsNumber && !/^[A-Za-z0-9\-]{0,20}$/.test(body.mlsNumber)) {
+    errors.push('MLS number contains invalid characters');
+  }
+  if (body.photographyNotes && body.photographyNotes.length > 2000) {
+    errors.push('Photography notes exceed maximum length');
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+// In the handler:
+const validation = validateTransactionInput(req.body);
+if (!validation.valid) {
+  log.warn({ errors: validation.errors, requestId: req.requestId }, 'Invalid transaction input');
+  return res.status(400).json({ error: 'Validation failed', details: validation.errors });
+}
+```
+
+### Verification:
+- [ ] API returns 429 when rate limit exceeded
+- [ ] Transaction creation limited to 5/minute
+- [ ] Flyer/marketing generation limited to 3/minute
+- [ ] Invalid transaction input returns 400 with error details
+- [ ] Rate limit hits are logged with structured logger
+- [ ] Normal usage is not affected by rate limits
+
+---
+
+## PHASE 4: External Call Resilience (Guideline Sections 5.2, 12)
+
+Add explicit timeouts, retry logic, and circuit breaker patterns to all external API calls.
+
+### Step 4.1: Create resilience utilities
+
+Create `server/lib/resilience.ts`:
+
+```typescript
+import { createModuleLogger } from './logger';
+
+const log = createModuleLogger('resilience');
+
+// Timeout wrapper for any async function
+export async function withTimeout<T>(
+  fn: () => Promise<T>,
+  timeoutMs: number,
+  label: string
+): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  
+  try {
+    const result = await fn();
+    clearTimeout(timer);
+    return result;
+  } catch (err: any) {
+    clearTimeout(timer);
+    if (err.name === 'AbortError' || controller.signal.aborted) {
+      log.error({ label, timeoutMs }, 'External call timed out');
+      throw new Error(`${label} timed out after ${timeoutMs}ms`);
+    }
+    throw err;
+  }
+}
+
+// Retry with exponential backoff (only for idempotent/safe operations)
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: {
+    maxRetries?: number;
+    baseDelayMs?: number;
+    label: string;
+  }
+): Promise<T> {
+  const { maxRetries = 3, baseDelayMs = 1000, label } = options;
+  let lastError: Error;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * 500;
+        log.warn({ label, attempt: attempt + 1, maxRetries, delay }, 'Retrying external call');
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  log.error({ label, maxRetries }, 'All retry attempts exhausted');
+  throw lastError!;
+}
+
+// Simple circuit breaker
+class CircuitBreaker {
+  private failures = 0;
+  private lastFailureTime = 0;
+  private state: 'closed' | 'open' | 'half-open' = 'closed';
+  
+  constructor(
+    private readonly label: string,
+    private readonly threshold: number = 5,
+    private readonly resetTimeMs: number = 60000
+  ) {}
+  
+  async execute<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.state === 'open') {
+      if (Date.now() - this.lastFailureTime > this.resetTimeMs) {
+        this.state = 'half-open';
+        log.info({ label: this.label }, 'Circuit breaker half-open, allowing test request');
+      } else {
+        log.warn({ label: this.label }, 'Circuit breaker open, rejecting request');
+        throw new Error(`Circuit breaker open for ${this.label}`);
+      }
+    }
+    
+    try {
+      const result = await fn();
+      if (this.state === 'half-open') {
+        this.state = 'closed';
+        this.failures = 0;
+        log.info({ label: this.label }, 'Circuit breaker closed, service recovered');
+      }
+      return result;
+    } catch (err) {
+      this.failures++;
+      this.lastFailureTime = Date.now();
+      if (this.failures >= this.threshold) {
+        this.state = 'open';
+        log.error({ label: this.label, failures: this.failures }, 'Circuit breaker opened');
+      }
+      throw err;
+    }
+  }
+}
+
+// Create circuit breakers for each external service
+export const repliersCircuit = new CircuitBreaker('repliers-api', 5, 60000);
+export const slackCircuit = new CircuitBreaker('slack-api', 5, 30000);
+export const openaiCircuit = new CircuitBreaker('openai-api', 3, 120000);
+```
+
+### Step 4.2: Wrap Repliers API calls
+
+Find all Repliers API fetch calls:
+
+```bash
+grep -rn "repliers\|REPLIERS_API\|cdn\.repliers" server/ --include="*.ts" | head -20
+```
+
+Wrap each call:
+
+```typescript
+import { withTimeout, withRetry, repliersCircuit } from './lib/resilience';
+
+// BEFORE
+const response = await fetch(`https://api.repliers.io/listings/${mlsNumber}`, { headers });
+
+// AFTER  
+const response = await repliersCircuit.execute(() => 
+  withTimeout(
+    () => withRetry(
+      () => fetch(`https://api.repliers.io/listings/${mlsNumber}`, { 
+        headers,
+        signal: AbortSignal.timeout(10000) // 10 second timeout
+      }),
+      { label: 'repliers-listing-fetch', maxRetries: 2 }
+    ),
+    15000,
+    'repliers-listing'
+  )
+);
+```
+
+### Step 4.3: Wrap Slack API calls
+
+The Slack WebClient already has some built-in retry, but add timeouts:
+
+```typescript
+import { withTimeout, slackCircuit } from './lib/resilience';
+
+// Wrap channel creation
+const channel = await slackCircuit.execute(() =>
+  withTimeout(
+    () => slackClient.conversations.create({ name: channelName }),
+    10000,
+    'slack-channel-create'
+  )
+);
+
+// Wrap message posting
+await slackCircuit.execute(() =>
+  withTimeout(
+    () => slackClient.chat.postMessage({ channel: channelId, text, blocks }),
+    10000,
+    'slack-post-message'
+  )
+);
+```
+
+### Step 4.4: Wrap OpenAI calls
+
+```bash
+grep -rn "openai\|OPENAI_API\|gpt-4\|ChatCompletion" server/ --include="*.ts" | head -20
+```
+
+```typescript
+import { withTimeout, openaiCircuit } from './lib/resilience';
+
+// Wrap GPT-4o calls with 30s timeout and circuit breaker
+const completion = await openaiCircuit.execute(() =>
+  withTimeout(
+    () => openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages,
+      max_tokens: 500,
+    }),
+    30000,
+    'openai-completion'
+  )
+);
+```
+
+### Verification:
+- [ ] All Repliers API calls have timeout + retry + circuit breaker
+- [ ] All Slack API calls have timeout + circuit breaker
+- [ ] All OpenAI calls have timeout + circuit breaker
+- [ ] App handles timeout gracefully (returns error, doesn't crash)
+- [ ] Circuit breaker opens after 5 consecutive failures
+- [ ] Circuit breaker resets after cooldown period
+- [ ] Retry attempts are logged with attempt count
+
+---
+
+## PHASE 5: Environment Separation Guards (Guideline Section 4.2)
+
+### Step 5.1: Create environment validation on startup
+
+Add to the beginning of server startup (server/index.ts):
+
+```typescript
+import logger from './lib/logger';
+
+function validateEnvironment() {
+  const required = ['DATABASE_URL', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'];
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    logger.fatal({ missing }, 'Missing required environment variables');
+    process.exit(1);
+  }
+  
+  // Warn if Slack notifications enabled without proper config
+  if (process.env.DISABLE_SLACK_NOTIFICATIONS !== 'true') {
+    if (!process.env.SLACK_BOT_TOKEN) {
+      logger.fatal('Slack notifications enabled but SLACK_BOT_TOKEN is not set');
+      process.exit(1);
+    }
+    logger.warn('⚡ Slack notifications are ENABLED — bot will post to real channels');
+  } else {
+    logger.info('Slack notifications are DISABLED');
+  }
+  
+  // Log environment for debugging
+  logger.info({
+    nodeEnv: process.env.NODE_ENV,
+    slackEnabled: process.env.DISABLE_SLACK_NOTIFICATIONS !== 'true',
+    hasRepliersKey: !!process.env.REPLIERS_API_KEY,
+    hasOpenAIKey: !!process.env.OPENAI_API_KEY,
+    hasSlackToken: !!process.env.SLACK_BOT_TOKEN,
+    appUrl: process.env.APP_URL || 'not set',
+  }, 'Environment configuration loaded');
+}
+
+// Call before server starts
+validateEnvironment();
+```
+
+### Step 5.2: Add health check endpoint
+
+Create `server/routes/health.ts`:
+
+```typescript
+import { Router } from 'express';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
+import { createModuleLogger } from '../lib/logger';
+
+const log = createModuleLogger('health');
+const router = Router();
+
+router.get('/health', async (req, res) => {
+  const checks: Record<string, string> = {};
+  let healthy = true;
+  
+  // Database check
+  try {
+    await db.execute(sql`SELECT 1`);
+    checks.database = 'ok';
+  } catch (err) {
+    checks.database = 'failed';
+    healthy = false;
+    log.error({ err }, 'Health check: database failed');
+  }
+  
+  // Slack token check (just verifies token exists, doesn't call API)
+  checks.slack = process.env.SLACK_BOT_TOKEN ? 'configured' : 'missing';
+  checks.slackEnabled = process.env.DISABLE_SLACK_NOTIFICATIONS !== 'true' ? 'enabled' : 'disabled';
+  
+  // Repliers API check
+  checks.repliers = process.env.REPLIERS_API_KEY ? 'configured' : 'missing';
+  
+  // OpenAI check
+  checks.openai = process.env.OPENAI_API_KEY ? 'configured' : 'missing';
+  
+  const status = healthy ? 200 : 503;
+  res.status(status).json({
+    status: healthy ? 'healthy' : 'degraded',
+    timestamp: new Date().toISOString(),
+    version: process.env.npm_package_version || 'unknown',
+    uptime: process.uptime(),
+    checks,
+  });
+});
+
+export default router;
+```
+
+Register in server/index.ts:
+```typescript
+import healthRouter from './routes/health';
+app.use(healthRouter);
+```
+
+### Verification:
+- [ ] App fails to start if DATABASE_URL is missing
+- [ ] App logs warning when Slack notifications are enabled
+- [ ] GET /health returns 200 with service status
+- [ ] GET /health returns 503 if database is unreachable
+- [ ] Environment variables logged on startup (without secret values)
+
+---
+
+## PHASE 6: Generate Repository Documentation (Guideline Section 6)
+
+Generate these files in the project root. These are documentation files — they do NOT affect app functionality.
+
+### Step 6.1: Create README.md
+
+Create `README.md` in the project root:
+
+```markdown
+# Contract Conduit — Mission Control Transaction Management
+
+Real estate transaction management platform for Spyglass Realty agents.
+
+## Tech Stack
+
+- **Frontend:** React + TypeScript + Vite
+- **Backend:** Express.js + TypeScript
+- **Database:** PostgreSQL (Render managed)
+- **ORM:** Drizzle ORM
+- **Routing:** wouter
+- **Auth:** Google OAuth 2.0
+- **APIs:** Repliers (MLS), Slack, OpenAI GPT-4o, Mapbox
+
+## Quick Start
+
+```bash
+npm install
+npm run dev
+```
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| DATABASE_URL | Yes | PostgreSQL connection string |
+| GOOGLE_CLIENT_ID | Yes | Google OAuth client ID |
+| GOOGLE_CLIENT_SECRET | Yes | Google OAuth client secret |
+| SESSION_SECRET | Yes | Express session secret |
+| REPLIERS_API_KEY | Yes | Repliers MLS API key |
+| SLACK_BOT_TOKEN | Yes | Slack bot OAuth token (xoxb-) |
+| OPENAI_API_KEY | Yes | OpenAI API key |
+| DISABLE_SLACK_NOTIFICATIONS | No | Set to 'true' to disable Slack |
+| APP_URL | No | Public app URL for Slack links |
+| MAPBOX_TOKEN | No | Mapbox API token for maps |
+| LOG_LEVEL | No | Logging level (default: info) |
+
+## Deployment
+
+Deployed to Render via GitHub auto-deploy on push to `main`.
+
+## API Health Check
+
+GET /health — Returns service status and dependency checks.
+```
+
+### Step 6.2: Create ARCHITECTURE.md
+
+```markdown
+# Contract Conduit — Architecture
+
+## Context
+
+Contract Conduit is the central transaction management hub for Spyglass Realty agents. It manages property listings, coordinates team communication via Slack, generates marketing materials, and provides CMA tools.
+
+## System Context
+
+```
+[Agents] --> [Contract Conduit] --> [Repliers API (MLS Data)]
+                                --> [Slack API (Notifications)]
+                                --> [OpenAI GPT-4o (Content Gen)]
+                                --> [Google OAuth (Authentication)]
+                                --> [Mapbox (Maps)]
+                                --> [PostgreSQL (Data Store)]
+```
+
+## Container Diagram
+
+```
+┌─────────────────────────────────────────────┐
+│              Contract Conduit                │
+│                                             │
+│  ┌──────────────┐    ┌──────────────────┐   │
+│  │  React SPA   │    │  Express API     │   │
+│  │  (Vite)      │───>│  (TypeScript)    │   │
+│  │              │    │                  │   │
+│  └──────────────┘    │  Routes:         │   │
+│                      │  /api/transactions│   │
+│                      │  /api/mls        │   │
+│                      │  /api/marketing  │   │
+│                      │  /api/cma        │   │
+│                      │  /api/flyers     │   │
+│                      │  /health         │   │
+│                      └────────┬─────────┘   │
+│                               │              │
+│                      ┌────────▼─────────┐   │
+│                      │  PostgreSQL      │   │
+│                      │  (Render)        │   │
+│                      └──────────────────┘   │
+└─────────────────────────────────────────────┘
+```
+
+## Key Decisions
+
+- Repliers API is the single source of truth for MLS/property data
+- Slack bot autonomously creates channels and posts notifications (audit logged)
+- GPT-4o generates marketing copy with agent review before publishing
+- Google OAuth restricts access to @spyglassrealty.com domain
+```
+
+### Step 6.3: Create SECURITY.md
+
+```markdown
+# Contract Conduit — Security
+
+## Data Classification
+
+| Data Type | Classification | Examples |
+|-----------|---------------|----------|
+| Agent PII | Confidential | Email, phone, name |
+| Property Data | Internal | MLS data, prices, addresses |
+| Transaction Data | Internal | Contract dates, closing info |
+| Marketing Assets | Internal | Flyers, social media graphics |
+| API Keys/Tokens | Restricted | Slack, Repliers, OpenAI keys |
+
+## Authentication
+
+- Google OAuth 2.0 with domain restriction (@spyglassrealty.com)
+- Session-based auth with secure cookies
+- No API key auth (session only)
+
+## Secrets Management
+
+- All secrets stored in Render environment variables
+- Never committed to code repository
+- .env files in .gitignore
+
+## PII Handling
+
+- Agent emails and phone numbers logged as [REDACTED]
+- Property addresses are not classified as PII
+- No client/buyer PII stored in the system
+
+## Threat Model Summary
+
+| Threat | Mitigation |
+|--------|-----------|
+| Unauthorized access | Google OAuth domain restriction |
+| API abuse | Rate limiting on all endpoints |
+| Slack bot misuse | Audit logging, environment guards |
+| Data exposure in logs | PII redaction via pino |
+| External API failure | Circuit breakers, timeouts |
+```
+
+### Step 6.4: Create RUNBOOK.md
+
+```markdown
+# Contract Conduit — Runbook
+
+## Health Check
+
+GET https://mission-control-contract-conduit.onrender.com/health
+
+## Common Issues
+
+### Server Won't Start
+1. Check Render logs for error message
+2. Verify all required env vars are set
+3. Check DATABASE_URL connectivity
+4. Look for migration errors
+
+### Slack Notifications Not Posting
+1. Verify DISABLE_SLACK_NOTIFICATIONS is not 'true'
+2. Check SLACK_BOT_TOKEN is valid (not expired)
+3. Verify bot has chat:write scope
+4. Check audit_logs table for failure entries
+
+### Repliers API Errors
+1. Check circuit breaker status in logs ('Circuit breaker opened')
+2. Verify REPLIERS_API_KEY is valid
+3. Check Repliers service status
+4. MLS numbers must be ACT-prefixed (Austin ABOR only)
+
+### Rollback Procedure
+1. Go to Render Dashboard > mission-control-contract-conduit
+2. Click "Manual Deploy" > select previous commit
+3. Monitor /health endpoint after deploy
+4. Check Slack channels still functional
+
+## Database Backup
+- Render auto-backups enabled
+- Manual backup: Render Dashboard > spyglass-db > Backups
+- Restore: Contact Render support or use pg_restore
+```
+
+### Verification:
+- [ ] README.md created in project root
+- [ ] ARCHITECTURE.md created in project root
+- [ ] SECURITY.md created in project root
+- [ ] RUNBOOK.md created in project root
+- [ ] Files are documentation only — no app functionality affected
+- [ ] App still starts and runs normally
+
+---
+
+## PHASE 7: Graceful Shutdown (Guideline Section 9.2)
+
+### Step 7.1: Add graceful shutdown handler
+
+Add to server/index.ts at the END of the file:
+
+```typescript
+import logger from './lib/logger';
+
+// Graceful shutdown
+function gracefulShutdown(signal: string) {
+  logger.info({ signal }, 'Received shutdown signal, closing gracefully...');
+  
+  server.close(() => {
+    logger.info('HTTP server closed');
+    // Close database connections
+    // If using a connection pool, close it here
+    process.exit(0);
+  });
+  
+  // Force shutdown after 30 seconds
+  setTimeout(() => {
+    logger.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 30000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Catch unhandled errors
+process.on('unhandledRejection', (reason, promise) => {
+  logger.fatal({ reason }, 'Unhandled promise rejection');
+});
+
+process.on('uncaughtException', (error) => {
+  logger.fatal({ err: error }, 'Uncaught exception');
+  process.exit(1);
+});
+```
+
+### Verification:
+- [ ] App logs shutdown signal when stopped
+- [ ] App closes HTTP connections before exit
+- [ ] Unhandled rejections are logged (not silent)
+- [ ] Uncaught exceptions are logged before exit
+
+---
+
+## FINAL VERIFICATION CHECKLIST
+
+Run the app and verify ALL of these:
+
+### Infrastructure:
+- [ ] App starts without errors
+- [ ] Structured JSON logs in console (or pretty-printed in dev)
+- [ ] Request IDs in all log entries and response headers
+- [ ] PII redacted in logs (test with an agent email)
+- [ ] GET /health returns 200 with all checks
+
+### Security:
+- [ ] Rate limiting active (test with rapid requests)
+- [ ] Input validation on transaction creation
+- [ ] Environment validation on startup
+
+### Resilience:
+- [ ] External calls have timeouts (Repliers, Slack, OpenAI)
+- [ ] Circuit breakers log when opened/closed
+- [ ] Failed calls are retried where safe
+
+### Audit:
+- [ ] audit_logs table exists with entries
+- [ ] Slack channel creation logged
+- [ ] Slack message posting logged
+- [ ] Failed actions logged with error details
+
+### Documentation:
+- [ ] README.md in project root
+- [ ] ARCHITECTURE.md in project root
+- [ ] SECURITY.md in project root
+- [ ] RUNBOOK.md in project root
+
+### Existing Features (NO REGRESSIONS):
+- [ ] Transaction creation still works
+- [ ] Slack channel creation still works
+- [ ] Coming Soon notification still posts
+- [ ] Photography request notification still posts
+- [ ] MLS data fetching still works
+- [ ] Flyer generation still works
+- [ ] Marketing materials generation still works
+- [ ] CMA features still work
+- [ ] Google OAuth login still works
+- [ ] All existing UI pages render correctly
+
+---
+
+## 📱 Mobile Optimization
+
+No UI changes in this prompt. If any UI changes are accidentally introduced:
+
+| Device | Browser | Screen Size |
+|--------|---------|-------------|
+| iPad Pro | Safari | 1024 x 1366 |
+| iPad Air/Mini | Safari | 768 x 1024 |
+| iPhone 14/15 Pro | Safari | 393 x 852 |
+| iPhone SE | Safari | 375 x 667 |
+| Android Tablet | Chrome | 800 x 1280 |
+| Android Phone | Chrome | 360 x 800 |
+
+### Mobile UX Checklist:
+- [ ] Touch targets minimum 44x44px
+- [ ] No hover-only interactions
+- [ ] Responsive layouts (stack on mobile, side-by-side on tablet+)
+- [ ] Safe area insets for notched devices
+- [ ] No horizontal overflow
+- [ ] Readable font sizes (min 16px body text)
+- [ ] Works in both portrait and landscape orientations
+
+### Testing Required:
+- [ ] iPad Safari
+- [ ] iPhone Safari
+- [ ] Android Chrome (phone)
+- [ ] Android Chrome (tablet)

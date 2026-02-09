@@ -2,6 +2,9 @@ import { storage } from "./storage";
 import { fetchMLSListing, fetchSimilarListings, searchNearbyComparables, type CMASearchFilters } from "./repliers";
 import { isRentalOrLease } from "../shared/lib/listings";
 import type { Transaction, InsertTransaction } from "@shared/schema";
+import { createModuleLogger } from './lib/logger';
+
+const log = createModuleLogger('repliers-sync');
 
 const SYNC_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const BATCH_DELAY_MS = 2000; // 2 seconds between API calls to respect rate limits
@@ -47,7 +50,7 @@ async function syncTransactionMLS(transaction: Transaction): Promise<SyncResult>
     if (isRentalOrLease(mlsData.rawData ?? mlsData)) {
       result.skippedAsRental = true;
       result.error = "Skipped: Rental/Lease listing";
-      console.log(`[ReplierSync] Skipping rental/lease listing: ${transaction.mlsNumber}`);
+      log.info({ mlsNumber: transaction.mlsNumber }, 'Skipping rental/lease listing');
       return result;
     }
     
@@ -70,7 +73,7 @@ async function syncTransactionMLS(transaction: Transaction): Promise<SyncResult>
       const isClosed = status.includes('closed') || status.includes('sold');
       
       if (isClosed) {
-        console.log(`[ReplierSync] Using coordinate-based search for closed listing ${transaction.mlsNumber}`);
+        log.info({ mlsNumber: transaction.mlsNumber }, 'Using coordinate-based search for closed listing');
         const defaultFilters: CMASearchFilters = {
           radius: 5,
           maxResults: 10,
@@ -87,7 +90,7 @@ async function syncTransactionMLS(transaction: Transaction): Promise<SyncResult>
         if (cmaData && cmaData.length > 0) {
           cmaSourceType = 'coordinate_fallback';
         }
-        console.log(`[ReplierSync] Coordinate search found ${cmaData.length} comparables for closed listing`);
+        log.info({ comparablesCount: cmaData.length }, 'Coordinate search found comparables for closed listing');
       }
     }
 
@@ -122,7 +125,7 @@ async function syncTransactionMLS(transaction: Transaction): Promise<SyncResult>
     return result;
   } catch (error: any) {
     result.error = error.message || "Unknown error";
-    console.error(`[ReplierSync] Error syncing transaction ${transaction.id}:`, error);
+    log.error({ err: error, transactionId: transaction.id }, 'Error syncing transaction');
     return result;
   }
 }
@@ -133,18 +136,18 @@ function delay(ms: number): Promise<void> {
 
 async function runSync(): Promise<void> {
   if (isSyncing) {
-    console.log("[ReplierSync] Sync already in progress, skipping...");
+    log.info('Sync already in progress, skipping');
     return;
   }
 
   if (!process.env.REPLIERS_API_KEY) {
-    console.log("[ReplierSync] REPLIERS_API_KEY not configured, skipping sync");
+    log.info('REPLIERS_API_KEY not configured, skipping sync');
     return;
   }
 
   isSyncing = true;
   const startTime = Date.now();
-  console.log("[ReplierSync] Starting automatic MLS data sync...");
+  log.info('Starting automatic MLS data sync');
 
   try {
     const transactions = await storage.getTransactions();
@@ -154,20 +157,20 @@ async function runSync(): Promise<void> {
       (t.status === "active" || t.status === "in_contract")
     );
 
-    console.log(`[ReplierSync] Found ${activeTransactions.length} active transactions with MLS numbers`);
+    log.info({ count: activeTransactions.length }, 'Found active transactions with MLS numbers');
 
     const results: SyncResult[] = [];
     
     for (const transaction of activeTransactions) {
-      console.log(`[ReplierSync] Syncing: ${transaction.propertyAddress} (MLS# ${transaction.mlsNumber})`);
+      log.info({ address: transaction.propertyAddress, mlsNumber: transaction.mlsNumber }, 'Syncing transaction');
       
       const result = await syncTransactionMLS(transaction);
       results.push(result);
       
       if (result.success) {
-        console.log(`[ReplierSync] Success: ${result.address} - ${result.photosCount} photos, ${result.comparablesCount} comparables`);
+        log.info({ address: result.address, photosCount: result.photosCount, comparablesCount: result.comparablesCount }, 'Sync success');
       } else {
-        console.log(`[ReplierSync] Failed: ${result.address} - ${result.error}`);
+        log.warn({ address: result.address, error: result.error }, 'Sync failed');
       }
       
       if (activeTransactions.indexOf(transaction) < activeTransactions.length - 1) {
@@ -182,7 +185,7 @@ async function runSync(): Promise<void> {
     
     lastGlobalSyncAt = new Date();
     
-    console.log(`[ReplierSync] Sync complete: ${successful} success, ${skippedLeaseCount} skipped (rentals), ${failed} failed, took ${duration}s`);
+    log.info({ successful, skippedLeaseCount, failed, durationSeconds: duration }, 'Sync complete');
     
     await storage.upsertIntegrationSetting({
       integrationType: "repliers",
@@ -200,7 +203,7 @@ async function runSync(): Promise<void> {
     });
     
   } catch (error) {
-    console.error("[ReplierSync] Sync failed with error:", error);
+    log.error({ err: error }, 'Sync failed with error');
   } finally {
     isSyncing = false;
   }
@@ -208,11 +211,11 @@ async function runSync(): Promise<void> {
 
 export function startRepliersSync(): void {
   if (syncIntervalId) {
-    console.log("[ReplierSync] Sync already started");
+    log.info('Sync already started');
     return;
   }
 
-  console.log(`[ReplierSync] Starting automatic sync every ${SYNC_INTERVAL_MS / 60000} minutes`);
+  log.info({ intervalMinutes: SYNC_INTERVAL_MS / 60000 }, 'Starting automatic sync');
   
   setTimeout(() => {
     runSync();
@@ -222,14 +225,14 @@ export function startRepliersSync(): void {
     runSync();
   }, SYNC_INTERVAL_MS);
   
-  console.log("[ReplierSync] Automatic sync scheduler initialized");
+  log.info('Automatic sync scheduler initialized');
 }
 
 export function stopRepliersSync(): void {
   if (syncIntervalId) {
     clearInterval(syncIntervalId);
     syncIntervalId = null;
-    console.log("[ReplierSync] Automatic sync stopped");
+    log.info('Automatic sync stopped');
   }
 }
 
@@ -248,6 +251,6 @@ export function getSyncStatus(): {
 }
 
 export async function triggerManualSync(): Promise<void> {
-  console.log("[ReplierSync] Manual sync triggered");
+  log.info('Manual sync triggered');
   await runSync();
 }

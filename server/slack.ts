@@ -1,7 +1,17 @@
 // Real Slack API integration using SLACK_BOT_TOKEN
 import OpenAI from "openai";
+import { createModuleLogger } from './lib/logger';
+import { logAudit } from './lib/audit';
+import { withTimeout, slackCircuit, openaiCircuit } from './lib/resilience';
 
+const log = createModuleLogger('slack');
 const SLACK_API_BASE = "https://slack.com/api";
+
+async function slackFetch(url: string, init: RequestInit): Promise<Response> {
+  return slackCircuit.execute(() =>
+    withTimeout(() => fetch(url, init), 10000, `slack-fetch`)
+  );
+}
 
 /**
  * Summarize a property description using AI for Slack notifications
@@ -17,25 +27,31 @@ export async function summarizeDescription(description: string, maxLength: numbe
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a real estate assistant. Summarize property descriptions concisely while keeping the most important selling points. Keep it under 200 characters. Do not use quotes around the summary.'
-        },
-        {
-          role: 'user',
-          content: `Summarize this property description:\n\n${description}`
-        }
-      ],
-      max_tokens: 100,
-      temperature: 0.5,
-    });
+    const response = await openaiCircuit.execute(() =>
+      withTimeout(
+        () => openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a real estate assistant. Summarize property descriptions concisely while keeping the most important selling points. Keep it under 200 characters. Do not use quotes around the summary.'
+            },
+            {
+              role: 'user',
+              content: `Summarize this property description:\n\n${description}`
+            }
+          ],
+          max_tokens: 100,
+          temperature: 0.5,
+        }),
+        30000,
+        'openai-summarize'
+      )
+    );
 
     return response.choices[0]?.message?.content?.trim() || description.substring(0, maxLength) + '...';
   } catch (error) {
-    console.error('Failed to summarize description:', error);
+    log.error({ err: error }, 'Failed to summarize description');
     // Fallback to simple truncation if AI fails
     return description.substring(0, maxLength) + '...';
   }
@@ -49,8 +65,7 @@ function isSlackNotificationsDisabled(): boolean {
 
 // Verbose logging helper for Slack operations
 function logSlackOp(emoji: string, message: string, data?: Record<string, any>): void {
-  const dataStr = data ? ` ${JSON.stringify(data)}` : '';
-  console.log(`[SLACK] ${emoji} ${message}${dataStr}`);
+  log.info(data || {}, message);
 }
 
 async function slackRequest(method: string, body: Record<string, any>): Promise<any> {
@@ -73,14 +88,20 @@ async function slackRequest(method: string, body: Record<string, any>): Promise<
   });
 
   try {
-    const response = await fetch(`${SLACK_API_BASE}/${method}`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+    const response = await slackCircuit.execute(() =>
+      withTimeout(
+        () => fetch(`${SLACK_API_BASE}/${method}`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        }),
+        10000,
+        `slack-${method}`
+      )
+    );
 
     const data = await response.json();
     if (!data.ok) {
@@ -107,7 +128,7 @@ async function slackRequest(method: string, body: Record<string, any>): Promise<
   }
 }
 
-export async function createSlackChannel(name: string): Promise<{ channelId: string; channelName: string } | null> {
+export async function createSlackChannel(name: string, propertyAddress?: string, transactionId?: string): Promise<{ channelId: string; channelName: string } | null> {
   logSlackOp('🔨', 'createSlackChannel called', {
     channelName: name,
     DISABLE_SLACK_NOTIFICATIONS: process.env.DISABLE_SLACK_NOTIFICATIONS,
@@ -117,6 +138,7 @@ export async function createSlackChannel(name: string): Promise<{ channelId: str
 
   if (isSlackNotificationsDisabled()) {
     logSlackOp('⛔', `Channel creation SKIPPED - notifications disabled`, { channelName: name });
+    logAudit({ action: 'slack.channel.create', actor: 'system', metadata: { channelName: name, propertyAddress }, status: 'skipped' });
     return null; // Return null so caller knows channel wasn't created
   }
   
@@ -134,27 +156,34 @@ export async function createSlackChannel(name: string): Promise<{ channelId: str
       is_private: false,
     });
 
+    const channelId = data.channel.id;
+    const channelName = data.channel.name;
+
     logSlackOp('✅', 'Channel created successfully', {
-      channelId: data.channel.id,
-      channelName: data.channel.name
+      channelId,
+      channelName
     });
 
+    logAudit({ action: 'slack.channel.create', actor: 'system', target: channelId, metadata: { channelName, propertyAddress }, status: 'success', transactionId });
+
     return {
-      channelId: data.channel.id,
-      channelName: data.channel.name,
+      channelId,
+      channelName,
     };
   } catch (error: any) {
     logSlackOp('❌', 'Channel creation FAILED', {
       error: error.message,
       channelName: cleanName
     });
+    logAudit({ action: 'slack.channel.create', actor: 'system', metadata: { channelName: cleanName, error: error.message }, status: 'failure' });
     throw error;
   }
 }
 
 export async function inviteUsersToChannel(channelId: string, userIds: string[]): Promise<void> {
   if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
-    console.log(`[NOTIFICATIONS DISABLED] Would have invited users to channel ${channelId}: ${userIds.join(', ')}`);
+    log.debug({ channelId, userIds }, 'Notifications disabled - would have invited users to channel');
+    logAudit({ action: 'slack.channel.invite', actor: 'system', target: channelId, metadata: { userIds }, status: 'skipped' });
     return;
   }
   
@@ -169,24 +198,28 @@ export async function inviteUsersToChannel(channelId: string, userIds: string[])
       channel: channelId,
       users: validUserIds.join(","),
     });
+    for (const userId of validUserIds) {
+      logAudit({ action: 'slack.channel.invite', actor: 'system', target: channelId, metadata: { userId }, status: 'success' });
+    }
   } catch (error: any) {
     // Handle common cases where invite fails but isn't a real error
     const errorMessage = error?.message || "";
     if (errorMessage.includes("already_in_channel") || 
         errorMessage.includes("is_archived") ||
         errorMessage.includes("cant_invite_self")) {
-      console.log(`Slack invite non-fatal: ${errorMessage}`);
+      log.debug({ errorMessage }, 'Slack invite non-fatal');
       return;
     }
     // Re-throw other errors
-    console.error("Failed to invite users to Slack channel:", error);
+    log.error({ err: error, channelId }, 'Failed to invite users to Slack channel');
     throw error;
   }
 }
 
 export async function postToChannel(channelId: string, text: string): Promise<void> {
   if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
-    console.log(`[NOTIFICATIONS DISABLED] Would have posted to channel ${channelId}: ${text.substring(0, 100)}...`);
+    log.debug({ channelId }, 'Notifications disabled - would have posted to channel');
+    logAudit({ action: 'slack.message.post', actor: 'system', target: channelId, metadata: { messagePreview: text?.substring(0, 100) }, status: 'skipped' });
     return;
   }
   
@@ -194,6 +227,7 @@ export async function postToChannel(channelId: string, text: string): Promise<vo
     channel: channelId,
     text,
   });
+  logAudit({ action: 'slack.message.post', actor: 'system', target: channelId, metadata: { messagePreview: text?.substring(0, 100) }, status: 'success' });
 }
 
 interface DocumentUploadNotification {
@@ -214,7 +248,7 @@ export async function postDocumentUploadNotification(
   doc: DocumentUploadNotification
 ): Promise<void> {
   if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
-    console.log(`[NOTIFICATIONS DISABLED] Would have sent document upload notification for: ${doc.documentName} at ${doc.propertyAddress}`);
+    log.debug({ documentName: doc.documentName, propertyAddress: doc.propertyAddress }, 'Notifications disabled - would have sent document upload notification');
     return;
   }
   
@@ -318,31 +352,31 @@ export async function uploadImageFromUrl(
   altText?: string
 ): Promise<{ fileId: string } | null> {
   if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
-    console.log(`[NOTIFICATIONS DISABLED] Would have uploaded image to channel ${channelId}: ${filename}`);
+    log.debug({ channelId, filename }, 'Notifications disabled - would have uploaded image');
     return { fileId: 'disabled' };
   }
   
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {
-    console.log("Slack not configured, skipping image upload");
+    log.info('Slack not configured, skipping image upload');
     return null;
   }
 
   try {
-    console.log(`[Slack] Downloading image from: ${imageUrl}`);
+    log.info({ imageUrl }, 'Downloading image');
     
     // Download the image
     const imageResponse = await fetch(imageUrl);
     if (!imageResponse.ok) {
-      console.error(`[Slack] Failed to download image: ${imageResponse.status}`);
+      log.error({ status: imageResponse.status }, 'Failed to download image');
       return null;
     }
     
     const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-    console.log(`[Slack] Downloaded image: ${imageBuffer.length} bytes`);
+    log.info({ bytes: imageBuffer.length }, 'Downloaded image');
 
     // Step 1: Get upload URL
-    const getUploadUrlResponse = await fetch("https://slack.com/api/files.getUploadURLExternal", {
+    const getUploadUrlResponse = await slackFetch("https://slack.com/api/files.getUploadURLExternal", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${token}`,
@@ -356,7 +390,7 @@ export async function uploadImageFromUrl(
 
     const uploadUrlData = await getUploadUrlResponse.json();
     if (!uploadUrlData.ok) {
-      console.error("[Slack] Failed to get upload URL:", uploadUrlData.error);
+      log.error({ error: uploadUrlData.error }, 'Failed to get upload URL');
       return null;
     }
 
@@ -369,12 +403,12 @@ export async function uploadImageFromUrl(
     });
 
     if (!uploadResponse.ok) {
-      console.error("[Slack] Failed to upload image:", uploadResponse.status);
+      log.error({ status: uploadResponse.status }, 'Failed to upload image');
       return null;
     }
 
     // Step 3: Complete upload
-    const completeResponse = await fetch("https://slack.com/api/files.completeUploadExternal", {
+    const completeResponse = await slackFetch("https://slack.com/api/files.completeUploadExternal", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${token}`,
@@ -388,14 +422,14 @@ export async function uploadImageFromUrl(
 
     const completeData = await completeResponse.json();
     if (!completeData.ok) {
-      console.error("[Slack] Failed to complete image upload:", completeData.error);
+      log.error({ error: completeData.error }, 'Failed to complete image upload');
       return null;
     }
 
-    console.log(`[Slack] Property image uploaded successfully: ${file_id}`);
+    log.info({ fileId: file_id }, 'Property image uploaded successfully');
     return { fileId: file_id };
   } catch (error) {
-    console.error("[Slack] Failed to upload image from URL:", error);
+    log.error({ err: error }, 'Failed to upload image from URL');
     return null;
   }
 }
@@ -424,7 +458,8 @@ export async function postMLSListingNotification(
   listing: MLSListingData
 ): Promise<void> {
   if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
-    console.log(`[NOTIFICATIONS DISABLED] Would have sent MLS listing notification for: ${listing.address}`);
+    log.debug({ address: listing.address }, 'Notifications disabled - would have sent MLS listing notification');
+    logAudit({ action: 'slack.message.mls_data', actor: 'system', target: channelId, metadata: { mlsNumber: listing.mlsNumber, propertyAddress: listing.address }, status: 'skipped' });
     return;
   }
   
@@ -522,6 +557,7 @@ export async function postMLSListingNotification(
     text: `MLS Listing: ${fullAddress}`,
     blocks,
   });
+  logAudit({ action: 'slack.message.mls_data', actor: 'system', target: channelId, metadata: { mlsNumber: listing.mlsNumber, propertyAddress: listing.address }, status: 'success' });
 
   // Upload property image separately for reliable display
   if (listing.imageUrl) {
@@ -533,7 +569,7 @@ export async function postMLSListingNotification(
         `Photo of ${fullAddress}`
       );
     } catch (imageError) {
-      console.error("[Slack] Failed to upload property image:", imageError);
+      log.error({ err: imageError }, 'Failed to upload property image');
       // Fallback: try posting image URL directly
       await postToChannel(channelId, listing.imageUrl);
     }
@@ -548,7 +584,8 @@ export async function uploadFileToChannel(
   initialComment?: string
 ): Promise<{ fileId: string } | null> {
   if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
-    console.log(`[NOTIFICATIONS DISABLED] Would have uploaded file to channel ${channelId}: ${fileName}`);
+    log.debug({ channelId, fileName }, 'Notifications disabled - would have uploaded file');
+    logAudit({ action: 'slack.photo.upload', actor: 'system', target: channelId, metadata: { fileName, title }, status: 'skipped' });
     return { fileId: 'disabled' };
   }
   
@@ -573,7 +610,7 @@ export async function uploadFileToChannel(
     process.stderr.write(`[Slack] File buffer size: ${fileBuffer.length} bytes\n`);
 
     // Step 1: Get upload URL using files.getUploadURLExternal
-    const getUploadUrlResponse = await fetch("https://slack.com/api/files.getUploadURLExternal", {
+    const getUploadUrlResponse = await slackFetch("https://slack.com/api/files.getUploadURLExternal", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${token}`,
@@ -607,7 +644,7 @@ export async function uploadFileToChannel(
     process.stderr.write(`[Slack] File uploaded successfully\n`);
 
     // Step 3: Complete the upload with files.completeUploadExternal
-    const completeResponse = await fetch("https://slack.com/api/files.completeUploadExternal", {
+    const completeResponse = await slackFetch("https://slack.com/api/files.completeUploadExternal", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${token}`,
@@ -627,6 +664,7 @@ export async function uploadFileToChannel(
     }
 
     process.stderr.write(`[Slack] File upload completed successfully: ${file_id}\n`);
+    logAudit({ action: 'slack.photo.upload', actor: 'system', target: channelId, metadata: { fileName, title }, status: 'success' });
     return { fileId: file_id };
   } catch (error) {
     process.stderr.write(`[Slack] Failed to upload file: ${error}\n`);
@@ -645,14 +683,13 @@ export async function sendClosingReminder(
 ): Promise<void> {
   // KILL SWITCH - check FIRST before any Slack API calls
   if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
-    console.log(`[Slack] 🔴 BLOCKED sendClosingReminder - DISABLE_SLACK_NOTIFICATIONS=true`);
-    console.log(`[Slack] Would have sent: ${propertyAddress} (${daysRemaining} days remaining)`);
+    log.debug({ propertyAddress, daysRemaining }, 'Blocked sendClosingReminder - notifications disabled');
     return;
   }
   
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {
-    console.error("[Slack] No Slack token available for closing reminder");
+    log.error('No Slack token available for closing reminder');
     return;
   }
 
@@ -724,7 +761,7 @@ export async function sendClosingReminder(
   ];
 
   try {
-    const response = await fetch("https://slack.com/api/chat.postMessage", {
+    const response = await slackFetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${token}`,
@@ -739,12 +776,12 @@ export async function sendClosingReminder(
 
     const data = await response.json();
     if (!data.ok) {
-      console.error("[Slack] Failed to send closing reminder:", data.error);
+      log.error({ error: data.error }, 'Failed to send closing reminder');
     } else {
-      console.log(`[Slack] Closing reminder sent for ${propertyAddress}: ${daysRemaining} days remaining`);
+      log.info({ propertyAddress, daysRemaining }, 'Closing reminder sent');
     }
   } catch (error) {
-    console.error("[Slack] Failed to send closing reminder:", error);
+    log.error({ err: error }, 'Failed to send closing reminder');
   }
 }
 
@@ -760,13 +797,14 @@ export async function sendMarketingNotification(
   fileName?: string
 ): Promise<void> {
   if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
-    console.log(`[NOTIFICATIONS DISABLED] Would have sent marketing notification for: ${propertyAddress} (${assetType})`);
+    log.debug({ propertyAddress, assetType }, 'Notifications disabled - would have sent marketing notification');
+    logAudit({ action: 'slack.message.marketing_materials', actor: createdBy, target: channelId, metadata: { assetType, propertyAddress }, status: 'skipped' });
     return;
   }
   
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {
-    console.error("[Slack] No Slack token available for marketing notification");
+    log.error('No Slack token available for marketing notification');
     return;
   }
 
@@ -801,6 +839,7 @@ export async function sendMarketingNotification(
     ].join('\n');
 
     await uploadFileToChannel(channelId, imageData, fileName, `${typeLabel} - ${propertyAddress}`, initialComment);
+    logAudit({ action: 'slack.message.marketing_materials', actor: createdBy, target: channelId, metadata: { assetType, propertyAddress }, status: 'success' });
   } else {
     // Just send a text message without attachment
     const blocks = [
@@ -829,7 +868,7 @@ export async function sendMarketingNotification(
     ];
 
     try {
-      const response = await fetch("https://slack.com/api/chat.postMessage", {
+      const response = await slackFetch("https://slack.com/api/chat.postMessage", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -844,10 +883,12 @@ export async function sendMarketingNotification(
 
       const data = await response.json();
       if (!data.ok) {
-        console.error("[Slack] Failed to send marketing notification:", data.error);
+        log.error({ error: data.error }, 'Failed to send marketing notification');
+      } else {
+        logAudit({ action: 'slack.message.marketing_materials', actor: createdBy, target: channelId, metadata: { assetType, propertyAddress }, status: 'success' });
       }
     } catch (error) {
-      console.error("[Slack] Failed to send marketing notification:", error);
+      log.error({ err: error }, 'Failed to send marketing notification');
     }
   }
 }
@@ -904,6 +945,7 @@ export async function postComingSoonNotification(data: ComingSoonNotification): 
 
   if (isSlackNotificationsDisabled()) {
     logSlackOp('⛔', 'Coming Soon notification SKIPPED - notifications disabled', { propertyAddress: data.propertyAddress });
+    logAudit({ action: 'slack.message.coming_soon', actor: 'system', target: COMING_SOON_CHANNEL_ID, metadata: { propertyAddress: data.propertyAddress }, status: 'skipped' });
     return false;
   }
 
@@ -1010,7 +1052,7 @@ export async function postComingSoonNotification(data: ComingSoonNotification): 
   try {
     // Ensure bot is in the #coming-soon-listings channel
     try {
-      const joinResponse = await fetch("https://slack.com/api/conversations.join", {
+      const joinResponse = await slackFetch("https://slack.com/api/conversations.join", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -1032,7 +1074,7 @@ export async function postComingSoonNotification(data: ComingSoonNotification): 
       tokenPrefix: token.substring(0, 15) + '...'
     });
 
-    const response = await fetch("https://slack.com/api/chat.postMessage", {
+    const response = await slackFetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${token}`,
@@ -1052,6 +1094,7 @@ export async function postComingSoonNotification(data: ComingSoonNotification): 
         channel: COMING_SOON_CHANNEL_ID,
         propertyAddress: data.propertyAddress
       });
+      logAudit({ action: 'slack.message.coming_soon', actor: 'system', target: COMING_SOON_CHANNEL_ID, metadata: { propertyAddress: data.propertyAddress, error: result.error }, status: 'failure' });
       return false;
     } else {
       logSlackOp('✅', 'Coming Soon notification POSTED', {
@@ -1059,6 +1102,7 @@ export async function postComingSoonNotification(data: ComingSoonNotification): 
         propertyAddress: data.propertyAddress,
         ts: result.ts
       });
+      logAudit({ action: 'slack.message.coming_soon', actor: 'system', target: COMING_SOON_CHANNEL_ID, metadata: { propertyAddress: data.propertyAddress }, status: 'success' });
       return true;
     }
   } catch (error: any) {
@@ -1066,6 +1110,7 @@ export async function postComingSoonNotification(data: ComingSoonNotification): 
       error: error.message,
       propertyAddress: data.propertyAddress
     });
+    logAudit({ action: 'slack.message.coming_soon', actor: 'system', target: COMING_SOON_CHANNEL_ID, metadata: { propertyAddress: data.propertyAddress, error: error.message }, status: 'failure' });
     return false;
   }
 }
@@ -1095,6 +1140,7 @@ export async function postPhotographyRequest(data: PhotographyRequestData): Prom
 
   if (isSlackNotificationsDisabled()) {
     logSlackOp('⛔', 'Photography request SKIPPED - notifications disabled', { propertyAddress: data.propertyAddress });
+    logAudit({ action: 'slack.message.photography_request', actor: data.agentName || 'system', target: PHOTOGRAPHY_CHANNEL_ID, metadata: { propertyAddress: data.propertyAddress }, status: 'skipped' });
     return false;
   }
 
@@ -1172,7 +1218,7 @@ export async function postPhotographyRequest(data: PhotographyRequestData): Prom
 
   try {
     // Join the channel first
-    await fetch("https://slack.com/api/conversations.join", {
+    await slackFetch("https://slack.com/api/conversations.join", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -1181,7 +1227,7 @@ export async function postPhotographyRequest(data: PhotographyRequestData): Prom
       body: JSON.stringify({ channel: PHOTOGRAPHY_CHANNEL_ID }),
     });
 
-    const response = await fetch("https://slack.com/api/chat.postMessage", {
+    const response = await slackFetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -1202,6 +1248,7 @@ export async function postPhotographyRequest(data: PhotographyRequestData): Prom
         channel: PHOTOGRAPHY_CHANNEL_ID,
         propertyAddress: data.propertyAddress
       });
+      logAudit({ action: 'slack.message.photography_request', actor: data.agentName || 'system', target: PHOTOGRAPHY_CHANNEL_ID, metadata: { propertyAddress: data.propertyAddress, error: result.error }, status: 'failure' });
       return false;
     } else {
       logSlackOp('✅', 'Photography request POSTED', {
@@ -1209,6 +1256,7 @@ export async function postPhotographyRequest(data: PhotographyRequestData): Prom
         propertyAddress: data.propertyAddress,
         ts: result.ts
       });
+      logAudit({ action: 'slack.message.photography_request', actor: data.agentName || 'system', target: PHOTOGRAPHY_CHANNEL_ID, metadata: { propertyAddress: data.propertyAddress }, status: 'success' });
       return true;
     }
   } catch (error: any) {
@@ -1216,6 +1264,7 @@ export async function postPhotographyRequest(data: PhotographyRequestData): Prom
       error: error.message,
       propertyAddress: data.propertyAddress
     });
+    logAudit({ action: 'slack.message.photography_request', actor: data.agentName || 'system', target: PHOTOGRAPHY_CHANNEL_ID, metadata: { propertyAddress: data.propertyAddress, error: error.message }, status: 'failure' });
     return false;
   }
 }

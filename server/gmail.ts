@@ -2,6 +2,9 @@
 // This allows Mission Control to create filters and watch emails for all agents in the domain
 
 import { google } from "googleapis";
+import { createModuleLogger } from './lib/logger';
+
+const log = createModuleLogger('gmail');
 
 interface GmailServiceAccount {
   client_email: string;
@@ -20,7 +23,7 @@ function getServiceAccountCredentials(): GmailServiceAccount | null {
     serviceAccountCredentials = JSON.parse(credentialsJson);
     return serviceAccountCredentials;
   } catch (error) {
-    console.error("Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON:", error);
+    log.error({ err: error }, 'Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON');
     return null;
   }
 }
@@ -55,7 +58,7 @@ export async function createGmailLabelAndFilter(
   transactionId: string
 ): Promise<{ labelId: string; filterId: string } | null> {
   if (!isGmailConfigured()) {
-    console.log("Gmail not configured, skipping label/filter creation");
+    log.info('Gmail not configured, skipping label/filter creation');
     return null;
   }
 
@@ -69,7 +72,7 @@ export async function createGmailLabelAndFilter(
     
     const addressParts = propertyAddress.match(/^(\d+)\s+(.+?)(?:,|$)/);
     if (!addressParts) {
-      console.log("Could not parse address for filter:", propertyAddress);
+      log.info({ propertyAddress }, 'Could not parse address for filter');
       return null;
     }
     
@@ -111,7 +114,7 @@ export async function createGmailLabelAndFilter(
     // This handles abbreviations like Ave/Avenue, St/Street, etc.
     const subjectPattern = `${streetNumber} ${streetName}`;
     
-    console.log(`Creating Gmail filter for subject containing: "${subjectPattern}"`);
+    log.info({ subjectPattern }, 'Creating Gmail filter for subject');
     
     const filterResponse = await gmail.users.settings.filters.create({
       userId: "me",
@@ -130,11 +133,11 @@ export async function createGmailLabelAndFilter(
       throw new Error("Failed to create Gmail filter");
     }
 
-    console.log(`Created Gmail label "${labelName}" and filter for ${userEmail}`);
+    log.info({ labelName, userEmail }, 'Created Gmail label and filter');
     
     return { labelId, filterId };
   } catch (error: any) {
-    console.error("Failed to create Gmail label/filter:", error.message);
+    log.error({ err: error }, 'Failed to create Gmail label/filter');
     return null;
   }
 }
@@ -147,7 +150,7 @@ export async function watchUserMailbox(
 
   const topicName = process.env.GOOGLE_PUBSUB_TOPIC;
   if (!topicName) {
-    console.log("GOOGLE_PUBSUB_TOPIC not configured, skipping watch");
+    log.info('GOOGLE_PUBSUB_TOPIC not configured, skipping watch');
     return null;
   }
 
@@ -168,7 +171,7 @@ export async function watchUserMailbox(
       expiration: response.data.expiration || "",
     };
   } catch (error: any) {
-    console.error("Failed to watch mailbox:", error.message);
+    log.error({ err: error }, 'Failed to watch mailbox');
     return null;
   }
 }
@@ -222,7 +225,7 @@ export async function getNewMessages(
 
     return messages;
   } catch (error: any) {
-    console.error("Failed to get new messages:", error.message);
+    log.error({ err: error }, 'Failed to get new messages');
     return [];
   }
 }
@@ -238,7 +241,7 @@ export async function deleteGmailFilter(userEmail: string, filterId: string): Pr
     });
     return true;
   } catch (error: any) {
-    console.error("Failed to delete Gmail filter:", error.message);
+    log.error({ err: error }, 'Failed to delete Gmail filter');
     return false;
   }
 }
@@ -253,7 +256,7 @@ export async function setupGmailForTransaction(
   filterNeedsManualSetup?: boolean;
 }> {
   if (!userEmail) {
-    console.log("No user email provided for Gmail setup");
+    log.info('No user email provided for Gmail setup');
     return { labelId: null, filterId: null };
   }
   

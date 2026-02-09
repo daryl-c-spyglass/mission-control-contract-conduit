@@ -1,5 +1,8 @@
 import type { Express, Request, Response } from "express";
 import { openai } from "./client";
+import { createModuleLogger } from '../../lib/logger';
+
+const log = createModuleLogger('image');
 
 export function registerImageRoutes(app: Express): void {
   app.post("/api/generate-image", async (req: Request, res: Response) => {
@@ -23,7 +26,7 @@ export function registerImageRoutes(app: Express): void {
         b64_json: imageData.b64_json,
       });
     } catch (error) {
-      console.error("Error generating image:", error);
+      log.error({ err: error }, 'Error generating image');
       res.status(500).json({ error: "Failed to generate image" });
     }
   });

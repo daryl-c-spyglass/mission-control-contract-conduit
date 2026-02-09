@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, jsonb, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -865,6 +865,22 @@ export interface Property {
   details?: Record<string, any>;
   rawData?: Record<string, any>;
 }
+
+export const auditLogs = pgTable('audit_logs', {
+  id: serial('id').primaryKey(),
+  timestamp: timestamp('timestamp').defaultNow().notNull(),
+  requestId: text('request_id'),
+  action: text('action').notNull(),
+  actor: text('actor').notNull(),
+  target: text('target'),
+  metadata: jsonb('metadata'),
+  status: text('status').notNull(),
+  errorMessage: text('error_message'),
+  transactionId: varchar('transaction_id'),
+});
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;
 
 // Re-export auth models (users and sessions tables for Replit Auth)
 export * from "./models/auth";

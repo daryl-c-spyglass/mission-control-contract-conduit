@@ -1,6 +1,9 @@
 import type { Express } from "express";
 import { authStorage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
+import { createModuleLogger } from '../../lib/logger';
+
+const log = createModuleLogger('auth');
 
 // Register auth-specific routes
 export function registerAuthRoutes(app: Express): void {
@@ -11,7 +14,7 @@ export function registerAuthRoutes(app: Express): void {
       const user = await authStorage.getUser(userId);
       res.json(user);
     } catch (error) {
-      console.error("Error fetching user:", error);
+      log.error({ err: error }, 'Error fetching user');
       res.status(500).json({ message: "Failed to fetch user" });
     }
   });
@@ -33,7 +36,7 @@ export function registerAuthRoutes(app: Express): void {
       const updatedUser = await authStorage.updateUser(userId, { slackUserId: sanitizedSlackId });
       res.json(updatedUser);
     } catch (error) {
-      console.error("Error updating profile:", error);
+      log.error({ err: error }, 'Error updating profile');
       res.status(500).json({ message: "Failed to update profile" });
     }
   });
@@ -60,7 +63,7 @@ export function registerAuthRoutes(app: Express): void {
       
       res.json(updatedUser);
     } catch (error) {
-      console.error("Error completing onboarding:", error);
+      log.error({ err: error }, 'Error completing onboarding');
       res.status(500).json({ message: "Failed to complete onboarding" });
     }
   });
@@ -139,7 +142,7 @@ export function registerAuthRoutes(app: Express): void {
       
       res.json(updatedUser);
     } catch (error) {
-      console.error("Error updating graphics settings:", error);
+      log.error({ err: error }, 'Error updating graphics settings');
       res.status(500).json({ message: "Failed to update graphics settings" });
     }
   });

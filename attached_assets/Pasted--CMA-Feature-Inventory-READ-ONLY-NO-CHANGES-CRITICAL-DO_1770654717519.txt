@@ -1,0 +1,394 @@
+# 🔍 CMA Feature Inventory — READ ONLY, NO CHANGES
+
+## ⚠️ CRITICAL: DO NOT MODIFY ANY CODE
+
+This is a **documentation-only** task. You are creating a complete inventory of the CMA feature so we can migrate it to a separate webapp. 
+
+**DO NOT:**
+- Change any files
+- Add any files
+- Delete any files
+- Modify any code
+- Run any migrations
+- Install any packages
+
+**DO:**
+- Read files
+- Search the codebase
+- Document everything you find
+- Create ONE output file with the complete inventory
+
+---
+
+## Objective
+
+Create a comprehensive migration manifest for the entire CMA tab and all related features (CMA data, CMA Presentation Builder, CMA PDF Export, Comparables, Statistics). This manifest will be used to extract the CMA feature into a standalone webapp.
+
+---
+
+## STEP 1: Find ALL CMA-Related Files
+
+Run these searches and document every file found:
+
+```bash
+# Find all files with CMA in the name
+find . -type f \( -name "*CMA*" -o -name "*cma*" -o -name "*Cma*" \) | grep -v node_modules | grep -v .git | sort
+
+# Find all files with "comparable" in the name
+find . -type f \( -name "*comparable*" -o -name "*Comparable*" \) | grep -v node_modules | grep -v .git | sort
+
+# Find all files with "presentation" in the name  
+find . -type f \( -name "*presentation*" -o -name "*Presentation*" \) | grep -v node_modules | grep -v .git | sort
+
+# Find all files referencing CMA in their content
+grep -rl "CMA\|cma\|comparab\|Comparative Market" --include="*.ts" --include="*.tsx" . | grep -v node_modules | grep -v .git | sort
+
+# Find all files referencing presentation builder
+grep -rl "PresentationBuilder\|presentation-builder\|presentationBuilder\|SlidePlayer\|slidePlayer" --include="*.ts" --include="*.tsx" . | grep -v node_modules | grep -v .git | sort
+```
+
+**Output as a table:**
+
+| # | File Path | Type | Lines | Purpose |
+|---|-----------|------|-------|---------|
+| 1 | path/to/file | Component/Page/Route/Schema/API/Util | count | Brief description |
+
+---
+
+## STEP 2: Document Database Schema
+
+Find and document ALL CMA-related database tables:
+
+```bash
+# Check Drizzle schema for CMA tables
+grep -n "cma\|CMA\|comparable\|Comparable\|presentation\|Presentation" shared/schema.ts
+
+# Check for migration files
+find . -name "*.sql" -path "*/migrations/*" | xargs grep -l "cma\|comparable\|presentation" 2>/dev/null
+```
+
+**For EACH table found, document:**
+
+```
+Table: [table_name]
+File: [schema file path]
+Line Numbers: [start-end]
+
+Columns:
+| Column | Type | Nullable | Default | References |
+|--------|------|----------|---------|------------|
+| id     | serial | No | auto | primary key |
+| ...    | ...    | ... | ... | ... |
+
+Indexes:
+| Index Name | Columns | Type |
+|------------|---------|------|
+```
+
+Also check if there are any CMA-related columns on OTHER tables:
+
+```bash
+# Check if transactions table has CMA fields
+grep -n "cma\|CMA\|comparable" shared/schema.ts | grep -i "transact"
+```
+
+---
+
+## STEP 3: Document ALL API Routes
+
+Find every API endpoint related to CMA:
+
+```bash
+# Search route definitions
+grep -n "cma\|CMA\|comparable\|presentation" server/routes.ts
+grep -rn "cma\|CMA\|comparable\|presentation" server/routes/ --include="*.ts" 2>/dev/null
+
+# Check for standalone route files
+find server/ -name "*cma*" -o -name "*comparable*" -o -name "*presentation*" | grep -v node_modules
+```
+
+**Document EACH endpoint:**
+
+| # | Method | Path | Handler Location | Purpose | Auth Required | Request Body | Response Shape |
+|---|--------|------|-----------------|---------|---------------|-------------|----------------|
+| 1 | GET | /api/cmas | server/routes.ts:L## | List all CMAs | Yes | — | CMA[] |
+
+**For each endpoint, copy the FULL handler code** (we need exact logic for migration).
+
+---
+
+## STEP 4: Document Frontend Components
+
+For EACH CMA-related component file found in Step 1:
+
+```bash
+# Get line count and imports for each file
+for f in $(find client/src -name "*cma*" -o -name "*CMA*" -o -name "*comparable*" -o -name "*Comparable*" -o -name "*presentation*" -o -name "*Presentation*" 2>/dev/null | grep -v node_modules); do
+  echo "=== $f ==="
+  wc -l "$f"
+  head -50 "$f"  # Show imports and component signature
+  echo "---"
+done
+```
+
+**For EACH component, document:**
+
+```
+Component: [ComponentName]
+File: [path]
+Lines: [count]
+Exports: [default export / named exports]
+
+Props Interface:
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+
+Internal State (useState/useReducer):
+| State Variable | Type | Initial Value | Purpose |
+|---------------|------|---------------|---------|
+
+API Calls (useQuery/useMutation/fetch):
+| Hook/Call | Endpoint | Purpose |
+|-----------|----------|---------|
+
+Child Components Used:
+| Component | From | Purpose |
+|-----------|------|---------|
+
+External Libraries Used:
+| Library | Import | Purpose |
+|---------|--------|---------|
+```
+
+---
+
+## STEP 5: Document the CMA Presentation Builder Specifically
+
+This is the most critical feature to inventory. Find ALL files related to the Presentation Builder:
+
+```bash
+# Presentation Builder specific files
+grep -rl "PresentationBuilder\|presentation.*builder\|CmaPresentation\|cma.*presentation\|SlidePlayer\|slide.*player\|LivePreview\|live.*preview" --include="*.ts" --include="*.tsx" client/src/ | grep -v node_modules | sort
+
+# Presentation slides/sections/widgets
+grep -rl "slide\|Slide\|widget\|Widget\|section.*slide\|coverPage\|CoverPage\|agentResume\|AgentResume" --include="*.ts" --include="*.tsx" client/src/ | grep -v node_modules | sort
+```
+
+**Document the Presentation Builder architecture:**
+
+### 5a. Entry Points
+- How does the user launch the Presentation Builder? (button location, route)
+- What URL/route does it live at?
+- What data does it receive on load?
+
+### 5b. Slide/Section Inventory
+List EVERY slide/section/widget in the presentation:
+
+| # | Slide ID | Title | Type | Data Source | Component |
+|---|----------|-------|------|-------------|-----------|
+| 1 | cover_page | Cover Page | static | Agent profile + property | CoverSlide.tsx |
+
+### 5c. Settings/Configuration
+- What settings panels exist? (Layout, Photos, Sections, etc.)
+- How are settings stored? (state, database, localStorage)
+- What can be customized per presentation?
+
+### 5d. Photo Selection (AI-Powered)
+- How does the AI photo selection work?
+- Does it use Repliers imageInsights?
+- What classification/quality scoring is used?
+- Which files implement this?
+
+### 5e. PDF Export
+- What generates the PDF? (Puppeteer, html2canvas, jsPDF, other?)
+- What endpoint handles PDF generation?
+- What HTML template is used for PDF rendering?
+- Known issues with PDF export?
+
+### 5f. Share/Public Link
+- How is a shareable link generated?
+- What route serves the public presentation?
+- Is auth required for shared links?
+- Expiration logic?
+
+---
+
+## STEP 6: Document Data Flow
+
+Trace the complete data flow for CMA:
+
+### 6a. Where does CMA data come from?
+
+```bash
+# Find Repliers API calls in CMA context
+grep -rn "repliers\|REPLIERS\|api\.repliers\|listings.*api" --include="*.ts" --include="*.tsx" . | grep -i "cma\|comparable" | grep -v node_modules
+```
+
+### 6b. How does data flow from Repliers → CMA Tab → Presentation?
+
+Document the chain:
+1. **Transaction created** → What MLS data is fetched?
+2. **CMA Tab loaded** → What API calls fire? What data populates?
+3. **Comparables loaded** → From where? Auto-fetched or manual search?
+4. **Presentation Builder opened** → What data is passed in?
+5. **PDF exported** → What data is serialized?
+
+### 6c. Field Mapping (Repliers → CMA)
+
+| CMA Display Field | Repliers API Field | Transform |
+|-------------------|-------------------|-----------|
+| Address | ? | ? |
+| Price | ? | ? |
+| Beds | ? | ? |
+| Baths | ? | ? |
+| Sq Ft | ? | ? |
+| Year Built | ? | ? |
+| Days on Market | ? | ? |
+| Status | ? | ? |
+| Photos | ? | ? |
+| Lat/Long | ? | ? |
+
+---
+
+## STEP 7: Document Dependencies
+
+### 7a. NPM Packages used ONLY by CMA
+
+```bash
+# Check imports across all CMA files for external packages
+grep -rh "from ['\"]" $(find . -name "*cma*" -o -name "*CMA*" -o -name "*comparable*" -o -name "*presentation*" 2>/dev/null | grep -v node_modules) 2>/dev/null | grep -v "^\.\|@/" | sort -u
+```
+
+**List packages that are CMA-specific (not used elsewhere in the app):**
+
+| Package | Version | Used By | Purpose | Also Used Elsewhere? |
+|---------|---------|---------|---------|---------------------|
+| recharts | ? | CMAReport.tsx | Charts | Check |
+| react-leaflet | ? | PolygonMapSearch.tsx | Map | Check |
+| leaflet | ? | PolygonMapSearch.tsx | Map | Check |
+
+### 7b. Internal Dependencies (shared components/hooks used by CMA)
+
+```bash
+# Find all @/ imports in CMA files
+grep -rh "from ['\"]@/" $(find . -name "*cma*" -o -name "*CMA*" -o -name "*comparable*" -o -name "*presentation*" 2>/dev/null | grep -v node_modules) 2>/dev/null | sort -u
+```
+
+| Internal Import | File Path | Also Used Elsewhere? |
+|----------------|-----------|---------------------|
+| @/components/ui/button | client/src/components/ui/button.tsx | Yes (shared) |
+
+---
+
+## STEP 8: Document Shared Resources
+
+### 8a. Does CMA share any database tables with other features?
+
+```bash
+# Check if CMA reads from transactions, users, or other tables
+grep -rn "transactions\|users\|activities" $(find . -name "*cma*" -o -name "*CMA*" -o -name "*comparable*" 2>/dev/null | grep "server/" | grep -v node_modules) 2>/dev/null
+```
+
+### 8b. Does CMA share any API endpoints with other features?
+
+Check if any CMA routes are also called by non-CMA components.
+
+### 8c. Does CMA use the agent marketing profile?
+
+```bash
+grep -rn "marketing.*profile\|agent.*profile\|headshot\|agentPhoto\|branding" $(find . -name "*cma*" -o -name "*CMA*" -o -name "*presentation*" 2>/dev/null | grep -v node_modules) 2>/dev/null
+```
+
+---
+
+## STEP 9: Document Current State & Known Issues
+
+### 9a. What works?
+- [ ] CMA tab loads
+- [ ] Comparables display from Repliers
+- [ ] Statistics calculate
+- [ ] Presentation Builder opens
+- [ ] PDF Export works
+- [ ] Share link works
+
+### 9b. What's broken?
+- [ ] "Can't start a CMA from here like Client Data Portal" — document what's missing
+- [ ] Any console errors when loading CMA tab?
+- [ ] Any console errors in Presentation Builder?
+- [ ] PDF export issues?
+
+### 9c. What's partially implemented?
+- [ ] Features that exist in code but don't work in UI
+- [ ] Endpoints that exist but aren't connected to frontend
+
+---
+
+## STEP 10: Create the Output File
+
+Create a single file: `docs/CMA-MIGRATION-MANIFEST.md`
+
+Structure it as:
+
+```markdown
+# CMA Feature Migration Manifest
+Generated: [date]
+Source: Contract Conduit (Mission Control)
+Target: Standalone CMA WebApp
+
+## 1. File Inventory
+[Table from Step 1]
+
+## 2. Database Schema  
+[Full schema from Step 2]
+
+## 3. API Routes
+[All endpoints with full handler code from Step 3]
+
+## 4. Frontend Components
+[Component inventory from Step 4]
+
+## 5. Presentation Builder Deep Dive
+[Full architecture from Step 5]
+
+## 6. Data Flow
+[Chain documentation from Step 6]
+
+## 7. Dependencies
+[Package and internal dependency lists from Step 7]
+
+## 8. Shared Resources
+[Cross-feature dependencies from Step 8]
+
+## 9. Current State
+[Working/broken/partial status from Step 9]
+
+## 10. Migration Checklist
+- [ ] Copy database schema (tables: ___)
+- [ ] Copy API routes (endpoints: ___)
+- [ ] Copy components (files: ___)  
+- [ ] Copy Presentation Builder (files: ___)
+- [ ] Install dependencies (packages: ___)
+- [ ] Set up Repliers API integration
+- [ ] Set up agent profile data source
+- [ ] Set up shareable link routes
+- [ ] Verify PDF export works standalone
+- [ ] Remove CMA tab from Contract Conduit
+```
+
+---
+
+## REMINDER: NO CHANGES
+
+This entire task is **read-only**. The ONLY file you should create is:
+
+`docs/CMA-MIGRATION-MANIFEST.md`
+
+Do NOT modify any existing files. Do NOT install packages. Do NOT run migrations.
+
+Show me the complete manifest when done.
+
+---
+
+## 📱 Mobile Optimization
+
+No UI changes in this prompt. This is a documentation-only task.

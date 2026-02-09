@@ -102,6 +102,25 @@ Preferred communication style: Simple, everyday language.
     - Uses TanStack Query for data fetching
     - Complies with UI guidelines (shadcn Button components, no custom hover states)
 
+## Enterprise Architecture Compliance (Feb 2026)
+
+### Infrastructure Modules (server/lib/)
+- **logger.ts**: Pino-based structured logging with PII redaction, module-specific child loggers
+- **audit.ts**: Database-backed audit trail for Slack bot operations (audit_logs table)
+- **resilience.ts**: Circuit breakers (Repliers/Slack/OpenAI), timeout wrappers, retry with exponential backoff
+- **envGuard.ts**: Startup environment variable validation with required/optional classification
+
+### Middleware (server/middleware/)
+- **requestId.ts**: UUID correlation IDs on every request
+- **requestLogger.ts**: HTTP request/response structured logging
+- **rateLimit.ts**: Per-endpoint rate limiting (global 100/15min, transaction 5/min, generation 3/min)
+
+### Operational
+- **Health Check**: GET /health returns status, uptime, environment, version
+- **Graceful Shutdown**: SIGTERM/SIGINT handlers with 10s drain timeout
+- **Unhandled Errors**: Global promise rejection and uncaught exception logging
+- **Documentation**: docs/ARCHITECTURE.md, docs/SECURITY.md, docs/RUNBOOK.md
+
 ## External Dependencies
 - **Slack**: Team coordination.
 - **Gmail**: Email routing.

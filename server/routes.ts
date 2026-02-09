@@ -17,6 +17,11 @@ import { generatePrintFlyer, formatAddressForFlyer, type FlyerData, type OutputT
 import { generateGraphic, type GraphicsFormat, type GraphicsData } from "./services/graphics-generator";
 import { nanoid } from "nanoid";
 import QRCode from "qrcode";
+import { createModuleLogger } from './lib/logger';
+import { withTimeout, openaiCircuit } from './lib/resilience';
+import { apiLimiter, transactionCreateLimiter, generationLimiter } from './middleware/rateLimit';
+
+const log = createModuleLogger('transactions');
 
 // Helper to check if a user can access a transaction (owner OR assigned coordinator)
 async function canAccessTransaction(transaction: any, userId: string, userEmail?: string): Promise<boolean> {
@@ -75,6 +80,8 @@ export async function registerRoutes(
   // Set up object storage routes
   registerObjectStorageRoutes(app);
 
+  app.use('/api/', apiLimiter);
+
   // ============ Transactions ============
 
   app.get("/api/transactions", isAuthenticated, async (req: any, res) => {
@@ -108,14 +115,14 @@ export async function registerRoutes(
         const missingCount = cmaComparables.filter(c => !c.map && c.mlsNumber).length;
         
         if (missingCount > 0) {
-          console.log(`[CMA Enrich] Transaction ${req.params.id} has ${missingCount}/${cmaComparables.length} comparables without coordinates`);
+          log.info(`[CMA Enrich] Transaction ${req.params.id} has ${missingCount}/${cmaComparables.length} comparables without coordinates`);
           try {
             const { enrichCMAWithCoordinates } = await import("./repliers");
             const enrichedCMA = await enrichCMAWithCoordinates(cmaComparables);
             
             // Check how many were enriched
             const enrichedCount = enrichedCMA.filter((c: any) => c.map).length;
-            console.log(`[CMA Enrich] Enriched ${enrichedCount}/${cmaComparables.length} comparables with coordinates`);
+            log.info(`[CMA Enrich] Enriched ${enrichedCount}/${cmaComparables.length} comparables with coordinates`);
             
             // Update the transaction in database with enriched coordinates
             await storage.updateTransaction(req.params.id, { cmaData: enrichedCMA });
@@ -123,7 +130,7 @@ export async function registerRoutes(
             // Return enriched data
             return res.json({ ...transaction, cmaData: enrichedCMA });
           } catch (enrichError) {
-            console.error("Error enriching CMA coordinates:", enrichError);
+            log.error({ err: enrichError }, "Error enriching CMA coordinates");
             // Fall through to return original data
           }
         }
@@ -135,8 +142,33 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions", isAuthenticated, async (req: any, res) => {
+  app.post("/api/transactions", transactionCreateLimiter, isAuthenticated, async (req: any, res) => {
     try {
+      const body = req.body;
+      const validationErrors: string[] = [];
+      if (!body.propertyAddress || typeof body.propertyAddress !== 'string' || body.propertyAddress.trim().length === 0) {
+        validationErrors.push('Property address is required');
+      }
+      if (body.propertyAddress && body.propertyAddress.length > 500) {
+        validationErrors.push('Property address exceeds maximum length');
+      }
+      if (body.listPrice && (isNaN(Number(body.listPrice)) || Number(body.listPrice) < 0)) {
+        validationErrors.push('List price must be a positive number');
+      }
+      if (body.bedrooms && (isNaN(Number(body.bedrooms)) || Number(body.bedrooms) < 0 || Number(body.bedrooms) > 99)) {
+        validationErrors.push('Beds must be between 0 and 99');
+      }
+      if (body.bathrooms && (isNaN(Number(body.bathrooms)) || Number(body.bathrooms) < 0 || Number(body.bathrooms) > 99)) {
+        validationErrors.push('Baths must be between 0 and 99');
+      }
+      if (body.photographyNotes && body.photographyNotes.length > 2000) {
+        validationErrors.push('Photography notes exceed maximum length');
+      }
+      if (validationErrors.length > 0) {
+        log.warn({ errors: validationErrors, requestId: req.requestId }, 'Invalid transaction input');
+        return res.status(400).json({ error: 'Validation failed', details: validationErrors });
+      }
+
       const { 
         createSlackChannel: shouldCreateSlack, 
         createGmailFilter, 
@@ -151,7 +183,6 @@ export async function registerRoutes(
         orderPhotography,
         photographyNotes,
         photographyAppointmentDate,
-        // Off-market property details
         propertyDescription,
         listPrice,
         propertyType,
@@ -161,7 +192,6 @@ export async function registerRoutes(
         bathrooms,
         halfBaths,
         goLiveDate,
-        // Photo upload for off-market/coming soon
         propertyPhotoBase64,
         propertyPhotoFileName,
         ...transactionData 
@@ -183,7 +213,7 @@ export async function registerRoutes(
         transactionData.halfBaths = halfBaths ? parseInt(halfBaths) : null;
         transactionData.goLiveDate = goLiveDate || null; // When listing will go live on MLS
         
-        console.log('[TRANSACTION] Manual data fields saved:', {
+        log.info({
           listPrice: transactionData.listPrice,
           bedrooms: transactionData.bedrooms,
           bathrooms: transactionData.bathrooms,
@@ -191,7 +221,7 @@ export async function registerRoutes(
           sqft: transactionData.sqft,
           goLiveDate: transactionData.goLiveDate,
           propertyType: transactionData.propertyType,
-        });
+        }, 'Manual data fields saved');
       }
       
       // Off-market specific settings
@@ -223,12 +253,12 @@ export async function registerRoutes(
       transactionData.photographyAppointmentDate = transactionData.orderPhotography ? (photographyAppointmentDate || null) : null;
       
       // DEBUG: Log Coming Soon status
-      console.log('[TRANSACTION] Coming Soon debug:', {
+      log.debug({
         isComingSoon_raw: isComingSoon,
         isComingSoon_type: typeof isComingSoon,
         isComingSoon_computed: transactionData.isComingSoon,
         propertyAddress: transactionData.propertyAddress
-      });
+      }, 'Coming Soon debug');
       
       // Set the status based on whether property is under contract (for non-off-market)
       if (!isOffMarket) {
@@ -271,13 +301,13 @@ export async function registerRoutes(
       });
 
       // Create real Slack channel if requested
-      console.log('[TRANSACTION] Slack channel creation check:', {
+      log.info({
         shouldCreateSlack,
-        SLACK_BOT_TOKEN_exists: !!process.env.SLACK_BOT_TOKEN,
-        DISABLE_SLACK_NOTIFICATIONS: process.env.DISABLE_SLACK_NOTIFICATIONS,
+        slackTokenExists: !!process.env.SLACK_BOT_TOKEN,
+        disableSlackNotifications: process.env.DISABLE_SLACK_NOTIFICATIONS,
         transactionId: transaction.id,
         address: transaction.propertyAddress
-      });
+      }, 'Slack channel creation check');
 
       if (shouldCreateSlack && process.env.SLACK_BOT_TOKEN) {
         try {
@@ -302,16 +332,16 @@ export async function registerRoutes(
             transaction.transactionType,
             agentName
           );
-          console.log('[TRANSACTION] Attempting to create Slack channel:', { channelName, agentName });
+          log.info({ channelName, agentName }, 'Attempting to create Slack channel');
           
           const slackResult = await createSlackChannel(channelName);
           
           // Handle null result (notifications disabled or creation failed)
           if (!slackResult) {
-            console.log('[TRANSACTION] ⚠️ Slack channel NOT created (returned null)');
+            log.info('[TRANSACTION] ⚠️ Slack channel NOT created (returned null)');
             // Continue without Slack channel - don't store fake ID
           } else {
-            console.log('[TRANSACTION] ✅ Slack channel created:', slackResult);
+            log.info({ data: slackResult }, '[TRANSACTION] ✅ Slack channel created');
             
             await storage.updateTransaction(transaction.id, {
               slackChannelId: slackResult.channelId,
@@ -426,7 +456,7 @@ export async function registerRoutes(
           await postToChannel(slackResult.channelId, welcomeMessage);
           } // end of else (slackResult exists)
         } catch (slackError) {
-          console.error("Slack channel creation error:", slackError);
+          log.error({ err: slackError }, "Slack channel creation error");
           // Continue without Slack - don't fail the transaction
         }
       }
@@ -441,7 +471,7 @@ export async function registerRoutes(
           if (onBehalfOfEmail) {
             // Creating on behalf of another agent - we can't check their consent yet
             // Mark transaction as pending Gmail setup for when they consent
-            console.log(`Gmail filter pending for ${onBehalfOfEmail} - will create when they consent`);
+            log.info(`Gmail filter pending for ${onBehalfOfEmail} - will create when they consent`);
             await storage.updateTransaction(transaction.id, {
               gmailPendingForEmail: onBehalfOfEmail,
             });
@@ -458,7 +488,7 @@ export async function registerRoutes(
               targetEmail = agent.email;
               hasEmailConsent = true;
             } else if (agent?.email && !agent?.emailFilterConsent) {
-              console.log("Skipping Gmail filter: agent hasn't given email consent");
+              log.info("Skipping Gmail filter: agent hasn't given email consent");
             }
           }
           
@@ -475,7 +505,7 @@ export async function registerRoutes(
                 // Set up Gmail watch on this label to receive push notifications
                 const watchResult = await watchUserMailbox(targetEmail, [gmailResult.labelId]);
                 if (watchResult) {
-                  console.log(`Gmail watch set up for ${targetEmail}, historyId: ${watchResult.historyId}`);
+                  log.info(`Gmail watch set up for ${targetEmail}, historyId: ${watchResult.historyId}`);
                 }
                 
                 await storage.createActivity({
@@ -503,7 +533,7 @@ export async function registerRoutes(
           }
           // else: already logged the reason above
         } catch (gmailError) {
-          console.error("Gmail setup error:", gmailError);
+          log.error({ err: gmailError }, "Gmail setup error");
           // Continue without Gmail - don't fail the transaction
         }
       }
@@ -585,14 +615,14 @@ export async function registerRoutes(
                   imageUrl: mlsData.images?.[0] || undefined,
                 });
               } catch (slackPostError) {
-                console.error("Error posting MLS data to Slack:", slackPostError);
+                log.error({ err: slackPostError }, "Error posting MLS data to Slack");
               }
             } else if (currentTransaction?.slackChannelId && mlsData.status) {
-              console.log(`Skipping Slack post: listing status "${mlsData.status}" is not active/pending`);
+              log.info(`Skipping Slack post: listing status "${mlsData.status}" is not active/pending`);
             }
           }
         } catch (mlsError) {
-          console.error("MLS data fetch error:", mlsError);
+          log.error({ err: mlsError }, "MLS data fetch error");
           // Continue without MLS - don't fail the transaction
         }
       }
@@ -604,13 +634,13 @@ export async function registerRoutes(
         try {
           const privateDir = process.env.PRIVATE_OBJECT_DIR;
           if (!privateDir) {
-            console.warn("[Transaction Creation] PRIVATE_OBJECT_DIR not configured, skipping photo upload");
+            log.warn("[Transaction Creation] PRIVATE_OBJECT_DIR not configured, skipping photo upload");
             photoUploadError = "Object storage not configured";
           } else {
             // Validate image type
             const validImagePrefixes = ['data:image/jpeg', 'data:image/png', 'data:image/gif', 'data:image/webp', 'data:image/jpg'];
             if (!validImagePrefixes.some(prefix => propertyPhotoBase64.startsWith(prefix))) {
-              console.warn("[Transaction Creation] Invalid image type provided");
+              log.warn("[Transaction Creation] Invalid image type provided");
               photoUploadError = "Invalid image type";
             } else {
               const base64Data = propertyPhotoBase64.replace(/^data:image\/\w+;base64,/, '');
@@ -618,7 +648,7 @@ export async function registerRoutes(
               const maxSizeBytes = 10 * 1024 * 1024; // 10MB
               
               if (fileSizeBytes > maxSizeBytes) {
-                console.warn(`[Transaction Creation] Photo too large: ${(fileSizeBytes / (1024 * 1024)).toFixed(2)}MB`);
+                log.warn(`[Transaction Creation] Photo too large: ${(fileSizeBytes / (1024 * 1024)).toFixed(2)}MB`);
                 photoUploadError = "Photo exceeds 10MB limit";
               } else {
                 const pathParts = privateDir.startsWith('/') ? privateDir.slice(1).split('/') : privateDir.split('/');
@@ -663,12 +693,12 @@ export async function registerRoutes(
                   sortOrder: 0,
                 });
                 
-                console.log(`[Transaction Creation] Photo uploaded successfully: ${uploadedPhotoUrl} (source: ${photoSource})`);
+                log.info(`[Transaction Creation] Photo uploaded successfully: ${uploadedPhotoUrl} (source: ${photoSource})`);
               }
             }
           }
         } catch (photoError) {
-          console.error("[Transaction Creation] Photo upload error:", photoError);
+          log.error({ err: photoError }, "[Transaction Creation] Photo upload error");
           photoUploadError = "Upload failed";
           // Continue without photo - don't fail transaction creation
         }
@@ -677,24 +707,24 @@ export async function registerRoutes(
       // Log photo status for Coming Soon notifications
       if (isComingSoon) {
         if (uploadedPhotoUrl) {
-          console.log(`[Coming Soon] Photo available for notification: ${uploadedPhotoUrl}`);
+          log.info(`[Coming Soon] Photo available for notification: ${uploadedPhotoUrl}`);
         } else if (photoUploadError) {
-          console.log(`[Coming Soon] No photo for notification (${photoUploadError}), notification will proceed without image`);
+          log.info(`[Coming Soon] No photo for notification (${photoUploadError}), notification will proceed without image`);
         } else if (!propertyPhotoBase64) {
-          console.log("[Coming Soon] No photo provided by user, notification will proceed without image");
+          log.info("[Coming Soon] No photo provided by user, notification will proceed without image");
         }
       }
 
       // Post Coming Soon notification if checkbox was checked
-      console.log('[TRANSACTION] 📋 Coming Soon check:', {
+      log.info({
         isComingSoon: transactionData.isComingSoon,
         transactionId: transaction.id,
         propertyAddress: transaction.propertyAddress,
         willPostNotification: !!transactionData.isComingSoon
-      });
+      }, 'Coming Soon check');
       
       if (transactionData.isComingSoon) {
-        console.log('[TRANSACTION] ✅ Coming Soon is TRUE - calling postComingSoonNotification');
+        log.info('[TRANSACTION] ✅ Coming Soon is TRUE - calling postComingSoonNotification');
         try {
           // Get agent info for notification
           let agentName = "";
@@ -736,7 +766,7 @@ export async function registerRoutes(
           const totalBaths = fullBaths + (halfBathsCount * 0.5);
           const formattedBaths = totalBaths > 0 ? totalBaths : null;
           
-          console.log('[TRANSACTION] Coming Soon notification data:', {
+          log.info({
             listPrice: currentTx?.listPrice,
             bedrooms: currentTx?.bedrooms,
             fullBaths,
@@ -746,7 +776,7 @@ export async function registerRoutes(
             goLiveDate: currentTx?.goLiveDate,
             heroPhotoUrl,
             uploadedPhotoUrl,
-          });
+          }, 'Coming Soon notification data');
           
           // Use persisted data from manual entry, falling back to MLS data
           const notificationSuccess = await postComingSoonNotification({
@@ -773,10 +803,10 @@ export async function registerRoutes(
               category: "communication",
             });
           } else {
-            console.log('[TRANSACTION] ⚠️ Coming Soon notification was NOT posted (check Slack logs above)');
+            log.info('[TRANSACTION] ⚠️ Coming Soon notification was NOT posted (check Slack logs above)');
           }
         } catch (comingSoonError) {
-          console.error("Failed to post Coming Soon notification:", comingSoonError);
+          log.error({ err: comingSoonError }, "Failed to post Coming Soon notification");
           // Don't fail transaction creation if notification fails
         }
       }
@@ -835,7 +865,7 @@ export async function registerRoutes(
             });
           }
         } catch (photographyError) {
-          console.error("Failed to post photography request:", photographyError);
+          log.error({ err: photographyError }, "Failed to post photography request");
         }
       }
 
@@ -843,7 +873,7 @@ export async function registerRoutes(
       const updatedTransaction = await storage.getTransaction(transaction.id);
       res.status(201).json(updatedTransaction);
     } catch (error: any) {
-      console.error("Create transaction error:", error);
+      log.error({ err: error }, "Create transaction error");
       res.status(400).json({ message: error.message || "Failed to create transaction" });
     }
   });
@@ -982,7 +1012,7 @@ export async function registerRoutes(
           });
         }
       } catch (mlsError) {
-        console.error('Failed to sync MLS data after adding MLS number:', mlsError);
+        log.error({ err: mlsError }, 'Failed to sync MLS data after adding MLS number');
         // Still return success since the MLS number was added
       }
       
@@ -990,7 +1020,7 @@ export async function registerRoutes(
       const finalTransaction = await storage.getTransaction(req.params.id);
       res.json(finalTransaction);
     } catch (error) {
-      console.error('Error adding MLS number to transaction:', error);
+      log.error({ err: error }, 'Error adding MLS number to transaction');
       res.status(500).json({ message: "Failed to add MLS number" });
     }
   });
@@ -1056,11 +1086,11 @@ export async function registerRoutes(
         description: 'Transaction archived - all notifications disabled',
       });
       
-      console.log(`[Archive] Transaction ${req.params.id} archived. All notifications disabled.`);
+      log.info(`[Archive] Transaction ${req.params.id} archived. All notifications disabled.`);
       
       res.json(updated);
     } catch (error) {
-      console.error('Error archiving transaction:', error);
+      log.error({ err: error }, 'Error archiving transaction');
       res.status(500).json({ message: "Failed to archive transaction" });
     }
   });
@@ -1100,7 +1130,7 @@ export async function registerRoutes(
         });
         
         notificationsRestored = prevSettings.closingReminders ?? false;
-        console.log(`[Unarchive] Transaction ${req.params.id} - Restoring notification settings`);
+        log.info(`[Unarchive] Transaction ${req.params.id} - Restoring notification settings`);
       }
       
       const updated = await storage.updateTransaction(req.params.id, {
@@ -1119,14 +1149,14 @@ export async function registerRoutes(
           : 'Transaction restored from archive - notifications remain OFF',
       });
       
-      console.log(`[Unarchive] Transaction ${req.params.id} restored. Notifications: ${notificationsRestored ? 'RESTORED' : 'OFF'}`);
+      log.info(`[Unarchive] Transaction ${req.params.id} restored. Notifications: ${notificationsRestored ? 'RESTORED' : 'OFF'}`);
       
       res.json({
         ...updated,
         notificationsRestored,
       });
     } catch (error) {
-      console.error('Error unarchiving transaction:', error);
+      log.error({ err: error }, 'Error unarchiving transaction');
       res.status(500).json({ message: "Failed to unarchive transaction" });
     }
   });
@@ -1142,7 +1172,7 @@ export async function registerRoutes(
         return res.json({ deleted: 0, message: "No archived transactions to delete" });
       }
 
-      console.log(`[DeleteAllArchived] Deleting ${archivedTransactions.length} archived transactions for user ${userId}`);
+      log.info(`[DeleteAllArchived] Deleting ${archivedTransactions.length} archived transactions for user ${userId}`);
 
       let deletedCount = 0;
       const errors: string[] = [];
@@ -1152,14 +1182,14 @@ export async function registerRoutes(
           // Delete the transaction - this cascades to activities, open houses, etc.
           await storage.deleteTransaction(transaction.id);
           deletedCount++;
-          console.log(`[DeleteAllArchived] Deleted transaction: ${transaction.propertyAddress}`);
+          log.info(`[DeleteAllArchived] Deleted transaction: ${transaction.propertyAddress}`);
         } catch (err) {
-          console.error(`[DeleteAllArchived] Failed to delete transaction ${transaction.id}:`, err);
+          log.error({ err: err }, `[DeleteAllArchived] Failed to delete transaction ${transaction.id}`);
           errors.push(transaction.propertyAddress);
         }
       }
 
-      console.log(`[DeleteAllArchived] Complete: ${deletedCount} deleted, ${errors.length} failed`);
+      log.info(`[DeleteAllArchived] Complete: ${deletedCount} deleted, ${errors.length} failed`);
       
       res.json({ 
         deleted: deletedCount, 
@@ -1168,7 +1198,7 @@ export async function registerRoutes(
         message: `Successfully deleted ${deletedCount} archived transaction${deletedCount !== 1 ? 's' : ''}`
       });
     } catch (error) {
-      console.error('Error deleting all archived transactions:', error);
+      log.error({ err: error }, 'Error deleting all archived transactions');
       res.status(500).json({ message: "Failed to delete archived transactions" });
     }
   });
@@ -1212,12 +1242,12 @@ export async function registerRoutes(
         agentName
       );
       
-      console.log(`[Slack] Creating channel for existing transaction: ${channelName}`);
+      log.info(`[Slack] Creating channel for existing transaction: ${channelName}`);
       const slackResult = await createSlackChannel(channelName);
       
       // Handle null result (notifications disabled or creation failed)
       if (!slackResult) {
-        console.log('[Slack] ⚠️ Channel NOT created for existing transaction (returned null)');
+        log.info('[Slack] ⚠️ Channel NOT created for existing transaction (returned null)');
         res.status(400).json({ message: "Slack channel creation failed or notifications are disabled" });
         return;
       }
@@ -1277,25 +1307,25 @@ export async function registerRoutes(
         transaction: updatedTransaction
       });
     } catch (error: any) {
-      console.error("Connect Slack error:", error);
+      log.error({ err: error }, "Connect Slack error");
       res.status(500).json({ message: error.message || "Failed to connect Slack channel" });
     }
   });
 
   app.post("/api/transactions/:id/refresh-mls", isAuthenticated, async (req, res) => {
-    console.log("=== REFRESH MLS REQUEST ===", req.params.id);
+    log.info({ data: req.params.id }, "=== REFRESH MLS REQUEST ===");
     try {
       const transaction = await storage.getTransaction(req.params.id);
-      console.log("Transaction found:", transaction?.id, "MLS#:", transaction?.mlsNumber);
+      log.info({ transactionId: transaction?.id, mlsNumber: transaction?.mlsNumber }, 'Transaction found');
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
       }
 
       if (!process.env.REPLIERS_API_KEY) {
-        console.log("REPLIERS_API_KEY not configured");
+        log.info("REPLIERS_API_KEY not configured");
         return res.status(400).json({ message: "Repliers API key not configured" });
       }
-      console.log("Calling Repliers API for MLS#:", transaction.mlsNumber);
+      log.info({ data: transaction.mlsNumber }, "Calling Repliers API for MLS#");
 
       let mlsData = null;
       let cmaData: any[] = [];
@@ -1305,7 +1335,7 @@ export async function registerRoutes(
         if (mlsResult) {
           mlsData = mlsResult.mlsData;
           cmaData = mlsResult.comparables;
-          console.log("MLS Data returned:", "found", mlsData?.photos?.length, "photos");
+          log.info("MLS Data returned:", "found", mlsData?.photos?.length, "photos");
           
           // GLOBAL RENTAL EXCLUSION: Reject rental/lease listings on refresh
           // Check both rawData and mlsData itself (rawData may be absent for cached/normalized records)
@@ -1329,7 +1359,7 @@ export async function registerRoutes(
             const isClosed = status.includes('closed') || status.includes('sold');
             
             if (isClosed) {
-              console.log(`[RefreshMLS] Using coordinate-based search for closed listing ${transaction.mlsNumber}`);
+              log.info(`[RefreshMLS] Using coordinate-based search for closed listing ${transaction.mlsNumber}`);
               const defaultFilters: CMASearchFilters = {
                 radius: 5,
                 maxResults: 10,
@@ -1343,14 +1373,14 @@ export async function registerRoutes(
                 transaction.mlsNumber,
                 defaultFilters
               );
-              console.log(`[RefreshMLS] Coordinate search found ${cmaData.length} comparables for closed listing`);
+              log.info(`[RefreshMLS] Coordinate search found ${cmaData.length} comparables for closed listing`);
             }
           }
         } else {
-          console.log("MLS Data returned: null");
+          log.info("MLS Data returned: null");
         }
       } else {
-        console.log("No MLS number on transaction");
+        log.info("No MLS number on transaction");
       }
 
       const updateData: any = {};
@@ -1371,7 +1401,7 @@ export async function registerRoutes(
         updateData.cmaData = cmaData;
       }
 
-      console.log("Updating transaction with:", Object.keys(updateData));
+      log.info({ updateFields: Object.keys(updateData) }, 'Updating transaction');
       const updated = await storage.updateTransaction(req.params.id, updateData);
 
       // Sync CMA record's propertiesData if it exists (keep Presentation Builder in sync)
@@ -1382,10 +1412,10 @@ export async function registerRoutes(
             await storage.updateCma(existingCma.id, {
               propertiesData: cmaData,
             });
-            console.log(`[MLS Refresh] Synced ${cmaData.length} comparables to CMA propertiesData`);
+            log.info(`[MLS Refresh] Synced ${cmaData.length} comparables to CMA propertiesData`);
           }
         } catch (syncError) {
-          console.warn("[MLS Refresh] Failed to sync CMA propertiesData:", syncError);
+          log.warn({ err: syncError }, 'MLS Refresh: Failed to sync CMA propertiesData');
         }
       }
 
@@ -1398,7 +1428,7 @@ export async function registerRoutes(
 
       res.json(updated);
     } catch (error: any) {
-      console.error("Error refreshing MLS data:", error);
+      log.error({ err: error }, "Error refreshing MLS data");
       res.status(500).json({ message: error.message || "Failed to refresh MLS data" });
     }
   });
@@ -1452,7 +1482,7 @@ export async function registerRoutes(
         filters.minBeds = Math.max(1, subjectBeds - 1);
       }
 
-      console.log(`[CMA Fallback] Generating for transaction ${id} at (${latitude}, ${longitude})`);
+      log.info(`[CMA Fallback] Generating for transaction ${id} at (${latitude}, ${longitude})`);
 
       const comparables = await searchNearbyComparables(
         latitude,
@@ -1482,7 +1512,7 @@ export async function registerRoutes(
         category: "cma",
       });
 
-      console.log(`[CMA Fallback] Success: ${comparables.length} comparables found for transaction ${id}`);
+      log.info(`[CMA Fallback] Success: ${comparables.length} comparables found for transaction ${id}`);
 
       res.json({ 
         success: true,
@@ -1491,7 +1521,7 @@ export async function registerRoutes(
       });
 
     } catch (error: any) {
-      console.error("[CMA Fallback] Error:", error);
+      log.error({ err: error }, "[CMA Fallback] Error");
       res.status(500).json({ error: error.message });
     }
   });
@@ -1520,12 +1550,12 @@ export async function registerRoutes(
         category: "cma",
       });
 
-      console.log(`[CMA] Cleared CMA data for transaction ${id}`);
+      log.info(`[CMA] Cleared CMA data for transaction ${id}`);
 
       res.json({ success: true, message: "CMA data cleared" });
 
     } catch (error: any) {
-      console.error("[CMA Clear] Error:", error);
+      log.error({ err: error }, "[CMA Clear] Error");
       res.status(500).json({ error: error.message });
     }
   });
@@ -1609,7 +1639,7 @@ export async function registerRoutes(
 
       res.json(listing);
     } catch (error) {
-      console.error("Error searching listings:", error);
+      log.error({ err: error }, "Error searching listings");
       res.status(500).json({ message: "Failed to search listings" });
     }
   });
@@ -1719,11 +1749,11 @@ export async function registerRoutes(
 
       const apiKey = process.env.GOOGLE_MAPS_API_KEY;
       if (!apiKey) {
-        console.error('[Places API] GOOGLE_MAPS_API_KEY not configured');
+        log.error('[Places API] GOOGLE_MAPS_API_KEY not configured');
         return res.json({ predictions: [] });
       }
 
-      console.log(`[Places API] Searching for: "${query}"`);
+      log.info(`[Places API] Searching for: "${query}"`);
 
       const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
       url.searchParams.append('input', query);
@@ -1734,14 +1764,14 @@ export async function registerRoutes(
       const response = await fetch(url.toString());
       
       if (!response.ok) {
-        console.error(`[Places API] Error: ${response.status}`);
+        log.error(`[Places API] Error: ${response.status}`);
         return res.json({ predictions: [] });
       }
 
       const data = await response.json();
       
       if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-        console.error(`[Places API] Status: ${data.status}`);
+        log.error(`[Places API] Status: ${data.status}`);
         return res.json({ predictions: [] });
       }
 
@@ -1752,10 +1782,10 @@ export async function registerRoutes(
         secondaryText: p.structured_formatting?.secondary_text || '',
       }));
       
-      console.log(`[Places API] Found ${predictions.length} suggestions`);
+      log.info(`[Places API] Found ${predictions.length} suggestions`);
       res.json({ predictions });
     } catch (error: any) {
-      console.error('[Places API] Error:', error.message);
+      log.error({ err: error }, '[Places API] Error');
       res.json({ predictions: [] });
     }
   });
@@ -1770,7 +1800,7 @@ export async function registerRoutes(
         return res.json({ results: [] });
       }
 
-      console.log(`[MLS Search] Searching by address: "${query}"`);
+      log.info(`[MLS Search] Searching by address: "${query}"`);
 
       if (!process.env.REPLIERS_API_KEY) {
         return res.json({ results: [] });
@@ -1799,7 +1829,7 @@ export async function registerRoutes(
       });
 
       if (!response.ok) {
-        console.error(`[MLS Search] Address search error: ${response.status}`);
+        log.error(`[MLS Search] Address search error: ${response.status}`);
         return res.json({ results: [] });
       }
 
@@ -1808,10 +1838,10 @@ export async function registerRoutes(
         .filter((l: any) => !isRentalOrLease(l))
         .map(mapListingToSearchResult);
       
-      console.log(`[MLS Search] Found ${results.length} properties for address: "${query}"`);
+      log.info(`[MLS Search] Found ${results.length} properties for address: "${query}"`);
       res.json({ results });
     } catch (error: any) {
-      console.error('[MLS Search Address] Error:', error.message);
+      log.error({ err: error }, '[MLS Search Address] Error');
       res.json({ results: [] });
     }
   });
@@ -1827,7 +1857,7 @@ export async function registerRoutes(
         return res.json({ results: [] });
       }
 
-      console.log(`[MLS Search] Searching by MLS#: "${query}"`);
+      log.info(`[MLS Search] Searching by MLS#: "${query}"`);
 
       if (!process.env.REPLIERS_API_KEY) {
         return res.json({ results: [] });
@@ -1841,7 +1871,7 @@ export async function registerRoutes(
       // Strategy 1: Try exact match with normalized MLS number
       if (!isPartial && normalized) {
         try {
-          console.log(`[MLS Search] Trying exact match: ${normalized}`);
+          log.info(`[MLS Search] Trying exact match: ${normalized}`);
           const exactUrl = `${REPLIERS_API_BASE}/listings/${normalized}`;
           const exactResponse = await fetch(exactUrl, {
             method: "GET",
@@ -1856,12 +1886,12 @@ export async function registerRoutes(
             if (exactMatch && (exactMatch.mlsNumber || exactMatch.listingId)) {
               if (!isRentalOrLease(exactMatch)) {
                 results.push(mapListingToSearchResult(exactMatch));
-                console.log(`[MLS Search] Exact match found: ${normalized}`);
+                log.info(`[MLS Search] Exact match found: ${normalized}`);
               }
             }
           }
         } catch (e) {
-          console.log(`[MLS Search] No exact match for ${normalized}`);
+          log.info(`[MLS Search] No exact match for ${normalized}`);
         }
       }
 
@@ -1895,7 +1925,7 @@ export async function registerRoutes(
             }
           }
         } catch (e) {
-          console.log(`[MLS Search] Search failed for ${normalized}`);
+          log.info(`[MLS Search] Search failed for ${normalized}`);
         }
       }
 
@@ -1904,10 +1934,10 @@ export async function registerRoutes(
         index === self.findIndex(t => t.mlsNumber === item.mlsNumber)
       );
 
-      console.log(`[MLS Search] Found ${uniqueResults.length} properties for MLS#: "${query}"`);
+      log.info(`[MLS Search] Found ${uniqueResults.length} properties for MLS#: "${query}"`);
       res.json({ results: uniqueResults });
     } catch (error: any) {
-      console.error('[MLS Search MLS#] Error:', error.message);
+      log.error({ err: error }, '[MLS Search MLS#] Error');
       res.json({ results: [] });
     }
   });
@@ -1919,7 +1949,7 @@ export async function registerRoutes(
     try {
       let { mlsNumber } = req.params;
       const { normalized } = normalizeMlsNumber(mlsNumber);
-      console.log(`[MLS Listing] Fetching: ${normalized}`);
+      log.info(`[MLS Listing] Fetching: ${normalized}`);
 
       const result = await fetchMLSListing(normalized);
       
@@ -1960,7 +1990,7 @@ export async function registerRoutes(
           : null,
       });
     } catch (error: any) {
-      console.error('[MLS Listing] Error:', error.message);
+      log.error({ err: error }, '[MLS Listing] Error');
       res.status(500).json({ error: "Failed to fetch listing" });
     }
   });
@@ -1969,12 +1999,12 @@ export async function registerRoutes(
   // Note: Coordinators are internal team data, no auth required for read
   app.get("/api/coordinators", async (req, res) => {
     try {
-      console.log("[coordinators] Fetching coordinators...");
+      log.info("[coordinators] Fetching coordinators...");
       const coordinators = await storage.getCoordinators();
-      console.log(`[coordinators] Found ${coordinators.length} coordinators:`, coordinators.map(c => c.name));
+      log.info({ count: coordinators.length, names: coordinators.map(c => c.name) }, 'Found coordinators');
       res.json(coordinators);
     } catch (error) {
-      console.error("[coordinators] Error fetching coordinators:", error);
+      log.error({ err: error }, "[coordinators] Error fetching coordinators");
       res.status(500).json({ message: "Failed to fetch coordinators" });
     }
   });
@@ -2096,7 +2126,7 @@ export async function registerRoutes(
         recommendations
       });
     } catch (error) {
-      console.error("Error getting recommended photos:", error);
+      log.error({ err: error }, "Error getting recommended photos");
       res.status(500).json({ message: "Failed to get photo recommendations" });
     }
   });
@@ -2166,14 +2196,14 @@ export async function registerRoutes(
               fileName
             );
           } catch (slackError) {
-            console.error("Failed to send marketing notification to Slack:", slackError);
+            log.error({ err: slackError }, "Failed to send marketing notification to Slack");
           }
         }
       }
 
       res.status(201).json(asset);
     } catch (error: any) {
-      console.error("Marketing asset creation error:", error);
+      log.error({ err: error }, "Marketing asset creation error");
       res.status(400).json({ message: error.message || "Failed to create marketing asset" });
     }
   });
@@ -2196,7 +2226,7 @@ export async function registerRoutes(
       const updated = await storage.updateMarketingAsset(req.params.id, updateData);
       res.json(updated);
     } catch (error: any) {
-      console.error("Marketing asset update error:", error);
+      log.error({ err: error }, "Marketing asset update error");
       res.status(500).json({ message: error.message || "Failed to update marketing asset" });
     }
   });
@@ -2252,7 +2282,7 @@ export async function registerRoutes(
             const message = `:wastebasket: *Marketing Asset Deleted*\n• Type: ${assetTypeLabel}\n• Property: ${address}`;
             await postToChannel(transaction.slackChannelId, message);
           } catch (slackError) {
-            console.error("Failed to send Slack notification for marketing deletion:", slackError);
+            log.error({ err: slackError }, "Failed to send Slack notification for marketing deletion");
           }
         }
       }
@@ -2296,7 +2326,7 @@ export async function registerRoutes(
 
       res.json(sortedPhotos);
     } catch (error) {
-      console.error("Error fetching transaction photos:", error);
+      log.error({ err: error }, "Error fetching transaction photos");
       res.status(500).json({ message: "Failed to fetch photos" });
     }
   });
@@ -2341,7 +2371,7 @@ export async function registerRoutes(
 
       res.json({ success: true });
     } catch (error) {
-      console.error("Error deleting photo:", error);
+      log.error({ err: error }, "Error deleting photo");
       res.status(500).json({ message: "Failed to delete photo" });
     }
   });
@@ -2364,7 +2394,7 @@ export async function registerRoutes(
       // Get the private object directory from env
       const privateDir = process.env.PRIVATE_OBJECT_DIR;
       if (!privateDir) {
-        console.error("[Photo Upload] PRIVATE_OBJECT_DIR not set");
+        log.error("[Photo Upload] PRIVATE_OBJECT_DIR not set");
         return res.status(500).json({ message: "Object storage not configured" });
       }
 
@@ -2400,7 +2430,7 @@ export async function registerRoutes(
       // Store in uploads/ directory to match the /objects/* route pattern
       const objectName = `.private/uploads/property-${transaction.id}-${timestamp}-${objectId}-${safeFileName}`;
       
-      console.log(`[Photo Upload] Bucket: ${bucketName}, Object: ${objectName}`);
+      log.info(`[Photo Upload] Bucket: ${bucketName}, Object: ${objectName}`);
       
       // Upload to object storage using GCS client
       const { objectStorageClient } = await import("./replit_integrations/object_storage/objectStorage");
@@ -2415,7 +2445,7 @@ export async function registerRoutes(
                          imageData.startsWith('data:image/gif') ? 'image/gif' : 
                          imageData.startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg';
       
-      console.log(`[Photo Upload] Saving file (${buffer.length} bytes, ${contentType})`);
+      log.info(`[Photo Upload] Saving file (${buffer.length} bytes, ${contentType})`);
       
       await file.save(buffer, {
         contentType,
@@ -2424,14 +2454,14 @@ export async function registerRoutes(
         },
       });
       
-      console.log(`[Photo Upload] File saved successfully`);
+      log.info(`[Photo Upload] File saved successfully`);
 
       // Construct the object path that our /objects/* route can serve
       // The path matches what getObjectEntityFile expects: /objects/{entityId}
       const entityId = objectName.replace('.private/', '');
       const photoUrl = `/objects/${entityId}`;
       
-      console.log(`[Photo Upload] Photo URL: ${photoUrl}`);
+      log.info(`[Photo Upload] Photo URL: ${photoUrl}`);
 
       // Update transaction with new photo URL
       const currentImages = transaction.propertyImages || [];
@@ -2465,8 +2495,8 @@ export async function registerRoutes(
         photo: savedPhoto,
       });
     } catch (error: any) {
-      console.error("[Photo Upload] Error:", error);
-      console.error("[Photo Upload] Stack:", error?.stack);
+      log.error({ err: error }, "[Photo Upload] Error");
+      log.error({ stack: error?.stack }, 'Photo Upload stack trace');
       res.status(500).json({ message: "Failed to upload photo", error: error?.message });
     }
   });
@@ -2490,7 +2520,7 @@ export async function registerRoutes(
 
       res.json({ success: true, primaryPhotoIndex });
     } catch (error) {
-      console.error("Error setting primary photo:", error);
+      log.error({ err: error }, "Error setting primary photo");
       res.status(500).json({ message: "Failed to set primary photo" });
     }
   });
@@ -2539,7 +2569,7 @@ export async function registerRoutes(
         primaryPhotoIndex: newPrimaryIndex,
       });
     } catch (error) {
-      console.error("Error deleting photo:", error);
+      log.error({ err: error }, "Error deleting photo");
       res.status(500).json({ message: "Failed to delete photo" });
     }
   });
@@ -2556,10 +2586,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/transactions/:id/documents", isAuthenticated, async (req: any, res) => {
-    process.stderr.write(`\n[DOC UPLOAD] ========== DOCUMENT UPLOAD DEBUG ==========\n`);
-    process.stderr.write(`[DOC UPLOAD] Route hit for transaction: ${req.params.id}\n`);
-    process.stderr.write(`[DOC UPLOAD] Content-Type: ${req.get('Content-Type')}\n`);
-    process.stderr.write(`[DOC UPLOAD] Body keys: ${Object.keys(req.body || {}).join(', ')}\n`);
+    log.debug({ transactionId: req.params.id, contentType: req.get('Content-Type'), bodyKeys: Object.keys(req.body || {}) }, 'Document upload request received');
     
     try {
       const transaction = await storage.getTransaction(req.params.id);
@@ -2619,29 +2646,27 @@ export async function registerRoutes(
       const fileExt = fileName.split('.').pop()?.toLowerCase() || 'unknown';
 
       // Check notification settings and send Slack notification with file
-      process.stderr.write(`[DOC UPLOAD] Starting Slack notification flow...\n`);
-      process.stderr.write(`[DOC UPLOAD] Transaction slackChannelId: ${transaction.slackChannelId}\n`);
+      log.debug({ slackChannelId: transaction.slackChannelId }, 'Starting Slack notification flow for document upload');
       
       if (transaction.slackChannelId) {
         const userId = req.user?.claims?.sub;
         let shouldNotify = true; // Default to enabled
         
-        process.stderr.write(`[DOC UPLOAD] User ID: ${userId}\n`);
+        log.debug({ userId }, 'Document upload user ID');
         
         if (userId) {
           try {
             const userPrefs = await storage.getUserNotificationPreferences(userId);
             shouldNotify = userPrefs?.notifyDocumentUploads ?? true;
-            process.stderr.write(`[DOC UPLOAD] User notification preferences: ${JSON.stringify(userPrefs)}\n`);
-            process.stderr.write(`[DOC UPLOAD] shouldNotify: ${shouldNotify}\n`);
+            log.debug({ userPrefs, shouldNotify }, 'Document upload notification preferences');
           } catch (e) {
-            process.stderr.write(`[DOC UPLOAD] Error getting settings, defaulting to enabled: ${e}\n`);
+            log.debug({ err: e }, 'Error getting notification settings, defaulting to enabled');
             shouldNotify = true; // Default to enabled if can't get settings
           }
         }
         
         if (shouldNotify) {
-          process.stderr.write(`[DOC UPLOAD] Preparing to send file to Slack...\n`);
+          log.debug('Preparing to send document file to Slack');
           try {
             // Build the notification message to include with file upload
             const timestamp = new Date().toLocaleString('en-US', {
@@ -2670,10 +2695,7 @@ export async function registerRoutes(
             ].filter(Boolean).join('\n');
 
             // Upload the actual file to Slack with the notification as initial comment
-            process.stderr.write(`[DOC UPLOAD] Calling uploadFileToChannel with:\n`);
-            process.stderr.write(`[DOC UPLOAD]   - channelId: ${transaction.slackChannelId}\n`);
-            process.stderr.write(`[DOC UPLOAD]   - fileName: ${fileName}\n`);
-            process.stderr.write(`[DOC UPLOAD]   - fileData length: ${fileData?.length || 'undefined'}\n`);
+            log.debug({ channelId: transaction.slackChannelId, fileName, fileDataLength: fileData?.length }, 'Calling uploadFileToChannel');
             
             const result = await uploadFileToChannel(
               transaction.slackChannelId,
@@ -2682,21 +2704,21 @@ export async function registerRoutes(
               docLabel,
               initialComment
             );
-            process.stderr.write(`[DOC UPLOAD] uploadFileToChannel result: ${JSON.stringify(result)}\n`);
+            log.debug({ result }, 'uploadFileToChannel result');
           } catch (slackError) {
-            process.stderr.write(`[DOC UPLOAD] Failed to send document to Slack: ${slackError}\n`);
+            log.error({ err: slackError }, 'Failed to send document to Slack');
             // Don't fail the request if Slack notification fails
           }
         } else {
-          process.stderr.write(`[DOC UPLOAD] shouldNotify is false, skipping Slack notification\n`);
+          log.debug('shouldNotify is false, skipping Slack notification for document');
         }
       } else {
-        process.stderr.write(`[DOC UPLOAD] No slackChannelId on transaction, skipping Slack notification\n`);
+        log.debug('No slackChannelId on transaction, skipping Slack notification for document');
       }
 
       res.status(201).json(doc);
     } catch (error: any) {
-      console.error("Document upload error:", error);
+      log.error({ err: error }, "Document upload error");
       res.status(400).json({ message: error.message || "Failed to upload document" });
     }
   });
@@ -2760,7 +2782,7 @@ export async function registerRoutes(
             const message = `:wastebasket: *Document Deleted*\n• Name: ${docLabel}\n• Type: ${docTypeLabel}\n• Property: ${address}`;
             await postToChannel(transaction.slackChannelId, message);
           } catch (slackError) {
-            console.error("Failed to send Slack notification for document deletion:", slackError);
+            log.error({ err: slackError }, "Failed to send Slack notification for document deletion");
           }
         }
       }
@@ -2859,7 +2881,7 @@ export async function registerRoutes(
       const cma = await storage.createCma(validatedData);
       res.status(201).json(cma);
     } catch (error: any) {
-      console.error("CMA creation error:", error);
+      log.error({ err: error }, "CMA creation error");
       res.status(400).json({ message: error.message || "Failed to create CMA" });
     }
   });
@@ -2882,7 +2904,7 @@ export async function registerRoutes(
       const cma = await storage.createCma(validatedData);
       res.status(201).json(cma);
     } catch (error: any) {
-      console.error("Transaction CMA creation error:", error);
+      log.error({ err: error }, "Transaction CMA creation error");
       res.status(400).json({ message: error.message || "Failed to create CMA for transaction" });
     }
   });
@@ -2927,7 +2949,7 @@ export async function registerRoutes(
         maxResults: filters?.maxResults || 10,
       };
 
-      console.log(`[CMA Refresh] Searching for comparables near ${mlsNumber} with filters:`, searchFilters);
+      log.info({ data: searchFilters }, `[CMA Refresh] Searching for comparables near ${mlsNumber} with filters`);
 
       // Search for nearby comparables
       const comparables = await searchNearbyComparables(
@@ -2937,7 +2959,7 @@ export async function registerRoutes(
         searchFilters
       );
 
-      console.log(`[CMA Refresh] Found ${comparables.length} comparables`);
+      log.info(`[CMA Refresh] Found ${comparables.length} comparables`);
 
       // Update transaction with new CMA data
       await storage.updateTransaction(req.params.transactionId, {
@@ -2959,7 +2981,7 @@ export async function registerRoutes(
         appliedFilters: searchFilters,
       });
     } catch (error: any) {
-      console.error("[CMA Refresh] Error:", error);
+      log.error({ err: error }, "[CMA Refresh] Error");
       res.status(500).json({ message: error.message || "Failed to refresh CMA comparables" });
     }
   });
@@ -3120,7 +3142,7 @@ export async function registerRoutes(
         yearBuilt: calcStats(years),
       });
     } catch (error) {
-      console.error("CMA statistics error:", error);
+      log.error({ err: error }, "CMA statistics error");
       res.status(500).json({ message: "Failed to calculate CMA statistics" });
     }
   });
@@ -3343,7 +3365,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
       const coverLetter = completion.choices[0]?.message?.content || '';
       res.json({ coverLetter });
     } catch (error: any) {
-      console.error("AI cover letter generation error:", error);
+      log.error({ err: error }, "AI cover letter generation error");
       res.status(500).json({ message: error.message || "Failed to generate cover letter" });
     }
   });
@@ -3438,7 +3460,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
       
       res.json(contact);
     } catch (error: any) {
-      console.error("FUB contact fetch error:", error);
+      log.error({ err: error }, "FUB contact fetch error");
       res.status(500).json({ message: error.message || "Failed to fetch contact from Follow Up Boss" });
     }
   });
@@ -3561,7 +3583,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
         return res.status(400).json({ message: "MLS number is required" });
       }
       
-      console.log(`[AI Photos API] Fetching AI-selected photos for MLS# ${mlsNumber}`);
+      log.info(`[AI Photos API] Fetching AI-selected photos for MLS# ${mlsNumber}`);
       
       const result = await getAISelectedPhotosForFlyer(mlsNumber);
       
@@ -3576,7 +3598,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
         selectionMethod: result.selectionMethod,
       });
     } catch (error: any) {
-      console.error("[AI Photos API] Error:", error);
+      log.error({ err: error }, "[AI Photos API] Error");
       res.status(500).json({ message: error.message || "Failed to fetch AI-selected photos" });
     }
   });
@@ -3617,7 +3639,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
             // Set up Gmail watch on this label to receive push notifications
             const watchResult = await watchUserMailbox(user.email, [gmailResult.labelId]);
             if (watchResult) {
-              console.log(`Gmail watch set up for ${user.email}, historyId: ${watchResult.historyId}`);
+              log.info(`Gmail watch set up for ${user.email}, historyId: ${watchResult.historyId}`);
             }
             
             await storage.createActivity({
@@ -3630,13 +3652,13 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
             processed++;
           }
         } catch (error) {
-          console.error(`Failed to create pending Gmail filter for transaction ${txn.id}:`, error);
+          log.error({ err: error }, `Failed to create pending Gmail filter for transaction ${txn.id}`);
         }
       }
       
       res.json({ processed, message: `Created ${processed} pending Gmail filter(s)` });
     } catch (error) {
-      console.error("Error processing pending filters:", error);
+      log.error({ err: error }, "Error processing pending filters");
       res.status(500).json({ message: "Failed to process pending filters" });
     }
   });
@@ -3676,7 +3698,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
       // If we couldn't match the agent to a FUB user, return empty results
       // This prevents agents from seeing contacts they don't own
       if (!fubUserId) {
-        console.log("FUB search: No FUB user ID found for agent, returning empty results");
+        log.info("FUB search: No FUB user ID found for agent, returning empty results");
         return res.json([]);
       }
 
@@ -3684,7 +3706,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
       const contacts = await searchFUBContactsByAssignedUser(query, fubUserId);
       res.json(contacts);
     } catch (error) {
-      console.error("FUB search error:", error);
+      log.error({ err: error }, "FUB search error");
       res.status(500).json({ message: "Failed to search FUB contacts" });
     }
   });
@@ -3694,7 +3716,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
   app.get("/api/mapbox-token", isAuthenticated, (req, res) => {
     const token = process.env.MAPBOX_TOKEN;
     if (!token) {
-      console.error('Mapbox token not found in environment');
+      log.error('Mapbox token not found in environment');
       return res.status(500).json({ error: 'Mapbox token not configured' });
     }
     res.json({ token });
@@ -3721,7 +3743,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
       
       const response = await fetch(geocodeUrl);
       if (!response.ok) {
-        console.error('Mapbox geocoding failed:', response.status, response.statusText);
+        log.error({ status: response.status, statusText: response.statusText }, 'Mapbox geocoding failed');
         return res.status(response.status).json({ error: 'Geocoding failed' });
       }
       
@@ -3763,7 +3785,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
         fullAddress: feature.place_name 
       });
     } catch (error) {
-      console.error('Mapbox geocoding error:', error);
+      log.error({ err: error }, 'Mapbox geocoding error');
       res.status(500).json({ error: 'Failed to geocode address' });
     }
   });
@@ -3793,7 +3815,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
       
       res.json({ embedUrl });
     } catch (error) {
-      console.error("Error generating maps embed:", error);
+      log.error({ err: error }, "Error generating maps embed");
       res.status(500).json({ message: "Failed to generate map embed" });
     }
   });
@@ -3838,7 +3860,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
       res.setHeader("Cache-Control", "public, max-age=3600");
       res.send(Buffer.from(buffer));
     } catch (error) {
-      console.error("Image proxy error:", error);
+      log.error({ err: error }, "Image proxy error");
       res.status(500).json({ message: "Failed to proxy image" });
     }
   });
@@ -3865,30 +3887,30 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
 
   app.post("/api/gmail/webhook", async (req, res) => {
     try {
-      console.log("Gmail webhook received:", JSON.stringify(req.body).substring(0, 500));
+      log.info({ body: JSON.stringify(req.body).substring(0, 500) }, 'Gmail webhook received');
       
       // Pub/Sub sends base64 encoded message data
       const message = req.body.message;
       if (!message?.data) {
-        console.log("No message.data in webhook payload");
+        log.info("No message.data in webhook payload");
         return res.status(400).json({ message: "Invalid Pub/Sub message" });
       }
 
       // Decode the message
       const decoded = Buffer.from(message.data, "base64").toString("utf-8");
       const notification = JSON.parse(decoded);
-      console.log("Decoded notification:", notification);
+      log.info({ data: notification }, "Decoded notification");
       
       // notification contains: { emailAddress, historyId }
       const userEmail = notification.emailAddress;
       const historyId = notification.historyId;
       
       if (!userEmail || !historyId) {
-        console.log("Missing emailAddress or historyId in notification");
+        log.info("Missing emailAddress or historyId in notification");
         return res.status(200).json({ message: "No email data in notification" });
       }
 
-      console.log(`Processing Gmail notification for ${userEmail}, historyId: ${historyId}`);
+      log.info(`Processing Gmail notification for ${userEmail}, historyId: ${historyId}`);
 
       // Find transactions for this user that have Gmail labels
       const transactions = await storage.getTransactions();
@@ -3896,7 +3918,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
         t.userId && t.gmailLabelId && t.slackChannelId
       );
       
-      console.log(`Found ${userTransactions.length} transactions with Gmail labels and Slack channels`);
+      log.info(`Found ${userTransactions.length} transactions with Gmail labels and Slack channels`);
 
       // For each transaction with a Gmail label, check for new messages
       for (const txn of userTransactions) {
@@ -3905,10 +3927,10 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
           const owner = await authStorage.getUser(txn.userId!);
           if (owner?.email !== userEmail) continue;
           
-          console.log(`Checking transaction ${txn.id} for ${txn.propertyAddress}`);
+          log.info(`Checking transaction ${txn.id} for ${txn.propertyAddress}`);
           
           const messages = await getNewMessages(userEmail, historyId, txn.gmailLabelId!);
-          console.log(`Found ${messages.length} new messages for transaction ${txn.id}`);
+          log.info(`Found ${messages.length} new messages for transaction ${txn.id}`);
           
           // Extract street pattern for subject line filtering
           const streetPattern = getStreetPatternFromAddress(txn.propertyAddress);
@@ -3916,7 +3938,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
           for (const msg of messages) {
             // Skip if already processed
             if (processedMessageIds.has(msg.id)) {
-              console.log(`Skipping already processed message ${msg.id}`);
+              log.info(`Skipping already processed message ${msg.id}`);
               continue;
             }
             
@@ -3927,7 +3949,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
               const hasStreetName = subjectLower.includes(streetPattern.streetName.toLowerCase());
               
               if (!hasStreetNumber || !hasStreetName) {
-                console.log(`Skipping email - subject "${msg.subject}" doesn't match "${streetPattern.streetNumber} ${streetPattern.streetName}"`);
+                log.info(`Skipping email - subject "${msg.subject}" doesn't match "${streetPattern.streetNumber} ${streetPattern.streetName}"`);
                 continue;
               }
             }
@@ -3944,18 +3966,18 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
             }
             
             // Post to Slack channel
-            console.log(`Posting email to Slack channel ${txn.slackChannelId}`);
+            log.info(`Posting email to Slack channel ${txn.slackChannelId}`);
             const slackMessage = `*New email related to ${txn.propertyAddress}*\n\n*From:* ${msg.from}\n*Subject:* ${msg.subject}\n\n${msg.snippet}...`;
             await postToChannel(txn.slackChannelId!, slackMessage);
           }
         } catch (err) {
-          console.error("Error processing transaction emails:", err);
+          log.error({ err: err }, "Error processing transaction emails");
         }
       }
 
       res.status(200).json({ message: "Processed" });
     } catch (error) {
-      console.error("Gmail webhook error:", error);
+      log.error({ err: error }, "Gmail webhook error");
       res.status(200).json({ message: "Error processed" }); // Return 200 to prevent retries
     }
   });
@@ -3963,11 +3985,11 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
   // Test endpoint to debug Repliers API access
   app.get("/api/test-repliers", async (req, res) => {
     try {
-      console.log("Testing Repliers API access...");
+      log.info("Testing Repliers API access...");
       const result = await testRepliersAccess();
       res.json(result);
     } catch (error: any) {
-      console.error("Repliers test error:", error);
+      log.error({ err: error }, "Repliers test error");
       res.status(500).json({ error: error.message });
     }
   });
@@ -3983,7 +4005,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
       const apiKey = process.env.REPLIERS_API_KEY;
       
       if (!apiKey) {
-        console.error('REPLIERS_API_KEY not configured');
+        log.error('REPLIERS_API_KEY not configured');
         return res.status(500).json({ 
           available: false,
           error: 'API key not configured',
@@ -3997,7 +4019,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
         return res.json(cached.data);
       }
 
-      console.log(`Fetching image insights for listing: ${listingId}`);
+      log.info(`Fetching image insights for listing: ${listingId}`);
 
       // Fetch listing with imageInsights from Repliers
       const response = await fetch(
@@ -4013,7 +4035,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Repliers API error:', response.status, errorText);
+        log.error({ status: response.status, errorText }, 'Repliers API error');
         return res.status(response.status).json({
           available: false,
           error: `Repliers API error: ${response.status}`,
@@ -4033,7 +4055,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
       
       // Check if Image Insights is available in the response
       if (data.imageInsights?.images && data.imageInsights.images.length > 0) {
-        console.log(`Image Insights available: ${data.imageInsights.images.length} images analyzed`);
+        log.info(`Image Insights available: ${data.imageInsights.images.length} images analyzed`);
         
         const photos = data.photos || data.images || [];
         
@@ -4061,7 +4083,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
       }
       
       // Fallback: Image Insights not enabled or no data - return photos without insights
-      console.log('Image Insights not available for this listing, returning basic photos');
+      log.info('Image Insights not available for this listing, returning basic photos');
       const photos = data.photos || data.images || [];
       const fallbackResult = {
         available: false,
@@ -4080,7 +4102,7 @@ Return ONLY the cover letter text${hasClientName ? ' starting with the greeting'
       return res.json(fallbackResult);
       
     } catch (error: any) {
-      console.error('Image insights fetch error:', error);
+      log.error({ err: error }, 'Image insights fetch error');
       return res.status(500).json({ 
         available: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -4232,15 +4254,21 @@ Write a summary that is UNDER ${maxLength} characters and ends with a complete s
 Count your characters carefully before responding.
 Return only the summary text, nothing else.`;
 
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: "You are a real estate copywriter. Always write complete sentences. Never end with '...' or mid-thought. Count characters carefully." },
-          { role: "user", content: prompt }
-        ],
-        max_tokens: 200,
-        temperature: 0.7,
-      });
+      const response = await openaiCircuit.execute(() =>
+        withTimeout(
+          () => openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              { role: "system", content: "You are a real estate copywriter. Always write complete sentences. Never end with '...' or mid-thought. Count characters carefully." },
+              { role: "user", content: prompt }
+            ],
+            max_tokens: 200,
+            temperature: 0.7,
+          }),
+          30000,
+          'openai-mls-summary'
+        )
+      );
 
       let summary = response.choices[0]?.message?.content?.trim() || "";
       
@@ -4249,7 +4277,7 @@ Return only the summary text, nothing else.`;
 
       res.json({ summary });
     } catch (error: any) {
-      console.error("AI summarization error:", error);
+      log.error({ err: error }, "AI summarization error");
       
       // Fallback: truncate at sentence boundary
       const { description, maxLength = 150 } = req.body;
@@ -4263,7 +4291,7 @@ Return only the summary text, nothing else.`;
   });
 
   // ============ Professional Social Media Tagline Generation ============
-  app.post("/api/generate-social-tagline", isAuthenticated, async (req, res) => {
+  app.post("/api/generate-social-tagline", generationLimiter, isAuthenticated, async (req, res) => {
     try {
       const { transactionId } = req.body;
       
@@ -4367,15 +4395,21 @@ BAD EXAMPLES (AVOID):
 
 Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
 
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: "You are a professional real estate broker. Write punchy, professional taglines. Never use generic words like beautiful, nice, great, amazing. Never use clichés. Sound like a broker, not like AI. Max 70 characters." },
-          { role: "user", content: prompt }
-        ],
-        max_tokens: 100,
-        temperature: 0.8,
-      });
+      const response = await openaiCircuit.execute(() =>
+        withTimeout(
+          () => openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              { role: "system", content: "You are a professional real estate broker. Write punchy, professional taglines. Never use generic words like beautiful, nice, great, amazing. Never use clichés. Sound like a broker, not like AI. Max 70 characters." },
+              { role: "user", content: prompt }
+            ],
+            max_tokens: 100,
+            temperature: 0.8,
+          }),
+          30000,
+          'openai-tagline'
+        )
+      );
 
       let tagline = response.choices[0]?.message?.content?.trim() || "";
       
@@ -4389,13 +4423,13 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
 
       res.json({ tagline });
     } catch (error: any) {
-      console.error("Social tagline generation error:", error);
+      log.error({ err: error }, "Social tagline generation error");
       res.status(500).json({ error: "Failed to generate tagline" });
     }
   });
 
   // ============ HTML/Puppeteer Flyer Generation ============
-  app.post("/api/generate-flyer-html", isAuthenticated, async (req, res) => {
+  app.post("/api/generate-flyer-html", generationLimiter, isAuthenticated, async (req, res) => {
     try {
       const {
         status,
@@ -4492,7 +4526,7 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
       // Support both PNG preview and PDF download
       const outputType: OutputType = req.body.outputType === 'pdf' ? 'pdf' : 'pngPreview';
       
-      console.log(`Generating ${outputType} flyer for:`, address);
+      log.info({ data: address }, `Generating ${outputType} flyer for`);
       const buffer = await generatePrintFlyer(flyerData, outputType);
       
       // Create filename from address
@@ -4508,7 +4542,7 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
       res.send(buffer);
       
     } catch (error: any) {
-      console.error('Flyer generation error:', error);
+      log.error({ err: error }, 'Flyer generation error');
       res.status(500).json({ error: 'Failed to generate flyer', details: error.message });
     }
   });
@@ -4516,7 +4550,7 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
   // ============ Unified Flyer Render (PNG Preview or PDF) ============
   // This endpoint is the single source of truth for flyer rendering
   // Both preview and download use the SAME Puppeteer-rendered output
-  app.post("/api/flyer/render", isAuthenticated, async (req, res) => {
+  app.post("/api/flyer/render", generationLimiter, isAuthenticated, async (req, res) => {
     try {
       const {
         status,
@@ -4611,7 +4645,7 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
       };
       
       const validOutputType: OutputType = outputType === 'pdf' ? 'pdf' : 'pngPreview';
-      console.log(`Unified flyer render: ${validOutputType} for ${address}`);
+      log.info(`Unified flyer render: ${validOutputType} for ${address}`);
       
       const buffer = await generatePrintFlyer(flyerData, validOutputType);
       
@@ -4628,13 +4662,13 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
       res.send(buffer);
       
     } catch (error: any) {
-      console.error('Unified flyer render error:', error);
+      log.error({ err: error }, 'Unified flyer render error');
       res.status(500).json({ error: 'Failed to render flyer', details: error.message });
     }
   });
 
   // ============ Flyer Generator AI Headline ============
-  app.post("/api/flyer/generate-headline", isAuthenticated, async (req, res) => {
+  app.post("/api/flyer/generate-headline", generationLimiter, isAuthenticated, async (req, res) => {
     try {
       const { propertyData } = req.body;
 
@@ -4663,27 +4697,33 @@ Property Details:
 
 Generate only the headline, nothing else.`;
 
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a professional real estate copywriter. Generate compelling, concise headlines for property flyers.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        max_tokens: 100,
-        temperature: 0.7,
-      });
+      const completion = await openaiCircuit.execute(() =>
+        withTimeout(
+          () => openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a professional real estate copywriter. Generate compelling, concise headlines for property flyers.',
+              },
+              {
+                role: 'user',
+                content: prompt,
+              },
+            ],
+            max_tokens: 100,
+            temperature: 0.7,
+          }),
+          30000,
+          'openai-flyer-headline'
+        )
+      );
 
       const headline = completion.choices[0]?.message?.content?.trim() || 'Beautiful Home in Prime Location';
 
       res.json({ headline });
     } catch (error: any) {
-      console.error('AI headline generation error:', error);
+      log.error({ err: error }, 'AI headline generation error');
       res.status(500).json({ error: 'Failed to generate headline' });
     }
   });
@@ -4748,7 +4788,7 @@ Generate only the headline, nothing else.`;
         imageTransforms,
       };
 
-      console.log(`[FlyerGenerator] ${saveOnly ? 'Saving' : 'Exporting'} ${format} flyer for transaction ${id}`);
+      log.info(`[FlyerGenerator] ${saveOnly ? 'Saving' : 'Exporting'} ${format} flyer for transaction ${id}`);
 
       const outputType: OutputType = format === 'cmyk' ? 'pdf' : 'pngPreview';
       const buffer = await generatePrintFlyer(flyerData, outputType);
@@ -4765,7 +4805,7 @@ Generate only the headline, nothing else.`;
           fileName: `${addressSlug}_flyer_${Date.now()}.png`,
           metadata: { format, createdBy: userId, flyerData: data },
         });
-        console.log(`[FlyerGenerator] Saved flyer to marketing assets`);
+        log.info(`[FlyerGenerator] Saved flyer to marketing assets`);
         return res.json({ success: true, message: 'Flyer saved to My Assets' });
       }
 
@@ -4779,10 +4819,10 @@ Generate only the headline, nothing else.`;
           fileName: `${addressSlug}_flyer.${format === 'cmyk' ? 'pdf' : 'png'}`,
           metadata: { format, createdBy: userId, flyerData: data },
         });
-        console.log(`[FlyerGenerator] Saved flyer to marketing assets`);
+        log.info(`[FlyerGenerator] Saved flyer to marketing assets`);
         
         // Send Slack notification if postToSlack is true and transaction has Slack channel
-        console.log(`[FlyerGenerator] postToSlack=${postToSlack}, slackChannelId=${transaction.slackChannelId}`);
+        log.info(`[FlyerGenerator] postToSlack=${postToSlack}, slackChannelId=${transaction.slackChannelId}`);
         if (postToSlack && transaction.slackChannelId) {
           try {
             const userId = req.user?.claims?.sub;
@@ -4791,13 +4831,13 @@ Generate only the headline, nothing else.`;
             if (userId) {
               const userPrefs = await storage.getUserNotificationPreferences(userId);
               shouldNotify = userPrefs?.notifyMarketingAssets ?? true;
-              console.log(`[FlyerGenerator] User ${userId} notifyMarketingAssets=${shouldNotify}`);
+              log.info(`[FlyerGenerator] User ${userId} notifyMarketingAssets=${shouldNotify}`);
             }
             
             if (shouldNotify) {
               const address = transaction.propertyAddress || data.address || 'Unknown Property';
               const createdBy = req.user?.claims?.email || 'Unknown User';
-              console.log(`[FlyerGenerator] Sending Slack notification for flyer: ${address}`);
+              log.info(`[FlyerGenerator] Sending Slack notification for flyer: ${address}`);
               await sendMarketingNotification(
                 transaction.slackChannelId,
                 address,           // propertyAddress
@@ -4806,19 +4846,19 @@ Generate only the headline, nothing else.`;
                 `data:image/png;base64,${buffer.toString('base64')}`,  // imageData
                 `${addressSlug}_flyer.png`  // fileName
               );
-              console.log(`[FlyerGenerator] Posted flyer to Slack channel ${transaction.slackChannelId}`);
+              log.info(`[FlyerGenerator] Posted flyer to Slack channel ${transaction.slackChannelId}`);
             } else {
-              console.log(`[FlyerGenerator] Slack notification skipped - user preference disabled`);
+              log.info(`[FlyerGenerator] Slack notification skipped - user preference disabled`);
             }
           } catch (slackError: any) {
-            console.error('[FlyerGenerator] Failed to post to Slack:', slackError.message);
+            log.error({ err: slackError }, '[FlyerGenerator] Failed to post to Slack');
             // Don't fail the export just because Slack failed
           }
         } else {
-          console.log(`[FlyerGenerator] Slack notification skipped - postToSlack=${postToSlack}, hasChannel=${!!transaction.slackChannelId}`);
+          log.info(`[FlyerGenerator] Slack notification skipped - postToSlack=${postToSlack}, hasChannel=${!!transaction.slackChannelId}`);
         }
       } catch (saveError: any) {
-        console.error('[FlyerGenerator] Failed to save to marketing assets:', saveError.message);
+        log.error({ err: saveError }, '[FlyerGenerator] Failed to save to marketing assets');
       }
 
       if (format === 'cmyk') {
@@ -4831,13 +4871,13 @@ Generate only the headline, nothing else.`;
 
       res.send(buffer);
     } catch (error: any) {
-      console.error('[FlyerGenerator] Export error:', error);
+      log.error({ err: error }, '[FlyerGenerator] Export error');
       res.status(500).json({ error: 'Failed to export flyer', details: error.message });
     }
   });
 
   // ============ Social Media Graphics Render ============
-  app.post("/api/graphics/render", isAuthenticated, async (req, res) => {
+  app.post("/api/graphics/render", generationLimiter, isAuthenticated, async (req, res) => {
     try {
       const {
         format,
@@ -4879,7 +4919,7 @@ Generate only the headline, nothing else.`;
         brokerageLogo: logoPath,
       };
 
-      console.log(`Graphics render: ${format} for ${address}`);
+      log.info(`Graphics render: ${format} for ${address}`);
       
       const buffer = await generateGraphic(graphicsData, format as GraphicsFormat);
       
@@ -4895,7 +4935,7 @@ Generate only the headline, nothing else.`;
       res.send(buffer);
       
     } catch (error: any) {
-      console.error('Graphics render error:', error);
+      log.error({ err: error }, 'Graphics render error');
       res.status(500).json({ error: 'Failed to render graphic', details: error.message });
     }
   });
@@ -4965,15 +5005,21 @@ Description: ${description}
 
 Generate ONE headline only. Return just the headline text, nothing else.`;
 
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: "You are a real estate marketing expert. Return only the headline text, no quotes or explanation. Match the tone to the property status." },
-          { role: "user", content: prompt }
-        ],
-        max_tokens: 60,
-        temperature: 0.8, // Higher for more variation
-      });
+      const response = await openaiCircuit.execute(() =>
+        withTimeout(
+          () => openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              { role: "system", content: "You are a real estate marketing expert. Return only the headline text, no quotes or explanation. Match the tone to the property status." },
+              { role: "user", content: prompt }
+            ],
+            max_tokens: 60,
+            temperature: 0.8,
+          }),
+          30000,
+          'openai-social-headline'
+        )
+      );
 
       let headline = response.choices[0]?.message?.content?.trim() || "";
       
@@ -4997,7 +5043,7 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
 
       res.json({ headline });
     } catch (error: any) {
-      console.error("Error generating headline:", error);
+      log.error({ err: error }, "Error generating headline");
       res.status(500).json({ error: "Failed to generate headline" });
     }
   });
@@ -5036,7 +5082,7 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
 
       res.json(settings);
     } catch (error) {
-      console.error("Error getting notification settings:", error);
+      log.error({ err: error }, "Error getting notification settings");
       res.status(500).json({ message: "Failed to get notification settings" });
     }
   });
@@ -5089,7 +5135,7 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
       const settings = await storage.upsertNotificationSettings(validationResult.data);
       res.json(settings);
     } catch (error) {
-      console.error("Error updating notification settings:", error);
+      log.error({ err: error }, "Error updating notification settings");
       res.status(500).json({ message: "Failed to update notification settings" });
     }
   });
@@ -5103,7 +5149,7 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
       const result = await triggerNotificationsNow(bypassDisable);
       res.json({ message: "Reminder check triggered", ...result });
     } catch (error) {
-      console.error("Error triggering reminder check:", error);
+      log.error({ err: error }, "Error triggering reminder check");
       res.status(500).json({ message: "Failed to trigger reminder check" });
     }
   });
@@ -5114,7 +5160,7 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
       const { getCronStatus } = await import("./cron/notificationCron");
       res.json(getCronStatus());
     } catch (error) {
-      console.error("Error getting notification status:", error);
+      log.error({ err: error }, "Error getting notification status");
       res.status(500).json({ message: "Failed to get notification status" });
     }
   });
@@ -5134,7 +5180,7 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
         res.json(diagnostics);
       }
     } catch (error) {
-      console.error("Error running Slack diagnostics:", error);
+      log.error({ err: error }, "Error running Slack diagnostics");
       res.status(500).json({ message: "Failed to run diagnostics", error: String(error) });
     }
   });
@@ -5150,7 +5196,7 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
       const result = await sendTestNotification(channelId);
       res.json(result);
     } catch (error) {
-      console.error("Error sending test notification:", error);
+      log.error({ err: error }, "Error sending test notification");
       res.status(500).json({ message: "Failed to send test notification" });
     }
   });
@@ -5184,7 +5230,7 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
         } : null,
       });
     } catch (error: any) {
-      console.error("[Agent Profile] Error fetching:", error.message);
+      log.error({ err: error }, "[Agent Profile] Error fetching");
       res.status(500).json({ error: "Failed to fetch agent profile" });
     }
   });
@@ -5221,7 +5267,7 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
 
       res.json({ success: true, profile: updatedProfile });
     } catch (error: any) {
-      console.error("[Agent Profile] Error updating:", error.message);
+      log.error({ err: error }, "[Agent Profile] Error updating");
       res.status(500).json({ error: "Failed to update agent profile" });
     }
   });
@@ -5306,21 +5352,27 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       const OpenAI = (await import('openai')).default;
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 500,
-      });
+      const completion = await openaiCircuit.execute(() =>
+        withTimeout(
+          () => openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 500,
+          }),
+          30000,
+          'openai-cover-letter'
+        )
+      );
 
       const coverLetter = completion.choices[0]?.message?.content?.trim() || '';
 
       res.json({ coverLetter, mode: isEnhancing ? 'enhanced' : 'generated' });
     } catch (error: any) {
-      console.error("[AI Cover Letter] Error:", error.message);
+      log.error({ err: error }, "[AI Cover Letter] Error");
       res.status(500).json({ error: "Failed to generate cover letter" });
     }
   });
@@ -5348,7 +5400,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
         secondaryLogoUseDefault: true,
       });
     } catch (error: any) {
-      console.error("[Marketing Profile] Error fetching:", error.message);
+      log.error({ err: error }, "[Marketing Profile] Error fetching");
       res.status(500).json({ error: "Failed to fetch marketing profile" });
     }
   });
@@ -5412,7 +5464,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
 
       res.json(profile);
     } catch (error: any) {
-      console.error("[Marketing Profile] Error saving:", error.message);
+      log.error({ err: error }, "[Marketing Profile] Error saving");
       if (error.message.includes('must be') || error.message.includes('exceeds')) {
         return res.status(400).json({ error: error.message });
       }
@@ -5433,7 +5485,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       const resources = await storage.getAgentResources(userId);
       res.json(resources);
     } catch (error: any) {
-      console.error("[Agent Resources] Error fetching:", error.message);
+      log.error({ err: error }, "[Agent Resources] Error fetching");
       res.status(500).json({ error: "Failed to fetch resources" });
     }
   });
@@ -5470,7 +5522,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
 
       res.json(resource);
     } catch (error: any) {
-      console.error("[Agent Resources] Error creating:", error.message);
+      log.error({ err: error }, "[Agent Resources] Error creating");
       res.status(500).json({ error: "Failed to create resource" });
     }
   });
@@ -5502,7 +5554,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       const updated = await storage.updateAgentResource(id, updateData);
       res.json(updated);
     } catch (error: any) {
-      console.error("[Agent Resources] Error updating:", error.message);
+      log.error({ err: error }, "[Agent Resources] Error updating");
       res.status(500).json({ error: "Failed to update resource" });
     }
   });
@@ -5526,7 +5578,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       await storage.deleteAgentResource(id);
       res.json({ success: true });
     } catch (error: any) {
-      console.error("[Agent Resources] Error deleting:", error.message);
+      log.error({ err: error }, "[Agent Resources] Error deleting");
       res.status(500).json({ error: "Failed to delete resource" });
     }
   });
@@ -5548,7 +5600,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       await storage.reorderAgentResources(userId, orderedIds);
       res.json({ success: true });
     } catch (error: any) {
-      console.error("[Agent Resources] Error reordering:", error.message);
+      log.error({ err: error }, "[Agent Resources] Error reordering");
       res.status(500).json({ error: "Failed to reorder resources" });
     }
   });
@@ -5578,7 +5630,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       res.setHeader('Content-Length', buffer.length);
       res.send(buffer);
     } catch (error: any) {
-      console.error("[Agent Resources] Error serving file:", error.message);
+      log.error({ err: error }, "[Agent Resources] Error serving file");
       res.status(500).json({ error: "Failed to serve file" });
     }
   });
@@ -5598,7 +5650,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       // Use single file upload middleware
       upload.single('file')(req, res, async (err: unknown) => {
         if (err) {
-          console.error("[Agent Resources] Upload error:", err);
+          log.error({ err: err }, "[Agent Resources] Upload error");
           return res.status(400).json({ error: "File upload failed" });
         }
 
@@ -5629,12 +5681,12 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
             fileMimeType: req.file.mimetype,
           });
         } catch (uploadErr: any) {
-          console.error("[Agent Resources] Storage upload error:", uploadErr);
+          log.error({ err: uploadErr }, "[Agent Resources] Storage upload error");
           res.status(500).json({ error: "Failed to process file" });
         }
       });
     } catch (error: any) {
-      console.error("[Agent Resources] Error uploading:", error.message);
+      log.error({ err: error }, "[Agent Resources] Error uploading");
       res.status(500).json({ error: "Failed to upload file" });
     }
   });
@@ -5663,7 +5715,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       
       res.json(prefs);
     } catch (error) {
-      console.error("Error fetching notification preferences:", error);
+      log.error({ err: error }, "Error fetching notification preferences");
       res.status(500).json({ message: "Failed to fetch notification preferences" });
     }
   });
@@ -5690,7 +5742,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       const prefs = await storage.upsertUserNotificationPreferences(userId, validationResult.data);
       res.json(prefs);
     } catch (error) {
-      console.error("Error updating notification preferences:", error);
+      log.error({ err: error }, "Error updating notification preferences");
       res.status(500).json({ message: "Failed to update notification preferences" });
     }
   });
@@ -5933,7 +5985,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       res.json(audit);
       
     } catch (error: any) {
-      console.error("Error in CMA PDF audit:", error);
+      log.error({ err: error }, "Error in CMA PDF audit");
       res.status(500).json({ error: error.message });
     }
   });
@@ -6005,7 +6057,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       // Validate with Zod schema
       const validationResult = insertFlyerSchema.safeParse(flyerPayload);
       if (!validationResult.success) {
-        console.error("[Flyer] Validation error:", validationResult.error.flatten());
+        log.error({ validationErrors: validationResult.error.flatten() }, 'Flyer validation error');
         return res.status(400).json({ 
           error: "Invalid flyer data", 
           details: validationResult.error.flatten().fieldErrors 
@@ -6019,7 +6071,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       const flyerUrl = `${baseUrl}/flyer/${flyer.id}`;
       const qrCode = await generateFlyerQRCode(flyerUrl);
 
-      console.log(`[Flyer] Created flyer ${flyer.id} for user ${userId}`);
+      log.info(`[Flyer] Created flyer ${flyer.id} for user ${userId}`);
 
       res.json({
         success: true,
@@ -6029,7 +6081,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
         qrCode,
       });
     } catch (error: any) {
-      console.error("[Flyer] Create error:", error);
+      log.error({ err: error }, "[Flyer] Create error");
       res.status(500).json({ error: "Failed to create flyer" });
     }
   });
@@ -6046,7 +6098,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       const userFlyers = await storage.getFlyersByUser(userId);
       res.json(userFlyers);
     } catch (error: any) {
-      console.error("[Flyer] Get user flyers error:", error);
+      log.error({ err: error }, "[Flyer] Get user flyers error");
       res.status(500).json({ error: "Failed to get flyers" });
     }
   });
@@ -6059,7 +6111,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       const qrCode = await generateFlyerQRCode(flyerUrl);
       res.json({ qrCode, flyerUrl });
     } catch (error: any) {
-      console.error("[Flyer] Generate QR error:", error);
+      log.error({ err: error }, "[Flyer] Generate QR error");
       res.status(500).json({ error: "Failed to generate QR" });
     }
   });
@@ -6076,11 +6128,11 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
       }
       
       // Track view asynchronously
-      storage.incrementFlyerViews(req.params.id).catch(console.error);
+      storage.incrementFlyerViews(req.params.id).catch(err => log.error({ err }, 'Async operation failed'));
       
       res.json(flyer);
     } catch (error: any) {
-      console.error("[Flyer] Public get error:", error);
+      log.error({ err: error }, "[Flyer] Public get error");
       res.status(500).json({ error: "Failed to load flyer" });
     }
   });

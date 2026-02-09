@@ -1,5 +1,8 @@
+import { createModuleLogger } from '../lib/logger';
 import { storage } from '../storage.js';
 import type { InsertActivity } from '@shared/schema';
+
+const log = createModuleLogger('timeline');
 
 function getCategoryFromType(eventType: string): string {
   if (eventType.startsWith('transaction_') || eventType === 'status_changed') return 'transaction';
@@ -32,7 +35,7 @@ export async function logTimelineEvent(
 
     return await storage.createActivity(activity);
   } catch (error) {
-    console.error('Failed to log timeline event:', error);
+    log.error({ err: error }, 'Failed to log timeline event');
   }
 }
 

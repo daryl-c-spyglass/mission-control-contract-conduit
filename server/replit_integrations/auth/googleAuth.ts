@@ -4,6 +4,9 @@ import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import { authStorage } from "./storage";
+import { createModuleLogger } from '../../lib/logger';
+
+const log = createModuleLogger('auth');
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
@@ -44,7 +47,7 @@ export async function setupAuth(app: Express) {
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
   if (!clientID || !clientSecret) {
-    console.error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are required for authentication");
+    log.error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are required for authentication");
     return;
   }
 
@@ -66,7 +69,7 @@ export async function setupAuth(app: Express) {
           
           const allowedDomain = "@spyglassrealty.com";
           if (!email.toLowerCase().endsWith(allowedDomain)) {
-            console.log(`Login rejected: ${email} is not a Spyglass Realty account`);
+            log.info({ email }, 'Login rejected: not a Spyglass Realty account');
             return done(null, false, { message: "Only Spyglass Realty accounts are allowed" });
           }
           

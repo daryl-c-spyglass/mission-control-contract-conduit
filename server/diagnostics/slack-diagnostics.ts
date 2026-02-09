@@ -1,6 +1,9 @@
+import { createModuleLogger } from '../lib/logger';
 import { db } from '../db';
 import { transactions, activities, userNotificationPreferences } from '../../shared/schema';
 import { eq, isNotNull, desc, and } from 'drizzle-orm';
+
+const log = createModuleLogger('diagnostics');
 
 const SLACK_API_BASE = "https://slack.com/api";
 
@@ -199,13 +202,13 @@ export async function runSlackDiagnostics(): Promise<DiagnosticResult> {
   try {
     allTransactions = await db.select().from(transactions);
   } catch (e) {
-    console.error('Error fetching transactions:', e);
+    log.error({ err: e }, 'Error fetching transactions');
   }
 
   try {
     userPrefs = await db.select().from(userNotificationPreferences);
   } catch (e) {
-    console.error('Error fetching user preferences:', e);
+    log.error({ err: e }, 'Error fetching user preferences');
   }
 
   try {
@@ -216,7 +219,7 @@ export async function runSlackDiagnostics(): Promise<DiagnosticResult> {
       .orderBy(desc(activities.createdAt))
       .limit(10);
   } catch (e) {
-    console.error('Error fetching notifications:', e);
+    log.error({ err: e }, 'Error fetching notifications');
   }
 
   const withClosingDates = allTransactions.filter(t => t.closingDate && t.closingDate !== '');

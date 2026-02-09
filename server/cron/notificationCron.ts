@@ -1,4 +1,7 @@
+import { createModuleLogger } from '../lib/logger';
 import { processClosingDateNotifications, getNotificationStatus } from "../services/slackNotificationService";
+
+const log = createModuleLogger('notifications');
 
 let isProcessing = false;
 let cronIntervalId: NodeJS.Timeout | null = null;
@@ -7,13 +10,13 @@ let lastRunDate: string | null = null;
 export function initializeNotificationCron(): void {
   // KILL SWITCH - check FIRST before any initialization
   if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
-    console.log(`[NotificationCron] 🔴 DISABLED - DISABLE_SLACK_NOTIFICATIONS=true`);
-    console.log(`[NotificationCron] ⚠️ No closing date reminders will be sent`);
+    log.warn('DISABLED - DISABLE_SLACK_NOTIFICATIONS=true');
+    log.warn('No closing date reminders will be sent');
     return;
   }
 
   if (process.env.NODE_ENV !== 'production') {
-    console.log(`[NotificationCron] Skipping - not in production environment (NODE_ENV: ${process.env.NODE_ENV})`);
+    log.info({ nodeEnv: process.env.NODE_ENV }, 'Skipping - not in production environment');
     return;
   }
 
@@ -31,31 +34,31 @@ export function initializeNotificationCron(): void {
     }
 
     if (isProcessing) {
-      console.log("[NotificationCron] ⚠️ Already running, skipping...");
+      log.warn('Already running, skipping...');
       return;
     }
 
     lastRunDate = today;
     isProcessing = true;
-    console.log("[NotificationCron] 🚀 Starting daily notification job (9 AM CT)...");
+    log.info('Starting daily notification job (9 AM CT)...');
 
     try {
       await processClosingDateNotifications();
     } catch (error) {
-      console.error("[NotificationCron] ❌ Job failed:", error);
+      log.error({ err: error }, 'Job failed');
     } finally {
       isProcessing = false;
     }
   }, 60000);
 
-  console.log("[NotificationCron] ✅ Notification cron initialized - runs daily at 9:00 AM CT");
+  log.info('Notification cron initialized - runs daily at 9:00 AM CT');
 }
 
 export function stopNotificationCron(): void {
   if (cronIntervalId) {
     clearInterval(cronIntervalId);
     cronIntervalId = null;
-    console.log("[NotificationCron] 🛑 Notification cron stopped");
+    log.info('Notification cron stopped');
   }
 }
 

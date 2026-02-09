@@ -1,6 +1,9 @@
+import { createModuleLogger } from '../lib/logger';
 import { db } from "../db";
 import { sentNotifications, transactions, notificationSettings } from "@shared/schema";
 import { eq, and, gte, lte, isNotNull } from "drizzle-orm";
+
+const log = createModuleLogger('slack-notifications');
 
 const SLACK_API_BASE = "https://slack.com/api";
 
@@ -204,7 +207,7 @@ async function sendNotificationIfNotSent(
   );
 
   if (alreadySent) {
-    console.log(`[Slack] SKIPPED (already sent today): ${notificationType} for "${transaction.propertyAddress}"`);
+    log.info({ notificationType, address: transaction.propertyAddress }, 'SKIPPED (already sent today)');
     return { sent: false, reason: 'already_sent_today' };
   }
 
@@ -217,10 +220,10 @@ async function sendNotificationIfNotSent(
       channelId,
       result.ts
     );
-    console.log(`[Slack] ✅ SENT: ${notificationType} for "${transaction.propertyAddress}"`);
+    log.info({ notificationType, address: transaction.propertyAddress }, 'SENT');
     return { sent: true };
   } else {
-    console.error(`[Slack] ❌ ERROR: ${result.error}`);
+    log.error({ error: result.error }, 'Send failed');
     return { sent: false, reason: 'send_failed' };
   }
 }
@@ -262,22 +265,20 @@ export async function processClosingDateNotifications(): Promise<{
   
   // KILL SWITCH - check FIRST before any processing
   if (process.env.DISABLE_SLACK_NOTIFICATIONS === 'true') {
-    console.log(`[Slack] 🔴 DISABLED - DISABLE_SLACK_NOTIFICATIONS=true`);
-    console.log(`[Slack] ⚠️ Skipping all closing date notifications`);
+    log.warn('DISABLED - DISABLE_SLACK_NOTIFICATIONS=true');
+    log.warn('Skipping all closing date notifications');
     return stats;
   }
 
   if (!process.env.SLACK_BOT_TOKEN) {
-    console.log(`[Slack] ⚠️ Bot token not configured`);
+    log.warn('Bot token not configured');
     return stats;
   }
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  console.log(`\n========================================`);
-  console.log(`[Slack] Starting notification check: ${today.toDateString()}`);
-  console.log(`========================================\n`);
+  log.info({ date: today.toDateString() }, 'Starting notification check');
 
   try {
     const transactionsToCheck = await db
@@ -290,7 +291,7 @@ export async function processClosingDateNotifications(): Promise<{
         )
       );
 
-    console.log(`[Slack] Found ${transactionsToCheck.length} transactions to check`);
+    log.info({ count: transactionsToCheck.length }, 'Found transactions to check');
 
     for (const transaction of transactionsToCheck) {
       stats.processed++;
@@ -302,13 +303,17 @@ export async function processClosingDateNotifications(): Promise<{
       // User-specific notification lookup - each transaction owner controls their own settings
       const userPrefs = await getUserNotificationSettings(transaction.userId || '');
       
-      console.log(`[Slack] Processing: "${transaction.propertyAddress}"`);
-      console.log(`[Slack]   Owner userId: ${transaction.userId || '(none)'}`);
-      console.log(`[Slack]   Channel: ${transaction.slackChannelId}`);
-      console.log(`[Slack]   User prefs: closingReminders=${userPrefs.closingReminders}, 3days=${userPrefs.reminder3Days}, dayOf=${userPrefs.reminderDayOf}`);
+      log.info({
+        address: transaction.propertyAddress,
+        userId: transaction.userId || '(none)',
+        channelId: transaction.slackChannelId,
+        closingReminders: userPrefs.closingReminders,
+        reminder3Days: userPrefs.reminder3Days,
+        reminderDayOf: userPrefs.reminderDayOf
+      }, 'Processing transaction');
 
       if (!userPrefs.closingReminders) {
-        console.log(`[Slack] SKIPPED (closing reminders disabled): "${transaction.propertyAddress}"`);
+        log.info({ address: transaction.propertyAddress }, 'SKIPPED (closing reminders disabled)');
         stats.disabled++;
         continue;
       }
@@ -320,12 +325,12 @@ export async function processClosingDateNotifications(): Promise<{
         (closingDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
       );
 
-      console.log(`[Slack] Checking "${transaction.propertyAddress}" - ${daysUntilClosing} days until closing`);
+      log.info({ address: transaction.propertyAddress, daysUntilClosing }, 'Checking days until closing');
 
       for (const config of REMINDER_CONFIGS) {
         if (daysUntilClosing === config.daysBeforeClosing) {
           if (!userPrefs[config.settingKey]) {
-            console.log(`[Slack] SKIPPED (${config.settingKey} disabled): "${transaction.propertyAddress}"`);
+            log.info({ settingKey: config.settingKey, address: transaction.propertyAddress }, 'SKIPPED (setting disabled)');
             stats.disabled++;
             continue;
           }
@@ -349,18 +354,17 @@ export async function processClosingDateNotifications(): Promise<{
       }
     }
   } catch (error: any) {
-    console.error(`[Slack] Error:`, error);
+    log.error({ err: error }, 'Error during notification processing');
     stats.errors++;
   }
 
-  console.log(`\n========================================`);
-  console.log(`[Slack] Notification check complete:`);
-  console.log(`  ✅ Sent: ${stats.sent}`);
-  console.log(`  ⏭️ Skipped (already sent): ${stats.skipped}`);
-  console.log(`  🔕 Disabled by user: ${stats.disabled}`);
-  console.log(`  ❌ Errors: ${stats.errors}`);
-  console.log(`  📊 Total processed: ${stats.processed}`);
-  console.log(`========================================\n`);
+  log.info({
+    sent: stats.sent,
+    skipped: stats.skipped,
+    disabled: stats.disabled,
+    errors: stats.errors,
+    processed: stats.processed
+  }, 'Notification check complete');
 
   return stats;
 }
