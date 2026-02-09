@@ -1,0 +1,344 @@
+# Add "Order Company Photography" Checkbox to Create Transaction
+
+## Objective
+
+Add an "Order Company Photography" checkbox to the Create Transaction form. When checked, a formatted message posts to #spyglass-photography Slack channel with all property and agent details so Randi can add it to the Spyglass Photography Orders list.
+
+This follows the same pattern as the existing "Coming Soon" checkbox.
+
+---
+
+## Slack Channel
+
+- Channel: #spyglass-photography
+- Channel ID: C0A9019MYT1
+
+---
+
+## Database Changes
+
+Add column to transactions table:
+
+```sql
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS order_photography BOOLEAN DEFAULT false;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS photography_notes TEXT;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS photography_appointment_date TIMESTAMP;
+```
+
+Update Drizzle schema to include:
+
+```typescript
+orderPhotography: boolean('order_photography').default(false),
+photographyNotes: text('photography_notes'),
+photographyAppointmentDate: timestamp('photography_appointment_date'),
+```
+
+---
+
+## UI Changes — Create Transaction Form
+
+Add a new checkbox BELOW the existing "Coming Soon" checkbox section. When checked, expand to show photography-specific fields.
+
+### Checkbox and Expandable Section:
+
+```tsx
+{/* Order Company Photography */}
+<div className="flex items-center gap-3">
+  <Checkbox 
+    id="orderPhotography" 
+    checked={orderPhotography} 
+    onCheckedChange={setOrderPhotography} 
+  />
+  <div>
+    <Label htmlFor="orderPhotography">Order Company Photography</Label>
+    <p className="text-sm text-muted-foreground">
+      Submit photography request to #spyglass-photography
+    </p>
+  </div>
+</div>
+
+{/* Expandable Photography Details — only visible when checked */}
+{orderPhotography && (
+  <div className="ml-6 mt-3 p-4 border border-purple-200 rounded-lg bg-purple-50/30 space-y-4">
+    <h4 className="text-sm font-semibold text-purple-700 flex items-center gap-2">
+      <Camera className="w-4 h-4" />
+      Photography Request Details
+    </h4>
+
+    {/* Appointment Date — OPTIONAL */}
+    <div>
+      <Label htmlFor="photographyDate">
+        Preferred Appointment Date 
+        <span className="text-muted-foreground font-normal ml-1">(optional)</span>
+      </Label>
+      <p className="text-xs text-muted-foreground mb-1">
+        When should the photographer come? Leave blank if no date in mind yet.
+      </p>
+      <Input
+        id="photographyDate"
+        type="date"
+        value={photographyAppointmentDate}
+        onChange={(e) => setPhotographyAppointmentDate(e.target.value)}
+      />
+    </div>
+
+    {/* Notes for James — OPTIONAL */}
+    <div>
+      <Label htmlFor="photographyNotes">
+        Notes for Photographer
+        <span className="text-muted-foreground font-normal ml-1">(optional)</span>
+      </Label>
+      <p className="text-xs text-muted-foreground mb-1">
+        Access instructions, special requests, staging notes, etc.
+      </p>
+      <Textarea
+        id="photographyNotes"
+        placeholder="e.g., Gate code 1234, homeowner will be home, focus on backyard pool..."
+        value={photographyNotes}
+        onChange={(e) => setPhotographyNotes(e.target.value)}
+        rows={3}
+      />
+    </div>
+
+    <p className="text-xs text-muted-foreground italic">
+      The property address, agent name, and contact info will be automatically included 
+      in the Slack request from the transaction details above.
+    </p>
+  </div>
+)}
+```
+
+### Important Field Notes from Randi:
+
+| Field | Source | Required | Notes |
+|-------|--------|----------|-------|
+| Full Address | Transaction property address | Yes (from form) | Auto-included from Property Address field above |
+| Agent | Logged-in user | Yes (automatic) | Auto-included from current user session |
+| Photo Order Status | Auto-populated | Automatic | Always set to "Photos Requested" |
+| Listing Status | Auto-populated | Automatic | Set to "Pre-Listing" |
+| Appointment Date | Photography form field | Optional | Agent may not have a date in mind yet |
+| Notes for James | Photography form field | Optional | Access codes, special instructions, etc. |
+| Payment Status | N/A | Skip | Randi said don't worry about this |
+
+---
+
+## Slack Message Format
+
+When the transaction is created with `orderPhotography = true`, post this message:
+
+```typescript
+const PHOTOGRAPHY_CHANNEL_ID = process.env.PHOTOGRAPHY_CHANNEL_ID || 'C0A9019MYT1';
+
+async function postPhotographyRequest(transaction: any, agent: any) {
+  // Format appointment date
+  const appointmentDate = transaction.photographyAppointmentDate
+    ? new Date(transaction.photographyAppointmentDate).toLocaleDateString('en-US', { 
+        weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' 
+      })
+    : 'TBD — Agent will follow up';
+
+  // Build the message blocks
+  const blocks: any[] = [
+    {
+      type: "header",
+      text: { type: "plain_text", text: "New Photography Request", emoji: true }
+    },
+    {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*Full Address:*\n${transaction.propertyAddress}` },
+        { type: "mrkdwn", text: `*Agent:*\n${agent?.name || agent?.fullName || 'N/A'}` },
+      ]
+    },
+    {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*Photo Order Status:*\nPhotos Requested` },
+        { type: "mrkdwn", text: `*Listing Status:*\nPre-Listing` },
+      ]
+    },
+    {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*Preferred Appointment Date:*\n${appointmentDate}` },
+        { type: "mrkdwn", text: `*Agent Contact:*\n${agent?.phone || agent?.email || 'N/A'}` },
+      ]
+    },
+  ];
+
+  // Add notes if provided
+  if (transaction.photographyNotes) {
+    blocks.push({
+      type: "section",
+      text: { type: "mrkdwn", text: `*Notes for James:*\n${transaction.photographyNotes}` }
+    });
+  }
+
+  // Add divider and action button
+  blocks.push(
+    { type: "divider" },
+    {
+      type: "actions",
+      elements: [{
+        type: "button",
+        text: { type: "plain_text", text: "View in Contract Conduit", emoji: true },
+        url: `${process.env.APP_URL || 'https://mission-control-contract-conduit.onrender.com'}/transactions/${transaction.id}`,
+        style: "primary"
+      }]
+    }
+  );
+
+  await slackClient.chat.postMessage({
+    channel: PHOTOGRAPHY_CHANNEL_ID,
+    text: `New Photography Request: ${transaction.propertyAddress}`,
+    blocks: blocks
+  });
+}
+```
+
+### Expected Slack Output:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  New Photography Request
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Full Address:                   Agent:
+4507 Unity Cir, Austin, TX      Randi White
+
+Photo Order Status:             Listing Status:
+Photos Requested                Pre-Listing
+
+Preferred Appointment Date:     Agent Contact:
+Friday, February 14, 2026       (512) 555-1234
+
+Notes for James:
+Gate code is 4455. Homeowner will leave at 9am. 
+Please focus on the backyard pool and renovated kitchen.
+Staging company delivering furniture Thursday evening.
+
+─────────────────────────────────
+[ View in Contract Conduit ]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+---
+
+## Integration in Transaction Creation Handler
+
+Add the photography notification alongside the existing Coming Soon notification:
+
+```typescript
+// In POST /api/transactions handler — AFTER transaction is created
+
+// Existing: Coming Soon notification
+if (transaction.isComingSoon) {
+  try {
+    const agent = await getUser(transaction.userId);
+    await postComingSoonNotification(transaction, agent, comingSoonPhotoUrl);
+  } catch (slackError) {
+    console.error('Failed to post Coming Soon notification:', slackError);
+  }
+}
+
+// NEW: Photography request notification
+if (transaction.orderPhotography) {
+  try {
+    const agent = await getUser(transaction.userId);
+    await postPhotographyRequest(transaction, agent);
+    
+    // Log activity
+    await createActivity({
+      transactionId: transaction.id,
+      type: 'notification',
+      description: 'Photography request posted to #spyglass-photography'
+    });
+  } catch (slackError) {
+    console.error('Failed to post photography request:', slackError);
+    // Don't fail transaction creation if Slack fails
+  }
+}
+```
+
+---
+
+## Important: Both Checkboxes Can Be Checked Simultaneously
+
+An agent might check BOTH "Coming Soon" AND "Order Photography" for the same transaction. This is valid — the transaction is Coming Soon AND they want photos taken. Each posts to its respective channel independently:
+
+- Coming Soon → posts to #coming-soon-listings (C09J6327HQS)
+- Order Photography → posts to #spyglass-photography (C0A9019MYT1)
+
+Make sure both fire independently without blocking each other.
+
+---
+
+## Form State Variables
+
+Add these to the Create Transaction form state:
+
+```typescript
+const [orderPhotography, setOrderPhotography] = useState(false);
+const [photographyNotes, setPhotographyNotes] = useState('');
+const [photographyAppointmentDate, setPhotographyAppointmentDate] = useState('');
+```
+
+Include in the submission payload:
+
+```typescript
+const payload = {
+  // ... existing fields ...
+  orderPhotography,
+  photographyNotes: orderPhotography ? photographyNotes : null,
+  photographyAppointmentDate: orderPhotography ? photographyAppointmentDate : null,
+};
+```
+
+---
+
+## Verification Checklist
+
+- [ ] "Order Company Photography" checkbox appears in Create Transaction form
+- [ ] Checking the box reveals the expandable photography details section
+- [ ] Unchecking hides the section and clears the fields
+- [ ] Appointment Date field accepts a date or can be left blank
+- [ ] Notes field accepts free text or can be left blank
+- [ ] Creating transaction with checkbox checked posts to #spyglass-photography
+- [ ] Slack message includes: Full Address, Agent Name, Agent Contact, Photo Order Status ("Photos Requested"), Listing Status ("Pre-Listing"), Appointment Date (or "TBD"), Notes for James (if provided)
+- [ ] "View in Contract Conduit" button links to the correct transaction
+- [ ] Creating transaction with checkbox unchecked does NOT post to #spyglass-photography
+- [ ] Both "Coming Soon" and "Order Photography" can be checked simultaneously
+- [ ] Both post to their respective channels independently
+- [ ] Transaction creation succeeds even if Slack notification fails
+- [ ] Database correctly stores orderPhotography, photographyNotes, photographyAppointmentDate
+
+---
+
+## 📱 Mobile Optimization
+
+All changes must be optimized for:
+
+| Device | Browser | Screen Size |
+|--------|---------|-------------|
+| iPad Pro | Safari | 1024 x 1366 |
+| iPad Air/Mini | Safari | 768 x 1024 |
+| iPhone 14/15 Pro | Safari | 393 x 852 |
+| iPhone SE | Safari | 375 x 667 |
+| Android Tablet | Chrome | 800 x 1280 |
+| Android Phone | Chrome | 360 x 800 |
+
+### Mobile UX Checklist:
+- [ ] Touch targets minimum 44x44px for checkbox and all inputs
+- [ ] Expandable photography section doesn't cause horizontal overflow
+- [ ] Date picker uses native mobile date input (type="date")
+- [ ] Textarea is full-width and comfortable to type in on mobile
+- [ ] Form scrolls smoothly with the new section expanded
+- [ ] Safe area insets for notched devices
+- [ ] Min 16px font size for body text to prevent iOS auto-zoom
+- [ ] Works in both portrait and landscape orientations
+
+### Testing Required:
+- [ ] iPad Safari — form layout with photography section expanded
+- [ ] iPhone Safari — scrolling, date picker, textarea input
+- [ ] Android Chrome (phone) — all fields accessible
+- [ ] Android Chrome (tablet) — layout consistency

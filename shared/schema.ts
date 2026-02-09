@@ -33,6 +33,9 @@ export const transactions = pgTable("transactions", {
   isCompanyLead: boolean("is_company_lead").default(false),
   isOffMarket: boolean("is_off_market").default(false),
   isComingSoon: boolean("is_coming_soon").default(false), // Post to #coming-soon-listings Slack channel
+  orderPhotography: boolean("order_photography").default(false),
+  photographyNotes: text("photography_notes"),
+  photographyAppointmentDate: text("photography_appointment_date"),
   offMarketListingDate: timestamp("off_market_listing_date"),
   goLiveDate: text("go_live_date"), // When off-market listing will go live on MLS
   slackChannelId: text("slack_channel_id"),
