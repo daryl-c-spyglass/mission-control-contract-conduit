@@ -1078,6 +1078,7 @@ interface PhotographyRequestData {
   agentName: string;
   agentEmail?: string | null;
   agentPhone?: string | null;
+  mlsNumber?: string | null;
   photographyNotes?: string | null;
   photographyAppointmentDate?: string | null;
   appUrl?: string;
@@ -1119,6 +1120,7 @@ export async function postPhotographyRequest(data: PhotographyRequestData): Prom
       type: "section",
       fields: [
         { type: "mrkdwn", text: `*Full Address:*\n${data.propertyAddress}` },
+        { type: "mrkdwn", text: `*MLS #:*\n${data.mlsNumber?.trim() || 'Pending'}` },
         { type: "mrkdwn", text: `*Agent:*\n${data.agentName || 'N/A'}` },
       ]
     },

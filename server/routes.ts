@@ -810,6 +810,7 @@ export async function registerRoutes(
             agentName: photographyAgentName,
             agentEmail: photographyAgentEmail,
             agentPhone: photographyAgentPhone,
+            mlsNumber: transaction.mlsNumber,
             photographyNotes: transactionData.photographyNotes,
             photographyAppointmentDate: transactionData.photographyAppointmentDate,
             appUrl,
