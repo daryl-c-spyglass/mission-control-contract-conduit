@@ -1068,3 +1068,142 @@ export async function postComingSoonNotification(data: ComingSoonNotification): 
     return false;
   }
 }
+
+// Photography Request channel ID
+const PHOTOGRAPHY_CHANNEL_ID = process.env.PHOTOGRAPHY_CHANNEL_ID || 'C0A9019MYT1';
+
+interface PhotographyRequestData {
+  propertyAddress: string;
+  transactionId: string;
+  agentName: string;
+  agentEmail?: string | null;
+  agentPhone?: string | null;
+  photographyNotes?: string | null;
+  photographyAppointmentDate?: string | null;
+  appUrl?: string;
+}
+
+export async function postPhotographyRequest(data: PhotographyRequestData): Promise<boolean> {
+  logSlackOp('📸', 'postPhotographyRequest called', {
+    propertyAddress: data.propertyAddress,
+    transactionId: data.transactionId,
+    targetChannel: PHOTOGRAPHY_CHANNEL_ID
+  });
+
+  if (isSlackNotificationsDisabled()) {
+    logSlackOp('⛔', 'Photography request SKIPPED - notifications disabled', { propertyAddress: data.propertyAddress });
+    return false;
+  }
+
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!token) {
+    logSlackOp('⛔', 'Photography request SKIPPED - no SLACK_BOT_TOKEN', { propertyAddress: data.propertyAddress });
+    return false;
+  }
+
+  const appointmentDate = data.photographyAppointmentDate
+    ? new Date(data.photographyAppointmentDate).toLocaleDateString('en-US', {
+        weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+      })
+    : 'TBD \u2014 Agent will follow up';
+
+  const agentContact = data.agentPhone || data.agentEmail || 'N/A';
+  const viewUrl = `${data.appUrl || 'https://mission-control-contract-conduit.onrender.com'}/transactions/${data.transactionId}`;
+
+  const blocks: any[] = [
+    {
+      type: "header",
+      text: { type: "plain_text", text: "New Photography Request", emoji: true }
+    },
+    {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*Full Address:*\n${data.propertyAddress}` },
+        { type: "mrkdwn", text: `*Agent:*\n${data.agentName || 'N/A'}` },
+      ]
+    },
+    {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*Photo Order Status:*\nPhotos Requested` },
+        { type: "mrkdwn", text: `*Listing Status:*\nPre-Listing` },
+      ]
+    },
+    {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*Preferred Appointment Date:*\n${appointmentDate}` },
+        { type: "mrkdwn", text: `*Agent Contact:*\n${agentContact}` },
+      ]
+    },
+  ];
+
+  if (data.photographyNotes) {
+    blocks.push({
+      type: "section",
+      text: { type: "mrkdwn", text: `*Notes for James:*\n${data.photographyNotes}` }
+    });
+  }
+
+  blocks.push(
+    { type: "divider" },
+    {
+      type: "actions",
+      elements: [{
+        type: "button",
+        text: { type: "plain_text", text: "View in Contract Conduit", emoji: true },
+        url: viewUrl,
+        style: "primary"
+      }]
+    }
+  );
+
+  try {
+    // Join the channel first
+    await fetch("https://slack.com/api/conversations.join", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ channel: PHOTOGRAPHY_CHANNEL_ID }),
+    });
+
+    const response = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        channel: PHOTOGRAPHY_CHANNEL_ID,
+        blocks,
+        text: `New Photography Request: ${data.propertyAddress}`,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!result.ok) {
+      logSlackOp('❌', 'Photography request FAILED', {
+        error: result.error,
+        channel: PHOTOGRAPHY_CHANNEL_ID,
+        propertyAddress: data.propertyAddress
+      });
+      return false;
+    } else {
+      logSlackOp('✅', 'Photography request POSTED', {
+        channel: PHOTOGRAPHY_CHANNEL_ID,
+        propertyAddress: data.propertyAddress,
+        ts: result.ts
+      });
+      return true;
+    }
+  } catch (error: any) {
+    logSlackOp('💥', 'Photography request EXCEPTION', {
+      error: error.message,
+      propertyAddress: data.propertyAddress
+    });
+    return false;
+  }
+}

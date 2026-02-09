@@ -5,7 +5,7 @@ import fs from "fs";
 import { storage } from "./storage";
 import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema, insertCmaSchema, insertNotificationSettingsSchema, insertFlyerSchema } from "@shared/schema";
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages, watchUserMailbox } from "./gmail";
-import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel, postDocumentUploadNotification, postMLSListingNotification, sendMarketingNotification, postComingSoonNotification } from "./slack";
+import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel, postDocumentUploadNotification, postMLSListingNotification, sendMarketingNotification, postComingSoonNotification, postPhotographyRequest } from "./slack";
 import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess, getBestPhotosForFlyer, getAISelectedPhotosForFlyer, searchNearbyComparables, type CMASearchFilters } from "./repliers";
 import { isRentalOrLease } from "../shared/lib/listings";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
@@ -148,6 +148,9 @@ export async function registerRoutes(
         isOffMarket,
         isCompanyLead,
         isComingSoon,
+        orderPhotography,
+        photographyNotes,
+        photographyAppointmentDate,
         // Off-market property details
         propertyDescription,
         listPrice,
@@ -213,6 +216,11 @@ export async function registerRoutes(
       
       // Set coming soon flag
       transactionData.isComingSoon = isComingSoon === true || isComingSoon === 'true';
+      
+      // Set photography order fields
+      transactionData.orderPhotography = orderPhotography === true || orderPhotography === 'true';
+      transactionData.photographyNotes = transactionData.orderPhotography ? (photographyNotes || null) : null;
+      transactionData.photographyAppointmentDate = transactionData.orderPhotography ? (photographyAppointmentDate || null) : null;
       
       // DEBUG: Log Coming Soon status
       console.log('[TRANSACTION] Coming Soon debug:', {
@@ -770,6 +778,53 @@ export async function registerRoutes(
         } catch (comingSoonError) {
           console.error("Failed to post Coming Soon notification:", comingSoonError);
           // Don't fail transaction creation if notification fails
+        }
+      }
+
+      // Post Photography Request if checkbox was checked
+      if (transactionData.orderPhotography) {
+        try {
+          let photographyAgentName = "";
+          let photographyAgentEmail = "";
+          let photographyAgentPhone = "";
+          
+          if (onBehalfOfName && onBehalfOfName.trim()) {
+            photographyAgentName = onBehalfOfName.trim();
+            photographyAgentEmail = onBehalfOfEmail || "";
+          } else if (userId) {
+            const creator = await authStorage.getUser(userId);
+            if (creator) {
+              photographyAgentName = `${creator.firstName || ""} ${creator.lastName || ""}`.trim();
+              photographyAgentEmail = creator.email || "";
+              photographyAgentPhone = creator.marketingPhone || "";
+            }
+          }
+          
+          const appUrl = process.env.REPLIT_DOMAINS?.split(',')[0]
+            ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+            : 'https://mission-control-contract-conduit.onrender.com';
+
+          const photographySuccess = await postPhotographyRequest({
+            propertyAddress: transaction.propertyAddress,
+            transactionId: transaction.id,
+            agentName: photographyAgentName,
+            agentEmail: photographyAgentEmail,
+            agentPhone: photographyAgentPhone,
+            photographyNotes: transactionData.photographyNotes,
+            photographyAppointmentDate: transactionData.photographyAppointmentDate,
+            appUrl,
+          });
+          
+          if (photographySuccess) {
+            await storage.createActivity({
+              transactionId: transaction.id,
+              type: "notification",
+              description: "Photography request posted to #spyglass-photography",
+              category: "communication",
+            });
+          }
+        } catch (photographyError) {
+          console.error("Failed to post photography request:", photographyError);
         }
       }
 

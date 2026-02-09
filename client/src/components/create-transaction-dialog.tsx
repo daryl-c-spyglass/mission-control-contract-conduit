@@ -55,6 +55,9 @@ const formSchema = z.object({
   mlsNumber: z.string().optional(),
   isOffMarket: z.boolean().default(false),
   isComingSoon: z.boolean().default(false),
+  orderPhotography: z.boolean().default(false),
+  photographyNotes: z.string().optional(),
+  photographyAppointmentDate: z.string().optional(),
   isUnderContract: z.boolean().default(true),
   // Off Market property details
   propertyDescription: z.string().optional(),
@@ -226,6 +229,9 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
       mlsNumber: "",
       isOffMarket: false,
       isComingSoon: false,
+      orderPhotography: false,
+      photographyNotes: "",
+      photographyAppointmentDate: "",
       isUnderContract: true,
       propertyDescription: "",
       listPrice: "",
@@ -279,6 +285,15 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
       clearResults();
     }
   }, [isComingSoon, form, clearResults]);
+  
+  const orderPhotography = form.watch("orderPhotography");
+  
+  useEffect(() => {
+    if (!orderPhotography) {
+      form.setValue("photographyNotes", "");
+      form.setValue("photographyAppointmentDate", "");
+    }
+  }, [orderPhotography, form]);
 
   const pullFubMutation = useMutation({
     mutationFn: async (url: string) => {
@@ -312,9 +327,14 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
 
   const createMutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      // Include photo as base64 if selected (for Off Market or Coming Soon)
       const requestData: any = { ...data };
       
+      if (!data.orderPhotography) {
+        requestData.photographyNotes = null;
+        requestData.photographyAppointmentDate = null;
+      }
+      
+      // Include photo as base64 if selected (for Off Market or Coming Soon)
       if (propertyPhoto && (data.isOffMarket || data.isComingSoon)) {
         // Validate file size client-side (10MB limit)
         const maxSize = 10 * 1024 * 1024;
@@ -628,6 +648,95 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                 </FormItem>
               )}
             />
+
+            {/* Order Company Photography Checkbox */}
+            <FormField
+              control={form.control}
+              name="orderPhotography"
+              render={({ field }) => (
+                <FormItem className="flex items-start gap-2 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      data-testid="checkbox-order-photography"
+                    />
+                  </FormControl>
+                  <div className="space-y-1">
+                    <FormLabel className="text-sm font-normal cursor-pointer">
+                      Order Company Photography
+                    </FormLabel>
+                    <FormDescription className="text-xs">
+                      Submit photography request to #spyglass-photography
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            {/* Photography Request Details - shown when checkbox is checked */}
+            {form.watch("orderPhotography") && (
+              <Card className="p-4 space-y-4 bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800">
+                <div className="flex items-center gap-2 text-violet-700 dark:text-violet-300">
+                  <Camera className="w-4 h-4" />
+                  <span className="font-medium text-sm">Photography Request Details</span>
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="photographyAppointmentDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm">
+                        Preferred Appointment Date
+                        <span className="text-muted-foreground font-normal ml-1">(optional)</span>
+                      </FormLabel>
+                      <FormDescription className="text-xs">
+                        When should the photographer come? Leave blank if no date in mind yet.
+                      </FormDescription>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="date"
+                          data-testid="input-photography-date"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="photographyNotes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm">
+                        Notes for Photographer
+                        <span className="text-muted-foreground font-normal ml-1">(optional)</span>
+                      </FormLabel>
+                      <FormDescription className="text-xs">
+                        Access instructions, special requests, staging notes, etc.
+                      </FormDescription>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder="e.g., Gate code 1234, homeowner will be home, focus on backyard pool..."
+                          className="min-h-[80px] resize-none"
+                          data-testid="input-photography-notes"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <p className="text-xs text-muted-foreground italic">
+                  The property address, agent name, and contact info will be automatically included
+                  in the Slack request from the transaction details above.
+                </p>
+              </Card>
+            )}
 
             {/* Property Details Section - shown for Off Market OR Coming Soon */}
             {(isOffMarket || isComingSoon) && (
