@@ -260,14 +260,14 @@ export function FlyerPreview({
           />
         </div>
 
-        {/* Grid 15: Agent Photo + Name/Title/Phone (centered) */}
+        {/* Grid 15: Agent Photo only (centered) */}
         <div 
-          className="flex flex-col items-center pt-[16px] overflow-hidden"
-          data-layout-id="agent-info"
+          className="flex flex-col items-center justify-center overflow-hidden"
+          data-layout-id="agent-photo-column"
         >
           <div 
-            className="rounded-full overflow-hidden bg-gray-200 flex items-center justify-center flex-shrink-0 mb-2"
-            style={{ width: '80px', height: '80px' }}
+            className="rounded-full overflow-hidden bg-gray-200 flex items-center justify-center flex-shrink-0"
+            style={{ width: '100px', height: '100px' }}
           >
             {images.agentPhoto ? (
               <img
@@ -277,34 +277,21 @@ export function FlyerPreview({
                 style={getTransformStyle(imageTransforms.agentPhoto)}
               />
             ) : (
-              <User className="w-10 h-10 text-gray-400" />
+              <User className="w-12 h-12 text-gray-400" />
             )}
-          </div>
-          <div 
-            className="font-bold text-center truncate text-gray-800 w-full px-1"
-            style={{ fontSize: '14pt' }}
-          >
-            {data.agentName || ''}
-          </div>
-          <div 
-            className="text-center w-full px-1"
-            style={{ fontSize: '9pt', lineHeight: 1.4, color: '#555' }}
-          >
-            <div className="truncate">{data.agentTitle || ''}</div>
-            <div>{data.phone || ''}</div>
           </div>
         </div>
 
-        {/* Grid 16: QR Code (centered in column) */}
+        {/* Grid 16: QR Code + Agent Name/Title/Phone */}
         <div 
           className="flex flex-col items-center pt-[16px] overflow-hidden"
-          data-layout-id="qr-section"
+          data-layout-id="qr-agent-section"
         >
           <div 
             className="flex items-center justify-center"
             style={{ 
-              width: '80px', 
-              height: '80px', 
+              width: '70px', 
+              height: '70px', 
               border: '2px solid #000',
               padding: '2px',
             }}
@@ -315,12 +302,19 @@ export function FlyerPreview({
               <QrCode className="w-full h-full text-gray-400" />
             )}
           </div>
-          <span 
-            className="text-center mt-1"
-            style={{ fontSize: '7pt', color: '#666', letterSpacing: '0.5px' }}
+          <div 
+            className="font-bold text-center truncate text-gray-800 w-full px-1 mt-2"
+            style={{ fontSize: '12pt' }}
           >
-            SCAN FOR INFO
-          </span>
+            {data.agentName || ''}
+          </div>
+          <div 
+            className="text-center w-full px-1"
+            style={{ fontSize: '8pt', lineHeight: 1.4, color: '#555' }}
+          >
+            <div className="truncate">{data.agentTitle || ''}</div>
+            <div>{data.phone || ''}</div>
+          </div>
         </div>
       </div>
     </div>
