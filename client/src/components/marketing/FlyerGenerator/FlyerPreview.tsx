@@ -283,14 +283,12 @@ export function FlyerPreview({
           data-layout-id="divider-2"
         />
 
-        {/* Agent Card Container: Grids 15-16 (remaining ~308px) */}
-        {/* Layout: Agent info positioned 75% right toward QR code, QR at right edge */}
+        {/* Agent Card Container: flex-1 fills remaining space, QR right edge aligns with photo edge */}
         <div 
           className="relative flex-1 flex items-start justify-end gap-3 overflow-hidden"
           style={{ 
             paddingTop: '16px',
             minWidth: '280px',
-            maxWidth: '308px',
           }}
           data-layout-id="agent-card"
         >
