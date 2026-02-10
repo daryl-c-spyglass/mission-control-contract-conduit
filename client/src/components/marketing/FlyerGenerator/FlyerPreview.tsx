@@ -187,41 +187,43 @@ export function FlyerPreview({
         style={{ width: '720px', display: 'grid', gridTemplateColumns: '180px 180px 180px 180px' }}
         data-layout-id="bottom-section"
       >
-        {/* Grid 13: Property Stats */}
+        {/* Grid 13: Property Stats — subsquare: items at rows 1.5, 4.5, 7.5 */}
         <div 
-          className="relative pt-[20px] pl-2 pr-2"
+          className="relative pl-[18px] pr-[8px]"
+          style={{ paddingTop: '40px' }}
           data-layout-id="stats"
         >
-          <div className="flex items-center gap-2 mb-4 text-[11pt] whitespace-nowrap text-gray-800">
+          <div className="flex items-center gap-2 text-[11pt] whitespace-nowrap text-gray-800" style={{ marginBottom: '50px' }}>
             <svg className="w-[24px] h-[24px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/>
             </svg>
-            <span>{data.bedrooms || '0'} beds</span>
+            <span>{data.bedrooms || '0'} bedrooms</span>
           </div>
-          <div className="flex items-center gap-2 mb-4 text-[11pt] whitespace-nowrap text-gray-800">
+          <div className="flex items-center gap-2 text-[11pt] whitespace-nowrap text-gray-800" style={{ marginBottom: '50px' }}>
             <svg className="w-[24px] h-[24px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M9 6 6.5 3.5a1.5 1.5 0 0 0-1-.5C4.683 3 4 3.683 4 4.5V17a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/>
               <line x1="10" x2="8" y1="5" y2="7"/><line x1="2" x2="22" y1="12" y2="12"/>
             </svg>
-            <span>{data.bathrooms || '0'} baths</span>
+            <span>{data.bathrooms || '0'} bathrooms</span>
           </div>
-          <div className="flex items-center gap-2 mb-4 text-[11pt] whitespace-nowrap text-gray-800">
+          <div className="flex items-center gap-2 text-[11pt] whitespace-nowrap text-gray-800">
             <svg className="w-[24px] h-[24px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/>
             </svg>
-            <span>{data.sqft || '0'} sqft</span>
+            <span>{data.sqft ? `${Number(data.sqft).toLocaleString()} sq. ft` : '0 sq. ft'}</span>
           </div>
-          {/* Accent divider on right edge of grid 13 */}
+          {/* Accent divider — subsquare: rows 1.5 to 7, right edge */}
           <div
-            className="absolute right-0 top-[35px]"
-            style={{ width: '4px', height: '148px', backgroundColor: accentColor }}
+            className="absolute right-0 top-[40px]"
+            style={{ width: '4px', height: '160px', backgroundColor: accentColor }}
             data-layout-id="divider-1"
           />
         </div>
 
-        {/* Grid 14: Headline + Description */}
+        {/* Grid 14: Headline + Description — subsquare: headline row 0.5, desc row 2.5 */}
         <div 
-          className="relative overflow-hidden px-3"
+          className="relative overflow-hidden"
+          style={{ paddingLeft: '14px', paddingRight: '10px' }}
           data-layout-id="description-column"
         >
           <h3 
@@ -231,7 +233,7 @@ export function FlyerPreview({
               fontWeight: 600,
               letterSpacing: '1px',
               lineHeight: 1.3,
-              marginTop: '8px',
+              marginTop: '14px',
               marginBottom: '8px',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -252,22 +254,22 @@ export function FlyerPreview({
           >
             {data.introDescription || 'Property description will appear here...'}
           </p>
-          {/* Accent divider on right edge of grid 14 */}
+          {/* Accent divider — subsquare: rows 1.5 to 7, right edge */}
           <div
-            className="absolute right-0 top-[35px]"
-            style={{ width: '4px', height: '148px', backgroundColor: accentColor }}
+            className="absolute right-0 top-[40px]"
+            style={{ width: '4px', height: '160px', backgroundColor: accentColor }}
             data-layout-id="divider-2"
           />
         </div>
 
-        {/* Grid 15: Agent Photo only (centered) */}
+        {/* Grid 15: Agent Photo only — subsquare: centered at (5,5), ~4 subsquares dia */}
         <div 
           className="flex flex-col items-center justify-center overflow-hidden"
           data-layout-id="agent-photo-column"
         >
           <div 
             className="rounded-full overflow-hidden bg-gray-200 flex items-center justify-center flex-shrink-0"
-            style={{ width: '100px', height: '100px' }}
+            style={{ width: '108px', height: '108px' }}
           >
             {images.agentPhoto ? (
               <img
@@ -282,16 +284,17 @@ export function FlyerPreview({
           </div>
         </div>
 
-        {/* Grid 16: QR Code + Agent Name/Title/Phone */}
+        {/* Grid 16: QR Code + Agent Name/Title/Phone — subsquare: QR rows 0.5-3.5, name row 5.5 */}
         <div 
-          className="flex flex-col items-center pt-[16px] overflow-hidden"
+          className="flex flex-col items-center overflow-hidden"
+          style={{ paddingTop: '14px' }}
           data-layout-id="qr-agent-section"
         >
           <div 
-            className="flex items-center justify-center"
+            className="flex items-center justify-center flex-shrink-0"
             style={{ 
-              width: '70px', 
-              height: '70px', 
+              width: '76px', 
+              height: '76px', 
               border: '2px solid #000',
               padding: '2px',
             }}
@@ -303,8 +306,8 @@ export function FlyerPreview({
             )}
           </div>
           <div 
-            className="font-bold text-center truncate text-gray-800 w-full px-1 mt-2"
-            style={{ fontSize: '12pt' }}
+            className="font-bold text-center truncate text-gray-800 w-full px-1"
+            style={{ fontSize: '11pt', marginTop: '46px' }}
           >
             {data.agentName || ''}
           </div>
