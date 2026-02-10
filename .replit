@@ -45,5 +45,6 @@ integrations = ["google-mail:1.0.0", "javascript_log_in_with_replit:2.0.0", "jav
 [userenv]
 
 [userenv.shared]
+MARKETING_CHANNEL_ID = "C099HGBH407"
 
 [userenv.development]

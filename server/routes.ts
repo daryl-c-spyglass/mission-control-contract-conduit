@@ -5,7 +5,7 @@ import fs from "fs";
 import { storage } from "./storage";
 import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema, insertCmaSchema, insertNotificationSettingsSchema, insertFlyerSchema } from "@shared/schema";
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages, watchUserMailbox } from "./gmail";
-import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel, postDocumentUploadNotification, postMLSListingNotification, sendMarketingNotification, postComingSoonNotification, postPhotographyRequest } from "./slack";
+import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel, postDocumentUploadNotification, postMLSListingNotification, sendMarketingNotification, postComingSoonNotification, postPhotographyRequest, notifyMarketingTeamNewListing } from "./slack";
 import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess, getBestPhotosForFlyer, getAISelectedPhotosForFlyer, searchNearbyComparables, type CMASearchFilters } from "./repliers";
 import { isRentalOrLease } from "../shared/lib/listings";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
@@ -866,6 +866,46 @@ export async function registerRoutes(
           }
         } catch (photographyError) {
           log.error({ err: photographyError }, "Failed to post photography request");
+        }
+      }
+
+      // Notify marketing team channel of new listing
+      if (process.env.SLACK_BOT_TOKEN) {
+        try {
+          let marketingAgentName = "";
+          if (onBehalfOfName && onBehalfOfName.trim()) {
+            marketingAgentName = onBehalfOfName.trim();
+          } else if (userId) {
+            const creator = await authStorage.getUser(userId);
+            if (creator) {
+              marketingAgentName = `${creator.firstName || ""} ${creator.lastName || ""}`.trim();
+            }
+          }
+
+          const currentTxForMarketing = await storage.getTransaction(transaction.id);
+          const marketingSuccess = await notifyMarketingTeamNewListing({
+            propertyAddress: transaction.propertyAddress,
+            listPrice: currentTxForMarketing?.listPrice || null,
+            bedrooms: currentTxForMarketing?.bedrooms || null,
+            bathrooms: currentTxForMarketing?.bathrooms || null,
+            sqft: currentTxForMarketing?.sqft || null,
+            status: currentTxForMarketing?.status || null,
+            transactionId: transaction.id,
+            agentName: marketingAgentName || 'Unknown',
+            isComingSoon: transactionData.isComingSoon,
+            isOffMarket: transactionData.isOffMarket,
+          });
+
+          if (marketingSuccess) {
+            await storage.createActivity({
+              transactionId: transaction.id,
+              type: "notification",
+              description: "Marketing team notified of new listing",
+              category: "communication",
+            });
+          }
+        } catch (marketingError) {
+          log.error({ err: marketingError }, "Failed to notify marketing team");
         }
       }
 

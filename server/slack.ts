@@ -1115,6 +1115,148 @@ export async function postComingSoonNotification(data: ComingSoonNotification): 
   }
 }
 
+// Marketing Team channel ID
+const MARKETING_CHANNEL_ID = process.env.MARKETING_CHANNEL_ID || 'C099HGBH407';
+
+interface NewListingNotification {
+  propertyAddress: string;
+  listPrice?: number | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  sqft?: number | null;
+  status?: string | null;
+  transactionId: string;
+  agentName: string;
+  isComingSoon?: boolean;
+  isOffMarket?: boolean;
+}
+
+export async function notifyMarketingTeamNewListing(data: NewListingNotification): Promise<boolean> {
+  logSlackOp('📢', 'notifyMarketingTeamNewListing called', {
+    propertyAddress: data.propertyAddress,
+    transactionId: data.transactionId,
+    targetChannel: MARKETING_CHANNEL_ID
+  });
+
+  if (isSlackNotificationsDisabled()) {
+    logSlackOp('⛔', 'Marketing team notification SKIPPED - notifications disabled', { propertyAddress: data.propertyAddress });
+    logAudit({ action: 'slack.message.marketing_new_listing', actor: 'system', target: MARKETING_CHANNEL_ID, metadata: { propertyAddress: data.propertyAddress }, status: 'skipped' });
+    return false;
+  }
+
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!token) {
+    logSlackOp('⛔', 'Marketing team notification SKIPPED - no SLACK_BOT_TOKEN', { propertyAddress: data.propertyAddress });
+    return false;
+  }
+
+  let statusLabel = data.status || 'Active Listing';
+  if (data.isComingSoon) statusLabel = 'Coming Soon';
+  if (data.isOffMarket) statusLabel = 'Off-Market';
+
+  const appUrl = process.env.REPLIT_DOMAINS?.split(',')[0]
+    ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+    : 'https://mission-control-contract-conduit.onrender.com';
+
+  const blocks: any[] = [
+    {
+      type: "header",
+      text: { type: "plain_text", text: "New Listing Created", emoji: true }
+    },
+    {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*Address:*\n${data.propertyAddress}` },
+        { type: "mrkdwn", text: `*Agent:*\n${data.agentName}` },
+        { type: "mrkdwn", text: `*Status:*\n${statusLabel}` },
+        { type: "mrkdwn", text: `*Price:*\n${formatPrice(data.listPrice)}` }
+      ]
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `${data.bedrooms || '\u2014'} bed | ${data.bathrooms || '\u2014'} bath | ${data.sqft ? Number(data.sqft).toLocaleString() + ' sqft' : '\u2014'}`
+      }
+    },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "View in Contract Conduit", emoji: true },
+          url: `${appUrl}/transactions/${data.transactionId}`,
+          style: "primary"
+        }
+      ]
+    },
+    {
+      type: "context",
+      elements: [
+        { type: "mrkdwn", text: `Created via Contract Conduit | ${new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}` }
+      ]
+    }
+  ];
+
+  try {
+    try {
+      const joinResponse = await slackFetch("https://slack.com/api/conversations.join", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ channel: MARKETING_CHANNEL_ID }),
+      });
+      const joinResult = await joinResponse.json();
+      if (!joinResult.ok && joinResult.error !== 'already_in_channel') {
+        logSlackOp('⚠️', 'Could not join marketing channel (non-fatal)', { error: joinResult.error });
+      }
+    } catch (joinErr: any) {
+      logSlackOp('⚠️', 'Join marketing channel error (non-fatal)', { error: joinErr.message });
+    }
+
+    const response = await slackFetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        channel: MARKETING_CHANNEL_ID,
+        blocks,
+        text: `New Listing Created: ${data.propertyAddress}`,
+      }),
+    });
+
+    const result = await response.json();
+    if (!result.ok) {
+      logSlackOp('❌', 'Marketing team notification FAILED', {
+        error: result.error,
+        channel: MARKETING_CHANNEL_ID,
+        propertyAddress: data.propertyAddress
+      });
+      logAudit({ action: 'slack.message.marketing_new_listing', actor: 'system', target: MARKETING_CHANNEL_ID, metadata: { propertyAddress: data.propertyAddress, error: result.error }, status: 'failure' });
+      return false;
+    } else {
+      logSlackOp('✅', 'Marketing team notification POSTED', {
+        channel: MARKETING_CHANNEL_ID,
+        propertyAddress: data.propertyAddress,
+        ts: result.ts
+      });
+      logAudit({ action: 'slack.message.marketing_new_listing', actor: 'system', target: MARKETING_CHANNEL_ID, metadata: { propertyAddress: data.propertyAddress }, status: 'success' });
+      return true;
+    }
+  } catch (error: any) {
+    logSlackOp('💥', 'Marketing team notification EXCEPTION', {
+      error: error.message,
+      propertyAddress: data.propertyAddress
+    });
+    logAudit({ action: 'slack.message.marketing_new_listing', actor: 'system', target: MARKETING_CHANNEL_ID, metadata: { propertyAddress: data.propertyAddress, error: error.message }, status: 'failure' });
+    return false;
+  }
+}
+
 // Photography Request channel ID
 const PHOTOGRAPHY_CHANNEL_ID = process.env.PHOTOGRAPHY_CHANNEL_ID || 'C0A9019MYT1';
 

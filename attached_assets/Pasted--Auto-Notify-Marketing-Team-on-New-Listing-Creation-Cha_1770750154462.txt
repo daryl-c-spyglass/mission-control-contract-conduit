@@ -1,0 +1,95 @@
+## Auto-Notify Marketing Team on New Listing Creation (Channel)
+
+### Context
+Caleb, Trisha, and Maria need automatic notifications in their team channel when any agent creates a new listing/transaction in Contract Conduit.
+
+### Channel Details
+- Channel ID: C099HGBH407
+- Transaction Management Bot already added ✅
+
+### Implementation
+
+#### 1. Add notification function in `server/routes.ts` or `server/slack.ts`:
+```typescript
+const MARKETING_CHANNEL_ID = 'C099HGBH407';  // Marketing team channel
+
+async function notifyMarketingTeamNewListing(transaction: Transaction, agent: any) {
+  try {
+    await slackClient.chat.postMessage({
+      channel: MARKETING_CHANNEL_ID,
+      text: `🏠 New Listing Created: ${transaction.propertyAddress}`,
+      blocks: [
+        {
+          type: "header",
+          text: { type: "plain_text", text: "🏠 New Listing Created", emoji: true }
+        },
+        {
+          type: "section",
+          fields: [
+            { type: "mrkdwn", text: `*Address:*\n${transaction.propertyAddress}` },
+            { type: "mrkdwn", text: `*Agent:*\n${agent?.name || agent?.email || 'Unknown'}` },
+            { type: "mrkdwn", text: `*Status:*\n${transaction.status || 'Active Listing'}` },
+            { type: "mrkdwn", text: `*Price:*\n${transaction.listPrice ? '$' + Number(transaction.listPrice).toLocaleString() : 'TBD'}` }
+          ]
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `🛏️ ${transaction.bedrooms || '—'} bed | 🛁 ${transaction.bathrooms || '—'} bath | 📐 ${transaction.sqft ? Number(transaction.sqft).toLocaleString() + ' sqft' : '—'}`
+          }
+        },
+        {
+          type: "context",
+          elements: [
+            { type: "mrkdwn", text: `Created via Contract Conduit • ${new Date().toLocaleDateString()}` }
+          ]
+        }
+      ]
+    });
+    
+    console.log(`Marketing team notified of new listing: ${transaction.propertyAddress}`);
+  } catch (error) {
+    console.error('Failed to notify marketing team:', error);
+    // Don't throw - notification failure shouldn't block transaction creation
+  }
+}
+```
+
+#### 2. Call the function when a new transaction is created
+
+In the POST `/api/transactions` endpoint, after successfully creating the transaction:
+```typescript
+// After: const newTransaction = await storage.createTransaction(transactionData);
+
+// Notify marketing team channel
+if (process.env.DISABLE_SLACK_NOTIFICATIONS !== 'true') {
+  await notifyMarketingTeamNewListing(newTransaction, req.user);
+}
+```
+
+#### 3. Optional: Add to environment variables for flexibility
+
+Instead of hardcoding, add to Render environment:
+MARKETING_CHANNEL_ID=C099HGBH407
+
+Then reference as:
+```typescript
+const MARKETING_CHANNEL_ID = process.env.MARKETING_CHANNEL_ID || 'C099HGBH407';
+```
+
+### Expected Result
+
+1. Agent creates new transaction in Contract Conduit
+2. Single notification posted to marketing team channel with:
+   - Property address
+   - Agent name  
+   - Status
+   - Price
+   - Bed/bath/sqft
+3. All team members (Caleb, Trisha, Maria) see it in one place
+4. No duplicate DMs - just one channel post
+
+### Mobile Optimization
+- Slack blocks render responsively on mobile
+- No additional work needed
