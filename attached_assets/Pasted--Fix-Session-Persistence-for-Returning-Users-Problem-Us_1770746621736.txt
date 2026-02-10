@@ -1,0 +1,167 @@
+## Fix: Session Persistence for Returning Users
+
+### Problem
+Users (like Caleb) report:
+1. Having to re-enter their Slack ID multiple times
+2. Transactions disappearing when they return
+
+### Root Cause
+Slack ID is stored in session memory only - not persisted to the database. When session expires, user data is lost.
+
+### Solution: Persist Slack ID to Users Table
+
+---
+
+### Step 1: Check/Add Slack ID Column to Users Table
+
+In `shared/schema.ts`, ensure the `users` table has:
+```typescript
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey(),
+  email: varchar("email").notNull().unique(),
+  name: varchar("name"),
+  slackUserId: varchar("slack_user_id"),  // <-- ADD THIS if missing
+  slackChannelId: varchar("slack_channel_id"), // <-- ADD THIS if missing
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+```
+
+Run migration if needed:
+```sql
+ALTER TABLE users ADD COLUMN IF NOT EXISTS slack_user_id VARCHAR(50);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS slack_channel_id VARCHAR(50);
+```
+
+---
+
+### Step 2: Save Slack ID to Database When User Enters It
+
+In the Settings or wherever Slack ID is collected, save to DB not just session:
+```typescript
+// When user enters/updates their Slack ID
+app.post('/api/user/slack-settings', isAuthenticated, async (req, res) => {
+  const userId = req.user.id; // From Google OAuth
+  const { slackUserId, slackChannelId } = req.body;
+  
+  // Save to DATABASE, not just session
+  await db.update(users)
+    .set({ 
+      slackUserId, 
+      slackChannelId,
+      updatedAt: new Date()
+    })
+    .where(eq(users.id, userId));
+  
+  res.json({ success: true });
+});
+```
+
+---
+
+### Step 3: Load Slack ID from Database on Login
+
+When user authenticates via Google OAuth, load their Slack ID from the database:
+```typescript
+// In your auth callback or session setup
+const existingUser = await db.query.users.findFirst({
+  where: eq(users.email, userEmail)
+});
+
+if (existingUser) {
+  // Restore user data from database
+  req.session.user = {
+    id: existingUser.id,
+    email: existingUser.email,
+    name: existingUser.name,
+    slackUserId: existingUser.slackUserId,  // Load from DB!
+    slackChannelId: existingUser.slackChannelId
+  };
+}
+```
+
+---
+
+### Step 4: Pre-populate Slack ID Field in Settings
+
+When showing the Settings page, load existing Slack ID:
+```typescript
+// Frontend: Settings component
+const { data: userSettings } = useQuery({
+  queryKey: ['user-settings'],
+  queryFn: () => fetch('/api/user/settings').then(r => r.json())
+});
+
+// Pre-fill the Slack ID input
+<Input 
+  value={slackId || userSettings?.slackUserId || ''} 
+  onChange={(e) => setSlackId(e.target.value)}
+  placeholder="Enter your Slack User ID"
+/>
+```
+
+---
+
+### Step 5: Verify Transaction Association
+
+Ensure transactions are linked to user by database ID, not session:
+```typescript
+// When creating transaction
+const newTransaction = await db.insert(transactions).values({
+  ...transactionData,
+  userId: req.user.id,  // Use database user ID, not session-only data
+  createdBy: req.user.id
+});
+```
+
+When loading transactions for returning user:
+```typescript
+// GET /api/transactions
+const userTransactions = await db.query.transactions.findMany({
+  where: eq(transactions.userId, req.user.id)  // Filter by authenticated user
+});
+```
+
+---
+
+### Step 6: Session Configuration for Persistence
+
+Ensure sessions persist across restarts:
+```typescript
+// In server setup
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
+  },
+  // Use database session store for persistence
+  store: new PgSession({
+    conString: process.env.DATABASE_URL
+  })
+}));
+```
+
+---
+
+### Expected Behavior After Fix
+
+1. **User enters Slack ID once** → Saved to `users` table
+2. **User returns later** → Google OAuth identifies them by email
+3. **System loads their profile** → Slack ID retrieved from database
+4. **Settings page pre-filled** → No need to re-enter Slack ID
+5. **Transactions persist** → Always linked to user's database ID
+
+---
+
+### Verification Checklist
+
+- [ ] `users` table has `slack_user_id` column
+- [ ] Slack ID is saved to DB when user enters it (not just session)
+- [ ] On login, user's Slack ID is loaded from DB
+- [ ] Settings page pre-populates Slack ID from DB
+- [ ] Transactions query filters by `userId` from authenticated user
+- [ ] Session store uses database (not memory) for persistence

@@ -9,7 +9,7 @@ import { createModuleLogger } from '../../lib/logger';
 const log = createModuleLogger('auth');
 
 export function getSession() {
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+  const sessionTtl = 30 * 24 * 60 * 60 * 1000; // 30 days
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
@@ -18,20 +18,18 @@ export function getSession() {
     tableName: "sessions",
   });
   const isProduction = process.env.NODE_ENV === "production";
-  // Replit dev environment uses HTTPS via their proxy
   const isSecure = isProduction || process.env.REPL_ID;
   
-  // Use 'none' sameSite for cross-origin iframe embedding support when secure
-  // This allows the session cookie to be sent when embedded in an iframe
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
+    rolling: true,
     cookie: {
       httpOnly: true,
       secure: isSecure ? true : false,
-      sameSite: isSecure ? "none" : "lax", // 'none' requires secure:true
+      sameSite: isSecure ? "none" : "lax",
       maxAge: sessionTtl,
     },
   });
@@ -92,7 +90,7 @@ export async function setupAuth(app: Express) {
               first_name: user.firstName,
               last_name: user.lastName,
             },
-            expires_at: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
+            expires_at: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
           };
 
           done(null, sessionUser);
@@ -199,9 +197,18 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   }
 
   const now = Math.floor(Date.now() / 1000);
-  if (now <= user.expires_at) {
-    return next();
+  if (now > user.expires_at) {
+    return res.status(401).json({ message: "Session expired" });
   }
 
-  return res.status(401).json({ message: "Session expired" });
+  const daysUntilExpiry = (user.expires_at - now) / (24 * 60 * 60);
+  if (daysUntilExpiry < 15) {
+    user.expires_at = now + 30 * 24 * 60 * 60;
+    if ((req.session as any)?.passport?.user) {
+      (req.session as any).passport.user.expires_at = user.expires_at;
+      req.session.touch();
+    }
+  }
+
+  return next();
 };
