@@ -308,7 +308,7 @@
             flex-shrink: 0;
         }
         
-        /* Agent Card Container: flex-based layout for photo + QR row */
+        /* Agent Card Container: right-aligned so QR edge matches photo edge */
         .agent-section {
             flex: 1;
             min-width: 875px;
@@ -317,15 +317,15 @@
             padding-left: 38px;
             display: flex;
             flex-direction: column;
-            align-items: center;
+            align-items: flex-end;
             overflow: hidden;
         }
         
-        /* Agent Media Row - side by side photo + QR */
+        /* Agent Media Row - side by side photo + QR, right-aligned */
         .agent-media-row {
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-end;
             gap: 50px;
             margin-bottom: 25px;
             width: 100%;
@@ -368,23 +368,23 @@
             object-fit: contain;
         }
         
-        /* Agent Name - centered below media row */
+        /* Agent Name - right-aligned below media row */
         /* 16pt * 3.125 = 50px */
         .agent-name {
             font-size: 50px;
             font-weight: bold;
-            text-align: center;
+            text-align: right;
             max-width: 100%;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
         
-        /* Agent Title/Phone - below name */
+        /* Agent Title/Phone - right-aligned below name */
         /* 9pt * 3.125 = 28px */
         .agent-info {
             font-size: 28px;
-            text-align: center;
+            text-align: right;
             line-height: 1.4;
             color: #555;
         }

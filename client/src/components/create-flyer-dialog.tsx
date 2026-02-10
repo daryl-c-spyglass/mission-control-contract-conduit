@@ -304,8 +304,8 @@ function PrintFlyerPreview({
         </div>
       </div>
 
-      {/* Info Section - 3 Columns (expanded per template) */}
-      <div className="bg-white px-2 py-3 grid grid-cols-3 gap-2">
+      {/* Info Section - 3 Columns (px-1.5 to match photo section padding) */}
+      <div className="bg-white px-1.5 py-3 grid grid-cols-3 gap-2">
         {/* Left Column - Property Stats with custom icons (matching template) */}
         <div className="space-y-1.5 pl-0.5">
           <div className="flex items-center gap-1.5 text-[#333]">
@@ -349,26 +349,26 @@ function PrintFlyerPreview({
           )}
         </div>
 
-        {/* Right Column - Agent Info */}
-        <div className="text-center pr-0.5 space-y-0.5 relative">
+        {/* Right Column - Agent Info (right-aligned to match photo edge) */}
+        <div className="flex flex-col items-end pr-0.5 space-y-0.5 relative">
           {agentPhotoUrl ? (
             <img 
               src={agentPhotoUrl} 
               alt="Agent" 
-              className="w-8 h-8 mx-auto rounded-full object-cover border border-gray-200"
+              className="w-8 h-8 rounded-full object-cover border border-gray-200"
             />
           ) : (
-            <div className="w-8 h-8 mx-auto bg-gray-200 rounded-full flex items-center justify-center">
+            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
               <User className="h-4 w-4 text-gray-400" />
             </div>
           )}
-          <p className="text-[7px] font-bold text-[#333] capitalize">{agentName || "Agent Name"}</p>
-          <p className="text-[5px] text-gray-500">{agentTitle || "REALTOR®"}</p>
-          <p className="text-[6px] text-gray-600">{agentPhone || "(XXX) XXX-XXXX"}</p>
+          <p className="text-[7px] font-bold text-[#333] capitalize text-right">{agentName || "Agent Name"}</p>
+          <p className="text-[5px] text-gray-500 text-right">{agentTitle || "REALTOR®"}</p>
+          <p className="text-[6px] text-gray-600 text-right">{agentPhone || "(XXX) XXX-XXXX"}</p>
           <img
             src={spyglassLogoBlack}
             alt="Logo"
-            className="h-4 w-auto mx-auto mt-1"
+            className="h-4 w-auto mt-1"
           />
         </div>
       </div>
@@ -1404,15 +1404,18 @@ export function CreateFlyerDialog({
       }
     }
 
-    // RIGHT COLUMN - Agent Info (expand right column for bigger elements)
-    const expandedRightColX = canvas.width - 550;
+    // RIGHT COLUMN - Agent Info (right-aligned so QR code edge aligns with photo edge)
+    const photosRightEdge = canvas.width - photosPadding;
     const expandedRightColWidth = 480;
-    ctx.textAlign = "center";
+    const expandedRightColX = photosRightEdge - expandedRightColWidth;
+    ctx.textAlign = "right";
+    const agentRightX = photosRightEdge;
     const agentCenterX = expandedRightColX + expandedRightColWidth / 2;
     
-    // Agent photo (circle) - 200px diameter per template
-    const agentCircleR = 130;  // Larger (was 100)
+    // Agent photo (circle) - right-aligned so right edge of circle aligns with photo edge
+    const agentCircleR = 130;
     const agentPhotoY = infoY + 20;
+    const agentPhotoCenterX = agentRightX - agentCircleR;
     
     if (effectiveAgentPhoto) {
       const agentImg = document.createElement('img');
@@ -1425,45 +1428,43 @@ export function CreateFlyerDialog({
       if (agentImg.complete && agentImg.naturalWidth > 0) {
         ctx.save();
         ctx.beginPath();
-        ctx.arc(agentCenterX, agentPhotoY + agentCircleR, agentCircleR, 0, Math.PI * 2);
+        ctx.arc(agentPhotoCenterX, agentPhotoY + agentCircleR, agentCircleR, 0, Math.PI * 2);
         ctx.clip();
-        ctx.drawImage(agentImg, agentCenterX - agentCircleR, agentPhotoY, agentCircleR * 2, agentCircleR * 2);
+        ctx.drawImage(agentImg, agentPhotoCenterX - agentCircleR, agentPhotoY, agentCircleR * 2, agentCircleR * 2);
         ctx.restore();
         
         // Add subtle border
         ctx.beginPath();
-        ctx.arc(agentCenterX, agentPhotoY + agentCircleR, agentCircleR, 0, Math.PI * 2);
+        ctx.arc(agentPhotoCenterX, agentPhotoY + agentCircleR, agentCircleR, 0, Math.PI * 2);
         ctx.strokeStyle = "#dddddd";
         ctx.lineWidth = 3;
         ctx.stroke();
       } else {
         // Placeholder circle with simple user silhouette
         ctx.beginPath();
-        ctx.arc(agentCenterX, agentPhotoY + agentCircleR, agentCircleR, 0, Math.PI * 2);
+        ctx.arc(agentPhotoCenterX, agentPhotoY + agentCircleR, agentCircleR, 0, Math.PI * 2);
         ctx.fillStyle = "#e0e0e0";
         ctx.fill();
-        // Draw simple person silhouette
         ctx.fillStyle = "#999999";
         ctx.beginPath();
-        ctx.arc(agentCenterX, agentPhotoY + agentCircleR - 20, 28, 0, Math.PI * 2);
+        ctx.arc(agentPhotoCenterX, agentPhotoY + agentCircleR - 20, 28, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(agentCenterX, agentPhotoY + agentCircleR + 60, 50, Math.PI, 0, true);
+        ctx.arc(agentPhotoCenterX, agentPhotoY + agentCircleR + 60, 50, Math.PI, 0, true);
         ctx.fill();
       }
     } else {
       // Placeholder circle with simple user silhouette
       ctx.beginPath();
-      ctx.arc(agentCenterX, agentPhotoY + agentCircleR, agentCircleR, 0, Math.PI * 2);
+      ctx.arc(agentPhotoCenterX, agentPhotoY + agentCircleR, agentCircleR, 0, Math.PI * 2);
       ctx.fillStyle = "#e0e0e0";
       ctx.fill();
-      // Draw simple person silhouette
       ctx.fillStyle = "#999999";
       ctx.beginPath();
-      ctx.arc(agentCenterX, agentPhotoY + agentCircleR - 20, 28, 0, Math.PI * 2);
+      ctx.arc(agentPhotoCenterX, agentPhotoY + agentCircleR - 20, 28, 0, Math.PI * 2);
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(agentCenterX, agentPhotoY + agentCircleR + 60, 50, Math.PI, 0, true);
+      ctx.arc(agentPhotoCenterX, agentPhotoY + agentCircleR + 60, 50, Math.PI, 0, true);
       ctx.fill();
     }
 
@@ -1474,20 +1475,21 @@ export function CreateFlyerDialog({
       );
     };
 
-    // Agent name (Title Case) - larger per refinement
+    // Agent name (Title Case) - right-aligned
+    ctx.textAlign = "right";
     ctx.fillStyle = DARK_TEXT;
     ctx.font = `700 48px ${FONT_MONTSERRAT}`;
     const formattedAgentName = data.agentName ? toTitleCase(data.agentName) : "Agent Name";
-    ctx.fillText(formattedAgentName, agentCenterX, agentPhotoY + agentCircleR * 2 + 60);
+    ctx.fillText(formattedAgentName, agentRightX, agentPhotoY + agentCircleR * 2 + 60);
     
     // Agent title
     ctx.fillStyle = "#666666";
     ctx.font = `400 26px ${FONT_MONTSERRAT}`;
-    ctx.fillText(data.agentTitle || "REALTOR®, Spyglass Realty", agentCenterX, agentPhotoY + agentCircleR * 2 + 95);
+    ctx.fillText(data.agentTitle || "REALTOR®, Spyglass Realty", agentRightX, agentPhotoY + agentCircleR * 2 + 95);
     
     // Agent phone
     ctx.font = `400 30px ${FONT_MONTSERRAT}`;
-    ctx.fillText(data.agentPhone || "(XXX) XXX-XXXX", agentCenterX, agentPhotoY + agentCircleR * 2 + 135);
+    ctx.fillText(data.agentPhone || "(XXX) XXX-XXXX", agentRightX, agentPhotoY + agentCircleR * 2 + 135);
 
     // Small Spyglass logo under agent info - use BLACK logo on white background
     // (Since bottom section has white background, use black logo directly)
@@ -1499,9 +1501,9 @@ export function CreateFlyerDialog({
       agentLogo.src = spyglassLogoBlack;
     });
     
-    const smallLogoWidth = 120; // Larger agent logo per refinement (~120px wide)
+    const smallLogoWidth = 120;
     const smallLogoHeight = (agentLogo.height / agentLogo.width) * smallLogoWidth || 70;
-    const smallLogoX = agentCenterX - smallLogoWidth / 2;
+    const smallLogoX = agentRightX - smallLogoWidth;
     const smallLogoY = agentPhotoY + agentCircleR * 2 + 190;
     
     ctx.drawImage(agentLogo, smallLogoX, smallLogoY, smallLogoWidth, smallLogoHeight);
