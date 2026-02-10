@@ -238,11 +238,10 @@ export function FlyerPreview({
           style={{ width: '196px', paddingLeft: '8px', paddingRight: '8px' }}
           data-layout-id="description-column"
         >
-          {/* Headline: 10pt to fit narrower column */}
           <h3 
             className="text-gray-700 uppercase line-clamp-2"
             style={{
-              fontSize: '10pt',
+              fontSize: '11.5pt',
               fontWeight: 600,
               letterSpacing: '1px',
               lineHeight: 1.3,
@@ -255,11 +254,10 @@ export function FlyerPreview({
           >
             {data.introHeading || 'Property Headline'}
           </h3>
-          {/* Description: 9pt for narrower column */}
           <p 
             className="line-clamp-8"
             style={{
-              fontSize: '9pt',
+              fontSize: '10.35pt',
               lineHeight: 1.4,
               color: '#555',
               overflow: 'hidden',
