@@ -1,0 +1,363 @@
+# CMA Feature Inquiry — Contract Conduit (READ ONLY)
+
+## ⚠️ IMPORTANT: DO NOT MAKE ANY CHANGES TO ANY FILES
+
+This is an information-gathering inquiry only. Please provide code snippets, file paths, data structures, and explanations. **Do not modify, create, or delete any files.**
+
+---
+
+## Purpose
+
+We need a complete understanding of how the CMA (Comparative Market Analysis) feature is built in Contract Conduit — from data acquisition through presentation output. This documentation will be used as a reference for building the CMA in a separate application (Mission Control).
+
+Please answer each section thoroughly with actual code snippets and file paths from this codebase.
+
+---
+
+## PART 1: PROPERTY LISTING DATA ACQUISITION
+
+### 1.1 Transaction Creation → MLS Data Fetch
+
+Show the complete flow when a user creates a new transaction with an MLS number:
+
+1. What happens when the user submits an MLS number or address?
+2. Which API route handles the transaction creation?
+3. How does the system call Repliers API to fetch the subject property's MLS data?
+4. What fields are stored from the Repliers response? Show the database insert/update code.
+5. Show the exact Repliers API URL pattern and headers used.
+
+**Please provide:**
+- File path and relevant code for the transaction creation route
+- File path and relevant code for the Repliers API call
+- The complete list of MLS data fields stored in the database
+
+### 1.2 CMA Comparables Fetch
+
+Show the complete flow for fetching comparable properties:
+
+1. When are comparables fetched? (On transaction creation? On MLS sync? On manual trigger?)
+2. What is the exact Repliers API endpoint used for comparables?
+3. What parameters are sent? (lat/lng, radius, price range, beds/baths, status filters, etc.)
+4. Show the complete API call code including URL construction and headers.
+5. How are comparables stored in the database? Show the schema and insert code.
+6. How many comparables are fetched by default?
+7. Are there any status-based conditions? (e.g., does it only work for Active listings?)
+
+**Please provide:**
+- File path and complete code for the comparables fetch function
+- The Repliers API parameters object
+- Database storage code for comparables
+
+### 1.3 MLS Data Refresh
+
+1. What happens when "Refresh MLS Data" is clicked?
+2. Does it also refresh comparables?
+3. Show the refresh handler code (both client and server).
+
+---
+
+## PART 2: PROPERTY PHOTOS
+
+### 2.1 Subject Property Photos
+
+1. How are subject property photos fetched from Repliers?
+2. What is the photo URL format? (CDN URL, relative path, etc.)
+3. Are photos stored in our database or fetched on-demand from Repliers CDN?
+4. Show the code that extracts and formats photo URLs from the Repliers response.
+5. How does the `imageInsights` classification work? Show the data structure returned.
+6. What `imageInsights.classification.imageOf` values are used? (exterior_front, kitchen, living_room, etc.)
+7. How is the `coverImage` parameter used in Repliers API calls?
+
+**Please provide:**
+- The exact Repliers photo URL format (e.g., `https://cdn.repliers.io/...`)
+- Code that processes `imageInsights` data
+- Photo selection logic for flyers and presentations
+
+### 2.2 Comparable Property Photos
+
+1. How are comparable property photos stored?
+2. What field name holds the photos array for each comparable? (`photos`, `images`, `Pictures`, `Media`?)
+3. Are comparable photos fetched with the comparables data or separately?
+4. Show the data structure of a single comparable object including its photo fields.
+5. How are photos displayed in the CMA grid/cards?
+
+**Please provide:**
+- A sample comparable object from the database (JSON structure with all fields)
+- The component code that renders comparable photos
+
+---
+
+## PART 3: CMA DATABASE SCHEMA
+
+### 3.1 All CMA-Related Tables
+
+For each CMA-related database table, please show:
+
+1. **`cmas` table** — Complete schema definition from `shared/schema.ts`
+2. **`cma_report_configs` table** — Complete schema definition
+3. **`cma_report_templates` table** — Complete schema definition (if exists)
+4. **`agent_profiles` table** — Complete schema definition (used in presentations)
+5. **Any other tables** that store CMA-related data
+
+For each table, show:
+- All columns with types
+- Default values
+- Foreign key relationships
+- Any JSON column type definitions (interfaces)
+
+### 3.2 Key TypeScript Interfaces
+
+Show all CMA-related TypeScript interfaces/types from `shared/schema.ts`:
+- `CmaAdjustmentRates`
+- `CmaCompAdjustmentOverrides`
+- `CmaAdjustmentsData`
+- `CmaBrochure`
+- `CoverPageConfig`
+- Any other CMA-related interfaces
+
+---
+
+## PART 4: CMA API ROUTES
+
+### 4.1 Complete Route Inventory
+
+List every API route related to CMA functionality. For each route, provide:
+- HTTP method and path
+- File path where it's defined
+- What it does (brief description)
+- Request parameters/body
+- Response shape
+
+Expected routes include but may not be limited to:
+- CRUD operations for CMA records
+- Comparables fetch/refresh
+- Report configuration save/load
+- PDF export
+- Share link generation
+- Statistics calculation
+- Agent profile data
+- Template save/load
+
+### 4.2 Key Route Details
+
+For these specific routes, show the **complete handler code**:
+
+1. **CMA creation** — The route that creates a new CMA record
+2. **Comparables fetch** — The route that calls Repliers for comparable properties
+3. **Report config save** — The route that saves presentation section configuration
+4. **PDF export** — The route that generates or triggers PDF output
+5. **Statistics** — The route that calculates CMA statistics (avg price, price/sqft, etc.)
+6. **Share** — The route that generates a shareable link
+
+---
+
+## PART 5: CMA PRESENTATION BUILDER
+
+### 5.1 Page Component
+
+1. What is the main Presentation Builder page component? Show file path.
+2. How is it routed? (Show the wouter/router configuration for this page)
+3. What URL pattern does it use? (e.g., `/transactions/:id/cma/presentation`)
+
+### 5.2 Builder Layout
+
+Show the complete component hierarchy:
+1. The split layout (left builder tabs vs right live preview)
+2. What percentage split is used? (e.g., 60/40)
+3. Show the three tabs: **Sections**, **Content**, **Layout**
+
+### 5.3 Sections Tab
+
+1. Show the complete list of all presentation sections with their IDs, labels, categories, and default on/off state.
+2. How are sections organized into categories? (Introduction, Listings, Analysis)
+3. How many sections per category?
+4. Show the toggle on/off code for each section.
+5. Show the drag-and-drop reordering code (what library is used?).
+6. How is the section order persisted?
+
+### 5.4 Content Tab
+
+1. What content is editable on the Content tab?
+2. Show the Cover Page configuration options (title, subtitle, date, etc.)
+3. Show the Cover Letter editor (AI generation, manual edit, client name)
+4. What other content sections are editable?
+
+### 5.5 Layout Tab
+
+1. What is configured on the Layout tab?
+2. Show the cover photo selection logic (AI auto-select vs manual)
+3. How does the Repliers `imageInsights` data drive photo selection?
+4. Are there any other layout options (map style, branding, etc.)?
+
+---
+
+## PART 6: PRESENTATION SECTIONS (ALL 17+)
+
+For **each** presentation section/widget, provide:
+
+1. **Component file path**
+2. **Data source** — Where does the data come from? (API endpoint, database field, static content, calculated)
+3. **Key fields used** — What specific data fields are rendered?
+4. **Is it dynamic or static?** — Does it pull live data or show a fixed image/template?
+5. **Brief description** of what the section displays
+
+### Expected sections to document:
+
+**Introduction Category:**
+- Cover Page
+- Listing Brochure
+- Cover Letter
+- Agent Resume
+- Our Company
+- What is a CMA?
+- Contact Me
+
+**Listings Category:**
+- Map of All Listings
+- Listings Chapter Header
+- Summary of Comparables
+- Property Details (per comparable)
+- Property Photos (per comparable)
+- Adjustments
+
+**Analysis Category:**
+- Analysis Chapter Header
+- Online Valuation Analysis
+- Average Price Per Sq. Ft.
+- Comparable Property Statistics
+
+### For each section, also note:
+- Does it have a corresponding PDF export section? (Yes/No)
+- If the PDF version differs from the live preview version, explain how.
+
+---
+
+## PART 7: LIVE PREVIEW
+
+### 7.1 Preview Panel
+
+1. Show the `LivePreviewPanel` component code (file path and key logic).
+2. How does the preview update when sections are toggled on/off?
+3. How does section reordering reflect in the preview?
+4. What zoom controls exist? (50%, 100%, 150% or zoom in/out)
+5. Show the expand-to-modal preview code.
+
+### 7.2 Preview Content Rendering
+
+1. Show the `CMAPreviewContent` component (or equivalent) that maps section IDs to preview components.
+2. How does it determine which sections to render and in what order?
+3. Show the section-to-component mapping (registry/switch statement).
+
+---
+
+## PART 8: PDF EXPORT
+
+### 8.1 PDF Generation Approach
+
+1. Is PDF generated **client-side** (e.g., `@react-pdf/renderer`) or **server-side** (e.g., Puppeteer)?
+2. Show the PDF generation trigger code (what happens when "Export PDF" is clicked).
+3. What library/package is used?
+
+### 8.2 PDF Document Component
+
+1. Show the main PDF document component file path and structure.
+2. How does it map presentation sections to PDF pages?
+3. Which sections are implemented in PDF export? Which are NOT?
+4. Show a sample of one PDF section component (e.g., Cover Page).
+
+### 8.3 PDF Data Flow
+
+1. How is data passed to the PDF generator?
+2. Is there a `transformToCMAReportData` function or equivalent? Show it.
+3. How are images handled in the PDF? (base64 conversion? URL references?)
+4. How is the Mapbox map rendered in the PDF? (Static Images API? Screenshot?)
+
+### 8.4 PDF Output
+
+1. What is the output format? (blob download? URL? file on server?)
+2. How is the filename constructed?
+3. What is the page size and orientation?
+
+---
+
+## PART 9: SHARE FUNCTIONALITY
+
+### 9.1 Share Link
+
+1. How is a shareable CMA link generated?
+2. What is the share URL pattern?
+3. Is there a public-facing page for shared CMAs? Show the route.
+4. What data is accessible on the shared view? (All sections? Read-only?)
+5. Is authentication required to view a shared CMA?
+
+---
+
+## PART 10: STATISTICS & CALCULATIONS
+
+### 10.1 CMA Statistics
+
+1. What statistics are calculated from comparables? (avg price, median, price/sqft, DOM, etc.)
+2. Show the calculation logic (file path and code).
+3. Where are statistics displayed? (Statistics section in presentation, CMA tab overview)
+
+### 10.2 Adjustments
+
+1. How do property adjustments work?
+2. What are the default adjustment rates? ($/sqft, bedroom value, bathroom value, etc.)
+3. Show the adjustment calculation code.
+4. Can agents override individual adjustments per comparable?
+
+---
+
+## PART 11: AGENT PROFILE DATA IN CMA
+
+### 11.1 Agent Data Sources
+
+1. Where does agent name, photo, title, phone, email come from for the CMA?
+2. Is it from `agent_profiles` table, `users` table, or both?
+3. Show the API route that serves agent profile data to the presentation builder.
+4. What is the field mapping? (e.g., `profile.headshotUrl` vs `user.marketingHeadshotUrl`)
+
+### 11.2 Agent Data in Presentation
+
+1. Which sections use agent data? (Cover Page, Agent Resume, Contact Me, Cover Letter)
+2. Show how agent data is passed into each section component.
+
+---
+
+## Expected Response Format
+
+Please organize your response matching the PART numbers above. For each section:
+
+```
+## PART X: [Title]
+
+### X.X [Subsection]
+
+**File:** `path/to/file.ts` (lines XX-XX)
+
+```typescript
+// relevant code snippet
+```
+
+**Explanation:** Brief description of what this code does and how it connects to other parts.
+```
+
+If any section doesn't exist or isn't implemented, please state that clearly so we know what's missing.
+
+---
+
+## 📱 Mobile Optimization Reference
+
+Note: This is for documentation purposes. The CMA Presentation Builder must be optimized for:
+
+| Device | Browser | Screen Size |
+|--------|---------|-------------|
+| iPad Pro | Safari | 1024 x 1366 |
+| iPad Air/Mini | Safari | 768 x 1024 |
+| iPhone 14/15 Pro | Safari | 393 x 852 |
+| iPhone SE | Safari | 375 x 667 |
+| Android Tablet | Chrome | 800 x 1280 |
+| Android Phone | Chrome | 360 x 800 |
+
+Please note in your response any components that currently have responsive/mobile-specific code vs those that don't.
