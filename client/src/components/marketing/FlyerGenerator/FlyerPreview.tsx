@@ -269,7 +269,7 @@ export function FlyerPreview({
         >
           <div 
             className="rounded-full overflow-hidden bg-gray-200 flex items-center justify-center flex-shrink-0"
-            style={{ width: '108px', height: '108px', marginTop: '-68px' }}
+            style={{ width: '108px', height: '108px', marginTop: '-95px' }}
           >
             {images.agentPhoto ? (
               <img
