@@ -229,9 +229,9 @@ export function FlyerPreview({
           <h3 
             className="text-gray-700 uppercase"
             style={{
-              fontSize: '11.5pt',
+              fontSize: '10pt',
               fontWeight: 600,
-              letterSpacing: '1px',
+              letterSpacing: '0.5px',
               lineHeight: 1.3,
               marginTop: '14px',
               marginBottom: '8px',
