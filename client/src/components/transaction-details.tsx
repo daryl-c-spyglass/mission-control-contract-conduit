@@ -635,7 +635,10 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   const [activeTab, setActiveTab] = useState(initialTab);
   const { toast } = useToast();
   const [flyerDialogOpen, setFlyerDialogOpen] = useState(false);
-  const [showFlyerGenerator, setShowFlyerGenerator] = useState(initialFlyer);
+  const [showFlyerGenerator, setShowFlyerGenerator] = useState(() => {
+    if (initialFlyer) return true;
+    return localStorage.getItem('flyerGeneratorOpen') === transaction.id;
+  });
   const [editFlyerAsset, setEditFlyerAsset] = useState<{ id: string; config: FlyerAssetConfig } | null>(null);
   const [editGraphicsAsset, setEditGraphicsAsset] = useState<{ id: string; config: SocialGraphicConfig } | null>(null);
   const [graphicsDialogOpen, setGraphicsDialogOpen] = useState(false);
@@ -700,8 +703,17 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   
   // Sync activeTab when initialTab prop changes (e.g., when clicking MLS Sheet button)
   useEffect(() => {
-    setActiveTab(initialFlyer ? "marketing" : initialTab);
+    setActiveTab(initialFlyer || showFlyerGenerator ? "marketing" : initialTab);
   }, [initialTab, initialFlyer, transaction.id]);
+
+  // Persist flyer generator open state across hot reloads
+  useEffect(() => {
+    if (showFlyerGenerator) {
+      localStorage.setItem('flyerGeneratorOpen', transaction.id);
+    } else {
+      localStorage.removeItem('flyerGeneratorOpen');
+    }
+  }, [showFlyerGenerator, transaction.id]);
 
   const transactionCoordinators = coordinators.filter(
     (c) => transaction.coordinatorIds?.includes(c.id)

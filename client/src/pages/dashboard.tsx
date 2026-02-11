@@ -27,9 +27,19 @@ interface DashboardProps {
 
 export default function Dashboard({ createDialogOpen, setCreateDialogOpen, transactionId: propTransactionId, urlTab, urlFlyer }: DashboardProps) {
   const [, setLocation] = useLocation();
-  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(propTransactionId || null);
-  const [initialTab, setInitialTab] = useState<string>(urlTab || "overview");
-  const [initialFlyer, setInitialFlyer] = useState<boolean>(urlFlyer || false);
+  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(() => {
+    if (propTransactionId) return propTransactionId;
+    const flyerTxn = localStorage.getItem('flyerGeneratorOpen');
+    return flyerTxn || null;
+  });
+  const [initialTab, setInitialTab] = useState<string>(() => {
+    if (urlTab) return urlTab;
+    if (localStorage.getItem('flyerGeneratorOpen')) return 'marketing';
+    return 'overview';
+  });
+  const [initialFlyer, setInitialFlyer] = useState<boolean>(() => {
+    return urlFlyer || !!localStorage.getItem('flyerGeneratorOpen');
+  });
   
   const [addMlsDialogOpen, setAddMlsDialogOpen] = useState(false);
   const [addMlsTransactionId, setAddMlsTransactionId] = useState<string | null>(null);
