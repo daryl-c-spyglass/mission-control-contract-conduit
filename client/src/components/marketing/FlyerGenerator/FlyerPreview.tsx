@@ -222,8 +222,8 @@ export function FlyerPreview({
 
         {/* Grid 14: Headline + Description — subsquare: headline row 0.5, desc row 2.5 */}
         <div 
-          className="relative overflow-hidden"
-          style={{ paddingLeft: '14px', paddingRight: '10px' }}
+          className="relative"
+          style={{ paddingLeft: '14px', paddingRight: '10px', overflow: 'visible' }}
           data-layout-id="description-column"
         >
           <h3 
