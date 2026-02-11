@@ -22,12 +22,14 @@ interface DashboardProps {
   setCreateDialogOpen: (open: boolean) => void;
   transactionId?: string | null;
   urlTab?: string | null;
+  urlFlyer?: boolean;
 }
 
-export default function Dashboard({ createDialogOpen, setCreateDialogOpen, transactionId: propTransactionId, urlTab }: DashboardProps) {
+export default function Dashboard({ createDialogOpen, setCreateDialogOpen, transactionId: propTransactionId, urlTab, urlFlyer }: DashboardProps) {
   const [, setLocation] = useLocation();
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(propTransactionId || null);
   const [initialTab, setInitialTab] = useState<string>(urlTab || "overview");
+  const [initialFlyer, setInitialFlyer] = useState<boolean>(urlFlyer || false);
   
   const [addMlsDialogOpen, setAddMlsDialogOpen] = useState(false);
   const [addMlsTransactionId, setAddMlsTransactionId] = useState<string | null>(null);
@@ -65,7 +67,10 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen, trans
     if (urlTab) {
       setInitialTab(urlTab);
     }
-  }, [propTransactionId, urlTab]);
+    if (urlFlyer) {
+      setInitialFlyer(true);
+    }
+  }, [propTransactionId, urlTab, urlFlyer]);
 
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
@@ -120,9 +125,11 @@ export default function Dashboard({ createDialogOpen, setCreateDialogOpen, trans
         onBack={() => {
           setSelectedTransactionId(null);
           setInitialTab("overview");
+          setInitialFlyer(false);
           setLocation("/");
         }}
         initialTab={initialTab}
+        initialFlyer={initialFlyer}
       />
     );
   }

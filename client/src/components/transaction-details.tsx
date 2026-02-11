@@ -129,6 +129,7 @@ interface TransactionDetailsProps {
   activities: ActivityType[];
   onBack: () => void;
   initialTab?: string;
+  initialFlyer?: boolean;
 }
 
 function formatDate(dateString: string | null): string {
@@ -630,11 +631,11 @@ const ROOM_TYPES = [
   { id: "exterior", label: "Exterior", icon: Home },
 ] as const;
 
-export function TransactionDetails({ transaction, coordinators, activities, onBack, initialTab = "overview" }: TransactionDetailsProps) {
+export function TransactionDetails({ transaction, coordinators, activities, onBack, initialTab = "overview", initialFlyer = false }: TransactionDetailsProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const { toast } = useToast();
   const [flyerDialogOpen, setFlyerDialogOpen] = useState(false);
-  const [showFlyerGenerator, setShowFlyerGenerator] = useState(false);
+  const [showFlyerGenerator, setShowFlyerGenerator] = useState(initialFlyer);
   const [editFlyerAsset, setEditFlyerAsset] = useState<{ id: string; config: FlyerAssetConfig } | null>(null);
   const [editGraphicsAsset, setEditGraphicsAsset] = useState<{ id: string; config: SocialGraphicConfig } | null>(null);
   const [graphicsDialogOpen, setGraphicsDialogOpen] = useState(false);
@@ -699,8 +700,8 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
   
   // Sync activeTab when initialTab prop changes (e.g., when clicking MLS Sheet button)
   useEffect(() => {
-    setActiveTab(initialTab);
-  }, [initialTab, transaction.id]);
+    setActiveTab(initialFlyer ? "marketing" : initialTab);
+  }, [initialTab, initialFlyer, transaction.id]);
 
   const transactionCoordinators = coordinators.filter(
     (c) => transaction.coordinatorIds?.includes(c.id)

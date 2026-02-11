@@ -36,6 +36,7 @@ function TransactionRoute({ createDialogOpen, setCreateDialogOpen }: { createDia
   // Read tab from URL query params
   const urlParams = new URLSearchParams(window.location.search);
   const urlTab = urlParams.get('tab');
+  const urlFlyer = urlParams.get('flyer') === '1';
   
   return (
     <Dashboard
@@ -43,6 +44,7 @@ function TransactionRoute({ createDialogOpen, setCreateDialogOpen }: { createDia
       setCreateDialogOpen={setCreateDialogOpen}
       transactionId={transactionId}
       urlTab={urlTab}
+      urlFlyer={urlFlyer}
     />
   );
 }
