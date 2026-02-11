@@ -215,7 +215,7 @@ export function FlyerPreview({
           {/* Accent divider — subsquare: rows 1.5 to 7, right edge */}
           <div
             className="absolute right-0 top-[40px]"
-            style={{ width: '3px', height: '160px', backgroundColor: accentColor }}
+            style={{ width: '2px', height: '160px', backgroundColor: accentColor }}
             data-layout-id="divider-1"
           />
         </div>
@@ -256,7 +256,7 @@ export function FlyerPreview({
         {/* Accent divider 2 — positioned in bottom-section grid, after description column */}
         <div
           className="absolute top-[40px]"
-          style={{ width: '3px', height: '160px', backgroundColor: accentColor, left: '472px' }}
+          style={{ width: '2px', height: '160px', backgroundColor: accentColor, left: '472px' }}
           data-layout-id="divider-2"
         />
 
