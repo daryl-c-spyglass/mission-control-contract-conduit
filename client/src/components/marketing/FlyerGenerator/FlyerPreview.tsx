@@ -222,8 +222,8 @@ export function FlyerPreview({
 
         {/* Grid 14: Headline + Description — subsquare: headline row 0.5, desc row 2.5 */}
         <div 
-          className="relative"
-          style={{ paddingLeft: '14px', paddingRight: '10px', overflow: 'visible' }}
+          className="relative overflow-hidden"
+          style={{ paddingLeft: '14px', paddingRight: '10px' }}
           data-layout-id="description-column"
         >
           <h3 
@@ -254,13 +254,13 @@ export function FlyerPreview({
           >
             {data.introDescription || 'Property description will appear here...'}
           </p>
-          {/* Accent divider — subsquare: rows 1.5 to 7, right edge */}
-          <div
-            className="absolute top-[40px]"
-            style={{ width: '4px', height: '160px', backgroundColor: accentColor, right: '-108px' }}
-            data-layout-id="divider-2"
-          />
         </div>
+        {/* Accent divider 2 — positioned in bottom-section grid, after description column */}
+        <div
+          className="absolute top-[40px]"
+          style={{ width: '4px', height: '160px', backgroundColor: accentColor, left: '468px' }}
+          data-layout-id="divider-2"
+        />
 
         {/* Grid 15: Agent Photo only — subsquare: centered at (5,5), ~4 subsquares dia */}
         <div 
