@@ -264,13 +264,13 @@ export function FlyerPreview({
 
         {/* Grid 15: Agent Photo only — subsquare: centered at (5,5), ~4 subsquares dia */}
         <div 
-          className="flex flex-col items-center overflow-hidden"
+          className="relative"
           style={{ paddingTop: '12px' }}
           data-layout-id="agent-photo-column"
         >
           <div 
-            className="rounded-full overflow-hidden bg-gray-200 flex items-center justify-center flex-shrink-0"
-            style={{ width: '108px', height: '108px', marginLeft: '170px' }}
+            className="absolute rounded-full overflow-hidden bg-gray-200 flex items-center justify-center flex-shrink-0"
+            style={{ width: '108px', height: '108px', right: '-4px' }}
           >
             {images.agentPhoto ? (
               <img
