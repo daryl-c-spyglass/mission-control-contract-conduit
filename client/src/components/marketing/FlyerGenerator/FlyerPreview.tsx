@@ -227,7 +227,7 @@ export function FlyerPreview({
           data-layout-id="description-column"
         >
           <h3 
-            className="text-gray-700 uppercase line-clamp-2"
+            className="text-gray-700 uppercase"
             style={{
               fontSize: '11.5pt',
               fontWeight: 600,
@@ -235,8 +235,6 @@ export function FlyerPreview({
               lineHeight: 1.3,
               marginTop: '14px',
               marginBottom: '8px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
             }}
             data-layout-id="headline"
           >
