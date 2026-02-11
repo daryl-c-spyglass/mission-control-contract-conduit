@@ -184,7 +184,7 @@ export function FlyerPreview({
       {/* 720px = 816px canvas - 48px padding each side, each column = 180px */}
       <div 
         className="absolute left-[48px] top-[790px] h-[270px] overflow-hidden"
-        style={{ width: '720px', display: 'grid', gridTemplateColumns: '180px 360px 180px' }}
+        style={{ width: '720px', display: 'grid', gridTemplateColumns: '180px 270px 270px' }}
         data-layout-id="bottom-section"
       >
         {/* Grid 13: Property Stats — subsquare: items at rows 1.5, 4.5, 7.5 */}
@@ -256,7 +256,7 @@ export function FlyerPreview({
         {/* Accent divider 2 — positioned in bottom-section grid, after description column */}
         <div
           className="absolute top-[40px]"
-          style={{ width: '4px', height: '160px', backgroundColor: accentColor, left: '540px' }}
+          style={{ width: '4px', height: '160px', backgroundColor: accentColor, left: '450px' }}
           data-layout-id="divider-2"
         />
 
