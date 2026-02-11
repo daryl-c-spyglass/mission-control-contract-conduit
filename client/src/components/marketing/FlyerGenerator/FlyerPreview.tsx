@@ -265,7 +265,7 @@ export function FlyerPreview({
         {/* Grid 15: Agent Photo only — subsquare: centered at (5,5), ~4 subsquares dia */}
         <div 
           className="relative"
-          style={{ paddingTop: '17px' }}
+          style={{ paddingTop: '14px' }}
           data-layout-id="agent-photo-column"
         >
           <div 
