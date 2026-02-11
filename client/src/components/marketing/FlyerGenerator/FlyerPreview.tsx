@@ -287,7 +287,7 @@ export function FlyerPreview({
         {/* Grid 16: QR Code + Agent Name/Title/Phone — subsquare: QR rows 0.5-3.5, name row 5.5 */}
         <div 
           className="flex flex-col items-center overflow-hidden"
-          style={{ paddingTop: '41px' }}
+          style={{ paddingTop: '28px' }}
           data-layout-id="qr-agent-section"
         >
           <div 
