@@ -145,14 +145,14 @@ export function FlyerForm({
   const [localQrUrl, setLocalQrUrl] = useState(qrCodeUrl);
   const lastGeneratedQrUrlRef = useRef<string>('');
 
-  const generateQRCode = useCallback(async (url: string) => {
+  const generateQRCode = useCallback(async (url: string, force?: boolean) => {
     if (!url.trim()) {
       onImageChange('qrCode', null);
       lastGeneratedQrUrlRef.current = '';
       return;
     }
     
-    if (lastGeneratedQrUrlRef.current === url) {
+    if (!force && lastGeneratedQrUrlRef.current === url) {
       return;
     }
     
@@ -346,6 +346,55 @@ export function FlyerForm({
             }}
             data-testid="input-flyer-phone"
           />
+        </div>
+      </Section>
+
+      <Section icon={<QrCode className="w-5 h-5 text-primary" />} title="QR Code Link">
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Enter a URL and click Generate to create a QR code on the flyer.
+          </p>
+          <div className="flex items-center gap-2">
+            <Input
+              value={localQrUrl}
+              onChange={handleQrUrlChange}
+              placeholder="https://example.com"
+              className="h-9 flex-1"
+              data-testid="input-qr-code-url"
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => generateQRCode(localQrUrl, true)}
+              disabled={!localQrUrl.trim() || isGeneratingQR}
+              data-testid="button-generate-qr"
+            >
+              {isGeneratingQR ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                'Generate'
+              )}
+            </Button>
+            {images.qrCode && (
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={handleClearQR}
+                title="Clear QR Code"
+                data-testid="button-clear-qr-inline"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          {images.qrCode && localQrUrl && (
+            <div className="flex items-center gap-2 text-green-500 text-xs">
+              <Check className="w-3.5 h-3.5" />
+              QR code generated
+            </div>
+          )}
         </div>
       </Section>
 
