@@ -190,7 +190,7 @@ export function FlyerPreview({
         {/* Grid 13: Property Stats — subsquare: items at rows 1.5, 4.5, 7.5 */}
         <div 
           className="relative pl-[18px] pr-[8px]"
-          style={{ paddingTop: '40px' }}
+          style={{ paddingTop: '45px' }}
           data-layout-id="stats"
         >
           <div className="flex items-center gap-2 text-[11pt] whitespace-nowrap text-gray-800" style={{ marginBottom: '33px' }}>
