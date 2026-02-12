@@ -306,17 +306,27 @@ export function FlyerPreview({
             )}
           </div>
           <div 
-            className="font-bold text-center truncate text-gray-800 w-full px-1"
-            style={{ fontSize: '13.9pt', marginTop: '31px' }}
+            className="flex flex-col items-center w-full px-1"
+            style={{ marginTop: '31px', gap: '6px' }}
           >
-            {data.agentName || ''}
-          </div>
-          <div 
-            className="text-center w-full px-1"
-            style={{ fontSize: '10.1pt', lineHeight: 1.4, color: '#555' }}
-          >
-            <div className="truncate">{data.agentTitle || ''}</div>
-            <div>{data.phone || ''}</div>
+            <div 
+              className="font-bold text-center truncate text-gray-800 w-full"
+              style={{ fontSize: '13.9pt' }}
+            >
+              {data.agentName || ''}
+            </div>
+            <div 
+              className="text-center truncate w-full"
+              style={{ fontSize: '10.1pt', color: '#555' }}
+            >
+              {data.agentTitle || ''}
+            </div>
+            <div 
+              className="text-center w-full"
+              style={{ fontSize: '10.1pt', color: '#555' }}
+            >
+              {data.phone || ''}
+            </div>
           </div>
         </div>
       </div>
