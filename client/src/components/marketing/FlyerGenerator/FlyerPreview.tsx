@@ -296,7 +296,7 @@ export function FlyerPreview({
               height: '76px', 
               border: '2px solid #000',
               padding: '2px',
-              marginLeft: '-43px',
+              marginLeft: '32px',
             }}
           >
             {images.qrCode ? (
