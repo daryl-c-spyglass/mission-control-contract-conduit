@@ -307,7 +307,7 @@ export function FlyerPreview({
           </div>
           <div 
             className="flex flex-col items-center w-full px-1"
-            style={{ marginTop: '31px', gap: '6px' }}
+            style={{ marginTop: '31px', gap: '6px', marginLeft: '-10px' }}
           >
             <div 
               className="font-bold text-center truncate text-gray-800 w-full"
