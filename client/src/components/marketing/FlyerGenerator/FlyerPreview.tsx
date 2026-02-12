@@ -214,7 +214,7 @@ export function FlyerPreview({
           </div>
           {/* Accent divider — subsquare: rows 1.5 to 7, right edge */}
           <div
-            className="absolute right-[10px] top-[40px]"
+            className="absolute right-[5px] top-[40px]"
             style={{ width: '2px', height: '160px', backgroundColor: accentColor }}
             data-layout-id="divider-1"
           />
