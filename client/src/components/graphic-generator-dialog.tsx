@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Download, Image as ImageIcon, Upload, Check, Sparkles, Wand2, X, ZoomIn } from "lucide-react";
+import { Loader2, Download, Upload, Check, ZoomIn, RefreshCw } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -34,7 +34,7 @@ type StatusType = typeof STATUS_OPTIONS[number]["value"];
 const getStatusBadgeColor = (statusValue: StatusType): string => {
   const colors: Record<StatusType, string> = {
     'just_listed': '#f97316',
-    'for_sale': '#f97316',
+    'for_sale': '#22c55e',
     'for_lease': '#06b6d4',
     'under_contract': '#3b82f6',
     'just_sold': '#ef4444',
@@ -53,6 +53,7 @@ export function GraphicGeneratorDialog({
   const { user } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const [status, setStatus] = useState<StatusType>("just_listed");
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
@@ -61,6 +62,8 @@ export function GraphicGeneratorDialog({
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
   const [showEnlargedPreview, setShowEnlargedPreview] = useState(false);
   const [addressOverride, setAddressOverride] = useState("");
+  const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);
+  const [isRenderingPreview, setIsRenderingPreview] = useState(false);
 
   const { data: agentProfileData } = useQuery<{
     profile: AgentProfile | null;
@@ -113,6 +116,7 @@ export function GraphicGeneratorDialog({
       setGeneratedImage(null);
       setShowEnlargedPreview(false);
       setAddressOverride("");
+      setPreviewDataUrl(null);
 
       const mlsStatus = (mlsData?.status || transaction.status || "").toLowerCase();
       let detectedStatus: StatusType = 'just_listed';
@@ -138,6 +142,7 @@ export function GraphicGeneratorDialog({
       setSelectedPhotoIndex(0);
       setGeneratedImage(null);
       setShowEnlargedPreview(false);
+      setPreviewDataUrl(null);
     }
   }, [open]);
 
@@ -154,7 +159,7 @@ export function GraphicGeneratorDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/transactions/${transaction.id}/marketing-assets`] });
-      toast({ title: "Asset Saved", description: "Graphic saved to marketing assets." });
+      toast({ title: "Saved", description: "Graphic saved to marketing assets." });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to save.", variant: "destructive" });
@@ -210,6 +215,212 @@ export function GraphicGeneratorDialog({
     }
   };
 
+  const renderCanvas = useCallback(async (size: number = 1080): Promise<string | null> => {
+    if (!currentImage) return null;
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d")!;
+    canvas.width = size;
+    canvas.height = size;
+    const s = size / 1080;
+
+    const propertyImg = await loadImage(getProxiedUrl(currentImage));
+
+    const imgAspect = propertyImg.width / propertyImg.height;
+    const canvasAspect = 1;
+    let drawWidth, drawHeight, drawX, drawY;
+    if (imgAspect > canvasAspect) {
+      drawHeight = canvas.height;
+      drawWidth = canvas.height * imgAspect;
+      drawX = (canvas.width - drawWidth) / 2;
+      drawY = 0;
+    } else {
+      drawWidth = canvas.width;
+      drawHeight = canvas.width / imgAspect;
+      drawX = 0;
+      drawY = (canvas.height - drawHeight) / 2;
+    }
+    ctx.drawImage(propertyImg, drawX, drawY, drawWidth, drawHeight);
+
+    const topGrad = ctx.createLinearGradient(0, 0, 0, 220 * s);
+    topGrad.addColorStop(0, "rgba(0,0,0,0.6)");
+    topGrad.addColorStop(0.7, "rgba(0,0,0,0.2)");
+    topGrad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = topGrad;
+    ctx.fillRect(0, 0, canvas.width, 220 * s);
+
+    const bottomGrad = ctx.createLinearGradient(0, canvas.height - 380 * s, 0, canvas.height);
+    bottomGrad.addColorStop(0, "rgba(0,0,0,0)");
+    bottomGrad.addColorStop(0.3, "rgba(0,0,0,0.4)");
+    bottomGrad.addColorStop(0.7, "rgba(0,0,0,0.7)");
+    bottomGrad.addColorStop(1, "rgba(0,0,0,0.85)");
+    ctx.fillStyle = bottomGrad;
+    ctx.fillRect(0, canvas.height - 380 * s, canvas.width, 380 * s);
+
+    const useDefaultCompany = marketingProfile?.companyLogoUseDefault !== false;
+    const useDefaultSecondary = marketingProfile?.secondaryLogoUseDefault !== false;
+    const companyLogoSrc = useDefaultCompany
+      ? '/logos/SpyglassRealty_Logo_White.png'
+      : (marketingProfile?.companyLogo || '/logos/SpyglassRealty_Logo_White.png');
+    const secondaryLogoSrc = useDefaultSecondary
+      ? '/logos/LeadingRE_White.png'
+      : (marketingProfile?.secondaryLogo || '/logos/LeadingRE_White.png');
+
+    const companyLogo = await loadImageSafe(companyLogoSrc);
+    if (companyLogo && companyLogo.naturalWidth > 0) {
+      const logoHeight = 45 * s;
+      const logoWidth = (companyLogo.naturalWidth / companyLogo.naturalHeight) * logoHeight;
+      ctx.drawImage(companyLogo, 35 * s, 30 * s, logoWidth, logoHeight);
+    }
+
+    const secondaryLogo = await loadImageSafe(secondaryLogoSrc);
+    if (secondaryLogo && secondaryLogo.naturalWidth > 0) {
+      const logoHeight = 45 * s;
+      const logoWidth = (secondaryLogo.naturalWidth / secondaryLogo.naturalHeight) * logoHeight;
+      ctx.drawImage(secondaryLogo, canvas.width - logoWidth - 35 * s, 30 * s, logoWidth, logoHeight);
+    }
+
+    const statusLabel = getStatusLabel(status);
+    ctx.font = `bold ${26 * s}px Inter, Arial, sans-serif`;
+    const badgeTextWidth = ctx.measureText(statusLabel).width;
+    const badgePadH = 24 * s;
+    const badgePadV = 10 * s;
+    const badgeHeight = 44 * s;
+    const badgeX = (canvas.width - badgeTextWidth - badgePadH * 2) / 2;
+    const badgeY = canvas.height - 280 * s;
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.4)";
+    ctx.shadowBlur = 12 * s;
+    ctx.shadowOffsetY = 3 * s;
+    ctx.fillStyle = getStatusBadgeColor(status);
+    ctx.beginPath();
+    ctx.roundRect(badgeX, badgeY, badgeTextWidth + badgePadH * 2, badgeHeight, 5 * s);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(statusLabel, canvas.width / 2, badgeY + badgeHeight / 2);
+
+    const parts = displayAddress.split(',').map(p => p.trim());
+    const street = parts[0] || '';
+    const cityStateZip = parts.slice(1).join(', ');
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.shadowBlur = 8 * s;
+    ctx.font = `bold ${38 * s}px Inter, Arial, sans-serif`;
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(street, canvas.width / 2, canvas.height - 195 * s);
+    ctx.restore();
+
+    if (cityStateZip) {
+      ctx.font = `${22 * s}px Inter, Arial, sans-serif`;
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.textAlign = "center";
+      ctx.fillText(cityStateZip, canvas.width / 2, canvas.height - 162 * s);
+    }
+
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(255,255,255,0.2)";
+    ctx.lineWidth = 1 * s;
+    ctx.moveTo(canvas.width * 0.15, canvas.height - 140 * s);
+    ctx.lineTo(canvas.width * 0.85, canvas.height - 140 * s);
+    ctx.stroke();
+
+    const agentSectionY = canvas.height - 95 * s;
+
+    if (agentHeadshot) {
+      const headshot = await loadImageSafe(agentHeadshot);
+      if (headshot && headshot.naturalWidth > 0) {
+        const circleRadius = 32 * s;
+        let contentWidth = circleRadius * 2;
+        let nameWidth = 0;
+
+        if (agentName) {
+          ctx.font = `600 ${20 * s}px Inter, Arial, sans-serif`;
+          nameWidth = ctx.measureText(agentName + ", REALTOR\u00AE").width;
+          let phoneWidth = 0;
+          if (agentPhone) {
+            ctx.font = `${16 * s}px Inter, Arial, sans-serif`;
+            phoneWidth = ctx.measureText(agentPhone).width;
+          }
+          contentWidth += 14 * s + Math.max(nameWidth, phoneWidth);
+        }
+
+        const startX = (canvas.width - contentWidth) / 2;
+        const circleX = startX + circleRadius;
+        const circleY = agentSectionY;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(circleX, circleY, circleRadius, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(headshot, circleX - circleRadius, circleY - circleRadius, circleRadius * 2, circleRadius * 2);
+        ctx.restore();
+
+        ctx.strokeStyle = "rgba(255,255,255,0.6)";
+        ctx.lineWidth = 2 * s;
+        ctx.beginPath();
+        ctx.arc(circleX, circleY, circleRadius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        if (agentName) {
+          const textX = circleX + circleRadius + 14 * s;
+          ctx.textAlign = "left";
+          ctx.font = `600 ${20 * s}px Inter, Arial, sans-serif`;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillText(`${agentName}, REALTOR\u00AE`, textX, agentSectionY - 6 * s);
+
+          if (agentPhone) {
+            ctx.font = `${16 * s}px Inter, Arial, sans-serif`;
+            ctx.fillStyle = "rgba(255,255,255,0.75)";
+            ctx.fillText(agentPhone, textX, agentSectionY + 18 * s);
+          }
+        }
+      }
+    } else if (agentName) {
+      ctx.textAlign = "center";
+      ctx.font = `600 ${20 * s}px Inter, Arial, sans-serif`;
+      ctx.fillStyle = "#ffffff";
+      const nameText = agentPhone ? `${agentName}, REALTOR\u00AE  |  ${agentPhone}` : agentName;
+      ctx.fillText(nameText, canvas.width / 2, agentSectionY + 5 * s);
+    }
+
+    return canvas.toDataURL("image/png");
+  }, [currentImage, status, displayAddress, agentName, agentPhone, agentHeadshot, marketingProfile]);
+
+  useEffect(() => {
+    if (!open || !currentImage) {
+      setPreviewDataUrl(null);
+      return;
+    }
+
+    let cancelled = false;
+    setIsRenderingPreview(true);
+
+    const timeout = setTimeout(() => {
+      renderCanvas(540).then((url) => {
+        if (!cancelled) {
+          setPreviewDataUrl(url);
+          setIsRenderingPreview(false);
+        }
+      }).catch(() => {
+        if (!cancelled) setIsRenderingPreview(false);
+      });
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [open, currentImage, status, displayAddress, agentName, agentPhone, agentHeadshot, marketingProfile, renderCanvas]);
+
   const generateGraphic = useCallback(async () => {
     if (!currentImage) {
       toast({ title: "No Image", description: "Select a property photo first.", variant: "destructive" });
@@ -219,157 +430,26 @@ export function GraphicGeneratorDialog({
     setIsGenerating(true);
 
     try {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d")!;
-      canvas.width = 1080;
-      canvas.height = 1080;
-
-      const propertyImg = await loadImage(getProxiedUrl(currentImage));
-
-      const imgAspect = propertyImg.width / propertyImg.height;
-      const canvasAspect = canvas.width / canvas.height;
-      let drawWidth, drawHeight, drawX, drawY;
-      if (imgAspect > canvasAspect) {
-        drawHeight = canvas.height;
-        drawWidth = canvas.height * imgAspect;
-        drawX = (canvas.width - drawWidth) / 2;
-        drawY = 0;
-      } else {
-        drawWidth = canvas.width;
-        drawHeight = canvas.width / imgAspect;
-        drawX = 0;
-        drawY = (canvas.height - drawHeight) / 2;
+      const dataUrl = await renderCanvas(1080);
+      if (dataUrl) {
+        setGeneratedImage(dataUrl);
+        toast({ title: "Graphic Generated", description: "Ready to download." });
       }
-      ctx.drawImage(propertyImg, drawX, drawY, drawWidth, drawHeight);
-
-      const topGrad = ctx.createLinearGradient(0, 0, 0, 200);
-      topGrad.addColorStop(0, "rgba(0,0,0,0.55)");
-      topGrad.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = topGrad;
-      ctx.fillRect(0, 0, canvas.width, 200);
-
-      const bottomGrad = ctx.createLinearGradient(0, canvas.height - 300, 0, canvas.height);
-      bottomGrad.addColorStop(0, "rgba(0,0,0,0)");
-      bottomGrad.addColorStop(0.4, "rgba(0,0,0,0.5)");
-      bottomGrad.addColorStop(1, "rgba(0,0,0,0.75)");
-      ctx.fillStyle = bottomGrad;
-      ctx.fillRect(0, canvas.height - 300, canvas.width, 300);
-
-      const useDefaultCompany = marketingProfile?.companyLogoUseDefault !== false;
-      const useDefaultSecondary = marketingProfile?.secondaryLogoUseDefault !== false;
-      const companyLogoSrc = useDefaultCompany
-        ? '/logos/SpyglassRealty_Logo_White.png'
-        : (marketingProfile?.companyLogo || '/logos/SpyglassRealty_Logo_White.png');
-      const secondaryLogoSrc = useDefaultSecondary
-        ? '/logos/LeadingRE_White.png'
-        : (marketingProfile?.secondaryLogo || '/logos/LeadingRE_White.png');
-
-      const companyLogo = await loadImageSafe(companyLogoSrc);
-      if (companyLogo && companyLogo.naturalWidth > 0) {
-        const logoHeight = 50;
-        const logoWidth = (companyLogo.naturalWidth / companyLogo.naturalHeight) * logoHeight;
-        ctx.drawImage(companyLogo, 30, 25, logoWidth, logoHeight);
-      }
-
-      const secondaryLogo = await loadImageSafe(secondaryLogoSrc);
-      if (secondaryLogo && secondaryLogo.naturalWidth > 0) {
-        const logoHeight = 50;
-        const logoWidth = (secondaryLogo.naturalWidth / secondaryLogo.naturalHeight) * logoHeight;
-        ctx.drawImage(secondaryLogo, canvas.width - logoWidth - 30, 25, logoWidth, logoHeight);
-      }
-
-      const statusLabel = getStatusLabel(status);
-      ctx.font = "bold 28px Inter, Arial, sans-serif";
-      const badgeTextWidth = ctx.measureText(statusLabel).width;
-      const badgePadding = 20;
-      const badgeHeight = 48;
-      const badgeX = (canvas.width - badgeTextWidth - badgePadding * 2) / 2;
-      const badgeY = canvas.height - 260;
-
-      ctx.fillStyle = getStatusBadgeColor(status);
-      ctx.beginPath();
-      ctx.roundRect(badgeX, badgeY, badgeTextWidth + badgePadding * 2, badgeHeight, 6);
-      ctx.fill();
-
-      ctx.fillStyle = "#ffffff";
-      ctx.textAlign = "center";
-      ctx.fillText(statusLabel, canvas.width / 2, badgeY + 34);
-
-      const parts = displayAddress.split(',').map(p => p.trim());
-      const street = parts[0] || '';
-      const cityStateZip = parts.slice(1).join(', ');
-
-      ctx.font = "bold 36px Inter, Arial, sans-serif";
-      ctx.fillStyle = "#ffffff";
-      ctx.textAlign = "center";
-      ctx.fillText(street, canvas.width / 2, canvas.height - 170);
-
-      if (cityStateZip) {
-        ctx.font = "24px Inter, Arial, sans-serif";
-        ctx.fillStyle = "#dddddd";
-        ctx.fillText(cityStateZip, canvas.width / 2, canvas.height - 135);
-      }
-
-      const agentY = canvas.height - 60;
-
-      if (agentHeadshot) {
-        const headshot = await loadImageSafe(agentHeadshot);
-        if (headshot && headshot.naturalWidth > 0) {
-          const circleRadius = 35;
-          const circleX = agentName ? canvas.width / 2 - 120 : canvas.width / 2;
-          const circleY = agentY;
-
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(circleX, circleY, circleRadius, 0, Math.PI * 2);
-          ctx.closePath();
-          ctx.clip();
-          const headshotSize = circleRadius * 2;
-          ctx.drawImage(headshot, circleX - circleRadius, circleY - circleRadius, headshotSize, headshotSize);
-          ctx.restore();
-
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(circleX, circleY, circleRadius, 0, Math.PI * 2);
-          ctx.stroke();
-
-          if (agentName) {
-            ctx.textAlign = "left";
-            ctx.font = "bold 22px Inter, Arial, sans-serif";
-            ctx.fillStyle = "#ffffff";
-            const nameText = agentPhone ? `${agentName}, REALTOR\u00AE` : agentName;
-            ctx.fillText(nameText, circleX + circleRadius + 15, agentY - 5);
-
-            if (agentPhone) {
-              ctx.font = "18px Inter, Arial, sans-serif";
-              ctx.fillStyle = "#dddddd";
-              ctx.fillText(agentPhone, circleX + circleRadius + 15, agentY + 20);
-            }
-          }
-        }
-      } else if (agentName) {
-        ctx.textAlign = "center";
-        ctx.font = "bold 22px Inter, Arial, sans-serif";
-        ctx.fillStyle = "#ffffff";
-        const nameText = agentPhone ? `${agentName}, REALTOR\u00AE | ${agentPhone}` : agentName;
-        ctx.fillText(nameText, canvas.width / 2, agentY + 5);
-      }
-
-      setGeneratedImage(canvas.toDataURL("image/png"));
-      toast({ title: "Graphic Generated", description: "Ready to download." });
     } catch (error) {
       console.error("Error generating graphic:", error);
       toast({ title: "Generation Failed", description: "Failed to load images. Try a different photo.", variant: "destructive" });
     } finally {
       setIsGenerating(false);
     }
-  }, [currentImage, status, displayAddress, agentName, agentPhone, agentHeadshot, marketingProfile, toast]);
+  }, [currentImage, renderCanvas, toast]);
 
   const handleDownload = async () => {
-    if (!generatedImage) return;
-    const fileName = `${transaction.propertyAddress.replace(/[^a-z0-9]/gi, "_")}_graphic.png`;
+    if (!generatedImage) {
+      await generateGraphic();
+      return;
+    }
 
+    const fileName = `${transaction.propertyAddress.replace(/[^a-z0-9]/gi, "_")}_graphic.png`;
     await saveAssetMutation.mutateAsync({ imageData: generatedImage, fileName });
 
     const link = document.createElement("a");
@@ -380,24 +460,24 @@ export function GraphicGeneratorDialog({
     document.body.removeChild(link);
   };
 
+  const previewImage = generatedImage || previewDataUrl;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-5xl max-h-[90vh] overflow-hidden flex flex-col p-4 sm:p-6">
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="text-base sm:text-lg">Graphic Generator</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg" data-testid="text-graphic-title">Graphic Generator</DialogTitle>
           <DialogDescription className="text-xs sm:text-sm">
             Create professional social media graphics for {transaction.propertyAddress}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr] gap-6 flex-1 overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1.2fr] gap-6 flex-1 overflow-hidden">
           <div className="space-y-4 overflow-y-auto pr-2" data-testid="graphic-form-column">
             <div className="space-y-2">
-              <div className="flex items-center justify-between flex-wrap gap-1">
-                <Label>Select Photo</Label>
-              </div>
-              <div className="grid grid-cols-5 gap-1.5 max-h-28 overflow-y-auto p-1 bg-muted/30 rounded-md">
-                {allImages.slice(0, 20).map((photo, index) => {
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Select Photo</Label>
+              <div className="grid grid-cols-5 gap-1.5 max-h-32 overflow-y-auto p-1.5 bg-muted/30 rounded-md">
+                {allImages.slice(0, 30).map((photo, index) => {
                   const isSelected = selectedPhotoIndex === index;
                   return (
                     <button
@@ -416,7 +496,7 @@ export function GraphicGeneratorDialog({
                         onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                       />
                       {isSelected && (
-                        <div className="absolute top-0.5 left-0.5 bg-primary text-primary-foreground rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">
+                        <div className="absolute top-0.5 left-0.5 bg-primary text-primary-foreground rounded-full w-4 h-4 flex items-center justify-center">
                           <Check className="h-2.5 w-2.5" />
                         </div>
                       )}
@@ -424,18 +504,17 @@ export function GraphicGeneratorDialog({
                   );
                 })}
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-1">
                 <p className="text-xs text-muted-foreground">
-                  {allImages.length} photos
+                  {allImages.length} photo{allImages.length !== 1 ? 's' : ''}
                 </p>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
-                  className="h-6 text-xs gap-1"
                   data-testid="button-graphic-upload"
                 >
-                  <Upload className="h-3 w-3" />
+                  <Upload className="h-3 w-3 mr-1" />
                   Upload
                 </Button>
               </div>
@@ -450,187 +529,128 @@ export function GraphicGeneratorDialog({
             </div>
 
             <div className="space-y-2">
-              <Label>Status</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</Label>
               <Select value={status} onValueChange={(v) => { setStatus(v as StatusType); setGeneratedImage(null); }}>
                 <SelectTrigger data-testid="select-graphic-status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {STATUS_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0"
+                          style={{ backgroundColor: getStatusBadgeColor(opt.value) }}
+                        />
+                        {opt.label}
+                      </span>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Address (editable)</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Address</Label>
               <Input
                 placeholder={transaction.propertyAddress}
                 value={addressOverride}
                 onChange={(e) => { setAddressOverride(e.target.value); setGeneratedImage(null); }}
                 data-testid="input-graphic-address"
               />
-              <p className="text-xs text-muted-foreground">
-                Leave blank to use: {transaction.propertyAddress}
+              <p className="text-[11px] text-muted-foreground">
+                Leave blank to use default: {transaction.propertyAddress}
               </p>
             </div>
 
-            <div className="p-3 bg-muted/30 rounded-md space-y-2">
-              <Label className="text-xs text-muted-foreground">Auto-populated from Settings</Label>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <span className="text-muted-foreground">Agent: </span>
-                  <span className="font-medium">{agentName || "Not set"}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Phone: </span>
-                  <span className="font-medium">{agentPhone || "Not set"}</span>
+            <div className="p-3 bg-muted/30 rounded-md space-y-2.5">
+              <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Auto-populated from Settings</Label>
+              <div className="flex items-center gap-3">
+                {agentHeadshot && (
+                  <img src={getProxiedUrl(agentHeadshot)} alt="Agent" className="w-10 h-10 rounded-full object-cover flex-shrink-0 border-2 border-muted" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{agentName || "Agent name not set"}</p>
+                  <p className="text-xs text-muted-foreground">{agentPhone || "Phone not set"}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-muted-foreground">Logos: </span>
-                <span className="font-medium">Spyglass Realty + Partner</span>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1 border-t border-border/50">
+                <span>Logos: Spyglass Realty + Partner</span>
               </div>
-              {agentHeadshot && (
-                <div className="flex items-center gap-2">
-                  <img src={getProxiedUrl(agentHeadshot)} alt="Agent" className="w-8 h-8 rounded-full object-cover" />
-                  <span className="text-xs text-muted-foreground">Agent headshot</span>
-                </div>
-              )}
             </div>
           </div>
 
           <div className="flex flex-col space-y-3 overflow-hidden" data-testid="graphic-preview-column">
-            <Label>Preview (1080 x 1080px)</Label>
+            <div className="flex items-center justify-between flex-wrap gap-1">
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Live Preview
+                <span className="text-muted-foreground/60 font-normal normal-case ml-1">(1080 x 1080px)</span>
+              </Label>
+              {isRenderingPreview && (
+                <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" />
+              )}
+            </div>
             <div
-              className="relative bg-muted rounded-lg overflow-hidden flex items-center justify-center flex-1 min-h-0 cursor-pointer group aspect-square max-h-[55vh]"
-              onClick={() => (generatedImage || currentImage) && setShowEnlargedPreview(true)}
+              className="relative bg-black rounded-lg overflow-hidden flex items-center justify-center flex-1 min-h-0 cursor-pointer group aspect-square max-h-[55vh]"
+              onClick={() => previewImage && setShowEnlargedPreview(true)}
               data-testid="graphic-preview-container"
             >
-              {generatedImage ? (
+              {previewImage ? (
                 <>
                   <img
-                    src={generatedImage}
-                    alt="Generated graphic"
+                    src={previewImage}
+                    alt="Graphic preview"
                     className="w-full h-full object-contain"
-                    data-testid="img-graphic-generated"
+                    data-testid="img-graphic-preview"
                   />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                    <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
-                </>
-              ) : currentImage ? (
-                <>
-                  <div className="relative w-full h-full">
-                    <img
-                      src={getProxiedUrl(currentImage)}
-                      alt="Selected photo"
-                      className="w-full h-full object-cover"
-                      data-testid="img-graphic-selected"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/40" />
-                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-                      <p className="text-white/80 text-[10px] font-medium tracking-wide">SPYGLASS REALTY</p>
-                      <p className="text-white/80 text-[10px] font-medium tracking-wide">PARTNER</p>
-                    </div>
-                    <div className="absolute bottom-4 left-0 right-0 text-center px-4">
-                      <span
-                        className="inline-block px-3 py-1 rounded text-xs font-semibold uppercase text-white"
-                        style={{ backgroundColor: getStatusBadgeColor(status) }}
-                      >
-                        {getStatusLabel(status)}
-                      </span>
-                      <p className="text-white text-sm font-medium mt-2 truncate">
-                        {displayAddress.split(',')[0]}
-                      </p>
-                      {agentName && (
-                        <p className="text-white/70 text-xs mt-1">{agentName}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center pointer-events-none">
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center pointer-events-none">
                     <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 </>
               ) : (
-                <div className="flex flex-col items-center gap-2 text-muted-foreground p-8">
-                  <ImageIcon className="h-12 w-12 opacity-30" />
-                  <span className="text-sm">No photo selected</span>
+                <div className="flex flex-col items-center gap-2 text-muted-foreground p-6">
+                  <div className="w-16 h-16 rounded-lg bg-muted/20 flex items-center justify-center">
+                    <Upload className="h-6 w-6" />
+                  </div>
+                  <p className="text-sm">Select a photo to see preview</p>
                 </div>
               )}
             </div>
-
-            <p className="text-xs text-muted-foreground text-center">
-              {generatedImage ? "Click to enlarge" : "Select a photo and click Generate"}
-            </p>
-
-            <div className="flex gap-2 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                className="flex-1"
-                data-testid="button-graphic-cancel"
-              >
-                Cancel
-              </Button>
-              {generatedImage ? (
-                <Button
-                  onClick={handleDownload}
-                  disabled={saveAssetMutation.isPending}
-                  className="flex-1"
-                  data-testid="button-graphic-download"
-                >
-                  {saveAssetMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Download className="h-4 w-4 mr-2" />
-                  )}
-                  Save & Download
-                </Button>
-              ) : (
-                <Button
-                  onClick={generateGraphic}
-                  disabled={isGenerating || !currentImage}
-                  className="flex-1"
-                  data-testid="button-graphic-generate"
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <ImageIcon className="h-4 w-4 mr-2" />
-                      Generate Graphic
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
+            <p className="text-[11px] text-muted-foreground text-center">Click preview to enlarge</p>
           </div>
         </div>
 
-        {showEnlargedPreview && (generatedImage || currentImage) && (
-          <div
-            className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-            onClick={() => setShowEnlargedPreview(false)}
+        <canvas ref={previewCanvasRef} className="hidden" />
+
+        <div className="flex items-center justify-end gap-3 pt-3 border-t flex-shrink-0">
+          <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-graphic-cancel">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDownload}
+            disabled={!currentImage || isGenerating || saveAssetMutation.isPending}
+            data-testid="button-graphic-download"
           >
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-4 right-4 text-white hover:bg-white/20"
-              onClick={() => setShowEnlargedPreview(false)}
-              data-testid="button-graphic-close-enlarged"
-            >
-              <X className="h-6 w-6" />
-            </Button>
+            {(isGenerating || saveAssetMutation.isPending) ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Download className="h-4 w-4 mr-2" />
+            )}
+            Save & Download
+          </Button>
+        </div>
+
+        {showEnlargedPreview && previewImage && (
+          <div
+            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-pointer"
+            onClick={() => setShowEnlargedPreview(false)}
+            data-testid="graphic-enlarged-overlay"
+          >
             <img
-              src={generatedImage || getProxiedUrl(currentImage!)}
+              src={previewImage}
               alt="Enlarged preview"
-              className="max-w-full max-h-full object-contain rounded-lg"
-              onClick={(e) => e.stopPropagation()}
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              data-testid="img-graphic-enlarged"
             />
           </div>
         )}
