@@ -4722,7 +4722,7 @@ Return ONLY the tagline, no quotes, no explanation, 50-70 characters max.`;
 
       const prompt = `Generate a compelling, professional real estate flyer headline for this property. 
 The headline should be attention-grabbing, highlight key features, and be suitable for marketing materials.
-Keep it under 60 characters. Do not use quotes around the headline.
+Keep it under 40 characters. Do not use quotes around the headline.
 
 Property Details:
 - Location: ${propertyData.city || 'Unknown'}, ${propertyData.state || 'TX'}
