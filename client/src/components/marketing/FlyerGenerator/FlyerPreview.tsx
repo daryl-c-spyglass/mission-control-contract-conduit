@@ -101,7 +101,8 @@ export function FlyerPreview({
       </div>
 
       <div
-        className="absolute left-[70px] top-[114px] text-[11pt] text-gray-700 tracking-[2px] uppercase font-medium"
+        className="absolute left-[70px] top-[114px] text-[11pt] tracking-[2px] uppercase font-medium"
+        style={{ color: '#4a4a4a' }}
       >
         {data.address || 'PROPERTY ADDRESS'}
         {(data.city || data.state || data.zip) && ', '}
