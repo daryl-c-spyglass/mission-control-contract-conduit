@@ -242,8 +242,11 @@ export function GraphicGeneratorDialog({
       }
       ctx.drawImage(propertyImg, drawX, drawY, drawWidth, drawHeight);
 
-      ctx.fillStyle = "rgba(255,255,255,0.92)";
-      ctx.fillRect(0, 0, canvas.width, 90);
+      const topGrad = ctx.createLinearGradient(0, 0, 0, 200);
+      topGrad.addColorStop(0, "rgba(0,0,0,0.55)");
+      topGrad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = topGrad;
+      ctx.fillRect(0, 0, canvas.width, 200);
 
       const bottomGrad = ctx.createLinearGradient(0, canvas.height - 300, 0, canvas.height);
       bottomGrad.addColorStop(0, "rgba(0,0,0,0)");
@@ -255,27 +258,24 @@ export function GraphicGeneratorDialog({
       const useDefaultCompany = marketingProfile?.companyLogoUseDefault !== false;
       const useDefaultSecondary = marketingProfile?.secondaryLogoUseDefault !== false;
       const companyLogoSrc = useDefaultCompany
-        ? '/logos/SpyglassRealty_Logo_Black.png'
-        : (marketingProfile?.companyLogo || '/logos/SpyglassRealty_Logo_Black.png');
+        ? '/logos/SpyglassRealty_Logo_White.png'
+        : (marketingProfile?.companyLogo || '/logos/SpyglassRealty_Logo_White.png');
       const secondaryLogoSrc = useDefaultSecondary
-        ? '/logos/LeadingRE_Black.png'
-        : (marketingProfile?.secondaryLogo || '/logos/LeadingRE_Black.png');
-
-      const bannerHeight = 90;
-      const logoPad = 25;
+        ? '/logos/LeadingRE_White.png'
+        : (marketingProfile?.secondaryLogo || '/logos/LeadingRE_White.png');
 
       const companyLogo = await loadImageSafe(companyLogoSrc);
       if (companyLogo && companyLogo.naturalWidth > 0) {
         const logoHeight = 50;
         const logoWidth = (companyLogo.naturalWidth / companyLogo.naturalHeight) * logoHeight;
-        ctx.drawImage(companyLogo, logoPad, (bannerHeight - logoHeight) / 2, logoWidth, logoHeight);
+        ctx.drawImage(companyLogo, 30, 25, logoWidth, logoHeight);
       }
 
       const secondaryLogo = await loadImageSafe(secondaryLogoSrc);
       if (secondaryLogo && secondaryLogo.naturalWidth > 0) {
         const logoHeight = 50;
         const logoWidth = (secondaryLogo.naturalWidth / secondaryLogo.naturalHeight) * logoHeight;
-        ctx.drawImage(secondaryLogo, canvas.width - logoWidth - logoPad, (bannerHeight - logoHeight) / 2, logoWidth, logoHeight);
+        ctx.drawImage(secondaryLogo, canvas.width - logoWidth - 30, 25, logoWidth, logoHeight);
       }
 
       const statusLabel = getStatusLabel(status);
@@ -529,10 +529,10 @@ export function GraphicGeneratorDialog({
                       className="w-full h-full object-cover"
                       data-testid="img-graphic-selected"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                    <div className="absolute top-0 left-0 right-0 h-[60px] bg-white/90 flex items-center justify-between px-3">
-                      <p className="text-[10px] font-semibold text-gray-800 tracking-wide">SPYGLASS REALTY</p>
-                      <p className="text-[10px] font-semibold text-gray-800 tracking-wide">PARTNER</p>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/40" />
+                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+                      <p className="text-white/80 text-[10px] font-medium tracking-wide">SPYGLASS REALTY</p>
+                      <p className="text-white/80 text-[10px] font-medium tracking-wide">PARTNER</p>
                     </div>
                     <div className="absolute bottom-4 left-0 right-0 text-center px-4">
                       <span
