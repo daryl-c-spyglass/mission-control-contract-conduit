@@ -193,7 +193,7 @@ export function FlyerPreview({
           style={{ paddingTop: '40px' }}
           data-layout-id="stats"
         >
-          <div className="flex items-center gap-2 text-[11pt] whitespace-nowrap text-gray-800" style={{ marginBottom: '50px' }}>
+          <div className="flex items-center gap-2 text-[11pt] whitespace-nowrap text-gray-800" style={{ marginBottom: '33px' }}>
             <svg className="w-[24px] h-[24px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/>
             </svg>
