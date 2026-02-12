@@ -308,12 +308,13 @@
         }
         
         /* Preview: fontSize 10.35pt → 10.35*3.125=32.3pt≈43px */
+        /* Reduced to 40px and 7 lines to prevent bottom overflow in PDF export */
         .description-text {
-            font-size: 43px;
-            line-height: 1.4;
+            font-size: 40px;
+            line-height: 1.35;
             color: #555;
             display: -webkit-box;
-            -webkit-line-clamp: 8;
+            -webkit-line-clamp: 7;
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
