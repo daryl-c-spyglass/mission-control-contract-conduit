@@ -227,7 +227,8 @@
             grid-template-columns: 562px 563px 562px 563px;
         }
         
-        /* Grid 13: Property Stats — 40px*3.125=125px top, 50px*3.125=156px spacing */
+        /* Grid 13: Property Stats — preview: paddingTop 52px, gap 33px between items */
+        /* 52*3.125=163, 33*3.125=103, 18*3.125=56 pl, 8*3.125=25 pr */
         .property-details {
             position: relative;
             padding-top: 163px;
@@ -235,16 +236,19 @@
             padding-right: 25px;
         }
         
+        /* Preview: 11pt text, 24px icons, gap 2 (8px) */
+        /* 11pt*3.125=34.4pt≈46px, 24*3.125=75px icons, gap 6px*3.125=19px */
         .detail-item {
             display: flex;
             align-items: center;
-            gap: 25px;
+            gap: 19px;
             font-size: 46px;
             white-space: nowrap;
         }
         
+        /* Preview: marginBottom 33px → 33*3.125=103px */
         .detail-item-spaced {
-            margin-bottom: 156px;
+            margin-bottom: 103px;
         }
         
         .detail-icon {
@@ -258,32 +262,36 @@
             height: 100%;
         }
         
-        /* Accent dividers — 52px*3.125=163px top, 160px*3.125=500px height */
+        /* Accent divider 1 — preview: top 40px, height 160px, right 7px */
+        /* 40*3.125=125, 160*3.125=500, 7*3.125=22 */
         .accent-divider {
             position: absolute;
             right: 22px;
-            top: 163px;
-            width: 13px;
+            top: 125px;
+            width: 6px;
             height: 500px;
             background-color: #8b7d6b;
         }
         
-        /* Grid 14: Description — 14px*3.125=44px padding-left, 10px*3.125=31px right */
+        /* Grid 14: Description — preview: paddingLeft 29px, paddingRight 10px, width 270px */
+        /* 29*3.125=91, 10*3.125=31, 270*3.125=844 */
         .description-section {
             position: relative;
-            padding-left: 44px;
+            padding-left: 91px;
             padding-right: 31px;
-            overflow: hidden;
+            width: 844px;
+            overflow: visible;
         }
         
-        /* Headline — 14px*3.125=44px marginTop */
+        /* Headline — preview: fontSize 11.5pt, marginTop 4px, marginBottom 8px */
+        /* 11.5pt*3.125=36pt≈48px, 4*3.125=13, 8*3.125=25 */
         .listing-headline {
             font-size: 48px;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 3px;
             line-height: 1.3;
-            margin-top: 44px;
+            margin-top: 13px;
             margin-bottom: 25px;
             color: #374151;
             overflow: hidden;
@@ -293,8 +301,9 @@
             -webkit-box-orient: vertical;
         }
         
+        /* Preview: fontSize 10.35pt → 10.35*3.125=32.3pt≈43px */
         .description-text {
-            font-size: 44px;
+            font-size: 43px;
             line-height: 1.4;
             color: #555;
             display: -webkit-box;
@@ -303,27 +312,29 @@
             overflow: hidden;
         }
         
+        /* Accent divider 2 — positioned at right edge of description column */
+        /* Inside .description-section (position:relative), so right:0 puts it at column edge */
         .accent-divider-2 {
             position: absolute;
-            right: 0;
+            right: -31px;
             top: 125px;
-            width: 13px;
+            width: 6px;
             height: 500px;
             background-color: #8b7d6b;
         }
         
-        /* Grid 15: Agent Photo only — 108px*3.125=338px circle, centered */
+        /* Grid 15: Agent Photo — preview: 113px circle, paddingTop 14px, right -79px */
+        /* 113*3.125=353, 14*3.125=44, -79*3.125=-247 */
         .agent-section {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
+            position: relative;
+            padding-top: 44px;
+            overflow: visible;
         }
         
         .agent-photo {
-            width: 338px;
-            height: 338px;
+            position: absolute;
+            width: 353px;
+            height: 353px;
             border-radius: 50%;
             overflow: hidden;
             background: #e5e7eb;
@@ -331,6 +342,7 @@
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
+            right: -247px;
         }
         
         .agent-photo img {
@@ -339,12 +351,13 @@
             object-fit: cover;
         }
         
-        /* Grid 16: QR + Agent info — 14px*3.125=44px top, 76px*3.125=238px QR */
+        /* Grid 16: QR + Agent info — preview: paddingTop 28px, QR 76px, marginLeft 82px */
+        /* 28*3.125=88, 76*3.125=238, 82*3.125=256 */
         .qr-section {
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding-top: 44px;
+            padding-top: 88px;
             overflow: hidden;
         }
         
@@ -357,6 +370,7 @@
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
+            margin-left: 256px;
         }
         
         .qr-code img {
@@ -365,23 +379,28 @@
             object-fit: contain;
         }
         
-        /* Agent name — 46px*3.125=144px marginTop, 11pt*3.125=34pt≈45px */
+        /* Agent info — preview: marginTop 31px, gap 2.5px, marginLeft -10px */
+        /* 31*3.125=97, 2.5*3.125=8, -10*3.125=-31 */
+        /* fontSize: 13.9pt → 13.9*3.125=43.4pt≈58px */
         .agent-name {
-            font-size: 36px;
+            font-size: 58px;
             font-weight: bold;
             text-align: center;
             max-width: 100%;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            margin-top: 144px;
+            margin-top: 97px;
+            margin-left: -31px;
         }
         
+        /* Preview: fontSize 10.1pt → 10.1*3.125=31.6pt≈42px */
         .agent-info {
-            font-size: 25px;
+            font-size: 42px;
             text-align: center;
             line-height: 1.4;
             color: #555;
+            margin-left: -31px;
         }
         
         .photo-placeholder {
