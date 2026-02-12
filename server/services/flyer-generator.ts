@@ -5,6 +5,7 @@ import path from 'path';
 import Handlebars from 'handlebars';
 import { execSync } from 'child_process';
 import crypto from 'crypto';
+import { PDFDocument } from 'pdf-lib';
 import { ObjectStorageService, ObjectNotFoundError } from '../replit_integrations/object_storage';
 import { createModuleLogger } from '../lib/logger';
 
@@ -524,20 +525,28 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     let result: Buffer;
     
     if (outputType === 'pdf') {
-      // Keep screen media type — do NOT switch to print, as it changes font rendering
-      // and causes text to overflow/resize differently than the preview.
-      // Content is already sized at 2550x3300px to match the viewport exactly.
-      const pdf = await page.pdf({
-        printBackground: true,
-        width: `${RENDER_CONFIG.width}px`,
-        height: `${RENDER_CONFIG.height}px`,
-        pageRanges: '1',
-        preferCSSPageSize: false,
-        margin: { top: 0, right: 0, bottom: 0, left: 0 },
-        scale: 1
+      // Take a pixel-identical screenshot first, then wrap in PDF.
+      // This avoids Puppeteer's page.pdf() which internally switches to print mode
+      // and changes font metrics, causing text overflow mismatches with the preview.
+      const screenshotBuffer = await page.screenshot({
+        type: 'png',
+        fullPage: false,
+        clip: { x: 0, y: 0, width: RENDER_CONFIG.width, height: RENDER_CONFIG.height }
       });
-      result = Buffer.from(pdf);
-      log.info({ size: result.length }, 'PDF generated (2550x3300px)');
+      
+      // Create PDF with 8.5x11 inch page (612x792 points) and embed the screenshot
+      const pdfDoc = await PDFDocument.create();
+      const pdfPage = pdfDoc.addPage([612, 792]); // 8.5 x 11 inches in points
+      const pngImage = await pdfDoc.embedPng(screenshotBuffer);
+      pdfPage.drawImage(pngImage, {
+        x: 0,
+        y: 0,
+        width: 612,
+        height: 792,
+      });
+      const pdfBytes = await pdfDoc.save();
+      result = Buffer.from(pdfBytes);
+      log.info({ size: result.length }, 'PDF generated (screenshot-based, 8.5x11in)');
     } else {
       // Generate PNG with exact clip (same dimensions as PDF)
       const screenshot = await page.screenshot({

@@ -155,7 +155,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   const [hasUsedAISummarize, setHasUsedAISummarize] = useState(false);
 
   // QR Code URL state
-  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('https://www.austinhomesaleguide.com/2213-poquito-st-109-209');
   const [isGeneratingShareableLink, setIsGeneratingShareableLink] = useState(false);
   
 
@@ -479,7 +479,7 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
     
     const user = agentProfile?.user;
     
-    // Build agent name - try user settings first, then transaction data
+    // Build agent name - try user settings first, then transaction data, then fallback
     let agentName = '';
     if (user?.marketingDisplayName) {
       agentName = user.marketingDisplayName;
@@ -488,12 +488,13 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
     } else if (transaction?.agentName) {
       agentName = transaction.agentName;
     }
+    if (!agentName) agentName = 'Caleb Nelson';
 
     // Agent title - user settings, marketing profile, or default
     const agentTitle = user?.marketingTitle || marketingProfile?.agentTitle || 'REALTOR®';
     
-    // Phone - user settings or transaction
-    const phone = user?.marketingPhone || transaction?.agentPhone || '';
+    // Phone - user settings or transaction, then fallback
+    const phone = user?.marketingPhone || transaction?.agentPhone || '7195888768';
 
     // Set values - always update when we have any data source
     form.setValue('agentName', agentName);
