@@ -24,6 +24,7 @@
             margin: 0 auto;
             position: relative;
             background: white;
+            overflow: hidden;
         }
         
         /* Print-specific - page fills the print area, Puppeteer's page.pdf() handles scaling */
@@ -66,6 +67,7 @@
             height: 156px;
             display: flex;
             align-items: center;
+            overflow: visible;
         }
         
         /* Logo Container - no margin needed now */
@@ -73,6 +75,8 @@
             display: flex;
             align-items: center;
             height: 100%;
+            max-width: 100%;
+            overflow: hidden;
         }
         
         /* Primary Logo Section */
@@ -105,6 +109,9 @@
             align-items: center;
             justify-content: flex-start;
             height: 100%;
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
         }
         
         /* max-h-[50px] -> 50*3.125 = 156px */
@@ -117,11 +124,11 @@
         /* Positioned relative to canvas top, not header */
         .price-badge {
             position: absolute;
-            right: 0;
-            top: -50px;
+            right: 78px;
+            top: -13px;
             width: 450px;
             height: 181px;
-            background-color: #6b7b6e;
+            background-color: #867d71;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -148,11 +155,15 @@
             position: absolute;
             left: 219px;
             top: 356px;
+            right: 75px;
             font-size: 46px;
             color: #374151;
             letter-spacing: 6px;
             text-transform: uppercase;
             font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         
         /* Main Image - Exact coordinates from reference project (scaled 3.125x) */
@@ -219,7 +230,7 @@
         /* Grid 13: Property Stats — 40px*3.125=125px top, 50px*3.125=156px spacing */
         .property-details {
             position: relative;
-            padding-top: 125px;
+            padding-top: 163px;
             padding-left: 56px;
             padding-right: 25px;
         }
@@ -247,11 +258,11 @@
             height: 100%;
         }
         
-        /* Accent dividers — 40px*3.125=125px top, 160px*3.125=500px height */
+        /* Accent dividers — 52px*3.125=163px top, 160px*3.125=500px height */
         .accent-divider {
             position: absolute;
-            right: 0;
-            top: 125px;
+            right: 22px;
+            top: 163px;
             width: 13px;
             height: 500px;
             background-color: #8b7d6b;
