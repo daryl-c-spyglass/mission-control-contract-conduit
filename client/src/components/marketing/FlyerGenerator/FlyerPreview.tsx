@@ -233,7 +233,7 @@ export function FlyerPreview({
               fontWeight: 600,
               letterSpacing: '1px',
               lineHeight: 1.3,
-              marginTop: '14px',
+              marginTop: '4px',
               marginBottom: '8px',
             }}
             data-layout-id="headline"
