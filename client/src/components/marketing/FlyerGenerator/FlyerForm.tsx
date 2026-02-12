@@ -19,7 +19,7 @@ import type { FlyerData, FlyerImages, ImageTransforms, ImageTransform } from '@/
 import type { PhotoSelectionInfo } from '@/lib/flyer-utils';
 import QRCode from 'qrcode';
 
-const MAX_DESCRIPTION_LENGTH = 150;
+const MAX_DESCRIPTION_LENGTH = 300;
 
 interface FlyerFormProps {
   form: UseFormReturn<FlyerData>;
