@@ -66,71 +66,74 @@ function formatNumber(value: string | number | null | undefined): string {
 }
 
 function TemplateThumbnail({ templateId }: { templateId: TemplateId }) {
-  const size = 56;
+  const w = 48;
+  const h = 60;
   switch (templateId) {
     case "navy_header":
       return (
-        <svg width={size} height={size} viewBox="0 0 56 56" className="rounded-sm">
-          <rect width="56" height="56" fill="#f3f3f3" />
-          <rect width="56" height="12" fill="#0f1b3d" />
-          <rect x="3" y="3" width="20" height="3" rx="1" fill="#fff" opacity="0.9" />
-          <rect x="3" y="7" width="14" height="2" rx="0.5" fill="#fff" opacity="0.5" />
-          <rect x="3" y="14" width="50" height="28" fill="#ccc" rx="1" />
-          <rect x="3" y="14" width="50" height="28" fill="#a0aec0" rx="1" opacity="0.5" />
-          <rect x="6" y="46" width="10" height="3" rx="0.5" fill="#333" />
-          <rect x="22" y="46" width="10" height="3" rx="0.5" fill="#333" />
-          <rect x="38" y="46" width="10" height="3" rx="0.5" fill="#333" />
-          <line x1="19" y1="45" x2="19" y2="52" stroke="#e84393" strokeWidth="1" />
-          <line x1="35" y1="45" x2="35" y2="52" stroke="#e84393" strokeWidth="1" />
+        <svg width={w} height={h} viewBox="0 0 48 60" className="rounded-sm">
+          <rect width="48" height="60" fill="#f3f3f3" />
+          <rect width="48" height="10" fill="#0f1b3d" />
+          <rect x="3" y="2.5" width="18" height="2.5" rx="0.5" fill="#fff" opacity="0.9" />
+          <rect x="3" y="6" width="12" height="1.5" rx="0.5" fill="#fff" opacity="0.5" />
+          <rect x="0" y="11" width="48" height="36" fill="#a0aec0" />
+          <rect x="0" y="48" width="48" height="12" fill="#fff" />
+          <rect x="4" y="51" width="8" height="2.5" rx="0.5" fill="#333" />
+          <rect x="16" y="51" width="8" height="2.5" rx="0.5" fill="#333" />
+          <rect x="28" y="51" width="8" height="2.5" rx="0.5" fill="#333" />
+          <rect x="40" y="51" width="5" height="2.5" rx="0.5" fill="#333" />
+          <line x1="13" y1="49" x2="13" y2="57" stroke="#e84393" strokeWidth="0.7" />
+          <line x1="25" y1="49" x2="25" y2="57" stroke="#e84393" strokeWidth="0.7" />
+          <line x1="37" y1="49" x2="37" y2="57" stroke="#e84393" strokeWidth="0.7" />
         </svg>
       );
     case "two_photo_white":
       return (
-        <svg width={size} height={size} viewBox="0 0 56 56" className="rounded-sm">
-          <rect width="56" height="56" fill="#fff" />
-          <rect x="3" y="3" width="22" height="5" rx="1" fill="#111" />
-          <rect x="3" y="9" width="16" height="2" rx="0.5" fill="#888" />
-          <rect x="3" y="12" width="12" height="3" rx="0.5" fill="#333" />
-          <rect x="3" y="18" width="24" height="24" fill="#a0aec0" rx="1" />
-          <rect x="29" y="18" width="24" height="24" fill="#90cdf4" rx="1" />
-          <rect x="6" y="46" width="10" height="3" rx="0.5" fill="#333" />
-          <rect x="22" y="46" width="10" height="3" rx="0.5" fill="#333" />
-          <rect x="38" y="46" width="10" height="3" rx="0.5" fill="#333" />
+        <svg width={w} height={h} viewBox="0 0 48 60" className="rounded-sm">
+          <rect width="48" height="60" fill="#fff" />
+          <rect x="3" y="3" width="20" height="4" rx="0.5" fill="#111" />
+          <rect x="3" y="8" width="14" height="1.5" rx="0.5" fill="#888" />
+          <rect x="3" y="11" width="10" height="2.5" rx="0.5" fill="#333" />
+          <rect x="0" y="16" width="23" height="32" fill="#a0aec0" rx="1" />
+          <rect x="25" y="16" width="23" height="32" fill="#90cdf4" rx="1" />
+          <rect x="4" y="51" width="10" height="2.5" rx="0.5" fill="#333" />
+          <rect x="18" y="51" width="10" height="2.5" rx="0.5" fill="#333" />
+          <rect x="32" y="51" width="10" height="2.5" rx="0.5" fill="#333" />
         </svg>
       );
     case "single_minimal":
       return (
-        <svg width={size} height={size} viewBox="0 0 56 56" className="rounded-sm">
-          <rect width="56" height="56" fill="#f8f8f8" />
-          <rect x="3" y="4" width="8" height="6" rx="1" fill="#ddd" stroke="#ccc" strokeWidth="0.5" />
-          <rect x="14" y="4" width="18" height="4" rx="1" fill="#111" />
-          <rect x="14" y="9" width="12" height="2" rx="0.5" fill="#888" />
-          <rect x="5" y="14" width="46" height="28" fill="#a0aec0" rx="1" />
-          <rect x="0" y="44" width="56" height="12" fill="#fff" />
-          <rect x="4" y="47" width="8" height="2" rx="0.5" fill="#333" />
-          <rect x="18" y="47" width="8" height="2" rx="0.5" fill="#333" />
-          <rect x="32" y="47" width="8" height="2" rx="0.5" fill="#333" />
-          <rect x="46" y="47" width="6" height="2" rx="0.5" fill="#333" />
-          <line x1="15" y1="45" x2="15" y2="53" stroke="#00bcd4" strokeWidth="1" />
-          <line x1="29" y1="45" x2="29" y2="53" stroke="#00bcd4" strokeWidth="1" />
-          <line x1="43" y1="45" x2="43" y2="53" stroke="#00bcd4" strokeWidth="1" />
+        <svg width={w} height={h} viewBox="0 0 48 60" className="rounded-sm">
+          <rect width="48" height="60" fill="#f8f8f8" />
+          <rect x="3" y="3" width="7" height="5" rx="0.5" fill="#ddd" stroke="#ccc" strokeWidth="0.4" />
+          <rect x="12" y="3" width="16" height="3" rx="0.5" fill="#111" />
+          <rect x="12" y="7" width="10" height="1.5" rx="0.5" fill="#888" />
+          <rect x="4" y="11" width="40" height="36" fill="#a0aec0" rx="1" />
+          <rect x="0" y="48" width="48" height="12" fill="#fff" />
+          <rect x="4" y="51" width="7" height="2" rx="0.5" fill="#333" />
+          <rect x="14" y="51" width="7" height="2" rx="0.5" fill="#333" />
+          <rect x="25" y="51" width="7" height="2" rx="0.5" fill="#333" />
+          <rect x="36" y="51" width="7" height="2" rx="0.5" fill="#333" />
+          <line x1="12" y1="49" x2="12" y2="57" stroke="#00bcd4" strokeWidth="0.7" />
+          <line x1="23" y1="49" x2="23" y2="57" stroke="#00bcd4" strokeWidth="0.7" />
+          <line x1="34" y1="49" x2="34" y2="57" stroke="#00bcd4" strokeWidth="0.7" />
         </svg>
       );
     case "photo_info_below":
       return (
-        <svg width={size} height={size} viewBox="0 0 56 56" className="rounded-sm">
-          <rect width="56" height="56" fill="#fff" />
-          <rect x="0" y="0" width="56" height="34" fill="#a0aec0" rx="1" />
-          <rect x="3" y="26" width="20" height="6" rx="1" fill="#fff" opacity="0.85" />
-          <rect x="3" y="38" width="24" height="4" rx="1" fill="#111" />
-          <rect x="3" y="44" width="8" height="2" rx="0.5" fill="#888" />
-          <rect x="13" y="44" width="14" height="2" rx="0.5" fill="#333" />
-          <rect x="34" y="44" width="6" height="2" rx="0.5" fill="#888" />
-          <rect x="42" y="44" width="10" height="2" rx="0.5" fill="#333" />
-          <line x1="3" y1="49" x2="53" y2="49" stroke="#eee" strokeWidth="0.5" />
-          <rect x="3" y="51" width="8" height="2" rx="0.5" fill="#333" />
-          <rect x="20" y="51" width="8" height="2" rx="0.5" fill="#333" />
-          <rect x="38" y="51" width="8" height="2" rx="0.5" fill="#333" />
+        <svg width={w} height={h} viewBox="0 0 48 60" className="rounded-sm">
+          <rect width="48" height="60" fill="#fff" />
+          <rect x="0" y="0" width="48" height="36" fill="#a0aec0" />
+          <rect x="3" y="29" width="18" height="5" rx="0.5" fill="#fff" opacity="0.85" />
+          <rect x="3" y="39" width="22" height="3" rx="0.5" fill="#111" />
+          <rect x="3" y="44" width="7" height="1.5" rx="0.5" fill="#888" />
+          <rect x="12" y="44" width="12" height="1.5" rx="0.5" fill="#333" />
+          <rect x="28" y="44" width="5" height="1.5" rx="0.5" fill="#888" />
+          <rect x="35" y="44" width="9" height="1.5" rx="0.5" fill="#333" />
+          <line x1="3" y1="49" x2="45" y2="49" stroke="#eee" strokeWidth="0.4" />
+          <rect x="3" y="52" width="7" height="2" rx="0.5" fill="#333" />
+          <rect x="16" y="52" width="7" height="2" rx="0.5" fill="#333" />
+          <rect x="30" y="52" width="7" height="2" rx="0.5" fill="#333" />
         </svg>
       );
   }
@@ -365,13 +368,13 @@ export function GraphicGeneratorDialog({
     return w;
   };
 
-  const renderNavyHeaderTemplate = async (ctx: CanvasRenderingContext2D, size: number) => {
-    const s = size / 1080;
+  const renderNavyHeaderTemplate = async (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+    const s = w / 1080;
     const navyColor = "#0f1b3d";
     const pinkAccent = "#e84393";
 
     ctx.fillStyle = navyColor;
-    ctx.fillRect(0, 0, size, 160 * s);
+    ctx.fillRect(0, 0, w, 160 * s);
 
     ctx.fillStyle = "#ffffff";
     ctx.font = `bold ${42 * s}px Inter, Arial, sans-serif`;
@@ -384,21 +387,21 @@ export function GraphicGeneratorDialog({
     ctx.fillText(displayAddress, 50 * s, 110 * s);
 
     const logos = getLogoSources();
-    await drawLogo(ctx, logos.companyLogoWhite, size - 50 * s, 40 * s, 55 * s, "right");
+    await drawLogo(ctx, logos.companyLogoWhite, w - 50 * s, 40 * s, 55 * s, "right");
 
     const photoY = 160 * s;
-    const photoH = size - 160 * s - 180 * s;
+    const photoH = h - 160 * s - 180 * s;
     if (currentImage) {
       const img = await loadImageSafe(currentImage);
-      if (img) drawImageCover(ctx, img, 0, photoY, size, photoH);
+      if (img) drawImageCover(ctx, img, 0, photoY, w, photoH);
     }
 
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, size - 180 * s, size, 180 * s);
+    ctx.fillRect(0, h - 180 * s, w, 180 * s);
 
-    const statsY = size - 120 * s;
+    const statsY = h - 120 * s;
     const statsBaseline = statsY + 30 * s;
-    const colWidth = size / 4;
+    const colWidth = w / 4;
 
     const statsData = [
       { value: extractedSqft, label: "SQF" },
@@ -429,12 +432,12 @@ export function GraphicGeneratorDialog({
     });
   };
 
-  const renderTwoPhotoWhiteTemplate = async (ctx: CanvasRenderingContext2D, size: number) => {
-    const s = size / 1080;
+  const renderTwoPhotoWhiteTemplate = async (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+    const s = w / 1080;
     const pinkAccent = "#f06292";
 
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, size, size);
+    ctx.fillRect(0, 0, w, h);
 
     ctx.fillStyle = "#111111";
     ctx.font = `bold ${48 * s}px Inter, Arial, sans-serif`;
@@ -451,11 +454,11 @@ export function GraphicGeneratorDialog({
     ctx.fillText(extractedPrice || "$0,000,000", 50 * s, 140 * s);
 
     const logos = getLogoSources();
-    await drawLogo(ctx, logos.companyLogo, size - 50 * s, 45 * s, 50 * s, "right");
+    await drawLogo(ctx, logos.companyLogo, w - 50 * s, 45 * s, 50 * s, "right");
 
     ctx.strokeStyle = pinkAccent;
     ctx.lineWidth = 2 * s;
-    const logoBoxX = size - 140 * s;
+    const logoBoxX = w - 140 * s;
     ctx.beginPath();
     ctx.moveTo(logoBoxX, 35 * s);
     ctx.lineTo(logoBoxX + 3 * s, 35 * s);
@@ -463,9 +466,9 @@ export function GraphicGeneratorDialog({
     ctx.stroke();
 
     const photoY = 200 * s;
-    const photoH = size - 200 * s - 180 * s;
+    const photoH = h - 200 * s - 180 * s;
     const gap = 8 * s;
-    const photoW = (size - gap) / 2;
+    const photoW = (w - gap) / 2;
 
     if (currentImage) {
       const img = await loadImageSafe(currentImage);
@@ -476,9 +479,9 @@ export function GraphicGeneratorDialog({
       if (img2) drawImageCover(ctx, img2, photoW + gap, photoY, photoW, photoH);
     }
 
-    const statsY = size - 160 * s;
+    const statsY = h - 160 * s;
     const statsBaseline = statsY + 40 * s;
-    const colWidth = size / 3;
+    const colWidth = w / 3;
 
     const statsData = [
       { value: extractedSqft, label: "SQF" },
@@ -508,12 +511,12 @@ export function GraphicGeneratorDialog({
     });
   };
 
-  const renderSingleMinimalTemplate = async (ctx: CanvasRenderingContext2D, size: number) => {
-    const s = size / 1080;
+  const renderSingleMinimalTemplate = async (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+    const s = w / 1080;
     const tealAccent = "#00bcd4";
 
     ctx.fillStyle = "#f8f8f8";
-    ctx.fillRect(0, 0, size, size);
+    ctx.fillRect(0, 0, w, h);
 
     const logos = getLogoSources();
     const logoW = await drawLogo(ctx, logos.companyLogo, 50 * s, 38 * s, 45 * s, "left");
@@ -530,20 +533,20 @@ export function GraphicGeneratorDialog({
     ctx.fillText(displayAddress, textStartX, 78 * s);
 
     const photoY = 115 * s;
-    const photoH = size - 115 * s - 180 * s;
+    const photoH = h - 115 * s - 180 * s;
     const photoPad = 40 * s;
 
     if (currentImage) {
       const img = await loadImageSafe(currentImage);
-      if (img) drawImageCover(ctx, img, photoPad, photoY, size - photoPad * 2, photoH);
+      if (img) drawImageCover(ctx, img, photoPad, photoY, w - photoPad * 2, photoH);
     }
 
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, size - 170 * s, size, 170 * s);
+    ctx.fillRect(0, h - 170 * s, w, 170 * s);
 
-    const statsY = size - 130 * s;
+    const statsY = h - 130 * s;
     const statsBaseline = statsY + 15 * s;
-    const colWidth = size / 4;
+    const colWidth = w / 4;
 
     const statsData = [
       { label: "Price", value: extractedPrice },
@@ -575,16 +578,16 @@ export function GraphicGeneratorDialog({
     });
   };
 
-  const renderPhotoInfoBelowTemplate = async (ctx: CanvasRenderingContext2D, size: number) => {
-    const s = size / 1080;
+  const renderPhotoInfoBelowTemplate = async (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+    const s = w / 1080;
 
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, size, size);
+    ctx.fillRect(0, 0, w, h);
 
-    const photoH = size * 0.6;
+    const photoH = h * 0.6;
     if (currentImage) {
       const img = await loadImageSafe(currentImage);
-      if (img) drawImageCover(ctx, img, 0, 0, size, photoH);
+      if (img) drawImageCover(ctx, img, 0, 0, w, photoH);
     }
 
     const logos = getLogoSources();
@@ -633,21 +636,21 @@ export function GraphicGeneratorDialog({
 
     ctx.fillStyle = "#888888";
     ctx.font = `${16 * s}px Inter, Arial, sans-serif`;
-    ctx.fillText("Price", size * 0.55, detailY);
+    ctx.fillText("Price", w * 0.55, detailY);
 
     ctx.fillStyle = "#333333";
     ctx.font = `${20 * s}px Inter, Arial, sans-serif`;
-    ctx.fillText(extractedPrice || "$0,000,000", size * 0.55 + 70 * s, detailY);
+    ctx.fillText(extractedPrice || "$0,000,000", w * 0.55 + 70 * s, detailY);
 
     ctx.strokeStyle = "#e0e0e0";
     ctx.lineWidth = 1 * s;
     ctx.beginPath();
     ctx.moveTo(50 * s, detailY + 72 * s);
-    ctx.lineTo(size - 50 * s, detailY + 72 * s);
+    ctx.lineTo(w - 50 * s, detailY + 72 * s);
     ctx.stroke();
 
     const statsY2 = detailY + 95 * s;
-    const col3 = (size - 100 * s) / 3;
+    const col3 = (w - 100 * s) / 3;
 
     const statsData = [
       { label: "SQF", value: extractedSqft },
@@ -668,27 +671,28 @@ export function GraphicGeneratorDialog({
     });
   };
 
-  const renderCanvas = useCallback(async (size: number = 1080): Promise<string | null> => {
+  const renderCanvas = useCallback(async (canvasWidth: number = 1080): Promise<string | null> => {
     if (!currentImage && !currentImage2) return null;
 
+    const canvasHeight = Math.round(canvasWidth * 1350 / 1080);
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d")!;
-    canvas.width = size;
-    canvas.height = size;
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
 
     try {
       switch (selectedTemplate) {
         case "navy_header":
-          await renderNavyHeaderTemplate(ctx, size);
+          await renderNavyHeaderTemplate(ctx, canvasWidth, canvasHeight);
           break;
         case "two_photo_white":
-          await renderTwoPhotoWhiteTemplate(ctx, size);
+          await renderTwoPhotoWhiteTemplate(ctx, canvasWidth, canvasHeight);
           break;
         case "single_minimal":
-          await renderSingleMinimalTemplate(ctx, size);
+          await renderSingleMinimalTemplate(ctx, canvasWidth, canvasHeight);
           break;
         case "photo_info_below":
-          await renderPhotoInfoBelowTemplate(ctx, size);
+          await renderPhotoInfoBelowTemplate(ctx, canvasWidth, canvasHeight);
           break;
       }
       return canvas.toDataURL("image/png");
@@ -954,7 +958,7 @@ export function GraphicGeneratorDialog({
               )}
             </div>
             <div
-              className="relative bg-muted rounded-lg overflow-hidden flex items-center justify-center flex-1 min-h-0 cursor-pointer group aspect-square max-h-[58vh]"
+              className="relative bg-muted rounded-lg overflow-hidden flex items-center justify-center flex-1 min-h-0 cursor-pointer group aspect-[4/5] max-h-[58vh]"
               onClick={() => previewImage && setShowEnlargedPreview(true)}
               data-testid="graphic-preview-container"
             >
