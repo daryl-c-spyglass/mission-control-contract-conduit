@@ -417,8 +417,8 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
   // Scale factor: preview is 96 DPI (816px wide), print is 300 DPI (2550px wide)
   // 2550/816 = 3.125 scale factor
   const PRINT_SCALE = 3.125;
-  const dividerPos = data.dividerPosition || 148;
-  const primaryLogoWidth = Math.round(dividerPos * PRINT_SCALE);
+  const dividerPos = data.dividerPosition || 12;
+  const logoGap = Math.round(dividerPos * PRINT_SCALE);
   const logoScales = data.logoScales || { primary: 1, secondary: 1 };
   const secondaryLogoOffsetY = Math.round((data.secondaryLogoOffsetY || 0) * PRINT_SCALE);
   
@@ -448,7 +448,7 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
     bathroomIcon: bathroomIconB64,
     sqftIcon: sqftIconB64,
     // Branding controls for template
-    primaryLogoWidth,
+    logoGap,
     primaryLogoScale: logoScales.primary,
     secondaryLogoScale: logoScales.secondary,
     secondaryLogoOffsetY,

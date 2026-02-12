@@ -15,7 +15,7 @@ export function FlyerPreview({
   images, 
   imageTransforms,
   logoScales = { primary: 1, secondary: 1 },
-  dividerPosition = 148,
+  dividerPosition = 12,
   secondaryLogoOffsetY = 0,
 }: FlyerPreviewProps) {
   const accentColor = "#8b7d6b";
@@ -50,56 +50,47 @@ export function FlyerPreview({
       {/* Logo container height 50px, so top = 66.5 - 25 = 41.5px ≈ 42px */}
       {/* Left aligned with address line at 70px */}
       <div className="absolute left-[70px] top-[42px] right-6 h-[50px] flex items-center">
-        {/* Company Logo Container */}
-        <div 
-          className="flex items-center justify-center h-full"
-          style={{ width: `${dividerPosition}px` }}
-        >
-          {images.companyLogo ? (
-            <img 
-              src={images.companyLogo} 
-              alt="Company Logo" 
-              className="max-h-[50px] object-contain"
-              style={{ 
-                transform: `scale(${logoScales.primary})`,
-                transformOrigin: 'center center',
-              }}
-            />
-          ) : (
-            <span className="text-gray-400 text-xs">LOGO</span>
-          )}
-        </div>
-        
-        {/* Vertical Divider Line */}
-        <div 
-          className="h-[50px] bg-gray-400"
-          style={{ 
-            width: '1px',
-            marginLeft: '8px',
-            marginRight: '8px',
-          }}
-        />
-        
-        {/* Secondary Logo Container - positioned immediately after divider */}
-        <div 
-          className="flex items-center justify-start h-full"
-          style={{ 
-            transform: `translateY(${secondaryLogoOffsetY}px)`,
-          }}
-        >
-          {images.secondaryLogo ? (
-            <img 
-              src={images.secondaryLogo} 
-              alt="Secondary Logo" 
-              className="max-h-[50px] object-contain"
-              style={{ 
-                transform: `scale(${logoScales.secondary})`,
-                transformOrigin: 'left center',
-              }}
-            />
-          ) : (
-            <span className="text-gray-400 text-xs">SECONDARY LOGO</span>
-          )}
+        {/* Logo group: primary + divider + secondary with equal gaps */}
+        <div className="flex items-center h-full" style={{ gap: `${dividerPosition}px` }}>
+          {/* Company Logo */}
+          <div className="flex items-center justify-center h-full shrink-0">
+            {images.companyLogo ? (
+              <img 
+                src={images.companyLogo} 
+                alt="Company Logo" 
+                className="max-h-[50px] object-contain"
+                style={{ 
+                  transform: `scale(${logoScales.primary})`,
+                  transformOrigin: 'center center',
+                }}
+              />
+            ) : (
+              <span className="text-gray-400 text-xs">LOGO</span>
+            )}
+          </div>
+          
+          {/* Vertical Divider Line */}
+          <div className="h-[50px] bg-gray-400 shrink-0" style={{ width: '1px' }} />
+          
+          {/* Secondary Logo Container */}
+          <div 
+            className="flex items-center justify-start h-full shrink-0"
+            style={{ transform: `translateY(${secondaryLogoOffsetY}px)` }}
+          >
+            {images.secondaryLogo ? (
+              <img 
+                src={images.secondaryLogo} 
+                alt="Secondary Logo" 
+                className="max-h-[50px] object-contain"
+                style={{ 
+                  transform: `scale(${logoScales.secondary})`,
+                  transformOrigin: 'left center',
+                }}
+              />
+            ) : (
+              <span className="text-gray-400 text-xs">SECONDARY LOGO</span>
+            )}
+          </div>
         </div>
         
         {/* Price Badge */}

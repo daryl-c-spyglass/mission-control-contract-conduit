@@ -493,10 +493,10 @@ export function FlyerForm({
             />
           </div>
           
-          {/* Divider Position */}
+          {/* Logo Spacing */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs text-muted-foreground">Divider Position</Label>
+              <Label className="text-xs text-muted-foreground">Logo Spacing</Label>
               <span className="text-xs text-muted-foreground font-medium">
                 {dividerPosition}px
               </span>
@@ -504,8 +504,8 @@ export function FlyerForm({
             <Slider
               value={[dividerPosition]}
               onValueChange={([value]) => onDividerPositionChange?.(value)}
-              min={100}
-              max={200}
+              min={4}
+              max={40}
               step={1}
               className="py-2"
               data-testid="slider-divider-position"
