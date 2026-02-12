@@ -103,7 +103,7 @@ export function FlyerPreview({
         </div>
         
         {/* Price Badge */}
-        <div className="absolute right-0 top-[-26px] w-[144px] h-[58px] bg-[#6b7b6e] flex flex-col justify-center items-center text-white">
+        <div className="absolute right-[20px] top-[-26px] w-[144px] h-[58px] bg-[#6b7b6e] flex flex-col justify-center items-center text-white">
           <span className="text-[7pt] tracking-[2px]">LISTED AT</span>
           <span className="text-[14pt] font-bold">{data.price || '$0'}</span>
         </div>
