@@ -70,7 +70,7 @@ export function FlyerPreview({
           </div>
           
           {/* Vertical Divider Line */}
-          <div className="h-[50px] bg-gray-400 shrink-0" style={{ width: '1px' }} />
+          <div className="h-[50px] shrink-0" style={{ width: '1px', backgroundColor: '#4a4a4a' }} />
           
           {/* Secondary Logo Container */}
           <div 
