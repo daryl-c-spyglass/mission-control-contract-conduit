@@ -214,23 +214,26 @@
         }
         
         /* Footer Section - Reference: y: 790, h: 270 */
-        /* Preview: x: 48, y: 790, w: 720, h: 270 */
+        /* Preview: x: 48, y: 790, w: 720, h: 270, grid: 180px x 4 */
         /* PDF: 790*3.125=2469, 270*3.125=844 */
-        /* 4-column grid: 2250px / 4 = 562.5px per column */
+        /* Preview description is 270px wide (1.5 cols), so use position-based layout */
         .footer-section {
             position: absolute;
             left: 150px;
             top: 2469px;
             width: 2250px;
             height: 844px;
-            display: grid;
-            grid-template-columns: 562px 563px 562px 563px;
+            overflow: hidden;
         }
         
-        /* Grid 13: Property Stats — preview: paddingTop 52px, gap 33px between items */
-        /* 52*3.125=163, 33*3.125=103, 18*3.125=56 pl, 8*3.125=25 pr */
+        /* Grid 13: Property Stats — preview: col 0, width 180px */
+        /* Position: left 0, width 562px (180*3.125) */
         .property-details {
-            position: relative;
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 562px;
+            height: 100%;
             padding-top: 163px;
             padding-left: 56px;
             padding-right: 25px;
@@ -273,10 +276,14 @@
             background-color: #8b7d6b;
         }
         
-        /* Grid 14: Description — preview: paddingLeft 29px, paddingRight 10px */
-        /* 29*3.125=91, 10*3.125=31 */
+        /* Grid 14: Description — preview: col 1, width 270px (1.5 cols), paddingLeft 29, paddingRight 10 */
+        /* Position: left 562px, width 844px (270*3.125), padding 91/31 */
         .description-section {
-            position: relative;
+            position: absolute;
+            left: 562px;
+            top: 0;
+            width: 844px;
+            height: 100%;
             padding-left: 91px;
             padding-right: 31px;
             overflow: hidden;
@@ -321,14 +328,20 @@
             background-color: #8b7d6b;
         }
         
-        /* Grid 15: Agent Photo — preview: 113px circle, paddingTop 14px, right -79px */
-        /* 113*3.125=353, 14*3.125=44, -79*3.125=-247 */
+        /* Grid 15: Agent Photo — preview: col 2, paddingTop 14px */
+        /* Position: left 1125px (562*2), width 562px */
+        /* Photo: 113px circle at right: -79px from col edge */
         .agent-section {
-            position: relative;
+            position: absolute;
+            left: 1125px;
+            top: 0;
+            width: 562px;
+            height: 100%;
             padding-top: 44px;
-            overflow: visible;
         }
         
+        /* Agent photo positioned to overlap between cols 3 and 4 */
+        /* Preview: right -79px means it extends into col 4 */
         .agent-photo {
             position: absolute;
             width: 353px;
@@ -341,6 +354,7 @@
             justify-content: center;
             flex-shrink: 0;
             right: -247px;
+            top: 44px;
         }
         
         .agent-photo img {
@@ -349,9 +363,14 @@
             object-fit: cover;
         }
         
-        /* Grid 16: QR + Agent info — preview: paddingTop 28px, QR 76px, marginLeft 82px */
-        /* 28*3.125=88, 76*3.125=238, 82*3.125=256 */
+        /* Grid 16: QR + Agent info — preview: col 3, paddingTop 28px */
+        /* Position: left 1687px (562*3), width 563px */
         .qr-section {
+            position: absolute;
+            left: 1687px;
+            top: 0;
+            width: 563px;
+            height: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
