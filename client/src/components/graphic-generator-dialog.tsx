@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Loader2, ExternalLink, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import type { Transaction, AgentProfile } from "@shared/schema";
+import type { Transaction, AgentProfile, AgentMarketingProfile } from "@shared/schema";
 
 interface GraphicGeneratorDialogProps {
   open: boolean;
@@ -32,6 +32,12 @@ export function GraphicGeneratorDialog({
     refetchOnWindowFocus: true, // Refetch when window gains focus
   });
   
+  const { data: marketingProfile } = useQuery<AgentMarketingProfile>({
+    queryKey: ["/api/settings/marketing-profile"],
+    staleTime: 0,
+    refetchOnMount: true,
+  });
+
   const mlsData = transaction.mlsData as any;
   
   // Build the primary photo URL
@@ -121,8 +127,22 @@ export function GraphicGeneratorDialog({
     // Transaction ID for reference
     url.searchParams.set('transactionId', transaction.id);
     
+    // Logos - use defaults or custom from marketing profile
+    const useDefaultCompany = marketingProfile?.companyLogoUseDefault !== false;
+    const useDefaultSecondary = marketingProfile?.secondaryLogoUseDefault !== false;
+    
+    const companyLogoUrl = useDefaultCompany
+      ? `${window.location.origin}/logos/SpyglassRealty_Logo_Black.png`
+      : (marketingProfile?.companyLogo || `${window.location.origin}/logos/SpyglassRealty_Logo_Black.png`);
+    const secondaryLogoUrl = useDefaultSecondary
+      ? `${window.location.origin}/logos/LeadingRE_Black.png`
+      : (marketingProfile?.secondaryLogo || `${window.location.origin}/logos/LeadingRE_Black.png`);
+    
+    url.searchParams.set('companyLogo', companyLogoUrl);
+    url.searchParams.set('secondaryLogo', secondaryLogoUrl);
+    
     return url.toString();
-  }, [transaction, statusLabel, primaryPhotoUrl, agentProfileData]);
+  }, [transaction, statusLabel, primaryPhotoUrl, agentProfileData, marketingProfile]);
   
   // Reset loading state when dialog opens
   useEffect(() => {
