@@ -520,8 +520,8 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
           ? '/logos/SpyglassRealty_Logo_Black.png'
           : marketingProfile?.companyLogo || '/logos/SpyglassRealty_Logo_Black.png',
         secondaryLogo: secondaryDefault
-          ? '/logos/lre-sgr-black.png'
-          : marketingProfile?.secondaryLogo || '/logos/lre-sgr-black.png',
+          ? '/logos/LeadingRE_Black.png'
+          : marketingProfile?.secondaryLogo || '/logos/LeadingRE_Black.png',
       }));
     }
   }, [marketingProfile, agentProfile]);
@@ -902,10 +902,10 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
                 setUseDefaultSecondaryLogo(checked);
                 if (checked) {
                   // Store current custom logo before switching to default
-                  if (images.secondaryLogo && images.secondaryLogo !== '/logos/lre-sgr-black.png') {
+                  if (images.secondaryLogo && images.secondaryLogo !== '/logos/LeadingRE_Black.png') {
                     setPreviousSecondaryLogo(images.secondaryLogo);
                   }
-                  setImages(prev => ({ ...prev, secondaryLogo: '/logos/lre-sgr-black.png' }));
+                  setImages(prev => ({ ...prev, secondaryLogo: '/logos/LeadingRE_Black.png' }));
                 } else {
                   // Restore previous custom logo if available
                   setImages(prev => ({ ...prev, secondaryLogo: previousSecondaryLogo }));
