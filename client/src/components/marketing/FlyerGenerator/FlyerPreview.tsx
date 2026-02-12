@@ -256,7 +256,7 @@ export function FlyerPreview({
         {/* Accent divider 2 — positioned in bottom-section grid, after description column */}
         <div
           className="absolute top-[40px]"
-          style={{ width: '2px', height: '160px', backgroundColor: accentColor, left: '472px' }}
+          style={{ width: '2px', height: '160px', backgroundColor: accentColor, left: '477px' }}
           data-layout-id="divider-2"
         />
 
