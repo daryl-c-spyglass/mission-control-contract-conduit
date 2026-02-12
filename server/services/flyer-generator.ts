@@ -527,19 +527,23 @@ export async function generatePrintFlyer(data: FlyerData, outputType: OutputType
       // For PDF, switch to print media type (page.pdf uses print mode internally)
       await page.emulateMediaType('print');
       
-      // Generate PDF with exact 8.5 x 11 inch dimensions for print
-      // Puppeteer page.pdf() scales viewport content to fit the specified page size
+      // Generate PDF at 300 DPI (8.5x11 inches)
+      // Content is 2550x3300px (300 DPI). Puppeteer page.pdf() uses 96 DPI internally,
+      // so set page size in pixels to match content exactly and let PDF viewers
+      // handle the physical sizing. 2550px/96dpi = 26.5625in, but we use preferCSSPageSize
+      // with @page CSS rule to match the content dimensions precisely.
+      // This avoids right-side clipping from mismatched content/page widths.
       const pdf = await page.pdf({
         printBackground: true,
-        width: '8.5in',
-        height: '11in',
+        width: `${RENDER_CONFIG.width}px`,
+        height: `${RENDER_CONFIG.height}px`,
         pageRanges: '1',
         preferCSSPageSize: false,
         margin: { top: 0, right: 0, bottom: 0, left: 0 },
-        scale: 1  // Let Puppeteer handle scaling to fit page
+        scale: 1
       });
       result = Buffer.from(pdf);
-      log.info({ size: result.length }, 'PDF generated (8.5x11in)');
+      log.info({ size: result.length }, 'PDF generated (2550x3300px)');
     } else {
       // Generate PNG with exact clip (same dimensions as PDF)
       const screenshot = await page.screenshot({
