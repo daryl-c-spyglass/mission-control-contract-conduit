@@ -303,20 +303,20 @@ export function FlyerPreview({
             style={{ marginTop: '31px', gap: '2.5px', marginLeft: '-10px' }}
           >
             <div 
-              className="font-bold text-center truncate text-gray-800 w-full"
-              style={{ fontSize: '13.9pt' }}
+              className="font-bold text-center truncate w-full"
+              style={{ fontSize: '13.9pt', color: '#4a4a4a' }}
             >
               {data.agentName || ''}
             </div>
             <div 
               className="text-center truncate w-full"
-              style={{ fontSize: '10.1pt', color: '#555' }}
+              style={{ fontSize: '10.1pt', color: '#4a4a4a' }}
             >
               {data.agentTitle || ''}
             </div>
             <div 
               className="text-center w-full"
-              style={{ fontSize: '10.1pt', color: '#555' }}
+              style={{ fontSize: '10.1pt', color: '#4a4a4a' }}
             >
               {data.phone || ''}
             </div>
