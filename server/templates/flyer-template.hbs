@@ -309,6 +309,7 @@
         
         /* Preview: fontSize 10.35pt → 10.35*3.125=32.3pt≈43px */
         /* Reduced to 40px and 7 lines to prevent bottom overflow in PDF export */
+        /* Hard max-height: 7 lines × 40px × 1.35 = 378px */
         .description-text {
             font-size: 40px;
             line-height: 1.35;
@@ -317,6 +318,7 @@
             -webkit-line-clamp: 7;
             -webkit-box-orient: vertical;
             overflow: hidden;
+            max-height: 378px;
         }
         
         /* Accent divider 2 — preview: left 472px from bottom-section */
