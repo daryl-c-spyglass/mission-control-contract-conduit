@@ -4822,7 +4822,7 @@ Generate only the headline, nothing else.`;
         logoUrl: data.companyLogo || undefined,
         secondaryLogoUrl: data.secondaryLogo || undefined,
         logoScales: data.logoScales || { primary: 1, secondary: 1 },
-        dividerPosition: data.dividerPosition || 148,
+        dividerPosition: data.dividerPosition || 12,
         secondaryLogoOffsetY: data.secondaryLogoOffsetY || 0,
         // Image transforms for cropping/positioning
         imageTransforms,
