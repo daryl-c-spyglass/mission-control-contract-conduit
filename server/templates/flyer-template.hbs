@@ -273,14 +273,13 @@
             background-color: #8b7d6b;
         }
         
-        /* Grid 14: Description — preview: paddingLeft 29px, paddingRight 10px, width 270px */
-        /* 29*3.125=91, 10*3.125=31, 270*3.125=844 */
+        /* Grid 14: Description — preview: paddingLeft 29px, paddingRight 10px */
+        /* 29*3.125=91, 10*3.125=31 */
         .description-section {
             position: relative;
             padding-left: 91px;
             padding-right: 31px;
-            width: 844px;
-            overflow: visible;
+            overflow: hidden;
         }
         
         /* Headline — preview: fontSize 11.5pt, marginTop 4px, marginBottom 8px */
@@ -312,11 +311,10 @@
             overflow: hidden;
         }
         
-        /* Accent divider 2 — positioned at right edge of description column */
-        /* Inside .description-section (position:relative), so right:0 puts it at column edge */
+        /* Accent divider 2 — at right edge of description column */
         .accent-divider-2 {
             position: absolute;
-            right: -31px;
+            right: 0;
             top: 125px;
             width: 6px;
             height: 500px;
