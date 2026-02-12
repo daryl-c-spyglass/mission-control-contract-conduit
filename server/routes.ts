@@ -4830,7 +4830,7 @@ Generate only the headline, nothing else.`;
 
       log.info(`[FlyerGenerator] ${saveOnly ? 'Saving' : 'Exporting'} ${format} flyer for transaction ${id}`);
 
-      const outputType: OutputType = format === 'cmyk' ? 'pdf' : 'pngPreview';
+      const outputType: OutputType = (format === 'cmyk' || format === 'pdf') ? 'pdf' : 'pngPreview';
       const buffer = await generatePrintFlyer(flyerData, outputType);
 
       const addressSlug = (data.address || 'property').split(',')[0].replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
@@ -4901,9 +4901,9 @@ Generate only the headline, nothing else.`;
         log.error({ err: saveError }, '[FlyerGenerator] Failed to save to marketing assets');
       }
 
-      if (format === 'cmyk') {
+      if (format === 'cmyk' || format === 'pdf') {
         res.set('Content-Type', 'application/pdf');
-        res.set('Content-Disposition', `attachment; filename="${addressSlug}_flyer_cmyk.pdf"`);
+        res.set('Content-Disposition', `attachment; filename="${addressSlug}_flyer.pdf"`);
       } else {
         res.set('Content-Type', 'image/png');
         res.set('Content-Disposition', `attachment; filename="${addressSlug}_flyer.png"`);

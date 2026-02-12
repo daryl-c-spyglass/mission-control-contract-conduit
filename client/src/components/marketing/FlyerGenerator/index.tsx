@@ -631,25 +631,15 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
   };
 
   const exportMutation = useMutation({
-    mutationFn: async (format: 'png' | 'cmyk') => {
+    mutationFn: async (format: 'png' | 'cmyk' | 'pdf') => {
       const exportData = {
         ...watchedValues,
         ...images,
         imageTransforms,
-        // Branding controls - ensure these are included
         logoScales,
         dividerPosition,
         secondaryLogoOffsetY,
       };
-      
-      console.log('[Export] Sending data:', {
-        agentName: exportData.agentName,
-        agentTitle: exportData.agentTitle,
-        phone: exportData.phone,
-        qrCode: exportData.qrCode ? 'present' : 'missing',
-        secondaryLogo: exportData.secondaryLogo ? 'present' : 'missing',
-        logoScales: exportData.logoScales,
-      });
       
       const response = await apiRequest('POST', `/api/transactions/${transactionId}/export-flyer?format=${format}`, exportData);
       if (!response.ok) throw new Error('Export failed');
@@ -660,13 +650,14 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
       const a = document.createElement('a');
       a.href = url;
       const safeAddress = watchedValues.address?.replace(/[^a-zA-Z0-9]/g, '-') || 'property';
-      a.download = `flyer-${safeAddress}.${format === 'cmyk' ? 'tiff' : 'png'}`;
+      const ext = format === 'png' ? 'png' : format === 'cmyk' ? 'tiff' : 'pdf';
+      a.download = `flyer-${safeAddress}.${ext}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast({ title: 'Flyer Exported', description: 'Your flyer has been downloaded and saved.' });
+      toast({ title: 'Flyer Exported', description: `Your flyer has been downloaded as ${ext.toUpperCase()}.` });
     },
     onError: () => {
       toast({ title: 'Export Failed', description: 'Please try again.', variant: 'destructive' });
@@ -826,14 +817,32 @@ export function FlyerGenerator({ transactionId, transaction, onBack }: FlyerGene
                 Save & Download
               </Button>
               <Button
+                onClick={() => exportMutation.mutate('pdf')}
+                disabled={exportMutation.isPending || saveAndDownloadMutation.isPending}
+                variant="outline"
+                className="gap-2"
+                data-testid="button-export-pdf"
+              >
+                {exportMutation.isPending && exportMutation.variables === 'pdf' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                Export PDF
+              </Button>
+              <Button
                 onClick={() => exportMutation.mutate('cmyk')}
                 disabled={exportMutation.isPending || saveAndDownloadMutation.isPending}
                 variant="outline"
                 className="gap-2"
                 data-testid="button-export-cmyk"
               >
-                <Download className="w-4 h-4" />
-                Export CMYK (Print)
+                {exportMutation.isPending && exportMutation.variables === 'cmyk' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                Export TIFF
               </Button>
             </div>
           </div>
