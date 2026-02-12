@@ -210,7 +210,7 @@ export function FlyerPreview({
             <svg className="w-[24px] h-[24px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/>
             </svg>
-            <span>{data.sqft ? `${Number(data.sqft).toLocaleString()} sq. ft` : '0 sq. ft'}</span>
+            <span>{data.sqft ? `${Number(String(data.sqft).replace(/,/g, '')).toLocaleString()} sq. ft` : '0 sq. ft'}</span>
           </div>
           {/* Accent divider — subsquare: rows 1.5 to 7, right edge */}
           <div
