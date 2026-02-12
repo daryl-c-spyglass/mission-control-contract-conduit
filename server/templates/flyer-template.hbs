@@ -318,14 +318,16 @@
             overflow: hidden;
         }
         
-        /* Accent divider 2 — at right edge of description column */
+        /* Accent divider 2 — preview: left 472px from bottom-section */
+        /* 472*3.125=1475px from footer left edge */
         .accent-divider-2 {
             position: absolute;
-            right: 0;
+            left: 1475px;
             top: 125px;
             width: 6px;
             height: 500px;
             background-color: #8b7d6b;
+            z-index: 5;
         }
         
         /* Grid 15: Agent Photo — preview: col 2, paddingTop 14px */
@@ -555,9 +557,9 @@
             <div class="description-section">
                 <h3 class="listing-headline">{{headline}}</h3>
                 <p class="description-text">{{description}}</p>
-                <!-- Accent divider on right edge of grid 14 -->
-                <div class="accent-divider-2"></div>
             </div>
+            <!-- Accent divider 2: positioned in footer, between description and agent photo -->
+            <div class="accent-divider-2"></div>
             
             <!-- Grid 15: Agent Photo only (centered) -->
             <div class="agent-section">
