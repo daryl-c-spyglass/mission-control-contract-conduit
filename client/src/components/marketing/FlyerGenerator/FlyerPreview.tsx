@@ -307,7 +307,7 @@ export function FlyerPreview({
           </div>
           <div 
             className="font-bold text-center truncate text-gray-800 w-full px-1"
-            style={{ fontSize: '12.65pt', marginTop: '46px' }}
+            style={{ fontSize: '12.65pt', marginTop: '36px' }}
           >
             {data.agentName || ''}
           </div>
