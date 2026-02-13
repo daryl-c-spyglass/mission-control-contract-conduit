@@ -9,7 +9,6 @@ function getCategoryFromType(eventType: string): string {
   if (eventType.startsWith('mls_') || eventType === 'price_changed' || eventType === 'photos_updated') return 'mls';
   if (eventType.startsWith('document_')) return 'documents';
   if (eventType.includes('graphic') || eventType.includes('flyer') || eventType.includes('asset') || eventType === 'quick_create_all') return 'marketing';
-  if (eventType.startsWith('cma_')) return 'cma';
   if (eventType.startsWith('coordinator_') || eventType === 'note_added') return 'team';
   if (eventType.includes('date') || eventType === 'deadline_approaching') return 'dates';
   if (eventType === 'email_sent' || eventType === 'slack_notification' || eventType === 'channel_created' || eventType === 'filter_created') return 'communication';
@@ -56,8 +55,8 @@ export const TimelineLogger = {
     }),
 
   // MLS events
-  mlsSynced: (transactionId: string, photoCount: number, compCount: number) =>
-    logTimelineEvent(transactionId, 'mls_synced', `MLS data synced: ${photoCount} photos, ${compCount} comparables`),
+  mlsSynced: (transactionId: string, photoCount: number) =>
+    logTimelineEvent(transactionId, 'mls_synced', `MLS data synced: ${photoCount} photos`),
 
   mlsFetched: (transactionId: string, message: string) =>
     logTimelineEvent(transactionId, 'mls_fetched', message),
@@ -104,19 +103,6 @@ export const TimelineLogger = {
 
   assetCreated: (transactionId: string, type: string) =>
     logTimelineEvent(transactionId, 'asset_created', `Marketing asset created: ${type}`),
-
-  // CMA events
-  cmaCreated: (transactionId: string, compCount: number) =>
-    logTimelineEvent(transactionId, 'cma_created', `CMA created with ${compCount} comparables`),
-
-  cmaUpdated: (transactionId: string, message?: string) =>
-    logTimelineEvent(transactionId, 'cma_updated', message || 'CMA updated'),
-
-  cmaShared: (transactionId: string) =>
-    logTimelineEvent(transactionId, 'cma_shared', 'CMA share link generated'),
-
-  cmaShareRevoked: (transactionId: string) =>
-    logTimelineEvent(transactionId, 'cma_share_revoked', 'CMA share link removed'),
 
   // Team events
   coordinatorAssigned: (transactionId: string, name: string) =>

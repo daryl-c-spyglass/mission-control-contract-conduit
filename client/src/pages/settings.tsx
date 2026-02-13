@@ -142,7 +142,7 @@ export default function Settings() {
     }
   }, [agentProfileData]);
 
-  // CMA Resources state
+  // Agent Resources state
   const [showAddLinkDialog, setShowAddLinkDialog] = useState(false);
   const [newLinkName, setNewLinkName] = useState("");
   const [newLinkUrl, setNewLinkUrl] = useState("");
@@ -207,7 +207,7 @@ export default function Settings() {
     setMarketingBranding(prev => ({ ...prev, [field]: null }));
   };
 
-  // CMA Resources query
+  // Agent Resources query
   const { data: agentResources = [], isLoading: resourcesLoading } = useQuery<AgentResource[]>({
     queryKey: ["/api/agent/resources"],
     staleTime: 30000,
@@ -402,7 +402,7 @@ export default function Settings() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Marketing profile saved", description: "Your agent info will appear on CMA reports and marketing materials." });
+      toast({ title: "Marketing profile saved", description: "Your agent info will appear on marketing materials." });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     },
     onError: (error: Error) => {
@@ -631,7 +631,7 @@ export default function Settings() {
             <div>
               <CardTitle>Agent Marketing Profile</CardTitle>
               <CardDescription>
-                Your personal information displayed on CMA reports
+                Your personal information displayed on marketing materials
               </CardDescription>
             </div>
           </div>
@@ -986,7 +986,7 @@ export default function Settings() {
             <div>
               <CardTitle>Bio & Default Cover Letter</CardTitle>
               <CardDescription>
-                Your bio and default cover letter for CMA reports
+                Your bio and default cover letter for reports
               </CardDescription>
             </div>
           </div>
@@ -997,14 +997,14 @@ export default function Settings() {
               <Label htmlFor="agentBio">Professional Bio</Label>
               <Textarea
                 id="agentBio"
-                placeholder="Write a brief professional bio that will be included in your CMA reports..."
+                placeholder="Write a brief professional bio that will be included in your marketing materials..."
                 value={agentProfile.bio}
                 onChange={(e) => setAgentProfile(prev => ({ ...prev, bio: e.target.value }))}
                 className="min-h-[100px] resize-none"
                 data-testid="textarea-agent-bio"
               />
               <p className="text-xs text-muted-foreground">
-                This bio can be used in CMA reports and other professional documents.
+                This bio can be used in marketing materials and other professional documents.
               </p>
             </div>
 
@@ -1041,7 +1041,7 @@ export default function Settings() {
               </div>
               <Textarea
                 id="defaultCoverLetter"
-                placeholder="Dear [Client Name],&#10;&#10;Write your default cover letter for CMA reports here..."
+                placeholder="Dear [Client Name],&#10;&#10;Write your default cover letter for reports here..."
                 value={agentProfile.defaultCoverLetter}
                 onChange={(e) => setAgentProfile(prev => ({ ...prev, defaultCoverLetter: e.target.value }))}
                 className="min-h-[180px] resize-none"
@@ -1077,9 +1077,9 @@ export default function Settings() {
               <FolderOpen className="h-5 w-5 text-[#EF4923]" />
             </div>
             <div>
-              <CardTitle>CMA Resources & Links</CardTitle>
+              <CardTitle>Resources & Links</CardTitle>
               <CardDescription>
-                Manage resources that appear in the "Spyglass Resources and Links" slide of your CMA presentations
+                Manage resources for marketing materials
               </CardDescription>
             </div>
           </div>
@@ -1190,14 +1190,14 @@ export default function Settings() {
                   <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground">No resources added yet</p>
                   <p className="text-xs text-muted-foreground/70 mt-1">
-                    Upload documents or add links to display in your CMA presentations
+                    Upload documents or add links to display in your presentations
                   </p>
                 </div>
               )}
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Resources will appear in the "Spyglass Resources and Links" slide of all your CMA presentations.
+              Resources will appear in your marketing materials and presentations.
               Toggle visibility with the switch.
             </p>
           </div>
@@ -1209,7 +1209,7 @@ export default function Settings() {
           <DialogHeader>
             <DialogTitle>Add External Link</DialogTitle>
             <DialogDescription>
-              Add a link that will appear in your CMA presentations
+              Add a link that will appear in your presentations
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1319,7 +1319,7 @@ export default function Settings() {
             <div>
               <CardTitle>Social Media Links</CardTitle>
               <CardDescription>
-                Add your social media profiles to display in CMA reports
+                Add your social media profiles to display on marketing materials
               </CardDescription>
             </div>
           </div>

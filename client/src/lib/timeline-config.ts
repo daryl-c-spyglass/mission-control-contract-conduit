@@ -1,4 +1,4 @@
-import { Home, Package, RefreshCw, DollarSign, BarChart3, Camera, FileText, Trash2, Download, FolderUp, Palette, Newspaper, Sparkles, TrendingUp, Pencil, Link, Ban, User, StickyNote, Calendar, Target, Clock, Mail, MessageSquare, Pin, FileCheck } from 'lucide-react';
+import { Home, Package, RefreshCw, DollarSign, BarChart3, Camera, FileText, Trash2, Download, FolderUp, Palette, Newspaper, Sparkles, Pencil, User, StickyNote, Calendar, Target, Clock, Mail, MessageSquare, Pin, FileCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface TimelineEventConfig {
@@ -39,12 +39,6 @@ export const TIMELINE_EVENT_CONFIG: Record<string, TimelineEventConfig> = {
   'asset_created': { icon: Palette, color: 'text-pink-600', bgColor: 'bg-pink-100 dark:bg-pink-900/30', label: 'Asset' },
   'marketing_created': { icon: Palette, color: 'text-pink-600', bgColor: 'bg-pink-100 dark:bg-pink-900/30', label: 'Marketing' },
   
-  // CMA events
-  'cma_created': { icon: TrendingUp, color: 'text-green-600', bgColor: 'bg-green-100 dark:bg-green-900/30', label: 'CMA Created' },
-  'cma_updated': { icon: Pencil, color: 'text-blue-600', bgColor: 'bg-blue-100 dark:bg-blue-900/30', label: 'CMA Updated' },
-  'cma_shared': { icon: Link, color: 'text-purple-600', bgColor: 'bg-purple-100 dark:bg-purple-900/30', label: 'CMA Shared' },
-  'cma_share_revoked': { icon: Ban, color: 'text-red-600', bgColor: 'bg-red-100 dark:bg-red-900/30', label: 'Share Revoked' },
-  
   // Team events
   'coordinator_assigned': { icon: User, color: 'text-blue-600', bgColor: 'bg-blue-100 dark:bg-blue-900/30', label: 'Assigned' },
   'coordinator_removed': { icon: User, color: 'text-gray-600', bgColor: 'bg-gray-100 dark:bg-gray-800/50', label: 'Removed' },
@@ -79,7 +73,6 @@ export function getCategoryFromType(eventType: string): string {
   if (eventType.startsWith('mls_') || eventType === 'price_changed' || eventType === 'photos_updated') return 'mls';
   if (eventType.startsWith('document_')) return 'documents';
   if (eventType.includes('graphic') || eventType.includes('flyer') || eventType.includes('asset') || eventType.includes('marketing') || eventType === 'quick_create_all') return 'marketing';
-  if (eventType.startsWith('cma_')) return 'cma';
   if (eventType.startsWith('coordinator_') || eventType === 'note_added') return 'team';
   if (eventType.includes('date') || eventType === 'deadline_approaching' || eventType === 'dates_updated') return 'dates';
   if (eventType === 'email_sent' || eventType === 'slack_notification' || eventType === 'channel_created' || eventType === 'filter_created' || eventType === 'label_created' || eventType === 'gmail_pending') return 'communication';
@@ -92,7 +85,6 @@ export const CATEGORY_FILTERS = [
   { value: 'mls', label: 'MLS Data' },
   { value: 'documents', label: 'Documents' },
   { value: 'marketing', label: 'Marketing' },
-  { value: 'cma', label: 'CMA' },
   { value: 'team', label: 'Team' },
   { value: 'dates', label: 'Dates' },
   { value: 'communication', label: 'Communication' },

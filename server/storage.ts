@@ -11,12 +11,6 @@ import {
   type InsertMarketingAsset,
   type ContractDocument,
   type InsertContractDocument,
-  type Cma,
-  type InsertCma,
-  type CmaReportConfig,
-  type InsertCmaReportConfig,
-  type CmaReportTemplate,
-  type InsertCmaReportTemplate,
   type NotificationSetting,
   type InsertNotificationSetting,
   type AgentProfile,
@@ -36,9 +30,6 @@ import {
   activities,
   marketingAssets,
   contractDocuments,
-  cmas,
-  cmaReportConfigs,
-  cmaReportTemplates,
   notificationSettings,
   agentProfiles,
   agentResources,
@@ -94,28 +85,6 @@ export interface IStorage {
   getContractDocument(id: string): Promise<ContractDocument | undefined>;
   createContractDocument(doc: InsertContractDocument): Promise<ContractDocument>;
   deleteContractDocument(id: string): Promise<boolean>;
-
-  // CMAs
-  getCma(id: string): Promise<Cma | undefined>;
-  getCmaByTransaction(transactionId: string): Promise<Cma | undefined>;
-  getCmaByShareToken(token: string): Promise<Cma | undefined>;
-  getCmasByUser(userId: string): Promise<Cma[]>;
-  getAllCmas(): Promise<Cma[]>;
-  createCma(cma: InsertCma): Promise<Cma>;
-  updateCma(id: string, cma: Partial<Cma>): Promise<Cma | undefined>;
-  deleteCma(id: string): Promise<boolean>;
-
-  // CMA Report Configs
-  getCmaReportConfig(cmaId: string): Promise<CmaReportConfig | undefined>;
-  upsertCmaReportConfig(config: InsertCmaReportConfig): Promise<CmaReportConfig>;
-  deleteCmaReportConfig(cmaId: string): Promise<boolean>;
-
-  // CMA Report Templates
-  getCmaReportTemplates(userId: string): Promise<CmaReportTemplate[]>;
-  getCmaReportTemplate(id: string): Promise<CmaReportTemplate | undefined>;
-  createCmaReportTemplate(template: InsertCmaReportTemplate): Promise<CmaReportTemplate>;
-  updateCmaReportTemplate(id: string, template: Partial<InsertCmaReportTemplate>): Promise<CmaReportTemplate | undefined>;
-  deleteCmaReportTemplate(id: string): Promise<boolean>;
 
   // Notification Settings
   getNotificationSettings(userId: string, transactionId?: string | null): Promise<NotificationSetting | undefined>;
@@ -425,112 +394,6 @@ export class DatabaseStorage implements IStorage {
 
   async deleteContractDocument(id: string): Promise<boolean> {
     await db.delete(contractDocuments).where(eq(contractDocuments.id, id));
-    return true;
-  }
-
-  // CMAs
-  async getCma(id: string): Promise<Cma | undefined> {
-    const [cma] = await db.select().from(cmas).where(eq(cmas.id, id));
-    return cma;
-  }
-
-  async getCmaByTransaction(transactionId: string): Promise<Cma | undefined> {
-    const [cma] = await db
-      .select()
-      .from(cmas)
-      .where(eq(cmas.transactionId, transactionId))
-      .orderBy(desc(cmas.updatedAt))
-      .limit(1);
-    return cma;
-  }
-
-  async getCmaByShareToken(token: string): Promise<Cma | undefined> {
-    const [cma] = await db.select().from(cmas).where(eq(cmas.publicLink, token));
-    return cma;
-  }
-
-  async getCmasByUser(userId: string): Promise<Cma[]> {
-    return await db.select().from(cmas).where(eq(cmas.userId, userId));
-  }
-
-  async getAllCmas(): Promise<Cma[]> {
-    return await db.select().from(cmas).orderBy(desc(cmas.updatedAt));
-  }
-
-  async createCma(cma: InsertCma): Promise<Cma> {
-    const [newCma] = await db.insert(cmas).values(cma).returning();
-    return newCma;
-  }
-
-  async updateCma(id: string, updates: Partial<Cma>): Promise<Cma | undefined> {
-    const [updated] = await db
-      .update(cmas)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(cmas.id, id))
-      .returning();
-    return updated;
-  }
-
-  async deleteCma(id: string): Promise<boolean> {
-    // Also delete related report config
-    await db.delete(cmaReportConfigs).where(eq(cmaReportConfigs.cmaId, id));
-    await db.delete(cmas).where(eq(cmas.id, id));
-    return true;
-  }
-
-  // CMA Report Configs
-  async getCmaReportConfig(cmaId: string): Promise<CmaReportConfig | undefined> {
-    const [config] = await db.select().from(cmaReportConfigs).where(eq(cmaReportConfigs.cmaId, cmaId));
-    return config;
-  }
-
-  async upsertCmaReportConfig(config: InsertCmaReportConfig): Promise<CmaReportConfig> {
-    const existing = await this.getCmaReportConfig(config.cmaId);
-    
-    if (existing) {
-      const [updated] = await db
-        .update(cmaReportConfigs)
-        .set({ ...config, updatedAt: new Date() })
-        .where(eq(cmaReportConfigs.cmaId, config.cmaId))
-        .returning();
-      return updated;
-    }
-    
-    const [created] = await db.insert(cmaReportConfigs).values(config).returning();
-    return created;
-  }
-
-  async deleteCmaReportConfig(cmaId: string): Promise<boolean> {
-    await db.delete(cmaReportConfigs).where(eq(cmaReportConfigs.cmaId, cmaId));
-    return true;
-  }
-
-  // CMA Report Templates
-  async getCmaReportTemplates(userId: string): Promise<CmaReportTemplate[]> {
-    return await db.select().from(cmaReportTemplates).where(eq(cmaReportTemplates.userId, userId));
-  }
-
-  async getCmaReportTemplate(id: string): Promise<CmaReportTemplate | undefined> {
-    const [template] = await db.select().from(cmaReportTemplates).where(eq(cmaReportTemplates.id, id));
-    return template;
-  }
-
-  async createCmaReportTemplate(template: InsertCmaReportTemplate): Promise<CmaReportTemplate> {
-    const [created] = await db.insert(cmaReportTemplates).values(template).returning();
-    return created;
-  }
-
-  async updateCmaReportTemplate(id: string, template: Partial<InsertCmaReportTemplate>): Promise<CmaReportTemplate | undefined> {
-    const [updated] = await db
-      .update(cmaReportTemplates)
-      .set({ ...template, updatedAt: new Date() })
-      .where(eq(cmaReportTemplates.id, id))
-      .returning();
-    return updated;
-  }
-
-  async deleteCmaReportTemplate(id: string): Promise<boolean> {
-    await db.delete(cmaReportTemplates).where(eq(cmaReportTemplates.id, id));
     return true;
   }
 

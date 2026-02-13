@@ -1398,7 +1398,7 @@ export function CreateTransactionDialog({ open, onOpenChange }: CreateTransactio
                     </FormControl>
                     <div>
                       <p className="text-sm">Fetch MLS data</p>
-                      <p className="text-xs text-muted-foreground">Pull property info and CMA from Repliers</p>
+                      <p className="text-xs text-muted-foreground">Pull property info from Repliers</p>
                     </div>
                   </FormItem>
                 )}

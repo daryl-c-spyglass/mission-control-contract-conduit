@@ -45,26 +45,12 @@ Preferred communication style: Simple, everyday language.
     - Active Listings (has MLS #): Auto-populates price, beds, baths, sqft, address, description from Repliers API
     - Off-Market Listings (no MLS #): Uses uploaded photos from transaction.propertyImages, shows empty fields for manual entry
     - Agent Details: Always loads from Settings (name, title, phone, photo, logos)
-- **CMA Presentation Player**: Fullscreen interactive slideshow with 33 widgets for client presentations, featuring responsive layout, Mapbox header, agent profile popover, sidebar navigation, keyboard controls, and mobile optimization. Uses Spyglass branding.
-- **CMA Print Preview System**: Pre-download slide preview with data validation, single/grid view modes, zoom controls, and keyboard navigation. Ensures preview matches PDF output.
-- **CMA PDF Export System**: Client-side PDF generation using `@react-pdf/renderer` in landscape letter format, covering all 33 widgets with specialized pages for dynamic content. Incorporates Spyglass brand colors and professional design elements.
 
 ### Technical Implementations
-- **AI Integration**: GPT-4o-mini for social media tagline generation, MLS description summarization, and CMA cover letter generation with tone selection.
-- **Agent Profile System**: Database-backed agent profiles with bio, default cover letter (with AI generation/enhancement), and social media links for CMA reports.
+- **AI Integration**: GPT-4o-mini for social media tagline generation and MLS description summarization.
+- **Agent Profile System**: Database-backed agent profiles with bio and social media links.
 - **Agent Marketing Profile System**: Separate database profile for flyers and marketing materials, including agent photo, title, QR code, company logos, with API endpoints for management and server-side validation.
 - **Automatic MLS Synchronization**: Background service for regular MLS data sync.
-- **CMA (Comparative Market Analysis) System**: Database-backed storage, public share links, property data visualization, and configurable filters. Includes robust data flow for subject property and comparables, extensive field aliasing, and status normalization for consistency across various MLS formats. Status normalization checks both `status` and `lastStatus` fields from Repliers API:
-  - `lastStatus="Sld"` (Sold) indicates a completed SALE transaction - displays as "Closed" with red badge
-  - `lastStatus="Lsd"` (Leased) indicates a completed RENTAL transaction - displays as "Leasing" with purple badge
-  - Per RESO Standard: Sale statuses (Active/Pending/Closed) are distinct from Rental statuses (Leasing)
-- **Status Color System**: Centralized status colors across all CMA views:
-  - Active = Green (#22c55e) - Property listed for sale
-  - Pending / Under Contract = Orange (#f97316) - Has accepted offer
-  - Closed = Red (#ef4444) - Sale completed
-  - Leasing = Purple (#a855f7) - Rental/For Rent property
-  - Subject = Blue (#3b82f6) - Subject property marker
-  - Unknown = Gray (#6b7280) - Status not determined
 - **Photo Upload System**: Photos uploaded via GCS client to private storage, served through a secure route. Server validates file type and size. Distinct handling for MLS photos and user uploads.
 - **Transaction Photos Table**: Database-backed photo tracking with source attribution:
   - **Schema**: transactionPhotos table tracks id, transactionId, url, filename, source, label, sortOrder, createdAt
@@ -75,8 +61,7 @@ Preferred communication style: Simple, everyday language.
     - POST /api/transactions/:id/photos - Upload new photos (saves to both propertyImages and transactionPhotos)
   - **PropertyPhotos Component** (client/src/components/marketing/PropertyPhotos.tsx): Unified photo gallery with color-coded source badges, upload functionality, and delete capability for non-MLS photos. Displays in Marketing tab.
   - **Lot Size Conversion**: Bidirectional auto-conversion between Square Feet and Acres (1 acre = 43,560 sq ft) in Create Transaction form
-- **CMA Data Extraction Utilities**: Comprehensive client-side utilities (`client/src/lib/cma-data-utils.ts`) for safe data extraction and normalization from various MLS/Repliers API field structures, including price, square footage, DOM, lot acres, beds/baths, address, coordinates, and status. Includes calculation of CMA statistics and robust formatting functions.
-- **CMA Resources System**: Agent-managed resources (documents, links) for CMA presentations, stored in a database with API endpoints for CRUD, reordering, and file uploads. Supports public access for shared CMAs.
+- **Agent Resources System**: Agent-managed resources (documents, links) stored in a database with API endpoints for CRUD, reordering, and file uploads.
 - **User Notification Preferences System**: Per-user Slack notification settings stored in a database, with API endpoints and a reusable component for managing preferences.
 - **Slack Diagnostics System**: Read-only diagnostic endpoint for pre-UAT testing:
   - **Endpoint**: GET /api/admin/slack-diagnostics (authenticated)
@@ -129,4 +114,4 @@ Preferred communication style: Simple, everyday language.
 - **Mapbox**: Interactive property maps.
 - **PostgreSQL**: Primary database.
 - **GPT-4o-mini**: AI services.
-- **Turf.js**: Geospatial operations for CMA maps.
+- **Graphic Generator**: Client-side canvas rendering for Instagram-format social media graphics (1080x1350px, 4:5 aspect ratio) with 4 template designs and agent branding.

@@ -75,7 +75,7 @@ export default function Admin() {
     {
       id: "repliers",
       name: "Repliers (MLS)",
-      description: "Fetch MLS listings, property data, and CMA comparables",
+      description: "Fetch MLS listings and property data",
       icon: <span className="text-blue-500 font-bold text-sm">MLS</span>,
       iconBg: "bg-blue-500/10",
       configured: status?.repliers ?? false,

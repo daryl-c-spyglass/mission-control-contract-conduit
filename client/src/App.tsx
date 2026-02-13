@@ -19,13 +19,7 @@ import Dashboard from "@/pages/dashboard";
 import Archive from "@/pages/archive";
 import Settings from "@/pages/settings";
 import Admin from "@/pages/admin";
-import SharedCMAPage from "@/pages/shared-cma";
 import PublicFlyerPage from "@/pages/flyer-viewer";
-import CMAs from "@/pages/CMAs";
-import CMANew from "@/pages/CMANew";
-import CMADetailPage from "@/pages/CMADetailPage";
-import CMAPresentationBuilder from "@/pages/CMAPresentationBuilder";
-import CMAPresentation from "@/pages/CMAPresentation";
 import NotFound from "@/pages/not-found";
 import type { Transaction } from "@shared/schema";
 
@@ -223,14 +217,9 @@ function AuthenticatedApp() {
                     setCreateDialogOpen={setCreateDialogOpen}
                   />
                 </Route>
-                <Route path="/transactions/:transactionId/cma-presentation" component={CMAPresentation} />
                 <Route path="/archive" component={Archive} />
                 <Route path="/settings" component={Settings} />
                 <Route path="/admin" component={Admin} />
-                <Route path="/cmas" component={CMAs} />
-                <Route path="/cmas/new" component={CMANew} />
-                <Route path="/cmas/:id/presentation" component={CMAPresentationBuilder} />
-                <Route path="/cmas/:id" component={CMADetailPage} />
                 <Route component={NotFound} />
               </Switch>
             </div>
@@ -254,16 +243,6 @@ function AuthenticatedApp() {
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
   
-  // Check for public routes that don't require authentication
-  if (window.location.pathname.startsWith('/shared/cma/')) {
-    return (
-      <Switch>
-        <Route path="/shared/cma/:token" component={SharedCMAPage} />
-        <Route component={NotFound} />
-      </Switch>
-    );
-  }
-
   // Public flyer viewer route - no auth required
   if (window.location.pathname.startsWith('/flyer/')) {
     return (

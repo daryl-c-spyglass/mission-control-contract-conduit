@@ -2,8 +2,6 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { MapboxPropertyMap } from "./mapbox-property-map";
-import { CMAAnalytics } from "./cma-analytics";
-import { calculateStatistics } from "./cma-tab";
 import { useTheme } from "@/hooks/use-theme";
 import { getDisplayDOM, hasAccurateDOM } from "@shared/lib/listings";
 import {
@@ -106,7 +104,6 @@ import { GraphicGeneratorDialog } from "./graphic-generator-dialog";
 import { FlyerGenerator } from "./marketing/FlyerGenerator";
 import { PropertyPhotos } from "./marketing/PropertyPhotos";
 import { PhotoGalleryModal } from "./photo-gallery-modal";
-import { CMATab } from "./cma-tab";
 import { TimelineTab } from "./timeline-tab";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -121,7 +118,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getStatusBadgeStyle, getStatusLabel } from "@/lib/utils/status-colors";
 import { cn } from "@/lib/utils";
-import type { Transaction, Coordinator, Activity as ActivityType, CMAComparable, MLSData, MarketingAsset, ContractDocument } from "@shared/schema";
+import type { Transaction, Coordinator, Activity as ActivityType, MLSData, MarketingAsset, ContractDocument } from "@shared/schema";
 
 interface TransactionDetailsProps {
   transaction: Transaction;
@@ -1687,7 +1684,6 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
                 <Badge variant="secondary" className="ml-1 sm:ml-2 text-[10px] sm:text-xs">{marketingAssets.length}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="cma" className="text-xs sm:text-sm" data-testid="tab-cma">CMA</TabsTrigger>
             <TabsTrigger value="timeline" className="text-xs sm:text-sm" data-testid="tab-timeline">Timeline</TabsTrigger>
           </TabsList>
         </div>
@@ -2018,59 +2014,6 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
             </Card>
           )}
 
-          {/* CMA Analytics Preview */}
-          {(() => {
-            const cmaData = transaction.cmaData as any[] | null;
-            if (!cmaData || cmaData.length === 0) return null;
-            
-            const statistics = calculateStatistics(cmaData);
-            if (!statistics) return null;
-            
-            const mlsData = transaction.mlsData as Record<string, any> | null;
-            const subjectProperty = mlsData ? {
-              listPrice: mlsData.listPrice || transaction.listPrice,
-              sqft: mlsData.sqft || transaction.sqft,
-              details: {
-                bedrooms: mlsData.details?.bedrooms || transaction.bedrooms,
-                bathrooms: mlsData.details?.bathrooms || transaction.bathrooms,
-              },
-            } : {
-              listPrice: transaction.listPrice,
-              sqft: transaction.sqft,
-              details: {
-                bedrooms: transaction.bedrooms,
-                bathrooms: transaction.bathrooms,
-              },
-            };
-            
-            return (
-              <Card>
-                <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Activity className="h-4 w-4" />
-                    Market Analysis
-                  </CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setActiveTab('cma')}
-                    className="text-xs"
-                    data-testid="button-view-full-cma"
-                  >
-                    View Full CMA
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  <CMAAnalytics 
-                    statistics={statistics}
-                    subjectProperty={subjectProperty as any}
-                    comparableCount={cmaData.length}
-                    variant="compact"
-                  />
-                </CardContent>
-              </Card>
-            );
-          })()}
 
           {/* Media Section with Photo Modal */}
           {overviewPhotos.length > 0 && (
@@ -2852,10 +2795,6 @@ export function TransactionDetails({ transaction, coordinators, activities, onBa
               </DialogContent>
             </Dialog>
           )}
-        </TabsContent>
-
-        <TabsContent value="cma" className="space-y-6">
-          <CMATab transaction={transaction} />
         </TabsContent>
 
         <TabsContent value="documents" className="space-y-6">

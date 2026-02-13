@@ -56,7 +56,7 @@ const integrations: IntegrationConfig[] = [
   {
     id: "repliers",
     name: "Repliers (MLS)",
-    description: "Fetch MLS listings, property data, and CMA comparables",
+    description: "Fetch MLS listings and property data",
     icon: Database,
     iconColor: "text-blue-500",
     fields: [

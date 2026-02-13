@@ -1,5 +1,5 @@
 import { storage } from "./storage";
-import { fetchMLSListing, fetchSimilarListings, searchNearbyComparables, type CMASearchFilters } from "./repliers";
+import { fetchMLSListing } from "./repliers";
 import { isRentalOrLease } from "../shared/lib/listings";
 import type { Transaction, InsertTransaction } from "@shared/schema";
 import { createModuleLogger } from './lib/logger';
@@ -18,7 +18,6 @@ interface SyncResult {
   address: string;
   success: boolean;
   photosCount?: number;
-  comparablesCount?: number;
   error?: string;
   skippedAsRental?: boolean;
 }
@@ -43,7 +42,7 @@ async function syncTransactionMLS(transaction: Transaction): Promise<SyncResult>
       return result;
     }
 
-    const { mlsData, comparables } = mlsResult;
+    const { mlsData } = mlsResult;
     
     // GLOBAL RENTAL EXCLUSION: Skip rental/lease listings during sync
     // Check both rawData and mlsData itself (rawData may be absent for cached/normalized records)
@@ -52,46 +51,6 @@ async function syncTransactionMLS(transaction: Transaction): Promise<SyncResult>
       result.error = "Skipped: Rental/Lease listing";
       log.info({ mlsNumber: transaction.mlsNumber }, 'Skipping rental/lease listing');
       return result;
-    }
-    
-    let cmaData = comparables;
-    let cmaSourceType: 'repliers_similar' | 'coordinate_fallback' | null = null;
-    
-    if (!cmaData || cmaData.length === 0) {
-      cmaData = await fetchSimilarListings(transaction.mlsNumber);
-      if (cmaData && cmaData.length > 0) {
-        cmaSourceType = 'repliers_similar';
-      }
-    } else {
-      cmaSourceType = 'repliers_similar';
-    }
-    
-    // Fallback for closed listings: use coordinate-based search if fetchSimilarListings returned empty
-    // The /listings/similar endpoint returns 404 for closed listings, so we use searchNearbyComparables
-    if ((!cmaData || cmaData.length === 0) && mlsData.coordinates?.latitude && mlsData.coordinates?.longitude) {
-      const status = mlsData.status?.toLowerCase() || (mlsData as any).standardStatus?.toLowerCase() || '';
-      const isClosed = status.includes('closed') || status.includes('sold');
-      
-      if (isClosed) {
-        log.info({ mlsNumber: transaction.mlsNumber }, 'Using coordinate-based search for closed listing');
-        const defaultFilters: CMASearchFilters = {
-          radius: 5,
-          maxResults: 10,
-          statuses: ['Closed', 'Active', 'Active Under Contract', 'Pending'],
-          soldWithinMonths: 6,
-        };
-        
-        cmaData = await searchNearbyComparables(
-          mlsData.coordinates.latitude,
-          mlsData.coordinates.longitude,
-          transaction.mlsNumber,
-          defaultFilters
-        );
-        if (cmaData && cmaData.length > 0) {
-          cmaSourceType = 'coordinate_fallback';
-        }
-        log.info({ comparablesCount: cmaData.length }, 'Coordinate search found comparables for closed listing');
-      }
     }
 
     const updateData: Partial<InsertTransaction> & { mlsLastSyncedAt?: Date } = {
@@ -108,19 +67,10 @@ async function syncTransactionMLS(transaction: Transaction): Promise<SyncResult>
     if (mlsData.propertyType) updateData.propertyType = mlsData.propertyType;
     if (mlsData.listPrice) updateData.listPrice = mlsData.listPrice;
 
-    if (cmaData && cmaData.length > 0) {
-      updateData.cmaData = cmaData;
-      if (cmaSourceType) {
-        (updateData as any).cmaSource = cmaSourceType;
-        (updateData as any).cmaGeneratedAt = new Date();
-      }
-    }
-
     await storage.updateTransaction(transaction.id, updateData as Partial<InsertTransaction>);
 
     result.success = true;
     result.photosCount = mlsData.photos?.length || 0;
-    result.comparablesCount = cmaData?.length || 0;
     
     return result;
   } catch (error: any) {
@@ -168,7 +118,7 @@ async function runSync(): Promise<void> {
       results.push(result);
       
       if (result.success) {
-        log.info({ address: result.address, photosCount: result.photosCount, comparablesCount: result.comparablesCount }, 'Sync success');
+        log.info({ address: result.address, photosCount: result.photosCount }, 'Sync success');
       } else {
         log.warn({ address: result.address, error: result.error }, 'Sync failed');
       }

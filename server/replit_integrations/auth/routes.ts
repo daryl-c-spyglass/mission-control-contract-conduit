@@ -128,7 +128,7 @@ export function registerAuthRoutes(app: Express): void {
       if (firstName !== undefined) updateData.firstName = firstName || null;
       if (lastName !== undefined) updateData.lastName = lastName || null;
       
-      // Auto-compose marketingDisplayName from firstName + lastName for backward compatibility with flyers/CMAs
+      // Auto-compose marketingDisplayName from firstName + lastName for backward compatibility with flyers
       if (firstName !== undefined || lastName !== undefined) {
         const first = firstName !== undefined ? firstName : '';
         const last = lastName !== undefined ? lastName : '';

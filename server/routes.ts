@@ -3,10 +3,10 @@ import { createServer, type Server } from "http";
 import path from "path";
 import fs from "fs";
 import { storage } from "./storage";
-import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema, insertCmaSchema, insertNotificationSettingsSchema, insertFlyerSchema } from "@shared/schema";
+import { insertTransactionSchema, insertCoordinatorSchema, insertMarketingAssetSchema, insertNotificationSettingsSchema, insertFlyerSchema } from "@shared/schema";
 import { setupGmailForTransaction, isGmailConfigured, getNewMessages, watchUserMailbox } from "./gmail";
 import { createSlackChannel, inviteUsersToChannel, postToChannel, uploadFileToChannel, postDocumentUploadNotification, postMLSListingNotification, sendMarketingNotification, postComingSoonNotification, postPhotographyRequest, notifyMarketingTeamNewListing } from "./slack";
-import { fetchMLSListing, fetchSimilarListings, searchByAddress, testRepliersAccess, getBestPhotosForFlyer, getAISelectedPhotosForFlyer, searchNearbyComparables, type CMASearchFilters } from "./repliers";
+import { fetchMLSListing, searchByAddress, testRepliersAccess, getBestPhotosForFlyer, getAISelectedPhotosForFlyer } from "./repliers";
 import { isRentalOrLease } from "../shared/lib/listings";
 import { searchFUBContacts, getFUBContact, getFUBUserByEmail, searchFUBContactsByAssignedUser } from "./fub";
 import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
@@ -107,33 +107,6 @@ export async function registerRoutes(
       // Verify user can access this transaction (owner OR assigned coordinator)
       if (!(await canAccessTransaction(transaction, userId, userEmail))) {
         return res.status(403).json({ message: "Access denied" });
-      }
-      
-      // Enrich CMA comparables with coordinates if they're missing
-      if (transaction.cmaData && Array.isArray(transaction.cmaData) && transaction.cmaData.length > 0) {
-        const cmaComparables = transaction.cmaData as any[];
-        const missingCount = cmaComparables.filter(c => !c.map && c.mlsNumber).length;
-        
-        if (missingCount > 0) {
-          log.info(`[CMA Enrich] Transaction ${req.params.id} has ${missingCount}/${cmaComparables.length} comparables without coordinates`);
-          try {
-            const { enrichCMAWithCoordinates } = await import("./repliers");
-            const enrichedCMA = await enrichCMAWithCoordinates(cmaComparables);
-            
-            // Check how many were enriched
-            const enrichedCount = enrichedCMA.filter((c: any) => c.map).length;
-            log.info(`[CMA Enrich] Enriched ${enrichedCount}/${cmaComparables.length} comparables with coordinates`);
-            
-            // Update the transaction in database with enriched coordinates
-            await storage.updateTransaction(req.params.id, { cmaData: enrichedCMA });
-            
-            // Return enriched data
-            return res.json({ ...transaction, cmaData: enrichedCMA });
-          } catch (enrichError) {
-            log.error({ err: enrichError }, "Error enriching CMA coordinates");
-            // Fall through to return original data
-          }
-        }
       }
       
       res.json(transaction);
@@ -560,15 +533,8 @@ export async function registerRoutes(
                 mlsNumber: transaction.mlsNumber,
               });
             }
-            // Use comparables from listing, fallback to separate API call if none found
-            let cmaData = comparables;
-            if (!cmaData || cmaData.length === 0) {
-              cmaData = await fetchSimilarListings(transaction.mlsNumber);
-            }
-            
             await storage.updateTransaction(transaction.id, {
               mlsData: mlsData,
-              cmaData: cmaData,
               // Note: propertyImages is for user uploads only, MLS photos come from mlsData
               bedrooms: mlsData.bedrooms || transaction.bedrooms,
               bathrooms: mlsData.bathrooms || transaction.bathrooms,
@@ -581,7 +547,7 @@ export async function registerRoutes(
             await storage.createActivity({
               transactionId: transaction.id,
               type: "mls_fetched",
-              description: "MLS data and CMA comparables loaded from Repliers",
+              description: "MLS data loaded from Repliers",
               category: "mls",
             });
 
@@ -1368,13 +1334,11 @@ export async function registerRoutes(
       log.info({ data: transaction.mlsNumber }, "Calling Repliers API for MLS#");
 
       let mlsData = null;
-      let cmaData: any[] = [];
 
       if (transaction.mlsNumber) {
         const mlsResult = await fetchMLSListing(transaction.mlsNumber);
         if (mlsResult) {
           mlsData = mlsResult.mlsData;
-          cmaData = mlsResult.comparables;
           log.info("MLS Data returned:", "found", mlsData?.photos?.length, "photos");
           
           // GLOBAL RENTAL EXCLUSION: Reject rental/lease listings on refresh
@@ -1385,36 +1349,6 @@ export async function registerRoutes(
               code: "RENTAL_EXCLUDED",
               mlsNumber: transaction.mlsNumber,
             });
-          }
-          
-          // Fallback to separate API call if no comparables in listing
-          if (!cmaData || cmaData.length === 0) {
-            cmaData = await fetchSimilarListings(transaction.mlsNumber);
-          }
-          
-          // Fallback for closed listings: use coordinate-based search if fetchSimilarListings returned empty
-          // The /listings/similar endpoint returns 404 for closed listings, so we use searchNearbyComparables
-          if ((!cmaData || cmaData.length === 0) && mlsData.coordinates?.latitude && mlsData.coordinates?.longitude) {
-            const status = mlsData.status?.toLowerCase() || (mlsData as any).standardStatus?.toLowerCase() || '';
-            const isClosed = status.includes('closed') || status.includes('sold');
-            
-            if (isClosed) {
-              log.info(`[RefreshMLS] Using coordinate-based search for closed listing ${transaction.mlsNumber}`);
-              const defaultFilters: CMASearchFilters = {
-                radius: 5,
-                maxResults: 10,
-                statuses: ['Closed', 'Active', 'Active Under Contract', 'Pending'],
-                soldWithinMonths: 6,
-              };
-              
-              cmaData = await searchNearbyComparables(
-                mlsData.coordinates.latitude,
-                mlsData.coordinates.longitude,
-                transaction.mlsNumber,
-                defaultFilters
-              );
-              log.info(`[RefreshMLS] Coordinate search found ${cmaData.length} comparables for closed listing`);
-            }
           }
         } else {
           log.info("MLS Data returned: null");
@@ -1437,27 +1371,8 @@ export async function registerRoutes(
         if (mlsData.listPrice) updateData.listPrice = mlsData.listPrice;
       }
       
-      if (cmaData && cmaData.length > 0) {
-        updateData.cmaData = cmaData;
-      }
-
       log.info({ updateFields: Object.keys(updateData) }, 'Updating transaction');
       const updated = await storage.updateTransaction(req.params.id, updateData);
-
-      // Sync CMA record's propertiesData if it exists (keep Presentation Builder in sync)
-      if (cmaData && cmaData.length > 0) {
-        try {
-          const existingCma = await storage.getCmaByTransaction(req.params.id);
-          if (existingCma) {
-            await storage.updateCma(existingCma.id, {
-              propertiesData: cmaData,
-            });
-            log.info(`[MLS Refresh] Synced ${cmaData.length} comparables to CMA propertiesData`);
-          }
-        } catch (syncError) {
-          log.warn({ err: syncError }, 'MLS Refresh: Failed to sync CMA propertiesData');
-        }
-      }
 
       await storage.createActivity({
         transactionId: transaction.id,
@@ -1470,133 +1385,6 @@ export async function registerRoutes(
     } catch (error: any) {
       log.error({ err: error }, "Error refreshing MLS data");
       res.status(500).json({ message: error.message || "Failed to refresh MLS data" });
-    }
-  });
-
-  // POST /api/transactions/:id/generate-cma-fallback
-  // Generates CMA data using coordinate-based search for closed listings
-  app.post("/api/transactions/:id/generate-cma-fallback", isAuthenticated, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { radius = 5 } = req.body;
-
-      const transaction = await storage.getTransaction(id);
-      if (!transaction) {
-        return res.status(404).json({ error: "Transaction not found" });
-      }
-
-      const mlsData = transaction.mlsData as any;
-      if (!mlsData) {
-        return res.status(400).json({ 
-          error: "No MLS data available",
-          message: "This transaction does not have MLS data to extract coordinates from."
-        });
-      }
-
-      const latitude = mlsData.coordinates?.latitude || mlsData.map?.latitude || mlsData.latitude;
-      const longitude = mlsData.coordinates?.longitude || mlsData.map?.longitude || mlsData.longitude;
-
-      if (!latitude || !longitude) {
-        return res.status(400).json({ 
-          error: "No coordinates available",
-          message: "This property does not have latitude/longitude coordinates in the MLS data."
-        });
-      }
-
-      const subjectPrice = mlsData.listPrice || mlsData.soldPrice || mlsData.closePrice;
-      const subjectBeds = mlsData.bedrooms || mlsData.bedroomsTotal;
-
-      const filters: CMASearchFilters = {
-        radius: radius,
-        maxResults: 15,
-        statuses: ['Closed', 'Active', 'Active Under Contract', 'Pending'],
-        soldWithinMonths: 6,
-      };
-
-      if (subjectPrice) {
-        filters.minPrice = Math.round(subjectPrice * 0.75);
-        filters.maxPrice = Math.round(subjectPrice * 1.25);
-      }
-
-      if (subjectBeds) {
-        filters.minBeds = Math.max(1, subjectBeds - 1);
-      }
-
-      log.info(`[CMA Fallback] Generating for transaction ${id} at (${latitude}, ${longitude})`);
-
-      const comparables = await searchNearbyComparables(
-        latitude,
-        longitude,
-        transaction.mlsNumber || '',
-        filters
-      );
-
-      if (!comparables || comparables.length === 0) {
-        return res.status(200).json({ 
-          success: false,
-          message: "No comparable properties found within the search radius.",
-          comparablesCount: 0
-        });
-      }
-
-      await storage.updateTransaction(id, {
-        cmaData: comparables,
-        cmaSource: "coordinate_fallback",
-        cmaGeneratedAt: new Date(),
-      });
-
-      await storage.createActivity({
-        transactionId: id,
-        type: "cma_generated",
-        description: `Generated ${comparables.length} comparables using nearby property search`,
-        category: "cma",
-      });
-
-      log.info(`[CMA Fallback] Success: ${comparables.length} comparables found for transaction ${id}`);
-
-      res.json({ 
-        success: true,
-        message: `Found ${comparables.length} comparable properties`,
-        comparablesCount: comparables.length,
-      });
-
-    } catch (error: any) {
-      log.error({ err: error }, "[CMA Fallback] Error");
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // DELETE /api/transactions/:id/cma
-  // Clears CMA data from a transaction
-  app.delete("/api/transactions/:id/cma", isAuthenticated, async (req, res) => {
-    try {
-      const { id } = req.params;
-
-      const transaction = await storage.getTransaction(id);
-      if (!transaction) {
-        return res.status(404).json({ error: "Transaction not found" });
-      }
-
-      await storage.updateTransaction(id, {
-        cmaData: null,
-        cmaSource: null,
-        cmaGeneratedAt: null,
-      });
-
-      await storage.createActivity({
-        transactionId: id,
-        type: "cma_cleared",
-        description: "Comparative market analysis data was removed",
-        category: "cma",
-      });
-
-      log.info(`[CMA] Cleared CMA data for transaction ${id}`);
-
-      res.json({ success: true, message: "CMA data cleared" });
-
-    } catch (error: any) {
-      log.error({ err: error }, "[CMA Clear] Error");
-      res.status(500).json({ error: error.message });
     }
   });
 
@@ -2831,623 +2619,6 @@ export async function registerRoutes(
     } catch (error) {
       res.status(500).json({ message: "Failed to delete document" });
     }
-  });
-
-  // ============ CMAs (Comparative Market Analysis) ============
-
-  // Get all CMAs
-  app.get("/api/cmas", isAuthenticated, async (req, res) => {
-    try {
-      const allCmas = await storage.getAllCmas();
-      res.json(allCmas);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch CMAs" });
-    }
-  });
-
-  // Get CMA by ID
-  app.get("/api/cmas/:id", isAuthenticated, async (req, res) => {
-    try {
-      const cma = await storage.getCma(req.params.id);
-      if (!cma) {
-        return res.status(404).json({ message: "CMA not found" });
-      }
-      res.json(cma);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch CMA" });
-    }
-  });
-
-  // Get CMA by transaction ID
-  app.get("/api/transactions/:transactionId/cma", isAuthenticated, async (req, res) => {
-    try {
-      const cma = await storage.getCmaByTransaction(req.params.transactionId);
-      res.json(cma || null);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch CMA for transaction" });
-    }
-  });
-
-  // Get shared CMA by public link token (no auth required for public sharing)
-  app.get("/api/shared/cma/:token", async (req, res) => {
-    try {
-      const cma = await storage.getCmaByShareToken(req.params.token);
-      if (!cma) {
-        return res.status(404).json({ message: "CMA not found or link expired" });
-      }
-      // Check expiration
-      if (cma.expiresAt && new Date(cma.expiresAt) < new Date()) {
-        return res.status(410).json({ message: "This CMA link has expired" });
-      }
-      res.json(cma);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch shared CMA" });
-    }
-  });
-
-  // Get agent resources for a shared CMA (no auth required for public sharing)
-  app.get("/api/shared/cma/:token/resources", async (req, res) => {
-    try {
-      const cma = await storage.getCmaByShareToken(req.params.token);
-      if (!cma) {
-        return res.status(404).json({ message: "CMA not found or link expired" });
-      }
-      // Check expiration
-      if (cma.expiresAt && new Date(cma.expiresAt) < new Date()) {
-        return res.status(410).json({ message: "This CMA link has expired" });
-      }
-      
-      if (!cma.userId) {
-        return res.json([]);
-      }
-      
-      const resources = await storage.getAgentResources(cma.userId);
-      // Only return active resources (filter out inactive ones)
-      const activeResources = resources.filter(r => r.isActive !== false);
-      res.json(activeResources);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch resources" });
-    }
-  });
-
-  // Create a new CMA
-  app.post("/api/cmas", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user?.claims?.sub;
-      const validatedData = insertCmaSchema.parse({
-        ...req.body,
-        userId,
-      });
-      const cma = await storage.createCma(validatedData);
-      res.status(201).json(cma);
-    } catch (error: any) {
-      log.error({ err: error }, "CMA creation error");
-      res.status(400).json({ message: error.message || "Failed to create CMA" });
-    }
-  });
-
-  // Create CMA for a specific transaction
-  app.post("/api/transactions/:transactionId/cma", isAuthenticated, async (req: any, res) => {
-    try {
-      const transaction = await storage.getTransaction(req.params.transactionId);
-      if (!transaction) {
-        return res.status(404).json({ message: "Transaction not found" });
-      }
-      
-      const userId = req.user?.claims?.sub;
-      const validatedData = insertCmaSchema.parse({
-        ...req.body,
-        transactionId: req.params.transactionId,
-        userId,
-        subjectPropertyId: transaction.mlsNumber || undefined,
-      });
-      const cma = await storage.createCma(validatedData);
-      res.status(201).json(cma);
-    } catch (error: any) {
-      log.error({ err: error }, "Transaction CMA creation error");
-      res.status(400).json({ message: error.message || "Failed to create CMA for transaction" });
-    }
-  });
-
-  // Refresh CMA comparables with new filters
-  app.post("/api/transactions/:transactionId/cma/refresh", isAuthenticated, async (req: any, res) => {
-    try {
-      const transaction = await storage.getTransaction(req.params.transactionId);
-      if (!transaction) {
-        return res.status(404).json({ message: "Transaction not found" });
-      }
-
-      const { mlsNumber, filters } = req.body;
-      if (!mlsNumber) {
-        return res.status(400).json({ message: "MLS number is required" });
-      }
-
-      // Get subject property coordinates
-      const subjectListing = await fetchMLSListing(mlsNumber);
-      if (!subjectListing) {
-        return res.status(404).json({ message: "Subject property not found in MLS" });
-      }
-
-      const coords = subjectListing.mlsData.coordinates;
-      if (!coords?.latitude || !coords?.longitude) {
-        return res.status(400).json({ message: "Subject property has no coordinates - cannot search nearby" });
-      }
-
-      // Build search filters with defaults
-      const searchFilters: CMASearchFilters = {
-        radius: filters?.radius || 2,
-        minPrice: filters?.minPrice,
-        maxPrice: filters?.maxPrice,
-        minSqft: filters?.minSqft,
-        maxSqft: filters?.maxSqft,
-        minYearBuilt: filters?.minYearBuilt,
-        maxYearBuilt: filters?.maxYearBuilt,
-        minBeds: filters?.minBeds,
-        minBaths: filters?.minBaths,
-        statuses: filters?.statuses || ['Closed', 'Active', 'Active Under Contract', 'Pending'],
-        soldWithinMonths: filters?.soldWithinMonths || 6,
-        maxResults: filters?.maxResults || 10,
-      };
-
-      log.info({ data: searchFilters }, `[CMA Refresh] Searching for comparables near ${mlsNumber} with filters`);
-
-      // Search for nearby comparables
-      const comparables = await searchNearbyComparables(
-        coords.latitude,
-        coords.longitude,
-        mlsNumber,
-        searchFilters
-      );
-
-      log.info(`[CMA Refresh] Found ${comparables.length} comparables`);
-
-      // Update transaction with new CMA data
-      await storage.updateTransaction(req.params.transactionId, {
-        cmaData: comparables,
-      });
-
-      // Also update any existing CMA record for this transaction
-      const existingCma = await storage.getCmaByTransaction(req.params.transactionId);
-      if (existingCma) {
-        await storage.updateCma(existingCma.id, {
-          propertiesData: comparables,
-        });
-      }
-
-      res.json({
-        success: true,
-        comparablesCount: comparables.length,
-        comparables,
-        appliedFilters: searchFilters,
-      });
-    } catch (error: any) {
-      log.error({ err: error }, "[CMA Refresh] Error");
-      res.status(500).json({ message: error.message || "Failed to refresh CMA comparables" });
-    }
-  });
-
-  // Update CMA
-  app.patch("/api/cmas/:id", isAuthenticated, async (req, res) => {
-    try {
-      const updated = await storage.updateCma(req.params.id, req.body);
-      if (!updated) {
-        return res.status(404).json({ message: "CMA not found" });
-      }
-      res.json(updated);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message || "Failed to update CMA" });
-    }
-  });
-
-  // Generate or regenerate share link for CMA
-  app.post("/api/cmas/:id/share", isAuthenticated, async (req, res) => {
-    try {
-      const cma = await storage.getCma(req.params.id);
-      if (!cma) {
-        return res.status(404).json({ message: "CMA not found" });
-      }
-      
-      // Generate a unique token
-      const token = `cma_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-      
-      // Set expiration (default 30 days from now)
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + (req.body.expirationDays || 30));
-      
-      const updated = await storage.updateCma(req.params.id, {
-        publicLink: token,
-        expiresAt,
-      });
-      
-      res.json({ publicLink: token, expiresAt });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to generate share link" });
-    }
-  });
-
-  // Delete CMA
-  app.delete("/api/cmas/:id", isAuthenticated, async (req, res) => {
-    try {
-      const deleted = await storage.deleteCma(req.params.id);
-      if (!deleted) {
-        return res.status(404).json({ message: "CMA not found" });
-      }
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to delete CMA" });
-    }
-  });
-
-  // Remove share link from CMA
-  app.delete("/api/cmas/:id/share", isAuthenticated, async (req, res) => {
-    try {
-      const cma = await storage.getCma(req.params.id);
-      if (!cma) {
-        return res.status(404).json({ message: "CMA not found" });
-      }
-      
-      await storage.updateCma(req.params.id, {
-        publicLink: null,
-        expiresAt: null,
-      });
-      
-      res.json({ message: "Share link removed" });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to remove share link" });
-    }
-  });
-
-  // Get CMA statistics
-  app.get("/api/cmas/:id/statistics", async (req, res) => {
-    try {
-      const cma = await storage.getCma(req.params.id);
-      if (!cma) {
-        return res.status(404).json({ message: "CMA not found" });
-      }
-      
-      // Try propertiesData first, fall back to linked transaction's cmaData
-      let properties = (cma.propertiesData || []) as any[];
-      
-      if (properties.length === 0 && cma.transactionId) {
-        const transaction = await storage.getTransaction(cma.transactionId);
-        if (transaction?.cmaData) {
-          properties = transaction.cmaData as any[];
-        }
-      }
-      
-      if (properties.length === 0) {
-        return res.json({
-          price: { range: { min: 0, max: 0 }, average: 0, median: 0 },
-          pricePerSqFt: { range: { min: 0, max: 0 }, average: 0, median: 0 },
-          daysOnMarket: { range: { min: 0, max: 0 }, average: 0, median: 0 },
-          livingArea: { range: { min: 0, max: 0 }, average: 0, median: 0 },
-          lotSize: { range: { min: 0, max: 0 }, average: 0, median: 0 },
-          acres: { range: { min: 0, max: 0 }, average: 0, median: 0 },
-          bedrooms: { range: { min: 0, max: 0 }, average: 0, median: 0 },
-          bathrooms: { range: { min: 0, max: 0 }, average: 0, median: 0 },
-          yearBuilt: { range: { min: 0, max: 0 }, average: 0, median: 0 },
-        });
-      }
-      
-      const calcStats = (values: number[]) => {
-        const filtered = values.filter(v => v != null && !isNaN(v));
-        if (filtered.length === 0) return { range: { min: 0, max: 0 }, average: 0, median: 0 };
-        const sorted = [...filtered].sort((a, b) => a - b);
-        const sum = filtered.reduce((a, b) => a + b, 0);
-        const avg = sum / filtered.length;
-        const mid = Math.floor(sorted.length / 2);
-        const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-        return { range: { min: sorted[0], max: sorted[sorted.length - 1] }, average: Math.round(avg), median: Math.round(median) };
-      };
-      
-      // Handle both CMA data formats: {price, sqft, status} and {listPrice, livingArea, standardStatus}
-      const prices = properties.map(p => {
-        const status = (p.standardStatus || p.status || '').toLowerCase();
-        const isClosed = status.includes('closed') || status.includes('sold');
-        const closePrice = p.closePrice || p.soldPrice || (isClosed ? p.price : null);
-        const listPrice = p.listPrice || p.price || 0;
-        return isClosed && closePrice ? Number(closePrice) : Number(listPrice);
-      }).filter(p => p > 0);
-      
-      const sqfts = properties.map(p => Number(p.livingArea || p.sqft || 0)).filter(s => s > 0);
-      
-      const pricePerSqft = properties
-        .filter(p => (p.livingArea || p.sqft) && Number(p.livingArea || p.sqft) > 0)
-        .map(p => {
-          const status = (p.standardStatus || p.status || '').toLowerCase();
-          const isClosed = status.includes('closed') || status.includes('sold');
-          const closePrice = p.closePrice || p.soldPrice || (isClosed ? p.price : null);
-          const listPrice = p.listPrice || p.price || 0;
-          const price = isClosed && closePrice ? Number(closePrice) : Number(listPrice);
-          const sqft = Number(p.livingArea || p.sqft);
-          return sqft > 0 ? price / sqft : 0;
-        }).filter(v => v > 0 && !isNaN(v));
-      
-      const doms = properties.map(p => Number(p.daysOnMarket || p.simpleDaysOnMarket || 0)).filter(d => d >= 0);
-      const beds = properties.map(p => Number(p.bedroomsTotal || p.bedrooms || 0)).filter(b => b > 0);
-      const baths = properties.map(p => Number(p.bathroomsTotalInteger || p.bathrooms || 0)).filter(b => b > 0);
-      const years = properties.map(p => Number(p.yearBuilt || 0)).filter(y => y > 0);
-      const lots = properties.map(p => Number(p.lotSizeSquareFeet || 0)).filter(l => l > 0);
-      const acres = properties.map(p => Number(p.lotSizeAcres || (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : 0))).filter(a => a > 0);
-      
-      res.json({
-        price: calcStats(prices),
-        pricePerSqFt: calcStats(pricePerSqft),
-        daysOnMarket: calcStats(doms),
-        livingArea: calcStats(sqfts),
-        lotSize: calcStats(lots),
-        acres: calcStats(acres),
-        bedrooms: calcStats(beds),
-        bathrooms: calcStats(baths),
-        yearBuilt: calcStats(years),
-      });
-    } catch (error) {
-      log.error({ err: error }, "CMA statistics error");
-      res.status(500).json({ message: "Failed to calculate CMA statistics" });
-    }
-  });
-
-  // Get CMA timeline data
-  app.get("/api/cmas/:id/timeline", async (req, res) => {
-    try {
-      const cma = await storage.getCma(req.params.id);
-      if (!cma) {
-        return res.status(404).json({ message: "CMA not found" });
-      }
-      
-      // Try propertiesData first, fall back to linked transaction's cmaData
-      let properties = (cma.propertiesData || []) as any[];
-      
-      if (properties.length === 0 && cma.transactionId) {
-        const transaction = await storage.getTransaction(cma.transactionId);
-        if (transaction?.cmaData) {
-          properties = transaction.cmaData as any[];
-        }
-      }
-      
-      const timeline = properties
-        .filter(p => p.listDate || p.closeDate)
-        .map(p => {
-          const status = (p.standardStatus || p.status || '').toLowerCase();
-          const isClosed = status.includes('closed') || status.includes('sold');
-          const closePrice = p.closePrice || p.soldPrice || (isClosed ? p.price : null);
-          const listPrice = p.listPrice || p.price || 0;
-          return {
-            date: isClosed && p.closeDate ? p.closeDate : p.listDate,
-            price: isClosed && closePrice ? Number(closePrice) : Number(listPrice),
-            status: p.standardStatus || p.status || 'Active',
-            propertyId: p.id || p.mlsNumber || '',
-            address: p.unparsedAddress || p.address || '',
-            daysOnMarket: p.daysOnMarket || p.simpleDaysOnMarket || null,
-            cumulativeDaysOnMarket: p.cumulativeDaysOnMarket || null,
-          };
-        })
-        .filter(t => t.date)
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      
-      res.json(timeline);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to get CMA timeline" });
-    }
-  });
-
-  // Get CMA report config
-  app.get("/api/cmas/:id/report-config", isAuthenticated, async (req, res) => {
-    try {
-      const config = await storage.getCmaReportConfig(req.params.id);
-      res.json(config || {
-        cmaId: req.params.id,
-        includedSections: ['cover_page', 'cover_letter', 'map_all_listings', 'summary_comparables', 'property_details', 'price_per_sqft', 'comparable_stats'],
-        sectionOrder: null,
-        layout: 'two_photos',
-        template: 'default',
-        theme: 'spyglass',
-        photoLayout: 'first_dozen',
-        mapStyle: 'streets',
-        showMapPolygon: true,
-        includeAgentFooter: true,
-      });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to get CMA report config" });
-    }
-  });
-
-  // Update CMA report config
-  app.put("/api/cmas/:id/report-config", isAuthenticated, async (req, res) => {
-    try {
-      const config = await storage.upsertCmaReportConfig({
-        ...req.body,
-        cmaId: req.params.id,
-      });
-      res.json(config);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to update CMA report config" });
-    }
-  });
-
-  // Get CMA adjustments
-  app.get("/api/cmas/:id/adjustments", async (req, res) => {
-    try {
-      const cma = await storage.getCma(req.params.id);
-      if (!cma) {
-        return res.status(404).json({ message: "CMA not found" });
-      }
-      
-      res.json(cma.adjustments || {
-        rates: {
-          sqftPerUnit: 50,
-          bedroomValue: 10000,
-          bathroomValue: 7500,
-          poolValue: 25000,
-          garagePerSpace: 5000,
-          yearBuiltPerYear: 1000,
-          lotSizePerSqft: 2,
-        },
-        compAdjustments: {},
-        enabled: false,
-      });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to get CMA adjustments" });
-    }
-  });
-
-  // Update CMA adjustments
-  app.put("/api/cmas/:id/adjustments", isAuthenticated, async (req, res) => {
-    try {
-      const updated = await storage.updateCma(req.params.id, {
-        adjustments: req.body,
-      });
-      if (!updated) {
-        return res.status(404).json({ message: "CMA not found" });
-      }
-      res.json(updated.adjustments);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to update CMA adjustments" });
-    }
-  });
-
-  // Get CMA brochure
-  app.get("/api/cmas/:id/brochure", async (req, res) => {
-    try {
-      const cma = await storage.getCma(req.params.id);
-      if (!cma) {
-        return res.status(404).json({ message: "CMA not found" });
-      }
-      res.json(cma.brochure || null);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to get CMA brochure" });
-    }
-  });
-
-  // Delete CMA brochure
-  app.delete("/api/cmas/:id/brochure", isAuthenticated, async (req, res) => {
-    try {
-      const updated = await storage.updateCma(req.params.id, {
-        brochure: null,
-      });
-      if (!updated) {
-        return res.status(404).json({ message: "CMA not found" });
-      }
-      res.json({ message: "Brochure deleted" });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to delete CMA brochure" });
-    }
-  });
-
-  // Save CMA brochure
-  app.post("/api/cmas/:id/brochure", isAuthenticated, async (req, res) => {
-    try {
-      const { url, filename, type, generated } = req.body;
-      const brochure = { url, filename, type, generated, uploadedAt: new Date().toISOString() };
-      
-      const updated = await storage.updateCma(req.params.id, { brochure });
-      if (!updated) {
-        return res.status(404).json({ message: "CMA not found" });
-      }
-      res.json(brochure);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to save CMA brochure" });
-    }
-  });
-
-  // Generate AI cover letter for CMA
-  app.post("/api/ai/generate-cover-letter", isAuthenticated, async (req, res) => {
-    try {
-      const { context, tone } = req.body;
-      
-      const toneDescriptions: Record<string, string> = {
-        professional: 'professional, polished, and business-appropriate',
-        friendly: 'warm, approachable, and personable while maintaining professionalism',
-        confident: 'confident, authoritative, and compelling'
-      };
-
-      const hasClientName = context.clientName && context.clientName.trim().length > 0;
-      
-      const systemPrompt = `You are a professional real estate agent at Spyglass Realty, a premier Austin real estate brokerage known for exceptional client service and market expertise. You are writing a cover letter for a Comparative Market Analysis (CMA) report.
-Write a personalized, compelling cover letter based on the provided property and market data.
-The tone should be ${toneDescriptions[tone] || toneDescriptions.professional}.
-Keep it concise (2-3 paragraphs) but impactful.
-Include specific data points from the analysis to demonstrate expertise.
-Reflect Spyglass Realty's commitment to exceptional service.
-End with a clear call to action but do NOT include signature.`;
-
-      const userPrompt = `Write a CMA cover letter for this specific property and client:
-${hasClientName ? `IMPORTANT: Start with "Dear ${context.clientName}," as the greeting.` : 'IMPORTANT: Do NOT include any salutation or greeting - start directly with the body content like "Thank you for the opportunity..." or "I am pleased to present..."'}
-${context.agentInfo?.name ? `Agent: ${context.agentInfo.name}` : ''}
-Brokerage: Spyglass Realty
-
-Subject Property: ${context.subjectProperty?.address || 'Not specified'}
-${context.subjectProperty?.price ? `List Price: $${context.subjectProperty.price.toLocaleString()}` : ''}
-${context.subjectProperty?.beds ? `Beds: ${context.subjectProperty.beds}` : ''} ${context.subjectProperty?.baths ? `Baths: ${context.subjectProperty.baths}` : ''} ${context.subjectProperty?.sqft ? `Sq Ft: ${context.subjectProperty.sqft.toLocaleString()}` : ''}
-
-Market Analysis:
-- ${context.comparables?.count || 0} comparable properties analyzed
-${context.comparables?.avgPrice ? `- Average price: $${context.comparables.avgPrice.toLocaleString()}` : ''}
-${context.comparables?.medianPrice ? `- Median price: $${context.comparables.medianPrice.toLocaleString()}` : ''}
-${context.comparables?.avgPricePerSqft ? `- Avg price/sqft: $${context.comparables.avgPricePerSqft.toFixed(0)}` : ''}
-${context.marketStats?.avgDOM ? `- Average days on market: ${context.marketStats.avgDOM}` : ''}
-
-Return ONLY the cover letter text${hasClientName ? ' starting with the greeting' : ' with no salutation'}, no signature, no additional commentary.`;
-
-      const openai = (await import('openai')).default;
-      const client = new openai();
-      
-      const completion = await client.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 800,
-      });
-
-      const coverLetter = completion.choices[0]?.message?.content || '';
-      res.json({ coverLetter });
-    } catch (error: any) {
-      log.error({ err: error }, "AI cover letter generation error");
-      res.status(500).json({ message: error.message || "Failed to generate cover letter" });
-    }
-  });
-
-  // Export CMA as PDF (stub - returns placeholder for now)
-  app.post("/api/cmas/:id/export-pdf", isAuthenticated, async (req, res) => {
-    try {
-      const cma = await storage.getCma(req.params.id);
-      if (!cma) {
-        return res.status(404).json({ message: "CMA not found" });
-      }
-
-      res.status(501).json({ 
-        message: "PDF export is handled client-side using @react-pdf/renderer",
-        note: "Use the client-side PDF generation for full presentation export"
-      });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to export PDF" });
-    }
-  });
-
-  // CMA Report Sections constant
-  app.get("/api/cma/report-sections", async (req, res) => {
-    res.json([
-      { id: 'cover_page', name: 'Cover Page', category: 'introduction', defaultEnabled: true },
-      { id: 'cover_letter', name: 'Cover Letter', category: 'introduction', defaultEnabled: true, editable: true },
-      { id: 'listing_brochure', name: 'Listing Brochure', category: 'introduction', defaultEnabled: false },
-      { id: 'agent_resume', name: 'Agent Resume', category: 'introduction', defaultEnabled: false, editable: true },
-      { id: 'our_company', name: 'Our Company', category: 'introduction', defaultEnabled: false },
-      { id: 'what_is_cma', name: 'What is a CMA?', category: 'introduction', defaultEnabled: false },
-      { id: 'contact_me', name: 'Contact Me', category: 'introduction', defaultEnabled: true },
-      { id: 'map_all_listings', name: 'Map of All Listings', category: 'listings', defaultEnabled: true },
-      { id: 'summary_comparables', name: 'Summary of Comparable Properties', category: 'listings', defaultEnabled: true },
-      { id: 'listings_header', name: 'Listings Chapter Header', category: 'listings', defaultEnabled: false },
-      { id: 'property_details', name: 'Property Details', category: 'listings', defaultEnabled: true },
-      { id: 'property_photos', name: 'Property Photos', category: 'listings', defaultEnabled: true },
-      { id: 'adjustments', name: 'Adjustments', category: 'listings', defaultEnabled: false },
-      { id: 'analysis_header', name: 'Analysis Chapter Header', category: 'analysis', defaultEnabled: false },
-      { id: 'online_valuation', name: 'Online Valuation Analysis', category: 'analysis', defaultEnabled: false },
-      { id: 'price_per_sqft', name: 'Average Price Per Sq. Ft.', category: 'analysis', defaultEnabled: true },
-      { id: 'comparable_stats', name: 'Comparable Property Statistics', category: 'analysis', defaultEnabled: true },
-    ]);
   });
 
   // ============ Admin ============
@@ -5350,7 +4521,7 @@ Generate ONE headline only. Return just the headline text, nothing else.`;
       let userPrompt: string;
 
       if (isEnhancing) {
-        systemPrompt = `You are an expert real estate marketing copywriter for Spyglass Realty, a premier Austin real estate brokerage. Your task is to enhance and improve an existing cover letter for a CMA (Comparative Market Analysis) report. The tone should be ${toneDescriptions[tone]}.`;
+        systemPrompt = `You are an expert real estate marketing copywriter for Spyglass Realty, a premier Austin real estate brokerage. Your task is to enhance and improve an existing cover letter for a real estate report. The tone should be ${toneDescriptions[tone]}.`;
 
         userPrompt = `Please enhance and improve this cover letter for ${agentName}${agentProfile?.title ? `, ${agentProfile.title}` : ''} at Spyglass Realty:
 
@@ -5365,22 +4536,22 @@ IMPORTANT REQUIREMENTS:
 3. Improve the writing quality and flow
 4. Make it more ${tone}
 5. Keep it concise (2-3 paragraphs)
-6. Maintain focus on CMA value proposition and Spyglass Realty's commitment to exceptional service
+6. Maintain focus on the value proposition and Spyglass Realty's commitment to exceptional service
 7. End with a call to action but do NOT include signature
 
 Return ONLY the improved cover letter body text, no salutation, no signature, no additional commentary.`;
       } else {
-        systemPrompt = `You are an expert real estate marketing copywriter for Spyglass Realty, a premier Austin real estate brokerage known for exceptional client service and market expertise. Create a compelling cover letter template for CMA (Comparative Market Analysis) reports. The tone should be ${toneDescriptions[tone]}.`;
+        systemPrompt = `You are an expert real estate marketing copywriter for Spyglass Realty, a premier Austin real estate brokerage known for exceptional client service and market expertise. Create a compelling cover letter template for real estate reports and presentations. The tone should be ${toneDescriptions[tone]}.`;
 
         userPrompt = `Create a default cover letter template for ${agentName}${agentProfile?.title ? `, ${agentProfile.title}` : ''} at Spyglass Realty.
 
 ${agentProfile?.bio ? `AGENT BIO:\n${agentProfile.bio}\n` : ''}
 
 IMPORTANT REQUIREMENTS:
-1. DO NOT include any salutation like "Dear..." - the client name greeting will be added separately in the Presentation Builder when a specific CMA is created
+1. DO NOT include any salutation like "Dear..." - the client name greeting will be added separately
 2. Start directly with the body content (e.g., "Thank you for the opportunity..." or "I'm pleased to present...")
 3. 2-3 paragraphs maximum
-4. Explain the value of the CMA and what insights it provides
+4. Explain the value of the market analysis and what insights it provides
 5. ${tone === 'professional' ? 'Maintain formal business tone' : tone === 'friendly' ? 'Be warm and approachable' : 'Project confidence and expertise'}
 6. Reflect Spyglass Realty's commitment to exceptional service and market expertise
 7. End with offer to discuss further
@@ -5645,7 +4816,7 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
     }
   });
 
-  // Serve file from database storage (public access for CMA viewers)
+  // Serve file from database storage (public access)
   app.get("/api/agent/resources/:id/file", async (req: any, res) => {
     try {
       const { id } = req.params;
@@ -5784,249 +4955,6 @@ Return ONLY the cover letter body text, no salutation, no signature, no addition
     } catch (error) {
       log.error({ err: error }, "Error updating notification preferences");
       res.status(500).json({ message: "Failed to update notification preferences" });
-    }
-  });
-
-  // ============ CMA PDF Data Audit (Diagnostic) ============
-  
-  function calculateAuditScore(checks: boolean[]): string {
-    const passed = checks.filter(Boolean).length;
-    const total = checks.length;
-    const percentage = Math.round((passed / total) * 100);
-    return `${passed}/${total} (${percentage}%)`;
-  }
-
-  app.get('/api/debug/cma-pdf-audit/:transactionId', isAuthenticated, async (req, res) => {
-    const { transactionId } = req.params;
-    
-    try {
-      // 1. TRANSACTION DATA
-      const transaction = await storage.getTransaction(transactionId);
-      if (!transaction) {
-        return res.status(404).json({ error: "Transaction not found" });
-      }
-      
-      // 2. CMA/COMPARABLES DATA
-      const cmaData = transaction?.cmaData;
-      const comparables = Array.isArray(cmaData) ? cmaData : [];
-      
-      // 3. AGENT/USER DATA
-      const userId = transaction?.userId;
-      const user = userId ? await authStorage.getUser(userId) : null;
-      const agentProfile = userId ? await storage.getAgentProfile(userId) : null;
-      
-      // 4. MLS DATA
-      const mlsData = transaction?.mlsData as any;
-      
-      // Build comprehensive audit report
-      const audit = {
-        // === TRANSACTION ===
-        transaction: {
-          exists: !!transaction,
-          id: transaction?.id,
-          address: transaction?.propertyAddress,
-          mlsNumber: transaction?.mlsNumber,
-          status: transaction?.status,
-          listPrice: transaction?.listPrice,
-          closingDate: transaction?.closingDate,
-          contractDate: transaction?.contractDate,
-        },
-        
-        // === AGENT PROFILE ===
-        agent: {
-          exists: !!agentProfile,
-          name: user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : null,
-          email: user?.email,
-          headshotUrl: agentProfile?.headshotUrl,
-          bio: agentProfile?.bio,
-          title: agentProfile?.title,
-          company: agentProfile?.marketingCompany,
-          // What's missing
-          missing: {
-            name: !user?.firstName,
-            photo: !agentProfile?.headshotUrl,
-            bio: !agentProfile?.bio,
-          }
-        },
-        
-        // === MLS DATA (Subject Property) ===
-        mlsData: {
-          exists: !!mlsData,
-          address: mlsData?.address || mlsData?.unparsedAddress,
-          city: mlsData?.city,
-          state: mlsData?.state,
-          zip: mlsData?.zip || mlsData?.postalCode,
-          listPrice: mlsData?.listPrice,
-          beds: mlsData?.beds || mlsData?.bedroomsTotal,
-          baths: mlsData?.baths || mlsData?.bathroomsTotalInteger,
-          sqft: mlsData?.sqft || mlsData?.livingArea,
-          lotSize: mlsData?.lotSize || mlsData?.lotSizeAcres || mlsData?.lot?.acres,
-          yearBuilt: mlsData?.yearBuilt,
-          propertyType: mlsData?.propertyType,
-          description: mlsData?.description || mlsData?.publicRemarks,
-          // Photos
-          photos: {
-            count: mlsData?.images?.length || mlsData?.photos?.length || 0,
-            firstPhotoUrl: mlsData?.images?.[0] || mlsData?.photos?.[0] || mlsData?.primaryPhoto,
-            hasPhotos: (mlsData?.images?.length || mlsData?.photos?.length || 0) > 0,
-          },
-          // Location
-          coordinates: {
-            latitude: mlsData?.coordinates?.latitude || mlsData?.latitude || mlsData?.map?.latitude,
-            longitude: mlsData?.coordinates?.longitude || mlsData?.longitude || mlsData?.map?.longitude,
-            hasCoordinates: !!(
-              (mlsData?.coordinates?.latitude && mlsData?.coordinates?.longitude) ||
-              (mlsData?.latitude && mlsData?.longitude) ||
-              (mlsData?.map?.latitude && mlsData?.map?.longitude)
-            ),
-          },
-        },
-        
-        // === COMPARABLES ===
-        comparables: {
-          count: comparables.length,
-          source: 'repliers',
-          
-          // Audit each comparable
-          items: comparables.slice(0, 5).map((comp: any, index: number) => ({
-            index,
-            address: comp.address || comp.unparsedAddress || `${comp.streetNumber} ${comp.streetName}`,
-            city: comp.city,
-            state: comp.state,
-            mlsNumber: comp.mlsNumber,
-            
-            // Price fields available
-            priceFields: {
-              price: comp.price,
-              listPrice: comp.listPrice,
-              soldPrice: comp.soldPrice,
-              closePrice: comp.closePrice,
-              hasAnyPrice: !!(comp.price || comp.listPrice || comp.soldPrice || comp.closePrice),
-            },
-            
-            // Property details
-            details: {
-              beds: comp.beds || comp.bedroomsTotal,
-              baths: comp.baths || comp.bathroomsTotalInteger,
-              sqft: comp.sqft || comp.livingArea,
-              lotSize: comp.lotSize || comp.lotSizeAcres || comp.lot?.acres,
-              yearBuilt: comp.yearBuilt,
-              status: comp.status || comp.standardStatus,
-            },
-            
-            // Days on market
-            dom: {
-              dom: comp.dom,
-              daysOnMarket: comp.daysOnMarket,
-              cumulativeDom: comp.cumulativeDom,
-              simpleDaysOnMarket: comp.simpleDaysOnMarket,
-              hasDOM: !!(comp.dom || comp.daysOnMarket || comp.cumulativeDom || comp.simpleDaysOnMarket),
-            },
-            
-            // Photos
-            photos: {
-              count: comp.images?.length || comp.photos?.length || 0,
-              primaryPhoto: comp.images?.[0] || comp.photos?.[0] || comp.primaryPhoto,
-              hasPhotos: (comp.images?.length || comp.photos?.length || 0) > 0 || !!comp.primaryPhoto,
-            },
-            
-            // Location
-            coordinates: {
-              latitude: comp.latitude || comp.map?.latitude,
-              longitude: comp.longitude || comp.map?.longitude,
-              hasCoordinates: !!(
-                (comp.latitude && comp.longitude) ||
-                (comp.map?.latitude && comp.map?.longitude)
-              ),
-            },
-          })),
-          
-          // Summary stats
-          summary: {
-            total: comparables.length,
-            withPrices: comparables.filter((c: any) => c.price || c.listPrice || c.soldPrice || c.closePrice).length,
-            withPhotos: comparables.filter((c: any) => (c.images?.length || c.photos?.length) > 0 || c.primaryPhoto).length,
-            withDOM: comparables.filter((c: any) => c.dom || c.daysOnMarket || c.cumulativeDom || c.simpleDaysOnMarket).length,
-            withCoordinates: comparables.filter((c: any) => 
-              (c.latitude && c.longitude) || (c.map?.latitude && c.map?.longitude)
-            ).length,
-            withSqft: comparables.filter((c: any) => c.sqft || c.livingArea).length,
-          },
-        },
-        
-        // === PDF READINESS SCORE ===
-        readiness: {
-          agent: {
-            score: calculateAuditScore([
-              !!user?.firstName,
-              !!agentProfile?.headshotUrl,
-              !!agentProfile?.bio,
-            ]),
-            issues: [] as string[],
-          },
-          comparables: {
-            score: calculateAuditScore([
-              comparables.length >= 3,
-              comparables.filter((c: any) => c.price || c.listPrice || c.soldPrice).length === comparables.length,
-              comparables.filter((c: any) => (c.images?.length || c.photos?.length) > 0).length > 0,
-            ]),
-            issues: [] as string[],
-          },
-          subject: {
-            score: calculateAuditScore([
-              !!mlsData?.address || !!mlsData?.unparsedAddress,
-              !!mlsData?.listPrice,
-              (mlsData?.images?.length || mlsData?.photos?.length || 0) > 0,
-              !!(
-                (mlsData?.coordinates?.latitude && mlsData?.coordinates?.longitude) ||
-                (mlsData?.latitude && mlsData?.longitude) ||
-                (mlsData?.map?.latitude && mlsData?.map?.longitude)
-              ),
-            ]),
-            issues: [] as string[],
-          },
-        },
-      };
-      
-      // Add issues to readiness
-      if (!audit.agent.name) {
-        audit.readiness.agent.issues.push('Agent name missing');
-      }
-      if (!audit.agent.headshotUrl) {
-        audit.readiness.agent.issues.push('Agent photo missing');
-      }
-      if (!audit.agent.bio) {
-        audit.readiness.agent.issues.push('Agent bio missing');
-      }
-      
-      if (audit.comparables.summary.withPrices < audit.comparables.count) {
-        audit.readiness.comparables.issues.push(`${audit.comparables.count - audit.comparables.summary.withPrices} comparables missing price data`);
-      }
-      if (audit.comparables.summary.withPhotos === 0) {
-        audit.readiness.comparables.issues.push('No comparable photos available');
-      }
-      if (audit.comparables.summary.withCoordinates < audit.comparables.count) {
-        audit.readiness.comparables.issues.push(`${audit.comparables.count - audit.comparables.summary.withCoordinates} comparables missing coordinates`);
-      }
-      
-      if (!audit.mlsData.address) {
-        audit.readiness.subject.issues.push('Subject property address missing');
-      }
-      if (!audit.mlsData.listPrice) {
-        audit.readiness.subject.issues.push('Subject property list price missing');
-      }
-      if (!audit.mlsData.photos.hasPhotos) {
-        audit.readiness.subject.issues.push('Subject property photos missing');
-      }
-      if (!audit.mlsData.coordinates.hasCoordinates) {
-        audit.readiness.subject.issues.push('Subject property coordinates missing');
-      }
-      
-      res.json(audit);
-      
-    } catch (error: any) {
-      log.error({ err: error }, "Error in CMA PDF audit");
-      res.status(500).json({ error: error.message });
     }
   });
 

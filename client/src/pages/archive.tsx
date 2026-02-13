@@ -67,7 +67,6 @@ export default function Archive() {
     queryKey: ["/api/coordinators"],
   });
 
-  // Fetch the full transaction details when selected (this triggers CMA coordinate enrichment)
   // staleTime: 0 ensures fresh data is fetched, not from cache
   // queryFn uses context.queryKey to avoid stale closure issues
   const { data: selectedTransaction } = useQuery<Transaction>({

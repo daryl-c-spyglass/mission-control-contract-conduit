@@ -13,10 +13,27 @@ import { FlyerPreview } from './FlyerPreview';
 import { GridOverlay } from './GridOverlay';
 import { useMarketingProfile } from '@/hooks/useMarketingProfile';
 import { autoSelectPhotosWithInfo, formatPrice, formatAddress, formatNumber, generateDefaultHeadline, doesClassificationMatchCategory, type PhotoSelectionInfo } from '@/lib/flyer-utils';
-import { extractSqft, extractBeds, extractBaths } from '@/lib/cma-data-utils';
 import type { FlyerData, FlyerImages, ImageTransforms } from '@/lib/flyer-types';
 import { DEFAULT_TRANSFORMS } from '@/lib/flyer-types';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+
+function extractSqft(mlsData: any): string {
+  if (!mlsData) return "";
+  const raw = mlsData.sqft || mlsData.livingArea || mlsData.LivingArea || mlsData.livingAreaRange || "";
+  return String(raw).replace(/[^0-9]/g, "");
+}
+
+function extractBeds(mlsData: any): string {
+  if (!mlsData) return "";
+  const raw = mlsData.beds || mlsData.bedroomsTotal || mlsData.BedroomsTotal || mlsData.bedrooms || "";
+  return String(raw).replace(/[^0-9]/g, "");
+}
+
+function extractBaths(mlsData: any): string {
+  if (!mlsData) return "";
+  const raw = mlsData.baths || mlsData.bathroomsTotalInteger || mlsData.BathroomsTotalInteger || mlsData.bathrooms || "";
+  return String(raw).replace(/[^0-9]/g, "");
+}
 
 interface AgentProfileResponse {
   profile: any;

@@ -1,0 +1,303 @@
+Yes, based on Ryan's direction, CMA will be removed from Contract Conduit since it's now being built as a standalone feature in Mission Control. Let me create a comprehensive Replit prompt for the removal.
+
+Contract Conduit — Remove CMA Feature (Phase 4 Cleanup)
+⚠️ CRITICAL: READ BEFORE STARTING
+Context: Ryan has confirmed that CMA functionality is moving to a standalone Mission Control webapp at missioncontrol-tjfm.onrender.com. The CMA tab and all related functionality should be removed from Contract Conduit.
+Important Constraints:
+
+✅ KEEP Agent Profile routes (used by Settings page)
+✅ KEEP Agent Resources routes (used by Marketing features)
+✅ KEEP All transaction functionality (Overview, MLS Data, Documents, Marketing, Timeline, Templates)
+❌ REMOVE All CMA-specific code, routes, components, and database operations
+
+
+PHASE 1: Remove Frontend Routes and Navigation
+Step 1.1: Remove CMA Routes from App.tsx
+Find and delete all CMA-related route definitions:
+typescript// DELETE these routes:
+/cmas
+/cmas/new
+/cmas/:id
+/cmas/:id/presentation
+/cmas/:id/presentation-builder
+/cmas/:id/cma-presentation
+/transactions/:transactionId/cma-presentation
+/shared/cma/:token
+Step 1.2: Remove CMA Tab from Transaction Details
+In client/src/pages/transaction-details.tsx (or similar):
+
+Remove the CMA TabsTrigger from the tab navigation
+Remove the CMA TabsContent panel
+Remove any CMA-related imports
+Remove CMA analytics dashboard cards if present
+
+Before:
+typescript<TabsTrigger value="cma">CMA</TabsTrigger>
+```
+
+**After:** (delete the line entirely)
+
+### Step 1.3: Remove CMA Buttons from Transaction Header
+
+Remove these buttons from the transaction detail header:
+- "Presentation Builder" button
+- "CMA Presentation" button
+- Any CMA-related action buttons
+
+---
+
+## PHASE 2: Delete CMA Pages
+
+Delete these page files (verify paths in your codebase):
+```
+client/src/pages/CMAs.tsx
+client/src/pages/CMANew.tsx
+client/src/pages/CMADetailPage.tsx
+client/src/pages/CMAPresentationBuilder.tsx
+client/src/pages/CMAPresentation.tsx
+client/src/pages/shared-cma.tsx
+
+PHASE 3: Delete CMA Components
+Step 3.1: Delete CMA Component Directories
+bash# Delete entire directories:
+client/src/components/cma/
+client/src/components/cma-presentation/
+client/src/components/pdf/
+client/src/components/presentation/
+```
+
+### Step 3.2: Delete Standalone CMA Component Files
+```
+client/src/components/cma-tab.tsx
+client/src/components/CMAReport.tsx
+client/src/components/CMABuilder.tsx
+client/src/components/cma-map.tsx
+client/src/components/cma-analytics.tsx
+client/src/components/cma-stats-view.tsx
+client/src/components/cma-source-indicator.tsx
+client/src/components/SharedCMAView.tsx
+```
+
+---
+
+## PHASE 4: Delete CMA Utilities
+
+Delete these utility files:
+```
+client/src/lib/cma-data-utils.ts
+client/src/lib/cma-map-data.ts
+client/src/lib/cma-transformer.ts
+client/src/lib/adjustmentCalculations.ts
+client/src/lib/cma-section-sources.ts
+client/src/lib/statusColors.ts (only if CMA-specific)
+client/src/lib/image-to-base64.ts (only if CMA-specific)
+```
+
+---
+
+## PHASE 5: Delete Shared CMA Config Files
+```
+shared/cma-sections.ts
+shared/cma-defaults.ts
+
+PHASE 6: Remove CMA API Routes from Server
+In server/routes.ts, remove ALL routes related to:
+DELETE These Route Groups:
+typescript// CMA CRUD routes
+app.get('/api/cmas', ...)
+app.get('/api/cmas/:id', ...)
+app.post('/api/cmas', ...)
+app.put('/api/cmas/:id', ...)
+app.delete('/api/cmas/:id', ...)
+
+// CMA Presentation routes
+app.get('/api/cmas/:id/presentation', ...)
+app.put('/api/cmas/:id/presentation', ...)
+app.post('/api/cmas/:id/presentation/pdf', ...)
+
+// CMA Comparables routes
+app.get('/api/cmas/:id/comparables', ...)
+app.post('/api/cmas/:id/comparables', ...)
+app.delete('/api/cmas/:id/comparables/:compId', ...)
+
+// CMA Search routes
+app.post('/api/cma/search-comparables', ...)
+app.get('/api/cma/nearby-properties', ...)
+
+// CMA Share routes
+app.post('/api/cmas/:id/share', ...)
+app.get('/api/shared/cma/:token', ...)
+
+// Transaction CMA routes
+app.get('/api/transactions/:id/cma', ...)
+app.post('/api/transactions/:id/cma/generate', ...)
+
+// CMA Templates routes
+app.get('/api/cma-templates', ...)
+app.post('/api/cma-templates', ...)
+app.put('/api/cma-templates/:id', ...)
+app.delete('/api/cma-templates/:id', ...)
+⚠️ KEEP These Routes (Used by Settings & Marketing):
+typescript// Agent Profile routes - KEEP
+app.get('/api/agent-profile', ...)
+app.put('/api/agent-profile', ...)
+app.post('/api/agent-profile/photo', ...)
+
+// Agent Resources routes - KEEP
+app.get('/api/agent-resources', ...)
+app.post('/api/agent-resources', ...)
+app.delete('/api/agent-resources/:id', ...)
+
+PHASE 7: Clean server/storage.ts
+Remove these CMA storage methods:
+typescript// DELETE these methods:
+getCMAs()
+getCMA()
+getCMAByTransactionId()
+createCMA()
+updateCMA()
+deleteCMA()
+getCMAComparables()
+addCMAComparable()
+removeCMAComparable()
+getCMAPresentation()
+updateCMAPresentation()
+getCMATemplates()
+createCMATemplate()
+updateCMATemplate()
+deleteCMATemplate()
+getSharedCMA()
+createSharedCMALink()
+⚠️ KEEP These Methods:
+typescript// Agent profile methods - KEEP
+getAgentProfile()
+updateAgentProfile()
+
+// Agent resources methods - KEEP
+getAgentResources()
+createAgentResource()
+deleteAgentResource()
+
+PHASE 8: Clean server/repliers.ts
+Remove these CMA-specific Repliers functions:
+typescript// DELETE:
+fetchSimilarListings()
+enrichCMAWithCoordinates()
+searchNearbyComparables()
+CMASearchFilters (type/interface)
+⚠️ KEEP All Non-CMA Repliers Functions:
+typescript// KEEP - Used by MLS Data tab and other features:
+fetchPropertyByMLS()
+fetchPropertyByAddress()
+refreshMLSData()
+getPropertyPhotos()
+// ... any other MLS/transaction-related functions
+
+PHASE 9: Remove CMA from MLS Sync
+In server/repliers-sync.ts (or similar):
+
+Remove any CMA data sync logic from MLS refresh route handler
+Keep all transaction MLS sync functionality
+
+
+PHASE 10: Clean Database Schema
+In shared/schema.ts:
+DELETE These Table Definitions:
+typescript// DELETE:
+export const cmas = pgTable('cmas', { ... })
+export const cmaReportConfigs = pgTable('cma_report_configs', { ... })
+export const cmaReportTemplates = pgTable('cma_report_templates', { ... })
+DELETE These Interfaces:
+typescript// DELETE:
+export interface CMAComparable { ... }
+export interface CmaBrochure { ... }
+export interface CmaAdjustmentRates { ... }
+export interface CmaAdjustmentsData { ... }
+MODIFY Transactions Table - Remove CMA Columns:
+typescript// Remove these columns from transactions table:
+cmaData: jsonb('cma_data')
+cmaSource: varchar('cma_source')
+cmaGeneratedAt: timestamp('cma_generated_at')
+⚠️ KEEP These Tables:
+typescript// KEEP - Used by Settings and Marketing:
+export const agentProfiles = pgTable('agent_profiles', { ... })
+export const agentResources = pgTable('agent_resources', { ... })
+
+PHASE 11: Database Migration
+Create and run a migration to clean up the database:
+sql-- Drop CMA tables
+DROP TABLE IF EXISTS cmas CASCADE;
+DROP TABLE IF EXISTS cma_report_configs CASCADE;
+DROP TABLE IF EXISTS cma_report_templates CASCADE;
+
+-- Remove CMA columns from transactions table
+ALTER TABLE transactions DROP COLUMN IF EXISTS cma_data;
+ALTER TABLE transactions DROP COLUMN IF EXISTS cma_source;
+ALTER TABLE transactions DROP COLUMN IF EXISTS cma_generated_at;
+
+-- Clean activity logs (optional - removes CMA activity history)
+DELETE FROM activity_logs WHERE category = 'cma';
+
+PHASE 12: Uninstall CMA-Only Packages
+Check if these packages are used elsewhere before removing:
+bash# Only remove if NOT used by other features:
+npm uninstall @turf/turf
+npm uninstall @dnd-kit/core
+npm uninstall @dnd-kit/sortable
+
+# Check @react-pdf/renderer usage - may be needed for flyers
+# Only remove if confirmed not used elsewhere
+
+PHASE 13: Delete Static Assets
+bash# Delete CMA-specific assets:
+rm -rf client/public/cma-widgets/
+
+# KEEP logos and shared marketing assets
+
+PHASE 14: Clean Up Imports and References
+After all deletions, search the entire codebase for orphaned references:
+bash# Search for any remaining CMA references:
+grep -r "CMA" --include="*.ts" --include="*.tsx" .
+grep -r "cma" --include="*.ts" --include="*.tsx" .
+grep -r "comparable" --include="*.ts" --include="*.tsx" .
+grep -r "presentation" --include="*.ts" --include="*.tsx" .
+Fix any remaining import errors or type references.
+
+📱 Mobile Optimization Requirements
+After removal, verify remaining features maintain mobile optimization:
+DeviceBrowserScreen SizeiPad ProSafari1024 x 1366iPad Air/MiniSafari768 x 1024iPhone 14/15 ProSafari393 x 852iPhone SESafari375 x 667Android TabletChrome800 x 1280Android PhoneChrome360 x 800
+Mobile UX Checklist:
+
+ Touch targets minimum 44x44px
+ Transaction tabs work correctly on mobile
+ No horizontal overflow after CMA tab removal
+ Tab navigation responsive on all screen sizes
+
+
+✅ Verification Checklist
+After completing all phases:
+
+ App builds without errors (npm run build)
+ App starts without errors (npm run dev)
+ Transaction detail page loads correctly
+ All remaining tabs work (Overview, MLS Data, Documents, Marketing, Timeline, Templates)
+ Settings page works (agent profile)
+ Create Flyer functionality works
+ Marketing Materials functionality works
+ No console errors related to missing CMA components
+ No 404 errors on any existing routes
+ Database migrations run successfully
+ Slack notifications still work for transactions
+
+
+🚫 What NOT to Remove
+FeatureReason to KeepAgent Profile routes/storageUsed by Settings pageAgent Resources routes/storageUsed by Marketing featuresRepliers MLS functionsUsed by MLS Data tabTransaction CRUDCore functionalityMarketing tabActive featureFlyer generationActive featureSlack integrationActive feature
+
+Rollback Plan
+If issues occur:
+
+Revert git commit
+Restore database from backup (if migrations were run)
+Redeploy previous version
+
+Recommendation: Create a git branch for this removal and test thoroughly before merging to main.
